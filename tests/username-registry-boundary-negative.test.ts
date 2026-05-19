@@ -25,6 +25,7 @@ const REFUND_DUE_STORAGE = 4_000_000n;
 const PENDING_MINT_STORAGE = 6_000_000n;
 const NFT_ITEM_DEPLOY_RESERVE = 20_000_000n;
 const ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
+const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 const ATH_TRANSFER_EXEC_RESERVE = 5_000_000n;
 const ATH_BURN_EXEC_RESERVE = 5_000_000n;
 const ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
@@ -179,7 +180,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       invalidOwner,
       'Larisa',
       PRICE_6_PLUS,
-      REFUND_DUE_STORAGE + ATH_NOTIFICATION_ACK_VALUE - 1n,
+      REFUND_DUE_STORAGE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
     );
     expect(await registry.getGetRefundDue(invalidOwner)).toBe(0n);
 
@@ -189,7 +190,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       invalidOwner,
       'Larisa',
       PRICE_6_PLUS,
-      REFUND_DUE_STORAGE + ATH_NOTIFICATION_ACK_VALUE,
+      REFUND_DUE_STORAGE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
     );
     expect(await registry.getGetRefundDue(invalidOwner)).toBe(PRICE_6_PLUS);
 
@@ -199,7 +200,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       validOwner,
       'exact1',
       PRICE_6_PLUS,
-      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE - 1n,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
     );
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
@@ -210,7 +211,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       validOwner,
       'exact1',
       PRICE_6_PLUS,
-      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE,
+      PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
     );
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(true);
   });

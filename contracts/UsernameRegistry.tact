@@ -13,6 +13,7 @@ const USERNAME_PRICE_5_CHARS: Int = 1000000000000;       // 1,000 ATH atomic uni
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
 const USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT: Int = 4000000;
+const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 20000000;
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 5000000;
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
@@ -270,7 +271,7 @@ contract UsernameRegistry {
         throwUnless(19110, amount > 0);
         let existing: Int? = self.ath_refunds_due.get(owner_wallet);
         if (existing == null) {
-            throwUnless(19111, context().value >= USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT);
+            throwUnless(19111, context().value >= USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_STATE_GROWTH_EXEC_RESERVE);
             self.ath_refunds_due.set(owner_wallet, amount);
             self.refund_due_count += 1;
         } else {
@@ -281,9 +282,9 @@ contract UsernameRegistry {
     fun requireRefundDueAndNotificationAckReserve(owner_wallet: Address) {
         let existing: Int? = self.ath_refunds_due.get(owner_wallet);
         if (existing == null) {
-            throwUnless(19124, context().value >= USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_ATH_NOTIFICATION_ACK_VALUE);
+            throwUnless(19124, context().value >= USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE);
         } else {
-            throwUnless(19125, context().value >= USERNAME_ATH_NOTIFICATION_ACK_VALUE);
+            throwUnless(19125, context().value >= USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE);
         }
     }
 
@@ -416,7 +417,7 @@ contract UsernameRegistry {
             return;
         }
 
-        throwUnless(19122, context().value >= USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE);
+        throwUnless(19122, context().value >= USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE);
 
         let item_address: Address = self.deriveItemAddress(msg.owner_wallet, name_hash);
         throwUnless(19123, !self.pending_item_to_name_hash.exists(item_address));

@@ -16,6 +16,7 @@ import {
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
 const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
+const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 const SESSION_STATE_STORAGE_ENDOWMENT = 5_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
 const ASSET_TON = 1n;
@@ -186,8 +187,11 @@ describe('Vault TON/session state-machine invariants', () => {
       } else if (op === 2) {
         const pubkey = BigInt(0x1000_0000 + step * 17 + i);
         const expiresAt = now + 1_000n + BigInt(step);
-        const required = (model[i].exists ? 0n : USER_STATE_STORAGE_ENDOWMENT)
+        let required = (model[i].exists ? 0n : USER_STATE_STORAGE_ENDOWMENT)
           + (model[i].sessionExists ? 0n : SESSION_STATE_STORAGE_ENDOWMENT);
+        if (required > 0n) {
+          required += STATE_GROWTH_EXEC_RESERVE;
+        }
         const underfunded = required > 0n && (rng() % 5) === 0;
         debugContext = `step ${step} set-session user=${i} required=${required} underfunded=${underfunded}`;
         await vault.send(users[i].getSender(), { value: underfunded ? required - 1n : (required > 0n ? required : toNano('0.01')) }, {
@@ -232,7 +236,8 @@ describe('Vault TON/session state-machine invariants', () => {
         const intentId = await vault.getGetReceiveIntentId(users[i].address, users[recipient].address, ASSET_TON, amount, clientNonce);
         const commitment = await vault.getGetReceiveIntentCommitment(intentId, users[recipient].address, secret);
         const underfunded = (rng() % 6) === 0;
-        await vault.send(users[i].getSender(), { value: underfunded ? RECEIVE_INTENT_STORAGE_ENDOWMENT - 1n : RECEIVE_INTENT_STORAGE_ENDOWMENT }, {
+        const required = RECEIVE_INTENT_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
+        await vault.send(users[i].getSender(), { value: underfunded ? required - 1n : required }, {
           $$type: 'CreateReceiveIntent',
           asset: ASSET_TON,
           amount,
@@ -252,7 +257,7 @@ describe('Vault TON/session state-machine invariants', () => {
         const wrongSecret = (rng() % 5) === 0;
         const callerIndex = wrongSecret ? intent.recipient : intent.recipient;
         const recipientExistsBefore = model[callerIndex].exists;
-        const required = recipientExistsBefore ? 0n : USER_STATE_STORAGE_ENDOWMENT;
+        const required = recipientExistsBefore ? 0n : USER_STATE_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
         const underfunded = required > 0n && (rng() % 4) === 0;
         debugContext = `step ${step} claim-intent recipient=${callerIndex} amount=${intent.amount} wrongSecret=${wrongSecret} underfunded=${underfunded}`;
         await vault.send(users[callerIndex].getSender(), { value: underfunded ? required - 1n : (required > 0n ? required : toNano('0.01')) }, {

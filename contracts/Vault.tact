@@ -14,6 +14,7 @@ const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT: Int = 3000000;
 const VAULT_PENDING_PUBLISH_STALE_TTL: Int = 86400; // 24 hours
 const VAULT_DEPOSIT_TON_EXEC_RESERVE: Int = 2000000;
+const VAULT_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 30000000;
 const ASSET_TON: Int = 1;
@@ -29,6 +30,7 @@ const UINT64_MAX: Int = 18446744073709551615;
 const UINT64_MOD: Int = 18446744073709551616;
 const UINT32_MAX: Int = 4294967295;
 const ATH_DEPOSIT_ID_DOMAIN: Int = 0x41445049; // "ADPI"
+const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
 const SESSION_ID_DOMAIN: Int = 0x53534944; // "SSID"
 const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
 const COMPACT_MAGIC: Int = 0x504c5352; // "PLSR"
@@ -420,6 +422,15 @@ contract Vault {
             .hash();
     }
 
+    fun computeAthWithdrawalId(ownerWallet: Address, queryId: Int): Int {
+        return beginCell()
+            .storeUint(ATH_WITHDRAWAL_ID_DOMAIN, 32)
+            .storeAddress(ownerWallet)
+            .storeUint(queryId, 64)
+            .endCell()
+            .hash() % UINT64_MOD;
+    }
+
 
     fun discountedFee(owner: Address, fullFee: Int): Int {
         let user: UserState = self.getUserOrEmpty(owner);
@@ -743,7 +754,7 @@ contract Vault {
         }
         let exists: Bool = self.users.exists(msg.sender_wallet);
         if (!exists) {
-            throwUnless(16015, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT + VAULT_ATH_NOTIFICATION_ACK_VALUE);
+            throwUnless(16015, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT + VAULT_ATH_NOTIFICATION_ACK_VALUE + VAULT_STATE_GROWTH_EXEC_RESERVE);
             self.user_count += 1;
         } else {
             throwUnless(16016, context().value >= VAULT_ATH_NOTIFICATION_ACK_VALUE);
@@ -796,12 +807,13 @@ contract Vault {
         throwUnless(16024, userOpt != null);
         let user: UserState = userOpt!!;
         throwUnless(16025, user.ath_balance >= msg.amount);
-        throwUnless(16026, !self.pending_ath_withdrawals.exists(msg.query_id));
+        let withdrawalId: Int = self.computeAthWithdrawalId(sender(), msg.query_id);
+        throwUnless(16026, !self.pending_ath_withdrawals.exists(withdrawalId));
 
         user.ath_balance -= msg.amount;
         self.users.set(sender(), user);
         let recipientAthWallet: Address = self.deriveAthWalletAddress(msg.recipient);
-        self.pending_ath_withdrawals.set(msg.query_id, PendingAthWithdrawal {
+        self.pending_ath_withdrawals.set(withdrawalId, PendingAthWithdrawal {
             owner_wallet: sender(),
             recipient: msg.recipient,
             recipient_ath_wallet: recipientAthWallet,
@@ -816,7 +828,7 @@ contract Vault {
             bounce: true,
             mode: SendRemainingValue,
             body: ATHTransferRequest {
-                query_id: msg.query_id,
+                query_id: withdrawalId,
                 amount: msg.amount,
                 recipient: msg.recipient,
                 response_destination: myAddress()
@@ -879,6 +891,9 @@ contract Vault {
         }
         if (!sessionExists) {
             required += VAULT_SESSION_STATE_STORAGE_ENDOWMENT;
+        }
+        if (required > 0) {
+            required += VAULT_STATE_GROWTH_EXEC_RESERVE;
         }
         throwUnless(16033, context().value >= required);
 
@@ -949,6 +964,7 @@ contract Vault {
         if (!userExists) {
             required += VAULT_USER_STATE_STORAGE_ENDOWMENT;
         }
+        required += VAULT_STATE_GROWTH_EXEC_RESERVE;
         throwUnless(16110, context().value >= required);
 
         let user: UserState = self.getUserOrEmpty(sender());
@@ -996,6 +1012,7 @@ contract Vault {
         throwUnless(16125, oldRecord.key_generation < UINT32_MAX);
 
         let required: Int = self.keyRecordStorageEndowment(msg.crypto_suite_mask);
+        required += VAULT_STATE_GROWTH_EXEC_RESERVE;
         throwUnless(16126, context().value >= required);
 
         oldRecord.revoked_at = now();
@@ -1048,7 +1065,7 @@ contract Vault {
 
         let intentId: Int = self.computeReceiveIntentId(sender(), msg.recipient_wallet, msg.asset, msg.amount, msg.client_nonce);
         throwUnless(16217, !self.receive_intents.exists(intentId));
-        throwUnless(16218, context().value >= VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT);
+        throwUnless(16218, context().value >= VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE);
 
         self.users.set(sender(), user);
         self.receive_intents.set(intentId, ReceiveIntent {
@@ -1078,7 +1095,7 @@ contract Vault {
 
         let userExists: Bool = self.users.exists(sender());
         if (!userExists) {
-            throwUnless(16235, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT);
+            throwUnless(16235, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE);
             self.user_count += 1;
         }
 
@@ -1150,6 +1167,7 @@ contract Vault {
         let sigHash: Int = self.computeSessionPublishHash(op, owner, sessionId, sessionNonce, validUntil, publishKind, sizeClass, cryptoSuite, maxCharge, hashesRef);
         let sigSlice: Slice = signatureRef.beginParse();
         let sigBits: Slice = sigSlice.loadBits(512);
+        throwUnless(16421, sigSlice.empty());
         if (!checkSignature(sigHash, sigBits, session.session_pubkey)) {
             throw(16422);
         }
@@ -1483,6 +1501,15 @@ contract Vault {
             amount: pending.amount,
             created_at: pending.created_at
         };
+    }
+
+    get fun get_ath_withdrawal_id(ownerWallet: Address, queryId: Int): Int {
+        return self.computeAthWithdrawalId(ownerWallet, queryId);
+    }
+
+    get fun get_pending_ath_withdrawal_for(ownerWallet: Address, queryId: Int): VaultPendingAthWithdrawalView {
+        let withdrawalId: Int = self.computeAthWithdrawalId(ownerWallet, queryId);
+        return self.get_pending_ath_withdrawal(withdrawalId);
     }
 
     get fun get_canonical_session_max_charge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {

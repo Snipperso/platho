@@ -986,7 +986,7 @@ PROGRAM{
       19111 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      4000000 PUSHINT
+      6000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s2 s9 XCHG
@@ -1020,14 +1020,14 @@ PROGRAM{
       19124 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      5000000 PUSHINT
+      7000000 PUSHINT
       GEQ
       THROWANYIFNOT
     }>ELSE<{
       19125 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      1000000 PUSHINT
+      3000000 PUSHINT
       GEQ
       THROWANYIFNOT
     }>
@@ -2329,7 +2329,7 @@ PROGRAM{
       19122 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      27000000 PUSHINT
+      29000000 PUSHINT
       GEQ
       THROWANYIFNOT
       25 s() PUSH

@@ -27,6 +27,7 @@ const ALT_MANIFEST_HASH = MANIFEST_HASH + 1n;
 const ROUTE_EVIDENCE_HASH = 0x111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000n;
 const ENVELOPE = toNano('51.05');
 const ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
+const ROUTE_REFUND_EXEC_RESERVE = 2_000_000n;
 const OFFER = toNano('50');
 const PTON_TRANSFER_GAS = 50_000_000n;
 const ACCOUNTING_RECYCLE_EXEC_RESERVE = 2_000_000n;
@@ -34,6 +35,10 @@ const ATH_BURN_REQUEST_VALUE = 30_000_000n;
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const PHASE_PENDING_ATH_BURN = 2n;
+
+function routeRefundCredit(value: bigint): bigint {
+  return value > ROUTE_REFUND_EXEC_RESERVE ? value - ROUTE_REFUND_EXEC_RESERVE : 0n;
+}
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
@@ -408,7 +413,7 @@ describe('BuybackBurn auth and negative matrix', () => {
     } as RecoverStonfiRouteRefund);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
-    await env.buyback.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.002') }, null);
+    await env.buyback.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.005') }, null);
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
       query_id: 31n,
@@ -428,7 +433,9 @@ describe('BuybackBurn auth and negative matrix', () => {
     } as RecycleRouteRefundReserve);
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.reserve_due_ton).toBe(0n);
-    expect(state.route_refund_due_ton).toBe(toNano('49.001'));
+    expect(state.route_refund_due_ton).toBe(
+      routeRefundCredit(toNano('48.999')) + routeRefundCredit(toNano('0.005')),
+    );
 
     await env.buyback.send(env.stonfiRouter.getSender(), { value: ENVELOPE }, null);
     await env.buyback.send(env.attacker.getSender(), { value: ACCOUNTING_RECYCLE_EXEC_RESERVE - 1n }, {
@@ -442,7 +449,12 @@ describe('BuybackBurn auth and negative matrix', () => {
     } as RecycleRouteRefundReserve);
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.reserve_due_ton).toBe(ENVELOPE);
-    expect(state.route_refund_due_ton).toBe(toNano('49.001'));
+    expect(state.route_refund_due_ton).toBe(
+      routeRefundCredit(toNano('48.999'))
+        + routeRefundCredit(toNano('0.005'))
+        + routeRefundCredit(ENVELOPE)
+        - ENVELOPE,
+    );
   });
 
   it('keeps ATH retry due unchanged across malformed retry attempts', async () => {

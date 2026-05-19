@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: Vault
-BoC Size: 19622 bytes
+BoC Size: 20173 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 61
@@ -250,7 +250,7 @@ TL-B: `_ vault_ath_wallet_address:address ath_master_address:address capsule_hub
 Signature: `Vault{vault_ath_wallet_address:address,ath_master_address:address,capsule_hub_address:address,capsule_hub_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,users:dict<address, ^UserState{ton_balance:uint128,ath_balance:uint128,message_budget_ton:uint128,budget_epoch:uint64,current_key_id:uint256}>,sessions:dict<address, ^SessionState{session_pubkey:uint256,session_id:uint256,nonce:uint64,expires_at:uint32,message_budget_ton:uint128,active:bool}>,key_records:dict<int, ^KeyRecord{owner_wallet:address,key_generation:uint32,enc_pubkey:uint256,sign_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,crypto_suite_mask:uint16,created_at:uint32,created_lt:uint64,revoked_at:uint32,revoked_lt:uint64}>,receive_intents:dict<int, ^ReceiveIntent{sender_wallet:address,recipient_wallet:address,asset:uint8,amount:uint128,commitment:uint256,expires_at:uint32,client_nonce:uint64,created_at:uint32,claimed:bool}>,processed_ath_deposits:dict<int, int>,pending_ath_withdrawals:dict<int, ^PendingAthWithdrawal{owner_wallet:address,recipient:address,recipient_ath_wallet:address,amount:uint128,created_at:uint32}>,pending_publishes:dict<int, ^PendingPublish{owner_wallet:address,session_id:uint256,budget_epoch:uint64,nonce:uint64,publish_kind:uint8,body_hash:uint256,protocol_fee_paid:uint128,capsulehub_call_value:uint128,refundable_budget_amount:uint128,created_at:uint32}>,user_count:uint64,session_count:uint64,key_record_count:uint64,receive_intent_count:uint64,processed_ath_deposit_count:uint64,pending_ath_withdrawal_count:uint64,pending_publish_count:uint64}`
 
 ## Get methods
-Total get methods: 10
+Total get methods: 12
 
 ## get_user
 Argument: owner
@@ -277,6 +277,14 @@ Argument: recipientWallet
 Argument: secret32
 
 ## get_pending_ath_withdrawal
+Argument: queryId
+
+## get_ath_withdrawal_id
+Argument: ownerWallet
+Argument: queryId
+
+## get_pending_ath_withdrawal_for
+Argument: ownerWallet
 Argument: queryId
 
 ## get_canonical_session_max_charge

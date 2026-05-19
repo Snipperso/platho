@@ -33,6 +33,7 @@ PROGRAM{
   DECLPROC $BuybackBurn$_fun_stonfiSwapPayload
   DECLPROC $BuybackBurn$_fun_ptonTonTransferBody
   DECLPROC $BuybackBurn$_fun_clearPending
+  DECLPROC $BuybackBurn$_fun_creditRouteRefundValue
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $ATHBurn$_constructor_query_id_amount_response_destination
   DECLPROC $BuybackBurn$_fun_sendAthBurn
@@ -578,6 +579,19 @@ PROGRAM{
     s5 s11 XCHG
     5 5 BLKSWAP
   }>
+  $BuybackBurn$_fun_creditRouteRefundValue PROCREF:<{
+    DUP
+    2000000 PUSHINT
+    LEQ
+    IFJMP:<{
+      DROP
+    }>
+    2000000 PUSHINT
+    SUB
+    s1 s5 XCHG
+    ADD
+    s0 s4 XCHG
+  }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
@@ -789,8 +803,7 @@ PROGRAM{
         THROWANYIFNOT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
-        s1 s3 XCHG
-        ADD
+        29 s() 31 s() XCHG
         28 s() 30 s() XCHG
         27 s() 29 s() XCHG
         26 s() 28 s() XCHG
@@ -817,7 +830,8 @@ PROGRAM{
         s5 s7 XCHG
         s4 s6 XCHG
         s3 s5 XCHG
-        s3 s4 XCHG2
+        s4 s3 s0 XCHG3
+        $BuybackBurn$_fun_creditRouteRefundValue INLINECALLDICT
         $BuybackBurn$_fun_clearPending INLINECALLDICT
         $BuybackBurn$_contract_store INLINECALLDICT
       }>
@@ -2169,8 +2183,7 @@ PROGRAM{
         IFJMP:<{
           __tact_context_get INLINECALLDICT
           $Context$_get_value INLINECALLDICT
-          s1 s3 XCHG
-          ADD
+          29 s() 31 s() XCHG
           28 s() 30 s() XCHG
           27 s() 29 s() XCHG
           26 s() 28 s() XCHG
@@ -2197,7 +2210,8 @@ PROGRAM{
           s5 s7 XCHG
           s4 s6 XCHG
           s3 s5 XCHG
-          s3 s4 XCHG2
+          s4 s3 s0 XCHG3
+          $BuybackBurn$_fun_creditRouteRefundValue INLINECALLDICT
           $BuybackBurn$_contract_store INLINECALLDICT
           RETALT
         }>
