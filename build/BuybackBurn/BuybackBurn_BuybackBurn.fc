@@ -1044,6 +1044,13 @@ _ %get_official_ath_wallet_address() method_id(110905) {
         return ();
     }
     
+    ;; Receive TopUpStorageReserve message
+    if (op == 0x906182d2) {
+        var $msg = empty_tuple();
+        $BuybackBurn$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'fee_accumulator_address, $self'official_ath_wallet_address, $self'stonfi_router_address, $self'stonfi_pool_address_ton_ath, $self'stonfi_pton_wallet_address, $self'ask_jetton_wallet_address, $self'stonfi_referral_address, $self'fee_bound, $self'official_ath_wallet_bound, $self'route_frozen, $self'sealed, $self'referral_value_bps, $self'buyback_min_ath_out_per_50_ton_atomic, $self'evidence_quote_out_atomic_ath, $self'evidence_dex_min_out_atomic_ath, $self'route_evidence_hash, $self'phase, $self'reserve_due_ton, $self'pending_query_id, $self'pending_deadline, $self'pending_route_refund_start_ton, $self'pending_dex_min_out_atomic_ath, $self'pending_received_ath_atomic, $self'route_refund_due_ton, $self'ath_burn_retry_due_atomic, $self'last_terminal_query_id, $self'accepted_reserve_count, $self'executed_buyback_count, $self'burned_ath_total_atomic));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         if (( ($self'sealed) ? ($self'route_frozen) : (false) )) {

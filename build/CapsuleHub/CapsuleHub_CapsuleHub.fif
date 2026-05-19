@@ -1354,6 +1354,16 @@ PROGRAM{
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
     18 s() POP
+    DUP
+    1395767424 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      16 s() POP
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $CapsuleHub$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 17 s() XCHG
     33 LESSINT

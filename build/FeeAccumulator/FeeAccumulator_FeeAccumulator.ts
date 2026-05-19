@@ -791,6 +791,47 @@ export function dictValueParserFlushBuybackDue(): DictionaryValue<FlushBuybackDu
     }
 }
 
+export type TopUpStorageReserve = {
+    $$type: 'TopUpStorageReserve';
+}
+
+export function storeTopUpStorageReserve(src: TopUpStorageReserve) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2275594951, 32);
+    };
+}
+
+export function loadTopUpStorageReserve(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2275594951) { throw Error('Invalid prefix'); }
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function loadTupleTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function loadGetterTupleTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function storeTupleTopUpStorageReserve(source: TopUpStorageReserve) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStorageReserve> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeTopUpStorageReserve(src)).endCell());
+        },
+        parse: (src) => {
+            return loadTopUpStorageReserve(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AcceptBurnReserve = {
     $$type: 'AcceptBurnReserve';
     amount: bigint;
@@ -994,7 +1035,7 @@ function initFeeAccumulator_init_args(src: FeeAccumulator_init_args) {
 }
 
 async function FeeAccumulator_init(treasury_receiver_address: Address, buyback_burn_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241020c010002aa000114ff00f4a413f4bcf2c80b01020162020a04ced001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019efa40fa40d37fd37fd37f55406c159bfa40fa405902d101705300e206e3027025d74920c21f953105d31f06de218210ff775609bae3022182107b24ea03bae302218210ddab4641ba030405060098048020d7217021d749c21f9430d31f01de8210594ba505ba8e2fd37f0131813ab8f84224c705f2f4813ab921c200f2f415a04430c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e05f0600725b04d37f30813a9921c200f2f4813a9af8416f24135f032282081e8480a0bef2f4a04034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54008c5b34813aa221c200f2f4813aa3f8416f24135f0382081e8480bef2f420811388a8812710a90466a1047002a05054a04430c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed5402f88e605b04d37f30813aac21c200f2f4813aad5315bbf2f4813aaef8416f24135f0382084c4b40bef2f45144a170544466706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e0218210b3d2c52dbae30236c00005c12115b0e3025f05f2c082070901de5b04d37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75316bbf2f4813abbf8416f24135f0382086acfc0bef2f45155a12582081e8480a07f7108c8018210594ba50558cb1fcb7fc9250450994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00403408002ac87f01ca0055405045ce12cecb7fcb7fcb7fc9ed540038813afbf2f04034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed540151a0a75bda89a1a400033df481f481a6ffa6ffa6feaa80d82b37f481f480b205a202e0a601c5b678d8ab0b000a5472105376462bfff9');
+    const __code = Cell.fromHex('b5ee9c7241020d010002d1000114ff00f4a413f4bcf2c80b01020162020b04ced001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019efa40fa40d37fd37fd37f55406c159bfa40fa405902d101705300e206e3027025d74920c21f953105d31f06de218210ff775609bae3022182107b24ea03bae302218210ddab4641ba030405060098048020d7217021d749c21f9430d31f01de8210594ba505ba8e2fd37f0131813ab8f84224c705f2f4813ab921c200f2f415a04430c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e05f0600725b04d37f30813a9921c200f2f4813a9af8416f24135f032282081e8480a0bef2f4a04034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54008c5b34813aa221c200f2f4813aa3f8416f24135f0382081e8480bef2f420811388a8812710a90466a1047002a05054a04430c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed5403fe8e605b04d37f30813aac21c200f2f4813aad5315bbf2f4813aaef8416f24135f0382084c4b40bef2f45144a170544466706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e0218210b3d2c52dbae3023620821087a2d2c7bae302c00005c12115b007090a01de5b04d37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75316bbf2f4813abbf8416f24135f0382086acfc0bef2f45155a12582081e8480a07f7108c8018210594ba50558cb1fcb7fc9250450994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00403408002ac87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54003230344034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed5400488e1c813afbf2f04034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e05f05f2c0820151a0a75bda89a1a400033df481f481a6ffa6ffa6feaa80d82b37f481f480b205a202e0a601c5b678d8ab0c000a547210537659393fd6');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initFeeAccumulator_init_args({ $$type: 'FeeAccumulator_init_args', treasury_receiver_address, buyback_burn_address })(builder);
@@ -1095,6 +1136,7 @@ const FeeAccumulator_types: ABIType[] = [
     {"name":"SplitAccumulated","header":2066016771,"fields":[]},
     {"name":"FlushTreasuryDue","header":3718989377,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"FlushBuybackDue","header":3016934701,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"TopUpStorageReserve","header":2275594951,"fields":[]},
     {"name":"AcceptBurnReserve","header":1498129669,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"FeeAccumulatorStateView","header":null,"fields":[{"name":"accumulated_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"FeeAccumulator$Data","header":null,"fields":[{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"accumulated_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
@@ -1105,6 +1147,7 @@ const FeeAccumulator_opcodes = {
     "SplitAccumulated": 2066016771,
     "FlushTreasuryDue": 3718989377,
     "FlushBuybackDue": 3016934701,
+    "TopUpStorageReserve": 2275594951,
     "AcceptBurnReserve": 1498129669,
 }
 
@@ -1121,6 +1164,7 @@ const FeeAccumulator_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"SplitAccumulated"}},
     {"receiver":"internal","message":{"kind":"typed","type":"FlushTreasuryDue"}},
     {"receiver":"internal","message":{"kind":"typed","type":"FlushBuybackDue"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
 
@@ -1166,7 +1210,7 @@ export class FeeAccumulator implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | SplitAccumulated | FlushTreasuryDue | FlushBuybackDue | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | SplitAccumulated | FlushTreasuryDue | FlushBuybackDue | TopUpStorageReserve | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'DepositProtocolFee') {
@@ -1180,6 +1224,9 @@ export class FeeAccumulator implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'FlushBuybackDue') {
             body = beginCell().store(storeFlushBuybackDue(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TopUpStorageReserve') {
+            body = beginCell().store(storeTopUpStorageReserve(message)).endCell();
         }
         if (message === null) {
             body = new Cell();

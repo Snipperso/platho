@@ -315,7 +315,9 @@ If none can be implemented, the flush operation is not part of v1.
 
 ### 5.1 Purpose
 
-CapsuleHub stores private encrypted message entries and public post entries.
+CapsuleHub v1 anchors accepted private encrypted message entries and public post entries with sequential counters, page counters, latest entry metadata, deterministic entry UIDs, and protocol-fee accounting.
+
+CapsuleHub v1 is intentionally counter-only / anchor-only. It does not store full retrievable on-chain page maps or full entry payload records. Encrypted capsule packages are carried by replaceable no-backend transports; the contract records acceptance metadata and fee accounting only.
 
 It does not parse private payload semantics, recipient identity, private conversation state, wallet balances, ATH discount ownership, or receive-intent secrets.
 
@@ -330,8 +332,14 @@ fee_accumulator_address: address
 private_latest_id: uint64
 public_latest_id: uint64
 
-private_pages: dict<uint64, Page>
-public_pages: dict<uint64, Page>
+private_page_count: uint64
+public_page_count: uint64
+private_entry_count: uint64
+public_entry_count: uint64
+last_private_entry_id: uint64
+last_public_entry_id: uint64
+last_private_entry_uid: uint256
+last_public_entry_uid: uint256
 
 accrued_plato_fee_ton: coins
 ```
@@ -345,7 +353,7 @@ entry_id:  uint64 sequential scan/index id
 entry_uid: uint256 content/source identity hash
 ```
 
-`entry_id` is used for pages, scanning, latest ids, and client pagination.
+`entry_id` is used for counter progression, page-count charging, latest ids, and client-side ordering.
 
 `entry_uid` is stored identity metadata.
 
@@ -450,13 +458,13 @@ Ignored-error mode remains forbidden for outbound money sends.
 
 ### 5.4 Page / Entry Storage
 
-Every new entry charges:
+Every new accepted entry charges the storage/economic endowment for v1 counter metadata:
 
 ```text
 capsulehub_entry_storage_endowment(kind, size_class)
 ```
 
-If the entry creates a new page:
+If the entry crosses a page boundary, it charges the page-count endowment:
 
 ```text
 CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
@@ -466,13 +474,15 @@ Page condition:
 
 ```text
 page_id = entry_id / CAPSULEHUB_PAGE_SIZE
-if page[page_id] does not exist before publish:
+if entry_id is the first entry in page_id:
   charge CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
 ```
 
 Direct publishes must attach enough TON for possible page creation if the client cannot prove page existence.
 
 Vault session publish max charge includes possible page endowment. Unused reserve returns through ACK excess.
+
+No v1 getter or state field exposes `private_pages[page_id]` or `public_pages[page_id]`. Clients must not depend on on-chain page retrieval in v1.
 
 ### 5.5 Direct Public Publish
 

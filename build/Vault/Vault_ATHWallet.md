@@ -3,7 +3,7 @@ Contract: ATHWallet
 BoC Size: 3503 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 63
+Total structures: 64
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -204,6 +204,10 @@ Signature: `CapsuleHubPublishAck{publish_id:uint256,entry_id:uint64,entry_uid:ui
 ### PrunePendingPublish
 TL-B: `prune_pending_publish#720bdd6d publish_id:uint256 = PrunePendingPublish`
 Signature: `PrunePendingPublish{publish_id:uint256}`
+
+### TopUpStorageReserve
+TL-B: `top_up_storage_reserve#3215b5fd  = TopUpStorageReserve`
+Signature: `TopUpStorageReserve{}`
 
 ### PendingAthWithdrawal
 TL-B: `_ owner_wallet:address recipient:address recipient_ath_wallet:address amount:uint128 created_at:uint32 = PendingAthWithdrawal`

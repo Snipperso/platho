@@ -172,6 +172,8 @@ message(0x720BDD6D) PrunePendingPublish {
     publish_id: Int as uint256;
 }
 
+message(0x3215B5FD) TopUpStorageReserve {}
+
 
 struct PendingAthWithdrawal {
     owner_wallet: Address;
@@ -959,6 +961,10 @@ contract Vault {
         session.message_budget_ton = user.message_budget_ton;
         self.sessions.set(sender(), session);
         self.users.set(sender(), user);
+    }
+
+    receive(msg: TopUpStorageReserve) {
+        // Accept TON for Vault storage reserve only. No user balance, authority, or config state changes.
     }
 
 

@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: FeeAccumulator
-BoC Size: 694 bytes
+BoC Size: 733 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 17
+Total structures: 18
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -60,6 +60,10 @@ Signature: `FlushTreasuryDue{amount:uint128}`
 ### FlushBuybackDue
 TL-B: `flush_buyback_due#b3d2c52d amount:uint128 = FlushBuybackDue`
 Signature: `FlushBuybackDue{amount:uint128}`
+
+### TopUpStorageReserve
+TL-B: `top_up_storage_reserve#87a2d2c7  = TopUpStorageReserve`
+Signature: `TopUpStorageReserve{}`
 
 ### AcceptBurnReserve
 TL-B: `accept_burn_reserve#594ba505 amount:uint128 = AcceptBurnReserve`

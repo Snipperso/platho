@@ -143,8 +143,8 @@ describe('CapsuleHub state-machine invariants', () => {
         expect(state.public_latest_id, `${debugContext}: public_latest`).toBe(publicLatest);
         expect(state.private_entry_count, `${debugContext}: private_count`).toBe(privateCount);
         expect(state.public_entry_count, `${debugContext}: public_count`).toBe(publicCount);
-        expect(state.private_page_count, `${debugContext}: private_pages`).toBe(privatePages);
-        expect(state.public_page_count, `${debugContext}: public_pages`).toBe(publicPages);
+        expect(state.private_page_count, `${debugContext}: private_page_count`).toBe(privatePages);
+        expect(state.public_page_count, `${debugContext}: public_page_count`).toBe(publicPages);
         expect(state.accrued_plato_fee_ton, `${debugContext}: accrued`).toBe(accrued);
         expect((await mockVault.getGetState()).ack_count, `${debugContext}: ack_count`).toBe(ackCount);
       }

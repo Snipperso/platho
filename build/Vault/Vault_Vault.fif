@@ -3880,6 +3880,20 @@ PROGRAM{
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
+    840283645 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      20 s() POP
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $Vault$_contract_store INLINECALLDICT
+    }>
+    OVER
     1383096026 PUSHINT
     EQUAL
     IFJMP:<{

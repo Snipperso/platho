@@ -27,6 +27,8 @@ message(0xB3D2C52D) FlushBuybackDue {
     amount: Int as uint128;
 }
 
+message(0x87A2D2C7) TopUpStorageReserve {}
+
 // Message body sent to BuybackBurn. Opcode matches Platho.V1.BuybackBurn.AcceptBurnReserve.
 // Field order is intentional so bounced<AcceptBurnReserve> can recover amount.
 message(0x594BA505) AcceptBurnReserve {
@@ -119,6 +121,10 @@ contract FeeAccumulator {
         throwUnless(15032, sender() == self.buyback_burn_address);
         throwUnless(15033, msg.amount > 0);
         self.buyback_due_ton += msg.amount;
+    }
+
+    receive(msg: TopUpStorageReserve) {
+        // Accept TON for FeeAccumulator storage reserve only. Due buckets and receivers are unchanged.
     }
 
     get fun get_state(): FeeAccumulatorStateView {

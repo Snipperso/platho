@@ -695,6 +695,13 @@ _ %get_state() method_id(86957) {
         return ();
     }
     
+    ;; Receive TopUpStorageReserve message
+    if (op == 0x5331b880) {
+        var $msg = empty_tuple();
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(13999);

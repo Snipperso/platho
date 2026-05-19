@@ -15,6 +15,15 @@ const productionContracts = [
   'Vault.tact',
 ];
 
+const storageTopUpReceivers: Array<[string, string]> = [
+  ['BuybackBurn.tact', 'TopUpStorageReserve'],
+  ['CapsuleHub.tact', 'TopUpStorageReserve'],
+  ['FeeAccumulator.tact', 'TopUpStorageReserve'],
+  ['UsernameNFTItem.tact', 'TopUpStorageReserve'],
+  ['UsernameRegistry.tact', 'UsernameRegistryTopUpStorageReserve'],
+  ['Vault.tact', 'TopUpStorageReserve'],
+];
+
 function file(path: string): string {
   return readFileSync(path, 'utf8');
 }
@@ -64,6 +73,13 @@ describe('M16 production conformance static checks', () => {
       const source = contractSource(contract);
       expect(source, `${contract} must define an empty receive fallback`).toMatch(/receive\s*\(\s*\)\s*\{/);
       expect(source, `${contract} empty fallback must throw`).toMatch(/receive\s*\(\s*\)\s*\{[\s\S]*?throw\s*\(/);
+    }
+  });
+
+  it('M16-CONF-02A: storage top-up ABI is explicit on v1 contracts that pin a top-up opcode', () => {
+    for (const [contract, messageName] of storageTopUpReceivers) {
+      const source = contractSource(contract);
+      expect(source, `${contract} must expose ${messageName}`).toMatch(new RegExp(`receive\\s*\\(\\s*msg:\\s*${messageName}\\s*\\)`));
     }
   });
 
