@@ -1,0 +1,12 @@
+{
+  "document": "PLATHO.V1.M20F_MAINNET_ADDRESS_DERIVATION_INPUT",
+  "network": "mainnet",
+  "status": "DRAFT_MAINNET_ADDRESS_INPUT",
+  "genesisControllerAddress": "REQUIRED_FINAL_MAINNET_GENESIS_CONTROLLER_ADDRESS",
+  "athMasterAddress": "REQUIRED_FINAL_MAINNET_ATH_MASTER_ADDRESS",
+  "proofRefs": {
+    "finalGenesisControllerProof": "required: immutable final genesis controller proof path/hash",
+    "athDeploymentManifest": "required: immutable ATH deployment manifest path/hash",
+    "buybackBurnBuildArtifact": "required: immutable BuybackBurn build artifact path/hash"
+  }
+}
