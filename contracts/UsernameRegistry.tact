@@ -17,12 +17,15 @@ const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 20000000;
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 5000000;
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
+const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
 const USERNAME_MAX_LENGTH: Int = 32;
 const USERNAME_SPLIT_BASE_BPS: Int = 10000;
 const USERNAME_TREASURY_SHARE_BPS: Int = 5000;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
+const USERNAME_REFUND_FLUSH_ID_DOMAIN: Int = 0x52464944; // "RFID"
+const UINT64_MOD: Int = 18446744073709551616;
 
 const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET: Int = 0x663DF03D;
 const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
@@ -313,6 +316,15 @@ contract UsernameRegistry {
         }
     }
 
+    fun computeRefundFlushId(owner_wallet: Address, query_id: Int): Int {
+        return beginCell()
+            .storeUint(USERNAME_REFUND_FLUSH_ID_DOMAIN, 32)
+            .storeAddress(owner_wallet)
+            .storeUint(query_id, 64)
+            .endCell()
+            .hash() % UINT64_MOD;
+    }
+
     fun clearPendingRefundFlush(query_id: Int): PendingAthRefundFlush {
         let pendingOpt: PendingAthRefundFlush? = self.pending_refund_flushes.get(query_id);
         throwUnless(19150, pendingOpt != null);
@@ -490,7 +502,7 @@ contract UsernameRegistry {
         throwUnless(19210, msg.query_id > 0);
         self.requireNoDueFlushQuery(msg.query_id);
         throwUnless(19211, self.treasury_due_ath > 0);
-        throwUnless(19212, context().value >= USERNAME_ATH_TRANSFER_EXEC_RESERVE);
+        throwUnless(19212, context().value >= USERNAME_ATH_TRANSFER_EXEC_RESERVE + USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE);
 
         let amount: Int = self.treasury_due_ath;
         self.treasury_due_ath = 0;
@@ -522,7 +534,7 @@ contract UsernameRegistry {
         throwUnless(19220, msg.query_id > 0);
         self.requireNoDueFlushQuery(msg.query_id);
         throwUnless(19221, self.burn_due_ath > 0);
-        throwUnless(19222, context().value >= USERNAME_ATH_BURN_EXEC_RESERVE);
+        throwUnless(19222, context().value >= USERNAME_ATH_BURN_EXEC_RESERVE + USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE);
 
         let amount: Int = self.burn_due_ath;
         self.burn_due_ath = 0;
@@ -549,19 +561,20 @@ contract UsernameRegistry {
     receive(msg: FlushAthRefundDue) {
         self.requireSealed();
         throwUnless(19151, msg.query_id > 0);
-        self.requireNoDueFlushQuery(msg.query_id);
+        let refundFlushId: Int = self.computeRefundFlushId(msg.owner_wallet, msg.query_id);
+        self.requireNoDueFlushQuery(refundFlushId);
 
         let dueOpt: Int? = self.ath_refunds_due.get(msg.owner_wallet);
         throwUnless(19153, dueOpt != null);
         let due: Int = dueOpt!!;
         throwUnless(19154, due > 0);
-        throwUnless(19155, context().value >= USERNAME_ATH_TRANSFER_EXEC_RESERVE);
+        throwUnless(19155, context().value >= USERNAME_ATH_TRANSFER_EXEC_RESERVE + USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE);
 
         self.ath_refunds_due.del(msg.owner_wallet);
         self.refund_due_count -= 1;
 
         let recipient_ath_wallet: Address = self.deriveAthWalletAddress(msg.owner_wallet);
-        self.pending_refund_flushes.set(msg.query_id, PendingAthRefundFlush {
+        self.pending_refund_flushes.set(refundFlushId, PendingAthRefundFlush {
             owner_wallet: msg.owner_wallet,
             amount: due,
             recipient_ath_wallet: recipient_ath_wallet,
@@ -575,7 +588,7 @@ contract UsernameRegistry {
             mode: SendPayFwdFeesSeparately,
             bounce: true,
             body: ATHTransferRequest {
-                query_id: msg.query_id,
+                query_id: refundFlushId,
                 amount: due,
                 recipient: msg.owner_wallet,
                 response_destination: myAddress()
@@ -759,6 +772,14 @@ contract UsernameRegistry {
             recipient_ath_wallet: pending.recipient_ath_wallet,
             created_at: pending.created_at
         };
+    }
+
+    get fun get_refund_flush_id(owner_wallet: Address, query_id: Int): Int {
+        return self.computeRefundFlushId(owner_wallet, query_id);
+    }
+
+    get fun get_pending_refund_flush_for(owner_wallet: Address, query_id: Int): PendingAthRefundFlushView {
+        return self.get_pending_refund_flush(self.computeRefundFlushId(owner_wallet, query_id));
     }
 
     get fun get_pending_treasury_flush(query_id: Int): PendingAthTreasuryFlushView {

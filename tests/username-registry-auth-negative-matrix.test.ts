@@ -175,7 +175,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       query_id: 7001n,
       owner_wallet: refundOwner,
     } as FlushAthRefundDue);
-    expect((await ctx.registry.getGetPendingRefundFlush(7001n)).exists).toBe(true);
+    expect((await ctx.registry.getGetPendingRefundFlushFor(refundOwner, 7001n)).exists).toBe(true);
     expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(0n);
 
     await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
@@ -188,7 +188,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
       query_id: 7001n,
       amount: PRICE_6_PLUS,
     } as ATHTransferFailed);
-    expect((await ctx.registry.getGetPendingRefundFlush(7001n)).exists).toBe(true);
+    expect((await ctx.registry.getGetPendingRefundFlushFor(refundOwner, 7001n)).exists).toBe(true);
     expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(0n);
 
     await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, treasuryOwner, 'treasy');

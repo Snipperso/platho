@@ -220,8 +220,8 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int) v)
 
 ((slice, slice, int, int, int), (int, int, int, slice, slice)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int) $self) impure inline_ref {
     var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton)) = $self;
-    var $fresh$ret_21 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_treasury_receiver_address_buyback_burn_address($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'treasury_receiver_address, $self'buyback_burn_address);
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton), $fresh$ret_21);
+    var $fresh$ret_27 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_treasury_receiver_address_buyback_burn_address($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'treasury_receiver_address, $self'buyback_burn_address);
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton), $fresh$ret_27);
 }
 
 ;;
@@ -311,7 +311,7 @@ _ %get_state() method_id(86957) {
         var $msg'amount = in_msg~load_uint(128);
         throw_unless(15020, ($msg'amount > 0));
         throw_unless(15021, ($msg'amount <= $self'treasury_due_ton));
-        throw_unless(15022, ($Context$_get_value(__tact_context_get()) >= 3000000));
+        throw_unless(15022, ($Context$_get_value(__tact_context_get()) >= 5000000));
         $self'treasury_due_ton = $self'treasury_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'treasury_receiver_address, $msg'amount, false, 0, null()));
         $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton));
@@ -324,7 +324,7 @@ _ %get_state() method_id(86957) {
         throw_unless(15030, ($msg'amount > 0));
         throw_unless(15034, ($msg'amount == 51050000000));
         throw_unless(15031, ($msg'amount <= $self'buyback_due_ton));
-        throw_unless(15035, ($Context$_get_value(__tact_context_get()) >= 5000000));
+        throw_unless(15035, ($Context$_get_value(__tact_context_get()) >= 7000000));
         $self'buyback_due_ton = $self'buyback_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'buyback_burn_address, ($msg'amount + 2000000), true, 1, $AcceptBurnReserve$_store_cell($AcceptBurnReserve$_constructor_amount($msg'amount), begin_cell())));
         $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton));

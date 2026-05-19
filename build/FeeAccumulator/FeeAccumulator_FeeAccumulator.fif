@@ -258,7 +258,7 @@ PROGRAM{
       15022 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      3000000 PUSHINT
+      5000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s4 s4 XCPU
@@ -312,7 +312,7 @@ PROGRAM{
       15035 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      5000000 PUSHINT
+      7000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s5 s5 XCPU

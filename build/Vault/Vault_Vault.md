@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: Vault
-BoC Size: 20173 bytes
+BoC Size: 20473 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 61
+Total structures: 63
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -77,6 +77,10 @@ Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_key:ui
 TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck`
 Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128,sender_key:uint32}`
 
+### PruneStaleNotification
+TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint32 = PruneStaleNotification`
+Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint32}`
+
 ### AthTransferNotificationMintUsername
 TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
 Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,sender_key:uint32,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
@@ -117,13 +121,17 @@ Signature: `ATHTransferFailed{query_id:uint64,amount:uint128}`
 TL-B: `_ balance:int257 owner_address:address ath_master_address:address = ATHWalletDataView`
 Signature: `ATHWalletDataView{balance:int257,owner_address:address,ath_master_address:address}`
 
+### PendingAthTransferNotificationView
+TL-B: `_ exists:bool sender_owner:address amount:int257 created_at:int257 = PendingAthTransferNotificationView`
+Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,amount:int257,created_at:int257}`
+
 ### PendingAthTransferNotification
-TL-B: `_ sender_owner:address amount:uint128 = PendingAthTransferNotification`
-Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128}`
+TL-B: `_ sender_owner:address amount:uint128 created_at:uint32 = PendingAthTransferNotification`
+Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}`
 
 ### ATHWallet$Data
-TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128}> processed_notifications:dict<int, int> = ATHWallet`
-Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128}>,processed_notifications:dict<int, int>}`
+TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> = ATHWallet`
+Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>}`
 
 ### BindDeploymentManifest
 TL-B: `bind_deployment_manifest#90e2e0cb deployment_manifest_hash:uint256 counterpart_address:address = BindDeploymentManifest`

@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: UsernameRegistry
-BoC Size: 13102 bytes
+BoC Size: 14145 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 55
+Total structures: 57
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -97,6 +97,10 @@ Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_key:ui
 TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck`
 Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128,sender_key:uint32}`
 
+### PruneStaleNotification
+TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint32 = PruneStaleNotification`
+Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint32}`
+
 ### AthTransferNotificationMintUsername
 TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
 Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,sender_key:uint32,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
@@ -137,13 +141,17 @@ Signature: `ATHTransferFailed{query_id:uint64,amount:uint128}`
 TL-B: `_ balance:int257 owner_address:address ath_master_address:address = ATHWalletDataView`
 Signature: `ATHWalletDataView{balance:int257,owner_address:address,ath_master_address:address}`
 
+### PendingAthTransferNotificationView
+TL-B: `_ exists:bool sender_owner:address amount:int257 created_at:int257 = PendingAthTransferNotificationView`
+Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,amount:int257,created_at:int257}`
+
 ### PendingAthTransferNotification
-TL-B: `_ sender_owner:address amount:uint128 = PendingAthTransferNotification`
-Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128}`
+TL-B: `_ sender_owner:address amount:uint128 created_at:uint32 = PendingAthTransferNotification`
+Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}`
 
 ### ATHWallet$Data
-TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128}> processed_notifications:dict<int, int> = ATHWallet`
-Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128}>,processed_notifications:dict<int, int>}`
+TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> = ATHWallet`
+Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>}`
 
 ### BindOfficialAthWallet
 TL-B: `bind_official_ath_wallet#663df03d deployment_manifest_hash:uint256 official_ath_wallet_address:address = BindOfficialAthWallet`
@@ -226,7 +234,7 @@ TL-B: `_ official_ath_wallet_address:address ath_master_address:address treasury
 Signature: `UsernameRegistry{official_ath_wallet_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,name_record_count:uint64,pending_mint_count:uint64,refund_due_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,name_records:dict<int, ^NameRecord{owner_wallet:address,item_address:address,registered_at:uint32}>,pending_mints:dict<int, ^PendingUsernameMint{owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint32}>,pending_item_to_name_hash:dict<address, int>,ath_refunds_due:dict<address, int>,pending_refund_flushes:dict<int, ^PendingAthRefundFlush{owner_wallet:address,amount:uint128,recipient_ath_wallet:address,created_at:uint32}>,pending_refund_flush_count:uint64,pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint32}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint32}>,pending_burn_flush_count:uint64,genesis_controller_address:address}`
 
 ## Get methods
-Total get methods: 10
+Total get methods: 12
 
 ## get_username_price
 Argument: name_len
@@ -245,6 +253,14 @@ Argument: name_hash
 Argument: owner_wallet
 
 ## get_pending_refund_flush
+Argument: query_id
+
+## get_refund_flush_id
+Argument: owner_wallet
+Argument: query_id
+
+## get_pending_refund_flush_for
+Argument: owner_wallet
 Argument: query_id
 
 ## get_pending_treasury_flush

@@ -66,6 +66,11 @@
       "output": "build/MockUsernameNFTItemNoAck"
     },
     {
+      "name": "MockAthWalletNoAck",
+      "path": "contracts/MockAthWalletNoAck.tact",
+      "output": "build/MockAthWalletNoAck"
+    },
+    {
       "name": "UsernameRegistry",
       "path": "contracts/UsernameRegistry.tact",
       "output": "build/UsernameRegistry"

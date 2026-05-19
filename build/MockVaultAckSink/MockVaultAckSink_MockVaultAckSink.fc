@@ -214,8 +214,8 @@ builder $MockVaultAckSink$_store(builder build_0, (int, int, int, int) v) inline
 
 ((int, int, int, int), (int, int, int, int)) $MockVaultAckSink$_fun_get_state((int, int, int, int) $self) impure inline_ref {
     var (($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid)) = $self;
-    var $fresh$ret_64 = $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid);
-    return (($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid), $fresh$ret_64);
+    var $fresh$ret_74 = $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid);
+    return (($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid), $fresh$ret_74);
 }
 
 ;;

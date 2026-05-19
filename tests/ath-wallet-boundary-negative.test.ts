@@ -12,6 +12,7 @@ import { ATHMaster, ATHBurnNotification } from '../build/ATHMaster/ATHMaster_ATH
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2_000_000n;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2_000_000n;
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
+const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 2_000_000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 
@@ -75,7 +76,10 @@ describe('ATH wallet/master value boundary negative matrix', () => {
     const sourceInit = await ATHWallet.init(0n, sourceOwner, master);
     const sourceWalletAddress = contractAddress(sourceOwner.workChain, sourceInit);
     const { wallet: recipientWallet } = await deployWallet(blockchain, recipientOwner, master, 0n);
-    const required = ATH_TRANSFER_NOTIFY_MIN_VALUE + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE;
+    const required = ATH_TRANSFER_NOTIFY_MIN_VALUE
+      + ATH_TRANSFER_NOTIFY_ACK_VALUE
+      + ATH_TRANSFER_NOTIFY_EXEC_RESERVE
+      + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
 
     await recipientWallet.send(blockchain.sender(sourceWalletAddress), { value: required - 1n }, {
       $$type: 'ATHInternalTransferWithNotify',

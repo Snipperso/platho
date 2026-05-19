@@ -102,7 +102,7 @@ describe('UsernameRegistry ATH refund flush milestone', () => {
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAthWalletAddress, recipientInit));
 
     expect(await registry.getGetRefundDue(ownerWallet)).toBe(0n);
-    expect((await registry.getGetPendingRefundFlush(9001n)).exists).toBe(false);
+    expect((await registry.getGetPendingRefundFlushFor(ownerWallet, 9001n)).exists).toBe(false);
     expect((await registry.getGetGlobal()).pending_refund_flush_count).toBe(0n);
     expect((await registry.getGetGlobal()).refund_due_count).toBe(0n);
     expect((await officialAthWallet.getGetWalletData()).balance).toBe(0n);
@@ -123,7 +123,7 @@ describe('UsernameRegistry ATH refund flush milestone', () => {
     } as FlushAthRefundDue);
 
     expect(await registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
-    expect((await registry.getGetPendingRefundFlush(9002n)).exists).toBe(false);
+    expect((await registry.getGetPendingRefundFlushFor(ownerWallet, 9002n)).exists).toBe(false);
     expect((await registry.getGetGlobal()).pending_refund_flush_count).toBe(0n);
     expect((await registry.getGetGlobal()).refund_due_count).toBe(1n);
     expect((await officialAthWallet.getGetWalletData()).balance).toBe(0n);
