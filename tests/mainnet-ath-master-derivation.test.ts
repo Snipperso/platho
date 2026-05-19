@@ -2,6 +2,7 @@ import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/
 import { createHash } from 'crypto';
 import { describe, expect, it } from 'vitest';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import {
   createMainnetAthMasterDerivationReport,
   MainnetAthMasterDerivationInput,
@@ -77,6 +78,8 @@ describe('Mainnet ATH Master derivation', () => {
     const content = Cell.fromBoc(Buffer.from(input.contentBocBase64, 'base64'))[0];
     const expectedInit = await ATHMaster.init(treasuryOwner, content);
     const expectedAddress = contractAddress(0, expectedInit);
+    const expectedTreasuryWalletInit = await ATHWallet.init(0n, treasuryOwner, expectedAddress);
+    const expectedTreasuryWalletAddress = contractAddress(treasuryOwner.workChain, expectedTreasuryWalletInit);
 
     expect(report.status).toBe('DERIVED_MAINNET_ATH_MASTER_ADDRESS');
     expect(report.ath_master_derivation_ready).toBe(true);
@@ -87,6 +90,13 @@ describe('Mainnet ATH Master derivation', () => {
     expect(report.derived.athMasterStateInitHash).toBe(stateInitHash(expectedInit));
     expect(report.derived.athMasterCodeHash).toBe(expectedInit.code.hash().toString('hex'));
     expect(report.derived.athMasterDataHash).toBe(expectedInit.data.hash().toString('hex'));
+    expect(report.derived.treasuryOwnerAthWalletAddress).toBe(expectedTreasuryWalletAddress.toString({ testOnly: false }));
+    expect(report.derived.treasuryOwnerAthWalletStateInitHash).toBe(stateInitHash(expectedTreasuryWalletInit));
+    expect(report.derived.athWalletCodeHash).toBe(expectedTreasuryWalletInit.code.hash().toString('hex'));
+    expect(report.treasurySupplyDeployment.messageType).toBe('DeployTreasurySupply');
+    expect(report.treasurySupplyDeployment.senderAddress).toBe(input.treasuryOwnerAddress);
+    expect(report.treasurySupplyDeployment.recipientAthWalletAddress).toBe(report.derived.treasuryOwnerAthWalletAddress);
+    expect(report.treasurySupplyDeployment.amountAtomic).toBe('100000000000000000');
     expect(report.nextM20FInputs.athMasterAddress).toBe(report.derived.athMasterAddress);
     expect(report.nextM20FInputs.athMasterCodeHash).toBe(report.derived.athMasterCodeHash);
   });

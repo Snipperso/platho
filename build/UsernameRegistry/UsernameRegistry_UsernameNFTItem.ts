@@ -1094,6 +1094,124 @@ export function dictValueParserATHBurnFailed(): DictionaryValue<ATHBurnFailed> {
     }
 }
 
+export type ATHGenesisSupplyCredit = {
+    $$type: 'ATHGenesisSupplyCredit';
+    query_id: bigint;
+    amount: bigint;
+    response_destination: Address;
+}
+
+export function storeATHGenesisSupplyCredit(src: ATHGenesisSupplyCredit) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042501, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.response_destination);
+    };
+}
+
+export function loadATHGenesisSupplyCredit(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042501) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _response_destination = sc_0.loadAddress();
+    return { $$type: 'ATHGenesisSupplyCredit' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function loadTupleATHGenesisSupplyCredit(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _response_destination = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyCredit' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function loadGetterTupleATHGenesisSupplyCredit(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _response_destination = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyCredit' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function storeTupleATHGenesisSupplyCredit(source: ATHGenesisSupplyCredit) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.response_destination);
+    return builder.build();
+}
+
+export function dictValueParserATHGenesisSupplyCredit(): DictionaryValue<ATHGenesisSupplyCredit> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHGenesisSupplyCredit(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHGenesisSupplyCredit(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHGenesisSupplyAck = {
+    $$type: 'ATHGenesisSupplyAck';
+    query_id: bigint;
+    amount: bigint;
+    owner_address: Address;
+}
+
+export function storeATHGenesisSupplyAck(src: ATHGenesisSupplyAck) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042502, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.owner_address);
+    };
+}
+
+export function loadATHGenesisSupplyAck(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042502) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _owner_address = sc_0.loadAddress();
+    return { $$type: 'ATHGenesisSupplyAck' as const, query_id: _query_id, amount: _amount, owner_address: _owner_address };
+}
+
+export function loadTupleATHGenesisSupplyAck(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _owner_address = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyAck' as const, query_id: _query_id, amount: _amount, owner_address: _owner_address };
+}
+
+export function loadGetterTupleATHGenesisSupplyAck(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _owner_address = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyAck' as const, query_id: _query_id, amount: _amount, owner_address: _owner_address };
+}
+
+export function storeTupleATHGenesisSupplyAck(source: ATHGenesisSupplyAck) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.owner_address);
+    return builder.build();
+}
+
+export function dictValueParserATHGenesisSupplyAck(): DictionaryValue<ATHGenesisSupplyAck> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHGenesisSupplyAck(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHGenesisSupplyAck(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AthTransferNotification = {
     $$type: 'AthTransferNotification';
     query_id: bigint;
@@ -3329,6 +3447,8 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"ATHBurnNotification","header":1096042498,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnFinalized","header":1096042499,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnFailed","header":1096042500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"ATHGenesisSupplyCredit","header":1096042501,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"ATHGenesisSupplyAck","header":1096042502,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
@@ -3371,6 +3491,8 @@ const UsernameNFTItem_opcodes = {
     "ATHBurnNotification": 1096042498,
     "ATHBurnFinalized": 1096042499,
     "ATHBurnFailed": 1096042500,
+    "ATHGenesisSupplyCredit": 1096042501,
+    "ATHGenesisSupplyAck": 1096042502,
     "AthTransferNotification": 1194171773,
     "AthTransferNotificationAck": 1194171774,
     "ATHTransferRequest": 1096042512,
@@ -3409,6 +3531,8 @@ export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
 export const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2000000n;
 export const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 2000000n;
+export const ATH_GENESIS_SUPPLY_EXEC_RESERVE = 2000000n;
+export const ATH_GENESIS_SUPPLY_ACK_VALUE = 1000000n;
 export const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 1096044105n;
 export const USERNAME_PRICE_4_CHARS = 10000000000000n;
 export const USERNAME_PRICE_5_CHARS = 1000000000000n;

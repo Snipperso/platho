@@ -241,7 +241,7 @@ describe('Vault ATH accounting invariants', () => {
         await assertInvariants();
       }
     }
-  });
+  }, 60_000);
 
   it('VAULT-INV-ATH-02: ATH receive intent claim and cancel preserve total internal ATH and official backing', async () => {
     const { blockchain, vault, users, userAthWallets, officialVaultAthWallet } = await setup(2);

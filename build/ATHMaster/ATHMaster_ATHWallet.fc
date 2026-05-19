@@ -41,6 +41,12 @@ builder $ATHBurnFailed$_store(builder build_0, (int, int) v) inline;
 ;; $ATHBurnFailed$_store_cell
 cell $ATHBurnFailed$_store_cell((int, int) v, builder b) inline;
 
+;; $ATHGenesisSupplyAck$_store
+builder $ATHGenesisSupplyAck$_store(builder build_0, (int, int, slice) v) inline;
+
+;; $ATHGenesisSupplyAck$_store_cell
+cell $ATHGenesisSupplyAck$_store_cell((int, int, slice) v, builder b) inline;
+
 ;; $AthTransferNotification$_store
 builder $AthTransferNotification$_store(builder build_0, (int, int, slice) v) inline;
 
@@ -166,6 +172,9 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 
 ;; $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination
 ((int, int, slice, slice)) $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination(int $query_id, int $amount, slice $owner_address, slice $response_destination) inline;
+
+;; $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address
+((int, int, slice)) $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address(int $query_id, int $amount, slice $owner_address) inline;
 
 ;; $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value
 ((int, int, slice, slice, slice, int)) $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value(int $query_id, int $amount, slice $sender_owner, slice $response_destination, slice $notify_destination, int $notify_value) inline;
@@ -475,6 +484,29 @@ cell $ATHBurnFailed$_store_cell((int, int) v, builder b) inline {
 
 ((int, int)) $ATHBurnFailed$_constructor_query_id_amount(int $query_id, int $amount) inline {
     return ($query_id, $amount);
+}
+
+;;
+;; Type: ATHGenesisSupplyAck
+;; Header: 0x41544806
+;; TLB: ath_genesis_supply_ack#41544806 query_id:uint64 amount:uint128 owner_address:address = ATHGenesisSupplyAck
+;;
+
+builder $ATHGenesisSupplyAck$_store(builder build_0, (int, int, slice) v) inline {
+    var (v'query_id, v'amount, v'owner_address) = v;
+    build_0 = store_uint(build_0, 1096042502, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'owner_address);
+    return build_0;
+}
+
+cell $ATHGenesisSupplyAck$_store_cell((int, int, slice) v, builder b) inline {
+    return $ATHGenesisSupplyAck$_store(b, v).end_cell();
+}
+
+((int, int, slice)) $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address(int $query_id, int $amount, slice $owner_address) inline {
+    return ($query_id, $amount, $owner_address);
 }
 
 ;;
@@ -887,6 +919,21 @@ _ %get_wallet_data() method_id(97026) {
         throw_unless(14006, ($Context$_get_value(__tact_context_get()) >= 2000000));
         $self'balance = $self'balance - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'ath_master_address, 0, 64, true, $ATHBurnNotification$_store_cell($ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination), begin_cell())));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications));
+        return ();
+    }
+    
+    ;; Receive ATHGenesisSupplyCredit message
+    if (op == 0x41544805) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'response_destination = in_msg~load_msg_addr();
+        throw_unless(14400, ( equal_slices_bits(__tact_context_get_sender(), $self'ath_master_address) ));
+        throw_unless(14401, ($msg'amount > 0));
+        throw_unless(14402, ($self'balance == 0));
+        throw_unless(14403, ($Context$_get_value(__tact_context_get()) >= 3000000));
+        $self'balance = $self'balance + $msg'amount;
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 1000000, 0, false, $ATHGenesisSupplyAck$_store_cell($ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address($msg'query_id, $msg'amount, $self'owner_address), begin_cell())));
         $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications));
         return ();
     }

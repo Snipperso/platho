@@ -2,6 +2,9 @@ import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
+
+const ATH_TOTAL_SUPPLY_ATOMIC = '100000000000000000';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
 const DEFAULT_INPUT_PATH = join(ARTIFACTS_DIR, 'mainnet_ath_master_derivation_input.json');
@@ -46,6 +49,18 @@ export interface MainnetAthMasterDerivationReport {
     athMasterStateInitHash: string | null;
     athMasterCodeHash: string | null;
     athMasterDataHash: string | null;
+    treasuryOwnerAthWalletAddress: string | null;
+    treasuryOwnerAthWalletRawAddress: string | null;
+    treasuryOwnerAthWalletStateInitHash: string | null;
+    athWalletCodeHash: string | null;
+  };
+  treasurySupplyDeployment: {
+    required: true;
+    messageType: 'DeployTreasurySupply';
+    senderAddress: string | null;
+    recipientAthWalletAddress: string | null;
+    amountAtomic: string;
+    proofRequired: string;
   };
   nextM20FInputs: {
     athMasterAddress: string | null;
@@ -208,6 +223,18 @@ export async function createMainnetAthMasterDerivationReport(options: {
       athMasterStateInitHash: null,
       athMasterCodeHash: null,
       athMasterDataHash: null,
+      treasuryOwnerAthWalletAddress: null,
+      treasuryOwnerAthWalletRawAddress: null,
+      treasuryOwnerAthWalletStateInitHash: null,
+      athWalletCodeHash: null,
+    },
+    treasurySupplyDeployment: {
+      required: true,
+      messageType: 'DeployTreasurySupply',
+      senderAddress: input?.treasuryOwnerAddress ?? null,
+      recipientAthWalletAddress: null,
+      amountAtomic: ATH_TOTAL_SUPPLY_ATOMIC,
+      proofRequired: 'required: post-deploy transaction plus official treasury ATH wallet balance proof',
     },
     nextM20FInputs: {
       athMasterAddress: null,
@@ -232,7 +259,10 @@ export async function createMainnetAthMasterDerivationReport(options: {
 
   const athMasterInit = await ATHMaster.init(treasuryOwner, content);
   const athMasterAddress = contractAddress(0, athMasterInit);
+  const treasuryOwnerAthWalletInit = await ATHWallet.init(0n, treasuryOwner, athMasterAddress);
+  const treasuryOwnerAthWalletAddress = contractAddress(treasuryOwner.workChain, treasuryOwnerAthWalletInit);
   const athMasterCodeHash = athMasterInit.code.hash().toString('hex');
+  const athWalletCodeHash = treasuryOwnerAthWalletInit.code.hash().toString('hex');
 
   return {
     ...base,
@@ -248,6 +278,18 @@ export async function createMainnetAthMasterDerivationReport(options: {
       athMasterStateInitHash: stateInitHash(athMasterInit),
       athMasterCodeHash,
       athMasterDataHash: athMasterInit.data.hash().toString('hex'),
+      treasuryOwnerAthWalletAddress: friendly(treasuryOwnerAthWalletAddress),
+      treasuryOwnerAthWalletRawAddress: raw(treasuryOwnerAthWalletAddress),
+      treasuryOwnerAthWalletStateInitHash: stateInitHash(treasuryOwnerAthWalletInit),
+      athWalletCodeHash,
+    },
+    treasurySupplyDeployment: {
+      required: true,
+      messageType: 'DeployTreasurySupply',
+      senderAddress: friendly(treasuryOwner),
+      recipientAthWalletAddress: friendly(treasuryOwnerAthWalletAddress),
+      amountAtomic: ATH_TOTAL_SUPPLY_ATOMIC,
+      proofRequired: 'required: post-deploy transaction plus official treasury ATH wallet balance proof',
     },
     nextM20FInputs: {
       athMasterAddress: friendly(athMasterAddress),
@@ -277,6 +319,18 @@ function markdown(report: MainnetAthMasterDerivationReport) {
     `- athMasterStateInitHash: ${report.derived.athMasterStateInitHash ?? 'not derived'}`,
     `- athMasterCodeHash: ${report.derived.athMasterCodeHash ?? 'not derived'}`,
     `- athMasterDataHash: ${report.derived.athMasterDataHash ?? 'not derived'}`,
+    `- treasuryOwnerAthWalletAddress: ${report.derived.treasuryOwnerAthWalletAddress ?? 'not derived'}`,
+    `- treasuryOwnerAthWalletStateInitHash: ${report.derived.treasuryOwnerAthWalletStateInitHash ?? 'not derived'}`,
+    `- athWalletCodeHash: ${report.derived.athWalletCodeHash ?? 'not derived'}`,
+    '',
+    '## Treasury Supply Deployment',
+    '',
+    `- required: ${report.treasurySupplyDeployment.required}`,
+    `- messageType: ${report.treasurySupplyDeployment.messageType}`,
+    `- senderAddress: ${report.treasurySupplyDeployment.senderAddress ?? 'not ready'}`,
+    `- recipientAthWalletAddress: ${report.treasurySupplyDeployment.recipientAthWalletAddress ?? 'not ready'}`,
+    `- amountAtomic: ${report.treasurySupplyDeployment.amountAtomic}`,
+    `- proofRequired: ${report.treasurySupplyDeployment.proofRequired}`,
     '',
     '## Blockers',
     '',

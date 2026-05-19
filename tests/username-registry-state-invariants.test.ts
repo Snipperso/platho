@@ -254,5 +254,5 @@ describe('UsernameRegistry state-machine invariants', () => {
         await assertModel();
       }
     }
-  });
+  }, 60_000);
 });

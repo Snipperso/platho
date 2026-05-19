@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, Cell, contractAddress, storeStateInit } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, storeStateInit, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
-import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
-import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHMaster, DeployTreasurySupply } from '../build/ATHMaster/ATHMaster_ATHMaster';
+import { ATHWallet, ATHGenesisSupplyCredit } from '../build/ATHWallet/ATHWallet_ATHWallet';
+
+const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -57,5 +60,98 @@ describe('ATH wallet derivation profile', () => {
       expect(stateInitCellHash).toHaveLength(64);
       expect(getterAddress.equals(localAddress)).toBe(true);
     }
+  });
+
+  it('ATH Master deploys the fixed supply once into the official treasury wallet', async () => {
+    const blockchain = await Blockchain.create();
+    const treasuryOwner = await blockchain.treasury('ath-genesis-treasury-owner');
+    const attacker = await blockchain.treasury('ath-genesis-attacker');
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterAddress = contractAddress(0, masterInit);
+    await blockchain.setShardAccount(
+      masterAddress,
+      createShardAccount({
+        address: masterAddress,
+        code: masterInit.code,
+        data: masterInit.data,
+        balance: toNano('1'),
+        workchain: masterAddress.workChain,
+      }),
+    );
+
+    const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+    const treasuryWalletAddress = await master.getGetWalletAddress(treasuryOwner.address);
+    const treasuryWalletInit = await ATHWallet.init(0n, treasuryOwner.address, masterAddress);
+    const treasuryWallet = blockchain.openContract(new ATHWallet(treasuryWalletAddress, treasuryWalletInit));
+
+    const attackerAttempt = await master.send(attacker.getSender(), { value: toNano('0.2') }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 1n,
+      response_destination: attacker.address,
+    } as DeployTreasurySupply);
+
+    expect(findTransaction(attackerAttempt.transactions, {
+      from: master.address,
+      to: treasuryWalletAddress,
+      success: true,
+    })).toBeUndefined();
+
+    const underfundedAttempt = await master.send(treasuryOwner.getSender(), { value: 2_999_999n }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 2n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect(findTransaction(underfundedAttempt.transactions, {
+      from: master.address,
+      to: treasuryWalletAddress,
+      success: true,
+    })).toBeUndefined();
+
+    await master.send(treasuryOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 3n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+
+    await master.send(treasuryOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 4n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+    expect((await master.getGetJettonData()).total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+  });
+
+  it('ATH treasury wallet rejects direct genesis supply credit from a non-master sender', async () => {
+    const blockchain = await Blockchain.create();
+    const treasuryOwner = await blockchain.treasury('ath-genesis-direct-owner');
+    const attacker = await blockchain.treasury('ath-genesis-direct-attacker');
+    const master = fixtureAddress('ATH_GENESIS_DIRECT_MASTER');
+    const walletInit = await ATHWallet.init(0n, treasuryOwner.address, master);
+    const walletAddress = contractAddress(treasuryOwner.address.workChain, walletInit);
+    await blockchain.setShardAccount(
+      walletAddress,
+      createShardAccount({
+        address: walletAddress,
+        code: walletInit.code,
+        data: walletInit.data,
+        balance: toNano('1'),
+        workchain: walletAddress.workChain,
+      }),
+    );
+
+    const wallet = blockchain.openContract(new ATHWallet(walletAddress, walletInit));
+    await wallet.send(attacker.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ATHGenesisSupplyCredit',
+      query_id: 4n,
+      amount: ATH_TOTAL_SUPPLY_ATOMIC,
+      response_destination: attacker.address,
+    } as ATHGenesisSupplyCredit);
+
+    expect((await wallet.getGetWalletData()).balance).toBe(0n);
   });
 });
