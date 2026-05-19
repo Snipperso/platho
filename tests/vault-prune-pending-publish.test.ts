@@ -23,6 +23,7 @@ const BODY_HASH = 0x111100000000000000000000000000000000000000000000000000000000
 const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
 const HEADER1 = 0x3333000000000000000000000000000000000000000000000000000000000003n;
 const VAULT_PENDING_PUBLISH_STALE_TTL = 86_400;
+const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -164,6 +165,12 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
     expect(afterPendingUser.ath_balance).toBe(ctx.beforeUser.ath_balance);
 
     ctx.blockchain.now = 1_700_000_000 + VAULT_PENDING_PUBLISH_STALE_TTL + 1;
+    await ctx.vault.send(ctx.user.getSender(), { value: VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE - 1n }, {
+      $$type: 'PrunePendingPublish',
+      publish_id: ctx.publishId,
+    } as PrunePendingPublish);
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(1n);
+
     await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.05') }, {
       $$type: 'PrunePendingPublish',
       publish_id: ctx.publishId,

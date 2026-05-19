@@ -2418,6 +2418,7 @@ _ %get_global() method_id(126899) {
     if (op == 0x720bdd6d) {
         var $msg'publish_id = in_msg~load_uint(256);
         ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'sessions, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'session_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_requireSealed();
+        throw_unless(16533, ($Context$_get_value(__tact_context_get()) >= 2000000));
         int $bounceId = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'sessions, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'session_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_computePublishBounceId($msg'publish_id);
         tuple $pendingOpt = $PendingPublish$_load_opt(__tact_dict_get_int_cell($self'pending_publishes, 257, $bounceId));
         throw_unless(16530, (~ null?($pendingOpt)));

@@ -18,6 +18,7 @@ const VAULT_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 30000000;
 const VAULT_WITHDRAW_TON_EXEC_RESERVE: Int = 2000000;
+const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000;
 const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
 const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
@@ -1351,6 +1352,7 @@ contract Vault {
 
     receive(msg: PrunePendingPublish) {
         self.requireSealed();
+        throwUnless(16533, context().value >= VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE);
         let bounceId: Int = self.computePublishBounceId(msg.publish_id);
         let pendingOpt: PendingPublish? = self.pending_publishes.get(bounceId);
         throwUnless(16530, pendingOpt != null);

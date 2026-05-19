@@ -22,6 +22,8 @@ const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 4000000;
 const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 3000000;
 const CAPSULEHUB_PAGE_STORAGE_ENDOWMENT: Int = 10000000;
 const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
+const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
+const CAPSULEHUB_MIN_FEE_FLUSH_TON: Int = PLATO_PUBLIC_POST_FEE_TON;
 const OP_BIND_DEPLOYMENT_MANIFEST: Int = 0x90E2E0CB;
 const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
 
@@ -414,9 +416,9 @@ contract CapsuleHub {
 
     receive(msg: FlushFees) {
         self.requireSealed();
-        throwUnless(13200, msg.amount > 0);
+        throwUnless(13200, msg.amount >= CAPSULEHUB_MIN_FEE_FLUSH_TON);
         throwUnless(13201, msg.amount <= self.accrued_plato_fee_ton);
-        throwUnless(13202, context().value >= CAPSULEHUB_ACK_FORWARD_RESERVE);
+        throwUnless(13202, context().value >= CAPSULEHUB_ACK_FORWARD_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE);
 
         self.accrued_plato_fee_ton -= msg.amount;
 

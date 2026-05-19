@@ -18,6 +18,8 @@ import {
 const PLATO_PRIVATE_STANDARD_FEE = 5_000_000n;
 const PLATO_PRIVATE_LONG_TERM_FEE = 10_000_000n;
 const PLATO_PUBLIC_FEE = 5_000_000n;
+const CAPSULEHUB_ACK_FORWARD_RESERVE = 30_000_000n;
+const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(label).digest('hex'));
@@ -250,6 +252,30 @@ describe('CapsuleHub v1 milestone 1', () => {
 
     const state = await capsule.getGetState();
     expect(state.accrued_plato_fee_ton).toBe(0n);
+  });
+
+  it('CAPSULE-FEE-06: dust or locally underfunded FlushFees cannot drain CapsuleHub reserve', async () => {
+    const { capsule, author, operator } = await setup({ feeAccumulatorDeployed: true });
+
+    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_ACK_FORWARD_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE - 1n }, {
+      $$type: 'FlushFees',
+      amount: PLATO_PUBLIC_FEE,
+    } as FlushFees);
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_ACK_FORWARD_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE }, {
+      $$type: 'FlushFees',
+      amount: 1n,
+    } as FlushFees);
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_ACK_FORWARD_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE }, {
+      $$type: 'FlushFees',
+      amount: PLATO_PUBLIC_FEE,
+    } as FlushFees);
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(0n);
   });
 
   it('CAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs', async () => {

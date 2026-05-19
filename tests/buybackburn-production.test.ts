@@ -542,6 +542,12 @@ describe('Production BuybackBurn candidate', () => {
     expect(totals.burned_ath_total_atomic).toBe(100_000n);
     expect(jetton.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - 100_000n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
+
+    await acceptReserve(env);
+    await executeBuyback(env, 99n);
+    const afterReuseAttempt = await env.buyback.getGetBuybackBurnState();
+    expect(afterReuseAttempt.phase).toBe(PHASE_IDLE);
+    expect(afterReuseAttempt.reserve_due_ton).toBe(ENVELOPE);
   });
 
   it('BUYBACK-06: authenticated burn failure becomes retry-due and can be finalized later', async () => {

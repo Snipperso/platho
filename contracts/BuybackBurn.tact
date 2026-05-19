@@ -17,6 +17,7 @@ const BUYBACK_ROUTE_NOTIFY_MIN_VALUE: Int = 35000000;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ROUTE_REFUND_EXEC_RESERVE: Int = 2000000;
+const BUYBACK_ROUTE_REFUND_RECOVERY_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_DEADLINE_MAX_AHEAD_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_GRACE_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS: Int = 49000000000;
@@ -114,6 +115,7 @@ struct BuybackBurnStateView {
     pending_received_ath_atomic: Int;
     route_refund_due_ton: Int;
     ath_burn_retry_due_atomic: Int;
+    last_terminal_query_id: Int;
 }
 
 struct BuybackBurnTotalsView {
@@ -151,6 +153,7 @@ contract BuybackBurn {
     pending_received_ath_atomic: Int as uint128;
     route_refund_due_ton: Int as uint128;
     ath_burn_retry_due_atomic: Int as uint128;
+    last_terminal_query_id: Int as uint64;
     accepted_reserve_count: Int as uint64;
     executed_buyback_count: Int as uint64;
     burned_ath_total_atomic: Int as uint128;
@@ -185,6 +188,7 @@ contract BuybackBurn {
         self.pending_received_ath_atomic = 0;
         self.route_refund_due_ton = 0;
         self.ath_burn_retry_due_atomic = 0;
+        self.last_terminal_query_id = 0;
         self.accepted_reserve_count = 0;
         self.executed_buyback_count = 0;
         self.burned_ath_total_atomic = 0;
@@ -223,6 +227,17 @@ contract BuybackBurn {
         throwUnless(22040, quoteOut > 0);
         throwUnless(22041, dexMinOut >= self.buyback_min_ath_out_per_50_ton_atomic);
         throwUnless(22042, dexMinOut >= (quoteOut * 95) / 100);
+        throwUnless(22043, dexMinOut <= quoteOut);
+    }
+
+    fun requireFreshQueryId(queryId: Int) {
+        throwUnless(22044, queryId > self.last_terminal_query_id);
+    }
+
+    fun recordTerminalQueryId(queryId: Int) {
+        if (queryId > self.last_terminal_query_id) {
+            self.last_terminal_query_id = queryId;
+        }
     }
 
     fun stonfiSwapPayload(deadline: Int, dexMinOut: Int): Cell {
@@ -266,6 +281,12 @@ contract BuybackBurn {
         self.pending_route_refund_start_ton = 0;
         self.pending_dex_min_out_atomic_ath = 0;
         self.pending_received_ath_atomic = 0;
+    }
+
+    fun finishPendingCycle() {
+        let queryId: Int = self.pending_query_id;
+        self.clearPending();
+        self.recordTerminalQueryId(queryId);
     }
 
     fun creditRouteRefundValue(value: Int) {
@@ -359,6 +380,7 @@ contract BuybackBurn {
         throwUnless(22211, self.phase == BUYBACK_PHASE_IDLE);
         throwUnless(22212, self.reserve_due_ton >= BUYBACK_FUNDING_ENVELOPE_NANOTONS);
         throwUnless(22213, msg.query_id > 0);
+        self.requireFreshQueryId(msg.query_id);
         throwUnless(22214, msg.deadline > now());
         throwUnless(22215, msg.deadline <= now() + BUYBACK_DEADLINE_MAX_AHEAD_SECONDS);
         throwUnless(22216, context().value >= BUYBACK_PTON_TRANSFER_GAS_NANOTONS);
@@ -418,7 +440,7 @@ contract BuybackBurn {
 
         self.burned_ath_total_atomic += msg.amount;
         self.executed_buyback_count += 1;
-        self.clearPending();
+        self.finishPendingCycle();
     }
 
     receive(msg: ATHBurnFailed) {
@@ -429,13 +451,14 @@ contract BuybackBurn {
         throwUnless(22333, msg.amount == self.pending_received_ath_atomic);
 
         self.ath_burn_retry_due_atomic += msg.amount;
-        self.clearPending();
+        self.finishPendingCycle();
     }
 
     receive(msg: RetryAthBurnDue) {
         self.requireSealed();
         throwUnless(22340, self.phase == BUYBACK_PHASE_IDLE);
         throwUnless(22341, msg.query_id > 0);
+        self.requireFreshQueryId(msg.query_id);
         throwUnless(22342, msg.amount > 0);
         throwUnless(22343, msg.amount <= self.ath_burn_retry_due_atomic);
         throwUnless(22344, context().value >= BUYBACK_ATH_BURN_REQUEST_VALUE);
@@ -450,11 +473,12 @@ contract BuybackBurn {
 
     receive(msg: RecoverStonfiRouteRefund) {
         self.requireSealed();
+        throwUnless(22354, context().value >= BUYBACK_ROUTE_REFUND_RECOVERY_EXEC_RESERVE);
         throwUnless(22350, self.phase == BUYBACK_PHASE_PENDING_STONFI_SWAP);
         throwUnless(22351, msg.query_id == self.pending_query_id);
         throwUnless(22352, self.route_refund_due_ton >= self.pending_route_refund_start_ton + BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS);
         throwUnless(22353, now() > self.pending_deadline + BUYBACK_ROUTE_REFUND_RECOVERY_GRACE_SECONDS);
-        self.clearPending();
+        self.finishPendingCycle();
     }
 
     receive(msg: RecycleRouteRefundReserve) {
@@ -473,7 +497,7 @@ contract BuybackBurn {
         throwUnless(22402, msg.query_id == self.pending_query_id);
         throwUnless(22403, msg.ton_amount == BUYBACK_OFFER_AMOUNT_NANOTONS);
         self.creditRouteRefundValue(context().value);
-        self.clearPending();
+        self.finishPendingCycle();
     }
 
     bounced(msg: bounced<ATHBurn>) {
@@ -483,7 +507,7 @@ contract BuybackBurn {
         throwUnless(22412, msg.query_id == self.pending_query_id);
         throwUnless(22413, msg.amount == self.pending_received_ath_atomic);
         self.ath_burn_retry_due_atomic += msg.amount;
-        self.clearPending();
+        self.finishPendingCycle();
     }
 
     receive() {
@@ -530,7 +554,8 @@ contract BuybackBurn {
             pending_dex_min_out_atomic_ath: self.pending_dex_min_out_atomic_ath,
             pending_received_ath_atomic: self.pending_received_ath_atomic,
             route_refund_due_ton: self.route_refund_due_ton,
-            ath_burn_retry_due_atomic: self.ath_burn_retry_due_atomic
+            ath_burn_retry_due_atomic: self.ath_burn_retry_due_atomic,
+            last_terminal_query_id: self.last_terminal_query_id
         };
     }
 

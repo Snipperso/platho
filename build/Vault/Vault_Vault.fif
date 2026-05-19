@@ -4908,6 +4908,12 @@ PROGRAM{
       s0 21 s() XCHG
       s1 s3 s0 XCHG3
       $Vault$_fun_requireSealed INLINECALLDICT
+      16533 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
       21 s() PUSH
       $Vault$_fun_computePublishBounceId INLINECALLDICT
       s8 PUSH

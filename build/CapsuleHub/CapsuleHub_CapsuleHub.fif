@@ -1294,7 +1294,8 @@ PROGRAM{
       $CapsuleHub$_fun_requireSealed INLINECALLDICT
       13200 PUSHINT
       18 s() PUSH
-      0 GTINT
+      5000000 PUSHINT
+      GEQ
       THROWANYIFNOT
       13201 PUSHINT
       18 s() PUSH
@@ -1304,7 +1305,7 @@ PROGRAM{
       13202 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      30000000 PUSHINT
+      32000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s0 s8 XCHG
