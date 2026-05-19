@@ -30,16 +30,19 @@ PROGRAM{
   DECLPROC $BuybackBurn$_fun_deriveOwnAthWalletAddress
   DECLPROC $BuybackBurn$_fun_acceptManifestHash
   DECLPROC $BuybackBurn$_fun_validateMinOut
+  DECLPROC $BuybackBurn$_fun_requireFreshQueryId
+  DECLPROC $BuybackBurn$_fun_recordTerminalQueryId
   DECLPROC $BuybackBurn$_fun_stonfiSwapPayload
   DECLPROC $BuybackBurn$_fun_ptonTonTransferBody
   DECLPROC $BuybackBurn$_fun_clearPending
+  DECLPROC $BuybackBurn$_fun_finishPendingCycle
   DECLPROC $BuybackBurn$_fun_creditRouteRefundValue
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $ATHBurn$_constructor_query_id_amount_response_destination
   DECLPROC $BuybackBurn$_fun_sendAthBurn
   DECLPROC $BuybackBurnConfigView$_constructor_sealed_fee_bound_official_ath_wallet_bound_route_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_fee_accumulator_address_official_ath_wallet_address_stonfi_router_address_stonfi_pool_address_ton_ath_stonfi_pton_wallet_address_ask_jetton_wallet_address_stonfi_referral_address_referral_value_bps_buyback_min_ath_out_per_50_ton_atomic_evidence_quote_out_atomic_ath_evidence_dex_min_out_atomic_ath_route_evidence_hash
   DECLPROC $BuybackBurn$_fun_get_buyback_burn_config
-  DECLPROC $BuybackBurnStateView$_constructor_phase_reserve_due_ton_pending_query_id_pending_deadline_pending_route_refund_start_ton_pending_dex_min_out_atomic_ath_pending_received_ath_atomic_route_refund_due_ton_ath_burn_retry_due_atomic
+  DECLPROC $BuybackBurnStateView$_constructor_phase_reserve_due_ton_pending_query_id_pending_deadline_pending_route_refund_start_ton_pending_dex_min_out_atomic_ath_pending_received_ath_atomic_route_refund_due_ton_ath_burn_retry_due_atomic_last_terminal_query_id
   DECLPROC $BuybackBurn$_fun_get_buyback_burn_state
   DECLPROC $BuybackBurnTotalsView$_constructor_accepted_reserve_count_executed_buyback_count_burned_ath_total_atomic
   DECLPROC $BuybackBurn$_fun_get_buyback_burn_totals
@@ -100,42 +103,43 @@ PROGRAM{
     -ROT
   }>
   $BuybackBurn$_store PROCINLINE:<{
-    s1 30 s() XCHG
-    s0 31 s() XCHG
+    s1 31 s() XCHG
+    s0 32 s() XCHG
     256 STU
-    s1 28 s() XCHG
+    s1 29 s() XCHG
     256 STU
-    s1 26 s() XCHG
+    s1 27 s() XCHG
     STSLICE
-    s0 24 s() XCHG
+    s0 25 s() XCHG
     NEWC
     STSLICE
-    s1 23 s() XCHG
+    s1 24 s() XCHG
     STSLICE
-    s1 21 s() XCHG
+    s1 22 s() XCHG
     STSLICE
-    s0 19 s() XCHG
+    s0 20 s() XCHG
     NEWC
     STSLICE
-    s1 18 s() XCHG
+    s1 19 s() XCHG
     STSLICE
-    s1 16 s() XCHG
+    s1 17 s() XCHG
     STSLICE
-    s0 s14 XCHG
+    s0 s15 XCHG
     NEWC
     STSLICE
-    s1 s13 XCHG
+    s1 s14 XCHG
     1 STI
-    s1 s11 XCHG
+    s1 s12 XCHG
     1 STI
-    s1 s9 XCHG
+    s1 s10 XCHG
     1 STI
-    s1 s7 XCHG
+    s1 s8 XCHG
     1 STI
-    s1 s5 XCHG
+    s1 s6 XCHG
     16 STU
-    s1 s3 XCHG
+    s1 s4 XCHG
     128 STU
+    s1 s2 XCHG
     128 STU
     128 STU
     256 STU
@@ -147,6 +151,8 @@ PROGRAM{
     64 STU
     s1 s2 XCHG
     64 STU
+    s1 s2 XCHG
+    128 STU
     s1 s3 XCHG
     128 STU
     s1 s3 XCHG
@@ -154,8 +160,6 @@ PROGRAM{
     s1 s4 XCHG
     128 STU
     s1 s4 XCHG
-    128 STU
-    s1 s5 XCHG
     128 STU
     s1 s5 XCHG
     64 STU
@@ -163,14 +167,15 @@ PROGRAM{
     NEWC
     64 STU
     s1 s6 XCHG
+    64 STU
+    s1 s6 XCHG
     128 STU
-    s1 s4 XCHG
-    STBREFR
-    s1 s2 XCHG
+    s1 s3 XCHG
     STBREFR
     s1 s3 XCHG
     STBREFR
-    s1 s2 XCHG
+    s1 s3 XCHG
+    STBREFR
     STBREFR
     STBREFR
   }>
@@ -220,11 +225,12 @@ PROGRAM{
     DROP
     CTOS
     64 LDU
+    64 LDU
     128 LDU
     DROP
-    28 s() 31 s() XCHG
-    28 s() 30 s() XCHG
-    28 s() 29 s() XCHG
+    29 s() 32 s() XCHG
+    29 s() 31 s() XCHG
+    29 s() 30 s() XCHG
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -267,7 +273,8 @@ PROGRAM{
     s0 s0 s0 PUSH3
     s0 s0 s0 PUSH3
     s0 s0 s0 PUSH3
-    s0 s0 PUSH2
+    s0 s0 s0 PUSH3
+    29 s() 30 s() XCHG
     28 s() 29 s() XCHG
     27 s() 28 s() XCHG
     26 s() 27 s() XCHG
@@ -275,7 +282,6 @@ PROGRAM{
     24 s() 25 s() XCHG
     23 s() 24 s() XCHG
     22 s() 23 s() XCHG
-    21 s() 22 s() XCHG
   }>
   $BuybackBurn$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -284,7 +290,8 @@ PROGRAM{
     SWAP
     IF:<{
       $BuybackBurn$_load INLINECALLDICT
-      31 s() POP
+      32 s() POP
+      30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
@@ -314,6 +321,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
+    s0 32 s() XCHG
     s0 31 s() XCHG
     s0 30 s() XCHG
     s0 29 s() XCHG
@@ -380,18 +388,18 @@ PROGRAM{
   }>
   $BuybackBurn$_fun_requireUnsealed PROCREF:<{
     22001 PUSHINT
-    18 s() PUSH
+    19 s() PUSH
     NOT
     THROWANYIFNOT
   }>
   $BuybackBurn$_fun_requireSealed PROCREF:<{
     22002 PUSHINT
-    18 s() PUSH
+    19 s() PUSH
     THROWANYIFNOT
   }>
   $BuybackBurn$_fun_requireGenesisController PROCREF:<{
     22003 PUSHINT
-    31 s() PUSH
+    32 s() PUSH
     0 NEQINT
     THROWANYIFNOT
     22004 PUSHINT
@@ -400,7 +408,7 @@ PROGRAM{
         STSLICER
         ENDC
         HASHCU
-    32 s() PUSH
+    33 s() PUSH
     EQUAL
     THROWANYIFNOT
   }>
@@ -410,7 +418,7 @@ PROGRAM{
     DROP
     0 PUSHINT
     ROT
-    31 s() PUSH
+    32 s() PUSH
     $ATHWallet$_init_child INLINECALLDICT
     $global_contractAddressExt INLINECALLDICT
   }>
@@ -424,17 +432,17 @@ PROGRAM{
     1 GTINT
     THROWANYIFNOT
     22006 PUSHINT
-    31 s() PUSH
+    32 s() PUSH
     0 EQINT
     IF:<{
-      31 s() POP
+      32 s() POP
       TRUE
     }>ELSE<{
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       OVER
       EQUAL
     }>
-    s1 31 s() XCHG
+    s1 32 s() XCHG
     THROWANYIFNOT
   }>
   $BuybackBurn$_fun_validateMinOut PROCREF:<{
@@ -444,16 +452,36 @@ PROGRAM{
     THROWANYIFNOT
     22041 PUSHINT
     OVER
-    19 s() PUSH
+    20 s() PUSH
     GEQ
     THROWANYIFNOT
     22042 PUSHINT
-    s0 s2 XCHG
+    s2 PUSH
     95 MULCONST
     100 PUSHINT
     DIV
+    s2 s(-1) PUXC
     GEQ
     THROWANYIFNOT
+    22043 PUSHINT
+    s0 s2 XCHG
+    LEQ
+    THROWANYIFNOT
+  }>
+  $BuybackBurn$_fun_requireFreshQueryId PROCREF:<{
+    22044 PUSHINT
+    s1 s5 XCPU
+    GREATER
+    THROWANYIFNOT
+  }>
+  $BuybackBurn$_fun_recordTerminalQueryId PROCREF:<{
+    s0 s4 PUSH2
+    GREATER
+    IF:<{
+      s4 POP
+    }>ELSE<{
+      DROP
+    }>
   }>
   $BuybackBurn$_fun_stonfiSwapPayload PROCREF:<{
     FALSE
@@ -461,7 +489,7 @@ PROGRAM{
         NEWC
     s0 s3 XCHG2
         STVARUINT16
-    30 s() PUSH
+    31 s() PUSH
         STSLICER
     0 PUSHINT
         STVARUINT16
@@ -470,17 +498,17 @@ PROGRAM{
     0 PUSHINT
         STVARUINT16
         1 STI
-    18 s() PUSH
+    19 s() PUSH
     SWAP
     16 STU
-    23 s() PUSH
+    24 s() PUSH
         STSLICER
         ENDC
         NEWC
     1717886506 PUSHINT
     SWAP
     32 STU
-    25 s() PUSH
+    26 s() PUSH
         STSLICER
         MYADDR
         STSLICER
@@ -492,54 +520,56 @@ PROGRAM{
         ENDC
   }>
   $BuybackBurn$_fun_ptonTonTransferBody PROCREF:<{
-    32 s() 33 s() XCHG
-    31 s() 33 s() XCHG
-    30 s() 33 s() XCHG
-    29 s() 33 s() XCHG
-    28 s() 33 s() XCHG
-    27 s() 33 s() XCHG
-    26 s() 33 s() XCHG
-    25 s() 33 s() XCHG
-    24 s() 33 s() XCHG
-    23 s() 33 s() XCHG
-    22 s() 33 s() XCHG
-    21 s() 33 s() XCHG
-    20 s() 33 s() XCHG
-    19 s() 33 s() XCHG
-    18 s() 33 s() XCHG
-    17 s() 33 s() XCHG
-    16 s() 33 s() XCHG
-    s15 33 s() XCHG
-    s14 33 s() XCHG
-    s13 33 s() XCHG
-    s12 33 s() XCHG
-    s11 33 s() XCHG
-    s10 33 s() XCHG
-    s9 33 s() XCHG
-    s8 33 s() XCHG
-    s7 33 s() XCHG
-    s6 33 s() XCHG
-    s5 33 s() XCHG
-    s4 33 s() XCHG
-    s3 33 s() XCHG
-    s2 33 s() XCHG
+    33 s() 34 s() XCHG
+    32 s() 34 s() XCHG
+    31 s() 34 s() XCHG
+    30 s() 34 s() XCHG
+    29 s() 34 s() XCHG
+    28 s() 34 s() XCHG
+    27 s() 34 s() XCHG
+    26 s() 34 s() XCHG
+    25 s() 34 s() XCHG
+    24 s() 34 s() XCHG
+    23 s() 34 s() XCHG
+    22 s() 34 s() XCHG
+    21 s() 34 s() XCHG
+    20 s() 34 s() XCHG
+    19 s() 34 s() XCHG
+    18 s() 34 s() XCHG
+    17 s() 34 s() XCHG
+    16 s() 34 s() XCHG
+    s15 34 s() XCHG
+    s14 34 s() XCHG
+    s13 34 s() XCHG
+    s12 34 s() XCHG
+    s11 34 s() XCHG
+    s10 34 s() XCHG
+    s9 34 s() XCHG
+    s8 34 s() XCHG
+    s7 34 s() XCHG
+    s6 34 s() XCHG
+    s5 34 s() XCHG
+    s4 34 s() XCHG
+    s3 34 s() XCHG
+    s2 34 s() XCHG
     $BuybackBurn$_fun_stonfiSwapPayload INLINECALLDICT
     TRUE
         NEWC
     32736093 PUSHINT
     SWAP
     32 STU
-    s1 34 s() XCHG
+    s1 35 s() XCHG
     64 STU
     50000000000 PUSHINT
         STVARUINT16
         MYADDR
         STSLICER
-    s1 33 s() XCHG
+    s1 34 s() XCHG
         1 STI
-    s1 32 s() XCHG
+    s1 33 s() XCHG
         STREF
         ENDC
+    31 s() 32 s() XCHG
     30 s() 31 s() XCHG
     29 s() 30 s() XCHG
     28 s() 29 s() XCHG
@@ -571,13 +601,70 @@ PROGRAM{
     s1 s3 s0 XCHG3
   }>
   $BuybackBurn$_fun_clearPending PROCREF:<{
-    5 5 BLKDROP2
     s6 POP
+    s6 POP
+    s6 POP
+    s6 POP
+    s6 POP
+    s7 POP
     0 PUSHINT
     s0 s0 s0 PUSH3
     s0 s0 PUSH2
-    s5 s11 XCHG
-    5 5 BLKSWAP
+    s5 s12 XCHG
+    s4 s10 XCHG
+    s3 s9 XCHG
+    s8 s7 s6 XCHG3
+  }>
+  $BuybackBurn$_fun_finishPendingCycle PROCREF:<{
+    s10 PUSH
+    31 s() 32 s() XCHG
+    30 s() 32 s() XCHG
+    29 s() 32 s() XCHG
+    28 s() 32 s() XCHG
+    27 s() 32 s() XCHG
+    26 s() 32 s() XCHG
+    25 s() 32 s() XCHG
+    24 s() 32 s() XCHG
+    23 s() 32 s() XCHG
+    22 s() 32 s() XCHG
+    21 s() 32 s() XCHG
+    20 s() 32 s() XCHG
+    19 s() 32 s() XCHG
+    18 s() 32 s() XCHG
+    17 s() 32 s() XCHG
+    16 s() 32 s() XCHG
+    s15 32 s() XCHG
+    s14 32 s() XCHG
+    s13 32 s() XCHG
+    s12 32 s() XCHG
+    s11 32 s() XCHG
+    s10 32 s() XCHG
+    s9 32 s() XCHG
+    s0 32 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    $BuybackBurn$_fun_clearPending INLINECALLDICT
+    31 s() 32 s() XCHG
+    30 s() 31 s() XCHG
+    29 s() 30 s() XCHG
+    28 s() 29 s() XCHG
+    27 s() 28 s() XCHG
+    26 s() 27 s() XCHG
+    25 s() 26 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 24 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    $BuybackBurn$_fun_recordTerminalQueryId INLINECALLDICT
   }>
   $BuybackBurn$_fun_creditRouteRefundValue PROCREF:<{
     DUP
@@ -588,9 +675,9 @@ PROGRAM{
     }>
     2000000 PUSHINT
     SUB
-    s1 s5 XCHG
+    s1 s6 XCHG
     ADD
-    s0 s4 XCHG
+    s0 s5 XCHG
   }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
@@ -606,7 +693,7 @@ PROGRAM{
     $ATHBurn$_constructor_query_id_amount_response_destination INLINECALLDICT
     NEWC
     $ATHBurn$_store_cell INLINECALLDICT
-    30 s() PUSH
+    31 s() PUSH
     s4 s1 s4 XCHG3
     s3 s3 XCHG2
     $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
@@ -631,34 +718,35 @@ PROGRAM{
   $BuybackBurnConfigView$_constructor_sealed_fee_bound_official_ath_wallet_bound_route_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_fee_accumulator_address_official_ath_wallet_address_stonfi_router_address_stonfi_pool_address_ton_ath_stonfi_pton_wallet_address_ask_jetton_wallet_address_stonfi_referral_address_referral_value_bps_buyback_min_ath_out_per_50_ton_atomic_evidence_quote_out_atomic_ath_evidence_dex_min_out_atomic_ath_route_evidence_hash PROCINLINE:<{
   }>
   $BuybackBurn$_fun_get_buyback_burn_config PROCREF:<{
-    17 s() PUSH
-    21 s() PUSH
-    21 s() PUSH
-    21 s() PUSH
-    33 s() PUSH
+    18 s() PUSH
+    22 s() PUSH
+    22 s() PUSH
+    22 s() PUSH
+    34 s() PUSH
+    36 s() PUSH
     35 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    34 s() PUSH
-    30 s() PUSH
-    30 s() PUSH
-    30 s() PUSH
-    30 s() PUSH
-    30 s() PUSH
+    35 s() PUSH
+    35 s() PUSH
+    35 s() PUSH
+    35 s() PUSH
+    35 s() PUSH
+    35 s() PUSH
+    35 s() PUSH
+    31 s() PUSH
+    31 s() PUSH
+    31 s() PUSH
+    31 s() PUSH
+    31 s() PUSH
     $BuybackBurnConfigView$_constructor_sealed_fee_bound_official_ath_wallet_bound_route_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_fee_accumulator_address_official_ath_wallet_address_stonfi_router_address_stonfi_pool_address_ton_ath_stonfi_pton_wallet_address_ask_jetton_wallet_address_stonfi_referral_address_referral_value_bps_buyback_min_ath_out_per_50_ton_atomic_evidence_quote_out_atomic_ath_evidence_dex_min_out_atomic_ath_route_evidence_hash INLINECALLDICT
   }>
-  $BuybackBurnStateView$_constructor_phase_reserve_due_ton_pending_query_id_pending_deadline_pending_route_refund_start_ton_pending_dex_min_out_atomic_ath_pending_received_ath_atomic_route_refund_due_ton_ath_burn_retry_due_atomic PROCINLINE:<{
+  $BuybackBurnStateView$_constructor_phase_reserve_due_ton_pending_query_id_pending_deadline_pending_route_refund_start_ton_pending_dex_min_out_atomic_ath_pending_received_ath_atomic_route_refund_due_ton_ath_burn_retry_due_atomic_last_terminal_query_id PROCINLINE:<{
   }>
   $BuybackBurn$_fun_get_buyback_burn_state PROCREF:<{
-    s11 s10 s9 PUSH3
-    s11 s10 s9 PUSH3
-    s11 s10 s9 PUSH3
-    $BuybackBurnStateView$_constructor_phase_reserve_due_ton_pending_query_id_pending_deadline_pending_route_refund_start_ton_pending_dex_min_out_atomic_ath_pending_received_ath_atomic_route_refund_due_ton_ath_burn_retry_due_atomic INLINECALLDICT
+    s12 s11 s10 PUSH3
+    s12 s11 s10 PUSH3
+    s12 s11 s10 PUSH3
+    s12 PUSH
+    $BuybackBurnStateView$_constructor_phase_reserve_due_ton_pending_query_id_pending_deadline_pending_route_refund_start_ton_pending_dex_min_out_atomic_ath_pending_received_ath_atomic_route_refund_due_ton_ath_burn_retry_due_atomic_last_terminal_query_id INLINECALLDICT
   }>
   $BuybackBurnTotalsView$_constructor_accepted_reserve_count_executed_buyback_count_burned_ath_total_atomic PROCINLINE:<{
   }>
@@ -706,29 +794,28 @@ PROGRAM{
     19 s() POP
     19 s() POP
     19 s() POP
-    s6 18 s() XCHG
-    s5 17 s() XCHG
-    s4 16 s() XCHG
-    s3 s15 XCHG
-    s14 s13 s12 XCHG3
-    5 7 BLKSWAP
+    19 s() POP
+    s5 18 s() XCHG
+    s4 17 s() XCHG
+    s3 16 s() XCHG
+    s15 s14 s13 XCHG3
+    7 6 BLKSWAP
     $BuybackBurnConfigView$_to_external INLINECALLDICT
   }>
   %get_buyback_burn_state PROC:<{
     $BuybackBurn$_contract_load INLINECALLDICT
     $BuybackBurn$_fun_get_buyback_burn_state INLINECALLDICT
-    9 9 BLKDROP2
-    9 9 BLKDROP2
-    9 9 BLKDROP2
-    4 9 BLKDROP2
+    10 10 BLKDROP2
+    10 10 BLKDROP2
+    12 10 BLKDROP2
     $BuybackBurnStateView$_to_external INLINECALLDICT
   }>
   %get_buyback_burn_totals PROC:<{
     $BuybackBurn$_contract_load INLINECALLDICT
     $BuybackBurn$_fun_get_buyback_burn_totals INLINECALLDICT
     15 3 BLKDROP2
-    12 3 BLKDROP2
-    4 3 BLKDROP2
+    15 3 BLKDROP2
+    2 3 BLKDROP2
     $BuybackBurnTotalsView$_to_external INLINECALLDICT
   }>
   %get_official_ath_wallet_address PROC:<{
@@ -736,7 +823,8 @@ PROGRAM{
     $BuybackBurn$_fun_get_official_ath_wallet_address INLINECALLDICT
     16 s() POP
     15 BLKDROP
-    15 1 BLKDROP2
+    16 s() POP
+    15 BLKDROP
   }>
   recv_internal PROC:<{
     c2 SAVE
@@ -756,9 +844,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $BuybackBurn$_contract_load INLINECALLDICT
-    s0 32 s() XCHG
+    s0 33 s() XCHG
     IFJMP:<{
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -777,32 +865,33 @@ PROGRAM{
         DROP
         $StonfiPtonTonTransferBounce$_load_bounced INLINECALLDICT
         s2 POP
-        s1 31 s() XCHG
-        s0 32 s() XCHG
+        s1 32 s() XCHG
+        s0 33 s() XCHG
         $BuybackBurn$_fun_requireSealed INLINECALLDICT
         22400 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        25 s() PUSH
+        26 s() PUSH
         SDEQ
         THROWANYIFNOT
         22401 PUSHINT
-        s12 PUSH
+        s13 PUSH
         1 EQINT
         THROWANYIFNOT
         22402 PUSHINT
-        s0 33 s() XCHG
-        s10 PUSH
+        s0 34 s() XCHG
+        s11 PUSH
         EQUAL
-        s1 33 s() XCHG
+        s1 34 s() XCHG
         THROWANYIFNOT
         22403 PUSHINT
-        s0 31 s() XCHG
+        s0 32 s() XCHG
         50000000000 PUSHINT
         EQUAL
-        s1 31 s() XCHG
+        s1 32 s() XCHG
         THROWANYIFNOT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
+        30 s() 32 s() XCHG
         29 s() 31 s() XCHG
         28 s() 30 s() XCHG
         27 s() 29 s() XCHG
@@ -831,8 +920,9 @@ PROGRAM{
         s4 s6 XCHG
         s3 s5 XCHG
         s4 s3 s0 XCHG3
+        s1 s2 XCHG
         $BuybackBurn$_fun_creditRouteRefundValue INLINECALLDICT
-        $BuybackBurn$_fun_clearPending INLINECALLDICT
+        $BuybackBurn$_fun_finishPendingCycle INLINECALLDICT
         $BuybackBurn$_contract_store INLINECALLDICT
       }>
       1096042497 PUSHINT
@@ -840,32 +930,33 @@ PROGRAM{
       IFJMP:<{
         $ATHBurn$_load_bounced INLINECALLDICT
         s2 POP
-        s1 31 s() XCHG
-        s0 32 s() XCHG
+        s1 32 s() XCHG
+        s0 33 s() XCHG
         $BuybackBurn$_fun_requireSealed INLINECALLDICT
         22410 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        28 s() PUSH
+        29 s() PUSH
         SDEQ
         THROWANYIFNOT
         22411 PUSHINT
-        s12 PUSH
+        s13 PUSH
         2 EQINT
         THROWANYIFNOT
         22412 PUSHINT
-        s0 33 s() XCHG
-        s10 PUSH
+        s0 34 s() XCHG
+        s11 PUSH
         EQUAL
-        s1 33 s() XCHG
+        s1 34 s() XCHG
         THROWANYIFNOT
         22413 PUSHINT
-        31 s() PUSH
-        s6 PUSH
+        32 s() PUSH
+        s7 PUSH
         EQUAL
         THROWANYIFNOT
-        s0 30 s() XCHG
-        s1 s2 XCHG
+        s0 31 s() XCHG
+        s1 s3 XCHG
         ADD
+        29 s() 31 s() XCHG
         28 s() 30 s() XCHG
         27 s() 29 s() XCHG
         26 s() 28 s() XCHG
@@ -892,39 +983,40 @@ PROGRAM{
         s5 s7 XCHG
         s4 s6 XCHG
         s3 s5 XCHG
-        s4 s3 s3 XCHG3
-        s0 s2 XCHG
-        $BuybackBurn$_fun_clearPending INLINECALLDICT
+        s4 s4 XCHG2
+        s0 s3 XCHG
+        $BuybackBurn$_fun_finishPendingCycle INLINECALLDICT
         $BuybackBurn$_contract_store INLINECALLDICT
       }>
       15 BLKDROP
       15 BLKDROP
-      2DROP
+      3 BLKDROP
     }>
     0 PUSHINT
-    31 s() PUSH
+    32 s() PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 31 s() XCHG
-      32 LDU
       s0 32 s() XCHG
+      32 LDU
+      s0 33 s() XCHG
     }>
     OVER
     1113146945 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 31 s() XCHG
-      s0 32 s() XCHG
+      s1 32 s() XCHG
+      s0 33 s() XCHG
       $BuybackBurn$_fun_requireUnsealed INLINECALLDICT
       $BuybackBurn$_fun_requireGenesisController INLINECALLDICT
+      31 s() 32 s() XCHG
       30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
@@ -943,30 +1035,31 @@ PROGRAM{
       s15 16 s() XCHG
       15 ROLL
       $BuybackBurn$_fun_acceptManifestHash INLINECALLDICT
-      27 s() POP
+      28 s() POP
       22100 PUSHINT
-      s0 20 s() XCHG
+      s0 21 s() XCHG
       NOT
-      s1 20 s() XCHG
+      s1 21 s() XCHG
       THROWANYIFNOT
       22101 PUSHINT
           MYADDR
-      31 s() PUSH
+      32 s() PUSH
       SWAP
       SDEQ
       NOT
       THROWANYIFNOT
+      29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
-      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
       22 s() 23 s() XCHG
       21 s() 22 s() XCHG
       20 s() 21 s() XCHG
-      19 s() 20 s() XCHG
       TRUE
-      s0 20 s() XCHG
+      s0 21 s() XCHG
+      19 s() 20 s() XCHG
       18 s() 19 s() XCHG
       17 s() 18 s() XCHG
       16 s() 17 s() XCHG
@@ -991,14 +1084,15 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       256 LDU
       LDMSGADDR
       DROP
-      s1 31 s() XCHG
-      s0 32 s() XCHG
+      s1 32 s() XCHG
+      s0 33 s() XCHG
       $BuybackBurn$_fun_requireUnsealed INLINECALLDICT
       $BuybackBurn$_fun_requireGenesisController INLINECALLDICT
+      31 s() 32 s() XCHG
       30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
@@ -1018,62 +1112,65 @@ PROGRAM{
       15 ROLL
       $BuybackBurn$_fun_acceptManifestHash INLINECALLDICT
       22110 PUSHINT
-      20 s() PUSH
+      21 s() PUSH
       NOT
       THROWANYIFNOT
-      29 s() 30 s() XCHG
-      28 s() 30 s() XCHG
-      27 s() 30 s() XCHG
-      26 s() 30 s() XCHG
-      25 s() 30 s() XCHG
-      24 s() 30 s() XCHG
-      23 s() 30 s() XCHG
-      22 s() 30 s() XCHG
-      21 s() 30 s() XCHG
-      20 s() 30 s() XCHG
-      19 s() 30 s() XCHG
-      18 s() 30 s() XCHG
-      17 s() 30 s() XCHG
-      16 s() 30 s() XCHG
-      s15 30 s() XCHG
-      s14 30 s() XCHG
-      s13 30 s() XCHG
-      s12 30 s() XCHG
-      s11 30 s() XCHG
-      s10 30 s() XCHG
-      s9 30 s() XCHG
-      s0 30 s() XCHG
+      30 s() 31 s() XCHG
+      29 s() 31 s() XCHG
+      28 s() 31 s() XCHG
+      27 s() 31 s() XCHG
+      26 s() 31 s() XCHG
+      25 s() 31 s() XCHG
+      24 s() 31 s() XCHG
+      23 s() 31 s() XCHG
+      22 s() 31 s() XCHG
+      21 s() 31 s() XCHG
+      20 s() 31 s() XCHG
+      19 s() 31 s() XCHG
+      18 s() 31 s() XCHG
+      17 s() 31 s() XCHG
+      16 s() 31 s() XCHG
+      s15 31 s() XCHG
+      s14 31 s() XCHG
+      s13 31 s() XCHG
+      s12 31 s() XCHG
+      s11 31 s() XCHG
+      s10 31 s() XCHG
+      s9 31 s() XCHG
+      s0 31 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       22111 PUSHINT
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       $BuybackBurn$_fun_deriveOwnAthWalletAddress INLINECALLDICT
-      20 s() POP
-      26 s() POP
-      31 s() PUSH
+      21 s() POP
+      27 s() POP
+      32 s() PUSH
       SWAP
-      s0 19 s() XCHG
+      s0 20 s() XCHG
       SDEQ
-      s1 30 s() XCHG
+      s1 31 s() XCHG
       THROWANYIFNOT
+      28 s() 30 s() XCHG
       27 s() 29 s() XCHG
       26 s() 28 s() XCHG
       25 s() 27 s() XCHG
-      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
       22 s() 24 s() XCHG
       21 s() 23 s() XCHG
       20 s() 22 s() XCHG
       19 s() 21 s() XCHG
       18 s() 20 s() XCHG
-      17 s() 19 s() XCHG
       TRUE
-      s0 19 s() XCHG
+      s0 20 s() XCHG
+      17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
-      2 14 BLKSWAP
+      s13 s15 XCHG
+      2 13 BLKSWAP
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1081,7 +1178,7 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       256 LDU
       LDMSGADDR
       LDMSGADDR
@@ -1100,6 +1197,7 @@ PROGRAM{
       128 LDU
       256 LDU
       DROP
+      31 s() 40 s() XCHG
       30 s() 39 s() XCHG
       29 s() 38 s() XCHG
       28 s() 37 s() XCHG
@@ -1108,7 +1206,7 @@ PROGRAM{
       25 s() 34 s() XCHG
       24 s() 33 s() XCHG
       23 s() 32 s() XCHG
-      22 s() 31 s() XCHG
+      22 s() 40 s() XCHG
       21 s() 39 s() XCHG
       20 s() 38 s() XCHG
       19 s() 37 s() XCHG
@@ -1117,7 +1215,7 @@ PROGRAM{
       16 s() 34 s() XCHG
       s15 33 s() XCHG
       s14 32 s() XCHG
-      s13 31 s() XCHG
+      s13 40 s() XCHG
       s12 39 s() XCHG
       s11 38 s() XCHG
       s10 37 s() XCHG
@@ -1126,13 +1224,14 @@ PROGRAM{
       s7 34 s() XCHG
       s6 33 s() XCHG
       s5 32 s() XCHG
-      s4 31 s() XCHG
+      s4 40 s() XCHG
       s3 39 s() XCHG
       s2 38 s() XCHG
-      s1 40 s() XCHG
-      s0 41 s() XCHG
+      s1 41 s() XCHG
+      s0 42 s() XCHG
       $BuybackBurn$_fun_requireUnsealed INLINECALLDICT
       $BuybackBurn$_fun_requireGenesisController INLINECALLDICT
+      31 s() 32 s() XCHG
       30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
@@ -1153,7 +1252,7 @@ PROGRAM{
       s0 37 s() XCHG
       $BuybackBurn$_fun_acceptManifestHash INLINECALLDICT
       22120 PUSHINT
-      19 s() PUSH
+      20 s() PUSH
       NOT
       THROWANYIFNOT
       22121 PUSHINT
@@ -1161,50 +1260,52 @@ PROGRAM{
       0 GTINT
       THROWANYIFNOT
       22122 PUSHINT
-      41 s() PUSH
+      42 s() PUSH
       0 NEQINT
       THROWANYIFNOT
       22123 PUSHINT
-      37 s() PUSH
+      40 s() PUSH
       101 LESSINT
       THROWANYIFNOT
-      29 s() 30 s() XCHG
-      28 s() 30 s() XCHG
-      27 s() 30 s() XCHG
-      26 s() 30 s() XCHG
-      25 s() 30 s() XCHG
-      24 s() 30 s() XCHG
-      23 s() 30 s() XCHG
-      22 s() 30 s() XCHG
-      21 s() 30 s() XCHG
-      20 s() 30 s() XCHG
-      19 s() 30 s() XCHG
-      18 s() 30 s() XCHG
-      17 s() 30 s() XCHG
-      16 s() 30 s() XCHG
-      s15 30 s() XCHG
-      s14 30 s() XCHG
-      s13 30 s() XCHG
-      s12 30 s() XCHG
-      s11 30 s() XCHG
-      s10 30 s() XCHG
-      s9 30 s() XCHG
-      s0 30 s() XCHG
+      30 s() 31 s() XCHG
+      29 s() 31 s() XCHG
+      28 s() 31 s() XCHG
+      27 s() 31 s() XCHG
+      26 s() 31 s() XCHG
+      25 s() 31 s() XCHG
+      24 s() 31 s() XCHG
+      23 s() 31 s() XCHG
+      22 s() 31 s() XCHG
+      21 s() 31 s() XCHG
+      20 s() 31 s() XCHG
+      19 s() 31 s() XCHG
+      18 s() 31 s() XCHG
+      17 s() 31 s() XCHG
+      16 s() 31 s() XCHG
+      s15 31 s() XCHG
+      s14 31 s() XCHG
+      s13 31 s() XCHG
+      s12 31 s() XCHG
+      s11 31 s() XCHG
+      s10 31 s() XCHG
+      s9 31 s() XCHG
+      s0 31 s() XCHG
       s0 s8 XCHG
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
       22124 PUSHINT
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       35 s() PUSH
       $BuybackBurn$_fun_deriveAthWalletAddress INLINECALLDICT
-      16 s() POP
+      17 s() POP
       33 s() PUSH
       SWAP
-      s0 16 s() XCHG
+      s0 17 s() XCHG
       SDEQ
-      s1 31 s() XCHG
+      s1 32 s() XCHG
       THROWANYIFNOT
+      29 s() 31 s() XCHG
       28 s() 30 s() XCHG
       27 s() 29 s() XCHG
       26 s() 28 s() XCHG
@@ -1219,55 +1320,50 @@ PROGRAM{
       17 s() 19 s() XCHG
       16 s() 18 s() XCHG
       s15 17 s() XCHG
-      s14 16 s() XCHG
-      s15 37 s() XCHG
-      s12 s14 XCHG
-      s11 s13 XCHG
-      s10 s12 XCHG
-      s9 s11 XCHG
-      s8 s10 XCHG
-      s7 s9 XCHG
-      s6 s8 XCHG
-      s5 s7 XCHG
-      s4 s6 XCHG
-      s3 s5 XCHG
-      s0 s1 s4 XCHG3
-      s0 37 s() XCHG
-      s0 s3 XCHG2
+      16 s() 37 s() XCHG
+      2 14 BLKSWAP
+      s1 37 s() XCHG
       36 s() PUSH
-      39 s() PUSH
+      40 s() PUSH
       $BuybackBurn$_fun_validateMinOut INLINECALLDICT
-      s12 POP
-      s12 POP
-      s12 POP
+      s13 POP
+      s13 POP
       s13 POP
       s14 POP
-      16 s() POP
-      16 s() POP
-      16 s() POP
-      16 s() POP
-      16 s() POP
+      s15 POP
+      17 s() POP
+      17 s() POP
+      17 s() POP
+      17 s() POP
+      17 s() POP
+      21 s() 30 s() XCHG
       20 s() 29 s() XCHG
       19 s() 28 s() XCHG
       18 s() 27 s() XCHG
       17 s() 26 s() XCHG
-      16 s() 25 s() XCHG
-      18 s() 20 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      18 s() 22 s() XCHG
+      18 s() 21 s() XCHG
+      s11 20 s() XCHG
       s10 19 s() XCHG
-      s9 18 s() XCHG
       TRUE
-      s0 18 s() XCHG
-      s8 17 s() XCHG
-      s8 16 s() XCHG
-      s6 s15 XCHG
-      s0 s14 XCHG
-      s11 s13 XCHG
-      s10 s12 XCHG
+      s0 19 s() XCHG
+      s9 18 s() XCHG
+      s11 17 s() XCHG
+      s7 16 s() XCHG
+      s9 s15 XCHG
+      s12 s14 XCHG
+      s0 s13 XCHG
+      s3 s12 XCHG
       s11 s10 s0 XCHG3
-      s8 s9 XCHG
-      s6 s8 XCHG
-      s6 s5 s7 XCHG3
-      s1 s4 s3 XCHG3
+      s2 s9 XCHG
+      s7 s8 XCHG
+      s2 s7 XCHG
+      s3 s6 XCHG
+      6 0 REVERSE
+      SWAP
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1275,9 +1371,10 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       256 LDU
       DROP
+      30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
@@ -1305,10 +1402,11 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       s1 s3 s0 XCHG3
       $BuybackBurn$_fun_requireUnsealed INLINECALLDICT
       $BuybackBurn$_fun_requireGenesisController INLINECALLDICT
+      31 s() 32 s() XCHG
       30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
@@ -1327,21 +1425,21 @@ PROGRAM{
       s15 16 s() XCHG
       15 ROLL
       $BuybackBurn$_fun_acceptManifestHash INLINECALLDICT
-      17 s() POP
-      29 s() POP
+      18 s() POP
+      30 s() POP
       22130 PUSHINT
-      19 s() PUSH
+      20 s() PUSH
       THROWANYIFNOT
       22131 PUSHINT
-      18 s() PUSH
+      19 s() PUSH
       THROWANYIFNOT
       22132 PUSHINT
-      17 s() PUSH
+      18 s() PUSH
       THROWANYIFNOT
       0 PUSHINT
-      s0 29 s() XCHG
+      s0 30 s() XCHG
       TRUE
-      s0 17 s() XCHG
+      s0 18 s() XCHG
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1349,9 +1447,10 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       128 LDU
       DROP
+      30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
@@ -1379,35 +1478,36 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       s1 s3 s0 XCHG3
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
       22200 PUSHINT
-      19 s() PUSH
+      20 s() PUSH
       THROWANYIFNOT
       22201 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      29 s() PUSH
+      30 s() PUSH
       SDEQ
       THROWANYIFNOT
       22202 PUSHINT
-      32 s() PUSH
+      33 s() PUSH
       51050000000 PUSHINT
       EQUAL
       THROWANYIFNOT
       22203 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      33 s() PUSH
+      34 s() PUSH
       2000000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT
-      s0 31 s() XCHG
-      s1 s10 XCHG
+      s0 32 s() XCHG
+      s1 s11 XCHG
       ADD
       SWAP
       INC
+      30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
@@ -1426,9 +1526,9 @@ PROGRAM{
       s14 s15 XCHG
       s13 s14 XCHG
       s12 s13 XCHG
-      s11 s12 XCHG
-      s1 s10 XCHG
       s1 s11 XCHG
+      s1 s12 XCHG
+      s9 s10 XCHG
       s8 s9 XCHG
       s7 s8 XCHG
       s6 s7 XCHG
@@ -1443,60 +1543,63 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       64 LDU
       64 LDU
       128 LDU
       128 LDU
       DROP
+      31 s() 33 s() XCHG
       30 s() 32 s() XCHG
-      29 s() 31 s() XCHG
+      29 s() 33 s() XCHG
       28 s() 32 s() XCHG
-      27 s() 31 s() XCHG
+      27 s() 33 s() XCHG
       26 s() 32 s() XCHG
-      25 s() 31 s() XCHG
+      25 s() 33 s() XCHG
       24 s() 32 s() XCHG
-      23 s() 31 s() XCHG
+      23 s() 33 s() XCHG
       22 s() 32 s() XCHG
-      21 s() 31 s() XCHG
+      21 s() 33 s() XCHG
       20 s() 32 s() XCHG
-      19 s() 31 s() XCHG
+      19 s() 33 s() XCHG
       18 s() 32 s() XCHG
-      17 s() 31 s() XCHG
+      17 s() 33 s() XCHG
       16 s() 32 s() XCHG
-      s15 31 s() XCHG
+      s15 33 s() XCHG
       s14 32 s() XCHG
-      s13 31 s() XCHG
+      s13 33 s() XCHG
       s12 32 s() XCHG
-      s11 31 s() XCHG
+      s11 33 s() XCHG
       s10 32 s() XCHG
-      s9 31 s() XCHG
+      s9 33 s() XCHG
       s8 32 s() XCHG
-      s7 31 s() XCHG
+      s7 33 s() XCHG
       s6 32 s() XCHG
-      s5 31 s() XCHG
+      s5 33 s() XCHG
       s4 32 s() XCHG
-      s3 31 s() XCHG
+      s3 33 s() XCHG
       s2 32 s() XCHG
-      s1 33 s() XCHG
-      s0 34 s() XCHG
+      s1 34 s() XCHG
+      s0 35 s() XCHG
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
       22210 PUSHINT
-      19 s() PUSH
+      20 s() PUSH
       THROWANYIFNOT
       22211 PUSHINT
-      s12 PUSH
+      s13 PUSH
       0 EQINT
       THROWANYIFNOT
       22212 PUSHINT
-      s11 PUSH
+      s12 PUSH
       51050000000 PUSHINT
       GEQ
       THROWANYIFNOT
       22213 PUSHINT
-      32 s() PUSH
+      34 s() PUSH
       0 GTINT
       THROWANYIFNOT
+      33 s() PUSH
+      $BuybackBurn$_fun_requireFreshQueryId INLINECALLDICT
       22214 PUSHINT
           NOW
       34 s() PUSH
@@ -1517,6 +1620,7 @@ PROGRAM{
       50000000 PUSHINT
       GEQ
       THROWANYIFNOT
+      31 s() 32 s() XCHG
       30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
@@ -1534,62 +1638,67 @@ PROGRAM{
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
-      s0 33 s() XCHG
-      34 s() PUSH
+      s0 34 s() XCHG
+      35 s() PUSH
       $BuybackBurn$_fun_validateMinOut INLINECALLDICT
-      5 5 BLKDROP2
       s6 POP
-      s0 s4 XCHG
+      s6 POP
+      s6 POP
+      s6 POP
+      s6 POP
+      s7 POP
+      s0 s5 XCHG
       51050000000 PUSHINT
       SUB
       1 PUSHINT
       27 s() PUSH
-      27 s() PUSH
-      s6 PUSH
-      31 s() PUSH
+      29 s() PUSH
+      s9 PUSH
+      32 s() PUSH
       0 PUSHINT
-      23 s() PUSH
+      24 s() PUSH
       51050000000 PUSHINT
       TRUE
       s8 PUSH
-      33 s() 34 s() XCHG
-      32 s() 34 s() XCHG
-      31 s() 34 s() XCHG
-      30 s() 34 s() XCHG
-      29 s() 34 s() XCHG
-      28 s() 34 s() XCHG
-      27 s() 34 s() XCHG
-      26 s() 34 s() XCHG
-      25 s() 34 s() XCHG
-      24 s() 34 s() XCHG
-      23 s() 34 s() XCHG
-      22 s() 34 s() XCHG
-      21 s() 34 s() XCHG
-      20 s() 34 s() XCHG
-      19 s() 34 s() XCHG
-      18 s() 34 s() XCHG
-      17 s() 34 s() XCHG
-      16 s() 34 s() XCHG
-      s15 34 s() XCHG
-      s9 s14 XCHG
-      s10 s13 XCHG
-      s8 s12 XCHG
-      s7 s11 XCHG
-      s6 s10 XCHG
-      s5 s9 XCHG
-      s4 s8 XCHG
-      s6 s7 XCHG
-      s4 s6 XCHG
-      s4 s5 XCHG
-      s3 34 s() XCHG
+      34 s() 35 s() XCHG
+      33 s() 35 s() XCHG
+      32 s() 35 s() XCHG
+      31 s() 35 s() XCHG
+      30 s() 35 s() XCHG
+      29 s() 35 s() XCHG
+      28 s() 35 s() XCHG
+      27 s() 35 s() XCHG
+      26 s() 35 s() XCHG
+      25 s() 35 s() XCHG
+      24 s() 35 s() XCHG
+      23 s() 35 s() XCHG
+      22 s() 35 s() XCHG
+      21 s() 35 s() XCHG
+      20 s() 35 s() XCHG
+      19 s() 35 s() XCHG
+      18 s() 35 s() XCHG
+      17 s() 35 s() XCHG
+      16 s() 35 s() XCHG
+      s9 s15 XCHG
+      s10 s14 XCHG
+      s8 s13 XCHG
+      s7 s12 XCHG
+      s6 s11 XCHG
+      s5 s10 XCHG
+      s4 s9 XCHG
+      s8 35 s() XCHG
+      s5 s7 XCHG
+      s6 35 s() XCHG
+      s4 35 s() XCHG
+      s3 35 s() XCHG
       s2 36 s() XCHG
-      s1 35 s() XCHG
-      s0 37 s() XCHG
+      s1 37 s() XCHG
+      s0 38 s() XCHG
       $BuybackBurn$_fun_ptonTonTransferBody INLINECALLDICT
-      s4 32 s() XCHG
+      s4 33 s() XCHG
       s3 34 s() XCHG
-      s2 33 s() XCHG
-      s1 35 s() XCHG
+      s2 35 s() XCHG
+      s1 36 s() XCHG
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1608,6 +1717,7 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      27 s() 31 s() XCHG
       26 s() 30 s() XCHG
       25 s() 29 s() XCHG
       24 s() 28 s() XCHG
@@ -1632,8 +1742,8 @@ PROGRAM{
       s5 s9 XCHG
       s4 s8 XCHG
       s3 s7 XCHG
-      s6 s4 s4 XCHG3
-      s5 s1 s5 XCHG3
+      s6 s1 s4 XCHG3
+      s5 s5 s3 XCHG3
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1641,70 +1751,71 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       64 LDU
       128 LDU
       32 LDU
       LDMSGADDR
       DROP
+      31 s() 33 s() XCHG
       30 s() 32 s() XCHG
-      29 s() 31 s() XCHG
+      29 s() 33 s() XCHG
       28 s() 32 s() XCHG
-      27 s() 31 s() XCHG
+      27 s() 33 s() XCHG
       26 s() 32 s() XCHG
-      25 s() 31 s() XCHG
+      25 s() 33 s() XCHG
       24 s() 32 s() XCHG
-      23 s() 31 s() XCHG
+      23 s() 33 s() XCHG
       22 s() 32 s() XCHG
-      21 s() 31 s() XCHG
+      21 s() 33 s() XCHG
       20 s() 32 s() XCHG
-      19 s() 31 s() XCHG
+      19 s() 33 s() XCHG
       18 s() 32 s() XCHG
-      17 s() 31 s() XCHG
+      17 s() 33 s() XCHG
       16 s() 32 s() XCHG
-      s15 31 s() XCHG
+      s15 33 s() XCHG
       s14 32 s() XCHG
-      s13 31 s() XCHG
+      s13 33 s() XCHG
       s12 32 s() XCHG
-      s11 31 s() XCHG
+      s11 33 s() XCHG
       s10 32 s() XCHG
-      s9 31 s() XCHG
+      s9 33 s() XCHG
       s8 32 s() XCHG
-      s7 31 s() XCHG
+      s7 33 s() XCHG
       s6 32 s() XCHG
-      s5 31 s() XCHG
+      s5 33 s() XCHG
       s4 32 s() XCHG
-      s3 31 s() XCHG
+      s3 33 s() XCHG
       s2 32 s() XCHG
-      s1 33 s() XCHG
-      s0 34 s() XCHG
+      s1 34 s() XCHG
+      s0 35 s() XCHG
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
-      s5 POP
+      s6 POP
       22300 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      27 s() PUSH
+      28 s() PUSH
       SDEQ
       THROWANYIFNOT
       22301 PUSHINT
-      s0 s11 XCHG
+      s0 s12 XCHG
       1 EQINT
-      s1 s11 XCHG
+      s1 s12 XCHG
       THROWANYIFNOT
       22302 PUSHINT
-      30 s() PUSH
-      s9 PUSH
+      32 s() PUSH
+      s10 PUSH
       EQUAL
       THROWANYIFNOT
       22303 PUSHINT
       31 s() PUSH
-      s6 PUSH
+      s7 PUSH
       GEQ
       THROWANYIFNOT
       22304 PUSHINT
-      s0 33 s() XCHG
-      23 s() PUSH
+      s0 34 s() XCHG
+      24 s() PUSH
       SDEQ
-      s1 33 s() XCHG
+      s1 34 s() XCHG
       THROWANYIFNOT
       22305 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -1717,16 +1828,16 @@ PROGRAM{
       __tact_context_get_sender INLINECALLDICT
       1000000 PUSHINT
       FALSE
-      33 s() PUSH
+      35 s() PUSH
       0 PUSHINT
-      s0 37 s() XCHG
+      s0 38 s() XCHG
       36 s() PUSH
       $AthTransferNotificationAck$_constructor_query_id_sender_key_amount INLINECALLDICT
       NEWC
       $AthTransferNotificationAck$_store_cell INLINECALLDICT
       s3 s4 XCHG
       s1 s3 s0 XCHG3
-      s1 36 s() XCHG
+      s1 37 s() XCHG
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1745,6 +1856,7 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      29 s() 33 s() XCHG
       28 s() 32 s() XCHG
       27 s() 31 s() XCHG
       26 s() 30 s() XCHG
@@ -1763,15 +1875,16 @@ PROGRAM{
       s13 17 s() XCHG
       s12 16 s() XCHG
       s11 s15 XCHG
-      s10 s14 XCHG
-      s0 s13 XCHG
+      s0 s14 XCHG
+      s9 s13 XCHG
       s8 s12 XCHG
       s7 s11 XCHG
       s6 s10 XCHG
       s5 s9 XCHG
-      s4 s8 XCHG
-      s6 s0 s5 XCHG3
-      s3 s1 s3 XCHG3
+      s3 s7 XCHG
+      s6 s5 s0 XCHG3
+      s4 s4 s0 XCHG3
+      s1 s3 XCHG
       $BuybackBurn$_fun_sendAthBurn INLINECALLDICT
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
@@ -1780,74 +1893,76 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       64 LDU
       128 LDU
       LDMSGADDR
       DROP
-      30 s() 31 s() XCHG
-      29 s() 31 s() XCHG
-      28 s() 31 s() XCHG
-      27 s() 31 s() XCHG
-      26 s() 31 s() XCHG
-      25 s() 31 s() XCHG
-      24 s() 31 s() XCHG
-      23 s() 31 s() XCHG
-      22 s() 31 s() XCHG
-      21 s() 31 s() XCHG
-      20 s() 31 s() XCHG
-      19 s() 31 s() XCHG
-      18 s() 31 s() XCHG
-      17 s() 31 s() XCHG
-      16 s() 31 s() XCHG
-      s15 31 s() XCHG
-      s14 31 s() XCHG
-      s13 31 s() XCHG
-      s12 31 s() XCHG
-      s11 31 s() XCHG
-      s10 31 s() XCHG
-      s9 31 s() XCHG
-      s8 31 s() XCHG
-      s7 31 s() XCHG
-      s6 31 s() XCHG
-      s5 31 s() XCHG
-      s4 31 s() XCHG
-      s3 31 s() XCHG
-      s2 31 s() XCHG
-      s1 32 s() XCHG
-      s0 33 s() XCHG
+      31 s() 32 s() XCHG
+      30 s() 32 s() XCHG
+      29 s() 32 s() XCHG
+      28 s() 32 s() XCHG
+      27 s() 32 s() XCHG
+      26 s() 32 s() XCHG
+      25 s() 32 s() XCHG
+      24 s() 32 s() XCHG
+      23 s() 32 s() XCHG
+      22 s() 32 s() XCHG
+      21 s() 32 s() XCHG
+      20 s() 32 s() XCHG
+      19 s() 32 s() XCHG
+      18 s() 32 s() XCHG
+      17 s() 32 s() XCHG
+      16 s() 32 s() XCHG
+      s15 32 s() XCHG
+      s14 32 s() XCHG
+      s13 32 s() XCHG
+      s12 32 s() XCHG
+      s11 32 s() XCHG
+      s10 32 s() XCHG
+      s9 32 s() XCHG
+      s8 32 s() XCHG
+      s7 32 s() XCHG
+      s6 32 s() XCHG
+      s5 32 s() XCHG
+      s4 32 s() XCHG
+      s3 32 s() XCHG
+      s2 32 s() XCHG
+      s1 33 s() XCHG
+      s0 34 s() XCHG
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
       22320 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      30 s() PUSH
+      31 s() PUSH
       SDEQ
       THROWANYIFNOT
       22321 PUSHINT
-      s12 PUSH
+      s13 PUSH
       2 EQINT
       THROWANYIFNOT
       22322 PUSHINT
-      s0 32 s() XCHG
-      s10 PUSH
+      s0 33 s() XCHG
+      s11 PUSH
       EQUAL
-      s1 32 s() XCHG
+      s1 33 s() XCHG
       THROWANYIFNOT
       22323 PUSHINT
-      32 s() PUSH
-      s6 PUSH
+      33 s() PUSH
+      s7 PUSH
       EQUAL
       THROWANYIFNOT
       22324 PUSHINT
           MYADDR
-      s1 34 s() XCHG
+      s1 35 s() XCHG
       SDEQ
-      s1 33 s() XCHG
+      s1 34 s() XCHG
       THROWANYIFNOT
-      s1 29 s() XCHG
-      s0 30 s() XCHG
+      s1 30 s() XCHG
+      s0 31 s() XCHG
       ADD
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       INC
+      28 s() 31 s() XCHG
       27 s() 30 s() XCHG
       26 s() 29 s() XCHG
       25 s() 28 s() XCHG
@@ -1873,9 +1988,9 @@ PROGRAM{
       s5 s8 XCHG
       s4 s7 XCHG
       s3 s6 XCHG
-      s5 s0 s4 XCHG3
-      s0 s3 XCHG
-      $BuybackBurn$_fun_clearPending INLINECALLDICT
+      s5 s4 s0 XCHG3
+      s3 s0 s0 XCHG3
+      $BuybackBurn$_fun_finishPendingCycle INLINECALLDICT
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1883,36 +1998,37 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 31 s() XCHG
-      s0 32 s() XCHG
+      s1 32 s() XCHG
+      s0 33 s() XCHG
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
       22330 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      28 s() PUSH
+      29 s() PUSH
       SDEQ
       THROWANYIFNOT
       22331 PUSHINT
-      s12 PUSH
+      s13 PUSH
       2 EQINT
       THROWANYIFNOT
       22332 PUSHINT
-      s0 32 s() XCHG
-      s10 PUSH
+      s0 33 s() XCHG
+      s11 PUSH
       EQUAL
-      s1 32 s() XCHG
+      s1 33 s() XCHG
       THROWANYIFNOT
       22333 PUSHINT
-      32 s() PUSH
-      s6 PUSH
+      33 s() PUSH
+      s7 PUSH
       EQUAL
       THROWANYIFNOT
-      s0 31 s() XCHG
-      s1 s2 XCHG
+      s0 32 s() XCHG
+      s1 s3 XCHG
       ADD
+      29 s() 31 s() XCHG
       28 s() 30 s() XCHG
       27 s() 29 s() XCHG
       26 s() 28 s() XCHG
@@ -1939,8 +2055,8 @@ PROGRAM{
       s5 s7 XCHG
       s4 s6 XCHG
       s3 s5 XCHG
-      s1 s4 s3 XCHG3
-      $BuybackBurn$_fun_clearPending INLINECALLDICT
+      s3 s4 XCHG2
+      $BuybackBurn$_fun_finishPendingCycle INLINECALLDICT
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1948,32 +2064,34 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       64 LDU
       128 LDU
       DROP
-      s1 31 s() XCHG
-      s0 32 s() XCHG
+      s1 32 s() XCHG
+      s0 33 s() XCHG
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
-      s5 POP
-      s5 POP
-      s7 POP
       22340 PUSHINT
-      s0 s9 XCHG
+      s13 PUSH
       0 EQINT
-      s1 s9 XCHG
       THROWANYIFNOT
       22341 PUSHINT
-      28 s() PUSH
+      33 s() PUSH
       0 GTINT
       THROWANYIFNOT
+      32 s() PUSH
+      $BuybackBurn$_fun_requireFreshQueryId INLINECALLDICT
+      s6 POP
+      s6 POP
+      s8 POP
+      s9 POP
       22342 PUSHINT
-      29 s() PUSH
+      30 s() PUSH
       0 GTINT
       THROWANYIFNOT
       22343 PUSHINT
-      29 s() PUSH
-      s9 PUSH
+      30 s() PUSH
+      s2 PUSH
       LEQ
       THROWANYIFNOT
       22344 PUSHINT
@@ -1982,13 +2100,13 @@ PROGRAM{
       30000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s0 s7 XCHG
-      28 s() PUSH
+      29 s() PUSH
       SUB
       2 PUSHINT
-      28 s() PUSH
-      30 s() PUSH
+      29 s() PUSH
       31 s() PUSH
+      32 s() PUSH
+      31 s() 33 s() XCHG
       30 s() 32 s() XCHG
       29 s() 31 s() XCHG
       28 s() 30 s() XCHG
@@ -2007,16 +2125,16 @@ PROGRAM{
       s15 17 s() XCHG
       s14 16 s() XCHG
       s13 s15 XCHG
-      s12 s14 XCHG
-      s3 s13 XCHG
-      s10 s12 XCHG
-      s2 s11 XCHG
-      s8 s10 XCHG
-      s0 s7 XCHG
-      s6 s8 s9 XCHG3
-      s0 s4 XCHG
-      s5 s1 s5 XCHG3
-      s3 s3 XCHG2
+      s3 s14 XCHG
+      s11 s13 XCHG
+      s2 s12 XCHG
+      s9 s11 XCHG
+      s0 s8 XCHG
+      s9 s10 XCHG2
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s5 s1 s4 XCHG3
+      s0 s3 s3 XCHG3
       $BuybackBurn$_fun_sendAthBurn INLINECALLDICT
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
@@ -2025,9 +2143,10 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 30 s() XCHG
+      s0 31 s() XCHG
       64 LDU
       DROP
+      30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
@@ -2055,33 +2174,40 @@ PROGRAM{
       s5 s6 XCHG
       s4 s5 XCHG
       s3 s4 XCHG
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       s1 s3 s0 XCHG3
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
+      22354 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
       22350 PUSHINT
-      s12 PUSH
+      s13 PUSH
       1 EQINT
       THROWANYIFNOT
       22351 PUSHINT
-      s0 32 s() XCHG
-      s10 PUSH
+      s0 33 s() XCHG
+      s11 PUSH
       EQUAL
-      s1 32 s() XCHG
+      s1 33 s() XCHG
       THROWANYIFNOT
       22352 PUSHINT
-      s7 PUSH
+      s8 PUSH
       49000000000 PUSHINT
       ADD
-      s5 s(-1) PUXC
+      s6 s(-1) PUXC
       GEQ
       THROWANYIFNOT
       22353 PUSHINT
           NOW
-      s9 PUSH
+      s10 PUSH
       900 PUSHINT
       ADD
       GREATER
       THROWANYIFNOT
+      30 s() 31 s() XCHG
       29 s() 30 s() XCHG
       28 s() 29 s() XCHG
       27 s() 28 s() XCHG
@@ -2098,16 +2224,17 @@ PROGRAM{
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
-      $BuybackBurn$_fun_clearPending INLINECALLDICT
+      $BuybackBurn$_fun_finishPendingCycle INLINECALLDICT
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
-    32 s() POP
+    33 s() POP
     DUP
     1113150034 PUSHINT
     EQUAL
     IFJMP:<{
       DROP
-      30 s() POP
+      31 s() POP
+      29 s() 31 s() XCHG
       28 s() 30 s() XCHG
       27 s() 29 s() XCHG
       26 s() 28 s() XCHG
@@ -2123,14 +2250,15 @@ PROGRAM{
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
-      2 14 BLKSWAP
+      s13 s15 XCHG
+      2 13 BLKSWAP
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
       22360 PUSHINT
-      s12 PUSH
+      s13 PUSH
       0 EQINT
       THROWANYIFNOT
       22361 PUSHINT
-      s5 PUSH
+      s6 PUSH
       51050000000 PUSHINT
       GEQ
       THROWANYIFNOT
@@ -2140,32 +2268,39 @@ PROGRAM{
       2000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s0 s4 XCHG
+      s0 s5 XCHG
       51050000000 PUSHINT
       SUB
-      s0 s10 XCHG
+      s0 s11 XCHG
       51050000000 PUSHINT
       ADD
-      s0 s10 XCHG
-      s0 s4 XCHG
+      s0 s11 XCHG
+      s0 s5 XCHG
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 31 s() XCHG
+    s0 32 s() XCHG
     33 LESSINT
-    s1 31 s() XCHG
+    s1 32 s() XCHG
     AND
     IFJMP:<{
-      s15 PUSH
+      16 s() PUSH
       IF:<{
-        16 s() PUSH
+        17 s() PUSH
       }>ELSE<{
         FALSE
       }>
       IF:<{
         __tact_context_get_sender INLINECALLDICT
-        22 s() PUSH
+        23 s() PUSH
         SDEQ
+        IF:<{
+          TRUE
+        }>ELSE<{
+          __tact_context_get_sender INLINECALLDICT
+          25 s() PUSH
+          SDEQ
+        }>
         IF:<{
           TRUE
         }>ELSE<{
@@ -2173,16 +2308,10 @@ PROGRAM{
           24 s() PUSH
           SDEQ
         }>
-        IF:<{
-          TRUE
-        }>ELSE<{
-          __tact_context_get_sender INLINECALLDICT
-          23 s() PUSH
-          SDEQ
-        }>
         IFJMP:<{
           __tact_context_get INLINECALLDICT
           $Context$_get_value INLINECALLDICT
+          30 s() 32 s() XCHG
           29 s() 31 s() XCHG
           28 s() 30 s() XCHG
           27 s() 29 s() XCHG
@@ -2211,6 +2340,7 @@ PROGRAM{
           s4 s6 XCHG
           s3 s5 XCHG
           s4 s3 s0 XCHG3
+          s1 s2 XCHG
           $BuybackBurn$_fun_creditRouteRefundValue INLINECALLDICT
           $BuybackBurn$_contract_store INLINECALLDICT
           RETALT
@@ -2218,6 +2348,7 @@ PROGRAM{
       }>
       22999 PUSHINT
       THROWANY
+      29 s() 31 s() XCHG
       28 s() 30 s() XCHG
       27 s() 29 s() XCHG
       26 s() 28 s() XCHG
@@ -2233,12 +2364,13 @@ PROGRAM{
       16 s() 18 s() XCHG
       s15 17 s() XCHG
       s14 16 s() XCHG
-      2 14 BLKSWAP
+      s13 s15 XCHG
+      2 13 BLKSWAP
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     15 BLKDROP
     15 BLKDROP
-    DROP
+    2DROP
     130 THROW
   }>
 }END>c

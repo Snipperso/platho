@@ -16,6 +16,8 @@ const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddcccc
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const STALE_TTL = 86_400;
+const PRUNE_EXEC_RESERVE = 2_000_000n;
+const REFUND_DUE_STORAGE_ENDOWMENT = 4_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -117,6 +119,13 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     expect((await ctx.registry.getGetGlobal()).pending_mint_count).toBe(1n);
 
     ctx.blockchain.now = 1_700_000_000 + STALE_TTL + 1;
+    await ctx.registry.send(ctx.pruner.getSender(), { value: PRUNE_EXEC_RESERVE + REFUND_DUE_STORAGE_ENDOWMENT - 1n }, {
+      $$type: 'PrunePendingUsernameMint',
+      name_hash: hash,
+    } as PrunePendingUsernameMint);
+    expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
+    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
+
     await ctx.registry.send(ctx.pruner.getSender(), { value: toNano('0.03') }, {
       $$type: 'PrunePendingUsernameMint',
       name_hash: hash,

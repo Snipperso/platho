@@ -18,6 +18,7 @@ const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 20000000;
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 5000000;
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
+const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
 const USERNAME_MAX_LENGTH: Int = 32;
@@ -676,12 +677,16 @@ contract UsernameRegistry {
 
     receive(msg: PrunePendingUsernameMint) {
         self.requireSealed();
+        throwUnless(19305, context().value >= USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE);
         throwUnless(19301, msg.name_hash != 0);
         let pendingOpt: PendingUsernameMint? = self.pending_mints.get(msg.name_hash);
         throwUnless(19302, pendingOpt != null);
         let pending: PendingUsernameMint = pendingOpt!!;
         throwUnless(19303, now() >= pending.created_at + USERNAME_PENDING_MINT_STALE_TTL);
         throwUnless(19304, !self.name_records.exists(msg.name_hash));
+        if (!self.ath_refunds_due.exists(pending.owner_wallet)) {
+            throwUnless(19306, context().value >= USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE + USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT);
+        }
 
         let cleared: PendingUsernameMint = self.clearPendingMint(msg.name_hash);
         self.restoreRefundDue(cleared.owner_wallet, cleared.price_paid);

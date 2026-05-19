@@ -686,9 +686,9 @@ _ %get_state() method_id(86957) {
     if (op == 0x7a861031) {
         var $msg'amount = in_msg~load_uint(128);
         ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
-        throw_unless(13200, ($msg'amount > 0));
+        throw_unless(13200, ($msg'amount >= 5000000));
         throw_unless(13201, ($msg'amount <= $self'accrued_plato_fee_ton));
-        throw_unless(13202, ($Context$_get_value(__tact_context_get()) >= 30000000));
+        throw_unless(13202, ($Context$_get_value(__tact_context_get()) >= 32000000));
         $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'fee_accumulator_address, ($msg'amount + 30000000), true, 0, $DepositProtocolFee$_store_cell($DepositProtocolFee$_constructor_amount($msg'amount), begin_cell())));
         $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));

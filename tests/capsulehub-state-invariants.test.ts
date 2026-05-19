@@ -17,6 +17,7 @@ const PUBLIC_FEE = 5_000_000n;
 const PRIVATE_REQUIRED = 5_000_000n + 3_000_000n + 1_000_000n + 4_000_000n + 10_000_000n;
 const PUBLIC_REQUIRED = 5_000_000n + 3_000_000n + 1_000_000n + 3_000_000n + 10_000_000n;
 const ACK_RESERVE = 30_000_000n;
+const FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const VAULT_PRIVATE_REQUIRED = PRIVATE_REQUIRED + ACK_RESERVE;
 const VAULT_PUBLIC_REQUIRED = PUBLIC_REQUIRED + ACK_RESERVE;
 const PAGE_SIZE = 256n;
@@ -206,7 +207,7 @@ describe('CapsuleHub state-machine invariants', () => {
         } else {
           const amount = accrued > 0n ? (accrued > PUBLIC_FEE ? PUBLIC_FEE : accrued) : PUBLIC_FEE;
           debugContext = `seed ${seed} step ${step} flush amount=${amount}`;
-          await capsule.send(operator.getSender(), { value: toNano('0.02') }, {
+          await capsule.send(operator.getSender(), { value: ACK_RESERVE + FLUSH_LOCAL_EXEC_RESERVE }, {
             $$type: 'FlushFees',
             amount,
           } as FlushFees);
