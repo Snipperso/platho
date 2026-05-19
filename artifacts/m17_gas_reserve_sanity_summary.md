@@ -6,11 +6,11 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Scenario | Operations | Total fees, nanotons | Max op fee, nanotons | Max gas used |
 |---|---:|---:|---:|---:|
-| ATH_TRANSFER_SUCCESS | 1 | 2073596 | 2073596 | 9613 |
-| ATH_BURN_SUCCESS | 1 | 1307069 | 1307069 | 7840 |
+| ATH_TRANSFER_SUCCESS | 1 | 2270282 | 2270282 | 9808 |
+| ATH_BURN_SUCCESS | 1 | 1313202 | 1313202 | 7932 |
 | CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3350005 | 1258690 | 13586 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 4 | 2023140 | 619113 | 4582 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 20839830 | 4049441 | 32492 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 21346669 | 4246127 | 32492 |
 | VAULT_EXTERNAL_PUBLISH | 2 | 11073093 | 6558447 | 46503 |
 
 ## Operation details
@@ -19,13 +19,13 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| owner_to_recipient_wallet | 4 | 2073596 | 1135549 | 9613 | 0 | 0 |
+| owner_to_recipient_wallet | 4 | 2270282 | 1319035 | 9808 | 0 | 0 |
 
 ### ATH_BURN_SUCCESS
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| wallet_to_master_burn_finalized | 4 | 1307069 | 558023 | 7840 | 0 | 0 |
+| wallet_to_master_burn_finalized | 4 | 1313202 | 564156 | 7932 | 0 | 0 |
 
 ### CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE
 
@@ -48,13 +48,13 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| valid_username_mint_with_item_ack | 4 | 3885690 | 2314243 | 32492 | 1 | 1 |
-| invalid_username_refund_due | 2 | 1572958 | 1368090 | 20080 | 1 | 1 |
-| flush_ath_refund_due | 5 | 4049441 | 1265356 | 18361 | 0 | 0 |
-| flush_treasury_due_ath | 5 | 4010751 | 1235356 | 17911 | 0 | 0 |
-| flush_burn_due_ath | 5 | 3137292 | 1030689 | 14930 | 0 | 0 |
-| stuck_pending_mint_creation_no_ack | 3 | 2660645 | 2314243 | 32492 | 1 | 1 |
-| prune_stale_pending_mint | 2 | 1523053 | 1238659 | 15069 | 0 | 0 |
+| valid_username_mint_with_item_ack | 4 | 3916690 | 2314243 | 32492 | 1 | 1 |
+| invalid_username_refund_due | 2 | 1603958 | 1368090 | 20080 | 1 | 1 |
+| flush_ath_refund_due | 5 | 4246127 | 1319035 | 18361 | 0 | 0 |
+| flush_treasury_due_ath | 5 | 4207437 | 1315968 | 17911 | 0 | 0 |
+| flush_burn_due_ath | 5 | 3143425 | 1030689 | 14930 | 0 | 0 |
+| stuck_pending_mint_creation_no_ack | 3 | 2691645 | 2314243 | 32492 | 1 | 1 |
+| prune_stale_pending_mint | 2 | 1537387 | 1252993 | 15069 | 0 | 0 |
 
 ### VAULT_EXTERNAL_PUBLISH
 
