@@ -10,7 +10,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | ATH_BURN_SUCCESS | 1 | 1313202 | 1313202 | 7932 |
 | CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3350005 | 1258690 | 13586 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 4 | 2023140 | 619113 | 4582 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 21834083 | 4518370 | 32606 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 21834916 | 4518370 | 32606 |
 | VAULT_EXTERNAL_PUBLISH | 2 | 11392425 | 6709913 | 46868 |
 
 ## Operation details
@@ -54,7 +54,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | flush_treasury_due_ath | 5 | 4297147 | 1405678 | 17911 | 0 | 0 |
 | flush_burn_due_ath | 5 | 3143425 | 1030689 | 14930 | 0 | 0 |
 | stuck_pending_mint_creation_no_ack | 3 | 2722689 | 2322554 | 32606 | 1 | 1 |
-| prune_stale_pending_mint | 2 | 1565050 | 1280656 | 15069 | 0 | 0 |
+| prune_stale_pending_mint | 2 | 1565883 | 1281489 | 15069 | 0 | 0 |
 
 ### VAULT_EXTERNAL_PUBLISH
 

@@ -488,6 +488,7 @@ contract UsernameRegistry {
     }
 
     bounced(msg: bounced<ResendDeployedAck>) {
+        self.requireSealed();
         let nameFromItem: Int? = self.pending_item_to_name_hash.get(sender());
         throwUnless(19140, nameFromItem != null);
         let pendingOpt: PendingUsernameMint? = self.pending_mints.get(nameFromItem!!);

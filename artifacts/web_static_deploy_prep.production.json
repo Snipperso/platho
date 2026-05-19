@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-19T19:36:33.398Z",
+  "generatedAt": "2026-05-19T21:40:42.741Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 102,
-    "totalBytes": 1917048,
-    "bundleSha256": "1beec3bc6c9c24833a870faf9e763d8d80f1ee89135b3b8b33c3c4f54d691bb4",
+    "totalBytes": 1918753,
+    "bundleSha256": "45ee3cbde46e71053c4fdfd0e7bbf5e6aa4a26a64013b300096888616d892d98",
     "files": [
       {
         "path": "app.js",
-        "bytes": 39595,
-        "sha256": "3556c2f2605db552eba89a4078f8cddde49e3183bf6b5f28f0abc58038c96dc5"
+        "bytes": 39957,
+        "sha256": "b76845a087f679db281efbf37b3f5dbcba3e46a3e7c791ace4999d9874566bc7"
       },
       {
         "path": "assets/icons/attach.svg",
@@ -104,8 +104,8 @@
       },
       {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 70123,
-        "sha256": "d405ca9af903da9e870eec82255049b8d10c617035180715ab4875a41166e0f8"
+        "bytes": 70946,
+        "sha256": "3eb0e23a24f7de33708fb6a3d28350a64ac12f036581825e19ba8c9ede7e9d01"
       },
       {
         "path": "crypto/ton-wallet-stateinit.mjs",
@@ -134,8 +134,8 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 6856,
-        "sha256": "912dd33d64c80c32a3a4418990385f1bae52a57ec9a39039d1254e66f791c5ad"
+        "bytes": 7376,
+        "sha256": "9742006fcd318d0f488e753b2becedfc9005b5a99dd319aa5ca44c1cf1094682"
       },
       {
         "path": "replay-store.mjs",

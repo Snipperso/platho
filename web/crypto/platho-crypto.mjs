@@ -943,6 +943,11 @@ export async function verifyTonConnectWalletOwnershipProof(signedBundle, tonConn
   if (options.expectedDomain && proof.domain.value !== options.expectedDomain) {
     throw new Error('TON proof domain is not allowed');
   }
+  if (options.expectedChain !== undefined && options.expectedChain !== null) {
+    if (account.chain === undefined || account.chain === null || String(account.chain) !== String(options.expectedChain)) {
+      throw new Error('TON Connect account chain mismatch');
+    }
+  }
   const { payload, verifiedBundle, bundleHash } = await parseTonConnectOwnershipPayload(
     signedBundle,
     proof.payload,
@@ -972,6 +977,7 @@ export async function verifyTonConnectWalletOwnershipProof(signedBundle, tonConn
     walletAddress: account.address,
     walletPublicKey: resolved.publicKey,
     walletPublicKeySource: resolved.source,
+    walletChain: account.chain ?? null,
     domain: proof.domain.value,
     timestamp: proof.timestamp,
     vaultAddress: payload.vaultAddress,
@@ -1002,6 +1008,7 @@ async function createTonConnectProofForSelfTest(options) {
     account: {
       address: options.accountAddress ?? parseTonAddress(options.address).raw,
       publicKey: bytesToHex(walletPublicKey),
+      chain: options.chain,
     },
     proof: {
       ...proof,
@@ -1424,6 +1431,7 @@ export async function runPlathoCryptoSelfTest() {
   );
   const walletAddress = `0:${bytesToHex(await sha256(utf8('self-test-ton-wallet-address')))}`;
   const tonProofDomain = 'platho.local';
+  const tonProofChain = '-3';
   const signedBundle = await exportSignedPublicKeyBundle(identity, {
     issuedAt: 1_700_000_000_000,
     expiresAt: 1_700_003_600_000,
@@ -1449,6 +1457,7 @@ export async function runPlathoCryptoSelfTest() {
     walletPublicKey,
     walletSecretKey,
     domain: tonProofDomain,
+    chain: tonProofChain,
     timestamp: 1_700_000_001,
     payload: tonProofPayload,
   });
@@ -1456,6 +1465,7 @@ export async function runPlathoCryptoSelfTest() {
     now: 1_700_000_001_000,
     nowSec: 1_700_000_001,
     expectedDomain: tonProofDomain,
+    expectedChain: tonProofChain,
     verifiedWalletPublicKey: walletPublicKey,
   });
   const friendlyWalletAddress = tonFriendlyAddressForSelfTest(walletAddress, { testOnly: true });
@@ -1465,6 +1475,7 @@ export async function runPlathoCryptoSelfTest() {
     walletPublicKey,
     walletSecretKey,
     domain: tonProofDomain,
+    chain: tonProofChain,
     timestamp: 1_700_000_001,
     payload: tonProofPayload,
   });
@@ -1472,6 +1483,7 @@ export async function runPlathoCryptoSelfTest() {
     now: 1_700_000_001_000,
     nowSec: 1_700_000_001,
     expectedDomain: tonProofDomain,
+    expectedChain: tonProofChain,
     verifiedWalletPublicKey: walletPublicKey,
   });
   if (!compareAddressLike(verifiedFriendlyWalletProof.walletAddress, walletAddress)) {
@@ -1497,6 +1509,7 @@ export async function runPlathoCryptoSelfTest() {
     ownerWallet: walletAddress,
     tonConnectProof,
     expectedDomain: tonProofDomain,
+    expectedChain: tonProofChain,
     verifiedWalletPublicKey: walletPublicKey,
     currentKeyId: '0x0100000000000000000000000000000000000000000000000000000000000001',
     recordKeyId: '0x0100000000000000000000000000000000000000000000000000000000000001',
@@ -1626,6 +1639,14 @@ export async function runPlathoCryptoSelfTest() {
     now: 1_700_000_001_000,
     nowSec: 1_700_000_001,
     expectedDomain: 'evil.example',
+    verifiedWalletPublicKey: walletPublicKey,
+  }));
+
+  await expectReject('TON proof chain mismatch', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
+    now: 1_700_000_001_000,
+    nowSec: 1_700_000_001,
+    expectedDomain: tonProofDomain,
+    expectedChain: '-239',
     verifiedWalletPublicKey: walletPublicKey,
   }));
 

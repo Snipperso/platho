@@ -153,7 +153,7 @@ PROGRAM{
       18002 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      3000000 PUSHINT
+      4000000 PUSHINT
       GEQ
       THROWANYIFNOT
       3000000 PUSHINT

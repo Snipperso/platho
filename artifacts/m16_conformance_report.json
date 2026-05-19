@@ -53,7 +53,7 @@
     },
     {
       "contract": "UsernameNFTItem.tact",
-      "non_comment_lines": 48,
+      "non_comment_lines": 49,
       "receive_handlers": 3,
       "bounced_handlers": 0,
       "forbidden_hits": [],
@@ -61,7 +61,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 739,
+      "non_comment_lines": 740,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -69,7 +69,7 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 1396,
+      "non_comment_lines": 1398,
       "receive_handlers": 20,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -103,18 +103,18 @@
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
-      "built": "23f13b3c91120c089244c411b855c69a71a42bc0244740e1cc6c266f71c1f1ea",
-      "pinned": "23f13b3c91120c089244c411b855c69a71a42bc0244740e1cc6c266f71c1f1ea",
+      "built": "96861964c8a76cd1d34b16dfcb9f8a4e68ffd652b00ac66ee7dc7410630e16b0",
+      "pinned": "96861964c8a76cd1d34b16dfcb9f8a4e68ffd652b00ac66ee7dc7410630e16b0",
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "e98a8d084bed77f82cc17d9459ddd9d7ecf019c99874de357c172ab3444cc44b",
-      "pinned": "e98a8d084bed77f82cc17d9459ddd9d7ecf019c99874de357c172ab3444cc44b",
+      "built": "e903114a0b29f401c49124da62a2596b39370fdf13e1bcf669ed574f24ca75c4",
+      "pinned": "e903114a0b29f401c49124da62a2596b39370fdf13e1bcf669ed574f24ca75c4",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "8229b8291f9b002d0bb59d0ab72d3b74cc765b99b2f28f117d702803a0cdb7bb",
-      "pinned": "8229b8291f9b002d0bb59d0ab72d3b74cc765b99b2f28f117d702803a0cdb7bb",
+      "built": "cc185e9fe3e8861b9be3ee8ca0434a4872872f312f50236e3874cd170c18b40b",
+      "pinned": "cc185e9fe3e8861b9be3ee8ca0434a4872872f312f50236e3874cd170c18b40b",
       "match": true
     }
   },
@@ -122,7 +122,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "281b05adc16d88e389401c42d689463703c0b97738829f15a0ff0890997fd36c",
+    "manifest_hash_hex": "2c427fba0f9ecf8426fbff3244d5b7783e8ef8fd4aa24423768d22ed18d6bab1",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

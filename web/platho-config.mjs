@@ -25,6 +25,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     manifestUrl: './tonconnect-manifest.json',
     insecureOriginManifestUrl: 'https://platho.app/tonconnect-manifest.json',
     expectedDomain: 'platho.app',
+    expectedChain: '-3',
   },
   vault: {
     address: null,
@@ -165,10 +166,17 @@ function collectMatchingStrings(value, pattern, path = 'config', out = []) {
   return out;
 }
 
+function expectedTonConnectChain(networkChain) {
+  if (networkChain === 'mainnet') return '-239';
+  if (networkChain === 'testnet') return '-3';
+  return null;
+}
+
 export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
   const findings = [];
   const mode = config?.mode;
   const provider = config?.vault?.provider ?? {};
+  const expectedChain = expectedTonConnectChain(config?.network?.chain);
 
   if (!VALID_MODES.has(mode)) {
     addFinding(findings, 'PWA_MODE_INVALID', `PWA mode must be one of ${[...VALID_MODES].join(', ')}.`);
@@ -178,6 +186,13 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
   }
   if (config?.network?.chain !== 'mainnet') {
     addFinding(findings, 'PWA_NETWORK_NOT_MAINNET', 'PWA config does not target mainnet.');
+  }
+  if (expectedChain && String(config?.tonConnect?.expectedChain) !== expectedChain) {
+    addFinding(
+      findings,
+      'PWA_TONCONNECT_CHAIN_MISMATCH',
+      `TON Connect expectedChain must be ${expectedChain} for ${config?.network?.chain}.`,
+    );
   }
   if (mode === PRODUCTION_MODE) {
     const markerPaths = collectMatchingStrings(config, /\b(testnet|preview)\b/i);

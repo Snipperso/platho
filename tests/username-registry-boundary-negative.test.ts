@@ -31,6 +31,7 @@ const ATH_TRANSFER_EXEC_RESERVE = 5_000_000n;
 const ATH_BURN_EXEC_RESERVE = 5_000_000n;
 const DUE_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
+const ITEM_ACK_EXEC_RESERVE = 1_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.USERNAME.BOUNDARY.${label}`).digest());
@@ -276,11 +277,15 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     }));
     const item = blockchain.openContract(new UsernameNFTItem(itemAddress, itemInit));
 
-    await item.send(caller.getSender(), { value: ITEM_ACK_FORWARD_RESERVE - 1n }, { $$type: 'ResendDeployedAck' });
+    const itemAckResendReserve = ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE;
+    await item.send(caller.getSender(), { value: itemAckResendReserve - 1n }, { $$type: 'ResendDeployedAck' });
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
 
-    await item.send(caller.getSender(), { value: ITEM_ACK_FORWARD_RESERVE }, { $$type: 'ResendDeployedAck' });
+    const beforeItemBalance = (await blockchain.getContract(itemAddress)).balance;
+    await item.send(caller.getSender(), { value: itemAckResendReserve }, { $$type: 'ResendDeployedAck' });
+    const afterItemBalance = (await blockchain.getContract(itemAddress)).balance;
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect(afterItemBalance).toBeGreaterThanOrEqual(beforeItemBalance);
   });
 
   it('USERNAME-REG-BND-03: refund flush rejects min-1 and exact reserve completes transfer', async () => {

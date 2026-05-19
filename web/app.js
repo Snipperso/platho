@@ -103,6 +103,7 @@ let localReplayStore = createMemoryReplayStore();
 let encryptedMessageStore = null;
 let tonConnectUI = null;
 let tonConnectExpectedDomain = null;
+let tonConnectExpectedChain = null;
 let pendingTonConnectWallet = null;
 let tonProofPayloadTimer = null;
 let vaultProviderLoadPromise = null;
@@ -940,6 +941,7 @@ async function handleTonConnectWallet(wallet) {
       { account: wallet.account, proof: proof.proof },
       {
         expectedDomain: tonConnectExpectedDomain,
+        expectedChain: tonConnectExpectedChain,
         getWalletPublicKey: async (account) => {
           const resolved = await resolveTonWalletPublicKeyFromStateInit(account);
           walletKeyVersion = resolved.walletVersion;
@@ -993,6 +995,8 @@ function bootTonConnect() {
   }
   const manifestUrl = tonConnectManifestUrl();
   tonConnectExpectedDomain = appConfig.tonConnect?.expectedDomain ?? new URL(manifestUrl).host;
+  tonConnectExpectedChain = appConfig.tonConnect?.expectedChain
+    ?? (appConfig.network?.chain === 'mainnet' ? '-239' : appConfig.network?.chain === 'testnet' ? '-3' : null);
   tonConnectUI = new TonConnectUI({
     manifestUrl,
     buttonRootId: 'tonConnectButton',
@@ -1042,6 +1046,7 @@ async function bootCrypto() {
     }
     globalThis.plathoVerifyTonConnectProof = async (tonConnectProof, options = {}) => {
       const expectedDomain = options.expectedDomain ?? tonConnectExpectedDomain ?? window.location.host;
+      const expectedChain = options.expectedChain ?? tonConnectExpectedChain;
       return verifyTonConnectWalletOwnershipProof(localSignedPublicBundle, tonConnectProof, {
         getWalletPublicKey: async (account) => {
           const resolved = await resolveTonWalletPublicKeyFromStateInit(account);
@@ -1049,6 +1054,7 @@ async function bootCrypto() {
         },
         ...options,
         expectedDomain,
+        expectedChain,
       });
     };
     globalThis.plathoBindVaultRecord = async (provider) => bindVaultRecordForProof(

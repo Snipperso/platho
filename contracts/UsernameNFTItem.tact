@@ -3,6 +3,7 @@
 // No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 
 const USERNAME_ITEM_ACK_FORWARD_RESERVE: Int = 3000000;
+const USERNAME_ITEM_ACK_EXEC_RESERVE: Int = 1000000;
 
 message(0x639CFC6C) ResendDeployedAck {}
 
@@ -32,9 +33,9 @@ contract UsernameNFTItem {
     }
 
     receive(msg: ResendDeployedAck) {
-        // Permissionless ACK resend is allowed, but the caller must fund the fixed ACK value
-        // so repeated underfunded calls cannot drain the item storage reserve.
-        throwUnless(18002, context().value >= USERNAME_ITEM_ACK_FORWARD_RESERVE);
+        // Permissionless ACK resend is allowed, but the caller must fund both
+        // the forwarded ACK value and this item's local execution reserve.
+        throwUnless(18002, context().value >= USERNAME_ITEM_ACK_FORWARD_RESERVE + USERNAME_ITEM_ACK_EXEC_RESERVE);
         message(MessageParameters {
             to: self.username_registry_address,
             value: USERNAME_ITEM_ACK_FORWARD_RESERVE,
