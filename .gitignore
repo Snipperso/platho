@@ -18,6 +18,7 @@ artifacts/*_SEED*
 artifacts/m20t_live_testnet_run.local.json
 artifacts/m20t_wallet_private.local.json
 artifacts/platho-web-static-*/
+artifacts/local/
 
 # Browser smoke-test profiles and local runtime state
 .edge-smoke/
