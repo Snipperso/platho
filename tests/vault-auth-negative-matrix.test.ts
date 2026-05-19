@@ -48,6 +48,7 @@ describe('Vault negative authorization matrix', () => {
       $$type: 'AthTransferNotification',
       query_id: 1n,
       amount: 1_000n,
+      sender_key: 0n,
       sender_wallet: user.address,
     } as AthTransferNotification);
     expect((await vault.getGetUser(user.address)).exists).toBe(false);

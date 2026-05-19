@@ -106,6 +106,7 @@ async function mintValidName(blockchain: Blockchain, registry: any, officialAthW
     $$type: 'AthTransferNotificationMintUsername',
     query_id: 7001n,
     amount: PRICE_6_PLUS,
+    sender_key: 0n,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),

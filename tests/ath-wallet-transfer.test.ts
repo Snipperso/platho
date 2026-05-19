@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
-import { ATHWallet, ATHTransferRequest } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, ATHTransferRequest, ATHTransferRequestWithNotify } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -92,5 +92,42 @@ describe('ATH wallet transfer profile', () => {
     const deadWallet = blockchain.openContract(new ATHWallet(deadWalletAddress, deadInit));
     expect((await sourceWallet.getGetWalletData()).balance).toBe(300n);
     expect((await deadWallet.getGetWalletData()).balance).toBe(200n);
+  });
+
+  it('ATH-XFER-04: pending notifications are keyed by sender owner plus query id', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwnerA = await blockchain.treasury('ath-transfer-notify-source-a');
+    const sourceOwnerB = await blockchain.treasury('ath-transfer-notify-source-b');
+    const recipientOwner = await blockchain.treasury('ath-transfer-notify-recipient');
+    const master = fixtureAddress('ATH_TRANSFER_NOTIFY_MASTER');
+
+    const sourceWalletA = await deployWallet(blockchain, sourceOwnerA.address, master, 1_000n);
+    const sourceWalletB = await deployWallet(blockchain, sourceOwnerB.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+    const queryId = 404n;
+
+    await sourceWalletA.send(sourceOwnerA.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: queryId,
+      amount: 100n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwnerA.address,
+      notify_destination: recipientOwner.address,
+      notify_value: toNano('0.05'),
+    } as ATHTransferRequestWithNotify);
+
+    await sourceWalletB.send(sourceOwnerB.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: queryId,
+      amount: 200n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwnerB.address,
+      notify_destination: recipientOwner.address,
+      notify_value: toNano('0.05'),
+    } as ATHTransferRequestWithNotify);
+
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(300n);
   });
 });

@@ -1,0 +1,17 @@
+Command:
+npm.cmd test -- --reporter=json --outputFile=artifacts\NPM_TEST_FULL_SUITE_M23_ACCOUNTING_FIX_RESULTS.json
+
+Result:
+PASS
+
+Vitest console summary from the preceding full run:
+Test Files: 65 passed (65)
+Tests: 265 passed (265)
+
+JSON reporter summary:
+numTotalTestSuites: 130
+numPassedTestSuites: 130
+numTotalTests: 265
+numPassedTests: 265
+numFailedTests: 0
+success: true

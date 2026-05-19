@@ -35,6 +35,7 @@ import {
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const ROUTE_EVIDENCE_HASH = 0x111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000n;
 const ENVELOPE = toNano('51.05');
+const ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
 const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
@@ -196,7 +197,7 @@ function routeFreeze(env: Awaited<ReturnType<typeof setup>>, overrides: Partial<
 }
 
 async function acceptReserve(env: Awaited<ReturnType<typeof setup>>) {
-  await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE }, {
+  await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE }, {
     $$type: 'AcceptBurnReserve',
     amount: ENVELOPE,
   } as AcceptBurnReserve);
@@ -286,7 +287,7 @@ describe('Production BuybackBurn candidate', () => {
   it('BUYBACK-03: accepts only the exact 51.05 TON envelope from the bound FeeAccumulator after seal', async () => {
     const env = await setup();
 
-    await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE }, {
+    await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE }, {
       $$type: 'AcceptBurnReserve',
       amount: ENVELOPE,
     } as AcceptBurnReserve);

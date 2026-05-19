@@ -10,6 +10,7 @@ const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
+const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD: Int = 4294967296;
 
 message(0x41544801) ATHBurn {
     query_id: Int as uint64;
@@ -53,12 +54,14 @@ message(0x41544806) ATHGenesisSupplyAck {
 message(0x472D9D7D) AthTransferNotification {
     query_id: Int as uint64;
     amount: Int as uint128;
+    sender_key: Int as uint32;
     sender_wallet: Address;
 }
 
 message(0x472D9D7E) AthTransferNotificationAck {
     query_id: Int as uint64;
     amount: Int as uint128;
+    sender_key: Int as uint32;
 }
 
 // Official ATH wallet -> UsernameRegistry. The wallet fills amount/owner from
@@ -66,6 +69,7 @@ message(0x472D9D7E) AthTransferNotificationAck {
 message(0x89129D5F) AthTransferNotificationMintUsername {
     query_id: Int as uint64;
     amount: Int as uint128;
+    sender_key: Int as uint32;
     owner_wallet: Address;
     username_len: Int as uint8;
     username: Slice as remaining;
@@ -178,16 +182,30 @@ contract ATHWallet {
             .hash();
     }
 
-    fun refund_bounced_notification(query_id: Int, amount: Int) {
+    fun compute_sender_key(sender_owner: Address): Int {
+        return beginCell()
+            .storeUint(ATH_TRANSFER_NOTIFY_ID_DOMAIN, 32)
+            .storeAddress(sender_owner)
+            .endCell()
+            .hash() % ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD;
+    }
+
+    fun compute_pending_notification_key(query_id: Int, sender_key: Int): Int {
+        return (query_id * ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD) + sender_key;
+    }
+
+    fun refund_bounced_notification(query_id: Int, sender_key: Int, amount: Int) {
         throwUnless(14330, amount > 0);
         throwUnless(14331, self.balance >= amount);
-        let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(query_id);
+        let pending_key: Int = self.compute_pending_notification_key(query_id, sender_key);
+        let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(pending_key);
         throwUnless(14332, pendingOpt != null);
         let pending: PendingAthTransferNotification = pendingOpt!!;
         throwUnless(14333, pending.amount == amount);
+        throwUnless(14334, self.compute_sender_key(pending.sender_owner) == sender_key);
 
         self.balance -= amount;
-        self.pending_notifications.del(query_id);
+        self.pending_notifications.del(pending_key);
 
         let refund_wallet: Address = self.derive_wallet_address(pending.sender_owner);
         let refund_init: StateInit = initOf ATHWallet(0, pending.sender_owner, self.ath_master_address);
@@ -388,13 +406,15 @@ contract ATHWallet {
         throwUnless(14312, msg.notify_destination == self.owner_address);
         throwUnless(14313, msg.notify_value > 0);
         throwUnless(14314, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
-        throwUnless(14315, !self.pending_notifications.exists(msg.query_id));
+        let sender_key: Int = self.compute_sender_key(msg.sender_owner);
+        let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
+        throwUnless(14315, !self.pending_notifications.exists(pending_key));
         throwUnless(14316, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
         let notification_id: Int = self.compute_notification_id(msg.sender_owner, msg.query_id);
         throwUnless(14317, !self.processed_notifications.exists(notification_id));
 
         self.balance += msg.amount;
-        self.pending_notifications.set(msg.query_id, PendingAthTransferNotification {
+        self.pending_notifications.set(pending_key, PendingAthTransferNotification {
             sender_owner: msg.sender_owner,
             amount: msg.amount
         });
@@ -406,6 +426,7 @@ contract ATHWallet {
             bounce: true,
             body: AthTransferNotification {
                 query_id: msg.query_id,
+                sender_key: sender_key,
                 amount: msg.amount,
                 sender_wallet: msg.sender_owner
             }.toCell()
@@ -428,13 +449,15 @@ contract ATHWallet {
         throwUnless(14511, sender() == self.derive_wallet_address(msg.sender_owner));
         throwUnless(14512, msg.notify_value > 0);
         throwUnless(14513, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
-        throwUnless(14514, !self.pending_notifications.exists(msg.query_id));
+        let sender_key: Int = self.compute_sender_key(msg.sender_owner);
+        let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
+        throwUnless(14514, !self.pending_notifications.exists(pending_key));
         throwUnless(14515, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
         let notification_id: Int = self.compute_notification_id(msg.sender_owner, msg.query_id);
         throwUnless(14516, !self.processed_notifications.exists(notification_id));
 
         self.balance += msg.amount;
-        self.pending_notifications.set(msg.query_id, PendingAthTransferNotification {
+        self.pending_notifications.set(pending_key, PendingAthTransferNotification {
             sender_owner: msg.sender_owner,
             amount: msg.amount
         });
@@ -446,6 +469,7 @@ contract ATHWallet {
             bounce: true,
             body: AthTransferNotificationMintUsername {
                 query_id: msg.query_id,
+                sender_key: sender_key,
                 amount: msg.amount,
                 owner_wallet: msg.sender_owner,
                 username_len: msg.username_len,
@@ -468,13 +492,15 @@ contract ATHWallet {
     receive(msg: AthTransferNotificationAck) {
         throwUnless(14340, sender() == self.owner_address);
         throwUnless(14341, msg.amount > 0);
-        let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(msg.query_id);
+        let pending_key: Int = self.compute_pending_notification_key(msg.query_id, msg.sender_key);
+        let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(pending_key);
         throwUnless(14342, pendingOpt != null);
         let pending: PendingAthTransferNotification = pendingOpt!!;
         throwUnless(14343, pending.amount == msg.amount);
+        throwUnless(14344, self.compute_sender_key(pending.sender_owner) == msg.sender_key);
         let notification_id: Int = self.compute_notification_id(pending.sender_owner, msg.query_id);
         self.processed_notifications.set(notification_id, msg.amount);
-        self.pending_notifications.del(msg.query_id);
+        self.pending_notifications.del(pending_key);
     }
 
     bounced(msg: bounced<ATHInternalTransfer>) {
@@ -526,11 +552,11 @@ contract ATHWallet {
     }
 
     bounced(msg: bounced<AthTransferNotification>) {
-        self.refund_bounced_notification(msg.query_id, msg.amount);
+        self.refund_bounced_notification(msg.query_id, msg.sender_key, msg.amount);
     }
 
     bounced(msg: bounced<AthTransferNotificationMintUsername>) {
-        self.refund_bounced_notification(msg.query_id, msg.amount);
+        self.refund_bounced_notification(msg.query_id, msg.sender_key, msg.amount);
     }
 
     get fun get_wallet_data(): ATHWalletDataView {

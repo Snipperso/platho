@@ -6,8 +6,9 @@ PROGRAM{
   DECLPROC $VaultAthTransferAck$_store_cell
   DECLPROC $MockVaultAthWallet$_load
   DECLPROC $MockVaultAthWallet$_contract_load
+  DECLPROC $MockVaultAthWallet$_fun_compute_sender_key
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
-  DECLPROC $AthTransferNotification$_constructor_query_id_amount_sender_wallet
+  DECLPROC $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet
   DECLPROC $VaultAthTransferAck$_constructor_query_id_amount
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
@@ -16,15 +17,16 @@ PROGRAM{
   DECLGLOBVAR __tact_randomized
   $AthTransferNotification$_store PROCINLINE:<{
     1194171773 PUSHINT
-    s0 s4 XCHG2
+    s0 s5 XCHG2
     32 STU
-    s1 s2 XCHG
+    s1 s3 XCHG
     64 STU
     128 STU
+    32 STU
     STSLICE
   }>
   $AthTransferNotification$_store_cell PROCINLINE:<{
-    3 -ROLL
+    4 -ROLL
     $AthTransferNotification$_store INLINECALLDICT
     ENDC
   }>
@@ -50,10 +52,22 @@ PROGRAM{
     $MockVaultAthWallet$_load INLINECALLDICT
     NIP
   }>
+  $MockVaultAthWallet$_fun_compute_sender_key PROCREF:<{
+        NEWC
+    1096044105 PUSHINT
+    SWAP
+    32 STU
+    SWAP
+        STSLICER
+        ENDC
+        HASHCU
+    32 MODPOW2#
+  }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
-  $AthTransferNotification$_constructor_query_id_amount_sender_wallet PROCINLINE:<{
+  $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet PROCINLINE:<{
+    s1 s2 XCHG
   }>
   $VaultAthTransferAck$_constructor_query_id_amount PROCINLINE:<{
   }>
@@ -92,8 +106,7 @@ PROGRAM{
     1296127044 PUSHINT
     EQUAL
     IFJMP:<{
-      s2 s3 XCHG
-      3 BLKDROP
+      2DROP
       64 LDU
       LDMSGADDR
       LDMSGADDR
@@ -101,13 +114,16 @@ PROGRAM{
       DROP
       0 PUSHINT
       TRUE
-      s5 s2 XCHG2
       64 PUSHINT
-      s0 s4 XCHG
-      $AthTransferNotification$_constructor_query_id_amount_sender_wallet INLINECALLDICT
+      s7 s4 XCPU
+      $MockVaultAthWallet$_fun_compute_sender_key INLINECALLDICT
+      NIP
+      s3 s6 XCHG
+      s0 s6 s4 XCHG3
+      $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet INLINECALLDICT
       NEWC
       $AthTransferNotification$_store_cell INLINECALLDICT
-      s3 s4 XCHG
+      s4 s3 s0 XCHG3
       s1 s2 XCHG
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC

@@ -26,6 +26,7 @@ const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff00001111222233334444
 const ALT_MANIFEST_HASH = MANIFEST_HASH + 1n;
 const ROUTE_EVIDENCE_HASH = 0x111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000n;
 const ENVELOPE = toNano('51.05');
+const ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
 const OFFER = toNano('50');
 const PTON_TRANSFER_GAS = 50_000_000n;
 const ACCOUNTING_RECYCLE_EXEC_RESERVE = 2_000_000n;
@@ -174,7 +175,7 @@ async function freezeAndSeal(env: Awaited<ReturnType<typeof setup>>) {
 }
 
 async function acceptReserve(env: Awaited<ReturnType<typeof setup>>) {
-  await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE }, {
+  await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE }, {
     $$type: 'AcceptBurnReserve',
     amount: ENVELOPE,
   } as AcceptBurnReserve);
@@ -279,7 +280,7 @@ describe('BuybackBurn auth and negative matrix', () => {
   it('accepts reserve only from the bound FeeAccumulator with exact envelope and backed value', async () => {
     const env = await setup();
 
-    await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE }, {
+    await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE }, {
       $$type: 'AcceptBurnReserve',
       amount: ENVELOPE,
     } as AcceptBurnReserve);
@@ -362,6 +363,7 @@ describe('BuybackBurn auth and negative matrix', () => {
       $$type: 'AthTransferNotification',
       query_id: 20n,
       amount: 100_000n,
+      sender_key: 0n,
       sender_wallet: env.stonfiPoolOwner.address,
     } as AthTransferNotification);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
