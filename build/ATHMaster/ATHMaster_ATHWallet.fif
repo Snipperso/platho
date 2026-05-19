@@ -11,6 +11,8 @@ PROGRAM{
   DECLPROC $ATHBurnNotification$_load_bounced
   DECLPROC $ATHBurnFailed$_store
   DECLPROC $ATHBurnFailed$_store_cell
+  DECLPROC $ATHGenesisSupplyAck$_store
+  DECLPROC $ATHGenesisSupplyAck$_store_cell
   DECLPROC $AthTransferNotification$_store
   DECLPROC $AthTransferNotification$_store_cell
   DECLPROC $AthTransferNotification$_load_bounced
@@ -53,6 +55,7 @@ PROGRAM{
   DECLPROC $SendParameters$_constructor_to_value_bounce_mode_code_data_body
   DECLPROC $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
   DECLPROC $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination
+  DECLPROC $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address
   DECLPROC $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value
   DECLPROC $ATHTransferAck$_constructor_query_id_amount
   DECLPROC $PendingAthTransferNotification$_constructor_sender_owner_amount
@@ -145,6 +148,20 @@ PROGRAM{
   $ATHBurnFailed$_store_cell PROCINLINE:<{
     -ROT
     $ATHBurnFailed$_store INLINECALLDICT
+    ENDC
+  }>
+  $ATHGenesisSupplyAck$_store PROCINLINE:<{
+    1096042502 PUSHINT
+    s0 s4 XCHG2
+    32 STU
+    s1 s2 XCHG
+    64 STU
+    128 STU
+    STSLICE
+  }>
+  $ATHGenesisSupplyAck$_store_cell PROCINLINE:<{
+    3 -ROLL
+    $ATHGenesisSupplyAck$_store INLINECALLDICT
     ENDC
   }>
   $AthTransferNotification$_store PROCINLINE:<{
@@ -424,6 +441,8 @@ PROGRAM{
   $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination PROCINLINE:<{
   }>
   $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination PROCINLINE:<{
+  }>
+  $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address PROCINLINE:<{
   }>
   $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value PROCINLINE:<{
   }>
@@ -793,6 +812,68 @@ PROGRAM{
       s0 s4 XCHG
       s3 s1 s3 XCHG3
       s7 s7 XCHG2
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s0 s3 s4 XCHG3
+      $ATHWallet$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1096042501 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s4 XCHG
+      64 LDU
+      128 LDU
+      LDMSGADDR
+      DROP
+      14400 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s5 PUSH
+      SDEQ
+      THROWANYIFNOT
+      14401 PUSHINT
+      s2 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      14402 PUSHINT
+      s6 PUSH
+      0 EQINT
+      THROWANYIFNOT
+      14403 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      3000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s5 s1 XCPU
+      ADD
+      1000000 PUSHINT
+      0 PUSHINT
+      s0 s4 XCHG
+      FALSE
+      s4 s7 XCPU
+      $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address INLINECALLDICT
+      NEWC
+      $ATHGenesisSupplyAck$_store_cell INLINECALLDICT
+      s4 s7 XCHG
+      s7 s3 s0 XCHG3
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true

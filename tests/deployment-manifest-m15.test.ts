@@ -32,6 +32,7 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('30000000000000000');
     expect(manifest.constants.vault_activity_airdrop_reward_per_message_atomic).toBe('10000000000');
     expect(manifest.constants.vault_activity_airdrop_per_wallet_cap_atomic).toBe('0');
+    expect(manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
     expect(manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
     expect(manifest.manifest_hash_hex).toBe(recomputed);
     expect(BigInt(`0x${manifest.manifest_hash_hex}`).toString()).toBe(manifest.manifest_hash_uint256);

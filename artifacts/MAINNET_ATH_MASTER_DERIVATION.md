@@ -16,6 +16,18 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS
 - athMasterStateInitHash: not derived
 - athMasterCodeHash: not derived
 - athMasterDataHash: not derived
+- treasuryOwnerAthWalletAddress: not derived
+- treasuryOwnerAthWalletStateInitHash: not derived
+- athWalletCodeHash: not derived
+
+## Treasury Supply Deployment
+
+- required: true
+- messageType: DeployTreasurySupply
+- senderAddress: not ready
+- recipientAthWalletAddress: not ready
+- amountAtomic: 100000000000000000
+- proofRequired: required: post-deploy transaction plus official treasury ATH wallet balance proof
 
 ## Blockers
 

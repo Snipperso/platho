@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 2175 bytes
+BoC Size: 2307 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 39
+Total structures: 41
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -60,6 +60,14 @@ Signature: `ATHBurnFinalized{query_id:uint64,amount:uint128,owner_address:addres
 ### ATHBurnFailed
 TL-B: `ath_burn_failed#41544804 query_id:uint64 amount:uint128 = ATHBurnFailed`
 Signature: `ATHBurnFailed{query_id:uint64,amount:uint128}`
+
+### ATHGenesisSupplyCredit
+TL-B: `ath_genesis_supply_credit#41544805 query_id:uint64 amount:uint128 response_destination:address = ATHGenesisSupplyCredit`
+Signature: `ATHGenesisSupplyCredit{query_id:uint64,amount:uint128,response_destination:address}`
+
+### ATHGenesisSupplyAck
+TL-B: `ath_genesis_supply_ack#41544806 query_id:uint64 amount:uint128 owner_address:address = ATHGenesisSupplyAck`
+Signature: `ATHGenesisSupplyAck{query_id:uint64,amount:uint128,owner_address:address}`
 
 ### AthTransferNotification
 TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_wallet:address = AthTransferNotification`

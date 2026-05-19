@@ -7,6 +7,8 @@ const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 2000000;
+const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
+const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
 
 message(0x41544801) ATHBurn {
@@ -33,6 +35,19 @@ message(0x41544803) ATHBurnFinalized {
 message(0x41544804) ATHBurnFailed {
     query_id: Int as uint64;
     amount: Int as uint128;
+}
+
+// ATH Master -> official treasury wallet. One-shot fixed-supply genesis credit.
+message(0x41544805) ATHGenesisSupplyCredit {
+    query_id: Int as uint64;
+    amount: Int as uint128;
+    response_destination: Address;
+}
+
+message(0x41544806) ATHGenesisSupplyAck {
+    query_id: Int as uint64;
+    amount: Int as uint128;
+    owner_address: Address;
 }
 
 message(0x472D9D7D) AthTransferNotification {
@@ -169,6 +184,27 @@ contract ATHWallet {
             body: ATHBurnFailed {
                 query_id: msg.query_id,
                 amount: msg.amount
+            }.toCell()
+        });
+    }
+
+    receive(msg: ATHGenesisSupplyCredit) {
+        throwUnless(14400, sender() == self.ath_master_address);
+        throwUnless(14401, msg.amount > 0);
+        throwUnless(14402, self.balance == 0);
+        throwUnless(14403, context().value >= ATH_GENESIS_SUPPLY_EXEC_RESERVE + ATH_GENESIS_SUPPLY_ACK_VALUE);
+
+        self.balance += msg.amount;
+
+        message(MessageParameters {
+            to: msg.response_destination,
+            value: ATH_GENESIS_SUPPLY_ACK_VALUE,
+            mode: SendDefaultMode,
+            bounce: false,
+            body: ATHGenesisSupplyAck {
+                query_id: msg.query_id,
+                amount: msg.amount,
+                owner_address: self.owner_address
             }.toCell()
         });
     }

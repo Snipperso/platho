@@ -845,6 +845,124 @@ export function dictValueParserATHBurnFailed(): DictionaryValue<ATHBurnFailed> {
     }
 }
 
+export type ATHGenesisSupplyCredit = {
+    $$type: 'ATHGenesisSupplyCredit';
+    query_id: bigint;
+    amount: bigint;
+    response_destination: Address;
+}
+
+export function storeATHGenesisSupplyCredit(src: ATHGenesisSupplyCredit) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042501, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.response_destination);
+    };
+}
+
+export function loadATHGenesisSupplyCredit(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042501) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _response_destination = sc_0.loadAddress();
+    return { $$type: 'ATHGenesisSupplyCredit' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function loadTupleATHGenesisSupplyCredit(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _response_destination = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyCredit' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function loadGetterTupleATHGenesisSupplyCredit(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _response_destination = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyCredit' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function storeTupleATHGenesisSupplyCredit(source: ATHGenesisSupplyCredit) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.response_destination);
+    return builder.build();
+}
+
+export function dictValueParserATHGenesisSupplyCredit(): DictionaryValue<ATHGenesisSupplyCredit> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHGenesisSupplyCredit(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHGenesisSupplyCredit(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHGenesisSupplyAck = {
+    $$type: 'ATHGenesisSupplyAck';
+    query_id: bigint;
+    amount: bigint;
+    owner_address: Address;
+}
+
+export function storeATHGenesisSupplyAck(src: ATHGenesisSupplyAck) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042502, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.owner_address);
+    };
+}
+
+export function loadATHGenesisSupplyAck(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042502) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _owner_address = sc_0.loadAddress();
+    return { $$type: 'ATHGenesisSupplyAck' as const, query_id: _query_id, amount: _amount, owner_address: _owner_address };
+}
+
+export function loadTupleATHGenesisSupplyAck(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _owner_address = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyAck' as const, query_id: _query_id, amount: _amount, owner_address: _owner_address };
+}
+
+export function loadGetterTupleATHGenesisSupplyAck(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _owner_address = source.readAddress();
+    return { $$type: 'ATHGenesisSupplyAck' as const, query_id: _query_id, amount: _amount, owner_address: _owner_address };
+}
+
+export function storeTupleATHGenesisSupplyAck(source: ATHGenesisSupplyAck) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.owner_address);
+    return builder.build();
+}
+
+export function dictValueParserATHGenesisSupplyAck(): DictionaryValue<ATHGenesisSupplyAck> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHGenesisSupplyAck(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHGenesisSupplyAck(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AthTransferNotification = {
     $$type: 'AthTransferNotification';
     query_id: bigint;
@@ -1547,7 +1665,7 @@ function initATHWallet_init_args(src: ATHWallet_init_args) {
 }
 
 async function ATHWallet_init(balance: bigint, owner_address: Address, ath_master_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241021e01000873000114ff00f4a413f4bcf2c80b01020162021c04dad001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019ed37ffa40fa40f404f40455406c158e10810101d700fa40fa40552003d1586d6de206e3027025d74920c21f953105d31f06de21821041544801bae30221821041544810bae30221821041544814ba030a0c0f046c048020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae3028210472d9d7dba0405060700d230d33fd37f59328136b3f84224c705f2f48136b422c200f2f45141a0708040067f04c8598210415448045003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5400be30d33fd37f593281378c22c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5400be30d33fd37f59328137f022c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed540108e3025f060803fed33fd37f59328137fa22c200f2f48137fb5352bef2f4258101012259f40d6fa192306ddf206e92306d9ad0fa40d37f596c126f02e28137fc216eb3f2f46f228137fd5114baf2f45152a15217810101f45a3010461036460725db3c705374db3c707f541cb880400cc855308210415448125005cb1f13cb3fcb7fcecec9103614150900a6105b104a1039103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005043c87f01ca0055405045cb7f12cecef400f400c9ed5401fc5b04d33fd37ffa40308136b0f84226c705f2f48136b122c200f2f48136b25362bef2f48136b55315c705f2f48136b6f8416f24135f0382081e8480bef2f45151a17080405414367f09c855308210415448025005cb1f13cb3fcb7fcecec9240443135077441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000b002e4034c87f01ca0055405045cb7f12cecef400f400c9ed5404fc5b04d33fd37ffa40fa4030813778f84227c705f2f48137795316c705f2f481377a23c200f2f481377b5373bef2f481377cf8416f24135f0382081e8480bef2f45162a1041035407827db3c70541094db3c707f5419c780400cc855308210415448125005cb1f13cb3fcb7fcecec9106a1058104b1039103645155034c88914150d0e000160008acf16ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb004144c87f01ca0055405045cb7f12cecef400f400c9ed54043ce30221821041544812bae30221821041544815bae302218210472d9d7eba1012131803fe5b04d33fd37ffa40fa40d430d0fa40d37f308137dcf84229c705f2f48137dd5338c705f2f48137de5324c705f2f48137df25c200f2f48137e021c200f2f48137e15395bef2f48137e2218209c9c380bef2f48137e3f8416f24135f032282080f4240a082081e8480a0bef2f45184a1041037469a27db3c70541094db3c507c14151100f8707f8040284c1350fec855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc95e351047103a48b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00441302c87f01ca0055405045cb7f12cecef400f400c9ed5402ec5b04d33fd37ffa40fa403081378223c200f2f4813783f84210581047103649a6db3c16c70519f2f4813784f8416f24135f0382081e8480bef2f45124a0708040077f07c8598210415448115003cb1fcb3fcb7fc91048473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00443012141a02fc5b04d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842104a103948bc25db3c1dc7051bf2f48137e85382c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082081e8480a0bef2f48137eb2a8101012859f40c6fa131b3f2f48137ec278209c9c380bef2f44014503a541909261416016820fa4430705825db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0150026f82ac87001ca0055215023810101cf00cecec902f0db3c8137ed81010154431359f40c6fa131b3f2f4514aa081010153abc85902cecb7fc927103401206e953059f45a30944133f415e270536b7f0dc855208210472d9d7d5004cb1f12cb3fcb7fcec91049103841b0441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f42407004700ac81917008c598210415448115003cb1fcb3fcb7fc91047473019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004134c87f01ca0055405045cb7f12cecef400f400c9ed5403fc8f735b04d33fd37f30813804f84225c705f2f481380521c200f2f4258101012359f40d6fa192306ddf206e92306d9ad0fa40d37f596c126f02e2813806216eb3f2f46f228138075113baf2f4467026db3c81010151221419216e955b59f45a3098c801cf004133f442e25045810101f45a30440302e036c00005c12115b0191a1b0024c8821041544e4901cb1f58cf16cb3fc9f900002ac87f01ca0055405045cb7f12cecef400f400c9ed5400488e1c8132c8f2f04034c87f01ca0055405045cb7f12cecef400f400c9ed54e05f05f2c082015da0f605da89a1a400033da6fff481f481e809e808aa80d82b1c21020203ae01f481f480aa4007a2b0dadbc5b678d8a71d0006547432e6f0a79a');
+    const __code = Cell.fromHex('b5ee9c7241021f010008f7000114ff00f4a413f4bcf2c80b01020162021d04dad001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019ed37ffa40fa40f404f40455406c158e10810101d700fa40fa40552003d1586d6de206e3027025d74920c21f953105d31f06de21821041544801bae30221821041544805bae30221821041544810ba030a0c0d046c048020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae3028210472d9d7dba0405060700d230d33fd37f59328136b3f84224c705f2f48136b422c200f2f45141a0708040067f04c8598210415448045003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5400be30d33fd37f593281378c22c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5400be30d33fd37f59328137f022c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed540108e3025f060803fed33fd37f59328137fa22c200f2f48137fb5352bef2f4258101012259f40d6fa192306ddf206e92306d9ad0fa40d37f596c126f02e28137fc216eb3f2f46f228137fd5114baf2f45152a15217810101f45a3010461036460725db3c705374db3c707f541cb880400cc855308210415448125005cb1f13cb3fcb7fcecec9103616170900a6105b104a1039103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005043c87f01ca0055405045cb7f12cecef400f400c9ed5401fc5b04d33fd37ffa40308136b0f84226c705f2f48136b122c200f2f48136b25362bef2f48136b55315c705f2f48136b6f8416f24135f0382081e8480bef2f45151a17080405414367f09c855308210415448025005cb1f13cb3fcb7fcecec9240443135077441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000b002e4034c87f01ca0055405045cb7f12cecef400f400c9ed5401ec5b04d33fd37ffa4030813840f84225c705f2f481384122c200f2f481384226c000f2f4813843f8416f24135f0382082dc6c0bef2f45151a082080f42407004705147c855208210415448065004cb1f12cb3fcb7fcec910474730441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0040341b043ce30221821041544814bae30221821041544812bae30221821041544815ba0e11131404fc5b04d33fd37ffa40fa4030813778f84227c705f2f48137795316c705f2f481377a23c200f2f481377b5373bef2f481377cf8416f24135f0382081e8480bef2f45162a1041035407827db3c70541094db3c707f5419c780400cc855308210415448125005cb1f13cb3fcb7fcecec9106a1058104b1039103645155034c88916170f10000160008acf16ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb004144c87f01ca0055405045cb7f12cecef400f400c9ed5403fe5b04d33fd37ffa40fa40d430d0fa40d37f308137dcf84229c705f2f48137dd5338c705f2f48137de5324c705f2f48137df25c200f2f48137e021c200f2f48137e15395bef2f48137e2218209c9c380bef2f48137e3f8416f24135f032282080f4240a082081e8480a0bef2f45184a1041037469a27db3c70541094db3c507c16171200f8707f8040284c1350fec855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc95e351047103a48b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00441302c87f01ca0055405045cb7f12cecef400f400c9ed5402ec5b04d33fd37ffa40fa403081378223c200f2f4813783f84210581047103649a6db3c16c70519f2f4813784f8416f24135f0382081e8480bef2f45124a0708040077f07c8598210415448115003cb1fcb3fcb7fc91048473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00443012161b04fee302218210472d9d7eba8f735b04d33fd37f30813804f84225c705f2f481380521c200f2f4258101012359f40d6fa192306ddf206e92306d9ad0fa40d37f596c126f02e2813806216eb3f2f46f228138075113baf2f4467026db3c81010151221419216e955b59f45a3098c801cf004133f442e25045810101f45a30440302151a1b1c02fc5b04d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842104a103948bc25db3c1dc7051bf2f48137e85382c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082081e8480a0bef2f48137eb2a8101012859f40c6fa131b3f2f48137ec278209c9c380bef2f44014503a541909261618016820fa4430705825db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0170026f82ac87001ca0055215023810101cf00cecec902f0db3c8137ed81010154431359f40c6fa131b3f2f4514aa081010153abc85902cecb7fc927103401206e953059f45a30944133f415e270536b7f0dc855208210472d9d7d5004cb1f12cb3fcb7fcec91049103841b0441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f42407004700ac81a19008c598210415448115003cb1fcb3fcb7fc91047473019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004134c87f01ca0055405045cb7f12cecef400f400c9ed540024c8821041544e4901cb1f58cf16cb3fc9f900002ac87f01ca0055405045cb7f12cecef400f400c9ed54005ae036c00005c12115b08e1c8132c8f2f04034c87f01ca0055405045cb7f12cecef400f400c9ed54e05f05f2c082015da0f605da89a1a400033da6fff481f481e809e808aa80d82b1c21020203ae01f481f480aa4007a2b0dadbc5b678d8a71e00065474320486503d');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initATHWallet_init_args({ $$type: 'ATHWallet_init_args', balance, owner_address, ath_master_address })(builder);
@@ -1648,6 +1766,8 @@ const ATHWallet_types: ABIType[] = [
     {"name":"ATHBurnNotification","header":1096042498,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnFinalized","header":1096042499,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnFailed","header":1096042500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"ATHGenesisSupplyCredit","header":1096042501,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"ATHGenesisSupplyAck","header":1096042502,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
@@ -1666,6 +1786,8 @@ const ATHWallet_opcodes = {
     "ATHBurnNotification": 1096042498,
     "ATHBurnFinalized": 1096042499,
     "ATHBurnFailed": 1096042500,
+    "ATHGenesisSupplyCredit": 1096042501,
+    "ATHGenesisSupplyAck": 1096042502,
     "AthTransferNotification": 1194171773,
     "AthTransferNotificationAck": 1194171774,
     "ATHTransferRequest": 1096042512,
@@ -1686,6 +1808,7 @@ export const ATHWallet_getterMapping: { [key: string]: string } = {
 
 const ATHWallet_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"ATHBurn"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"ATHGenesisSupplyCredit"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequest"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestWithNotify"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransfer"}},
@@ -1699,6 +1822,8 @@ export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
 export const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2000000n;
 export const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 2000000n;
+export const ATH_GENESIS_SUPPLY_EXEC_RESERVE = 2000000n;
+export const ATH_GENESIS_SUPPLY_ACK_VALUE = 1000000n;
 export const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 1096044105n;
 
 export class ATHWallet implements Contract {
@@ -1735,11 +1860,14 @@ export class ATHWallet implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHBurn | ATHTransferRequest | ATHTransferRequestWithNotify | ATHInternalTransfer | ATHInternalTransferWithNotify | AthTransferNotificationAck | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHBurn | ATHGenesisSupplyCredit | ATHTransferRequest | ATHTransferRequestWithNotify | ATHInternalTransfer | ATHInternalTransferWithNotify | AthTransferNotificationAck | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHBurn') {
             body = beginCell().store(storeATHBurn(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHGenesisSupplyCredit') {
+            body = beginCell().store(storeATHGenesisSupplyCredit(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequest') {
             body = beginCell().store(storeATHTransferRequest(message)).endCell();

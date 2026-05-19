@@ -5,6 +5,12 @@
 import "./ATHWallet.tact";
 
 const ATH_TOTAL_SUPPLY_ATOMIC: Int = 100000000000000000;
+
+message(0x41544807) DeployTreasurySupply {
+    query_id: Int as uint64;
+    response_destination: Address;
+}
+
 struct ATHJettonDataView {
     total_supply: Int;
     mintable: Bool;
@@ -17,11 +23,13 @@ contract ATHMaster {
     total_supply: Int as uint128;
     treasury_owner: Address;
     content: Cell;
+    treasury_supply_deployed: Bool;
 
     init(treasury_owner: Address, content: Cell) {
         self.total_supply = ATH_TOTAL_SUPPLY_ATOMIC;
         self.treasury_owner = treasury_owner;
         self.content = content;
+        self.treasury_supply_deployed = false;
     }
 
     fun derive_wallet_address(owner_address: Address): Address {
@@ -49,6 +57,38 @@ contract ATHMaster {
                 owner_address: msg.owner_address
             }.toCell()
         });
+    }
+
+    receive(msg: DeployTreasurySupply) {
+        throwUnless(14120, sender() == self.treasury_owner);
+        throwUnless(14121, !self.treasury_supply_deployed);
+        throwUnless(14122, msg.response_destination == self.treasury_owner);
+        throwUnless(14123, self.total_supply == ATH_TOTAL_SUPPLY_ATOMIC);
+        throwUnless(14124, context().value >= ATH_GENESIS_SUPPLY_EXEC_RESERVE + ATH_GENESIS_SUPPLY_ACK_VALUE);
+
+        self.treasury_supply_deployed = true;
+
+        let wallet_init: StateInit = initOf ATHWallet(0, self.treasury_owner, myAddress());
+        let treasury_wallet: Address = self.derive_wallet_address(self.treasury_owner);
+        send(SendParameters {
+            to: treasury_wallet,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            code: wallet_init.code,
+            data: wallet_init.data,
+            body: ATHGenesisSupplyCredit {
+                query_id: msg.query_id,
+                amount: self.total_supply,
+                response_destination: msg.response_destination
+            }.toCell()
+        });
+    }
+
+    bounced(msg: bounced<ATHGenesisSupplyCredit>) {
+        throwUnless(14130, sender() == self.derive_wallet_address(self.treasury_owner));
+        throwUnless(14131, msg.amount == self.total_supply);
+        self.treasury_supply_deployed = false;
     }
 
     get fun get_jetton_data(): ATHJettonDataView {
