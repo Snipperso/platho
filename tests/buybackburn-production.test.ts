@@ -36,11 +36,16 @@ const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff00001111222233334444
 const ROUTE_EVIDENCE_HASH = 0x111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000n;
 const ENVELOPE = toNano('51.05');
 const ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
+const ROUTE_REFUND_EXEC_RESERVE = 2_000_000n;
 const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
 const OP_PTON_TON_TRANSFER = 0x01f3835d;
+
+function routeRefundCredit(value: bigint): bigint {
+  return value > ROUTE_REFUND_EXEC_RESERVE ? value - ROUTE_REFUND_EXEC_RESERVE : 0n;
+}
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
@@ -432,7 +437,7 @@ describe('Production BuybackBurn candidate', () => {
     await env.buyback.send(env.stonfiRouter.getSender(), { value: refundValue }, null);
     let state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
-    expect(state.route_refund_due_ton).toBe(refundValue);
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(refundValue));
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
@@ -451,7 +456,7 @@ describe('Production BuybackBurn candidate', () => {
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_IDLE);
     expect(state.pending_query_id).toBe(0n);
-    expect(state.route_refund_due_ton).toBe(refundValue);
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(refundValue));
   });
 
   it('BUYBACK-04D: recovery uses only the current swap refund delta, not old dust or small success excess', async () => {
@@ -474,7 +479,7 @@ describe('Production BuybackBurn candidate', () => {
     const state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_query_id).toBe(90n);
-    expect(state.route_refund_due_ton).toBe(oldRouteDue + smallExcess);
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(oldRouteDue) + routeRefundCredit(smallExcess));
   });
 
   it('BUYBACK-04E: full accumulated route refunds can be recycled into exactly one new reserve envelope', async () => {
@@ -484,14 +489,14 @@ describe('Production BuybackBurn candidate', () => {
 
     await env.buyback.send(env.stonfiRouter.getSender(), { value: ENVELOPE + dust }, null);
     let state = await env.buyback.getGetBuybackBurnState();
-    expect(state.route_refund_due_ton).toBe(ENVELOPE + dust);
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE + dust));
     expect(state.reserve_due_ton).toBe(0n);
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.001') }, {
       $$type: 'RecycleRouteRefundReserve',
     } as RecycleRouteRefundReserve);
     state = await env.buyback.getGetBuybackBurnState();
-    expect(state.route_refund_due_ton).toBe(ENVELOPE + dust);
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE + dust));
     expect(state.reserve_due_ton).toBe(0n);
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
@@ -499,7 +504,7 @@ describe('Production BuybackBurn candidate', () => {
     } as RecycleRouteRefundReserve);
 
     state = await env.buyback.getGetBuybackBurnState();
-    expect(state.route_refund_due_ton).toBe(dust);
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE + dust) - ENVELOPE);
     expect(state.reserve_due_ton).toBe(ENVELOPE);
   });
 

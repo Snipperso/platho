@@ -83,6 +83,7 @@ PROGRAM{
   DECLPROC $Vault$_fun_computeSessionId
   DECLPROC $Vault$_fun_deriveAthWalletAddress
   DECLPROC $Vault$_fun_computeAthDepositId
+  DECLPROC $Vault$_fun_computeAthWithdrawalId
   DECLPROC $Vault$_fun_discountedFee
   DECLPROC $Vault$_fun_isPublishProfileValid
   DECLPROC $Vault$_fun_canonicalSessionMaxCharge
@@ -112,6 +113,8 @@ PROGRAM{
   DECLPROC $Vault$_fun_get_receive_intent_commitment
   DECLPROC $VaultPendingAthWithdrawalView$_constructor_exists_owner_wallet_recipient_recipient_ath_wallet_amount_created_at
   DECLPROC $Vault$_fun_get_pending_ath_withdrawal
+  DECLPROC $Vault$_fun_get_ath_withdrawal_id
+  DECLPROC $Vault$_fun_get_pending_ath_withdrawal_for
   DECLPROC $Vault$_fun_get_canonical_session_max_charge
   DECLPROC $Vault$_fun_get_session_publish_hash
   DECLPROC $VaultGlobalView$_constructor_sealed_capsule_hub_bound_deployment_manifest_hash_capsule_hub_address_vault_ath_wallet_address_ath_master_address_user_count_session_count_key_record_count_receive_intent_count_pending_ath_withdrawal_count_pending_publish_count_processed_ath_deposit_count_pending_publish_stale_ttl_airdrop_remaining_ath_airdrop_distributed_ath_airdrop_reward_per_message_ath_airdrop_total_allocation_ath
@@ -133,6 +136,8 @@ PROGRAM{
   72648 DECLMETHOD %get_receive_intent_id
   104854 DECLMETHOD %get_receive_intent_commitment
   125951 DECLMETHOD %get_pending_ath_withdrawal
+  123302 DECLMETHOD %get_ath_withdrawal_id
+  104521 DECLMETHOD %get_pending_ath_withdrawal_for
   109915 DECLMETHOD %get_canonical_session_max_charge
   71827 DECLMETHOD %get_session_publish_hash
   126899 DECLMETHOD %get_global
@@ -951,6 +956,18 @@ PROGRAM{
     64 STU
         ENDC
         HASHCU
+  }>
+  $Vault$_fun_computeAthWithdrawalId PROCREF:<{
+        NEWC
+    1096239428 PUSHINT
+    SWAP
+    32 STU
+    ROT
+        STSLICER
+    64 STU
+        ENDC
+        HASHCU
+    64 MODPOW2#
   }>
   $Vault$_fun_discountedFee PROCREF:<{
     21 s() 22 s() XCHG
@@ -1878,6 +1895,13 @@ PROGRAM{
     5 -ROLL
     $VaultPendingAthWithdrawalView$_constructor_exists_owner_wallet_recipient_recipient_ath_wallet_amount_created_at INLINECALLDICT
   }>
+  $Vault$_fun_get_ath_withdrawal_id PROCREF:<{
+    $Vault$_fun_computeAthWithdrawalId INLINECALLDICT
+  }>
+  $Vault$_fun_get_pending_ath_withdrawal_for PROCREF:<{
+    $Vault$_fun_computeAthWithdrawalId INLINECALLDICT
+    $Vault$_fun_get_pending_ath_withdrawal INLINECALLDICT
+  }>
   $Vault$_fun_get_canonical_session_max_charge PROCREF:<{
     $Vault$_fun_canonicalSessionMaxCharge INLINECALLDICT
   }>
@@ -2057,6 +2081,38 @@ PROGRAM{
     s15 16 s() XCHG
     15 ROLL
     $Vault$_fun_get_pending_ath_withdrawal INLINECALLDICT
+    12 6 BLKDROP2
+    9 6 BLKDROP2
+    $VaultPendingAthWithdrawalView$_to_external INLINECALLDICT
+  }>
+  %get_ath_withdrawal_id PROC:<{
+    $Vault$_contract_load INLINECALLDICT
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s15 17 s() XCHG
+    s14 16 s() XCHG
+    s13 s15 XCHG
+    2 13 BLKSWAP
+    $Vault$_fun_get_ath_withdrawal_id INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    5 1 BLKDROP2
+  }>
+  %get_pending_ath_withdrawal_for PROC:<{
+    $Vault$_contract_load INLINECALLDICT
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s15 17 s() XCHG
+    s14 16 s() XCHG
+    s13 s15 XCHG
+    2 13 BLKSWAP
+    $Vault$_fun_get_pending_ath_withdrawal_for INLINECALLDICT
     12 6 BLKDROP2
     9 6 BLKDROP2
     $VaultPendingAthWithdrawalView$_to_external INLINECALLDICT
@@ -2878,7 +2934,7 @@ PROGRAM{
         16015 PUSHINT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
-        11000000 PUSHINT
+        13000000 PUSHINT
         GEQ
         THROWANYIFNOT
         s0 s7 XCHG
@@ -3112,26 +3168,72 @@ PROGRAM{
       29 s() PUSH
       GEQ
       THROWANYIFNOT
+      __tact_context_get_sender INLINECALLDICT
+      22 s() 26 s() XCHG
+      21 s() 25 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 23 s() XCHG
+      18 s() 26 s() XCHG
+      17 s() 25 s() XCHG
+      16 s() 24 s() XCHG
+      s15 23 s() XCHG
+      s14 26 s() XCHG
+      s13 25 s() XCHG
+      s12 24 s() XCHG
+      s11 23 s() XCHG
+      s10 26 s() XCHG
+      s9 25 s() XCHG
+      s8 24 s() XCHG
+      s7 23 s() XCHG
+      s6 26 s() XCHG
+      s5 25 s() XCHG
+      s4 24 s() XCHG
+      s3 23 s() XCHG
+      s2 26 s() XCHG
+      SWAP
+      s0 27 s() XCHG
+      $Vault$_fun_computeAthWithdrawalId INLINECALLDICT
       16026 PUSHINT
-      s14 PUSH
+      s10 PUSH
       257 PUSHINT
-      29 s() PUSH
+      s3 PUSH
       __tact_dict_exists_int INLINECALLDICT
       NOT
       THROWANYIFNOT
-      s0 s3 XCHG
+      s0 23 s() XCHG
       27 s() PUSH
       SUB
       267 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s4 s6 XCHG
-      s3 s6 s5 XCHG3
-      s1 s2 XCHG
+      s4 26 s() XCHG
+      s2 s3 XCHG
+      s2 24 s() XCHG
+      s1 27 s() XCHG
+      s0 28 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s3 16 s() XCHG
+      s3 s12 XCHG
+      s2 23 s() XCHG
+      s1 24 s() XCHG
       __tact_dict_set_slice_cell INLINECALLDICT
+      16 s() 20 s() XCHG
+      s15 19 s() XCHG
+      s14 18 s() XCHG
+      s13 17 s() XCHG
+      s12 16 s() XCHG
+      s11 s15 XCHG
+      s10 s14 XCHG
       s0 s13 XCHG
+      s8 s12 XCHG
+      s7 s11 XCHG
+      s6 s10 XCHG
+      s5 s9 XCHG
+      s4 s8 XCHG
+      s3 s7 XCHG
+      s6 s5 s0 XCHG3
+      s1 s4 XCHG
+      s1 s3 XCHG
+      s2 21 s() XCHG
       23 s() PUSH
       $Vault$_fun_deriveAthWalletAddress INLINECALLDICT
       257 PUSHINT
@@ -3413,6 +3515,12 @@ PROGRAM{
       OVER
       IFNOT:<{
         5000000 PUSHINT
+        ADD
+      }>
+      DUP
+      0 GTINT
+      IF:<{
+        2000000 PUSHINT
         ADD
       }>
       16033 PUSHINT
@@ -3823,6 +3931,8 @@ PROGRAM{
         10000000 PUSHINT
         ADD
       }>
+      2000000 PUSHINT
+      ADD
       16110 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -4033,6 +4143,8 @@ PROGRAM{
       s0 28 s() XCHG
       39 s() PUSH
       $Vault$_fun_keyRecordStorageEndowment INLINECALLDICT
+      2000000 PUSHINT
+      ADD
       16126 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -4283,7 +4395,7 @@ PROGRAM{
       16218 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      5000000 PUSHINT
+      7000000 PUSHINT
       GEQ
       THROWANYIFNOT
       267 PUSHINT
@@ -4417,7 +4529,7 @@ PROGRAM{
         16235 PUSHINT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
-        10000000 PUSHINT
+        12000000 PUSHINT
         GEQ
         THROWANYIFNOT
         s0 s5 XCHG
@@ -5013,7 +5125,10 @@ PROGRAM{
         CTOS
     9 PUSHPOW2
     LDSLICEX
-    DROP
+    16421 PUSHINT
+    SWAP
+        SEMPTY
+    THROWANYIFNOT
     s0 33 s() XCHG
     16422 PUSHINT
     s0 34 s() XCHG

@@ -202,8 +202,8 @@ builder $UsernameNFTItem$_store(builder build_0, (slice, slice, int) v) inline {
 
 ((slice, slice, int), (slice, slice, int)) $UsernameNFTItem$_fun_get_state((slice, slice, int) $self) impure inline_ref {
     var (($self'owner_wallet, $self'username_registry_address, $self'name_hash)) = $self;
-    var $fresh$ret_178 = $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash($self'owner_wallet, $self'username_registry_address, $self'name_hash);
-    return (($self'owner_wallet, $self'username_registry_address, $self'name_hash), $fresh$ret_178);
+    var $fresh$ret_184 = $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash($self'owner_wallet, $self'username_registry_address, $self'name_hash);
+    return (($self'owner_wallet, $self'username_registry_address, $self'name_hash), $fresh$ret_184);
 }
 
 ;;

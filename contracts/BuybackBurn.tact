@@ -16,6 +16,7 @@ const BUYBACK_ATH_BURN_REQUEST_VALUE: Int = 30000000;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE: Int = 35000000;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE: Int = 2000000;
+const BUYBACK_ROUTE_REFUND_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_DEADLINE_MAX_AHEAD_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_GRACE_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS: Int = 49000000000;
@@ -267,6 +268,13 @@ contract BuybackBurn {
         self.pending_received_ath_atomic = 0;
     }
 
+    fun creditRouteRefundValue(value: Int) {
+        if (value <= BUYBACK_ROUTE_REFUND_EXEC_RESERVE) {
+            return;
+        }
+        self.route_refund_due_ton += value - BUYBACK_ROUTE_REFUND_EXEC_RESERVE;
+    }
+
     fun sendAthBurn(queryId: Int, amount: Int) {
         message(MessageParameters {
             to: self.official_ath_wallet_address,
@@ -464,7 +472,7 @@ contract BuybackBurn {
         throwUnless(22401, self.phase == BUYBACK_PHASE_PENDING_STONFI_SWAP);
         throwUnless(22402, msg.query_id == self.pending_query_id);
         throwUnless(22403, msg.ton_amount == BUYBACK_OFFER_AMOUNT_NANOTONS);
-        self.route_refund_due_ton += context().value;
+        self.creditRouteRefundValue(context().value);
         self.clearPending();
     }
 
@@ -481,7 +489,7 @@ contract BuybackBurn {
     receive() {
         if (self.sealed && self.route_frozen) {
             if (sender() == self.stonfi_pton_wallet_address || sender() == self.stonfi_router_address || sender() == self.stonfi_pool_address_ton_ath) {
-                self.route_refund_due_ton += context().value;
+                self.creditRouteRefundValue(context().value);
                 return;
             }
         }

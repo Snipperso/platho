@@ -12,6 +12,7 @@ import {
   CreateReceiveIntent,
   ClaimReceiveIntent,
   WithdrawAth,
+  AthTransferNotification,
 } from '../build/Vault/Vault_Vault';
 import {
   ATHWallet,
@@ -22,6 +23,7 @@ const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef123456789
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
 const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
+const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 const SESSION_STATE_STORAGE_ENDOWMENT = 5_000_000n;
 const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 5_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
@@ -81,7 +83,7 @@ async function setupPlain() {
     balance: toNano('2'),
     workchain: address.workChain,
   }));
-  return { blockchain, vault: blockchain.openContract(new Vault(address, init)), user, recipient };
+  return { blockchain, vault: blockchain.openContract(new Vault(address, init)), user, recipient, athWallet };
 }
 
 async function setupAth() {
@@ -215,7 +217,7 @@ describe('Vault value/storage boundary negative matrix', () => {
 
   it('VAULT-BND-02: SetSession and RegisterMessagingKeys honor exact storage boundaries', async () => {
     const lowSession = await setupPlain();
-    const sessionRequired = USER_STATE_STORAGE_ENDOWMENT + SESSION_STATE_STORAGE_ENDOWMENT;
+    const sessionRequired = USER_STATE_STORAGE_ENDOWMENT + SESSION_STATE_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
     await lowSession.vault.send(lowSession.user.getSender(), { value: sessionRequired - 1n }, {
       $$type: 'SetSession',
       session_pubkey: 0x1234n,
@@ -234,7 +236,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await exactSession.vault.getGetSession(exactSession.user.address)).exists).toBe(true);
 
     const lowKeys = await setupPlain();
-    const keyRequired = USER_STATE_STORAGE_ENDOWMENT + KEY_RECORD_STANDARD_STORAGE_ENDOWMENT;
+    const keyRequired = USER_STATE_STORAGE_ENDOWMENT + KEY_RECORD_STANDARD_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
     await lowKeys.vault.send(lowKeys.user.getSender(), { value: keyRequired - 1n }, {
       $$type: 'RegisterMessagingKeys',
       enc_pubkey: ENC,
@@ -269,7 +271,8 @@ describe('Vault value/storage boundary negative matrix', () => {
     const secret = 0x7777n;
     const commitment = await vault.getGetReceiveIntentCommitment(intentId, recipient.address, secret);
 
-    await vault.send(user.getSender(), { value: RECEIVE_INTENT_STORAGE_ENDOWMENT - 1n }, {
+    const createIntentRequired = RECEIVE_INTENT_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
+    await vault.send(user.getSender(), { value: createIntentRequired - 1n }, {
       $$type: 'CreateReceiveIntent',
       asset: ASSET_TON,
       amount,
@@ -281,7 +284,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('1'));
 
-    await vault.send(user.getSender(), { value: RECEIVE_INTENT_STORAGE_ENDOWMENT }, {
+    await vault.send(user.getSender(), { value: createIntentRequired }, {
       $$type: 'CreateReceiveIntent',
       asset: ASSET_TON,
       amount,
@@ -293,7 +296,8 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('0.8'));
 
-    await vault.send(recipient.getSender(), { value: USER_STATE_STORAGE_ENDOWMENT - 1n }, {
+    const claimNewUserRequired = USER_STATE_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
+    await vault.send(recipient.getSender(), { value: claimNewUserRequired - 1n }, {
       $$type: 'ClaimReceiveIntent',
       intent_id: intentId,
       secret32: secret,
@@ -301,7 +305,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
     expect((await vault.getGetUser(recipient.address)).exists).toBe(false);
 
-    await vault.send(recipient.getSender(), { value: USER_STATE_STORAGE_ENDOWMENT }, {
+    await vault.send(recipient.getSender(), { value: claimNewUserRequired }, {
       $$type: 'ClaimReceiveIntent',
       intent_id: intentId,
       secret32: secret,
@@ -358,5 +362,47 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetPendingAthWithdrawal(21n)).exists).toBe(false);
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_250n);
     expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);
+  });
+
+  it('VAULT-BND-05: ATH withdrawals scope pending ids by owner wallet, not only client query_id', async () => {
+    const { blockchain, vault, user, recipient, athWallet } = await setupPlain();
+    const user2 = await blockchain.treasury('vault-boundary-ath-user-2');
+    const clientQueryId = 777n;
+
+    await vault.send(athWallet.getSender(), { value: toNano('0.05') }, {
+      $$type: 'AthTransferNotification',
+      query_id: 1n,
+      amount: 1_000n,
+      sender_key: 0n,
+      sender_wallet: user.address,
+    } as AthTransferNotification);
+    await vault.send(athWallet.getSender(), { value: toNano('0.05') }, {
+      $$type: 'AthTransferNotification',
+      query_id: 2n,
+      amount: 1_000n,
+      sender_key: 0n,
+      sender_wallet: user2.address,
+    } as AthTransferNotification);
+
+    await vault.send(user.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
+      $$type: 'WithdrawAth',
+      query_id: clientQueryId,
+      amount: 100n,
+      recipient: recipient.address,
+    } as WithdrawAth);
+    await vault.send(user2.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
+      $$type: 'WithdrawAth',
+      query_id: clientQueryId,
+      amount: 100n,
+      recipient: recipient.address,
+    } as WithdrawAth);
+
+    const pending1 = await vault.getGetPendingAthWithdrawalFor(user.address, clientQueryId);
+    const pending2 = await vault.getGetPendingAthWithdrawalFor(user2.address, clientQueryId);
+    expect(pending1.exists).toBe(true);
+    expect(pending2.exists).toBe(true);
+    expect(pending1.owner_wallet.toString()).toBe(user.address.toString());
+    expect(pending2.owner_wallet.toString()).toBe(user2.address.toString());
+    expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(2n);
   });
 });

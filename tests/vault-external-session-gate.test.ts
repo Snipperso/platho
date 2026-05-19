@@ -105,6 +105,7 @@ async function buildExternalRequest(params: {
   header1?: bigint;
   secretKey: Buffer;
   mutateSignature?: boolean;
+  signatureTrailingData?: 'bits' | 'ref';
 }) {
   const bodyHash = params.bodyHash ?? BODY_HASH;
   const header0 = params.header0 ?? HEADER0;
@@ -136,7 +137,13 @@ async function buildExternalRequest(params: {
     .storeUint(header1, 256)
     .endCell();
 
-  const signatureRef = beginCell().storeBuffer(signature).endCell();
+  const signatureBuilder = beginCell().storeBuffer(signature);
+  if (params.signatureTrailingData === 'bits') {
+    signatureBuilder.storeUint(1n, 1);
+  } else if (params.signatureTrailingData === 'ref') {
+    signatureBuilder.storeRef(beginCell().storeUint(1n, 1).endCell());
+  }
+  const signatureRef = signatureBuilder.endCell();
 
   return beginCell()
     .storeUint(MAGIC, 32)
@@ -232,6 +239,39 @@ describe('Vault milestone 6: external session pre-accept gate and pending publis
     const afterSession = await vault.getGetSession(user.address);
     expect(afterSession.nonce).toBe(0n);
     expect(afterUser.message_budget_ton).toBe(before.message_budget_ton);
+  });
+
+  it('VAULT-EXT-CANONICAL-SIG-01: signatureRef with trailing bits or refs is rejected before mutation', async () => {
+    const { vault, user, blockchain } = await setup();
+    const kp = keyPairFromSeed(Buffer.alloc(32, 28));
+    const pub = bufToBigInt(kp.publicKey);
+    const now = blockchain.now ?? 0;
+
+    await fundSession(vault, user, pub, now + 1000);
+    const session = await vault.getGetSession(user.address);
+    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    const before = await vault.getGetUser(user.address);
+
+    for (const signatureTrailingData of ['bits', 'ref'] as const) {
+      const external = await buildExternalRequest({
+        vault,
+        op: OP_PRIVATE,
+        owner: user.address,
+        sessionId: session.session_id,
+        nonce: 0n,
+        validUntil: BigInt(now + 100),
+        publishKind: KIND_PRIVATE,
+        sizeClass: SIZE_STANDARD,
+        cryptoSuite: SUITE_CLASSICAL,
+        maxCharge,
+        secretKey: kp.secretKey,
+        signatureTrailingData,
+      });
+
+      await tryExternal(vault, external);
+      expect((await vault.getGetSession(user.address)).nonce).toBe(0n);
+      expect((await vault.getGetUser(user.address)).message_budget_ton).toBe(before.message_budget_ton);
+    }
   });
 
   it('VAULT-EXT-07: duplicate external request cannot be accepted twice', async () => {

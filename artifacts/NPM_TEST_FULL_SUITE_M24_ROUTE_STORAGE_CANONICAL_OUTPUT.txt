@@ -1,0 +1,13 @@
+> platho@1.0.0 test
+> vitest run --config vitest.all.config.ts --reporter=json --outputFile=artifacts/NPM_TEST_FULL_SUITE_M24_ROUTE_STORAGE_CANONICAL_RESULTS.json
+
+JSON report written to C:/platho/artifacts/NPM_TEST_FULL_SUITE_M24_ROUTE_STORAGE_CANONICAL_RESULTS.json
+
+Summary:
+numTotalTestSuites: 130
+numPassedTestSuites: 130
+numFailedTestSuites: 0
+numTotalTests: 267
+numPassedTests: 267
+numFailedTests: 0
+success: true
