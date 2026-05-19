@@ -1,0 +1,36 @@
+{
+  "document": "PLATHO.V1.MAINNET_ATH_MASTER_DERIVATION",
+  "status": "BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "ath_master_derivation_ready": false,
+  "production_deploy_executed": false,
+  "inputSource": null,
+  "blockers": [
+    "MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS"
+  ],
+  "missingInputs": [
+    "MAINNET_ATH_MASTER_DERIVATION_INPUT",
+    "FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+    "FINAL_ATH_METADATA_CONTENT_CELL_BOC_BASE64"
+  ],
+  "rejectedNonProdInputs": [],
+  "invalidInputs": [],
+  "inputs": {
+    "treasuryOwnerAddress": null,
+    "contentBocBase64": null,
+    "contentHash": null
+  },
+  "derived": {
+    "athMasterAddress": null,
+    "athMasterRawAddress": null,
+    "athMasterStateInitHash": null,
+    "athMasterCodeHash": null,
+    "athMasterDataHash": null
+  },
+  "nextM20FInputs": {
+    "athMasterAddress": null,
+    "athMasterCodeHash": null,
+    "athDeploymentManifest": null
+  },
+  "proofRefs": null
+}
