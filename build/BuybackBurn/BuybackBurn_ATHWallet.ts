@@ -2544,6 +2544,47 @@ export function dictValueParserRecycleRouteRefundReserve(): DictionaryValue<Recy
     }
 }
 
+export type TopUpStorageReserve = {
+    $$type: 'TopUpStorageReserve';
+}
+
+export function storeTopUpStorageReserve(src: TopUpStorageReserve) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2422309586, 32);
+    };
+}
+
+export function loadTopUpStorageReserve(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2422309586) { throw Error('Invalid prefix'); }
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function loadTupleTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function loadGetterTupleTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function storeTupleTopUpStorageReserve(source: TopUpStorageReserve) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStorageReserve> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeTopUpStorageReserve(src)).endCell());
+        },
+        parse: (src) => {
+            return loadTopUpStorageReserve(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type StonfiPtonTonTransferBounce = {
     $$type: 'StonfiPtonTonTransferBounce';
     query_id: bigint;
@@ -3321,6 +3362,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"RetryAthBurnDue","header":1113150036,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"RecoverStonfiRouteRefund","header":1113150019,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"RecycleRouteRefundReserve","header":1113150034,"fields":[]},
+    {"name":"TopUpStorageReserve","header":2422309586,"fields":[]},
     {"name":"StonfiPtonTonTransferBounce","header":32736093,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}}]},
     {"name":"BuybackBurnConfigView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"fee_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"route_frozen","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"fee_accumulator_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"referral_value_bps","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"BuybackBurnStateView","header":null,"fields":[{"name":"phase","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"reserve_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_deadline","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_route_refund_start_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_dex_min_out_atomic_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_received_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"route_refund_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_burn_retry_due_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_terminal_query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
@@ -3356,6 +3398,7 @@ const ATHWallet_opcodes = {
     "RetryAthBurnDue": 1113150036,
     "RecoverStonfiRouteRefund": 1113150019,
     "RecycleRouteRefundReserve": 1113150034,
+    "TopUpStorageReserve": 2422309586,
     "StonfiPtonTonTransferBounce": 32736093,
 }
 

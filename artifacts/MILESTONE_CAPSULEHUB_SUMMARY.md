@@ -30,7 +30,7 @@ Explicitly not implemented:
 - Vault ACK / excess return
 - discounted Vault fees
 - private recipient/client sync
-- real CapsuleHub page maps beyond milestone counters
+- full on-chain CapsuleHub page maps are intentionally out of scope for v1; v1 is counter-only / anchor-only
 - deployment/seal checks
 - UsernameRegistry
 - BuybackBurn STON.fi execution

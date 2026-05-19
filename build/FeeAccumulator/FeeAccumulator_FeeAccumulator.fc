@@ -331,6 +331,13 @@ _ %get_state() method_id(86957) {
         return ();
     }
     
+    ;; Receive TopUpStorageReserve message
+    if (op == 0x87a2d2c7) {
+        var $msg = empty_tuple();
+        $FeeAccumulator$_contract_store(($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(15099);

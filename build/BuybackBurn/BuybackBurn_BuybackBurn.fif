@@ -2278,6 +2278,32 @@ PROGRAM{
       s0 s5 XCHG
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
+    DUP
+    2422309586 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      31 s() POP
+      29 s() 31 s() XCHG
+      28 s() 30 s() XCHG
+      27 s() 29 s() XCHG
+      26 s() 28 s() XCHG
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      $BuybackBurn$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 32 s() XCHG
     33 LESSINT

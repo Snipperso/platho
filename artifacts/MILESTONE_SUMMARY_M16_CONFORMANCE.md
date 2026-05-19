@@ -2,12 +2,13 @@
 
 Status: PASS
 
-Scope: static and manifest-level conformance checks over the implemented M15 subset. No contract logic or code hashes were changed.
+Scope: static and manifest-level conformance checks over the implemented subset. Storage top-up ABI coverage is allowed as a no-authority maintenance surface.
 
 ## Checks
 
 - Forbidden control surface absent: true
 - Empty fallbacks reject: true
+- Storage top-up ABI covered: true
 - Code hash artifacts match build: true
 - FeeAccumulator duplicate hash artifacts match: true
 - Manifest remains non-final while blockers remain: true
@@ -16,7 +17,7 @@ Scope: static and manifest-level conformance checks over the implemented M15 sub
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: a55fb0995bee873a5ca2d7c358eec1249727480ca26f6a8c4be7bfa5b185c09c
+- Hash: dc86068ba3d09926217b372648a4a4621b910076a0ea14096279e5f80063832f
 
 ## Remaining final-genesis blockers
 
@@ -28,13 +29,13 @@ Scope: static and manifest-level conformance checks over the implemented M15 sub
 
 ## Per-contract summary
 
-| Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects |
-|---|---:|---:|---:|---|
-| ATHMaster.tact | 92 | 3 | 1 | true |
-| ATHWallet.tact | 532 | 11 | 6 | true |
-| BuybackBurn.tact | 506 | 13 | 2 | true |
-| CapsuleHub.tact | 401 | 8 | 1 | true |
-| FeeAccumulator.tact | 100 | 5 | 1 | true |
-| UsernameNFTItem.tact | 49 | 3 | 0 | true |
-| UsernameRegistry.tact | 745 | 14 | 3 | true |
-| Vault.tact | 1400 | 20 | 3 | true |
+| Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects | storage top-up receive |
+|---|---:|---:|---:|---|---|
+| ATHMaster.tact | 92 | 3 | 1 | true | false |
+| ATHWallet.tact | 532 | 11 | 6 | true | false |
+| BuybackBurn.tact | 509 | 14 | 2 | true | true |
+| CapsuleHub.tact | 404 | 9 | 1 | true | true |
+| FeeAccumulator.tact | 103 | 6 | 1 | true | true |
+| UsernameNFTItem.tact | 49 | 3 | 0 | true | true |
+| UsernameRegistry.tact | 745 | 14 | 3 | true | true |
+| Vault.tact | 1403 | 21 | 3 | true | true |

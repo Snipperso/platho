@@ -3066,6 +3066,47 @@ export function dictValueParserPrunePendingPublish(): DictionaryValue<PrunePendi
     }
 }
 
+export type TopUpStorageReserve = {
+    $$type: 'TopUpStorageReserve';
+}
+
+export function storeTopUpStorageReserve(src: TopUpStorageReserve) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(840283645, 32);
+    };
+}
+
+export function loadTopUpStorageReserve(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 840283645) { throw Error('Invalid prefix'); }
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function loadTupleTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function loadGetterTupleTopUpStorageReserve(source: TupleReader) {
+    return { $$type: 'TopUpStorageReserve' as const };
+}
+
+export function storeTupleTopUpStorageReserve(source: TopUpStorageReserve) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStorageReserve> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeTopUpStorageReserve(src)).endCell());
+        },
+        parse: (src) => {
+            return loadTopUpStorageReserve(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type PendingAthWithdrawal = {
     $$type: 'PendingAthWithdrawal';
     owner_wallet: Address;
@@ -4533,6 +4574,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PrunePendingPublish","header":1913380205,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"TopUpStorageReserve","header":840283645,"fields":[]},
     {"name":"PendingAthWithdrawal","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingPublish","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"session_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"budget_epoch","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"capsulehub_call_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"refundable_budget_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
@@ -4585,6 +4627,7 @@ const ATHWallet_opcodes = {
     "PublishPublicFromVault": 2351593143,
     "CapsuleHubPublishAck": 2270058346,
     "PrunePendingPublish": 1913380205,
+    "TopUpStorageReserve": 840283645,
 }
 
 const ATHWallet_getters: ABIGetter[] = [

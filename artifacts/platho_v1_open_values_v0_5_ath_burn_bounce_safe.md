@@ -338,7 +338,7 @@ page_id = entry_id / 256
 index_in_page = entry_id % 256
 ```
 
-Separate private and public page maps are used.
+Superseded by the M27 interface decision: CapsuleHub v1 uses separate private and public counters/page counts, not retrievable on-chain page maps.
 
 ---
 

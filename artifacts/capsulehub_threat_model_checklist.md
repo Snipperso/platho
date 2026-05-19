@@ -28,7 +28,7 @@ Date: 2026-05-17
 - Sandbox gas and forwarding behavior is a proxy, not final mainnet gas proof.
 - `CAPSULEHUB_ACK_FORWARD_RESERVE = 0.030 TON` is locally validated but should be remeasured on testnet/mainnet.
 - Direct-publish overpayment remains contract balance/storage reserve and is not modeled as refundable user balance.
-- CapsuleHub still stores milestone metadata/counters, not full production retrieval indexes.
+- CapsuleHub v1 intentionally stores counter/anchor metadata only, not full production retrieval indexes or on-chain page maps.
 - No independent human audit has reviewed this hardening pass.
 - No formal model checker has proven all reachable states.
 
@@ -36,5 +36,5 @@ Date: 2026-05-17
 
 - Independent Tact/security review focused on async ACK/bounce value backing and fee flush authority.
 - Testnet/mainnet gas envelope measurement for direct publish, Vault publish ACK, and fee flush bounce.
-- Final storage-rent policy for CapsuleHub page/entry growth.
+- Testnet/mainnet storage-rent measurement for CapsuleHub counter/page-count growth.
 - Keep CapsuleHub frozen only while the focused CapsuleHub/Vault suite, full suite, and artifact checks remain green.

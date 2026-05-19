@@ -77,6 +77,8 @@ message(0x42595243) RecoverStonfiRouteRefund { // "BYRC"
 
 message(0x42595252) RecycleRouteRefundReserve {} // "BYRR"
 
+message(0x906182D2) TopUpStorageReserve {}
+
 // Prefix-compatible with STON.fi pTON v2.1 TON transfer body for bounce recovery.
 message(0x01f3835d) StonfiPtonTonTransferBounce {
     query_id: Int as uint64;
@@ -508,6 +510,10 @@ contract BuybackBurn {
         throwUnless(22413, msg.amount == self.pending_received_ath_atomic);
         self.ath_burn_retry_due_atomic += msg.amount;
         self.finishPendingCycle();
+    }
+
+    receive(msg: TopUpStorageReserve) {
+        // Accept TON for BuybackBurn storage reserve only. It is not route refund or protocol reserve.
     }
 
     receive() {

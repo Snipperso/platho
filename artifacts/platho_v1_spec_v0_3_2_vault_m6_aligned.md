@@ -308,7 +308,9 @@ If none can be implemented, the flush operation is not part of v1.
 
 ### 5.1 Purpose
 
-CapsuleHub stores private encrypted message entries and public post entries.
+Superseded note: this v0.3.2 text predates the M27 interface decision. CapsuleHub v1 is counter-only / anchor-only and does not expose retrievable on-chain page maps.
+
+CapsuleHub anchors private encrypted message entries and public post entries.
 
 It does not parse private payload semantics, recipient identity, private conversation state, wallet balances, ATH discount ownership, or receive-intent secrets.
 
@@ -323,8 +325,14 @@ fee_accumulator_address: address
 private_latest_id: uint64
 public_latest_id: uint64
 
-private_pages: dict<uint64, Page>
-public_pages: dict<uint64, Page>
+private_page_count: uint64
+public_page_count: uint64
+private_entry_count: uint64
+public_entry_count: uint64
+last_private_entry_id: uint64
+last_public_entry_id: uint64
+last_private_entry_uid: uint256
+last_public_entry_uid: uint256
 
 accrued_plato_fee_ton: coins
 ```
@@ -338,7 +346,7 @@ entry_id:  uint64 sequential scan/index id
 entry_uid: uint256 content/source identity hash
 ```
 
-`entry_id` is used for pages, scanning, latest ids, and client pagination.
+`entry_id` is used for counter progression, page-count charging, latest ids, and client-side ordering.
 
 `entry_uid` is stored identity metadata.
 

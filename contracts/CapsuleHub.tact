@@ -86,6 +86,8 @@ message(0x7A861031) FlushFees {
     amount: Int as uint128;
 }
 
+message(0x5331B880) TopUpStorageReserve {}
+
 message(0xFF775609) DepositProtocolFee {
     amount: Int as uint128;
 }
@@ -436,6 +438,10 @@ contract CapsuleHub {
         throwUnless(13203, sender() == self.fee_accumulator_address);
         throwUnless(13204, msg.amount > 0);
         self.accrued_plato_fee_ton += msg.amount;
+    }
+
+    receive(msg: TopUpStorageReserve) {
+        // Accept TON for CapsuleHub storage reserve only. Counters, fees, and bindings are unchanged.
     }
 
     get fun get_state(): CapsuleHubStateView {

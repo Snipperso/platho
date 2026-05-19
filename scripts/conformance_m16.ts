@@ -14,6 +14,15 @@ const productionContracts = [
   'Vault.tact',
 ];
 
+const storageTopUpReceivers = new Map<string, string>([
+  ['BuybackBurn.tact', 'TopUpStorageReserve'],
+  ['CapsuleHub.tact', 'TopUpStorageReserve'],
+  ['FeeAccumulator.tact', 'TopUpStorageReserve'],
+  ['UsernameNFTItem.tact', 'TopUpStorageReserve'],
+  ['UsernameRegistry.tact', 'UsernameRegistryTopUpStorageReserve'],
+  ['Vault.tact', 'TopUpStorageReserve'],
+]);
+
 const hashChecks: Array<[string, string, string]> = [
   ['ATHMaster', 'ATHMaster_ATHMaster', 'ATHMASTER_CODE_HASH.txt'],
   ['ATHWallet', 'ATHWallet_ATHWallet', 'ATH_WALLET_CODE_HASH.txt'],
@@ -65,6 +74,10 @@ async function main() {
     const raw = text(join('contracts', name));
     const source = stripLineComments(raw);
     const forbiddenHits = forbiddenPatterns.filter((needle) => source.includes(needle));
+    const storageTopUpMessage = storageTopUpReceivers.get(name);
+    const storageTopUpReceive = storageTopUpMessage
+      ? new RegExp(`receive\\s*\\(\\s*msg:\\s*${storageTopUpMessage}\\s*\\)`).test(source)
+      : false;
     return {
       contract: name,
       non_comment_lines: source.split('\n').filter((line) => line.trim().length > 0).length,
@@ -72,6 +85,7 @@ async function main() {
       bounced_handlers: countRegex(source, /bounced\s*\(/),
       forbidden_hits: forbiddenHits,
       empty_fallback_rejects: /receive\s*\(\s*\)\s*\{[\s\S]*?throw\s*\(/.test(source),
+      storage_top_up_receive: storageTopUpReceive,
     };
   });
 
@@ -86,11 +100,12 @@ async function main() {
   const report = {
     profile: 'PLATHO.V1.M16.PRODUCTION_CONFORMANCE_AND_COMPACTNESS_PASS',
     baseline: 'M15 implemented-subset package',
-    contract_code_changed: false,
-    new_functional_surface_added: false,
+    contract_code_changed: 'storage-top-up-only',
+    new_functional_surface_added: 'storage-top-up-only',
     checks: {
       forbidden_control_surface_absent: perContract.every((x) => x.forbidden_hits.length === 0),
       empty_fallbacks_reject: perContract.every((x) => x.empty_fallback_rejects),
+      storage_top_up_abi_covered: [...storageTopUpReceivers.keys()].every((name) => perContract.find((x) => x.contract === name)?.storage_top_up_receive === true),
       code_hash_artifacts_match_build: Object.values(hashes).every((x: any) => x.match),
       fee_accumulator_duplicate_hash_artifacts_match: artifactHash('FEE_ACCUMULATOR_CODE_HASH.txt') === artifactHash('FEEACCUMULATOR_CODE_HASH.txt'),
       manifest_remains_non_final: manifest.status === 'IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS' && manifest.blockers_before_final_genesis.length > 0,
@@ -116,12 +131,13 @@ async function main() {
     '',
     'Status: PASS',
     '',
-    'Scope: static and manifest-level conformance checks over the implemented M15 subset. No contract logic or code hashes were changed.',
+    'Scope: static and manifest-level conformance checks over the implemented subset. Storage top-up ABI coverage is allowed as a no-authority maintenance surface.',
     '',
     '## Checks',
     '',
     `- Forbidden control surface absent: ${report.checks.forbidden_control_surface_absent}`,
     `- Empty fallbacks reject: ${report.checks.empty_fallbacks_reject}`,
+    `- Storage top-up ABI covered: ${report.checks.storage_top_up_abi_covered}`,
     `- Code hash artifacts match build: ${report.checks.code_hash_artifacts_match_build}`,
     `- FeeAccumulator duplicate hash artifacts match: ${report.checks.fee_accumulator_duplicate_hash_artifacts_match}`,
     `- Manifest remains non-final while blockers remain: ${report.checks.manifest_remains_non_final}`,
@@ -138,9 +154,9 @@ async function main() {
     '',
     '## Per-contract summary',
     '',
-    '| Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects |',
-    '|---|---:|---:|---:|---|',
-    ...perContract.map((c) => `| ${c.contract} | ${c.non_comment_lines} | ${c.receive_handlers} | ${c.bounced_handlers} | ${c.empty_fallback_rejects} |`),
+    '| Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects | storage top-up receive |',
+    '|---|---:|---:|---:|---|---|',
+    ...perContract.map((c) => `| ${c.contract} | ${c.non_comment_lines} | ${c.receive_handlers} | ${c.bounced_handlers} | ${c.empty_fallback_rejects} | ${c.storage_top_up_receive} |`),
     '',
   ].join('\n');
   writeFileSync('artifacts/MILESTONE_SUMMARY_M16_CONFORMANCE.md', md);

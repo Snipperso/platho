@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: BuybackBurn
-BoC Size: 11028 bytes
+BoC Size: 11144 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 46
+Total structures: 47
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -168,6 +168,10 @@ Signature: `RecoverStonfiRouteRefund{query_id:uint64}`
 ### RecycleRouteRefundReserve
 TL-B: `recycle_route_refund_reserve#42595252  = RecycleRouteRefundReserve`
 Signature: `RecycleRouteRefundReserve{}`
+
+### TopUpStorageReserve
+TL-B: `top_up_storage_reserve#906182d2  = TopUpStorageReserve`
+Signature: `TopUpStorageReserve{}`
 
 ### StonfiPtonTonTransferBounce
 TL-B: `stonfi_pton_ton_transfer_bounce#01f3835d query_id:uint64 ton_amount:coins = StonfiPtonTonTransferBounce`

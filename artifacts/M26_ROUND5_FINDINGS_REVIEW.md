@@ -14,10 +14,10 @@ Status: **PATCHED / TESTED** for confirmed code issues. Production remains **NO-
 - F-028: not reproduced. `npm audit --json` and `npm audit --omit=dev --json` both report 0 total vulnerabilities on the current lockfile.
 - F-029: resolved for this pass. Full suite evidence is archived in `artifacts/NPM_TEST_FULL_SUITE_M26_ROUND5_RESULTS.json`.
 
-## Unresolved Source-Of-Truth Items
+## Source-Of-Truth Decisions
 
-- F-030: CapsuleHub page-map vs counter-only semantics remains a product/spec decision, not a runtime exploit confirmed in this pass.
-- F-031: `TopUpStorageReserve` coverage remains a spec conformance decision. Current explicit handlers exist for UsernameRegistry and UsernameNFTItem; adding no-op top-up handlers to other production contracts should be decided as a contract interface change.
+- F-030: resolved as a v1 interface decision. CapsuleHub is counter-only / anchor-only in v1: it records counters, page counts, latest entry ids/uids, and fee accounting, but does not expose retrievable on-chain `private_pages` / `public_pages` maps. The current spec text has been aligned with that interface.
+- F-031: resolved as a v1 ABI decision. Explicit no-authority `TopUpStorageReserve` handlers exist for Vault, CapsuleHub, FeeAccumulator, BuybackBurn, UsernameRegistry, and UsernameNFTItem using the opcodes pinned in the current spec table. ATHMaster/ATHWallet are not extended by this decision because the current top-up opcode table does not define ATH jetton top-up operations.
 
 ## Regression Evidence
 

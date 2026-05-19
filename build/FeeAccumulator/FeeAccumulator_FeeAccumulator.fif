@@ -351,6 +351,15 @@ PROGRAM{
       $FeeAccumulator$_contract_store INLINECALLDICT
     }>
     s6 POP
+    DUP
+    2275594951 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s4 POP
+      s0 s3 s4 XCHG3
+      $FeeAccumulator$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 s5 XCHG
     33 LESSINT

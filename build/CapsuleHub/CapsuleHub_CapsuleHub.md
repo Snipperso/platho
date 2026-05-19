@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: CapsuleHub
-BoC Size: 3283 bytes
+BoC Size: 3373 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 21
+Total structures: 22
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -76,6 +76,10 @@ Signature: `CapsuleHubPublishAck{publish_id:uint256,entry_id:uint64,entry_uid:ui
 ### FlushFees
 TL-B: `flush_fees#7a861031 amount:uint128 = FlushFees`
 Signature: `FlushFees{amount:uint128}`
+
+### TopUpStorageReserve
+TL-B: `top_up_storage_reserve#5331b880  = TopUpStorageReserve`
+Signature: `TopUpStorageReserve{}`
 
 ### DepositProtocolFee
 TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
