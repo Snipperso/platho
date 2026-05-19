@@ -7,7 +7,7 @@ const SPLIT_BASE_BPS: Int = 10000;
 const TREASURY_SHARE_BPS: Int = 5000;
 const FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 2000000;
 const FEEACCUMULATOR_SPLIT_EXEC_RESERVE: Int = 2000000;
-const FEEACCUMULATOR_FLUSH_EXEC_RESERVE: Int = 3000000;
+const FEEACCUMULATOR_FLUSH_EXEC_RESERVE: Int = 5000000;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 // M19H BuybackBurn funding envelope: exact 50 TON offer + 1.05 TON route funding.
 // FeeAccumulator must only flush complete buyback execution envelopes, not raw 50 TON offer chunks.

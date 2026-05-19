@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 3222 bytes
+BoC Size: 3503 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 44
+Total structures: 46
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -77,6 +77,10 @@ Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_key:ui
 TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck`
 Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128,sender_key:uint32}`
 
+### PruneStaleNotification
+TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint32 = PruneStaleNotification`
+Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint32}`
+
 ### AthTransferNotificationMintUsername
 TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
 Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,sender_key:uint32,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
@@ -117,13 +121,17 @@ Signature: `ATHTransferFailed{query_id:uint64,amount:uint128}`
 TL-B: `_ balance:int257 owner_address:address ath_master_address:address = ATHWalletDataView`
 Signature: `ATHWalletDataView{balance:int257,owner_address:address,ath_master_address:address}`
 
+### PendingAthTransferNotificationView
+TL-B: `_ exists:bool sender_owner:address amount:int257 created_at:int257 = PendingAthTransferNotificationView`
+Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,amount:int257,created_at:int257}`
+
 ### PendingAthTransferNotification
-TL-B: `_ sender_owner:address amount:uint128 = PendingAthTransferNotification`
-Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128}`
+TL-B: `_ sender_owner:address amount:uint128 created_at:uint32 = PendingAthTransferNotification`
+Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}`
 
 ### ATHWallet$Data
-TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128}> processed_notifications:dict<int, int> = ATHWallet`
-Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128}>,processed_notifications:dict<int, int>}`
+TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> = ATHWallet`
+Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>}`
 
 ### AcceptBurnReserve
 TL-B: `accept_burn_reserve#594ba505 amount:uint128 = AcceptBurnReserve`
@@ -182,10 +190,14 @@ TL-B: `_ genesis_config_hash:uint256 deployment_manifest_hash:uint256 ath_master
 Signature: `BuybackBurn{genesis_config_hash:uint256,deployment_manifest_hash:uint256,ath_master_address:address,fee_accumulator_address:address,official_ath_wallet_address:address,stonfi_router_address:address,stonfi_pool_address_ton_ath:address,stonfi_pton_wallet_address:address,ask_jetton_wallet_address:address,stonfi_referral_address:address,fee_bound:bool,official_ath_wallet_bound:bool,route_frozen:bool,sealed:bool,referral_value_bps:uint16,buyback_min_ath_out_per_50_ton_atomic:uint128,evidence_quote_out_atomic_ath:uint128,evidence_dex_min_out_atomic_ath:uint128,route_evidence_hash:uint256,phase:uint8,reserve_due_ton:uint128,pending_query_id:uint64,pending_deadline:uint64,pending_route_refund_start_ton:uint128,pending_dex_min_out_atomic_ath:uint128,pending_received_ath_atomic:uint128,route_refund_due_ton:uint128,ath_burn_retry_due_atomic:uint128,accepted_reserve_count:uint64,executed_buyback_count:uint64,burned_ath_total_atomic:uint128}`
 
 ## Get methods
-Total get methods: 1
+Total get methods: 2
 
 ## get_wallet_data
 No arguments
+
+## get_pending_notification
+Argument: query_id
+Argument: sender_key
 
 ## Exit codes
 * 2: Stack underflow

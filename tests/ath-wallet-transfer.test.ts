@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
-import { ATHWallet, ATHTransferRequest, ATHTransferRequestWithNotify } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, ATHTransferRequest, ATHTransferRequestWithNotify, PruneStaleNotification } from '../build/ATHWallet/ATHWallet_ATHWallet';
+
+const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
+const ATH_PENDING_NOTIFICATION_TTL = 86_400;
+
+function senderKey(senderOwner: Address): bigint {
+  return BigInt('0x' + beginCell()
+    .storeUint(ATH_TRANSFER_NOTIFY_ID_DOMAIN, 32)
+    .storeAddress(senderOwner)
+    .endCell()
+    .hash()
+    .toString('hex')) % 4_294_967_296n;
+}
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -129,5 +141,49 @@ describe('ATH wallet transfer profile', () => {
 
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
     expect((await recipientWallet.getGetWalletData()).balance).toBe(300n);
+  });
+
+  it('ATH-XFER-05: stale notify pending can be pruned when destination never ACKs', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_700_000_000;
+    const sourceOwner = await blockchain.treasury('ath-transfer-stale-notify-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-stale-notify-recipient');
+    const pruner = await blockchain.treasury('ath-transfer-stale-notify-pruner');
+    const master = fixtureAddress('ATH_TRANSFER_STALE_NOTIFY_MASTER');
+    const queryId = 505n;
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: queryId,
+      amount: 100n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      notify_destination: recipientOwner.address,
+      notify_value: toNano('0.05'),
+    } as ATHTransferRequestWithNotify);
+
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+    const key = senderKey(sourceOwner.address);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
+    await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
   });
 });

@@ -4,6 +4,7 @@
 
 const ATH_TRANSFER_NOTIFY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
+const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 2000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 2000000;
@@ -11,6 +12,7 @@ const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
 const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD: Int = 4294967296;
+const ATH_PENDING_NOTIFICATION_TTL: Int = 86400; // 24 hours
 
 message(0x41544801) ATHBurn {
     query_id: Int as uint64;
@@ -61,6 +63,11 @@ message(0x472D9D7D) AthTransferNotification {
 message(0x472D9D7E) AthTransferNotificationAck {
     query_id: Int as uint64;
     amount: Int as uint128;
+    sender_key: Int as uint32;
+}
+
+message(0x504E5052) PruneStaleNotification {
+    query_id: Int as uint64;
     sender_key: Int as uint32;
 }
 
@@ -147,9 +154,17 @@ struct ATHWalletDataView {
     ath_master_address: Address;
 }
 
+struct PendingAthTransferNotificationView {
+    exists: Bool;
+    sender_owner: Address;
+    amount: Int;
+    created_at: Int;
+}
+
 struct PendingAthTransferNotification {
     sender_owner: Address;
     amount: Int as uint128;
+    created_at: Int as uint32;
 }
 
 contract ATHWallet {
@@ -323,7 +338,7 @@ contract ATHWallet {
         throwUnless(14304, msg.notify_value > 0);
         throwUnless(14305, self.balance >= msg.amount);
         throwUnless(14306, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14307, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
+        throwUnless(14307, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
 
         self.balance -= msg.amount;
 
@@ -355,7 +370,7 @@ contract ATHWallet {
         throwUnless(14503, msg.notify_value > 0);
         throwUnless(14504, self.balance >= msg.amount);
         throwUnless(14505, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14506, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
+        throwUnless(14506, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
 
         self.balance -= msg.amount;
 
@@ -405,7 +420,7 @@ contract ATHWallet {
         throwUnless(14311, sender() == self.derive_wallet_address(msg.sender_owner));
         throwUnless(14312, msg.notify_destination == self.owner_address);
         throwUnless(14313, msg.notify_value > 0);
-        throwUnless(14314, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
+        throwUnless(14314, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
         let sender_key: Int = self.compute_sender_key(msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
         throwUnless(14315, !self.pending_notifications.exists(pending_key));
@@ -416,7 +431,8 @@ contract ATHWallet {
         self.balance += msg.amount;
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
             sender_owner: msg.sender_owner,
-            amount: msg.amount
+            amount: msg.amount,
+            created_at: now()
         });
 
         message(MessageParameters {
@@ -448,7 +464,7 @@ contract ATHWallet {
         throwUnless(14510, msg.amount > 0);
         throwUnless(14511, sender() == self.derive_wallet_address(msg.sender_owner));
         throwUnless(14512, msg.notify_value > 0);
-        throwUnless(14513, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE);
+        throwUnless(14513, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
         let sender_key: Int = self.compute_sender_key(msg.sender_owner);
         let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
         throwUnless(14514, !self.pending_notifications.exists(pending_key));
@@ -459,7 +475,8 @@ contract ATHWallet {
         self.balance += msg.amount;
         self.pending_notifications.set(pending_key, PendingAthTransferNotification {
             sender_owner: msg.sender_owner,
-            amount: msg.amount
+            amount: msg.amount,
+            created_at: now()
         });
 
         message(MessageParameters {
@@ -500,6 +517,16 @@ contract ATHWallet {
         throwUnless(14344, self.compute_sender_key(pending.sender_owner) == msg.sender_key);
         let notification_id: Int = self.compute_notification_id(pending.sender_owner, msg.query_id);
         self.processed_notifications.set(notification_id, msg.amount);
+        self.pending_notifications.del(pending_key);
+    }
+
+    receive(msg: PruneStaleNotification) {
+        let pending_key: Int = self.compute_pending_notification_key(msg.query_id, msg.sender_key);
+        let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(pending_key);
+        throwUnless(14350, pendingOpt != null);
+        let pending: PendingAthTransferNotification = pendingOpt!!;
+        throwUnless(14351, self.compute_sender_key(pending.sender_owner) == msg.sender_key);
+        throwUnless(14352, now() >= pending.created_at + ATH_PENDING_NOTIFICATION_TTL);
         self.pending_notifications.del(pending_key);
     }
 
@@ -564,6 +591,26 @@ contract ATHWallet {
             balance: self.balance,
             owner_address: self.owner_address,
             ath_master_address: self.ath_master_address
+        };
+    }
+
+    get fun get_pending_notification(query_id: Int, sender_key: Int): PendingAthTransferNotificationView {
+        let pending_key: Int = self.compute_pending_notification_key(query_id, sender_key);
+        let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(pending_key);
+        if (pendingOpt == null) {
+            return PendingAthTransferNotificationView {
+                exists: false,
+                sender_owner: self.owner_address,
+                amount: 0,
+                created_at: 0
+            };
+        }
+        let pending: PendingAthTransferNotification = pendingOpt!!;
+        return PendingAthTransferNotificationView {
+            exists: true,
+            sender_owner: pending.sender_owner,
+            amount: pending.amount,
+            created_at: pending.created_at
         };
     }
 

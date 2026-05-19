@@ -158,8 +158,8 @@ cell $VaultAthTransferAck$_store_cell((int, int) v, builder b) inline {
 
 ((int), int) $MockVaultAthWallet$_fun_compute_sender_key((int) $self, slice $sender_owner) impure inline_ref {
     var (($self'reject_transfers)) = $self;
-    var $fresh$ret_65 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1096044105, 32), $sender_owner))) % 4294967296);
-    return (($self'reject_transfers), $fresh$ret_65);
+    var $fresh$ret_75 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1096044105, 32), $sender_owner))) % 4294967296);
+    return (($self'reject_transfers), $fresh$ret_75);
 }
 
 ;;

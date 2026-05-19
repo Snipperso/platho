@@ -49,7 +49,8 @@ const PLATO_PUBLIC_POST_FEE_TON: Int = 5000000;
 const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 30000000000000000;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
-const VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE: Int = 3000000;
+const VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE: Int = 6000000;
+const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 2000000;
 const INVALID_SESSION_REQUEST_CHARGE_TON: Int = 2000000;
 const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE: Int = 3000000;
 const CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE: Int = 4000000;
@@ -561,7 +562,10 @@ contract Vault {
     }
 
     fun refundPendingPublish(pending: PendingPublish, amount: Int) {
-        let refundAmount: Int = amount;
+        let refundAmount: Int = 0;
+        if (amount > VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE) {
+            refundAmount = amount - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE;
+        }
         if (refundAmount > pending.refundable_budget_amount) {
             refundAmount = pending.refundable_budget_amount;
         }

@@ -213,6 +213,7 @@ describe('Vault milestone 6: external publish orchestration', () => {
     const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     const beforeUser = await vault.getGetUser(user.address);
     const beforeGlobal = await vault.getGetGlobal();
+    const beforeVaultBalance = (await blockchain.getContract(vault.address)).balance;
 
     const external = await buildExternalRequest({
       vault,
@@ -232,6 +233,7 @@ describe('Vault milestone 6: external publish orchestration', () => {
 
     const afterUser = await vault.getGetUser(user.address);
     const afterSession = await vault.getGetSession(user.address);
+    const afterVaultBalance = (await blockchain.getContract(vault.address)).balance;
     const vg = await vault.getGetGlobal();
     const cs = await capsule.getGetState();
     const budgetSpent = beforeUser.message_budget_ton - afterUser.message_budget_ton;
@@ -243,6 +245,8 @@ describe('Vault milestone 6: external publish orchestration', () => {
     expect(cs.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE_TON);
     expect(budgetSpent > 0n).toBe(true);
     expect(budgetSpent <= maxCharge).toBe(true);
+    expect(beforeUser.ton_balance + beforeUser.message_budget_ton - afterUser.ton_balance - afterUser.message_budget_ton)
+      .toBeGreaterThanOrEqual(beforeVaultBalance - afterVaultBalance);
     expect(beforeGlobal.airdrop_remaining_ath).toBe(AIRDROP_TOTAL);
     expect(beforeGlobal.airdrop_distributed_ath).toBe(0n);
     expect(afterUser.ath_balance).toBe(beforeUser.ath_balance + AIRDROP_REWARD_PER_MESSAGE);
@@ -262,6 +266,7 @@ describe('Vault milestone 6: external publish orchestration', () => {
     const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     const beforeUser = await vault.getGetUser(user.address);
     const beforeGlobal = await vault.getGetGlobal();
+    const beforeVaultBalance = (await blockchain.getContract(vault.address)).balance;
 
     const external = await buildExternalRequest({
       vault,
@@ -281,6 +286,7 @@ describe('Vault milestone 6: external publish orchestration', () => {
 
     const afterUser = await vault.getGetUser(user.address);
     const afterSession = await vault.getGetSession(user.address);
+    const afterVaultBalance = (await blockchain.getContract(vault.address)).balance;
     const vg = await vault.getGetGlobal();
     const budgetSpent = beforeUser.message_budget_ton - afterUser.message_budget_ton;
 
@@ -288,6 +294,8 @@ describe('Vault milestone 6: external publish orchestration', () => {
     expect(vg.pending_publish_count).toBe(0n);
     expect(budgetSpent > 0n).toBe(true);
     expect(budgetSpent < maxCharge).toBe(true);
+    expect(beforeUser.ton_balance + beforeUser.message_budget_ton - afterUser.ton_balance - afterUser.message_budget_ton)
+      .toBeGreaterThanOrEqual(beforeVaultBalance - afterVaultBalance);
     expect(afterUser.ath_balance).toBe(beforeUser.ath_balance);
     expect(vg.airdrop_remaining_ath).toBe(beforeGlobal.airdrop_remaining_ath);
     expect(vg.airdrop_distributed_ath).toBe(beforeGlobal.airdrop_distributed_ath);

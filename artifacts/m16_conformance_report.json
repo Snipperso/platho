@@ -21,8 +21,8 @@
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 489,
-      "receive_handlers": 10,
+      "non_comment_lines": 532,
+      "receive_handlers": 11,
       "bounced_handlers": 6,
       "forbidden_hits": [],
       "empty_fallback_rejects": true
@@ -61,7 +61,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 721,
+      "non_comment_lines": 739,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -69,7 +69,7 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 1392,
+      "non_comment_lines": 1396,
       "receive_handlers": 20,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -78,18 +78,18 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "00be2848d146558ce157a60427a42ace8018992490946d2d8deb666282be6cfb",
-      "pinned": "00be2848d146558ce157a60427a42ace8018992490946d2d8deb666282be6cfb",
+      "built": "d6af66e6773be0ca4d12e08ebc3380e5a89f188b7a1f5e0f207f0ce87e723059",
+      "pinned": "d6af66e6773be0ca4d12e08ebc3380e5a89f188b7a1f5e0f207f0ce87e723059",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "5414d8a1ed3d178bb466f94bb73e5f359f982b3f7915c626acc4e5404c8e9b8e",
-      "pinned": "5414d8a1ed3d178bb466f94bb73e5f359f982b3f7915c626acc4e5404c8e9b8e",
+      "built": "5ea6f2351f26b45465518996ba35ce7887e9d9bca3353d13b674ca6180e6e3b4",
+      "pinned": "5ea6f2351f26b45465518996ba35ce7887e9d9bca3353d13b674ca6180e6e3b4",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "779ae38dde8b00e71723bd66c2339cc0c11492f61e93bb1882a61bd5b1bddff6",
-      "pinned": "779ae38dde8b00e71723bd66c2339cc0c11492f61e93bb1882a61bd5b1bddff6",
+      "built": "9a1472fe4b349243ca0b034a1ed986acacb98f7218056c6ea29b2ad967f68063",
+      "pinned": "9a1472fe4b349243ca0b034a1ed986acacb98f7218056c6ea29b2ad967f68063",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -98,8 +98,8 @@
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
-      "built": "b3b8da0de7891c309c9cc8c77abd8fee4c39d444a8fdcc8c7dcaa97fb13b6fc5",
-      "pinned": "b3b8da0de7891c309c9cc8c77abd8fee4c39d444a8fdcc8c7dcaa97fb13b6fc5",
+      "built": "cdc5cc6e635572eb2fa826845827ae84d7d70ce88c7d61c58467741dfbb6e67c",
+      "pinned": "cdc5cc6e635572eb2fa826845827ae84d7d70ce88c7d61c58467741dfbb6e67c",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -108,13 +108,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "7ab56ac284cd84f37222fa349f27b41bae7ffb297dd978938f724696c233b4fa",
-      "pinned": "7ab56ac284cd84f37222fa349f27b41bae7ffb297dd978938f724696c233b4fa",
+      "built": "e98a8d084bed77f82cc17d9459ddd9d7ecf019c99874de357c172ab3444cc44b",
+      "pinned": "e98a8d084bed77f82cc17d9459ddd9d7ecf019c99874de357c172ab3444cc44b",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "ddfaf2e8e48e47747dc95cce2b7da62ac9efa3112787cc3ecc9c7bc8ed0407d1",
-      "pinned": "ddfaf2e8e48e47747dc95cce2b7da62ac9efa3112787cc3ecc9c7bc8ed0407d1",
+      "built": "8229b8291f9b002d0bb59d0ab72d3b74cc765b99b2f28f117d702803a0cdb7bb",
+      "pinned": "8229b8291f9b002d0bb59d0ab72d3b74cc765b99b2f28f117d702803a0cdb7bb",
       "match": true
     }
   },
@@ -122,7 +122,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "cf50861b242b4a90995b60650cc55ead78b1ffb204e9ee176639a362884370be",
+    "manifest_hash_hex": "281b05adc16d88e389401c42d689463703c0b97738829f15a0ff0890997fd36c",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
@@ -150,6 +150,7 @@
     "FeeAccumulator.tact",
     "M20TBuybackBurnHarness.tact",
     "M20TFeeAccumulatorHarness.tact",
+    "MockAthWalletNoAck.tact",
     "MockUsernameNFTItemNoAck.tact",
     "MockUsernameRegistryAckSink.tact",
     "MockVaultAckSink.tact",

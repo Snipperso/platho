@@ -1,0 +1,110 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockAthWalletNoAck_MockAthWalletNoAck.headers.fc
+;;
+;; Header files for MockAthWalletNoAck
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockAthWalletNoAck$_contract_init
+tuple $MockAthWalletNoAck$_contract_init() impure inline;
+
+;; $MockAthWalletNoAck$_contract_load
+tuple $MockAthWalletNoAck$_contract_load() impure inline;
+
+;; $MockAthWalletNoAck$_contract_store
+() $MockAthWalletNoAck$_contract_store(tuple v) impure inline;
+
+
+;; MockAthWalletNoAck_MockAthWalletNoAck.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+;; MockAthWalletNoAck_MockAthWalletNoAck.storage.fc
+;;
+;; Type: MockAthWalletNoAck
+;; TLB: _  = MockAthWalletNoAck
+;;
+
+tuple $MockAthWalletNoAck$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return null();
+    }
+    else {
+        return $MockAthWalletNoAck$_contract_init();
+    }
+}
+
+() $MockAthWalletNoAck$_contract_store(tuple v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockAthWalletNoAck functions
+;;
+
+tuple $MockAthWalletNoAck$_contract_init() impure inline {
+    tuple $self = null();
+    return $self;
+}
+
+;;
+;; Get methods of a Contract MockAthWalletNoAck
+;;
+
+;;
+;; Routing of a Contract MockAthWalletNoAck
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var $self = $MockAthWalletNoAck$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ATHTransferRequest message
+    if (op == 0x41544810) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'recipient = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        $MockAthWalletNoAck$_contract_store($self);
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(18000);
+        $MockAthWalletNoAck$_contract_store($self);
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

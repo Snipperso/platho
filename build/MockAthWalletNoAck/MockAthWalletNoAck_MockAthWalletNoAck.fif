@@ -1,0 +1,86 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck.fc` 
+PROGRAM{
+  DECLPROC $MockAthWalletNoAck$_contract_init
+  DECLPROC $MockAthWalletNoAck$_contract_load
+  DECLPROC $MockAthWalletNoAck$_contract_store
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  $MockAthWalletNoAck$_contract_init PROCINLINE:<{
+    PUSHNULL
+  }>
+  $MockAthWalletNoAck$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    DROP
+    IF:<{
+      PUSHNULL
+    }>ELSE<{
+      $MockAthWalletNoAck$_contract_init INLINECALLDICT
+    }>
+  }>
+  $MockAthWalletNoAck$_contract_store PROCINLINE:<{
+    DROP
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    ENDC
+    c4 POP
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $MockAthWalletNoAck$_contract_load INLINECALLDICT
+    s0 s2 XCHG
+    IFJMP:<{
+      2DROP
+    }>
+    0 PUSHINT
+    OVER
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      SWAP
+      32 LDU
+      DROP
+    }>ELSE<{
+      s2 POP
+    }>
+    DUP
+    1096042512 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      $MockAthWalletNoAck$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    SWAP
+    33 LESSINT
+    AND
+    IFJMP:<{
+      18000 PUSHINT
+      THROWANY
+      $MockAthWalletNoAck$_contract_store INLINECALLDICT
+    }>
+    DROP
+    130 THROW
+  }>
+}END>c

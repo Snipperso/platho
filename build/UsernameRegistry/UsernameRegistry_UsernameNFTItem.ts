@@ -1336,6 +1336,59 @@ export function dictValueParserAthTransferNotificationAck(): DictionaryValue<Ath
     }
 }
 
+export type PruneStaleNotification = {
+    $$type: 'PruneStaleNotification';
+    query_id: bigint;
+    sender_key: bigint;
+}
+
+export function storePruneStaleNotification(src: PruneStaleNotification) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1347309650, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 32);
+    };
+}
+
+export function loadPruneStaleNotification(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1347309650) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(32);
+    return { $$type: 'PruneStaleNotification' as const, query_id: _query_id, sender_key: _sender_key };
+}
+
+export function loadTuplePruneStaleNotification(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    return { $$type: 'PruneStaleNotification' as const, query_id: _query_id, sender_key: _sender_key };
+}
+
+export function loadGetterTuplePruneStaleNotification(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    return { $$type: 'PruneStaleNotification' as const, query_id: _query_id, sender_key: _sender_key };
+}
+
+export function storeTuplePruneStaleNotification(source: PruneStaleNotification) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
+    return builder.build();
+}
+
+export function dictValueParserPruneStaleNotification(): DictionaryValue<PruneStaleNotification> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storePruneStaleNotification(src)).endCell());
+        },
+        parse: (src) => {
+            return loadPruneStaleNotification(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AthTransferNotificationMintUsername = {
     $$type: 'AthTransferNotificationMintUsername';
     query_id: bigint;
@@ -2032,10 +2085,74 @@ export function dictValueParserATHWalletDataView(): DictionaryValue<ATHWalletDat
     }
 }
 
+export type PendingAthTransferNotificationView = {
+    $$type: 'PendingAthTransferNotificationView';
+    exists: boolean;
+    sender_owner: Address;
+    amount: bigint;
+    created_at: bigint;
+}
+
+export function storePendingAthTransferNotificationView(src: PendingAthTransferNotificationView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.exists);
+        b_0.storeAddress(src.sender_owner);
+        b_0.storeInt(src.amount, 257);
+        b_0.storeInt(src.created_at, 257);
+    };
+}
+
+export function loadPendingAthTransferNotificationView(slice: Slice) {
+    const sc_0 = slice;
+    const _exists = sc_0.loadBit();
+    const _sender_owner = sc_0.loadAddress();
+    const _amount = sc_0.loadIntBig(257);
+    const _created_at = sc_0.loadIntBig(257);
+    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+}
+
+export function loadTuplePendingAthTransferNotificationView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _sender_owner = source.readAddress();
+    const _amount = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+}
+
+export function loadGetterTuplePendingAthTransferNotificationView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _sender_owner = source.readAddress();
+    const _amount = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+}
+
+export function storeTuplePendingAthTransferNotificationView(source: PendingAthTransferNotificationView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeAddress(source.sender_owner);
+    builder.writeNumber(source.amount);
+    builder.writeNumber(source.created_at);
+    return builder.build();
+}
+
+export function dictValueParserPendingAthTransferNotificationView(): DictionaryValue<PendingAthTransferNotificationView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storePendingAthTransferNotificationView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadPendingAthTransferNotificationView(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type PendingAthTransferNotification = {
     $$type: 'PendingAthTransferNotification';
     sender_owner: Address;
     amount: bigint;
+    created_at: bigint;
 }
 
 export function storePendingAthTransferNotification(src: PendingAthTransferNotification) {
@@ -2043,6 +2160,7 @@ export function storePendingAthTransferNotification(src: PendingAthTransferNotif
         const b_0 = builder;
         b_0.storeAddress(src.sender_owner);
         b_0.storeUint(src.amount, 128);
+        b_0.storeUint(src.created_at, 32);
     };
 }
 
@@ -2050,25 +2168,29 @@ export function loadPendingAthTransferNotification(slice: Slice) {
     const sc_0 = slice;
     const _sender_owner = sc_0.loadAddress();
     const _amount = sc_0.loadUintBig(128);
-    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount };
+    const _created_at = sc_0.loadUintBig(32);
+    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
 }
 
 export function loadTuplePendingAthTransferNotification(source: TupleReader) {
     const _sender_owner = source.readAddress();
     const _amount = source.readBigNumber();
-    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount };
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
 }
 
 export function loadGetterTuplePendingAthTransferNotification(source: TupleReader) {
     const _sender_owner = source.readAddress();
     const _amount = source.readBigNumber();
-    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount };
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
 }
 
 export function storeTuplePendingAthTransferNotification(source: PendingAthTransferNotification) {
     const builder = new TupleBuilder();
     builder.writeAddress(source.sender_owner);
     builder.writeNumber(source.amount);
+    builder.writeNumber(source.created_at);
     return builder.build();
 }
 
@@ -3635,6 +3757,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"ATHGenesisSupplyAck","header":1096042502,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PruneStaleNotification","header":1347309650,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"AthTransferNotificationMintUsername","header":2299698527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHTransferRequestWithNotify","header":1096042516,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
@@ -3645,7 +3768,8 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"ATHTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferFailed","header":1096042515,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}}]},
     {"name":"BindOfficialAthWallet","header":1715335229,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
@@ -3681,6 +3805,7 @@ const UsernameNFTItem_opcodes = {
     "ATHGenesisSupplyAck": 1096042502,
     "AthTransferNotification": 1194171773,
     "AthTransferNotificationAck": 1194171774,
+    "PruneStaleNotification": 1347309650,
     "AthTransferNotificationMintUsername": 2299698527,
     "ATHTransferRequest": 1096042512,
     "ATHTransferRequestWithNotify": 1096042516,
@@ -3716,6 +3841,7 @@ const UsernameNFTItem_receivers: ABIReceiver[] = [
 export const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3000000n;
 export const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1000000n;
 export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
+export const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2000000n;
 export const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2000000n;
 export const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 2000000n;
@@ -3723,6 +3849,7 @@ export const ATH_GENESIS_SUPPLY_EXEC_RESERVE = 2000000n;
 export const ATH_GENESIS_SUPPLY_ACK_VALUE = 1000000n;
 export const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 1096044105n;
 export const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD = 4294967296n;
+export const ATH_PENDING_NOTIFICATION_TTL = 86400n;
 export const USERNAME_PRICE_4_CHARS = 10000000000000n;
 export const USERNAME_PRICE_5_CHARS = 1000000000000n;
 export const USERNAME_PRICE_6_PLUS_CHARS = 100000000000n;
@@ -3732,12 +3859,15 @@ export const USERNAME_STATE_GROWTH_EXEC_RESERVE = 2000000n;
 export const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 20000000n;
 export const USERNAME_ATH_TRANSFER_EXEC_RESERVE = 5000000n;
 export const USERNAME_ATH_BURN_EXEC_RESERVE = 5000000n;
+export const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE = 2000000n;
 export const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
 export const USERNAME_PENDING_MINT_STALE_TTL = 86400n;
 export const USERNAME_MAX_LENGTH = 32n;
 export const USERNAME_SPLIT_BASE_BPS = 10000n;
 export const USERNAME_TREASURY_SHARE_BPS = 5000n;
 export const USERNAME_NAME_HASH_DOMAIN = 3318512854n;
+export const USERNAME_REFUND_FLUSH_ID_DOMAIN = 1380337988n;
+export const UINT64_MOD = 18446744073709551616n;
 export const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET = 1715335229n;
 export const OP_SEAL_GENESIS = 974311853n;
 

@@ -14,7 +14,7 @@ import { createFundingEnvelopeProfileM19H } from '../scripts/buybackburn_funding
 
 const DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const SPLIT_EXEC_RESERVE = 2_000_000n;
-const FLUSH_EXEC_RESERVE = 3_000_000n;
+const FLUSH_EXEC_RESERVE = 5_000_000n;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
 const OP_ACCEPT_BURN_RESERVE = 0x594BA505;
 
@@ -93,7 +93,7 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
   });
 
   it('FEE-BACKING-02: split and treasury flush require caller-funded execution reserve', async () => {
-    const { fee, donor, operator, treasury } = await setup();
+    const { blockchain, fee, donor, operator, treasury } = await setup();
     const amount = toNano('2');
 
     await fee.send(donor.getSender(), { value: amount + DEPOSIT_EXEC_RESERVE }, {
@@ -121,6 +121,15 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
       success: true,
     })).toBeUndefined();
     expect((await fee.getGetState()).treasury_due_ton).toBe(treasuryDue);
+
+    const beforeBalance = await contractBalance(blockchain, fee.address);
+    await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
+      $$type: 'FlushTreasuryDue',
+      amount: treasuryDue,
+    } as FlushTreasuryDue);
+    const afterBalance = await contractBalance(blockchain, fee.address);
+    expect((await fee.getGetState()).treasury_due_ton).toBe(0n);
+    expect(beforeBalance - afterBalance).toBeLessThanOrEqual(treasuryDue);
   });
 
   it('FEE-BACKING-03: buyback flush requires caller-funded reserve before sending the envelope', async () => {

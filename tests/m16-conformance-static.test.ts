@@ -117,6 +117,7 @@ describe('M16 production conformance static checks', () => {
       'FeeAccumulator.tact',
       'M20TBuybackBurnHarness.tact',
       'M20TFeeAccumulatorHarness.tact',
+      'MockAthWalletNoAck.tact',
       'MockUsernameNFTItemNoAck.tact',
       'MockUsernameRegistryAckSink.tact',
       'MockVaultAckSink.tact',
