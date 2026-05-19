@@ -1,0 +1,74 @@
+{
+  "projects": [
+    {
+      "name": "ATHWallet",
+      "path": "contracts/ATHWallet.tact",
+      "output": "build/ATHWallet"
+    },
+    {
+      "name": "ATHMaster",
+      "path": "contracts/ATHMaster.tact",
+      "output": "build/ATHMaster"
+    },
+    {
+      "name": "FeeAccumulator",
+      "path": "contracts/FeeAccumulator.tact",
+      "output": "build/FeeAccumulator"
+    },
+    {
+      "name": "BuybackBurn",
+      "path": "contracts/BuybackBurn.tact",
+      "output": "build/BuybackBurn"
+    },
+    {
+      "name": "M20TBuybackBurnHarness",
+      "path": "contracts/M20TBuybackBurnHarness.tact",
+      "output": "build/M20TBuybackBurnHarness"
+    },
+    {
+      "name": "M20TFeeAccumulatorHarness",
+      "path": "contracts/M20TFeeAccumulatorHarness.tact",
+      "output": "build/M20TFeeAccumulatorHarness"
+    },
+    {
+      "name": "CapsuleHub",
+      "path": "contracts/CapsuleHub.tact",
+      "output": "build/CapsuleHub"
+    },
+    {
+      "name": "MockVaultAckSink",
+      "path": "contracts/MockVaultAckSink.tact",
+      "output": "build/MockVaultAckSink"
+    },
+    {
+      "name": "MockVaultAthWallet",
+      "path": "contracts/MockVaultAthWallet.tact",
+      "output": "build/MockVaultAthWallet"
+    },
+    {
+      "name": "Vault",
+      "path": "contracts/Vault.tact",
+      "output": "build/Vault"
+    },
+    {
+      "name": "UsernameNFTItem",
+      "path": "contracts/UsernameNFTItem.tact",
+      "output": "build/UsernameNFTItem"
+    },
+    {
+      "name": "MockUsernameRegistryAckSink",
+      "path": "contracts/MockUsernameRegistryAckSink.tact",
+      "output": "build/MockUsernameRegistryAckSink"
+    },
+    {
+      "name": "MockUsernameNFTItemNoAck",
+      "path": "contracts/MockUsernameNFTItemNoAck.tact",
+      "output": "build/MockUsernameNFTItemNoAck"
+    },
+    {
+      "name": "UsernameRegistry",
+      "path": "contracts/UsernameRegistry.tact",
+      "output": "build/UsernameRegistry"
+    }
+  ]
+}

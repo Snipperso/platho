@@ -1,0 +1,78 @@
+{
+  "document": "PLATHO.V1.STONFI_ROUTE_CANDIDATE_INPUT_M19D",
+  "status": "TEMPLATE_NOT_FINAL_ROUTE_FREEZE",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "instructions": [
+    "Fill this object from an official STON.fi v2.1 SDK/API-generated TON->ATH tx sample.",
+    "Do not hand-type payload BOCs. Copy them from the SDK/API tx params for the selected route.",
+    "All refund/excess addresses must be the final BuybackBurn address.",
+    "Receiver must be the final official BuybackBurn ATH wallet.",
+    "Set status to FINAL_ROUTE_FREEZE_CANDIDATE only after live proof flags are backed by captured transaction evidence."
+  ],
+  "requiredEvidence": {
+    "officialSdkOrApiTxParams": "required: full tx params for 50 TON -> ATH through selected STON.fi v2.1 route",
+    "liveQuote": "required: quote output for 50 TON -> ATH, with source and timestamp/lt/hash if available",
+    "successExcess": "required: successful swap evidence showing excesses_address returns to BuybackBurn",
+    "minOutFailureRefund": "required: min_out failure evidence showing refund returns to BuybackBurn",
+    "ptonRefund": "required: pTON refund evidence showing refund returns to BuybackBurn",
+    "bounceFailureBehavior": "required: documented sender/body/value behavior for route bounce/failure cases",
+    "codeHashes": "required: router, pool, pTON and optional vault code hashes from live chain state or official verified source"
+  },
+  "candidate": {
+    "candidateLabel": "REPLACE_WITH_ROUTE_LABEL",
+    "status": "DRAFT_NOT_FINAL_ROUTE_FREEZE",
+    "officialSource": {
+      "package": "@ston-fi/sdk",
+      "version": "2.7.0",
+      "repository": "https://github.com/ston-fi/sdk/tree/main/packages/sdk",
+      "dexExport": "@ston-fi/sdk/dex/v2_1",
+      "sourceFiles": [
+        "src/contracts/dex/v2_1/router/BaseRouterV2_1.ts",
+        "src/contracts/dex/v2_1/constants.ts",
+        "src/contracts/pTON/v2_1/PtonV2_1.ts",
+        "src/contracts/pTON/v2_1/constants.ts"
+      ]
+    },
+    "addresses": {
+      "athMasterAddress": "REPLACE_WITH_FINAL_ATH_MASTER_ADDRESS",
+      "buybackBurnAddress": "REPLACE_WITH_FINAL_BUYBACKBURN_ADDRESS",
+      "buybackBurnOfficialAthWalletAddress": "REPLACE_WITH_FINAL_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
+      "stonfiRouterAddress": "REPLACE_WITH_SELECTED_STONFI_V2_1_ROUTER_ADDRESS",
+      "stonfiPoolAddressTonAth": "REPLACE_WITH_SELECTED_TON_ATH_POOL_ADDRESS",
+      "stonfiPtonWalletAddress": "REPLACE_WITH_SELECTED_ROUTER_PTON_WALLET_ADDRESS",
+      "stonfiVaultAddress": null,
+      "askJettonWalletAddress": "REPLACE_WITH_ROUTER_ATH_JETTON_WALLET_ADDRESS"
+    },
+    "codeHashes": {
+      "athMasterCodeHash": "143c2255d9bf3ae853947e45560afeb6ad0a0648361ed2350c714c3e9d6d2328",
+      "athWalletCodeHash": "7b4b51d5044ddd869d277dd037fd738a4f38696dc47c0960808e6891ca61a7d5",
+      "stonfiRouterCodeHash": "REPLACE_WITH_32_BYTE_HEX_ROUTER_CODE_HASH",
+      "stonfiPoolCodeHash": "REPLACE_WITH_32_BYTE_HEX_POOL_CODE_HASH",
+      "stonfiPtonCodeHash": "REPLACE_WITH_32_BYTE_HEX_PTON_CODE_HASH",
+      "stonfiVaultCodeHash": null
+    },
+    "swap": {
+      "queryId": "REPLACE_WITH_QUERY_ID_FROM_SDK_SAMPLE",
+      "deadline": "REPLACE_WITH_DEADLINE_FROM_SDK_SAMPLE",
+      "offerAmountNanotons": "50000000000",
+      "conservativeTotalSendValueNanotons": "51050000000",
+      "routeForwardGasNanotons": "1000000000",
+      "ptonTransferGasNanotons": "50000000",
+      "quoteOutAtomicAth": "REPLACE_WITH_LIVE_QUOTE_OUT_ATOMIC_ATH",
+      "dexMinOutAtomicAth": "REPLACE_WITH_SELECTED_DEX_MIN_OUT_ATOMIC_ATH",
+      "buybackMinAthOutPer50TonAtomic": "REPLACE_WITH_STATIC_BUYBACK_MIN_ATH_OUT_PER_50_TON"
+    },
+    "sdkSample": {
+      "ptonTransferBodyBocBase64": "REPLACE_WITH_OFFICIAL_SDK_API_PTON_TRANSFER_BODY_BOC_BASE64",
+      "stonfiSwapForwardPayloadBocBase64": "REPLACE_WITH_OFFICIAL_SDK_API_STONFI_SWAP_FORWARD_PAYLOAD_BOC_BASE64"
+    },
+    "liveProofs": {
+      "sdkOrApiTxParamsCaptured": false,
+      "liveQuoteCaptured": false,
+      "successExcessesAddressObservedAsBuybackBurn": false,
+      "minOutFailureRefundObservedAsBuybackBurn": false,
+      "ptonRefundObservedAsBuybackBurn": false,
+      "bounceOrFailureBehaviorDocumented": false
+    }
+  }
+}

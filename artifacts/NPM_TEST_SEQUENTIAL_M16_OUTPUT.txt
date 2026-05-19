@@ -1,0 +1,162 @@
+### tests/ath-burn-finalization.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00: burn operation reduces total_supply by exact burned amount and debits wallet balance[33m 409[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00C: ATH master accepts burn notification only from deterministic official ATH wallet[32m 66[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00D: wrong owner cannot burn another wallet owner balance[32m 69[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00B: transfer-to-dead-address is not treated as burn by ATH master[32m 58[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00E: underfunded ATHBurn does not debit wallet without total_supply decrease[32m 61[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00F: burn notification bounce/failure restores wallet balance when master is unavailable[32m 60[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:31:25
+[2m   Duration [22m 1.44s[2m (transform 172ms, setup 0ms, import 470ms, tests 728ms, environment 0ms)[22m
+
+### tests/ath-wallet-derivation.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/ath-wallet-derivation.test.ts[2m > [22mATH wallet derivation profile[2m > [22mcompiled wallet code hash comes from the ATH Wallet artifact[32m 12[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-derivation.test.ts[2m > [22mATH wallet derivation profile[2m > [22mATH Master get_wallet_address(owner) equals local StateInit derivation[33m 308[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:31:27
+[2m   Duration [22m 1.08s[2m (transform 152ms, setup 0ms, import 430ms, tests 321ms, environment 0ms)[22m
+
+### tests/ath-wallet-transfer.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/ath-wallet-transfer.test.ts[2m > [22mATH wallet transfer profile[2m > [22mATH-XFER-01: owner-authorized transfer debits source wallet and credits deterministic recipient wallet[33m 363[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-transfer.test.ts[2m > [22mATH wallet transfer profile[2m > [22mATH-XFER-02: non-owner cannot transfer and failed request does not debit source wallet[32m 54[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-transfer.test.ts[2m > [22mATH wallet transfer profile[2m > [22mATH-XFER-03: transfer-to-dead-address is still not burn and only credits deterministic wallet for that owner address[32m 58[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:31:29
+[2m   Duration [22m 1.09s[2m (transform 118ms, setup 0ms, import 385ms, tests 478ms, environment 0ms)[22m
+
+### tests/capsulehub.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee[33m 399[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-03: public direct publish rejects author spoofing[32m 68[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee[32m 56[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers[32m 78[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps[32m 62[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it[32m 78[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce[32m 73[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver[32m 57[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs[32m 64[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs[32m 69[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAP-REJECT-07: Vault-only publish from non-Vault sender rejected[32m 56[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAP-REJECT-08: Vault publish rejects protocol_fee_paid greater than full fee[32m 59[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mNO-ADMIN: empty fallback rejected and cannot mutate state[32m 55[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 09:31:32
+[2m   Duration [22m 1.83s[2m (transform 164ms, setup 0ms, import 438ms, tests 1.18s, environment 0ms)[22m
+
+### tests/deployment-ath-wallet-binding.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/deployment-ath-wallet-binding.test.ts[2m > [22mDeployment ATH wallet binding profile[2m > [22mDEPLOY-ATH-BIND-00: storing final official ATH wallet in Vault StateInit creates a self-address circularity[32m 30[2mms[22m[39m
+ [32m✓[39m tests/deployment-ath-wallet-binding.test.ts[2m > [22mDeployment ATH wallet binding profile[2m > [22mDEPLOY-04A/Vault: official ATH wallet is derived after Vault address exists, bound before seal, and frozen after seal[33m 463[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:31:35
+[2m   Duration [22m 1.33s[2m (transform 312ms, setup 0ms, import 611ms, tests 495ms, environment 0ms)[22m
+
+### tests/deployment-binding.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/deployment-binding.test.ts[2m > [22mDeployment binding profile[2m > [22mDEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash[33m 423[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts[2m > [22mDeployment binding profile[2m > [22mDEPLOY-BIND-04: second binding attempt is rejected and cannot overwrite counterpart address[32m 98[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts[2m > [22mDeployment binding profile[2m > [22mDEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing[32m 124[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts[2m > [22mDeployment binding profile[2m > [22mDEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal[32m 172[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 09:31:37
+[2m   Duration [22m 1.56s[2m (transform 232ms, setup 0ms, import 520ms, tests 820ms, environment 0ms)[22m
+
+### tests/deployment-manifest-m15.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-01: manifest hash is canonical cell hash over sorted addresses, code hashes, state init hashes, constants, and blockers[32m 65[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it[33m 505[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-03/06: official client profile rejects final genesis while blockers remain and detects manifest-hash mismatch[32m 27[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:31:40
+[2m   Duration [22m 1.58s[2m (transform 444ms, setup 0ms, import 757ms, tests 599ms, environment 0ms)[22m
+
+### tests/fee-accumulator.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only[33m 427[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-01/01A/01B: split is internal only, exact in nanotons, dust goes to buyback[32m 75[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-05: treasury flush uses immutable terminal receiver and debits treasury_due_ton only by requested amount[32m 81[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-06: buyback flush bounce restores buyback_due_ton[32m 87[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-07: buyback flush to deployed receiver is not treated as treasury final profile[32m 70[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mNO-ADMIN: empty fallback is rejected and cannot mutate accounting[32m 53[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:31:42
+[2m   Duration [22m 1.43s[2m (transform 111ms, setup 0ms, import 402ms, tests 796ms, environment 0ms)[22m
+
+### tests/m16-conformance-static.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-01: production contracts contain no ignored-error send mode, session-spender contract, or rescue/governance/admin-control message surface[32m 5[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-02: all production contracts reject empty fallback explicitly[32m 1[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-03: built code hashes match the pinned artifacts exactly[32m 26[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-04: implemented-subset manifest remains canonical and explicitly non-final while blockers remain[32m 52[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-05: source tree contains no extra production routes/adapters/migration hooks beyond the implemented subset[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 09:31:45
+[2m   Duration [22m 837ms[2m (transform 381ms, setup 0ms, import 528ms, tests 88ms, environment 0ms)[22m
+
+### tests/username-nft-item.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/username-nft-item.test.ts[2m > [22mUsernameNFTItem v1 milestone[2m > [22mUSERNAME-NFT-01: item StateInit deterministically binds owner wallet, registry address, and name hash[33m 319[2mms[22m[39m
+ [32m✓[39m tests/username-nft-item.test.ts[2m > [22mUsernameNFTItem v1 milestone[2m > [22mUSERNAME-NFT-02: ResendDeployedAck is permissionless and sends immutable owner/name identity to registry[32m 79[2mms[22m[39m
+ [32m✓[39m tests/username-nft-item.test.ts[2m > [22mUsernameNFTItem v1 milestone[2m > [22mUSERNAME-NFT-03: TopUpStorageReserve grants no ownership/name mutation and empty fallback is rejected[32m 64[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:31:47
+[2m   Duration [22m 1.15s[2m (transform 134ms, setup 0ms, import 430ms, tests 463ms, environment 0ms)[22m
+
+### tests/username-registry-due-flush.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m16_work[39m
+
+ [32m✓[39m tests/username-registry-due-flush.test.ts[2m > [22mUsernameRegistry treasury/burn due flush milestone[2m > [22mUSERNAME-REG-M12-01: FlushTreasuryAthDue transfers treasury due to immutable treasury ATH receiver and clears pending on ACK[33m 618[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts[2m > [22mUsernameRegistry treasury/burn due flush milestone[2m > [22mUSERNAME-REG-M12-02: FlushBurnAthDue burns through official ATH wallet, authenticated master ACK clears pending, and total_supply decreases exactly[32m 209[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts[2m > [22mUsernameRegistry treasury/burn due flush milestone[2m > [22mUSERNAME-REG-M12-03: treasury transfer failure restores treasury_due_ath and clears pending[32m 155[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts[2m > [22mUsernameRegistry treasury/burn due flush milestone[2m > [22mUSERNAME-REG-M12-04: burn notification failure restores burn_due_ath, clears pending, and restores official wallet balance[32m 158[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 09:31:49
+[2m   Duration [22m 1.95s[2m (transform 255ms, setup 0ms, import 554ms, tests 1.14s, environment 0ms)[22m
+
+### tests/username-registry-foundation.test.ts

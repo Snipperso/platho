@@ -1,0 +1,39 @@
+{
+  "document": "PLATHO.V1.M20T_SCALED_BUYBACKBURN_HARNESS",
+  "status": "SCALED_HARNESS_ONLY_NOT_PRODUCTION_ENVELOPE",
+  "scaleDivisor": "100",
+  "notMainnetRouteFreeze": true,
+  "notProductionBuybackBurnUnlock": true,
+  "doesNotChangeProductionFeeAccumulator": true,
+  "productionFlagsRemainFalse": true,
+  "values": {
+    "productionOfferAmountNanotons": "50000000000",
+    "productionRouteForwardGasNanotons": "1000000000",
+    "productionPtonTransferGasNanotons": "50000000",
+    "productionTotalFundingEnvelopeNanotons": "51050000000",
+    "scaledOfferAmountNanotons": "500000000",
+    "scaledRouteForwardGasNanotons": "10000000",
+    "scaledPtonTransferGasNanotons": "500000",
+    "scaledTotalFundingEnvelopeNanotons": "510500000",
+    "scaledAccumulatedFeesForOneEnvelopeNanotons": "1021000000"
+  },
+  "invariants": {
+    "scaledTotalEqualsOfferPlusRouteGas": true,
+    "scaledTotalIsExactly05105Ton": true,
+    "scaledOfferIsExactly05Ton": true,
+    "scaledRouteFundingIsExactly00105Ton": true,
+    "scaledAccumulatedFeesSplitWouldProduceOneEnvelope": true,
+    "productionEnvelopeRemains5105Ton": true
+  },
+  "forbiddenClaims": [
+    "M20T scaled harness unlocks production BuybackBurn",
+    "M20T scaled harness is mainnet STON.fi route freeze evidence",
+    "production FeeAccumulator accepts 0.5105 TON buyback flush",
+    "production 51.05 TON envelope can be reduced for final genesis"
+  ],
+  "nextLiveStep": {
+    "minimumUsefulTopUpNanotons": "1000000000",
+    "addressSource": ".env.testnet.local PLATHO_TESTNET_DEPLOYER_ADDRESS",
+    "expectedLiveStatusWithoutFunding": "NEED_TESTNET_TON"
+  }
+}

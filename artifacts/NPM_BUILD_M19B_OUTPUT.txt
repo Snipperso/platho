@@ -1,0 +1,121 @@
+
+> platho-deployment-binding-vault-capsulehub-milestone@1.0.0 build
+> tact --config tact.config.json
+
+💼 Compiling project ATHWallet ...
+   > ATHWallet: tact compiler
+   > ATHWallet: func compiler
+   > Packaging
+   > ATHWallet
+   > Bindings
+   > ATHWallet
+   > Reports
+   > ATHWallet
+💼 Compiling project ATHMaster ...
+   > ATHWallet: tact compiler
+   > ATHWallet: func compiler
+   > ATHMaster: tact compiler
+   > ATHMaster: func compiler
+   > Packaging
+   > ATHWallet
+   > ATHMaster
+   > Bindings
+   > ATHWallet
+   > ATHMaster
+   > Reports
+   > ATHWallet
+   > ATHMaster
+💼 Compiling project FeeAccumulator ...
+   > FeeAccumulator: tact compiler
+   > FeeAccumulator: func compiler
+   > Packaging
+   > FeeAccumulator
+   > Bindings
+   > FeeAccumulator
+   > Reports
+   > FeeAccumulator
+💼 Compiling project CapsuleHub ...
+   > CapsuleHub: tact compiler
+   > CapsuleHub: func compiler
+   > Packaging
+   > CapsuleHub
+   > Bindings
+   > CapsuleHub
+   > Reports
+   > CapsuleHub
+💼 Compiling project MockVaultAckSink ...
+   > MockVaultAckSink: tact compiler
+   > MockVaultAckSink: func compiler
+   > Packaging
+   > MockVaultAckSink
+   > Bindings
+   > MockVaultAckSink
+   > Reports
+   > MockVaultAckSink
+💼 Compiling project MockVaultAthWallet ...
+   > MockVaultAthWallet: tact compiler
+   > MockVaultAthWallet: func compiler
+   > Packaging
+   > MockVaultAthWallet
+   > Bindings
+   > MockVaultAthWallet
+   > Reports
+   > MockVaultAthWallet
+💼 Compiling project Vault ...
+   > Vault: tact compiler
+   > Vault: func compiler
+   > Packaging
+   > Vault
+   > Bindings
+   > Vault
+   > Reports
+   > Vault
+💼 Compiling project UsernameNFTItem ...
+   > UsernameNFTItem: tact compiler
+   > UsernameNFTItem: func compiler
+   > Packaging
+   > UsernameNFTItem
+   > Bindings
+   > UsernameNFTItem
+   > Reports
+   > UsernameNFTItem
+💼 Compiling project MockUsernameRegistryAckSink ...
+   > MockUsernameRegistryAckSink: tact compiler
+   > MockUsernameRegistryAckSink: func compiler
+   > Packaging
+   > MockUsernameRegistryAckSink
+   > Bindings
+   > MockUsernameRegistryAckSink
+   > Reports
+   > MockUsernameRegistryAckSink
+💼 Compiling project MockUsernameNFTItemNoAck ...
+   > MockUsernameNFTItemNoAck: tact compiler
+   > MockUsernameNFTItemNoAck: func compiler
+(node:64257) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 uncaughtException listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:64257) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 unhandledRejection listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+   > Packaging
+   > MockUsernameNFTItemNoAck
+   > Bindings
+   > MockUsernameNFTItemNoAck
+   > Reports
+   > MockUsernameNFTItemNoAck
+💼 Compiling project UsernameRegistry ...
+   > UsernameNFTItem: tact compiler
+   > UsernameNFTItem: func compiler
+   > ATHWallet: tact compiler
+   > ATHWallet: func compiler
+   > UsernameRegistry: tact compiler
+   > UsernameRegistry: func compiler
+   > Packaging
+   > UsernameNFTItem
+   > ATHWallet
+   > UsernameRegistry
+   > Bindings
+   > UsernameNFTItem
+   > ATHWallet
+   > UsernameRegistry
+   > Reports
+   > UsernameNFTItem
+   > ATHWallet
+   > UsernameRegistry

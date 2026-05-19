@@ -1,0 +1,4 @@
+tests/ath-burn-finalization.test.ts	0	10
+tests/ath-wallet-derivation.test.ts	0	7
+tests/ath-wallet-transfer.test.ts	0	7
+tests/capsulehub.test.ts	0	11

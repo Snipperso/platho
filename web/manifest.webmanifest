@@ -1,0 +1,25 @@
+{
+  "name": "Platho",
+  "short_name": "Platho",
+  "description": "Platho messenger shell",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0b0d0f",
+  "background_color": "#0b0d0f",
+  "icons": [
+    {
+      "src": "./assets/platho-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/platho-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

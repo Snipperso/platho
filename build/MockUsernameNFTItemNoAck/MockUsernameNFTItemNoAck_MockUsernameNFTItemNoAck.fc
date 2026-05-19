@@ -1,0 +1,149 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck.headers.fc
+;;
+;; Header files for MockUsernameNFTItemNoAck
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockUsernameNFTItemNoAck$_store
+builder $MockUsernameNFTItemNoAck$_store(builder build_0, (int) v) inline;
+
+;; $MockUsernameNFTItemNoAck$_load
+(slice, ((int))) $MockUsernameNFTItemNoAck$_load(slice sc_0) inline;
+
+;; $MockUsernameNFTItemNoAck$_contract_init
+(int) $MockUsernameNFTItemNoAck$_contract_init() impure inline;
+
+;; $MockUsernameNFTItemNoAck$_contract_load
+(int) $MockUsernameNFTItemNoAck$_contract_load() impure inline;
+
+;; $MockUsernameNFTItemNoAck$_contract_store
+() $MockUsernameNFTItemNoAck$_contract_store((int) v) impure inline;
+
+;; $MockUsernameNFTItemNoAck$_fun_get_accepted_count
+((int), int) $MockUsernameNFTItemNoAck$_fun_get_accepted_count((int) $self) impure inline_ref;
+
+
+;; MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+;; MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck.storage.fc
+;;
+;; Type: MockUsernameNFTItemNoAck
+;; TLB: _ accepted_count:uint64 = MockUsernameNFTItemNoAck
+;;
+
+builder $MockUsernameNFTItemNoAck$_store(builder build_0, (int) v) inline {
+    var (v'accepted_count) = v;
+    build_0 = build_0.store_uint(v'accepted_count, 64);
+    return build_0;
+}
+
+(slice, ((int))) $MockUsernameNFTItemNoAck$_load(slice sc_0) inline {
+    var v'accepted_count = sc_0~load_uint(64);
+    return (sc_0, (v'accepted_count));
+}
+
+(int) $MockUsernameNFTItemNoAck$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MockUsernameNFTItemNoAck$_load();
+    }
+    else {
+        return $MockUsernameNFTItemNoAck$_contract_init();
+    }
+}
+
+() $MockUsernameNFTItemNoAck$_contract_store((int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MockUsernameNFTItemNoAck$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockUsernameNFTItemNoAck functions
+;;
+
+(int) $MockUsernameNFTItemNoAck$_contract_init() impure inline {
+    var (($self'accepted_count)) = (null());
+    $self'accepted_count = 0;
+    return ($self'accepted_count);
+}
+
+((int), int) $MockUsernameNFTItemNoAck$_fun_get_accepted_count((int) $self) impure inline_ref {
+    var (($self'accepted_count)) = $self;
+    var $fresh$ret_165 = $self'accepted_count;
+    return (($self'accepted_count), $fresh$ret_165);
+}
+
+;;
+;; Get methods of a Contract MockUsernameNFTItemNoAck
+;;
+
+_ %get_accepted_count() method_id(109210) {
+    var self = $MockUsernameNFTItemNoAck$_contract_load();
+    var res = self~$MockUsernameNFTItemNoAck$_fun_get_accepted_count();
+    return res;
+}
+
+;;
+;; Routing of a Contract MockUsernameNFTItemNoAck
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'accepted_count) = $MockUsernameNFTItemNoAck$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ResendDeployedAck message
+    if (op == 0x639cfc6c) {
+        var $msg = empty_tuple();
+        $self'accepted_count = $self'accepted_count + 1;
+        $MockUsernameNFTItemNoAck$_contract_store(($self'accepted_count));
+        return ();
+    }
+    
+    ;; Receive TopUpStorageReserve message
+    if (op == 0x27acdf8b) {
+        var $msg = empty_tuple();
+        $MockUsernameNFTItemNoAck$_contract_store(($self'accepted_count));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(18998);
+        $MockUsernameNFTItemNoAck$_contract_store(($self'accepted_count));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

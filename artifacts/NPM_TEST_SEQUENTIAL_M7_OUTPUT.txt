@@ -1,0 +1,131 @@
+\n=== RUN tests/ath-wallet-derivation.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 06:18:34
+[2m   Duration [22m 1.05s[2m (transform 145ms, setup 0ms, import 470ms, tests 339ms, environment 0ms)[22m
+
+=== PASS tests/ath-wallet-derivation.test.ts ===
+\n=== RUN tests/ath-burn-finalization.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 06:18:36
+[2m   Duration [22m 1.50s[2m (transform 147ms, setup 0ms, import 449ms, tests 805ms, environment 0ms)[22m
+
+=== PASS tests/ath-burn-finalization.test.ts ===
+\n=== RUN tests/fee-accumulator.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 06:18:39
+[2m   Duration [22m 1.40s[2m (transform 120ms, setup 0ms, import 396ms, tests 777ms, environment 0ms)[22m
+
+=== PASS tests/fee-accumulator.test.ts ===
+\n=== RUN tests/capsulehub.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 06:18:41
+[2m   Duration [22m 1.92s[2m (transform 177ms, setup 0ms, import 464ms, tests 1.24s, environment 0ms)[22m
+
+=== PASS tests/capsulehub.test.ts ===
+\n=== RUN tests/deployment-binding.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 06:18:44
+[2m   Duration [22m 1.60s[2m (transform 247ms, setup 0ms, import 524ms, tests 845ms, environment 0ms)[22m
+
+=== PASS tests/deployment-binding.test.ts ===
+\n=== RUN tests/deployment-ath-wallet-binding.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 06:18:47
+[2m   Duration [22m 1.34s[2m (transform 324ms, setup 0ms, import 610ms, tests 494ms, environment 0ms)[22m
+
+=== PASS tests/deployment-ath-wallet-binding.test.ts ===
+\n=== RUN tests/vault-session-lifecycle.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m   Start at [22m 06:18:49
+[2m   Duration [22m 2.13s[2m (transform 234ms, setup 0ms, import 573ms, tests 1.32s, environment 0ms)[22m
+
+=== PASS tests/vault-session-lifecycle.test.ts ===
+\n=== RUN tests/vault-key-records.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 06:18:53
+[2m   Duration [22m 1.62s[2m (transform 189ms, setup 0ms, import 508ms, tests 835ms, environment 0ms)[22m
+
+=== PASS tests/vault-key-records.test.ts ===
+\n=== RUN tests/vault-receive-intent.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 06:18:55
+[2m   Duration [22m 1.97s[2m (transform 190ms, setup 0ms, import 471ms, tests 1.27s, environment 0ms)[22m
+
+=== PASS tests/vault-receive-intent.test.ts ===
+\n=== RUN tests/vault-ath-integration.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 06:18:59
+[2m   Duration [22m 1.77s[2m (transform 232ms, setup 0ms, import 537ms, tests 999ms, environment 0ms)[22m
+
+=== PASS tests/vault-ath-integration.test.ts ===
+\n=== RUN tests/vault-external-session-gate.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m7[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 06:19:01
+[2m   Duration [22m 1.88s[2m (transform 174ms, setup 0ms, import 508ms, tests 1.15s, environment 0ms)[22m
+

@@ -1,0 +1,36 @@
+{
+  "document": "PLATHO.V1.BUYBACKBURN_FUNDING_ENVELOPE_M19H",
+  "status": "FREEZE_CANDIDATE_NOT_PRODUCTION_BUYBACKBURN",
+  "productionBuybackBurnImplementationReady": false,
+  "routeFreezeRequired": true,
+  "values": {
+    "buybackOfferAmountNanotons": "50000000000",
+    "buybackRouteForwardGasNanotons": "1000000000",
+    "buybackPtonTransferGasNanotons": "50000000",
+    "buybackRouteGasTotalNanotons": "1050000000",
+    "buybackTotalStonfiSendValueNanotons": "51050000000",
+    "feeAccumulatorFlushAmountNanotons": "51050000000",
+    "exampleMinimumAccumulatedProtocolFeesForOneBuybackNanotons": "102100000000"
+  },
+  "invariants": {
+    "feeAccumulatorFlushAmountEqualsTotalFunding": true,
+    "totalFundingEqualsOfferPlusRouteGas": true,
+    "offerAmountRemainsExactly50Ton": true,
+    "routeGasIsNotAthPurchasePrincipal": true,
+    "excessAndRefundRemainBuybackBurnOwned": true
+  },
+  "feeAccumulatorRules": [
+    "FeeAccumulator.FlushBuybackDue.amount for one buyback envelope MUST be BUYBACK_TOTAL_STONFI_SEND_VALUE, not BUYBACK_OFFER_AMOUNT_TON.",
+    "FeeAccumulator.buyback_due_ton MUST be at least BUYBACK_TOTAL_STONFI_SEND_VALUE before one buyback flush is attempted.",
+    "If buyback_due_ton is exactly 50 TON, it is insufficient for a conservative 50 TON offer buyback envelope.",
+    "The route reserve is protocol-owned execution funding. Any route excess/refund MUST return to BuybackBurn, not executor/user/treasury."
+  ],
+  "forbidden": [
+    "treating FeeAccumulator buyback flush amount 50 TON as enough to fund STON.fi route after M19B conservative gas profile",
+    "reducing pTON ton_amount below 50 TON to pay route gas out of the offer principal",
+    "routing route excess/refund to executor, user, treasury, or arbitrary sender",
+    "production BuybackBurn before STON.fi route freeze",
+    "fake route placeholder",
+    "ignored-error send mode for money sends"
+  ]
+}

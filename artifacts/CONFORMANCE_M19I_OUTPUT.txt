@@ -1,0 +1,38 @@
+# Platho M16 Production Conformance & Compactness Pass
+
+Status: PASS
+
+Scope: static and manifest-level conformance checks over the implemented M15 subset. No contract logic or code hashes were changed.
+
+## Checks
+
+- Forbidden control surface absent: true
+- Empty fallbacks reject: true
+- Code hash artifacts match build: true
+- FeeAccumulator duplicate hash artifacts match: true
+- Manifest remains non-final while blockers remain: true
+
+## Manifest
+
+- Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
+- Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
+- Hash: 7ce023dbdcf90b1804d7118a14da2cfe84f584ced0b1776a9103c9d7a14d0672
+
+## Remaining final-genesis blockers
+
+- BUYBACK_BURN_CONTRACT_NOT_IMPLEMENTED_UNTIL_STONFI_ROUTE_VALUES_ARE_PINNED
+- STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED
+- FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_BUYBACK_BLOCKED_ADDRESS_WITH_REAL_BUYBACKBURN_STATEINIT_ADDRESS
+
+## Per-contract summary
+
+| Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects |
+|---|---:|---:|---:|---|
+| ATHMaster.tact | 57 | 2 | 0 | true |
+| ATHWallet.tact | 152 | 4 | 2 | true |
+| CapsuleHub.tact | 390 | 8 | 1 | true |
+| FeeAccumulator.tact | 93 | 5 | 1 | true |
+| UsernameNFTItem.tact | 47 | 3 | 0 | true |
+| UsernameRegistry.tact | 682 | 14 | 3 | true |
+| Vault.tact | 1235 | 19 | 3 | true |
+

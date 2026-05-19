@@ -1,0 +1,47 @@
+{
+  "document": "PLATHO.V1.M20T_TESTNET_MANIFEST",
+  "status": "LIVE_TESTNET_M20T_HARNESS_PASS",
+  "network": "testnet",
+  "runId": "1779138215",
+  "notMainnetRouteFreeze": true,
+  "productionFlags": {
+    "stonfiRouteFreezeReadyMustRemainFalse": true,
+    "buybackBurnImplementationReadyMustRemainFalse": true
+  },
+  "deployer": {
+    "address": "0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "walletVersion": "v4r2",
+    "secretMaterialPrinted": false,
+    "balanceBeforeNanotons": "57918803740",
+    "balanceAfterNanotons": "6543486764"
+  },
+  "contracts": {
+    "athMaster": {
+      "address": "NOT_DEPLOYED",
+      "reason": "M20T harness probe did not require ATHMaster deployment."
+    },
+    "feeAccumulator": {
+      "address": "NOT_DEPLOYED",
+      "reason": "Production FeeAccumulator was not deployed; M20T used explicit testnet fee-path harness because a production split would require about 102.1 TON."
+    },
+    "feeAccumulatorHarness": {
+      "address": "0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "codeHash": "531d6e9cd9025f8d42ce576f441c2e8d329a9fc42b79ebaeb17b4e219f6f6197",
+      "stateInitHash": "53823684cdbabd01a8bbeae3c1ed1a07b4b098dc527838ee27089f8bce159a3b",
+      "explorerUrl": "https://testnet.tonviewer.com/0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "buybackFundingEnvelopeNanotons": "51050000000"
+    },
+    "buybackBurnOrHarness": {
+      "address": "0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ",
+      "codeHash": "c112fda99950d9d55b9ca17c9b7e6f882814f112e890552557af26742a896cc7",
+      "stateInitHash": "8b224c8614ba553a66beea05d8e59c59633ecb26f0d14331ab493aedc9e437b7",
+      "explorerUrl": "https://testnet.tonviewer.com/0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ"
+    }
+  },
+  "runArtifacts": {
+    "evidenceJson": "artifacts/m20t_testnet_evidence.json",
+    "evidenceMarkdown": "artifacts/M20T_TESTNET_EVIDENCE.md",
+    "fullSuiteOutput": "artifacts/NPM_TEST_FULL_SUITE_M20T_OUTPUT.txt",
+    "fullSuiteExit": "artifacts/NPM_TEST_FULL_SUITE_M20T_EXIT.txt"
+  }
+}

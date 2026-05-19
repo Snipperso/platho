@@ -1,0 +1,56 @@
+{
+  "document": "PLATHO.V1.M20F_MAINNET_ROUTE_FREEZE_PREFLIGHT",
+  "status": "BLOCKED_MISSING_FINAL_MAINNET_INPUTS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "route_freeze_ready": false,
+  "production_buyback_burn_unlocked": false,
+  "official_sources": {
+    "stonfiSdkSwapDocs": "https://docs.ston.fi/developer-section/dex/sdk/v2/swap",
+    "stonfiRestApiDocs": "https://docs.ston.fi/developer-section/dex/api",
+    "stonfiRestApiReference": "https://docs.ston.fi/developer-section/dex/api/reference",
+    "stonfiApiBaseUrl": "https://api.ston.fi",
+    "stonfiApiSwapSimulationEndpoint": "POST /v1/swap/simulate",
+    "sdkPackage": "@ston-fi/sdk",
+    "sdkVersionVerifiedByNpm": "2.7.0",
+    "apiPackage": "@ston-fi/api",
+    "apiPackageVersionVerifiedByNpm": "0.32.0"
+  },
+  "route_profile": {
+    "offerAmountNanotons": "50000000000",
+    "conservativeTotalSendValueNanotons": "51050000000",
+    "routeForwardGasNanotons": "1000000000",
+    "ptonTransferGasNanotons": "50000000"
+  },
+  "m20t": {
+    "evidenceSource": "artifacts/m20t_testnet_evidence.json",
+    "status": "LIVE_TESTNET_M20T_HARNESS_PASS",
+    "complete": true,
+    "notProductionUnlock": true
+  },
+  "inputSource": null,
+  "m19fDossierPath": "artifacts/stonfi_route_evidence_dossier_m19f.json",
+  "m19fRouteFreezeReady": false,
+  "blockers": [
+    "MISSING_FINAL_MAINNET_M20F_INPUTS",
+    "M19F_ROUTE_EVIDENCE_DOSSIER_NOT_READY"
+  ],
+  "missingInputs": [
+    "M20F_MAINNET_ROUTE_FREEZE_INPUT",
+    "FINAL_MAINNET_ATH_MASTER_ADDRESS",
+    "FINAL_BUYBACKBURN_STATEINIT_ADDRESS",
+    "OFFICIAL_BUYBACKBURN_ATH_WALLET_ADDRESS",
+    "STONFI_API_SIMULATION_CAPTURE",
+    "OFFICIAL_STONFI_SDK_OR_API_TX_PARAMS_CAPTURE",
+    "MAINNET_REFUND_EXCESS_AND_FAILURE_PROOFS"
+  ],
+  "rejectedNonProdInputs": [],
+  "requiredNextInputs": [
+    "Deploy/freeze final mainnet ATH master and capture immutable deployment manifest.",
+    "Derive final production BuybackBurn StateInit address and official BuybackBurn ATH wallet.",
+    "Use STON.fi API mainnet simulation for exact 50 TON -> ATH route and capture router metadata.",
+    "Generate official @ston-fi/sdk/@ston-fi/api tx params from the simulation result.",
+    "Capture router, pool, pTON, ATH master, and ATH wallet code hashes on mainnet.",
+    "Prove success excesses, min_out failure refund, pTON refund, and bounce/failure behavior return to BuybackBurn.",
+    "Feed the complete evidence dossier through M19F; only then may M20F_ROUTE_FREEZE_READY become true."
+  ]
+}

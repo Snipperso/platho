@@ -1,0 +1,314 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockVaultAckSink_MockVaultAckSink.headers.fc
+;;
+;; Header files for MockVaultAckSink
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $PublishPrivateFromVault$_store
+builder $PublishPrivateFromVault$_store(builder build_0, (int, int, int, int, int, int, int, int) v) inline;
+
+;; $PublishPrivateFromVault$_store_cell
+cell $PublishPrivateFromVault$_store_cell((int, int, int, int, int, int, int, int) v, builder b) inline;
+
+;; $PublishPublicFromVault$_store
+builder $PublishPublicFromVault$_store(builder build_0, (int, int, slice, int, int) v) inline;
+
+;; $PublishPublicFromVault$_store_cell
+cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder b) inline;
+
+;; $MockVaultAckSink$_store
+builder $MockVaultAckSink$_store(builder build_0, (int, int, int, int) v) inline;
+
+;; $MockVaultAckSink$_load
+(slice, ((int, int, int, int))) $MockVaultAckSink$_load(slice sc_0) inline;
+
+;; $MockVaultStateView$_to_external
+(int, int, int, int) $MockVaultStateView$_to_external(((int, int, int, int)) v) inline;
+
+;; $MockVaultAckSink$_contract_init
+(int, int, int, int) $MockVaultAckSink$_contract_init() impure inline;
+
+;; $MockVaultAckSink$_contract_load
+(int, int, int, int) $MockVaultAckSink$_contract_load() impure inline;
+
+;; $MockVaultAckSink$_contract_store
+() $MockVaultAckSink$_contract_store((int, int, int, int) v) impure inline;
+
+;; $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid
+((int, int, int, int)) $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid(int $ack_count, int $last_publish_id, int $last_entry_id, int $last_entry_uid) inline;
+
+;; $MockVaultAckSink$_fun_get_state
+((int, int, int, int), (int, int, int, int)) $MockVaultAckSink$_fun_get_state((int, int, int, int) $self) impure inline_ref;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
+((int, int, int, int, int, int, int, int)) $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, int $protocol_fee_paid) inline;
+
+;; $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid
+((int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline;
+
+
+;; MockVaultAckSink_MockVaultAckSink.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+;; MockVaultAckSink_MockVaultAckSink.storage.fc
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: PublishPrivateFromVault
+;; Header: 0xa4f862c0
+;; TLB: publish_private_from_vault#a4f862c0 bounce_id:uint64 publish_id:uint256 size_class:uint8 crypto_suite:uint8 header_0_hash:uint256 header_1_hash:uint256 body_hash:uint256 protocol_fee_paid:uint128 = PublishPrivateFromVault
+;;
+
+builder $PublishPrivateFromVault$_store(builder build_0, (int, int, int, int, int, int, int, int) v) inline {
+    var (v'bounce_id, v'publish_id, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'protocol_fee_paid) = v;
+    build_0 = store_uint(build_0, 2767741632, 32);
+    build_0 = build_0.store_uint(v'bounce_id, 64);
+    build_0 = build_0.store_uint(v'publish_id, 256);
+    build_0 = build_0.store_uint(v'size_class, 8);
+    build_0 = build_0.store_uint(v'crypto_suite, 8);
+    build_0 = build_0.store_uint(v'header_0_hash, 256);
+    build_0 = build_0.store_uint(v'header_1_hash, 256);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'body_hash, 256);
+    build_1 = build_1.store_uint(v'protocol_fee_paid, 128);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $PublishPrivateFromVault$_store_cell((int, int, int, int, int, int, int, int) v, builder b) inline {
+    return $PublishPrivateFromVault$_store(b, v).end_cell();
+}
+
+((int, int, int, int, int, int, int, int)) $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, int $protocol_fee_paid) inline {
+    return ($bounce_id, $publish_id, $size_class, $crypto_suite, $header_0_hash, $header_1_hash, $body_hash, $protocol_fee_paid);
+}
+
+;;
+;; Type: PublishPublicFromVault
+;; Header: 0x8c2a76b7
+;; TLB: publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault
+;;
+
+builder $PublishPublicFromVault$_store(builder build_0, (int, int, slice, int, int) v) inline {
+    var (v'bounce_id, v'publish_id, v'author_wallet, v'body_hash, v'protocol_fee_paid) = v;
+    build_0 = store_uint(build_0, 2351593143, 32);
+    build_0 = build_0.store_uint(v'bounce_id, 64);
+    build_0 = build_0.store_uint(v'publish_id, 256);
+    build_0 = build_0.store_slice(v'author_wallet);
+    build_0 = build_0.store_uint(v'body_hash, 256);
+    build_0 = build_0.store_uint(v'protocol_fee_paid, 128);
+    return build_0;
+}
+
+cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder b) inline {
+    return $PublishPublicFromVault$_store(b, v).end_cell();
+}
+
+((int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline {
+    return ($bounce_id, $publish_id, $author_wallet, $body_hash, $protocol_fee_paid);
+}
+
+;;
+;; Type: MockVaultStateView
+;; TLB: _ ack_count:int257 last_publish_id:int257 last_entry_id:int257 last_entry_uid:int257 = MockVaultStateView
+;;
+
+(int, int, int, int) $MockVaultStateView$_to_external(((int, int, int, int)) v) inline {
+    var (v'ack_count, v'last_publish_id, v'last_entry_id, v'last_entry_uid) = v; 
+    return (v'ack_count, v'last_publish_id, v'last_entry_id, v'last_entry_uid);
+}
+
+((int, int, int, int)) $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid(int $ack_count, int $last_publish_id, int $last_entry_id, int $last_entry_uid) inline {
+    return ($ack_count, $last_publish_id, $last_entry_id, $last_entry_uid);
+}
+
+;;
+;; Type: MockVaultAckSink
+;; TLB: _ ack_count:uint64 last_publish_id:uint256 last_entry_id:uint64 last_entry_uid:uint256 = MockVaultAckSink
+;;
+
+builder $MockVaultAckSink$_store(builder build_0, (int, int, int, int) v) inline {
+    var (v'ack_count, v'last_publish_id, v'last_entry_id, v'last_entry_uid) = v;
+    build_0 = build_0.store_uint(v'ack_count, 64);
+    build_0 = build_0.store_uint(v'last_publish_id, 256);
+    build_0 = build_0.store_uint(v'last_entry_id, 64);
+    build_0 = build_0.store_uint(v'last_entry_uid, 256);
+    return build_0;
+}
+
+(slice, ((int, int, int, int))) $MockVaultAckSink$_load(slice sc_0) inline {
+    var v'ack_count = sc_0~load_uint(64);
+    var v'last_publish_id = sc_0~load_uint(256);
+    var v'last_entry_id = sc_0~load_uint(64);
+    var v'last_entry_uid = sc_0~load_uint(256);
+    return (sc_0, (v'ack_count, v'last_publish_id, v'last_entry_id, v'last_entry_uid));
+}
+
+(int, int, int, int) $MockVaultAckSink$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MockVaultAckSink$_load();
+    }
+    else {
+        return $MockVaultAckSink$_contract_init();
+    }
+}
+
+() $MockVaultAckSink$_contract_store((int, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MockVaultAckSink$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockVaultAckSink functions
+;;
+
+(int, int, int, int) $MockVaultAckSink$_contract_init() impure inline {
+    var (($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid)) = (null(), null(), null(), null());
+    $self'ack_count = 0;
+    $self'last_publish_id = 0;
+    $self'last_entry_id = 0;
+    $self'last_entry_uid = 0;
+    return ($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid);
+}
+
+((int, int, int, int), (int, int, int, int)) $MockVaultAckSink$_fun_get_state((int, int, int, int) $self) impure inline_ref {
+    var (($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid)) = $self;
+    var $fresh$ret_54 = $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid);
+    return (($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid), $fresh$ret_54);
+}
+
+;;
+;; Get methods of a Contract MockVaultAckSink
+;;
+
+_ %get_state() method_id(86957) {
+    var self = $MockVaultAckSink$_contract_load();
+    var res = self~$MockVaultAckSink$_fun_get_state();
+    return $MockVaultStateView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract MockVaultAckSink
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid) = $MockVaultAckSink$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ForwardVaultPrivate message
+    if (op == 0xfa001001) {
+        var $msg'capsule_hub_address = in_msg~load_msg_addr();
+        var $msg'bounce_id = in_msg~load_uint(64);
+        var $msg'publish_id = in_msg~load_uint(256);
+        var $msg'size_class = in_msg~load_uint(8);
+        var $msg'crypto_suite = in_msg~load_uint(8);
+        var $msg'header_0_hash = in_msg~load_uint(256);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'header_1_hash = sc_1~load_uint(256);
+        var $msg'body_hash = sc_1~load_uint(256);
+        var $msg'protocol_fee_paid = sc_1~load_uint(128);
+        var $msg'value_to_capsule = sc_1~load_uint(128);
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'capsule_hub_address, $msg'value_to_capsule, true, 0, $PublishPrivateFromVault$_store_cell($PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid($msg'bounce_id, $msg'publish_id, $msg'size_class, $msg'crypto_suite, $msg'header_0_hash, $msg'header_1_hash, $msg'body_hash, $msg'protocol_fee_paid), begin_cell())));
+        $MockVaultAckSink$_contract_store(($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid));
+        return ();
+    }
+    
+    ;; Receive ForwardVaultPublic message
+    if (op == 0xfa001002) {
+        var $msg'capsule_hub_address = in_msg~load_msg_addr();
+        var $msg'bounce_id = in_msg~load_uint(64);
+        var $msg'publish_id = in_msg~load_uint(256);
+        var $msg'author_wallet = in_msg~load_msg_addr();
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'body_hash = sc_1~load_uint(256);
+        var $msg'protocol_fee_paid = sc_1~load_uint(128);
+        var $msg'value_to_capsule = sc_1~load_uint(128);
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'capsule_hub_address, $msg'value_to_capsule, true, 0, $PublishPublicFromVault$_store_cell($PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid($msg'bounce_id, $msg'publish_id, $msg'author_wallet, $msg'body_hash, $msg'protocol_fee_paid), begin_cell())));
+        $MockVaultAckSink$_contract_store(($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid));
+        return ();
+    }
+    
+    ;; Receive CapsuleHubPublishAck message
+    if (op == 0x874e576a) {
+        var $msg'publish_id = in_msg~load_uint(256);
+        var $msg'entry_id = in_msg~load_uint(64);
+        var $msg'entry_uid = in_msg~load_uint(256);
+        $self'ack_count = $self'ack_count + 1;
+        $self'last_publish_id = $msg'publish_id;
+        $self'last_entry_id = $msg'entry_id;
+        $self'last_entry_uid = $msg'entry_uid;
+        $MockVaultAckSink$_contract_store(($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(20999);
+        $MockVaultAckSink$_contract_store(($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

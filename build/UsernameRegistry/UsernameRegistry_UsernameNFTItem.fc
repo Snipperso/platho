@@ -1,0 +1,272 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; UsernameRegistry_UsernameNFTItem.headers.fc
+;;
+;; Header files for UsernameNFTItem
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; $UsernameItemDeployedAck$_store
+builder $UsernameItemDeployedAck$_store(builder build_0, (int, slice) v) inline;
+
+;; $UsernameItemDeployedAck$_store_cell
+cell $UsernameItemDeployedAck$_store_cell((int, slice) v, builder b) inline;
+
+;; $UsernameNFTItem$_store
+builder $UsernameNFTItem$_store(builder build_0, (slice, slice, int) v) inline;
+
+;; $UsernameNFTItem$_load
+(slice, ((slice, slice, int))) $UsernameNFTItem$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $UsernameNFTItemStateView$_to_external
+(slice, slice, int) $UsernameNFTItemStateView$_to_external(((slice, slice, int)) v) inline;
+
+;; $UsernameNFTItem$init$_load
+(slice, ((slice, slice, int))) $UsernameNFTItem$init$_load(slice sc_0) inline;
+
+;; $UsernameNFTItem$_contract_init
+(slice, slice, int) $UsernameNFTItem$_contract_init(slice $owner_wallet, slice $username_registry_address, int $name_hash) impure inline;
+
+;; $UsernameNFTItem$_contract_load
+(slice, slice, int) $UsernameNFTItem$_contract_load() impure inline;
+
+;; $UsernameNFTItem$_contract_store
+() $UsernameNFTItem$_contract_store((slice, slice, int) v) impure inline;
+
+;; $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash
+((slice, slice, int)) $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash(slice $owner_wallet, slice $username_registry_address, int $name_hash) inline;
+
+;; $UsernameNFTItem$_fun_get_state
+((slice, slice, int), (slice, slice, int)) $UsernameNFTItem$_fun_get_state((slice, slice, int) $self) impure inline_ref;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $UsernameItemDeployedAck$_constructor_name_hash_owner_wallet
+((int, slice)) $UsernameItemDeployedAck$_constructor_name_hash_owner_wallet(int $name_hash, slice $owner_wallet) inline;
+
+
+;; UsernameRegistry_UsernameNFTItem.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+;; UsernameRegistry_UsernameNFTItem.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: UsernameItemDeployedAck
+;; Header: 0xbba3ec19
+;; TLB: username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address = UsernameItemDeployedAck
+;;
+
+builder $UsernameItemDeployedAck$_store(builder build_0, (int, slice) v) inline {
+    var (v'name_hash, v'owner_wallet) = v;
+    build_0 = store_uint(build_0, 3148082201, 32);
+    build_0 = build_0.store_uint(v'name_hash, 256);
+    build_0 = build_0.store_slice(v'owner_wallet);
+    return build_0;
+}
+
+cell $UsernameItemDeployedAck$_store_cell((int, slice) v, builder b) inline {
+    return $UsernameItemDeployedAck$_store(b, v).end_cell();
+}
+
+((int, slice)) $UsernameItemDeployedAck$_constructor_name_hash_owner_wallet(int $name_hash, slice $owner_wallet) inline {
+    return ($name_hash, $owner_wallet);
+}
+
+;;
+;; Type: UsernameNFTItemStateView
+;; TLB: _ owner_wallet:address username_registry_address:address name_hash:int257 = UsernameNFTItemStateView
+;;
+
+(slice, slice, int) $UsernameNFTItemStateView$_to_external(((slice, slice, int)) v) inline {
+    var (v'owner_wallet, v'username_registry_address, v'name_hash) = v; 
+    return (v'owner_wallet, v'username_registry_address, v'name_hash);
+}
+
+((slice, slice, int)) $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash(slice $owner_wallet, slice $username_registry_address, int $name_hash) inline {
+    return ($owner_wallet, $username_registry_address, $name_hash);
+}
+
+;;
+;; Type: UsernameNFTItem
+;; TLB: _ owner_wallet:address username_registry_address:address name_hash:uint256 = UsernameNFTItem
+;;
+
+builder $UsernameNFTItem$_store(builder build_0, (slice, slice, int) v) inline {
+    var (v'owner_wallet, v'username_registry_address, v'name_hash) = v;
+    build_0 = build_0.store_slice(v'owner_wallet);
+    build_0 = build_0.store_slice(v'username_registry_address);
+    build_0 = build_0.store_uint(v'name_hash, 256);
+    return build_0;
+}
+
+(slice, ((slice, slice, int))) $UsernameNFTItem$_load(slice sc_0) inline {
+    var v'owner_wallet = sc_0~load_msg_addr();
+    var v'username_registry_address = sc_0~load_msg_addr();
+    var v'name_hash = sc_0~load_uint(256);
+    return (sc_0, (v'owner_wallet, v'username_registry_address, v'name_hash));
+}
+
+(slice, ((slice, slice, int))) $UsernameNFTItem$init$_load(slice sc_0) inline {
+    var v'owner_wallet = sc_0~load_msg_addr();
+    var v'username_registry_address = sc_0~load_msg_addr();
+    var v'name_hash = sc_0~load_int(257);
+    return (sc_0, (v'owner_wallet, v'username_registry_address, v'name_hash));
+}
+
+(slice, slice, int) $UsernameNFTItem$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$UsernameNFTItem$_load();
+    }
+    else {
+        (slice $owner_wallet, slice $username_registry_address, int $name_hash) = $sc~$UsernameNFTItem$init$_load();
+        $sc.end_parse();
+        return $UsernameNFTItem$_contract_init($owner_wallet, $username_registry_address, $name_hash);
+    }
+}
+
+() $UsernameNFTItem$_contract_store((slice, slice, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $UsernameNFTItem$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract UsernameNFTItem functions
+;;
+
+(slice, slice, int) $UsernameNFTItem$_contract_init(slice $owner_wallet, slice $username_registry_address, int $name_hash) impure inline {
+    var (($self'owner_wallet, $self'username_registry_address, $self'name_hash)) = (null(), null(), null());
+    throw_unless(18001, ($name_hash != 0));
+    $self'owner_wallet = $owner_wallet;
+    $self'username_registry_address = $username_registry_address;
+    $self'name_hash = $name_hash;
+    return ($self'owner_wallet, $self'username_registry_address, $self'name_hash);
+}
+
+((slice, slice, int), (slice, slice, int)) $UsernameNFTItem$_fun_get_state((slice, slice, int) $self) impure inline_ref {
+    var (($self'owner_wallet, $self'username_registry_address, $self'name_hash)) = $self;
+    var $fresh$ret_166 = $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash($self'owner_wallet, $self'username_registry_address, $self'name_hash);
+    return (($self'owner_wallet, $self'username_registry_address, $self'name_hash), $fresh$ret_166);
+}
+
+;;
+;; Get methods of a Contract UsernameNFTItem
+;;
+
+_ %get_state() method_id(86957) {
+    var self = $UsernameNFTItem$_contract_load();
+    var res = self~$UsernameNFTItem$_fun_get_state();
+    return $UsernameNFTItemStateView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract UsernameNFTItem
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner_wallet, $self'username_registry_address, $self'name_hash) = $UsernameNFTItem$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ResendDeployedAck message
+    if (op == 0x639cfc6c) {
+        var $msg = empty_tuple();
+        throw_unless(18002, ($Context$_get_value(__tact_context_get()) >= 3000000));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'username_registry_address, 3000000, true, 0, $UsernameItemDeployedAck$_store_cell($UsernameItemDeployedAck$_constructor_name_hash_owner_wallet($self'name_hash, $self'owner_wallet), begin_cell())));
+        $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
+        return ();
+    }
+    
+    ;; Receive TopUpStorageReserve message
+    if (op == 0x27acdf8b) {
+        var $msg = empty_tuple();
+        $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(18099);
+        $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

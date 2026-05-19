@@ -1,0 +1,21 @@
+{
+  "profile": "PLATHO.V1.DEPLOYMENT_ATH_WALLET_BINDING_V1",
+  "ath_master_address": "EQA873oZhtHM3Uo8Au9dwTKMGooo_6m7v15_dGOTDYxtEgzp",
+  "ath_wallet_code_boc_sha256": "6db86ce6664eb628745fefd830de2343ac8178e39c1c55fdc089f2996a6c2be7",
+  "ath_wallet_code_cell_hash": "a4ca0258ce36f72c4bab250c5ead87bc6db1b0ebe3832bad8c6961efaaedc730",
+  "vault_preseal_controller_slot_address": "EQAXqPtcdvHZF7DWNZERplxPA2Xt8v-CI9yZnvi46WCVIXaZ",
+  "vault_genesis_controller_address": "EQAXqPtcdvHZF7DWNZERplxPA2Xt8v-CI9yZnvi46WCVIXaZ",
+  "vault_initial_address": "EQBFXiDYMLKiP-czjl1u3Ir5xhNkCIsbBEatAi6Boprqiy_n",
+  "vault_official_ath_wallet_address": "EQDaet8BxdkNTSibFfMpO9T7i3G3RZdArc0GoW_pvCL01UDr",
+  "vault_official_ath_wallet_data_cell_hash": "831e428cf187ca199dfa8529c7cf159604e09bb0f2623e7a9ff8eb8671b963ac",
+  "vault_official_ath_wallet_state_init_hash": "da7adf01c5d90d4d289b15f3293bd4fb8b71b7459740adcd06a16fe9bc22f4d5",
+  "circular_stateinit_address_if_official_wallet_were_stored_initially": "EQDRhAY-vMf1mATFH20PuAyS0PWH_Rr5UdWqHU7yWtMJtu9G",
+  "circularity_proof_address_changes": true,
+  "binding_order": [
+    "deploy Vault with vault_ath_wallet_address temporarily set to genesis_controller and sealed=false",
+    "compute Vault address from initial StateInit",
+    "derive official ATH wallet from owner=Vault address and ATH master/wallet code",
+    "genesis_controller sends BindOfficialAthWallet before OP_SEAL_GENESIS",
+    "OP_SEAL_GENESIS freezes bound official ATH wallet forever"
+  ]
+}

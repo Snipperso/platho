@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-01: manifest hash is canonical cell hash over sorted addresses, code hashes, state init hashes, constants, and blockers[32m 72[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it[33m 545[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-03/06: official client profile rejects final genesis while blockers remain and detects manifest-hash mismatch[32m 26[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:02:54
+[2m   Duration [22m 1.64s[2m (transform 451ms, setup 0ms, import 768ms, tests 645ms, environment 0ms)[22m
+

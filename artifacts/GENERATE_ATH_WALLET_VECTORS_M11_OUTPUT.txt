@@ -1,0 +1,89 @@
+
+> platho-deployment-binding-vault-capsulehub-milestone@1.0.0 vectors
+> ts-node scripts/generate_ath_wallet_vectors.ts
+
+{
+  "milestone": "ATH-derivation-and-burn-bounce-safe-v1",
+  "generated_at_utc": "2026-05-16T07:48:31.939Z",
+  "source_profile": "platho_v1_open_values_v0_5_ath_burn_bounce_safe.md",
+  "tact_compiler": "1.6.13",
+  "ton_core": "0.63.1",
+  "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+  "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+  "ATH_WALLET_CODE_BOC_SHA256": "7eded28939e138f7c9b12acbdb29275451448c9e5b2b58165718dc2721cd2f38",
+  "invariant": "ATH Master get_wallet_address(owner) == local StateInit derivation using owner workchain",
+  "vectors": [
+    {
+      "label": "Vault fixture owner",
+      "owner_address": "EQCXcwv_YTognKagdt5u3a33nrQW7Es6neEgv1yJlHzhowb5",
+      "owner_workchain": 0,
+      "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+      "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+      "ath_wallet_data_cell_hash": "690fda55ec1a02bae96756f38747dcc650a069816b50b2998645e7fa51b8f4f9",
+      "ath_wallet_state_init_hash": "205543912a50107bb57455ad8e9c214338246afa075b829eecaa70b119fc63ba",
+      "derived_ath_wallet_address": "EQAgVUORKlAQe7V0Va2OnCFDOCRq-gdbgp7sqnCxGfxjujvj",
+      "ath_master_get_wallet_address_result": "EQAgVUORKlAQe7V0Va2OnCFDOCRq-gdbgp7sqnCxGfxjujvj",
+      "match": true
+    },
+    {
+      "label": "BuybackBurn fixture owner",
+      "owner_address": "EQAEWAcH7xPYQP_DEoQymNAq_39YhR4PQqUhJmXHZGe6BRob",
+      "owner_workchain": 0,
+      "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+      "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+      "ath_wallet_data_cell_hash": "a8e3ef68c2f858c905bcec0a4b7f02ab1130a5e5927b5ccdedc215503497a036",
+      "ath_wallet_state_init_hash": "401ac79726ad6812065f42e7ad4a6f747f77d0599d23d9d8df543b94c6cb7fb2",
+      "derived_ath_wallet_address": "EQBAGseXJq1oEgZfQuetSm90f3fQWZ0j2djfVDuUxst_snI8",
+      "ath_master_get_wallet_address_result": "EQBAGseXJq1oEgZfQuetSm90f3fQWZ0j2djfVDuUxst_snI8",
+      "match": true
+    },
+    {
+      "label": "UsernameRegistry fixture owner",
+      "owner_address": "EQAXMMaCzX0h-vCmY0QWwjV47BOlu55dJvyfv01itP44Dwet",
+      "owner_workchain": 0,
+      "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+      "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+      "ath_wallet_data_cell_hash": "b01b5dbfef9ca55b40804ad765b8a0893ad42617c962df54654566c951eb2050",
+      "ath_wallet_state_init_hash": "30f02abcad67544837ea1d9c3060ebb589fa752b25d325303c65cd1c19533608",
+      "derived_ath_wallet_address": "EQAw8Cq8rWdUSDfqHZwwYOu1ifp1KyXTJTA8Zc0cGVM2CHd6",
+      "ath_master_get_wallet_address_result": "EQAw8Cq8rWdUSDfqHZwwYOu1ifp1KyXTJTA8Zc0cGVM2CHd6",
+      "match": true
+    },
+    {
+      "label": "Treasury ATH receiver fixture owner",
+      "owner_address": "EQAnqHV7L2_4qT0ccZ_boCLXJr5N2CK2D_nxt2FxmFP2rK_9",
+      "owner_workchain": 0,
+      "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+      "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+      "ath_wallet_data_cell_hash": "939e240d05dc6fb7a0851f58e0e4322f95fea3e552782076111896c9b3f8f7aa",
+      "ath_wallet_state_init_hash": "8c5bb4c87d2dee823aba0a2a9b9b4ffce6baec472b76454216f21dda655b4bbf",
+      "derived_ath_wallet_address": "EQCMW7TIfS3ugjq6Ciqbm0_85rrsRyt2RUIW8h3aZVtLv-Wd",
+      "ath_master_get_wallet_address_result": "EQCMW7TIfS3ugjq6Ciqbm0_85rrsRyt2RUIW8h3aZVtLv-Wd",
+      "match": true
+    },
+    {
+      "label": "Random user wallet fixture owner",
+      "owner_address": "EQCftY1SSbW77oOUMxRSib3FpwsFfUSgUcBIveYAaGA0kFOl",
+      "owner_workchain": 0,
+      "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+      "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+      "ath_wallet_data_cell_hash": "48d7639cb92f3eda3a0a7d1b601d1de7627c7da8519063219c7130a82f691e2b",
+      "ath_wallet_state_init_hash": "221ea6171fb111500ae5358dbcd1ea26088d93aedf7f712c06b750b263c8c004",
+      "derived_ath_wallet_address": "EQAiHqYXH7ERUArlNY280eomCI2Trt9_cSwGt1CyY8jABL1j",
+      "ath_master_get_wallet_address_result": "EQAiHqYXH7ERUArlNY280eomCI2Trt9_cSwGt1CyY8jABL1j",
+      "match": true
+    },
+    {
+      "label": "Masterchain owner workchain check fixture",
+      "owner_address": "Ef8t7blaU33A0Pg7dgqmJ-08Aba-UlkpvwLpD9vy_6r-1Q1p",
+      "owner_workchain": -1,
+      "ATH_MASTER_ADDRESS": "EQATs-hl76MfrOSU5CWIW7Rlsz1Mi5dDYzU1USQHAZZITFvp",
+      "ATH_WALLET_CODE_HASH": "fd9bebe7f6fabc9a5ecd248f6ad1786ff471dd7f7cf35a312e3876a1fe61ec47",
+      "ath_wallet_data_cell_hash": "a9b6defc97590e458c78731e51826487b1e7fe37e92592a55606fe12b968f2e7",
+      "ath_wallet_state_init_hash": "406b10dd03e31b4dd746f637fd64d195ccbdabeea7d0e90d66372b29158adbd1",
+      "derived_ath_wallet_address": "Ef9AaxDdA-MbTddG9jf9ZNGVzL2r7qfQ6Q1mNyspFYrb0YRz",
+      "ath_master_get_wallet_address_result": "Ef9AaxDdA-MbTddG9jf9ZNGVzL2r7qfQ6Q1mNyspFYrb0YRz",
+      "match": true
+    }
+  ]
+}

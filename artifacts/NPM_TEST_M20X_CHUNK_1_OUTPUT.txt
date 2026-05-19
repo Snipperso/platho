@@ -1,0 +1,44 @@
+=== M20X CHUNK 1 ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_latest[39m
+
+ [32m✓[39m tests/ath-wallet-derivation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2125[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH Master get_wallet_address(owner) equals local StateInit derivation [33m 2094[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-transfer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 3403[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-XFER-01: owner-authorized transfer debits source wallet and credits deterministic recipient wallet [33m 2619[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-XFER-02: non-owner cannot transfer and failed request does not debit source wallet [33m 379[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-XFER-03: transfer-to-dead-address is still not burn and only credits deterministic wallet for that owner address [33m 400[2mms[22m[39m
+ [32m✓[39m tests/deployment-ath-wallet-binding.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 3331[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-04A/Vault: official ATH wallet is derived after Vault address exists, bound before seal, and frozen after seal [33m 3199[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 3977[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-01: manifest hash is canonical cell hash over sorted addresses, code hashes, state init hashes, constants, and blockers [33m 485[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it [33m 3293[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4698[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00: burn operation reduces total_supply by exact burned amount and debits wallet balance [33m 2627[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00C: ATH master accepts burn notification only from deterministic official ATH wallet [33m 391[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00D: wrong owner cannot burn another wallet owner balance [33m 404[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00B: transfer-to-dead-address is not treated as burn by ATH master [33m 414[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00E: underfunded ATHBurn does not debit wallet without total_supply decrease [33m 409[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00F: burn notification bounce/failure restores wallet balance when master is unavailable [33m 313[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 5027[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash [33m 2489[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-04: second binding attempt is rejected and cannot overwrite counterpart address [33m 621[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing [33m 878[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal [33m 1033[2mms[22m[39m
+ [32m✓[39m tests/deployment-genesis-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 5013[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-01/02/03: arbitrary sender cannot bind or seal Vault genesis [33m 3502[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-04: arbitrary sender cannot bind or seal CapsuleHub genesis [33m 886[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-05/06/07: arbitrary sender cannot bind/seal UsernameRegistry and controller has no post-seal authority [33m 620[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 5919[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee [33m 2721[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-03: public direct publish rejects author spoofing [33m 478[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee [33m 408[2mms[22m[39m
+     [33m[2m✓[22m[39m CAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers [33m 601[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps [33m 410[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it [33m 404[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m36 passed[39m[22m[90m (36)[39m
+[2m   Start at [22m 00:28:55
+[2m   Duration [22m 11.10s[2m (transform 6.52s, setup 0ms, import 28.74s, tests 33.49s, environment 55ms)[22m
+

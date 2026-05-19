@@ -1,0 +1,160 @@
+{
+  "profile": "PLATHO.V1.M16.PRODUCTION_CONFORMANCE_AND_COMPACTNESS_PASS",
+  "baseline": "M15 implemented-subset package",
+  "contract_code_changed": false,
+  "new_functional_surface_added": false,
+  "checks": {
+    "forbidden_control_surface_absent": true,
+    "empty_fallbacks_reject": true,
+    "code_hash_artifacts_match_build": true,
+    "fee_accumulator_duplicate_hash_artifacts_match": true,
+    "manifest_remains_non_final": true
+  },
+  "per_contract": [
+    {
+      "contract": "ATHMaster.tact",
+      "non_comment_lines": 58,
+      "receive_handlers": 2,
+      "bounced_handlers": 0,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "ATHWallet.tact",
+      "non_comment_lines": 323,
+      "receive_handlers": 7,
+      "bounced_handlers": 4,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "BuybackBurn.tact",
+      "non_comment_lines": 475,
+      "receive_handlers": 13,
+      "bounced_handlers": 2,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "CapsuleHub.tact",
+      "non_comment_lines": 399,
+      "receive_handlers": 8,
+      "bounced_handlers": 1,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "FeeAccumulator.tact",
+      "non_comment_lines": 99,
+      "receive_handlers": 5,
+      "bounced_handlers": 1,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "UsernameNFTItem.tact",
+      "non_comment_lines": 48,
+      "receive_handlers": 3,
+      "bounced_handlers": 0,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "UsernameRegistry.tact",
+      "non_comment_lines": 724,
+      "receive_handlers": 14,
+      "bounced_handlers": 3,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    },
+    {
+      "contract": "Vault.tact",
+      "non_comment_lines": 1340,
+      "receive_handlers": 20,
+      "bounced_handlers": 3,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true
+    }
+  ],
+  "hashes": {
+    "ATHMASTER_CODE_HASH": {
+      "built": "33e4c62fa48e4f6d8b3b93a00e025485c18a6b81efcd055768508c215b88cfbf",
+      "pinned": "33e4c62fa48e4f6d8b3b93a00e025485c18a6b81efcd055768508c215b88cfbf",
+      "match": true
+    },
+    "ATH_WALLET_CODE_HASH": {
+      "built": "a4ca0258ce36f72c4bab250c5ead87bc6db1b0ebe3832bad8c6961efaaedc730",
+      "pinned": "a4ca0258ce36f72c4bab250c5ead87bc6db1b0ebe3832bad8c6961efaaedc730",
+      "match": true
+    },
+    "BUYBACKBURN_CODE_HASH": {
+      "built": "95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24",
+      "pinned": "95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24",
+      "match": true
+    },
+    "CAPSULEHUB_CODE_HASH": {
+      "built": "2522af15971a775b873a335c6637e961ab8a54d29446738f7c8390449c5c6cf6",
+      "pinned": "2522af15971a775b873a335c6637e961ab8a54d29446738f7c8390449c5c6cf6",
+      "match": true
+    },
+    "FEEACCUMULATOR_CODE_HASH": {
+      "built": "7273fe39e2ac54f61ccfc3b0811df1e352acc1b31ff8b028061c0411929404c1",
+      "pinned": "7273fe39e2ac54f61ccfc3b0811df1e352acc1b31ff8b028061c0411929404c1",
+      "match": true
+    },
+    "USERNAME_NFT_ITEM_CODE_HASH": {
+      "built": "23f13b3c91120c089244c411b855c69a71a42bc0244740e1cc6c266f71c1f1ea",
+      "pinned": "23f13b3c91120c089244c411b855c69a71a42bc0244740e1cc6c266f71c1f1ea",
+      "match": true
+    },
+    "USERNAME_REGISTRY_CODE_HASH": {
+      "built": "6cc5a428588f43a706047ea2ae6595726596b17ee54c8703cdc9c8239a6d0742",
+      "pinned": "6cc5a428588f43a706047ea2ae6595726596b17ee54c8703cdc9c8239a6d0742",
+      "match": true
+    },
+    "VAULT_CODE_HASH": {
+      "built": "ec268816c42d788b55bd171a32b81d40073cb7f242c48138d521185508914353",
+      "pinned": "ec268816c42d788b55bd171a32b81d40073cb7f242c48138d521185508914353",
+      "match": true
+    }
+  },
+  "manifest": {
+    "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
+    "version": 15,
+    "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
+    "manifest_hash_hex": "7fa3412db904367ed6e6a09411393e18098810308d69c645480efd223b0cc42b",
+    "blockers_before_final_genesis": [
+      "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
+      "STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED",
+      "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
+      "VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS"
+    ],
+    "constants": {
+      "ath_total_supply_atomic": "100000000000000000",
+      "buyback_offer_amount_nanotons": "50000000000",
+      "buyback_funding_envelope_nanotons": "51050000000",
+      "username_pending_mint_stale_ttl_seconds": "86400",
+      "username_item_ack_forward_reserve_nanotons": "3000000",
+      "vault_pending_publish_stale_ttl_seconds": "86400",
+      "vault_activity_airdrop_total_atomic": "30000000000000000",
+      "vault_activity_airdrop_reward_per_message_atomic": "10000000000",
+      "vault_activity_airdrop_per_wallet_cap_atomic": "0"
+    }
+  },
+  "implemented_contract_files": [
+    "ATHMaster.tact",
+    "ATHWallet.tact",
+    "BuybackBurn.tact",
+    "CapsuleHub.tact",
+    "FeeAccumulator.tact",
+    "M20TBuybackBurnHarness.tact",
+    "M20TFeeAccumulatorHarness.tact",
+    "MockUsernameNFTItemNoAck.tact",
+    "MockUsernameRegistryAckSink.tact",
+    "MockVaultAckSink.tact",
+    "MockVaultAthWallet.tact",
+    "UsernameNFTItem.tact",
+    "UsernameRegistry.tact",
+    "Vault.tact"
+  ]
+}

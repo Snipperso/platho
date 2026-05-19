@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m19d[39m
+
+ [32m✓[39m tests/m19d-stonfi-route-candidate-intake.test.ts[2m > [22mM19D STON.fi route candidate intake and evidence template[2m > [22mtemplate remains non-final and cannot pass route freeze by itself[32m 4[2mms[22m[39m
+ [32m✓[39m tests/m19d-stonfi-route-candidate-intake.test.ts[2m > [22mM19D STON.fi route candidate intake and evidence template[2m > [22maccepts a complete SDK/API evidence candidate when all route and live-proof fields match[32m 11[2mms[22m[39m
+ [32m✓[39m tests/m19d-stonfi-route-candidate-intake.test.ts[2m > [22mM19D STON.fi route candidate intake and evidence template[2m > [22mrejects evidence that routes refund/excess away from BuybackBurn even if the body decodes[32m 8[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 11:59:02
+[2m   Duration [22m 429ms[2m (transform 65ms, setup 0ms, import 152ms, tests 24ms, environment 20ms)[22m
+

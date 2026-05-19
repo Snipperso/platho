@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1692[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 1139[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 551[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 03:13:37
+[2m   Duration [22m 2.73s[2m (transform 257ms, setup 0ms, import 669ms, tests 1.69s, environment 27ms)[22m
+

@@ -1,0 +1,21 @@
+=== M20X CHUNK 2 ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_latest[39m
+
+ [32m✓[39m tests/m19b-stonfi-conservative-gas.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/m19-stonfi-route-discovery.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 85[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 132[2mms[22m[39m
+ [32m✓[39m tests/m19d-stonfi-route-candidate-intake.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 94[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 337[2mms[22m[39m
+ [32m✓[39m tests/m18-artifact-integrity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 341[2mms[22m[39m
+     [33m[2m✓[22m[39m M18-ARTIFACT-01: generated artifacts, vectors, code hashes, and implemented-subset manifest match the current build [33m 337[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2045[2mms[22m[39m
+     [33m[2m✓[22m[39m FEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only [33m 1005[2mms[22m[39m
+ [32m✓[39m tests/m17-gas-reserve-sanity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 2905[2mms[22m[39m
+     [33m[2m✓[22m[39m GAS-M17-01: implemented-subset money/publish flows stay below broad gas/fee sanity thresholds [33m 2901[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m27 passed[39m[22m[90m (27)[39m
+[2m   Start at [22m 00:29:09
+[2m   Duration [22m 7.10s[2m (transform 4.03s, setup 0ms, import 14.44s, tests 5.96s, environment 2ms)[22m
+

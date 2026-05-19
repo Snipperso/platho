@@ -1,0 +1,362 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/M20TFeeAccumulatorHarness/M20TFeeAccumulatorHarness_M20TFeeAccumulatorHarness.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
+  DECLPROC $AcceptBurnReserve$_store
+  DECLPROC $AcceptBurnReserve$_store_cell
+  DECLPROC $AcceptBurnReserve$_load_bounced
+  DECLPROC $M20TFeeAccumulatorHarness$_store
+  DECLPROC $M20TFeeAccumulatorHarness$_load
+  DECLPROC $Context$_get_value
+  DECLPROC $M20TFeeAccumulatorHarnessStateView$_to_external
+  DECLPROC $M20TFeeAccumulatorHarness$init$_load
+  DECLPROC $M20TFeeAccumulatorHarness$_contract_init
+  DECLPROC $M20TFeeAccumulatorHarness$_contract_load
+  DECLPROC $M20TFeeAccumulatorHarness$_contract_store
+  DECLPROC $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount
+  DECLPROC $M20TFeeAccumulatorHarness$_fun_get_state
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $AcceptBurnReserve$_constructor_amount
+  86957 DECLMETHOD %get_state
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $AcceptBurnReserve$_store PROCINLINE:<{
+    1498129669 PUSHINT
+    ROT
+    32 STU
+    128 STU
+  }>
+  $AcceptBurnReserve$_store_cell PROCINLINE:<{
+    SWAP
+    $AcceptBurnReserve$_store INLINECALLDICT
+    ENDC
+  }>
+  $AcceptBurnReserve$_load_bounced PROCINLINE:<{
+    128 LDU
+    SWAP
+  }>
+  $M20TFeeAccumulatorHarness$_store PROCINLINE:<{
+    s5 s6 XCHG2
+    64 STU
+    s1 s3 XCHG
+    STSLICE
+    STSLICE
+    128 STU
+    64 STU
+    128 STU
+  }>
+  $M20TFeeAccumulatorHarness$_load PROCINLINE:<{
+    64 LDU
+    LDMSGADDR
+    LDMSGADDR
+    128 LDU
+    64 LDU
+    128 LDU
+    6 -ROLL
+  }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $M20TFeeAccumulatorHarnessStateView$_to_external PROCINLINE:<{
+  }>
+  $M20TFeeAccumulatorHarness$init$_load PROCINLINE:<{
+    LDMSGADDR
+    LDMSGADDR
+    257 PUSHINT
+    LDIX
+    LDREF
+    SWAP
+    CTOS
+    257 PUSHINT
+    LDIX
+    DROP
+    s1 s4 XCHG
+    s3 s3 s0 XCHG3
+  }>
+  $M20TFeeAccumulatorHarness$_contract_init PROCINLINE:<{
+    21102 PUSHINT
+    OVER
+    0 GTINT
+    THROWANYIFNOT
+    21100 PUSHINT
+    s2 PUSH
+    51050000000 PUSHINT
+    EQUAL
+    THROWANYIFNOT
+    0 PUSHINT
+    s4 s0 s0 XC2PU
+    s2 s4 XCHG
+    s2 s3 XCHG
+  }>
+  $M20TFeeAccumulatorHarness$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $M20TFeeAccumulatorHarness$_load INLINECALLDICT
+      1 6 BLKDROP2
+    }>ELSE<{
+      $M20TFeeAccumulatorHarness$init$_load INLINECALLDICT
+      s0 s4 XCHG
+      ENDS
+      3 ROLL
+      $M20TFeeAccumulatorHarness$_contract_init INLINECALLDICT
+    }>
+  }>
+  $M20TFeeAccumulatorHarness$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    6 -ROLL
+    $M20TFeeAccumulatorHarness$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount PROCINLINE:<{
+  }>
+  $M20TFeeAccumulatorHarness$_fun_get_state PROCREF:<{
+    s5 s4 s3 PUSH3
+    s5 s4 s3 PUSH3
+    $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount INLINECALLDICT
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $AcceptBurnReserve$_constructor_amount PROCINLINE:<{
+  }>
+  %get_state PROC:<{
+    $M20TFeeAccumulatorHarness$_contract_load INLINECALLDICT
+    $M20TFeeAccumulatorHarness$_fun_get_state INLINECALLDICT
+    6 6 BLKDROP2
+    $M20TFeeAccumulatorHarnessStateView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $M20TFeeAccumulatorHarness$_contract_load INLINECALLDICT
+    s0 s7 XCHG
+    IFJMP:<{
+      s0 s5 XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      0 PUSHINT
+      OVER
+      SBITS
+      31 GTINT
+      IF:<{
+        DROP
+        32 LDU
+        SWAP
+      }>
+      1498129669 PUSHINT
+      EQUAL
+      IFJMP:<{
+        $AcceptBurnReserve$_load_bounced INLINECALLDICT
+        NIP
+        21130 PUSHINT
+        __tact_context_get_sender INLINECALLDICT
+        s4 PUSH
+        SDEQ
+        THROWANYIFNOT
+        21131 PUSHINT
+        OVER
+        0 GTINT
+        THROWANYIFNOT
+        ADD
+        s3 s5 XCHG
+        2 3 BLKSWAP
+        $M20TFeeAccumulatorHarness$_contract_store INLINECALLDICT
+      }>
+      7 BLKDROP
+    }>
+    0 PUSHINT
+    s6 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s6 XCHG
+      32 LDU
+      s0 s7 XCHG
+    }>
+    OVER
+    1295144006 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s5 POP
+      21101 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s4 PUSH
+      SDEQ
+      THROWANYIFNOT
+      s3 s5 XCHG
+      2 3 BLKSWAP
+      $M20TFeeAccumulatorHarness$_contract_store INLINECALLDICT
+    }>
+    OVER
+    3016934701 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s6 POP
+      s0 s4 XCHG
+      128 LDU
+      DROP
+      21110 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s4 PUSH
+      SDEQ
+      THROWANYIFNOT
+      21111 PUSHINT
+      OVER
+      0 GTINT
+      THROWANYIFNOT
+      21112 PUSHINT
+      OVER
+      51050000000 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      21113 PUSHINT
+      s1 s5 PUSH2
+      LEQ
+      THROWANYIFNOT
+      21114 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      3000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s4 s4 XCPU
+      SUB
+      s0 s5 XCHG
+      INC
+      s4 PUSH
+      TRUE
+      0 PUSHINT
+      s7 PUSH
+      $AcceptBurnReserve$_constructor_amount INLINECALLDICT
+      NEWC
+      $AcceptBurnReserve$_store_cell INLINECALLDICT
+      s5 PUSH
+      s0 s4 XCHG
+      s0 s9 XCHG
+      3 -ROLL
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s3 s5 XCHG
+      s4 s0 s3 XCHG3
+      s0 s2 XCHG
+      $M20TFeeAccumulatorHarness$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1295140439 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s5 XCHG
+      128 LDU
+      128 LDU
+      DROP
+      21120 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s6 PUSH
+      SDEQ
+      THROWANYIFNOT
+      21121 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s2 PUSH
+      3000000 PUSHINT
+      ADD
+      GEQ
+      THROWANYIFNOT
+      FALSE
+      0 PUSHINT
+      s0 s3 XCHG
+      $AcceptBurnReserve$_constructor_amount INLINECALLDICT
+      NEWC
+      $AcceptBurnReserve$_store_cell INLINECALLDICT
+      s5 PUSH
+      s4 s4 XCHG2
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s3 s5 XCHG
+      2 3 BLKSWAP
+      $M20TFeeAccumulatorHarness$_contract_store INLINECALLDICT
+    }>
+    s7 POP
+    0 EQINT
+    s0 s6 XCHG
+    33 LESSINT
+    s1 s6 XCHG
+    AND
+    IFJMP:<{
+      21199 PUSHINT
+      THROWANY
+      s3 s5 XCHG
+      2 3 BLKSWAP
+      $M20TFeeAccumulatorHarness$_contract_store INLINECALLDICT
+    }>
+    6 BLKDROP
+    130 THROW
+  }>
+}END>c

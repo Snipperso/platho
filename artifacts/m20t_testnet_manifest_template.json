@@ -1,0 +1,46 @@
+{
+  "document": "PLATHO.V1.M20T_TESTNET_MANIFEST_TEMPLATE",
+  "status": "TEMPLATE_NOT_EXECUTED",
+  "network": "testnet",
+  "notMainnetRouteFreeze": true,
+  "productionFlags": {
+    "stonfiRouteFreezeReadyMustRemainFalse": true,
+    "buybackBurnImplementationReadyMustRemainFalse": true
+  },
+  "deployer": {
+    "address": "FILL_AFTER_DISPOSABLE_TESTNET_WALLET_GENERATION",
+    "walletVersion": "v4r2",
+    "balanceBeforeNanotons": "FILL_AFTER_BALANCE_QUERY",
+    "balanceAfterNanotons": "FILL_AFTER_RUN"
+  },
+  "contracts": {
+    "athMaster": {
+      "address": "NOT_DEPLOYED_OR_FILL_TESTNET_ADDRESS",
+      "codeHash": "NOT_DEPLOYED_OR_FILL_64_LOWERCASE_HEX",
+      "stateInitHash": "NOT_DEPLOYED_OR_FILL_64_LOWERCASE_HEX",
+      "deployTxHash": "NOT_DEPLOYED_OR_FILL_TX_HASH",
+      "explorerUrl": "NOT_DEPLOYED_OR_FILL_TESTNET_EXPLORER_URL"
+    },
+    "feeAccumulator": {
+      "address": "NOT_DEPLOYED_OR_FILL_TESTNET_ADDRESS",
+      "codeHash": "NOT_DEPLOYED_OR_FILL_64_LOWERCASE_HEX",
+      "stateInitHash": "NOT_DEPLOYED_OR_FILL_64_LOWERCASE_HEX",
+      "deployTxHash": "NOT_DEPLOYED_OR_FILL_TX_HASH",
+      "explorerUrl": "NOT_DEPLOYED_OR_FILL_TESTNET_EXPLORER_URL",
+      "buybackFundingEnvelopeNanotons": "51050000000"
+    },
+    "buybackBurnOrHarness": {
+      "address": "NOT_DEPLOYED_OR_FILL_TESTNET_ADDRESS",
+      "codeHash": "NOT_DEPLOYED_OR_FILL_64_LOWERCASE_HEX",
+      "stateInitHash": "NOT_DEPLOYED_OR_FILL_64_LOWERCASE_HEX",
+      "deployTxHash": "NOT_DEPLOYED_OR_FILL_TX_HASH",
+      "explorerUrl": "NOT_DEPLOYED_OR_FILL_TESTNET_EXPLORER_URL"
+    }
+  },
+  "runArtifacts": {
+    "evidenceJson": "artifacts/m20t_testnet_evidence.json",
+    "evidenceMarkdown": "artifacts/M20T_TESTNET_EVIDENCE.md",
+    "fullSuiteOutput": "artifacts/NPM_TEST_FULL_SUITE_M20T_OUTPUT.txt",
+    "fullSuiteExit": "artifacts/NPM_TEST_FULL_SUITE_M20T_EXIT.txt"
+  }
+}

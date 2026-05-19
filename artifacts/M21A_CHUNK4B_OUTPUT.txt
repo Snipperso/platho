@@ -1,0 +1,25 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m21a_work[39m
+
+ [32m✓[39m tests/vault-key-records.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2402[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record [33m 1091[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1 [33m 330[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: cannot register twice and cannot replace before registration [33m 405[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: invalid suite/key profile is rejected without mutating current key [33m 571[2mms[22m[39m
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2409[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 1602[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 802[2mms[22m[39m
+ [32m✓[39m tests/vault-external-session-gate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 3100[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-EXT-01: valid signed request consumes nonce, debits max_charge, and creates pending publish when no ACK exists yet [33m 1403[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation [33m 517[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07: duplicate external request cannot be accepted twice [33m 677[2mms[22m[39m
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 3012[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 1800[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 703[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 505[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+[2m   Start at [22m 10:30:44
+[2m   Duration [22m 5.01s[2m (transform 1.08s, setup 0ms, import 5.09s, tests 10.92s, environment 1ms)[22m
+

@@ -1,0 +1,7 @@
+{
+  "status": "WAITING_FOR_REAL_STONFI_EVIDENCE_DOSSIER",
+  "route_freeze_ready": false,
+  "supplied_input_source": null,
+  "template_output": "artifacts/stonfi_route_evidence_dossier_template_m19f.json",
+  "output": "artifacts/stonfi_route_evidence_dossier_m19f.json"
+}

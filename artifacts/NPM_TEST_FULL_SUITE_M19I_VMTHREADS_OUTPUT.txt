@@ -1,0 +1,109 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m19i[39m
+
+ [32m✓[39m tests/capsulehub.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 4727[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee [33m 1247[2mms[22m[39m
+     [33m[2m✓[22m[39m CAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers [33m 304[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps [33m 349[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it [33m 384[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce [33m 337[2mms[22m[39m
+     [33m[2m✓[22m[39m NO-ADMIN: empty fallback rejected and cannot mutate state [33m 482[2mms[22m[39m
+ [32m✓[39m tests/vault-external-session-gate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 4441[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-EXT-01: valid signed request consumes nonce, debits max_charge, and creates pending publish when no ACK exists yet [33m 943[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation [33m 723[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07: duplicate external request cannot be accepted twice [33m 1055[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation [33m 884[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-03: expired session rejected before mutation [33m 833[2mms[22m[39m
+ [32m✓[39m tests/vault-receive-intent.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4862[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-14/15: create locks sender TON and claim credits recipient UserState [33m 932[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-16: cancel returns locked TON to sender and deletes intent [33m 927[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: wrong recipient or wrong secret cannot claim [33m 969[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: duplicate intent_id and insufficient sender balance are rejected without mutation [33m 761[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry [33m 570[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance [33m 699[2mms[22m[39m
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2298[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 1349[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 945[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 3964[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-01: FlushTreasuryAthDue transfers treasury due to immutable treasury ATH receiver and clears pending on ACK [33m 1099[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-02: FlushBurnAthDue burns through official ATH wallet, authenticated master ACK clears pending, and total_supply decreases exactly [33m 1202[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-03: treasury transfer failure restores treasury_due_ath and clears pending [33m 789[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-04: burn notification failure restores burn_due_ath, clears pending, and restores official wallet balance [33m 870[2mms[22m[39m
+ [32m✓[39m tests/username-registry-paid-mint.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 3316[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-01: valid official ATH username mint deploys deterministic item, consumes pending, and credits treasury/burn due after ACK [33m 734[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-02: invalid uppercase username from official ATH wallet creates refund due and no pending/name record [33m 842[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-03: non-official ATH sender is rejected and cannot create refund, pending, or name record [33m 410[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-04: duplicate finalized username creates refund due for the second minter without changing the existing record [33m 580[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-05: price tiers are enforced as exact ATH amounts and underpay is refunded [33m 748[2mms[22m[39m
+ [32m✓[39m tests/vault-session-lifecycle.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 4171[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-01/02: first TON deposit creates UserState, later deposit does not create another user [33m 757[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-04/REJECT-02B: TON withdrawal debits balance and action failure cannot leave negative state [33m 527[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-08: OP_SET_SESSION can create UserState and SessionState with fresh session_id [33m 333[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-08A: OP_SET_SESSION after expired active session installs fresh expiry and keeps Message Budget allocated [33m 669[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-09/10: Message Budget top-up requires active session and revoke returns budget to ton_balance [33m 731[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-09A/REJECT-06B: expired active session can revoke but cannot top up Message Budget [33m 892[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2805[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash [33m 722[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-04: second binding attempt is rejected and cannot overwrite counterpart address [33m 671[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing [33m 498[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal [33m 911[2mms[22m[39m
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2461[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 1492[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 967[2mms[22m[39m
+ [32m✓[39m tests/username-registry-foundation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1903[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-01: price getter enforces pinned name length tiers without accepting 1-3 char names [33m 539[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-04: official ATH wallet binds before seal and cannot be changed after seal [33m 709[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-05: seal fails without official ATH wallet binding and storage top-up grants no authority [33m 383[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2333[2mms[22m[39m
+     [33m[2m✓[22m[39m FEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only [33m 550[2mms[22m[39m
+     [33m[2m✓[22m[39m FEE-DUE-08/M19H: raw 50 TON buyback offer principal is rejected as an incomplete funding envelope [33m 584[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1454[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00F: burn notification bounce/failure restores wallet balance when master is unavailable [33m 527[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1360[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it [33m 870[2mms[22m[39m
+ [32m✓[39m tests/vault-ath-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2505[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-03: first ATH deposit from official wallet creates UserState and credits ath_balance [33m 340[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT-11: ATH notification from non-official wallet is rejected [33m 324[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT-11A: first ATH deposit without sufficient forwarded TON is rejected [33m 336[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-05: ATH withdrawal debits ath_balance and clears pending on official wallet ack [33m 527[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT-02A: ATH withdrawal bounce/failure restores ath_balance and clears pending [33m 497[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: ATH withdrawal rejects insufficient balance without mutation [33m 479[2mms[22m[39m
+ [32m✓[39m tests/username-registry-refund-flush.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1746[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-01: FlushAthRefundDue sends bounce-safe ATH transfer, clears due on recipient wallet ACK, and credits recipient ATH wallet [33m 1067[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-02: official ATH wallet request bounce restores refund due and clears pending flush [33m 678[2mms[22m[39m
+ [32m✓[39m tests/vault-key-records.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2271[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record [33m 349[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1 [33m 832[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: cannot register twice and cannot replace before registration [33m 599[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: invalid suite/key profile is rejected without mutating current key [33m 490[2mms[22m[39m
+ [32m✓[39m tests/username-registry-prune-pending-mint.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1620[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected [33m 1071[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending [33m 547[2mms[22m[39m
+ [32m✓[39m tests/deployment-ath-wallet-binding.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 815[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-04A/Vault: official ATH wallet is derived after Vault address exists, bound before seal, and frozen after seal [33m 720[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 909[2mms[22m[39m
+     [33m[2m✓[22m[39m M19H-02: 100 TON accumulated protocol fees split to only 50 TON buyback due, which is insufficient for one conservative envelope [33m 489[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 358[2mms[22m[39m
+ [32m✓[39m tests/m19g-buybackburn-state-machine.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-transfer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 839[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-XFER-01: owner-authorized transfer debits source wallet and credits deterministic recipient wallet [33m 464[2mms[22m[39m
+ [32m✓[39m tests/username-nft-item.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 709[2mms[22m[39m
+ [32m✓[39m tests/m19b-stonfi-conservative-gas.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/m19e-stonfi-live-evidence-collector.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m tests/m19-stonfi-route-discovery.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/m19d-stonfi-route-candidate-intake.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-derivation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 368[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH Master get_wallet_address(owner) equals local StateInit derivation [33m 351[2mms[22m[39m
+ [32m✓[39m tests/m19f-stonfi-route-evidence-dossier.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m tests/m18-artifact-integrity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 382[2mms[22m[39m
+     [33m[2m✓[22m[39m M18-ARTIFACT-01: generated artifacts, vectors, code hashes, and implemented-subset manifest match the current build [33m 381[2mms[22m[39m
+ [32m✓[39m tests/m17-gas-reserve-sanity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 4442[2mms[22m[39m
+     [33m[2m✓[22m[39m GAS-M17-01: implemented-subset money/publish flows stay below broad gas/fee sanity thresholds [33m 4441[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m32 passed[39m[22m[90m (32)[39m
+[2m      Tests [22m [1m[32m134 passed[39m[22m[90m (134)[39m
+[2m   Start at [22m 16:45:01
+[2m   Duration [22m 63.82s[2m (transform 3.96s, setup 0ms, import 5.55s, tests 57.22s, environment 47ms)[22m
+
+ELAPSED=1:07.64 EXIT=0

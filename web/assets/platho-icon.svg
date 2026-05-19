@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Platho">
+  <rect width="96" height="96" rx="20" fill="#0b0d0f"/>
+  <path d="M24 64V24h28c13 0 22 8 22 20s-9 20-22 20H38v12H24Zm14-24v12h13c6 0 10-2 10-8s-4-8-10-8H38Z" fill="#30d5b0"/>
+  <path d="M22 76h52" stroke="#49a6ff" stroke-width="6" stroke-linecap="round"/>
+</svg>

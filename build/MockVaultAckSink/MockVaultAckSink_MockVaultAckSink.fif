@@ -1,0 +1,290 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/MockVaultAckSink/MockVaultAckSink_MockVaultAckSink.fc` 
+PROGRAM{
+  DECLPROC $PublishPrivateFromVault$_store
+  DECLPROC $PublishPrivateFromVault$_store_cell
+  DECLPROC $PublishPublicFromVault$_store
+  DECLPROC $PublishPublicFromVault$_store_cell
+  DECLPROC $MockVaultAckSink$_store
+  DECLPROC $MockVaultAckSink$_load
+  DECLPROC $MockVaultStateView$_to_external
+  DECLPROC $MockVaultAckSink$_contract_init
+  DECLPROC $MockVaultAckSink$_contract_load
+  DECLPROC $MockVaultAckSink$_contract_store
+  DECLPROC $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid
+  DECLPROC $MockVaultAckSink$_fun_get_state
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
+  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid
+  86957 DECLMETHOD %get_state
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  $PublishPrivateFromVault$_store PROCINLINE:<{
+    2767741632 PUSHINT
+    s0 s9 XCHG2
+    32 STU
+    s1 s7 XCHG
+    64 STU
+    s1 s5 XCHG
+    256 STU
+    s1 s3 XCHG
+    8 STU
+    8 STU
+    256 STU
+    256 STU
+    SWAP
+    NEWC
+    256 STU
+    s1 s2 XCHG
+    128 STU
+    STBREFR
+  }>
+  $PublishPrivateFromVault$_store_cell PROCINLINE:<{
+    8 -ROLL
+    $PublishPrivateFromVault$_store INLINECALLDICT
+    ENDC
+  }>
+  $PublishPublicFromVault$_store PROCINLINE:<{
+    2351593143 PUSHINT
+    s0 s6 XCHG2
+    32 STU
+    s1 s4 XCHG
+    64 STU
+    s1 s2 XCHG
+    256 STU
+    STSLICE
+    256 STU
+    128 STU
+  }>
+  $PublishPublicFromVault$_store_cell PROCINLINE:<{
+    5 -ROLL
+    $PublishPublicFromVault$_store INLINECALLDICT
+    ENDC
+  }>
+  $MockVaultAckSink$_store PROCINLINE:<{
+    s3 s4 XCHG2
+    64 STU
+    256 STU
+    64 STU
+    256 STU
+  }>
+  $MockVaultAckSink$_load PROCINLINE:<{
+    64 LDU
+    256 LDU
+    64 LDU
+    256 LDU
+    4 -ROLL
+  }>
+  $MockVaultStateView$_to_external PROCINLINE:<{
+  }>
+  $MockVaultAckSink$_contract_init PROCINLINE:<{
+    0 PUSHINT
+    s0 s0 s0 PUSH3
+  }>
+  $MockVaultAckSink$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $MockVaultAckSink$_load INLINECALLDICT
+      1 4 BLKDROP2
+    }>ELSE<{
+      DROP
+      $MockVaultAckSink$_contract_init INLINECALLDICT
+    }>
+  }>
+  $MockVaultAckSink$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    4 -ROLL
+    $MockVaultAckSink$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid PROCINLINE:<{
+  }>
+  $MockVaultAckSink$_fun_get_state PROCREF:<{
+    s3 s2 s1 PUSH3
+    s3 PUSH
+    $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid INLINECALLDICT
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid PROCINLINE:<{
+  }>
+  $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid PROCINLINE:<{
+  }>
+  %get_state PROC:<{
+    $MockVaultAckSink$_contract_load INLINECALLDICT
+    $MockVaultAckSink$_fun_get_state INLINECALLDICT
+    4 4 BLKDROP2
+    $MockVaultStateView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $MockVaultAckSink$_contract_load INLINECALLDICT
+    s0 s5 XCHG
+    IFJMP:<{
+      5 BLKDROP
+    }>
+    0 PUSHINT
+    s4 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s4 XCHG
+      32 LDU
+      s0 s5 XCHG
+    }>
+    OVER
+    4194308097 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s3 XCHG
+      LDMSGADDR
+      64 LDU
+      256 LDU
+      8 LDU
+      8 LDU
+      256 LDU
+      LDREF
+      DROP
+      CTOS
+      256 LDU
+      256 LDU
+      128 LDU
+      128 LDU
+      DROP
+      s5 s8 XCHG
+      s4 s7 XCHG
+      s3 s6 XCHG
+      s8 s7 s0 XCHG3
+      TRUE
+      s7 s9 XCHG2
+      0 PUSHINT
+      s0 s9 XCHG
+      $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid INLINECALLDICT
+      NEWC
+      $PublishPrivateFromVault$_store_cell INLINECALLDICT
+      s3 s3 s0 XCHG3
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s0 s0 s3 XCHG3
+      $MockVaultAckSink$_contract_store INLINECALLDICT
+    }>
+    OVER
+    4194308098 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s3 XCHG
+      LDMSGADDR
+      64 LDU
+      256 LDU
+      LDMSGADDR
+      LDREF
+      DROP
+      CTOS
+      256 LDU
+      128 LDU
+      128 LDU
+      DROP
+      s5 s4 s0 XCHG3
+      TRUE
+      s4 s6 XCHG2
+      0 PUSHINT
+      s0 s6 XCHG
+      $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid INLINECALLDICT
+      NEWC
+      $PublishPublicFromVault$_store_cell INLINECALLDICT
+      s3 s3 s0 XCHG3
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s0 s0 s3 XCHG3
+      $MockVaultAckSink$_contract_store INLINECALLDICT
+    }>
+    OVER
+    2270058346 PUSHINT
+    EQUAL
+    IFJMP:<{
+      4 BLKDROP
+      s2 POP
+      256 LDU
+      64 LDU
+      256 LDU
+      DROP
+      s0 s3 XCHG
+      INC
+      s0 s3 XCHG
+      $MockVaultAckSink$_contract_store INLINECALLDICT
+    }>
+    s5 POP
+    0 EQINT
+    s0 s4 XCHG
+    33 LESSINT
+    s1 s4 XCHG
+    AND
+    IFJMP:<{
+      20999 PUSHINT
+      THROWANY
+      s0 s0 s3 XCHG3
+      $MockVaultAckSink$_contract_store INLINECALLDICT
+    }>
+    4 BLKDROP
+    130 THROW
+  }>
+}END>c

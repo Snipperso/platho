@@ -1,0 +1,112 @@
+\n=== RUN tests/username-registry-paid-mint.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 09:05:48
+[2m   Duration [22m 1.74s[2m (transform 208ms, setup 0ms, import 489ms, tests 1.01s, environment 0ms)[22m
+
+=== PASS tests/username-registry-paid-mint.test.ts ===
+\n=== RUN tests/username-registry-prune-pending-mint.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:05:51
+[2m   Duration [22m 1.55s[2m (transform 224ms, setup 0ms, import 554ms, tests 734ms, environment 0ms)[22m
+
+=== PASS tests/username-registry-prune-pending-mint.test.ts ===
+\n=== RUN tests/username-registry-refund-flush.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:05:54
+[2m   Duration [22m 1.79s[2m (transform 317ms, setup 0ms, import 697ms, tests 832ms, environment 0ms)[22m
+
+=== PASS tests/username-registry-refund-flush.test.ts ===
+\n=== RUN tests/vault-ath-integration.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:05:57
+[2m   Duration [22m 2.25s[2m (transform 303ms, setup 0ms, import 720ms, tests 1.20s, environment 0ms)[22m
+
+=== PASS tests/vault-ath-integration.test.ts ===
+\n=== RUN tests/vault-external-session-gate.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 09:06:01
+[2m   Duration [22m 2.19s[2m (transform 253ms, setup 0ms, import 605ms, tests 1.31s, environment 0ms)[22m
+
+=== PASS tests/vault-external-session-gate.test.ts ===
+\n=== RUN tests/vault-key-records.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 09:06:05
+[2m   Duration [22m 1.62s[2m (transform 204ms, setup 0ms, import 524ms, tests 841ms, environment 0ms)[22m
+
+=== PASS tests/vault-key-records.test.ts ===
+\n=== RUN tests/vault-m6-publish.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:06:07
+[2m   Duration [22m 1.62s[2m (transform 238ms, setup 0ms, import 559ms, tests 809ms, environment 0ms)[22m
+
+=== PASS tests/vault-m6-publish.test.ts ===
+\n=== RUN tests/vault-prune-pending-publish.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:06:10
+[2m   Duration [22m 1.62s[2m (transform 220ms, setup 0ms, import 553ms, tests 823ms, environment 0ms)[22m
+
+=== PASS tests/vault-prune-pending-publish.test.ts ===
+\n=== RUN tests/vault-receive-intent.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:06:13
+[2m   Duration [22m 2.14s[2m (transform 213ms, setup 0ms, import 542ms, tests 1.33s, environment 0ms)[22m
+
+=== PASS tests/vault-receive-intent.test.ts ===
+\n=== RUN tests/vault-session-lifecycle.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+

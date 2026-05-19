@@ -1,0 +1,6 @@
+tests/m19-stonfi-route-discovery.test.ts
+tests/m19b-stonfi-conservative-gas.test.ts
+tests/m19c-stonfi-route-freeze-gate.test.ts
+tests/m19d-stonfi-route-candidate-intake.test.ts
+tests/m19e-stonfi-live-evidence-collector.test.ts
+tests/m19f-stonfi-route-evidence-dossier.test.ts

@@ -1,0 +1,13 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m19c[39m
+
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts[2m > [22mM19C STON.fi route freeze gate / live sample harness[2m > [22maccepts a mechanically complete final route candidate only when SDK sample, quote, min_out, and live proofs all match[32m 12[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts[2m > [22mM19C STON.fi route freeze gate / live sample harness[2m > [22mrejects a draft candidate even if payload mechanics match, because live route proof is mandatory[32m 6[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts[2m > [22mM19C STON.fi route freeze gate / live sample harness[2m > [22mrejects a candidate whose dex_min_out is not the exact min_ask_amount inside the SDK/API sample[32m 6[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts[2m > [22mM19C STON.fi route freeze gate / live sample harness[2m > [22mrejects a candidate below 95% live quote even when it is above the static circuit breaker[32m 4[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 11:49:39
+[2m   Duration [22m 490ms[2m (transform 106ms, setup 0ms, import 191ms, tests 30ms, environment 21ms)[22m
+

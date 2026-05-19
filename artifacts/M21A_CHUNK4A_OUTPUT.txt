@@ -1,0 +1,23 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m21a_work[39m
+
+ [32m✓[39m tests/username-registry-prune-pending-mint.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1920[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected [33m 1347[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending [33m 570[2mms[22m[39m
+ [32m✓[39m tests/username-registry-refund-flush.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2021[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-01: FlushAthRefundDue sends bounce-safe ATH transfer, clears due on recipient wallet ACK, and credits recipient ATH wallet [33m 1414[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-02: official ATH wallet request bounce restores refund due and clears pending flush [33m 603[2mms[22m[39m
+ [32m✓[39m tests/vault-ath-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2540[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-03: first ATH deposit from official wallet creates UserState and credits ath_balance [33m 931[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-05: ATH withdrawal debits ath_balance and clears pending on official wallet ack [33m 425[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT-02A: ATH withdrawal bounce/failure restores ath_balance and clears pending [33m 420[2mms[22m[39m
+ [32m✓[39m tests/username-registry-paid-mint.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2601[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-01: valid official ATH username mint deploys deterministic item, consumes pending, and credits treasury/burn due after ACK [33m 1231[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-02: invalid uppercase username from official ATH wallet creates refund due and no pending/name record [33m 392[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-03: non-official ATH sender is rejected and cannot create refund, pending, or name record [33m 405[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m15 passed[39m[22m[90m (15)[39m
+[2m   Start at [22m 10:30:37
+[2m   Duration [22m 4.92s[2m (transform 1.68s, setup 0ms, import 6.58s, tests 9.08s, environment 1ms)[22m
+

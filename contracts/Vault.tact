@@ -1,0 +1,1504 @@
+// Platho v1 Vault milestone 1 implementation.
+// Scope: UserState, TON deposit/withdraw, session lifecycle, Message Budget, KeyRecord/key_generation lifecycle.
+// Includes external session publish to CapsuleHub with PendingPublish ACK/bounce recovery.
+// Includes pre-seal official ATH wallet binding to avoid self-address StateInit circularity.
+// No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
+
+import "./ATHWallet.tact";
+
+const VAULT_USER_STATE_STORAGE_ENDOWMENT: Int = 10000000;
+const VAULT_SESSION_STATE_STORAGE_ENDOWMENT: Int = 5000000;
+const VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT: Int = 5000000;
+const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT: Int = 30000000;
+const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT: Int = 5000000;
+const VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT: Int = 3000000;
+const VAULT_PENDING_PUBLISH_STALE_TTL: Int = 86400; // 24 hours
+const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
+const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 30000000;
+const ASSET_TON: Int = 1;
+const ASSET_ATH: Int = 2;
+const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
+const RECEIVE_INTENT_COMMITMENT_DOMAIN: Int = 0x5243434d; // "RCCM"
+const MAX_RECEIVE_INTENT_TTL: Int = 2592000; // 30 days
+const CRYPTO_SUITE_CLASSICAL: Int = 1;
+const CRYPTO_SUITE_HYBRID: Int = 2;
+const MLKEM768_PUBKEY_LEN: Int = 1184;
+const MAX_SESSION_TTL: Int = 2592000; // 30 days
+const UINT64_MAX: Int = 18446744073709551615;
+const UINT64_MOD: Int = 18446744073709551616;
+const UINT32_MAX: Int = 4294967295;
+const ATH_DEPOSIT_ID_DOMAIN: Int = 0x41445049; // "ADPI"
+const SESSION_ID_DOMAIN: Int = 0x53534944; // "SSID"
+const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
+const COMPACT_MAGIC: Int = 0x504c5352; // "PLSR"
+const COMPACT_VERSION: Int = 1;
+const SIGN_DOMAIN_SESSION_PUBLISH: Int = 0x56505542; // "VPUB"
+const OP_PUBLISH_PRIVATE_BY_SESSION_EXTERNAL: Int = 0x686694C6;
+const OP_PUBLISH_PUBLIC_BY_SESSION_EXTERNAL: Int = 0x900EC906;
+const PUBLISH_KIND_PRIVATE: Int = 1;
+const PUBLISH_KIND_PUBLIC: Int = 2;
+const SIZE_CLASS_STANDARD: Int = 1;
+const SIZE_CLASS_LONG_TERM: Int = 2;
+const CRYPTO_SUITE_PUBLIC_NONE: Int = 0;
+const PLATO_PRIVATE_STANDARD_FEE_TON: Int = 5000000;
+const PLATO_PRIVATE_LONG_TERM_FEE_TON: Int = 10000000;
+const PLATO_PUBLIC_POST_FEE_TON: Int = 5000000;
+const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
+const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 30000000000000000;
+const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
+const VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE: Int = 3000000;
+const INVALID_SESSION_REQUEST_CHARGE_TON: Int = 2000000;
+const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE: Int = 3000000;
+const CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE: Int = 4000000;
+const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 3000000;
+const CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
+const CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
+const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
+const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 4000000;
+const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 3000000;
+const CAPSULEHUB_PAGE_STORAGE_ENDOWMENT: Int = 10000000;
+const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
+const OP_BIND_DEPLOYMENT_MANIFEST: Int = 0x90E2E0CB;
+const OP_BIND_OFFICIAL_ATH_WALLET: Int = 0x18DB2CCB;
+const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
+
+
+message(0x90E2E0CB) BindDeploymentManifest {
+    deployment_manifest_hash: Int as uint256;
+    counterpart_address: Address;
+}
+
+message(0x18DB2CCB) BindOfficialAthWallet {
+    deployment_manifest_hash: Int as uint256;
+    official_ath_wallet_address: Address;
+}
+
+message(0x3A12D1AD) SealGenesis {
+    deployment_manifest_hash: Int as uint256;
+}
+
+message(0x2AAFBD98) DepositTon {
+    amount: Int as uint128;
+}
+
+message(0x484C1D72) WithdrawTon {
+    amount: Int as uint128;
+    recipient: Address;
+}
+
+message(0xF9A44834) WithdrawAth {
+    query_id: Int as uint64;
+    amount: Int as uint128;
+    recipient: Address;
+}
+
+message(0x86A15F92) TopUpMessageBudget {
+    amount: Int as uint128;
+}
+
+message(0xFF3FBCC0) SetSession {
+    session_pubkey: Int as uint256;
+    expires_at: Int as uint32;
+}
+
+message(0xDB1CCDBE) RevokeSession {}
+
+message(0x52705EDA) RegisterMessagingKeys {
+    enc_pubkey: Int as uint256;
+    sign_pubkey: Int as uint256;
+    pq_kem_pubkey_hash: Int as uint256;
+    pq_kem_pubkey_len: Int as uint16;
+    crypto_suite_mask: Int as uint16;
+}
+
+message(0x89D648BB) ReplaceMessagingKeys {
+    enc_pubkey: Int as uint256;
+    sign_pubkey: Int as uint256;
+    pq_kem_pubkey_hash: Int as uint256;
+    pq_kem_pubkey_len: Int as uint16;
+    crypto_suite_mask: Int as uint16;
+}
+
+message(0xF780F913) CreateReceiveIntent {
+    asset: Int as uint8;
+    amount: Int as uint128;
+    recipient_wallet: Address;
+    commitment: Int as uint256;
+    expires_at: Int as uint32;
+    client_nonce: Int as uint64;
+}
+
+message(0x99ECCCFC) ClaimReceiveIntent {
+    intent_id: Int as uint256;
+    secret32: Int as uint256;
+}
+
+message(0x32289374) CancelReceiveIntent {
+    intent_id: Int as uint256;
+}
+
+message(0xA4F862C0) PublishPrivateFromVault {
+    bounce_id: Int as uint64;
+    publish_id: Int as uint256;
+    size_class: Int as uint8;
+    crypto_suite: Int as uint8;
+    header_0_hash: Int as uint256;
+    header_1_hash: Int as uint256;
+    body_hash: Int as uint256;
+    protocol_fee_paid: Int as uint128;
+}
+
+message(0x8C2A76B7) PublishPublicFromVault {
+    bounce_id: Int as uint64;
+    publish_id: Int as uint256;
+    author_wallet: Address;
+    body_hash: Int as uint256;
+    protocol_fee_paid: Int as uint128;
+}
+
+message(0x874E576A) CapsuleHubPublishAck {
+    publish_id: Int as uint256;
+    entry_id: Int as uint64;
+    entry_uid: Int as uint256;
+}
+
+message(0x720BDD6D) PrunePendingPublish {
+    publish_id: Int as uint256;
+}
+
+
+struct PendingAthWithdrawal {
+    owner_wallet: Address;
+    recipient: Address;
+    recipient_ath_wallet: Address;
+    amount: Int as uint128;
+    created_at: Int as uint32;
+}
+
+struct PendingPublish {
+    owner_wallet: Address;
+    session_id: Int as uint256;
+    budget_epoch: Int as uint64;
+    nonce: Int as uint64;
+    publish_kind: Int as uint8;
+    body_hash: Int as uint256;
+    protocol_fee_paid: Int as uint128;
+    capsulehub_call_value: Int as uint128;
+    refundable_budget_amount: Int as uint128;
+    created_at: Int as uint32;
+}
+
+struct ReceiveIntent {
+    sender_wallet: Address;
+    recipient_wallet: Address;
+    asset: Int as uint8;
+    amount: Int as uint128;
+    commitment: Int as uint256;
+    expires_at: Int as uint32;
+    client_nonce: Int as uint64;
+    created_at: Int as uint32;
+    claimed: Bool;
+}
+
+struct KeyRecord {
+    owner_wallet: Address;
+    key_generation: Int as uint32;
+    enc_pubkey: Int as uint256;
+    sign_pubkey: Int as uint256;
+    pq_kem_pubkey_hash: Int as uint256;
+    pq_kem_pubkey_len: Int as uint16;
+    crypto_suite_mask: Int as uint16;
+    created_at: Int as uint32;
+    created_lt: Int as uint64;
+    revoked_at: Int as uint32;
+    revoked_lt: Int as uint64;
+}
+
+struct UserState {
+    ton_balance: Int as uint128;
+    ath_balance: Int as uint128;
+    message_budget_ton: Int as uint128;
+    budget_epoch: Int as uint64;
+    current_key_id: Int as uint256;
+}
+
+struct SessionState {
+    session_pubkey: Int as uint256;
+    session_id: Int as uint256;
+    nonce: Int as uint64;
+    expires_at: Int as uint32;
+    active: Bool;
+}
+
+
+struct VaultReceiveIntentView {
+    exists: Bool;
+    sender_wallet: Address;
+    recipient_wallet: Address;
+    asset: Int;
+    amount: Int;
+    commitment: Int;
+    expires_at: Int;
+    client_nonce: Int;
+    created_at: Int;
+    claimed: Bool;
+}
+
+struct VaultKeyRecordView {
+    exists: Bool;
+    owner_wallet: Address;
+    key_generation: Int;
+    enc_pubkey: Int;
+    sign_pubkey: Int;
+    pq_kem_pubkey_hash: Int;
+    pq_kem_pubkey_len: Int;
+    crypto_suite_mask: Int;
+    created_at: Int;
+    created_lt: Int;
+    revoked_at: Int;
+    revoked_lt: Int;
+}
+
+struct VaultUserView {
+    exists: Bool;
+    ton_balance: Int;
+    ath_balance: Int;
+    message_budget_ton: Int;
+    budget_epoch: Int;
+    current_key_id: Int;
+}
+
+struct VaultSessionView {
+    exists: Bool;
+    session_pubkey: Int;
+    session_id: Int;
+    nonce: Int;
+    expires_at: Int;
+    active: Bool;
+}
+
+struct VaultPendingAthWithdrawalView {
+    exists: Bool;
+    owner_wallet: Address;
+    recipient: Address;
+    recipient_ath_wallet: Address;
+    amount: Int;
+    created_at: Int;
+}
+
+struct VaultGlobalView {
+    sealed: Bool;
+    capsule_hub_bound: Bool;
+    deployment_manifest_hash: Int;
+    capsule_hub_address: Address;
+    vault_ath_wallet_address: Address;
+    ath_master_address: Address;
+    user_count: Int;
+    session_count: Int;
+    key_record_count: Int;
+    receive_intent_count: Int;
+    pending_ath_withdrawal_count: Int;
+    pending_publish_count: Int;
+    processed_ath_deposit_count: Int;
+    pending_publish_stale_ttl: Int;
+    airdrop_remaining_ath: Int;
+    airdrop_distributed_ath: Int;
+    airdrop_reward_per_message_ath: Int;
+    airdrop_total_allocation_ath: Int;
+}
+
+contract Vault {
+    vault_ath_wallet_address: Address;
+    ath_master_address: Address;
+    capsule_hub_address: Address;
+    capsule_hub_bound: Bool;
+    sealed: Bool;
+    deployment_manifest_hash: Int as uint256;
+    // Pre-seal: hash(genesis_controller_address). Post-seal: remaining community activity airdrop ATH.
+    // The canonical sealed signing/deployment domain is deployment_manifest_hash.
+    genesis_config_hash: Int as uint256;
+    users: map<Address, UserState>;
+    sessions: map<Address, SessionState>;
+    key_records: map<Int, KeyRecord>;
+    receive_intents: map<Int, ReceiveIntent>;
+    processed_ath_deposits: map<Int, Int>;
+    pending_ath_withdrawals: map<Int, PendingAthWithdrawal>;
+    pending_publishes: map<Int, PendingPublish>;
+    user_count: Int as uint64;
+    session_count: Int as uint64;
+    key_record_count: Int as uint64;
+    receive_intent_count: Int as uint64;
+    processed_ath_deposit_count: Int as uint64;
+    pending_ath_withdrawal_count: Int as uint64;
+    pending_publish_count: Int as uint64;
+
+    init(vault_ath_wallet_address: Address, ath_master_address: Address, capsule_hub_address: Address, genesis_config_hash: Int, capsule_hub_bound: Bool, sealed: Bool, deployment_manifest_hash: Int) {
+        self.vault_ath_wallet_address = vault_ath_wallet_address;
+        self.ath_master_address = ath_master_address;
+        self.capsule_hub_address = capsule_hub_address;
+        self.capsule_hub_bound = capsule_hub_bound;
+        self.sealed = sealed;
+        self.deployment_manifest_hash = deployment_manifest_hash;
+        self.genesis_config_hash = genesis_config_hash;
+        if (sealed) {
+            if (self.deployment_manifest_hash == 0) {
+                self.deployment_manifest_hash = genesis_config_hash;
+            }
+            self.genesis_config_hash = VAULT_ACTIVITY_AIRDROP_TOTAL_ATH;
+        }
+        self.users = emptyMap();
+        self.sessions = emptyMap();
+        self.key_records = emptyMap();
+        self.receive_intents = emptyMap();
+        self.processed_ath_deposits = emptyMap();
+        self.pending_ath_withdrawals = emptyMap();
+        self.pending_publishes = emptyMap();
+        self.user_count = 0;
+        self.session_count = 0;
+        self.key_record_count = 0;
+        self.receive_intent_count = 0;
+        self.processed_ath_deposit_count = 0;
+        self.pending_ath_withdrawal_count = 0;
+        self.pending_publish_count = 0;
+    }
+
+    fun requireSealed() {
+        throwUnless(15000, self.sealed);
+    }
+
+    fun requireUnsealed() {
+        throwUnless(15001, !self.sealed);
+    }
+
+    fun requireGenesisController() {
+        throwUnless(15030, self.genesis_config_hash != 0);
+        throwUnless(15031, beginCell().storeAddress(sender()).endCell().hash() == self.genesis_config_hash);
+    }
+
+    fun emptyUser(): UserState {
+        return UserState {
+            ton_balance: 0,
+            ath_balance: 0,
+            message_budget_ton: 0,
+            budget_epoch: 0,
+            current_key_id: 0
+        };
+    }
+
+    fun getUserOrEmpty(owner: Address): UserState {
+        let value: UserState? = self.users.get(owner);
+        if (value == null) {
+            return self.emptyUser();
+        }
+        return value!!;
+    }
+
+    fun computeSessionId(owner: Address, sessionPubkey: Int): Int {
+        return beginCell()
+            .storeUint(SESSION_ID_DOMAIN, 32)
+            .storeAddress(owner)
+            .storeUint(sessionPubkey, 256)
+            .storeUint(curLt(), 64)
+            .endCell()
+            .hash();
+    }
+
+    fun deriveAthWalletAddress(owner: Address): Address {
+        let owner_std: StdAddress = parseStdAddress(owner.asSlice());
+        let wallet_init: StateInit = initOf ATHWallet(0, owner, self.ath_master_address);
+        return contractAddressExt(owner_std.workchain, wallet_init.code, wallet_init.data);
+    }
+
+    fun computeAthDepositId(senderWallet: Address, queryId: Int): Int {
+        return beginCell()
+            .storeUint(ATH_DEPOSIT_ID_DOMAIN, 32)
+            .storeAddress(senderWallet)
+            .storeUint(queryId, 64)
+            .endCell()
+            .hash();
+    }
+
+
+    fun discountedFee(owner: Address, fullFee: Int): Int {
+        let user: UserState = self.getUserOrEmpty(owner);
+        if (user.ath_balance >= ATH_FULL_DISCOUNT_AMOUNT) {
+            return 0;
+        }
+        let remaining: Int = ATH_FULL_DISCOUNT_AMOUNT - user.ath_balance;
+        return ((fullFee * remaining) + ATH_FULL_DISCOUNT_AMOUNT - 1) / ATH_FULL_DISCOUNT_AMOUNT;
+    }
+
+    fun isPublishProfileValid(op: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, header0: Int, header1: Int): Bool {
+        if (op == OP_PUBLISH_PRIVATE_BY_SESSION_EXTERNAL) {
+            if (publishKind != PUBLISH_KIND_PRIVATE) { return false; }
+            if (header0 == 0) { return false; }
+            if (header1 == 0) { return false; }
+            if (sizeClass == SIZE_CLASS_STANDARD) {
+                return cryptoSuite == CRYPTO_SUITE_CLASSICAL;
+            }
+            if (sizeClass == SIZE_CLASS_LONG_TERM) {
+                return cryptoSuite == CRYPTO_SUITE_HYBRID;
+            }
+            return false;
+        }
+        if (op == OP_PUBLISH_PUBLIC_BY_SESSION_EXTERNAL) {
+            if (publishKind != PUBLISH_KIND_PUBLIC) { return false; }
+            if (sizeClass != SIZE_CLASS_STANDARD) { return false; }
+            if (cryptoSuite != CRYPTO_SUITE_PUBLIC_NONE) { return false; }
+            if (header0 != 0) { return false; }
+            if (header1 != 0) { return false; }
+            return true;
+        }
+        return false;
+    }
+
+    fun canonicalSessionMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+        if (publishKind == PUBLISH_KIND_PUBLIC) {
+            throwUnless(16320, sizeClass == SIZE_CLASS_STANDARD);
+            throwUnless(16321, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
+            return VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+                + self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON)
+                + CAPSULEHUB_PUBLIC_EXEC_RESERVE
+                + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
+                + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
+                + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
+                + CAPSULEHUB_ACK_FORWARD_RESERVE;
+        }
+        throwUnless(16322, publishKind == PUBLISH_KIND_PRIVATE);
+        if (sizeClass == SIZE_CLASS_STANDARD) {
+            throwUnless(16323, cryptoSuite == CRYPTO_SUITE_CLASSICAL);
+            return VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+                + self.discountedFee(owner, PLATO_PRIVATE_STANDARD_FEE_TON)
+                + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
+                + CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE
+                + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
+                + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
+                + CAPSULEHUB_ACK_FORWARD_RESERVE;
+        }
+        throwUnless(16324, sizeClass == SIZE_CLASS_LONG_TERM);
+        throwUnless(16325, cryptoSuite == CRYPTO_SUITE_HYBRID);
+        return VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+            + self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON)
+            + CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE
+            + CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE
+            + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
+            + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
+            + CAPSULEHUB_ACK_FORWARD_RESERVE;
+    }
+
+    fun computeSessionPublishHash(op: Int, owner: Address, sessionId: Int, sessionNonce: Int, validUntil: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, maxCharge: Int, hashesRef: Cell): Int {
+        let fields: Cell = beginCell()
+            .storeUint(COMPACT_MAGIC, 32)
+            .storeUint(COMPACT_VERSION, 8)
+            .storeUint(op, 32)
+            .storeAddress(owner)
+            .storeUint(sessionId, 256)
+            .storeUint(sessionNonce, 64)
+            .storeUint(validUntil, 32)
+            .storeUint(publishKind, 8)
+            .storeUint(sizeClass, 8)
+            .storeUint(cryptoSuite, 8)
+            .storeUint(maxCharge, 128)
+            .storeRef(hashesRef)
+            .endCell();
+        return beginCell()
+            .storeUint(SIGN_DOMAIN_SESSION_PUBLISH, 32)
+            .storeUint(self.deployment_manifest_hash, 256)
+            .storeAddress(myAddress())
+            .storeAddress(self.capsule_hub_address)
+            .storeRef(fields)
+            .endCell()
+            .hash();
+    }
+
+    fun computePublishId(owner: Address, nonce: Int, bodyHash: Int, publishKind: Int): Int {
+        return beginCell()
+            .storeUint(self.deployment_manifest_hash, 256)
+            .storeAddress(owner)
+            .storeUint(nonce, 64)
+            .storeUint(bodyHash, 256)
+            .storeUint(publishKind, 8)
+            .endCell()
+            .hash();
+    }
+
+    fun capsulehubCallValue(maxCharge: Int): Int {
+        throwUnless(16340, maxCharge >= VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE);
+        return maxCharge - VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE;
+    }
+
+    fun computePublishBounceId(publishId: Int): Int {
+        return publishId % UINT64_MOD;
+    }
+
+    fun protocolFeePaid(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+        if (publishKind == PUBLISH_KIND_PUBLIC) {
+            throwUnless(16350, sizeClass == SIZE_CLASS_STANDARD);
+            throwUnless(16351, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
+            return self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON);
+        }
+        throwUnless(16352, publishKind == PUBLISH_KIND_PRIVATE);
+        if (sizeClass == SIZE_CLASS_STANDARD) {
+            throwUnless(16353, cryptoSuite == CRYPTO_SUITE_CLASSICAL);
+            return self.discountedFee(owner, PLATO_PRIVATE_STANDARD_FEE_TON);
+        }
+        throwUnless(16354, sizeClass == SIZE_CLASS_LONG_TERM);
+        throwUnless(16355, cryptoSuite == CRYPTO_SUITE_HYBRID);
+        return self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON);
+    }
+
+    fun refundPendingPublish(pending: PendingPublish, amount: Int) {
+        let refundAmount: Int = amount;
+        if (refundAmount > pending.refundable_budget_amount) {
+            refundAmount = pending.refundable_budget_amount;
+        }
+        if (refundAmount <= 0) {
+            return;
+        }
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        let sessionOpt: SessionState? = self.sessions.get(pending.owner_wallet);
+        if (sessionOpt != null) {
+            let session: SessionState = sessionOpt!!;
+            if (session.active && user.budget_epoch == pending.budget_epoch) {
+                user.message_budget_ton += refundAmount;
+            } else {
+                user.ton_balance += refundAmount;
+            }
+        } else {
+            user.ton_balance += refundAmount;
+        }
+        self.users.set(pending.owner_wallet, user);
+    }
+
+    fun creditActivityAirdrop(owner: Address) {
+        if (self.genesis_config_hash <= 0) {
+            return;
+        }
+        throwUnless(16540, self.users.exists(owner));
+        let reward: Int = VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH;
+        if (reward > self.genesis_config_hash) {
+            reward = self.genesis_config_hash;
+        }
+        let user: UserState = self.getUserOrEmpty(owner);
+        user.ath_balance += reward;
+        self.genesis_config_hash -= reward;
+        self.users.set(owner, user);
+    }
+
+
+
+
+    fun keyRecordStorageEndowment(cryptoSuiteMask: Int): Int {
+        throwUnless(16100, (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) || (cryptoSuiteMask == CRYPTO_SUITE_HYBRID));
+        if (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) {
+            return VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT;
+        }
+        return VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT;
+    }
+
+    fun validateKeyProfile(encPubkey: Int, signPubkey: Int, pqHash: Int, pqLen: Int, cryptoSuiteMask: Int) {
+        throwUnless(16101, encPubkey != 0);
+        throwUnless(16102, signPubkey != 0);
+        if (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) {
+            throwUnless(16103, pqHash == 0);
+            throwUnless(16104, pqLen == 0);
+        } else {
+            if (cryptoSuiteMask == CRYPTO_SUITE_HYBRID) {
+                throwUnless(16105, pqHash != 0);
+                throwUnless(16106, pqLen == MLKEM768_PUBKEY_LEN);
+            } else {
+                throw(16107);
+            }
+        }
+    }
+
+    fun computeKeyId(owner: Address, keyGeneration: Int, encPubkey: Int, signPubkey: Int, pqHash: Int, pqLen: Int, cryptoSuiteMask: Int): Int {
+        let keyFields: Cell = beginCell()
+            .storeUint(encPubkey, 256)
+            .storeUint(signPubkey, 256)
+            .storeUint(pqHash, 256)
+            .endCell();
+        return beginCell()
+            .storeUint(KEY_ID_DOMAIN, 32)
+            .storeAddress(owner)
+            .storeUint(keyGeneration, 32)
+            .storeUint(pqLen, 16)
+            .storeUint(cryptoSuiteMask, 16)
+            .storeRef(keyFields)
+            .endCell()
+            .hash();
+    }
+
+
+
+    fun validateReceiveAsset(asset: Int) {
+        throwUnless(16200, (asset == ASSET_TON) || (asset == ASSET_ATH));
+    }
+
+    fun computeReceiveIntentId(senderWallet: Address, recipientWallet: Address, asset: Int, amount: Int, clientNonce: Int): Int {
+        return beginCell()
+            .storeUint(RECEIVE_INTENT_ID_DOMAIN, 32)
+            .storeAddress(senderWallet)
+            .storeAddress(recipientWallet)
+            .storeUint(asset, 8)
+            .storeUint(amount, 128)
+            .storeUint(clientNonce, 64)
+            .endCell()
+            .hash();
+    }
+
+    fun computeReceiveIntentCommitment(intentId: Int, recipientWallet: Address, secret32: Int): Int {
+        return beginCell()
+            .storeUint(RECEIVE_INTENT_COMMITMENT_DOMAIN, 32)
+            .storeUint(intentId, 256)
+            .storeAddress(recipientWallet)
+            .storeUint(secret32, 256)
+            .endCell()
+            .hash();
+    }
+
+    fun requireUsableSession(owner: Address) {
+        let sessionOpt: SessionState? = self.sessions.get(owner);
+        throwUnless(16000, sessionOpt != null);
+        let session: SessionState = sessionOpt!!;
+        throwUnless(16001, session.active);
+        throwUnless(16002, now() <= session.expires_at);
+    }
+
+    receive(msg: BindDeploymentManifest) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(15010, !self.capsule_hub_bound);
+        throwUnless(15011, msg.deployment_manifest_hash != 0);
+        throwUnless(15012, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        self.deployment_manifest_hash = msg.deployment_manifest_hash;
+        self.capsule_hub_address = msg.counterpart_address;
+        self.capsule_hub_bound = true;
+    }
+
+    receive(msg: BindOfficialAthWallet) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(15013, self.vault_ath_wallet_address == sender());
+        throwUnless(15014, msg.deployment_manifest_hash > 1);
+        throwUnless(15015, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(15016, msg.official_ath_wallet_address != sender());
+        self.deployment_manifest_hash = msg.deployment_manifest_hash;
+        self.vault_ath_wallet_address = msg.official_ath_wallet_address;
+    }
+
+    receive(msg: SealGenesis) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(15020, msg.deployment_manifest_hash > 1);
+        throwUnless(15021, self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(15022, self.capsule_hub_bound);
+        throwUnless(15023, self.vault_ath_wallet_address != sender());
+        self.genesis_config_hash = VAULT_ACTIVITY_AIRDROP_TOTAL_ATH;
+        self.sealed = true;
+    }
+
+    receive(msg: DepositTon) {
+        self.requireSealed();
+        throwUnless(16010, msg.amount > 0);
+        let exists: Bool = self.users.exists(sender());
+        if (!exists) {
+            throwUnless(16011, context().value >= msg.amount + VAULT_USER_STATE_STORAGE_ENDOWMENT);
+            self.user_count += 1;
+        } else {
+            throwUnless(16012, context().value >= msg.amount);
+        }
+
+        let user: UserState = self.getUserOrEmpty(sender());
+        user.ton_balance += msg.amount;
+        self.users.set(sender(), user);
+    }
+
+    receive(msg: AthTransferNotification) {
+        self.requireSealed();
+        throwUnless(16013, sender() == self.vault_ath_wallet_address);
+        throwUnless(16014, msg.amount > 0);
+        let depositId: Int = self.computeAthDepositId(msg.sender_wallet, msg.query_id);
+        if (self.processed_ath_deposits.exists(depositId)) {
+            if (context().value >= VAULT_ATH_NOTIFICATION_ACK_VALUE) {
+                message(MessageParameters {
+                    to: sender(),
+                    value: VAULT_ATH_NOTIFICATION_ACK_VALUE,
+                    bounce: false,
+                    mode: SendDefaultMode,
+                    body: AthTransferNotificationAck {
+                        query_id: msg.query_id,
+                        amount: msg.amount
+                    }.toCell()
+                });
+            }
+            return;
+        }
+        let exists: Bool = self.users.exists(msg.sender_wallet);
+        if (!exists) {
+            throwUnless(16015, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT + VAULT_ATH_NOTIFICATION_ACK_VALUE);
+            self.user_count += 1;
+        } else {
+            throwUnless(16016, context().value >= VAULT_ATH_NOTIFICATION_ACK_VALUE);
+        }
+
+        let user: UserState = self.getUserOrEmpty(msg.sender_wallet);
+        user.ath_balance += msg.amount;
+        self.users.set(msg.sender_wallet, user);
+        self.processed_ath_deposits.set(depositId, msg.amount);
+        self.processed_ath_deposit_count += 1;
+
+        message(MessageParameters {
+            to: sender(),
+            value: VAULT_ATH_NOTIFICATION_ACK_VALUE,
+            bounce: false,
+            mode: SendDefaultMode,
+            body: AthTransferNotificationAck {
+                query_id: msg.query_id,
+                amount: msg.amount
+            }.toCell()
+        });
+    }
+
+    receive(msg: WithdrawTon) {
+        self.requireSealed();
+        throwUnless(16020, msg.amount > 0);
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16021, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16022, user.ton_balance >= msg.amount);
+
+        user.ton_balance -= msg.amount;
+        self.users.set(sender(), user);
+
+        message(MessageParameters {
+            to: msg.recipient,
+            value: msg.amount,
+            bounce: false,
+            mode: SendDefaultMode,
+            body: null
+        });
+    }
+
+    receive(msg: WithdrawAth) {
+        self.requireSealed();
+        throwUnless(16023, msg.amount > 0);
+        throwUnless(16027, context().value >= VAULT_ATH_WITHDRAW_MIN_VALUE);
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16024, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16025, user.ath_balance >= msg.amount);
+        throwUnless(16026, !self.pending_ath_withdrawals.exists(msg.query_id));
+
+        user.ath_balance -= msg.amount;
+        self.users.set(sender(), user);
+        let recipientAthWallet: Address = self.deriveAthWalletAddress(msg.recipient);
+        self.pending_ath_withdrawals.set(msg.query_id, PendingAthWithdrawal {
+            owner_wallet: sender(),
+            recipient: msg.recipient,
+            recipient_ath_wallet: recipientAthWallet,
+            amount: msg.amount,
+            created_at: now()
+        });
+        self.pending_ath_withdrawal_count += 1;
+
+        message(MessageParameters {
+            to: self.vault_ath_wallet_address,
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: ATHTransferRequest {
+                query_id: msg.query_id,
+                amount: msg.amount,
+                recipient: msg.recipient,
+                response_destination: myAddress()
+            }.toCell()
+        });
+    }
+
+    receive(msg: ATHTransferAck) {
+        self.requireSealed();
+        let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(msg.query_id);
+        throwUnless(16028, pendingOpt != null);
+        let pending: PendingAthWithdrawal = pendingOpt!!;
+        throwUnless(16029, pending.amount == msg.amount);
+        throwUnless(16030, sender() == pending.recipient_ath_wallet);
+        self.pending_ath_withdrawals.del(msg.query_id);
+        self.pending_ath_withdrawal_count -= 1;
+    }
+
+    receive(msg: ATHTransferFailed) {
+        self.requireSealed();
+        throwUnless(16070, sender() == self.vault_ath_wallet_address);
+        throwUnless(16071, msg.amount > 0);
+        let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(msg.query_id);
+        throwUnless(16072, pendingOpt != null);
+        let pending: PendingAthWithdrawal = pendingOpt!!;
+        throwUnless(16073, pending.amount == msg.amount);
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        user.ath_balance += pending.amount;
+        self.users.set(pending.owner_wallet, user);
+        self.pending_ath_withdrawals.del(msg.query_id);
+        self.pending_ath_withdrawal_count -= 1;
+    }
+
+    bounced(msg: bounced<ATHTransferRequest>) {
+        self.requireSealed();
+        throwUnless(16060, sender() == self.vault_ath_wallet_address);
+        throwUnless(16061, msg.amount > 0);
+        let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(msg.query_id);
+        throwUnless(16062, pendingOpt != null);
+        let pending: PendingAthWithdrawal = pendingOpt!!;
+        throwUnless(16063, pending.amount == msg.amount);
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        user.ath_balance += pending.amount;
+        self.users.set(pending.owner_wallet, user);
+        self.pending_ath_withdrawals.del(msg.query_id);
+        self.pending_ath_withdrawal_count -= 1;
+    }
+
+    receive(msg: SetSession) {
+        self.requireSealed();
+        throwUnless(16030, msg.session_pubkey != 0);
+        throwUnless(16031, msg.expires_at > now());
+        throwUnless(16032, msg.expires_at <= now() + MAX_SESSION_TTL);
+
+        let userExists: Bool = self.users.exists(sender());
+        let sessionExists: Bool = self.sessions.exists(sender());
+        let required: Int = 0;
+        if (!userExists) {
+            required += VAULT_USER_STATE_STORAGE_ENDOWMENT;
+        }
+        if (!sessionExists) {
+            required += VAULT_SESSION_STATE_STORAGE_ENDOWMENT;
+        }
+        throwUnless(16033, context().value >= required);
+
+        if (!userExists) {
+            let user: UserState = self.emptyUser();
+            self.users.set(sender(), user);
+            self.user_count += 1;
+        }
+        if (!sessionExists) {
+            self.session_count += 1;
+        }
+
+        let sessionId: Int = self.computeSessionId(sender(), msg.session_pubkey);
+        self.sessions.set(sender(), SessionState {
+            session_pubkey: msg.session_pubkey,
+            session_id: sessionId,
+            nonce: 0,
+            expires_at: msg.expires_at,
+            active: true
+        });
+    }
+
+    receive(msg: RevokeSession) {
+        self.requireSealed();
+        let sessionOpt: SessionState? = self.sessions.get(sender());
+        throwUnless(16040, sessionOpt != null);
+        let session: SessionState = sessionOpt!!;
+        throwUnless(16041, session.active);
+
+        let user: UserState = self.getUserOrEmpty(sender());
+        session.active = false;
+        user.ton_balance += user.message_budget_ton;
+        user.message_budget_ton = 0;
+        throwUnless(16042, user.budget_epoch < UINT64_MAX);
+        user.budget_epoch += 1;
+
+        self.sessions.set(sender(), session);
+        self.users.set(sender(), user);
+    }
+
+    receive(msg: TopUpMessageBudget) {
+        self.requireSealed();
+        throwUnless(16050, msg.amount > 0);
+        self.requireUsableSession(sender());
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16051, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16052, user.ton_balance >= msg.amount);
+
+        user.ton_balance -= msg.amount;
+        user.message_budget_ton += msg.amount;
+        self.users.set(sender(), user);
+    }
+
+
+
+    receive(msg: RegisterMessagingKeys) {
+        self.requireSealed();
+        self.validateKeyProfile(msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.crypto_suite_mask);
+        let userExists: Bool = self.users.exists(sender());
+        let required: Int = self.keyRecordStorageEndowment(msg.crypto_suite_mask);
+        if (!userExists) {
+            required += VAULT_USER_STATE_STORAGE_ENDOWMENT;
+        }
+        throwUnless(16110, context().value >= required);
+
+        let user: UserState = self.getUserOrEmpty(sender());
+        throwUnless(16111, user.current_key_id == 0);
+
+        let keyGeneration: Int = 0;
+        let keyId: Int = self.computeKeyId(sender(), keyGeneration, msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.crypto_suite_mask);
+        throwUnless(16112, !self.key_records.exists(keyId));
+
+        if (!userExists) {
+            self.user_count += 1;
+        }
+
+        self.key_records.set(keyId, KeyRecord {
+            owner_wallet: sender(),
+            key_generation: keyGeneration,
+            enc_pubkey: msg.enc_pubkey,
+            sign_pubkey: msg.sign_pubkey,
+            pq_kem_pubkey_hash: msg.pq_kem_pubkey_hash,
+            pq_kem_pubkey_len: msg.pq_kem_pubkey_len,
+            crypto_suite_mask: msg.crypto_suite_mask,
+            created_at: now(),
+            created_lt: curLt(),
+            revoked_at: 0,
+            revoked_lt: 0
+        });
+        self.key_record_count += 1;
+        user.current_key_id = keyId;
+        self.users.set(sender(), user);
+    }
+
+    receive(msg: ReplaceMessagingKeys) {
+        self.requireSealed();
+        self.validateKeyProfile(msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.crypto_suite_mask);
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16120, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16121, user.current_key_id != 0);
+
+        let oldRecordOpt: KeyRecord? = self.key_records.get(user.current_key_id);
+        throwUnless(16122, oldRecordOpt != null);
+        let oldRecord: KeyRecord = oldRecordOpt!!;
+        throwUnless(16123, oldRecord.owner_wallet == sender());
+        throwUnless(16124, oldRecord.revoked_lt == 0);
+        throwUnless(16125, oldRecord.key_generation < UINT32_MAX);
+
+        let required: Int = self.keyRecordStorageEndowment(msg.crypto_suite_mask);
+        throwUnless(16126, context().value >= required);
+
+        oldRecord.revoked_at = now();
+        oldRecord.revoked_lt = curLt();
+        self.key_records.set(user.current_key_id, oldRecord);
+
+        let keyGeneration: Int = oldRecord.key_generation + 1;
+        let newKeyId: Int = self.computeKeyId(sender(), keyGeneration, msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.crypto_suite_mask);
+        throwUnless(16127, !self.key_records.exists(newKeyId));
+
+        self.key_records.set(newKeyId, KeyRecord {
+            owner_wallet: sender(),
+            key_generation: keyGeneration,
+            enc_pubkey: msg.enc_pubkey,
+            sign_pubkey: msg.sign_pubkey,
+            pq_kem_pubkey_hash: msg.pq_kem_pubkey_hash,
+            pq_kem_pubkey_len: msg.pq_kem_pubkey_len,
+            crypto_suite_mask: msg.crypto_suite_mask,
+            created_at: now(),
+            created_lt: curLt(),
+            revoked_at: 0,
+            revoked_lt: 0
+        });
+        self.key_record_count += 1;
+        user.current_key_id = newKeyId;
+        self.users.set(sender(), user);
+    }
+
+
+
+    receive(msg: CreateReceiveIntent) {
+        self.requireSealed();
+        self.validateReceiveAsset(msg.asset);
+        throwUnless(16210, msg.amount > 0);
+        throwUnless(16211, msg.commitment != 0);
+        throwUnless(16212, msg.expires_at > now());
+        throwUnless(16213, msg.expires_at <= now() + MAX_RECEIVE_INTENT_TTL);
+
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16214, userOpt != null);
+        let user: UserState = userOpt!!;
+
+        if (msg.asset == ASSET_TON) {
+            throwUnless(16215, user.ton_balance >= msg.amount);
+            user.ton_balance -= msg.amount;
+        } else {
+            throwUnless(16216, user.ath_balance >= msg.amount);
+            user.ath_balance -= msg.amount;
+        }
+
+        let intentId: Int = self.computeReceiveIntentId(sender(), msg.recipient_wallet, msg.asset, msg.amount, msg.client_nonce);
+        throwUnless(16217, !self.receive_intents.exists(intentId));
+        throwUnless(16218, context().value >= VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT);
+
+        self.users.set(sender(), user);
+        self.receive_intents.set(intentId, ReceiveIntent {
+            sender_wallet: sender(),
+            recipient_wallet: msg.recipient_wallet,
+            asset: msg.asset,
+            amount: msg.amount,
+            commitment: msg.commitment,
+            expires_at: msg.expires_at,
+            client_nonce: msg.client_nonce,
+            created_at: now(),
+            claimed: false
+        });
+        self.receive_intent_count += 1;
+    }
+
+    receive(msg: ClaimReceiveIntent) {
+        self.requireSealed();
+        let intentOpt: ReceiveIntent? = self.receive_intents.get(msg.intent_id);
+        throwUnless(16230, intentOpt != null);
+        let intent: ReceiveIntent = intentOpt!!;
+        throwUnless(16231, !intent.claimed);
+        throwUnless(16232, sender() == intent.recipient_wallet);
+        throwUnless(16233, now() <= intent.expires_at);
+        let expected: Int = self.computeReceiveIntentCommitment(msg.intent_id, sender(), msg.secret32);
+        throwUnless(16234, expected == intent.commitment);
+
+        let userExists: Bool = self.users.exists(sender());
+        if (!userExists) {
+            throwUnless(16235, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT);
+            self.user_count += 1;
+        }
+
+        let user: UserState = self.getUserOrEmpty(sender());
+        if (intent.asset == ASSET_TON) {
+            user.ton_balance += intent.amount;
+        } else {
+            user.ath_balance += intent.amount;
+        }
+
+        self.users.set(sender(), user);
+        self.receive_intents.del(msg.intent_id);
+        self.receive_intent_count -= 1;
+    }
+
+    receive(msg: CancelReceiveIntent) {
+        self.requireSealed();
+        let intentOpt: ReceiveIntent? = self.receive_intents.get(msg.intent_id);
+        throwUnless(16250, intentOpt != null);
+        let intent: ReceiveIntent = intentOpt!!;
+        throwUnless(16251, sender() == intent.sender_wallet);
+
+        let user: UserState = self.getUserOrEmpty(sender());
+        if (intent.asset == ASSET_TON) {
+            user.ton_balance += intent.amount;
+        } else {
+            user.ath_balance += intent.amount;
+        }
+
+        self.users.set(sender(), user);
+        self.receive_intents.del(msg.intent_id);
+        self.receive_intent_count -= 1;
+    }
+
+
+    external(msg: Slice) {
+        self.requireSealed();
+        throwUnless(16400, msg.bits() >= 843);
+        let magic: Int = msg.loadUint(32);
+        throwUnless(16401, magic == COMPACT_MAGIC);
+        let version: Int = msg.loadUint(8);
+        throwUnless(16402, version == COMPACT_VERSION);
+        let op: Int = msg.loadUint(32);
+        let owner: Address = msg.loadAddress();
+        let sessionId: Int = msg.loadUint(256);
+        let sessionNonce: Int = msg.loadUint(64);
+        let validUntil: Int = msg.loadUint(32);
+        let publishKind: Int = msg.loadUint(8);
+        let sizeClass: Int = msg.loadUint(8);
+        let cryptoSuite: Int = msg.loadUint(8);
+        let maxCharge: Int = msg.loadUint(128);
+        let hashesRef: Cell = msg.loadRef();
+        let signatureRef: Cell = msg.loadRef();
+        throwUnless(16403, msg.bits() == 0);
+        throwUnless(16404, msg.refs() == 0);
+
+        let sessionOpt: SessionState? = self.sessions.get(owner);
+        throwUnless(16410, sessionOpt != null);
+        let session: SessionState = sessionOpt!!;
+        throwUnless(16411, session.active);
+        throwUnless(16412, session.session_id == sessionId);
+        throwUnless(16413, session.nonce == sessionNonce);
+        throwUnless(16414, now() <= session.expires_at);
+        throwUnless(16415, now() <= validUntil);
+        throwUnless(16416, session.nonce < UINT64_MAX);
+
+        let sigHash: Int = self.computeSessionPublishHash(op, owner, sessionId, sessionNonce, validUntil, publishKind, sizeClass, cryptoSuite, maxCharge, hashesRef);
+        let sigSlice: Slice = signatureRef.beginParse();
+        let sigBits: Slice = sigSlice.loadBits(512);
+        if (!checkSignature(sigHash, sigBits, session.session_pubkey)) {
+            throw(16422);
+        }
+
+        acceptMessage();
+
+        let userOpt: UserState? = self.users.get(owner);
+        throwUnless(16418, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16419, user.message_budget_ton >= INVALID_SESSION_REQUEST_CHARGE_TON);
+        throwUnless(16420, maxCharge >= INVALID_SESSION_REQUEST_CHARGE_TON);
+
+        session.nonce += 1;
+
+        let hashes: Slice = hashesRef.beginParse();
+        let bodyHash: Int = 0;
+        let header0: Int = 0;
+        let header1: Int = 0;
+
+        let postAcceptInvalid: Bool = false;
+        if (hashes.bits() != 768) {
+            postAcceptInvalid = true;
+        }
+        if (hashes.refs() != 0) {
+            postAcceptInvalid = true;
+        }
+        if (!postAcceptInvalid) {
+            bodyHash = hashes.loadUint(256);
+            header0 = hashes.loadUint(256);
+            header1 = hashes.loadUint(256);
+        }
+        if (bodyHash == 0) {
+            postAcceptInvalid = true;
+        }
+        if (!self.isPublishProfileValid(op, publishKind, sizeClass, cryptoSuite, header0, header1)) {
+            postAcceptInvalid = true;
+        }
+
+        let expectedMax: Int = 0;
+        let protocolFee: Int = 0;
+        let callValue: Int = 0;
+        let publishId: Int = 0;
+        let bounceId: Int = 0;
+
+        if (!postAcceptInvalid) {
+            expectedMax = self.canonicalSessionMaxCharge(owner, publishKind, sizeClass, cryptoSuite);
+            if (maxCharge != expectedMax) {
+                postAcceptInvalid = true;
+            }
+            if (user.message_budget_ton < maxCharge) {
+                postAcceptInvalid = true;
+            }
+        }
+
+        if (!postAcceptInvalid) {
+            protocolFee = self.protocolFeePaid(owner, publishKind, sizeClass, cryptoSuite);
+            callValue = self.capsulehubCallValue(maxCharge);
+            publishId = self.computePublishId(owner, sessionNonce, bodyHash, publishKind);
+            bounceId = self.computePublishBounceId(publishId);
+            if (publishId == 0) {
+                postAcceptInvalid = true;
+            }
+            if (self.pending_publishes.exists(bounceId)) {
+                postAcceptInvalid = true;
+            }
+        }
+
+        if (postAcceptInvalid) {
+            user.message_budget_ton -= INVALID_SESSION_REQUEST_CHARGE_TON;
+            self.sessions.set(owner, session);
+            self.users.set(owner, user);
+            return;
+        }
+
+        user.message_budget_ton -= maxCharge;
+        self.sessions.set(owner, session);
+        self.users.set(owner, user);
+
+        self.pending_publishes.set(bounceId, PendingPublish {
+            owner_wallet: owner,
+            session_id: sessionId,
+            budget_epoch: user.budget_epoch,
+            nonce: sessionNonce,
+            publish_kind: publishKind,
+            body_hash: bodyHash,
+            protocol_fee_paid: protocolFee,
+            capsulehub_call_value: callValue,
+            refundable_budget_amount: callValue,
+            created_at: now()
+        });
+        self.pending_publish_count += 1;
+
+        if (publishKind == PUBLISH_KIND_PRIVATE) {
+            message(MessageParameters {
+                to: self.capsule_hub_address,
+                value: callValue,
+                bounce: true,
+                mode: SendPayGasSeparately,
+                body: PublishPrivateFromVault {
+                    bounce_id: bounceId,
+                    publish_id: publishId,
+                    size_class: sizeClass,
+                    crypto_suite: cryptoSuite,
+                    header_0_hash: header0,
+                    header_1_hash: header1,
+                    body_hash: bodyHash,
+                    protocol_fee_paid: protocolFee
+                }.toCell()
+            });
+        } else {
+            message(MessageParameters {
+                to: self.capsule_hub_address,
+                value: callValue,
+                bounce: true,
+                mode: SendPayGasSeparately,
+                body: PublishPublicFromVault {
+                    bounce_id: bounceId,
+                    publish_id: publishId,
+                    author_wallet: owner,
+                    body_hash: bodyHash,
+                    protocol_fee_paid: protocolFee
+                }.toCell()
+            });
+        }
+    }
+
+    receive(msg: CapsuleHubPublishAck) {
+        self.requireSealed();
+        throwUnless(16500, sender() == self.capsule_hub_address);
+        let bounceId: Int = self.computePublishBounceId(msg.publish_id);
+        let pendingOpt: PendingPublish? = self.pending_publishes.get(bounceId);
+        throwUnless(16501, pendingOpt != null);
+        let pending: PendingPublish = pendingOpt!!;
+        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
+        throwUnless(16502, expectedPublishId == msg.publish_id);
+        self.refundPendingPublish(pending, context().value);
+        self.creditActivityAirdrop(pending.owner_wallet);
+        self.pending_publishes.del(bounceId);
+        self.pending_publish_count -= 1;
+    }
+
+    bounced(msg: bounced<PublishPrivateFromVault>) {
+        self.requireSealed();
+        throwUnless(16510, sender() == self.capsule_hub_address);
+        let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
+        throwUnless(16511, pendingOpt != null);
+        let pending: PendingPublish = pendingOpt!!;
+        self.refundPendingPublish(pending, context().value);
+        self.pending_publishes.del(msg.bounce_id);
+        self.pending_publish_count -= 1;
+    }
+
+    bounced(msg: bounced<PublishPublicFromVault>) {
+        self.requireSealed();
+        throwUnless(16520, sender() == self.capsule_hub_address);
+        let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
+        throwUnless(16521, pendingOpt != null);
+        let pending: PendingPublish = pendingOpt!!;
+        self.refundPendingPublish(pending, context().value);
+        self.pending_publishes.del(msg.bounce_id);
+        self.pending_publish_count -= 1;
+    }
+
+    receive(msg: PrunePendingPublish) {
+        self.requireSealed();
+        let bounceId: Int = self.computePublishBounceId(msg.publish_id);
+        let pendingOpt: PendingPublish? = self.pending_publishes.get(bounceId);
+        throwUnless(16530, pendingOpt != null);
+        let pending: PendingPublish = pendingOpt!!;
+        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
+        throwUnless(16531, expectedPublishId == msg.publish_id);
+        throwUnless(16532, now() >= pending.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
+        self.pending_publishes.del(bounceId);
+        self.pending_publish_count -= 1;
+    }
+
+    get fun get_user(owner: Address): VaultUserView {
+        let userOpt: UserState? = self.users.get(owner);
+        if (userOpt == null) {
+            return VaultUserView {
+                exists: false,
+                ton_balance: 0,
+                ath_balance: 0,
+                message_budget_ton: 0,
+                budget_epoch: 0,
+                current_key_id: 0
+            };
+        }
+        let user: UserState = userOpt!!;
+        return VaultUserView {
+            exists: true,
+            ton_balance: user.ton_balance,
+            ath_balance: user.ath_balance,
+            message_budget_ton: user.message_budget_ton,
+            budget_epoch: user.budget_epoch,
+            current_key_id: user.current_key_id
+        };
+    }
+
+    get fun get_session(owner: Address): VaultSessionView {
+        let sessionOpt: SessionState? = self.sessions.get(owner);
+        if (sessionOpt == null) {
+            return VaultSessionView {
+                exists: false,
+                session_pubkey: 0,
+                session_id: 0,
+                nonce: 0,
+                expires_at: 0,
+                active: false
+            };
+        }
+        let session: SessionState = sessionOpt!!;
+        return VaultSessionView {
+            exists: true,
+            session_pubkey: session.session_pubkey,
+            session_id: session.session_id,
+            nonce: session.nonce,
+            expires_at: session.expires_at,
+            active: session.active
+        };
+    }
+
+
+
+    get fun get_key_record(keyId: Int): VaultKeyRecordView {
+        let recordOpt: KeyRecord? = self.key_records.get(keyId);
+        if (recordOpt == null) {
+            return VaultKeyRecordView {
+                exists: false,
+                owner_wallet: myAddress(),
+                key_generation: 0,
+                enc_pubkey: 0,
+                sign_pubkey: 0,
+                pq_kem_pubkey_hash: 0,
+                pq_kem_pubkey_len: 0,
+                crypto_suite_mask: 0,
+                created_at: 0,
+                created_lt: 0,
+                revoked_at: 0,
+                revoked_lt: 0
+            };
+        }
+        let record: KeyRecord = recordOpt!!;
+        return VaultKeyRecordView {
+            exists: true,
+            owner_wallet: record.owner_wallet,
+            key_generation: record.key_generation,
+            enc_pubkey: record.enc_pubkey,
+            sign_pubkey: record.sign_pubkey,
+            pq_kem_pubkey_hash: record.pq_kem_pubkey_hash,
+            pq_kem_pubkey_len: record.pq_kem_pubkey_len,
+            crypto_suite_mask: record.crypto_suite_mask,
+            created_at: record.created_at,
+            created_lt: record.created_lt,
+            revoked_at: record.revoked_at,
+            revoked_lt: record.revoked_lt
+        };
+    }
+
+
+
+    get fun get_receive_intent(intentId: Int): VaultReceiveIntentView {
+        let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
+        if (intentOpt == null) {
+            return VaultReceiveIntentView {
+                exists: false,
+                sender_wallet: myAddress(),
+                recipient_wallet: myAddress(),
+                asset: 0,
+                amount: 0,
+                commitment: 0,
+                expires_at: 0,
+                client_nonce: 0,
+                created_at: 0,
+                claimed: false
+            };
+        }
+        let intent: ReceiveIntent = intentOpt!!;
+        return VaultReceiveIntentView {
+            exists: true,
+            sender_wallet: intent.sender_wallet,
+            recipient_wallet: intent.recipient_wallet,
+            asset: intent.asset,
+            amount: intent.amount,
+            commitment: intent.commitment,
+            expires_at: intent.expires_at,
+            client_nonce: intent.client_nonce,
+            created_at: intent.created_at,
+            claimed: intent.claimed
+        };
+    }
+
+    get fun get_receive_intent_id(senderWallet: Address, recipientWallet: Address, asset: Int, amount: Int, clientNonce: Int): Int {
+        return self.computeReceiveIntentId(senderWallet, recipientWallet, asset, amount, clientNonce);
+    }
+
+    get fun get_receive_intent_commitment(intentId: Int, recipientWallet: Address, secret32: Int): Int {
+        return self.computeReceiveIntentCommitment(intentId, recipientWallet, secret32);
+    }
+
+    get fun get_pending_ath_withdrawal(queryId: Int): VaultPendingAthWithdrawalView {
+        let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(queryId);
+        if (pendingOpt == null) {
+            return VaultPendingAthWithdrawalView {
+                exists: false,
+                owner_wallet: myAddress(),
+                recipient: myAddress(),
+                recipient_ath_wallet: myAddress(),
+                amount: 0,
+                created_at: 0
+            };
+        }
+        let pending: PendingAthWithdrawal = pendingOpt!!;
+        return VaultPendingAthWithdrawalView {
+            exists: true,
+            owner_wallet: pending.owner_wallet,
+            recipient: pending.recipient,
+            recipient_ath_wallet: pending.recipient_ath_wallet,
+            amount: pending.amount,
+            created_at: pending.created_at
+        };
+    }
+
+    get fun get_canonical_session_max_charge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+        return self.canonicalSessionMaxCharge(owner, publishKind, sizeClass, cryptoSuite);
+    }
+
+    get fun get_session_publish_hash(op: Int, owner: Address, sessionId: Int, sessionNonce: Int, validUntil: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, maxCharge: Int, bodyHash: Int, header0: Int, header1: Int): Int {
+        let hashesRef: Cell = beginCell()
+            .storeUint(bodyHash, 256)
+            .storeUint(header0, 256)
+            .storeUint(header1, 256)
+            .endCell();
+        return self.computeSessionPublishHash(op, owner, sessionId, sessionNonce, validUntil, publishKind, sizeClass, cryptoSuite, maxCharge, hashesRef);
+    }
+
+
+    get fun get_global(): VaultGlobalView {
+        let airdropRemaining: Int = 0;
+        if (self.sealed) {
+            airdropRemaining = self.genesis_config_hash;
+        }
+        return VaultGlobalView {
+            sealed: self.sealed,
+            capsule_hub_bound: self.capsule_hub_bound,
+            deployment_manifest_hash: self.deployment_manifest_hash,
+            capsule_hub_address: self.capsule_hub_address,
+            vault_ath_wallet_address: self.vault_ath_wallet_address,
+            ath_master_address: self.ath_master_address,
+            user_count: self.user_count,
+            session_count: self.session_count,
+            key_record_count: self.key_record_count,
+            receive_intent_count: self.receive_intent_count,
+            pending_ath_withdrawal_count: self.pending_ath_withdrawal_count,
+            pending_publish_count: self.pending_publish_count,
+            processed_ath_deposit_count: self.processed_ath_deposit_count,
+            pending_publish_stale_ttl: VAULT_PENDING_PUBLISH_STALE_TTL,
+            airdrop_remaining_ath: airdropRemaining,
+            airdrop_distributed_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH - airdropRemaining,
+            airdrop_reward_per_message_ath: VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH,
+            airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH
+        };
+    }
+
+    receive() {
+        throw(16099);
+    }
+}

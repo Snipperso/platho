@@ -1,0 +1,225 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; M20TBuybackBurnHarness_M20TBuybackBurnHarness.headers.fc
+;;
+;; Header files for M20TBuybackBurnHarness
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $M20TBuybackBurnHarness$_store
+builder $M20TBuybackBurnHarness$_store(builder build_0, (int, slice, slice, int, int, int, int) v) inline;
+
+;; $M20TBuybackBurnHarness$_load
+(slice, ((int, slice, slice, int, int, int, int))) $M20TBuybackBurnHarness$_load(slice sc_0) inline;
+
+;; $M20TBuybackBurnHarnessStateView$_to_external
+(int, int, slice, int, int, int) $M20TBuybackBurnHarnessStateView$_to_external(((int, int, slice, int, int, int)) v) inline;
+
+;; $M20TBuybackBurnHarness$init$_load
+(slice, ((slice, int))) $M20TBuybackBurnHarness$init$_load(slice sc_0) inline;
+
+;; $M20TBuybackBurnHarness$_contract_init
+(int, slice, slice, int, int, int, int) $M20TBuybackBurnHarness$_contract_init(slice $genesis_controller_address, int $run_id) impure inline;
+
+;; $M20TBuybackBurnHarness$_contract_load
+(int, slice, slice, int, int, int, int) $M20TBuybackBurnHarness$_contract_load() impure inline;
+
+;; $M20TBuybackBurnHarness$_contract_store
+() $M20TBuybackBurnHarness$_contract_store((int, slice, slice, int, int, int, int) v) impure inline;
+
+;; $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount
+((int, int, slice, int, int, int)) $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount(int $run_id, int $fee_bound, slice $fee_accumulator_address, int $accepted_count, int $total_accepted, int $last_amount) inline;
+
+;; $M20TBuybackBurnHarness$_fun_get_state
+((int, slice, slice, int, int, int, int), (int, int, slice, int, int, int)) $M20TBuybackBurnHarness$_fun_get_state((int, slice, slice, int, int, int, int) $self) impure inline_ref;
+
+
+;; M20TBuybackBurnHarness_M20TBuybackBurnHarness.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+;; M20TBuybackBurnHarness_M20TBuybackBurnHarness.storage.fc
+;;
+;; Type: M20TBuybackBurnHarnessStateView
+;; TLB: _ run_id:int257 fee_bound:bool fee_accumulator_address:address accepted_count:int257 total_accepted:int257 last_amount:int257 = M20TBuybackBurnHarnessStateView
+;;
+
+(int, int, slice, int, int, int) $M20TBuybackBurnHarnessStateView$_to_external(((int, int, slice, int, int, int)) v) inline {
+    var (v'run_id, v'fee_bound, v'fee_accumulator_address, v'accepted_count, v'total_accepted, v'last_amount) = v; 
+    return (v'run_id, v'fee_bound, v'fee_accumulator_address, v'accepted_count, v'total_accepted, v'last_amount);
+}
+
+((int, int, slice, int, int, int)) $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount(int $run_id, int $fee_bound, slice $fee_accumulator_address, int $accepted_count, int $total_accepted, int $last_amount) inline {
+    return ($run_id, $fee_bound, $fee_accumulator_address, $accepted_count, $total_accepted, $last_amount);
+}
+
+;;
+;; Type: M20TBuybackBurnHarness
+;; TLB: _ run_id:uint64 genesis_controller_address:address fee_accumulator_address:address fee_bound:bool accepted_count:uint64 total_accepted:uint128 last_amount:uint128 = M20TBuybackBurnHarness
+;;
+
+builder $M20TBuybackBurnHarness$_store(builder build_0, (int, slice, slice, int, int, int, int) v) inline {
+    var (v'run_id, v'genesis_controller_address, v'fee_accumulator_address, v'fee_bound, v'accepted_count, v'total_accepted, v'last_amount) = v;
+    build_0 = build_0.store_uint(v'run_id, 64);
+    build_0 = build_0.store_slice(v'genesis_controller_address);
+    build_0 = build_0.store_slice(v'fee_accumulator_address);
+    build_0 = build_0.store_int(v'fee_bound, 1);
+    build_0 = build_0.store_uint(v'accepted_count, 64);
+    build_0 = build_0.store_uint(v'total_accepted, 128);
+    build_0 = build_0.store_uint(v'last_amount, 128);
+    return build_0;
+}
+
+(slice, ((int, slice, slice, int, int, int, int))) $M20TBuybackBurnHarness$_load(slice sc_0) inline {
+    var v'run_id = sc_0~load_uint(64);
+    var v'genesis_controller_address = sc_0~load_msg_addr();
+    var v'fee_accumulator_address = sc_0~load_msg_addr();
+    var v'fee_bound = sc_0~load_int(1);
+    var v'accepted_count = sc_0~load_uint(64);
+    var v'total_accepted = sc_0~load_uint(128);
+    var v'last_amount = sc_0~load_uint(128);
+    return (sc_0, (v'run_id, v'genesis_controller_address, v'fee_accumulator_address, v'fee_bound, v'accepted_count, v'total_accepted, v'last_amount));
+}
+
+(slice, ((slice, int))) $M20TBuybackBurnHarness$init$_load(slice sc_0) inline {
+    var v'genesis_controller_address = sc_0~load_msg_addr();
+    var v'run_id = sc_0~load_int(257);
+    return (sc_0, (v'genesis_controller_address, v'run_id));
+}
+
+(int, slice, slice, int, int, int, int) $M20TBuybackBurnHarness$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$M20TBuybackBurnHarness$_load();
+    }
+    else {
+        (slice $genesis_controller_address, int $run_id) = $sc~$M20TBuybackBurnHarness$init$_load();
+        $sc.end_parse();
+        return $M20TBuybackBurnHarness$_contract_init($genesis_controller_address, $run_id);
+    }
+}
+
+() $M20TBuybackBurnHarness$_contract_store((int, slice, slice, int, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $M20TBuybackBurnHarness$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract M20TBuybackBurnHarness functions
+;;
+
+(int, slice, slice, int, int, int, int) $M20TBuybackBurnHarness$_contract_init(slice $genesis_controller_address, int $run_id) impure inline {
+    var (($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount)) = (null(), null(), null(), null(), null(), null(), null());
+    throw_unless(21004, ($run_id > 0));
+    $self'run_id = $run_id;
+    $self'genesis_controller_address = $genesis_controller_address;
+    $self'fee_accumulator_address = $genesis_controller_address;
+    $self'fee_bound = false;
+    $self'accepted_count = 0;
+    $self'total_accepted = 0;
+    $self'last_amount = 0;
+    return ($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount);
+}
+
+((int, slice, slice, int, int, int, int), (int, int, slice, int, int, int)) $M20TBuybackBurnHarness$_fun_get_state((int, slice, slice, int, int, int, int) $self) impure inline_ref {
+    var (($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount)) = $self;
+    var $fresh$ret_38 = $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount($self'run_id, $self'fee_bound, $self'fee_accumulator_address, $self'accepted_count, $self'total_accepted, $self'last_amount);
+    return (($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount), $fresh$ret_38);
+}
+
+;;
+;; Get methods of a Contract M20TBuybackBurnHarness
+;;
+
+_ %get_state() method_id(86957) {
+    var self = $M20TBuybackBurnHarness$_contract_load();
+    var res = self~$M20TBuybackBurnHarness$_fun_get_state();
+    return $M20TBuybackBurnHarnessStateView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract M20TBuybackBurnHarness
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount) = $M20TBuybackBurnHarness$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive M20TBindFeeAccumulator message
+    if (op == 0x4d323042) {
+        var $msg'fee_accumulator_address = in_msg~load_msg_addr();
+        throw_unless(21000, ( equal_slices_bits(__tact_context_get_sender(), $self'genesis_controller_address) ));
+        throw_unless(21001, (~ $self'fee_bound));
+        throw_unless(21002, ( ~ equal_slices_bits($msg'fee_accumulator_address, $self'genesis_controller_address) ));
+        $self'fee_accumulator_address = $msg'fee_accumulator_address;
+        $self'fee_bound = true;
+        $M20TBuybackBurnHarness$_contract_store(($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount));
+        return ();
+    }
+    
+    ;; Receive M20TBuybackHarnessTopUp message
+    if (op == 0x4d32544b) {
+        var $msg = empty_tuple();
+        throw_unless(21003, ( equal_slices_bits(__tact_context_get_sender(), $self'genesis_controller_address) ));
+        $M20TBuybackBurnHarness$_contract_store(($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount));
+        return ();
+    }
+    
+    ;; Receive AcceptBurnReserve message
+    if (op == 0x594ba505) {
+        var $msg'amount = in_msg~load_uint(128);
+        throw_unless(21010, $self'fee_bound);
+        throw_unless(21011, ( equal_slices_bits(__tact_context_get_sender(), $self'fee_accumulator_address) ));
+        throw_unless(21012, ($msg'amount == 51050000000));
+        throw_unless(21013, ($self'accepted_count == 0));
+        $self'accepted_count = 1;
+        $self'total_accepted = $msg'amount;
+        $self'last_amount = $msg'amount;
+        $M20TBuybackBurnHarness$_contract_store(($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(21099);
+        $M20TBuybackBurnHarness$_contract_store(($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

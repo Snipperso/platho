@@ -1,0 +1,6 @@
+{
+  "ok": true,
+  "document": "PLATHO.V1.BUYBACKBURN_FUNDING_ENVELOPE_M19H",
+  "implementationReady": false,
+  "flushAmountNanotons": "51050000000"
+}

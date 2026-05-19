@@ -1,0 +1,13 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2667[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 1261[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 508[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 895[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 03:13:32
+[2m   Duration [22m 3.83s[2m (transform 327ms, setup 0ms, import 769ms, tests 2.67s, environment 32ms)[22m
+

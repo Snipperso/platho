@@ -1,0 +1,7 @@
+{
+  "status": "DRAFT_NOT_FINAL_ROUTE_FREEZE",
+  "route_freeze_ready": false,
+  "conservative_total_value_nanotons": "51050000000",
+  "payload_hashes_match": true,
+  "output": "artifacts/stonfi_conservative_gas_profile_m19b.json"
+}

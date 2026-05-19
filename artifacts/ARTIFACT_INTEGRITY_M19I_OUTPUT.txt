@@ -1,0 +1,4 @@
+{
+  "status": "PASS",
+  "artifacts_locked": 20
+}

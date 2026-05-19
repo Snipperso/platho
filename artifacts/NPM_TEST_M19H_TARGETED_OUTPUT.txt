@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m19h[39m
+
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-01: one buyback funding envelope is 51.05 TON total while preserving exactly 50 TON offer principal[32m 2[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-02: 100 TON accumulated protocol fees split to only 50 TON buyback due, which is insufficient for one conservative envelope[33m 433[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-03: 102.10 TON accumulated protocol fees produce exactly one 51.05 TON buyback funding envelope and bounce restores it[32m 118[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 12:45:10
+[2m   Duration [22m 1.26s[2m (transform 153ms, setup 0ms, import 436ms, tests 556ms, environment 21ms)[22m
+

@@ -1,0 +1,98 @@
+{
+  "milestone": "M19B_STONFI_CONSERVATIVE_GAS_EXCESS_PROFILE",
+  "status": "DRAFT_NOT_FINAL_ROUTE_FREEZE",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "official_source": {
+    "package": "@ston-fi/sdk",
+    "version": "2.7.0",
+    "repository": "https://github.com/ston-fi/sdk/tree/main/packages/sdk",
+    "dexExport": "@ston-fi/sdk/dex/v2_1",
+    "sourceFiles": [
+      "src/contracts/dex/v2_1/router/BaseRouterV2_1.ts",
+      "src/contracts/dex/v2_1/constants.ts",
+      "src/contracts/pTON/v2_1/PtonV2_1.ts",
+      "src/contracts/pTON/v2_1/constants.ts"
+    ],
+    "notes": [
+      "@ston-fi/sdk@2.7.0 was inspected from the official npm package tarball in M19A.",
+      "M19B does not change the SDK-derived cell payload layout.",
+      "M19B only overfunds message value for immutable-route safety and requires all refund/excess addresses to be BuybackBurn."
+    ]
+  },
+  "conservative_profile": {
+    "buyback_offer_amount_nanotons": "50000000000",
+    "sdk_default_router_forward_gas_nanotons": "300000000",
+    "sdk_default_pton_transfer_gas_nanotons": "10000000",
+    "conservative_route_forward_gas_nanotons": "1000000000",
+    "conservative_pton_transfer_gas_nanotons": "50000000",
+    "conservative_total_stonfi_send_value_nanotons": "51050000000",
+    "formula": "50 TON offer + 1.00 TON route forward gas + 0.05 TON pTON transfer gas = 51.05 TON",
+    "refund_address_rule": "refund_address MUST be BuybackBurn",
+    "excesses_address_rule": "excesses_address MUST be BuybackBurn",
+    "pton_refund_address_rule": "pTON ton-transfer refund_address MUST be BuybackBurn",
+    "success_signal": "ATH receipt by official BuybackBurn ATH wallet followed by ATHBurnFinalized from ATH Master; never a router claim"
+  },
+  "fixture_route_vector": {
+    "query_id": "5786071451510446513",
+    "deadline": "1800200000",
+    "min_ask_amount_atomic_ath": "223456789000000",
+    "addresses": {
+      "routerAddress": "0:d39a367dfbbb264afb55a56d59189846bd831050d459b8a0a5363f1646c184c6",
+      "ptonWalletAddress": "0:5b832c0e208e7f915ff1f9766d12db10fb7b16362076df40d1c5480730b99f7f",
+      "askJettonWalletAddress": "0:38233bc43862f1090f45956f3cff9b7e1132786fd494b66744ce0cd38020b4bf",
+      "buybackBurnAddress": "0:543f37fb2b3e1fd60b0a7f46260e34313514674c2ebd5086c6ad1f7ce22c64c5"
+    },
+    "sdk_default_total_value_nanotons": "50310000000",
+    "conservative_total_value_nanotons": "51050000000",
+    "payload_identity_unchanged_by_overfunding": {
+      "pton_transfer_body_hash_default": "1eed1e9a0a016614a9da84c10af7002b12da8a17969334b2a21d21122f2dd481",
+      "pton_transfer_body_hash_conservative": "1eed1e9a0a016614a9da84c10af7002b12da8a17969334b2a21d21122f2dd481",
+      "stonfi_swap_forward_payload_hash_default": "3e68ced1d07f26a22b3e37e0d5341960f5eb1eb10e6b31e343146f2bf5419931",
+      "stonfi_swap_forward_payload_hash_conservative": "3e68ced1d07f26a22b3e37e0d5341960f5eb1eb10e6b31e343146f2bf5419931",
+      "hashes_match": true
+    },
+    "conservative_tx_params": {
+      "to": "0:5b832c0e208e7f915ff1f9766d12db10fb7b16362076df40d1c5480730b99f7f",
+      "value_nanotons": "51050000000",
+      "pton_transfer_body_hash": "1eed1e9a0a016614a9da84c10af7002b12da8a17969334b2a21d21122f2dd481",
+      "pton_transfer_body_boc_base64": "te6cckEBAwEA2AABZgHzg11QTEFUSE8ZsVC6Q7dACACofm/2Vnw/rBYU/oxMHGhiaijOmF16oQ2NWj75xFjJiwEB4WZk3iqABwRneIcMXiEh6LKt55/zb8ImTw36kpbM6JnBmnAEFpfwAVD83+ys+H9YLCn9GJg40MTUUZ0wuvVCGxq0ffOIsZMWACofm/2Vnw/rBYU/oxMHGhiaijOmF16oQ2NWj75xFjJigAAAADWmb6BAAgBXbLO5aH70CACofm/2Vnw/rBYU/oxMHGhiaijOmF16oQ2NWj75xFjJigAABRASrEK7",
+      "stonfi_swap_forward_payload_hash": "3e68ced1d07f26a22b3e37e0d5341960f5eb1eb10e6b31e343146f2bf5419931",
+      "stonfi_swap_forward_payload_boc_base64": "te6cckEBAgEAogAB4WZk3iqABwRneIcMXiEh6LKt55/zb8ImTw36kpbM6JnBmnAEFpfwAVD83+ys+H9YLCn9GJg40MTUUZ0wuvVCGxq0ffOIsZMWACofm/2Vnw/rBYU/oxMHGhiaijOmF16oQ2NWj75xFjJigAAAADWmb6BAAQBXbLO5aH70CACofm/2Vnw/rBYU/oxMHGhiaijOmF16oQ2NWj75xFjJigAABRDpLrmi"
+    },
+    "decoded_pton_transfer": {
+      "op": "0x01f3835d",
+      "queryId": "5786071451510446513",
+      "tonAmount": "50000000000",
+      "refundAddress": "0:543f37fb2b3e1fd60b0a7f46260e34313514674c2ebd5086c6ad1f7ce22c64c5",
+      "hasForwardPayload": true,
+      "forwardPayloadHash": "3e68ced1d07f26a22b3e37e0d5341960f5eb1eb10e6b31e343146f2bf5419931"
+    },
+    "decoded_stonfi_swap_payload": {
+      "op": "0x6664de2a",
+      "askJettonWalletAddress": "0:38233bc43862f1090f45956f3cff9b7e1132786fd494b66744ce0cd38020b4bf",
+      "refundAddress": "0:543f37fb2b3e1fd60b0a7f46260e34313514674c2ebd5086c6ad1f7ce22c64c5",
+      "excessesAddress": "0:543f37fb2b3e1fd60b0a7f46260e34313514674c2ebd5086c6ad1f7ce22c64c5",
+      "deadline": "1800200000",
+      "details": {
+        "minAskAmount": "223456789000000",
+        "receiverAddress": "0:543f37fb2b3e1fd60b0a7f46260e34313514674c2ebd5086c6ad1f7ce22c64c5",
+        "dexCustomPayloadForwardGasAmount": "0",
+        "hasDexCustomPayload": false,
+        "refundForwardGasAmount": "0",
+        "hasRefundPayload": false,
+        "referralValue": "10",
+        "referralAddress": null
+      }
+    }
+  },
+  "unresolved_final_values": [
+    "ATH_MASTER_ADDRESS final deployment address",
+    "STONFI_ROUTER_ADDRESS selected production v2 router address",
+    "STONFI_POOL_ADDRESS_TON_ATH selected TON/ATH pool address",
+    "STONFI_PTON_ADDRESS / pTON wallet route address for selected router",
+    "STONFI_VAULT_ADDRESS if selected route requires it",
+    "BUYBACK_MIN_ATH_OUT_PER_50_TON from liquidity/route tests",
+    "live-route proof that overfunded excess/refund returns to BuybackBurn"
+  ],
+  "route_freeze_ready": false
+}

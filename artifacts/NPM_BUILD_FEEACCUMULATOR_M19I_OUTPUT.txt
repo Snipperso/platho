@@ -1,0 +1,9 @@
+💼 Compiling project FeeAccumulator ...
+   > FeeAccumulator: tact compiler
+   > FeeAccumulator: func compiler
+   > Packaging
+   > FeeAccumulator
+   > Bindings
+   > FeeAccumulator
+   > Reports
+   > FeeAccumulator

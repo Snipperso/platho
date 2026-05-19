@@ -1,0 +1,6 @@
+{
+  "ok": true,
+  "document": "PLATHO.V1.BUYBACKBURN_ROUTE_INDEPENDENT_STATE_MACHINE_M19G",
+  "implementationReady": false,
+  "states": 3
+}

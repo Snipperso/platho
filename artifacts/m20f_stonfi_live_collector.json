@@ -1,0 +1,39 @@
+{
+  "document": "PLATHO.V1.M20F_STONFI_LIVE_COLLECTOR_REPORT",
+  "status": "WAITING_FOR_FINAL_MAINNET_INPUT",
+  "generated_at": "2026-05-19T07:59:44.142Z",
+  "route_freeze_ready": false,
+  "production_buyback_burn_unlocked": false,
+  "official_sources": {
+    "stonfiSdkSwapDocs": "https://docs.ston.fi/developer-section/dex/sdk/v2/swap",
+    "stonfiRestApiDocs": "https://docs.ston.fi/developer-section/dex/api",
+    "stonfiRestApiReference": "https://docs.ston.fi/developer-section/dex/api/reference",
+    "stonfiApiBaseUrl": "https://api.ston.fi",
+    "stonfiApiSwapSimulationEndpoint": "POST /v1/swap/simulate",
+    "sdkPackage": "@ston-fi/sdk",
+    "sdkVersionVerifiedByNpm": "2.7.0",
+    "apiPackage": "@ston-fi/api",
+    "apiPackageVersionVerifiedByNpm": "0.32.0"
+  },
+  "inputSource": null,
+  "issue_codes": [
+    "MISSING_INPUT"
+  ],
+  "issues": [
+    {
+      "code": "MISSING_INPUT",
+      "message": "Supply artifacts/m20f_stonfi_live_collector_input_template.json filled with final mainnet values."
+    }
+  ],
+  "simulation": null,
+  "sdkTxParams": null,
+  "decoded": null,
+  "m19eInput": null,
+  "m19eReport": null,
+  "outputs": {
+    "template": "artifacts/m20f_stonfi_live_collector_input_template.json",
+    "simulation": null,
+    "sdkTxParams": null,
+    "m19eInput": null
+  }
+}

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0d0f">
+    <meta name="color-scheme" content="dark">
+    <title>Platho</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./assets/platho-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "@noble/ciphers/": "./vendor/@noble/ciphers/",
+          "@noble/curves/": "./vendor/@noble/curves/",
+          "@noble/hashes/": "./vendor/@noble/hashes/",
+          "@noble/post-quantum/": "./vendor/@noble/post-quantum/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="app-shell" data-view="chats">
+      <aside class="sidebar" aria-label="Navigation">
+        <div class="brand">
+          <img class="brand-mark" src="./assets/platho-icon.svg" alt="" width="32" height="32">
+          <div>
+            <div class="brand-name">Platho</div>
+            <div class="network-pill">
+              <span class="status-dot"></span>
+              <span id="brandNetworkLabel">network</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="rail" aria-label="Primary">
+          <button class="rail-item is-active" type="button" data-tab="chats" aria-label="Chats" title="Chats">
+            <span class="icon icon-chat"></span>
+            <span>Chats</span>
+          </button>
+          <button class="rail-item" type="button" data-tab="public" aria-label="Public" title="Public">
+            <span class="icon icon-broadcast"></span>
+            <span>Public</span>
+          </button>
+          <button class="rail-item" type="button" data-tab="vault" aria-label="Vault" title="Vault">
+            <span class="icon icon-vault"></span>
+            <span>Vault</span>
+          </button>
+          <button class="rail-item" type="button" data-tab="profile" aria-label="Profile" title="Profile">
+            <span class="icon icon-user"></span>
+            <span>Profile</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <section class="list-pane view-panel is-active" data-panel="chats" aria-label="Chats">
+          <header class="pane-header">
+            <div>
+              <h1>Chats</h1>
+              <p id="chatCountLabel">threads</p>
+            </div>
+            <div class="header-actions">
+              <button class="icon-button" type="button" aria-label="Search" title="Search">
+                <span class="icon icon-search"></span>
+              </button>
+              <button class="icon-button accent" type="button" aria-label="New chat" title="New chat">
+                <span class="icon icon-plus"></span>
+              </button>
+            </div>
+          </header>
+
+          <div class="search-row">
+            <span class="icon icon-search"></span>
+            <input id="threadSearch" type="search" placeholder="Search threads" autocomplete="off">
+          </div>
+
+          <div class="thread-list" id="threadList"></div>
+        </section>
+
+        <section class="content-pane chat-pane view-panel is-active" data-panel="chats" aria-label="Conversation">
+          <header class="conversation-header">
+            <div class="avatar" id="activeAvatar" aria-hidden="true">A</div>
+            <div class="conversation-title">
+              <h2 id="activeTitle">Ari</h2>
+              <p id="activeSubtitle">sealed 2 min ago</p>
+            </div>
+            <div class="header-actions">
+              <button class="icon-button" type="button" aria-label="Call" title="Call">
+                <span class="icon icon-call"></span>
+              </button>
+              <button class="icon-button" type="button" aria-label="More" title="More">
+                <span class="icon icon-more"></span>
+              </button>
+            </div>
+          </header>
+
+          <div class="message-strip" id="messageStrip" aria-live="polite"></div>
+
+          <form class="composer" id="composer">
+            <button class="icon-button" type="button" aria-label="Attach" title="Attach">
+              <span class="icon icon-attach"></span>
+            </button>
+            <label class="sr-only" for="messageInput">Message</label>
+            <input id="messageInput" type="text" placeholder="Message" autocomplete="off">
+            <button class="send-button" type="submit" aria-label="Send" title="Send">
+              <span class="icon icon-send"></span>
+            </button>
+          </form>
+        </section>
+
+        <section class="content-pane public-pane view-panel" data-panel="public" aria-label="Public feed">
+          <header class="pane-header inline">
+            <div>
+              <h1>Public</h1>
+              <p id="publicSubtitle">capsules</p>
+            </div>
+            <button class="icon-button accent" type="button" aria-label="Publish" title="Publish">
+              <span class="icon icon-plus"></span>
+            </button>
+          </header>
+          <div class="public-feed" id="publicFeed"></div>
+        </section>
+
+        <section class="content-pane vault-pane view-panel" data-panel="vault" aria-label="Vault">
+          <header class="pane-header inline">
+            <div>
+              <h1>Vault</h1>
+              <p id="vaultSubtitle">account</p>
+            </div>
+            <button class="icon-button" type="button" aria-label="Refresh" title="Refresh">
+              <span class="icon icon-refresh"></span>
+            </button>
+          </header>
+
+          <div class="balance-grid" id="balanceGrid"></div>
+
+          <div class="action-grid" id="actionGrid"></div>
+
+          <div class="ledger" id="ledgerRows"></div>
+        </section>
+
+        <section class="content-pane profile-pane view-panel" data-panel="profile" aria-label="Profile">
+          <header class="pane-header inline">
+            <div>
+              <h1>Profile</h1>
+              <p id="profileHandle">@platho</p>
+            </div>
+            <div class="header-actions">
+              <div class="ton-connect-anchor" id="tonConnectButton"></div>
+              <button class="icon-button" type="button" aria-label="Settings" title="Settings">
+                <span class="icon icon-gear"></span>
+              </button>
+            </div>
+          </header>
+
+          <div class="identity-block">
+            <div class="avatar large" aria-hidden="true">P</div>
+            <div>
+              <h2 id="identityName">platho.ton</h2>
+              <p id="identitySubtitle">username NFT pending</p>
+            </div>
+          </div>
+
+          <div class="settings-list">
+            <button type="button"><span>Wallet</span><strong id="walletRuntimeLabel">wallet</strong></button>
+            <button type="button"><span>Encryption</span><strong id="encryptionStatus">checking</strong></button>
+            <button type="button"><span>Key suite</span><strong id="keySuiteStatus">hybrid-v1</strong></button>
+            <button type="button"><span>Key auth</span><strong id="keyAuthStatus">checking</strong></button>
+            <button type="button"><span>Vault draft</span><strong id="vaultDraftStatus">checking</strong></button>
+            <button type="button"><span>Capsule policy</span><strong id="capsulePolicyStatus">checking</strong></button>
+            <button type="button"><span>TON Connect</span><strong id="tonConnectStatus">not connected</strong></button>
+            <button type="button"><span>Wallet proof</span><strong id="walletProofStatus">checking</strong></button>
+            <button type="button"><span>Wallet key</span><strong id="walletKeyStatus">lookup required</strong></button>
+            <button type="button"><span>Vault record</span><strong id="vaultRecordStatus">checking</strong></button>
+            <button type="button"><span>Replay store</span><strong id="replayStoreStatus">checking</strong></button>
+            <button type="button"><span>Local state</span><strong id="localStateLabel">device</strong></button>
+            <button type="button"><span>Network</span><strong id="networkRuntimeLabel">network</strong></button>
+          </div>
+
+          <section class="transport-panel" aria-label="Transport">
+            <header class="transport-header">
+              <div>
+                <h2>Transport</h2>
+                <p id="transportStatus">checking</p>
+              </div>
+            </header>
+            <div class="transport-actions">
+              <button id="showKeyQrButton" type="button"><span class="icon icon-broadcast"></span>QR key</button>
+              <button id="copyKeyBundleButton" type="button"><span class="icon icon-attach"></span>Copy key</button>
+              <button id="exportKeyBundleButton" type="button"><span class="icon icon-up"></span>Save key</button>
+              <button id="shareCapsuleButton" type="button"><span class="icon icon-send"></span>Share capsule</button>
+              <button id="exportCapsuleButton" type="button"><span class="icon icon-down"></span>Save capsule</button>
+              <button id="importTransportButton" type="button"><span class="icon icon-attach"></span>Open file</button>
+            </div>
+            <div class="transport-stats">
+              <div><span>Peer</span><strong id="transportPeerStatus">none</strong></div>
+              <div><span>Outbox</span><strong id="transportOutboxStatus">0</strong></div>
+              <div><span>Inbox</span><strong id="transportInboxStatus">0</strong></div>
+              <div><span>Last</span><strong id="transportLastStatus">none</strong></div>
+            </div>
+            <div class="transport-share-panel">
+              <div class="transport-qr-output" id="transportQrOutput" aria-label="Transport QR"></div>
+              <textarea id="transportPackageText" rows="6" spellcheck="false" placeholder="Paste package JSON"></textarea>
+              <div class="transport-inline-actions">
+                <button id="copyTransportTextButton" type="button">Copy</button>
+                <button id="importTransportTextButton" type="button">Import text</button>
+                <button id="shareTransportTextButton" type="button">Share</button>
+              </div>
+            </div>
+            <input class="sr-only" id="transportFileInput" type="file" accept="application/json,.json,.platho">
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="./vendor/@tonconnect/ui/tonconnect-ui.min.js"></script>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

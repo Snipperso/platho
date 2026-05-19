@@ -1,0 +1,4 @@
+npm.cmd test
+
+Test Files  56 passed (56)
+Tests       214 passed (214)

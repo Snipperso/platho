@@ -1,0 +1,136 @@
+{
+  "milestone": "M19C_STONFI_ROUTE_FREEZE_GATE_LIVE_SAMPLE_HARNESS",
+  "status": "ROUTE_FREEZE_BLOCKED_UNTIL_REAL_VALUES_AND_LIVE_PROOFS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "official_source": {
+    "package": "@ston-fi/sdk",
+    "version": "2.7.0",
+    "repository": "https://github.com/ston-fi/sdk/tree/main/packages/sdk",
+    "dexExport": "@ston-fi/sdk/dex/v2_1",
+    "sourceFiles": [
+      "src/contracts/dex/v2_1/router/BaseRouterV2_1.ts",
+      "src/contracts/dex/v2_1/constants.ts",
+      "src/contracts/pTON/v2_1/PtonV2_1.ts",
+      "src/contracts/pTON/v2_1/constants.ts"
+    ]
+  },
+  "freeze_gate": {
+    "requires_status": "FINAL_ROUTE_FREEZE_CANDIDATE",
+    "requires_sdk_sample_match": true,
+    "requires_live_quote": true,
+    "requires_live_refund_excess_proofs": true,
+    "requires_code_hash_identity": true,
+    "required_success_signal": "ATH receipt by official BuybackBurn ATH wallet, then ATHBurnFinalized from ATH Master",
+    "forbidden_success_signal": "router/pool payload claim without ATH receipt and burn finalization"
+  },
+  "candidate_fixture_addresses": {
+    "athMasterAddress": "0:331aa54c919ef6ac7a45577ac11e4e5209945c0b29bb087d7890eb7e8bce5b6f",
+    "buybackBurnAddress": "0:d61f33ad43d233cb55769bd01a887fa0e5e23f543063708ff3b03f59f23eecdc",
+    "buybackBurnOfficialAthWalletAddress": "0:899540da68f11200896df20f0cae4ca77e5ced3753a3756b0f7689a5db29890c",
+    "stonfiRouterAddress": "0:072b70e74cef314340ce386cf15e1f501d5ebc17126a4550948d2aaf4a869021",
+    "stonfiPoolAddressTonAth": "0:0714490baeb2fba1e2d9e498c66ef426e95ed01f8692acb877733c0a649a0cee",
+    "stonfiPtonWalletAddress": "0:f961caabda95ef72c9a41f54073f62340ddec44125be9f6d2334dbbcf09c53ae",
+    "askJettonWalletAddress": "0:d82438bca9e5d9d89ae94e3b13f7c4e05dccc42c042b0e2edc5f8cf53cb9684d"
+  },
+  "current_draft_candidate_validation": {
+    "freeze_ready": false,
+    "issue_codes": [
+      "MISSING_SDKORAPITXPARAMSCAPTURED",
+      "MISSING_LIVEQUOTECAPTURED",
+      "MISSING_SUCCESSEXCESSESADDRESSOBSERVEDASBUYBACKBURN",
+      "MISSING_MINOUTFAILUREREFUNDOBSERVEDASBUYBACKBURN",
+      "MISSING_PTONREFUNDOBSERVEDASBUYBACKBURN",
+      "MISSING_BOUNCEORFAILUREBEHAVIORDOCUMENTED",
+      "STATUS_NOT_FINAL_ROUTE_FREEZE_CANDIDATE"
+    ],
+    "issues": [
+      {
+        "code": "MISSING_SDKORAPITXPARAMSCAPTURED",
+        "message": "Live proof is required: sdkOrApiTxParamsCaptured"
+      },
+      {
+        "code": "MISSING_LIVEQUOTECAPTURED",
+        "message": "Live proof is required: liveQuoteCaptured"
+      },
+      {
+        "code": "MISSING_SUCCESSEXCESSESADDRESSOBSERVEDASBUYBACKBURN",
+        "message": "Live proof is required: successExcessesAddressObservedAsBuybackBurn"
+      },
+      {
+        "code": "MISSING_MINOUTFAILUREREFUNDOBSERVEDASBUYBACKBURN",
+        "message": "Live proof is required: minOutFailureRefundObservedAsBuybackBurn"
+      },
+      {
+        "code": "MISSING_PTONREFUNDOBSERVEDASBUYBACKBURN",
+        "message": "Live proof is required: ptonRefundObservedAsBuybackBurn"
+      },
+      {
+        "code": "MISSING_BOUNCEORFAILUREBEHAVIORDOCUMENTED",
+        "message": "Live proof is required: bounceOrFailureBehaviorDocumented"
+      },
+      {
+        "code": "STATUS_NOT_FINAL_ROUTE_FREEZE_CANDIDATE",
+        "message": "Route freeze candidate status must be FINAL_ROUTE_FREEZE_CANDIDATE"
+      }
+    ],
+    "rebuilt_hashes": {
+      "ptonTransferBodyHash": "e1f95e5c9dd2f7702d31741f1423a1ac68fccafc9b9912b911ca9464e0441f9a",
+      "samplePtonTransferBodyHash": "e1f95e5c9dd2f7702d31741f1423a1ac68fccafc9b9912b911ca9464e0441f9a",
+      "stonfiSwapForwardPayloadHash": "19f5b0efebbe4c5256922bcdbbd63887fe9cafa095b25ca365fd7bf495438aff",
+      "sampleStonfiSwapForwardPayloadHash": "19f5b0efebbe4c5256922bcdbbd63887fe9cafa095b25ca365fd7bf495438aff"
+    },
+    "decoded": {
+      "ptonTransfer": {
+        "op": "0x01f3835d",
+        "queryId": "5786071451510446528",
+        "tonAmount": "50000000000",
+        "refundAddress": "0:d61f33ad43d233cb55769bd01a887fa0e5e23f543063708ff3b03f59f23eecdc",
+        "hasForwardPayload": true,
+        "forwardPayloadHash": "19f5b0efebbe4c5256922bcdbbd63887fe9cafa095b25ca365fd7bf495438aff"
+      },
+      "stonfiSwapPayload": {
+        "op": "0x6664de2a",
+        "askJettonWalletAddress": "0:d82438bca9e5d9d89ae94e3b13f7c4e05dccc42c042b0e2edc5f8cf53cb9684d",
+        "refundAddress": "0:d61f33ad43d233cb55769bd01a887fa0e5e23f543063708ff3b03f59f23eecdc",
+        "excessesAddress": "0:d61f33ad43d233cb55769bd01a887fa0e5e23f543063708ff3b03f59f23eecdc",
+        "deadline": "1800300000",
+        "details": {
+          "minAskAmount": "950000000000000",
+          "receiverAddress": "0:899540da68f11200896df20f0cae4ca77e5ced3753a3756b0f7689a5db29890c",
+          "dexCustomPayloadForwardGasAmount": "0",
+          "hasDexCustomPayload": false,
+          "refundForwardGasAmount": "0",
+          "hasRefundPayload": false,
+          "referralValue": "10",
+          "referralAddress": null
+        }
+      }
+    }
+  },
+  "required_before_final_route_freeze": [
+    "ATH_MASTER_ADDRESS final deployment address",
+    "BuybackBurn final StateInit address",
+    "BuybackBurn official ATH wallet final address",
+    "STONFI_ROUTER_ADDRESS selected production v2.1 router address",
+    "STONFI_POOL_ADDRESS_TON_ATH selected production TON/ATH pool address",
+    "STONFI_PTON_ADDRESS / router pTON wallet address for selected router",
+    "STONFI_VAULT_ADDRESS and code hash if selected route uses a vault",
+    "Router/pool/pTON code hashes from live chain state or official source",
+    "BUYBACK_MIN_ATH_OUT_PER_50_TON from liquidity/route tests",
+    "Official SDK/API generated tx params for real 50 TON -> ATH route",
+    "Manual payload builder hash equals official SDK/API pTON body hash",
+    "Manual swap forward payload hash equals official SDK/API forward payload hash",
+    "Live quote proof for selected route",
+    "Successful swap excesses_address proof returns to BuybackBurn",
+    "min_out failure refund proof returns to BuybackBurn",
+    "pTON refund proof returns to BuybackBurn",
+    "Bounce/failure behavior documented for selected route"
+  ],
+  "constants": {
+    "pton_op_ton_transfer": "0x01f3835d",
+    "dex_op_swap": "0x6664de2a",
+    "buyback_offer_amount_nanotons": "50000000000",
+    "conservative_total_send_value_nanotons": "51050000000"
+  },
+  "route_freeze_ready": false
+}

@@ -1,0 +1,6 @@
+tests/username-registry-paid-mint.test.ts
+tests/username-registry-prune-pending-mint.test.ts
+tests/username-registry-refund-flush.test.ts
+tests/vault-ath-integration.test.ts
+tests/vault-external-session-gate.test.ts
+tests/vault-key-records.test.ts
