@@ -16,10 +16,11 @@ Scope: static and manifest-level conformance checks over the implemented M15 sub
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: 7fa3412db904367ed6e6a09411393e18098810308d69c645480efd223b0cc42b
+- Hash: e7f05aaab30f4791444c54c549c755264d941b0ab4ae8fb5378e4afdac3e521a
 
 ## Remaining final-genesis blockers
 
+- ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT
 - BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE
 - STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED
 - FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES
@@ -29,11 +30,11 @@ Scope: static and manifest-level conformance checks over the implemented M15 sub
 
 | Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects |
 |---|---:|---:|---:|---|
-| ATHMaster.tact | 58 | 2 | 0 | true |
-| ATHWallet.tact | 323 | 7 | 4 | true |
+| ATHMaster.tact | 92 | 3 | 1 | true |
+| ATHWallet.tact | 465 | 10 | 6 | true |
 | BuybackBurn.tact | 475 | 13 | 2 | true |
 | CapsuleHub.tact | 399 | 8 | 1 | true |
 | FeeAccumulator.tact | 99 | 5 | 1 | true |
 | UsernameNFTItem.tact | 48 | 3 | 0 | true |
-| UsernameRegistry.tact | 724 | 14 | 3 | true |
+| UsernameRegistry.tact | 717 | 14 | 3 | true |
 | Vault.tact | 1340 | 20 | 3 | true |

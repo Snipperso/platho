@@ -35,16 +35,6 @@ message(0x3A12D1AD) SealGenesis {
     deployment_manifest_hash: Int as uint256;
 }
 
-// This is the ATH official-wallet notification body consumed by UsernameRegistry.
-// The final field is raw username bytes stored in the remaining body slice.
-message(0x89129D5F) AthTransferNotificationMintUsername {
-    query_id: Int as uint64;
-    amount: Int as uint128;
-    owner_wallet: Address;
-    username_len: Int as uint8;
-    username: Slice as remaining;
-}
-
 message(0x60A9BDDB) FlushTreasuryAthDue {
     query_id: Int as uint64;
 }

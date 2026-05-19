@@ -16,12 +16,18 @@ PROGRAM{
   DECLPROC $AthTransferNotification$_store
   DECLPROC $AthTransferNotification$_store_cell
   DECLPROC $AthTransferNotification$_load_bounced
+  DECLPROC $AthTransferNotificationMintUsername$_store
+  DECLPROC $AthTransferNotificationMintUsername$_store_cell
+  DECLPROC $AthTransferNotificationMintUsername$_load_bounced
   DECLPROC $ATHInternalTransfer$_store
   DECLPROC $ATHInternalTransfer$_store_cell
   DECLPROC $ATHInternalTransfer$_load_bounced
   DECLPROC $ATHInternalTransferWithNotify$_store
   DECLPROC $ATHInternalTransferWithNotify$_store_cell
   DECLPROC $ATHInternalTransferWithNotify$_load_bounced
+  DECLPROC $ATHInternalTransferMintUsername$_store
+  DECLPROC $ATHInternalTransferMintUsername$_store_cell
+  DECLPROC $ATHInternalTransferMintUsername$_load_bounced
   DECLPROC $ATHTransferAck$_store
   DECLPROC $ATHTransferAck$_store_cell
   DECLPROC $ATHTransferFailed$_store
@@ -47,19 +53,22 @@ PROGRAM{
   DECLPROC $ATHWallet$_init_child
   DECLPROC $ATHWallet$_fun_derive_wallet_address
   DECLPROC $ATHWallet$_fun_compute_notification_id
+  DECLPROC $SendParameters$_constructor_to_value_bounce_mode_code_data_body
+  DECLPROC $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
+  DECLPROC $ATHWallet$_fun_refund_bounced_notification
   DECLPROC $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address
   DECLPROC $ATHWallet$_fun_get_wallet_data
   DECLPROC $MessageParameters$_constructor_to_value_mode_bounce_body
   DECLPROC $ATHBurnFailed$_constructor_query_id_amount
   DECLPROC $ATHTransferFailed$_constructor_query_id_amount
-  DECLPROC $SendParameters$_constructor_to_value_bounce_mode_code_data_body
-  DECLPROC $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
   DECLPROC $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination
   DECLPROC $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address
   DECLPROC $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value
+  DECLPROC $ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username
   DECLPROC $ATHTransferAck$_constructor_query_id_amount
   DECLPROC $PendingAthTransferNotification$_constructor_sender_owner_amount
   DECLPROC $AthTransferNotification$_constructor_query_id_amount_sender_wallet
+  DECLPROC $AthTransferNotificationMintUsername$_constructor_query_id_amount_owner_wallet_username_len_username
   97026 DECLMETHOD %get_wallet_data
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
@@ -183,6 +192,28 @@ PROGRAM{
     128 LDU
     -ROT
   }>
+  $AthTransferNotificationMintUsername$_store PROCINLINE:<{
+    2299698527 PUSHINT
+    s0 s6 XCHG2
+    32 STU
+    s1 s4 XCHG
+    64 STU
+    s1 s2 XCHG
+    128 STU
+    STSLICE
+    8 STU
+    STSLICE
+  }>
+  $AthTransferNotificationMintUsername$_store_cell PROCINLINE:<{
+    5 -ROLL
+    $AthTransferNotificationMintUsername$_store INLINECALLDICT
+    ENDC
+  }>
+  $AthTransferNotificationMintUsername$_load_bounced PROCINLINE:<{
+    64 LDU
+    128 LDU
+    -ROT
+  }>
   $ATHInternalTransfer$_store PROCINLINE:<{
     1096042514 PUSHINT
     s0 s5 XCHG2
@@ -226,6 +257,31 @@ PROGRAM{
     ENDC
   }>
   $ATHInternalTransferWithNotify$_load_bounced PROCINLINE:<{
+    64 LDU
+    128 LDU
+    -ROT
+  }>
+  $ATHInternalTransferMintUsername$_store PROCINLINE:<{
+    1096042519 PUSHINT
+    s0 s8 XCHG2
+    32 STU
+    s1 s6 XCHG
+    64 STU
+    s1 s4 XCHG
+    128 STU
+    s1 s2 XCHG
+    STSLICE
+    STSLICE
+    128 STU
+    8 STU
+    STSLICE
+  }>
+  $ATHInternalTransferMintUsername$_store_cell PROCINLINE:<{
+    7 -ROLL
+    $ATHInternalTransferMintUsername$_store INLINECALLDICT
+    ENDC
+  }>
+  $ATHInternalTransferMintUsername$_load_bounced PROCINLINE:<{
     64 LDU
     128 LDU
     -ROT
@@ -419,6 +475,131 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $SendParameters$_constructor_to_value_bounce_mode_code_data_body PROCINLINE:<{
+    s3 s6 XCHG
+    s5 s1 s5 XCHG3
+    s3 s4 XCHG2
+  }>
+  $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination PROCINLINE:<{
+  }>
+  $ATHWallet$_fun_refund_bounced_notification PROCREF:<{
+    14330 PUSHINT
+    OVER
+    0 GTINT
+    THROWANYIFNOT
+    14331 PUSHINT
+    s7 s1 PUSH2
+    GEQ
+    THROWANYIFNOT
+    s3 PUSH
+    257 PUSHINT
+    s3 PUSH
+    __tact_dict_get_int_cell INLINECALLDICT
+    $PendingAthTransferNotification$_load_opt INLINECALLDICT
+    14332 PUSHINT
+    OVER
+    ISNULL
+    NOT
+    THROWANYIFNOT
+    $PendingAthTransferNotification$_not_null INLINECALLDICT
+    14333 PUSHINT
+    s1 s3 XCPU
+    EQUAL
+    THROWANYIFNOT
+    s7 s1 XCPU
+    SUB
+    s2 s4 PUXC
+    257 PUSHINT
+        DICTIDEL
+    DROP
+    s3 s6 XCHG
+    s5 s0 s6 XCHG3
+    s7 PUSH
+    $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
+    0 PUSHINT
+    s9 s4 PUSH2
+    $ATHWallet$_init_child INLINECALLDICT
+    0 PUSHINT
+    TRUE
+    s10 s11 s8 XC2PU
+    64 PUSHINT
+    s0 s14 XCHG
+    $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination INLINECALLDICT
+    NEWC
+    $ATHInternalTransfer$_store_cell INLINECALLDICT
+    s3 s6 XCHG
+    s5 s9 XCHG
+    s4 s10 XCHG
+    s3 s11 XCHG
+    $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
+        NEWC
+        b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+        1 STI               // store `bounce`
+        b{000} STSLICECONST // store bounced = false and src = addr_none
+        STSLICE             // store `to`
+        SWAP
+        STGRAMS             // store `value`
+        105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+        STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+        // → Stack state
+        // s0: Builder
+        // s1: `data`
+        // s2: `code`
+        // s3: `body`
+        // s4: `mode`
+        // Group 2: Placing the Builder after code and data, then checking those for nullability
+        s2 XCHG0
+        DUP2
+        ISNULL
+        SWAP
+        ISNULL
+        AND
+        // → Stack state
+        // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+        // s1: `code`
+        // s2: `data`
+        // s3: Builder
+        // s4: `body`
+        // s5: `mode`
+        // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+        <{
+            DROP2 // drop `data` and `code`, since either of those is null
+            b{0} STSLICECONST
+        }> PUSHCONT
+        // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+        <{
+            // _ split_depth:(Maybe (## 5))
+            //   special:(Maybe TickTock)
+            //   code:(Maybe ^Cell)
+            //   data:(Maybe ^Cell)
+            //   library:(Maybe ^Cell)
+            // = StateInit;
+            ROT                // place message Builder on top
+            b{10} STSLICECONST // store Maybe = true, Either = false
+            // Start composing inlined StateInit
+            b{00} STSLICECONST // store split_depth and special first
+            STDICT             // store code
+            STDICT             // store data
+            b{0} STSLICECONST  // store library
+        }> PUSHCONT
+        // Group 3: IFELSE that does the branching shown above
+        IFELSE
+        // → Stack state
+        // s0: Builder
+        // s1: null or StateInit
+        // s2: `body`
+        // s3: `mode`
+        // Group 4: Finalizing the message
+        STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+        ENDC
+        // → Stack state
+        // s0: Cell
+        // s1: `mode`
+        // Group 5: Sending the message, with `mode` on top
+        SWAP
+        SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+    s4 s4 s3 XCHG3
+  }>
   $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address PROCINLINE:<{
   }>
   $ATHWallet$_fun_get_wallet_data PROCREF:<{
@@ -433,24 +614,21 @@ PROGRAM{
   }>
   $ATHTransferFailed$_constructor_query_id_amount PROCINLINE:<{
   }>
-  $SendParameters$_constructor_to_value_bounce_mode_code_data_body PROCINLINE:<{
-    s3 s6 XCHG
-    s5 s1 s5 XCHG3
-    s3 s4 XCHG2
-  }>
-  $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination PROCINLINE:<{
-  }>
   $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination PROCINLINE:<{
   }>
   $ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address PROCINLINE:<{
   }>
   $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value PROCINLINE:<{
   }>
+  $ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username PROCINLINE:<{
+  }>
   $ATHTransferAck$_constructor_query_id_amount PROCINLINE:<{
   }>
   $PendingAthTransferNotification$_constructor_sender_owner_amount PROCINLINE:<{
   }>
   $AthTransferNotification$_constructor_query_id_amount_sender_wallet PROCINLINE:<{
+  }>
+  $AthTransferNotificationMintUsername$_constructor_query_id_amount_owner_wallet_username_len_username PROCINLINE:<{
   }>
   %get_wallet_data PROC:<{
     $ATHWallet$_contract_load INLINECALLDICT
@@ -628,61 +806,31 @@ PROGRAM{
         s0 s3 s4 XCHG3
         $ATHWallet$_contract_store INLINECALLDICT
       }>
-      1194171773 PUSHINT
+      DUP
+      1096042519 PUSHINT
       EQUAL
       IFJMP:<{
-        $AthTransferNotification$_load_bounced INLINECALLDICT
+        DROP
+        $ATHInternalTransferMintUsername$_load_bounced INLINECALLDICT
         s2 POP
-        14330 PUSHINT
+        14520 PUSHINT
         s2 PUSH
         0 GTINT
         THROWANYIFNOT
-        14331 PUSHINT
-        s5 s2 PUSH2
-        GEQ
-        THROWANYIFNOT
-        s5 PUSH
-        257 PUSHINT
-        s2 PUSH
-        __tact_dict_get_int_cell INLINECALLDICT
-        $PendingAthTransferNotification$_load_opt INLINECALLDICT
-        14332 PUSHINT
-        OVER
-        ISNULL
-        NOT
-        THROWANYIFNOT
-        $PendingAthTransferNotification$_not_null INLINECALLDICT
-        14333 PUSHINT
-        s1 s4 XCPU
-        EQUAL
-        THROWANYIFNOT
-        s5 s2 XCPU
-        SUB
-        s1 s6 PUXC
-        257 PUSHINT
-            DICTIDEL
-        DROP
-        s4 s6 XCHG
-        s3 s6 XCHG
-        s6 s0 s7 XCHG3
-        s5 PUSH
-        $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
+        s4 s1 XCPU
+        ADD
         0 PUSHINT
-        s7 s4 PUSH2
-        $ATHWallet$_init_child INLINECALLDICT
-        0 PUSHINT
-        TRUE
-        s12 s11 s8 XC2PU
         64 PUSHINT
-        s0 s12 XCHG
-        $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination INLINECALLDICT
+        s0 s6 XCHG
+        TRUE
+        s0 s4 XCHG
+        $ATHTransferFailed$_constructor_query_id_amount INLINECALLDICT
         NEWC
-        $ATHInternalTransfer$_store_cell INLINECALLDICT
-        s3 s6 XCHG
-        s5 s11 XCHG
-        s4 s10 XCHG
-        s3 s9 XCHG
-        $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
+        $ATHTransferFailed$_store_cell INLINECALLDICT
+        s5 PUSH
+        s3 s1 s4 XCHG3
+        s7 s0 s0 XCHG3
+        $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
             NEWC
             b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
             1 STI               // store `bounce`
@@ -690,66 +838,41 @@ PROGRAM{
             STSLICE             // store `to`
             SWAP
             STGRAMS             // store `value`
-            105 PUSHINT         // 1 + 4 + 4 + 64 + 32
-            STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
             // → Stack state
             // s0: Builder
-            // s1: `data`
-            // s2: `code`
-            // s3: `body`
-            // s4: `mode`
-            // Group 2: Placing the Builder after code and data, then checking those for nullability
-            s2 XCHG0
-            DUP2
-            ISNULL
-            SWAP
-            ISNULL
-            AND
-            // → Stack state
-            // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
-            // s1: `code`
-            // s2: `data`
-            // s3: Builder
-            // s4: `body`
-            // s5: `mode`
-            // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
-            <{
-                DROP2 // drop `data` and `code`, since either of those is null
-                b{0} STSLICECONST
-            }> PUSHCONT
-            // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
-            <{
-                // _ split_depth:(Maybe (## 5))
-                //   special:(Maybe TickTock)
-                //   code:(Maybe ^Cell)
-                //   data:(Maybe ^Cell)
-                //   library:(Maybe ^Cell)
-                // = StateInit;
-                ROT                // place message Builder on top
-                b{10} STSLICECONST // store Maybe = true, Either = false
-                // Start composing inlined StateInit
-                b{00} STSLICECONST // store split_depth and special first
-                STDICT             // store code
-                STDICT             // store data
-                b{0} STSLICECONST  // store library
-            }> PUSHCONT
-            // Group 3: IFELSE that does the branching shown above
-            IFELSE
-            // → Stack state
-            // s0: Builder
-            // s1: null or StateInit
-            // s2: `body`
-            // s3: `mode`
-            // Group 4: Finalizing the message
-            STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+            // s1: `body`
+            // s2: `mode`
+            STDICT
             ENDC
-            // → Stack state
-            // s0: Cell
-            // s1: `mode`
-            // Group 5: Sending the message, with `mode` on top
             SWAP
-            SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-        s4 s3 XCHG2
+            SENDRAWMSG
+        s0 s3 s4 XCHG3
+        $ATHWallet$_contract_store INLINECALLDICT
+      }>
+      DUP
+      1194171773 PUSHINT
+      EQUAL
+      IFJMP:<{
+        DROP
+        $AthTransferNotification$_load_bounced INLINECALLDICT
+        s2 POP
+        s4 s6 XCHG
+        s3 s5 XCHG
+        s4 s0 s0 XCHG3
+        $ATHWallet$_fun_refund_bounced_notification INLINECALLDICT
+        $ATHWallet$_contract_store INLINECALLDICT
+      }>
+      2299698527 PUSHINT
+      EQUAL
+      IFJMP:<{
+        $AthTransferNotificationMintUsername$_load_bounced INLINECALLDICT
+        s2 POP
+        s4 s6 XCHG
+        s3 s5 XCHG
+        s4 s0 s0 XCHG3
+        $ATHWallet$_fun_refund_bounced_notification INLINECALLDICT
         $ATHWallet$_contract_store INLINECALLDICT
       }>
       6 BLKDROP
@@ -1173,6 +1296,152 @@ PROGRAM{
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
+    1096042518 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s4 XCHG
+      64 LDU
+      128 LDU
+      LDMSGADDR
+      LDMSGADDR
+      128 LDU
+      8 LDU
+      14500 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s10 PUSH
+      SDEQ
+      THROWANYIFNOT
+      14501 PUSHINT
+      s4 s9 PUSH2
+      SDEQ
+      THROWANYIFNOT
+      14502 PUSHINT
+      s6 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      14503 PUSHINT
+      s3 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      14504 PUSHINT
+      s10 s6 PUSH2
+      GEQ
+      THROWANYIFNOT
+      14505 PUSHINT
+      s3 PUSH
+      30000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      14506 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s4 PUSH
+      1000000 PUSHINT
+      ADD
+      2000000 PUSHINT
+      ADD
+      GEQ
+      THROWANYIFNOT
+      s9 s5 XCPU
+      SUB
+      s0 s4 XCHG
+      s3 s8 XCHG
+      s7 s10 s11 XCHG3
+      s11 PUSH
+      $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
+      0 PUSHINT
+      s0 s13 s4 XC2PU
+      $ATHWallet$_init_child INLINECALLDICT
+      s8 s7 s0 XCHG3
+      0 PUSHINT
+      TRUE
+      64 PUSHINT
+      s8 PUSH
+      s0 s4 XCHG
+      s3 s14 XCHG
+      s2 s13 XCHG
+      s1 16 s() XCHG
+      s0 s15 XCHG
+      $ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username INLINECALLDICT
+      NEWC
+      $ATHInternalTransferMintUsername$_store_cell INLINECALLDICT
+      s6 s11 XCHG
+      s5 s8 XCHG
+      s4 s7 XCHG
+      s3 s10 XCHG
+      s8 s9 s0 XCHG3
+      $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+      s2 s4 XCHG2
+      $ATHWallet$_contract_store INLINECALLDICT
+    }>
+    OVER
     1096042514 PUSHINT
     EQUAL
     IFJMP:<{
@@ -1380,6 +1649,143 @@ PROGRAM{
           SWAP
           SENDRAWMSG
       s1 s3 s4 XCHG3
+      $ATHWallet$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1096042519 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s4 XCHG
+      64 LDU
+      128 LDU
+      LDMSGADDR
+      LDMSGADDR
+      128 LDU
+      8 LDU
+      14510 PUSHINT
+      s6 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      14511 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s4 s11 XCHG
+      s3 s10 XCHG
+      s9 s12 s13 XCHG3
+      s6 PUSH
+      $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
+      s1 s14 XCHG
+      SDEQ
+      s1 s12 XCHG
+      THROWANYIFNOT
+      14512 PUSHINT
+      s10 PUSH
+      0 GTINT
+      THROWANYIFNOT
+      14513 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s11 PUSH
+      1000000 PUSHINT
+      ADD
+      2000000 PUSHINT
+      ADD
+      GEQ
+      THROWANYIFNOT
+      14514 PUSHINT
+      s11 PUSH
+      257 PUSHINT
+      s9 PUSH
+      __tact_dict_exists_int INLINECALLDICT
+      NOT
+      THROWANYIFNOT
+      14515 PUSHINT
+      s10 PUSH
+      30000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s0 s1 s4 XCHG3
+      s3 s11 XCHG2
+      s10 s0 s11 XC2PU
+      s7 PUSH
+      $ATHWallet$_fun_compute_notification_id INLINECALLDICT
+      14516 PUSHINT
+      257 PUSHINT
+      s3 s0 s2 PUXC2
+      __tact_dict_exists_int INLINECALLDICT
+      NOT
+      THROWANYIFNOT
+      s4 s5 XCPU
+      ADD
+      257 PUSHINT
+      s12 s6 PUSH2
+      $PendingAthTransferNotification$_constructor_sender_owner_amount INLINECALLDICT
+      NEWC
+      $PendingAthTransferNotification$_store_cell INLINECALLDICT
+      s8 PUSH
+      s3 s4 XCHG
+      SWAP
+      __tact_dict_set_int_cell INLINECALLDICT
+      0 PUSHINT
+      TRUE
+      s8 PUSH
+      s3 s8 XCPU
+      s15 s1 s3 XCHG3
+      s12 s11 XCHG2
+      $AthTransferNotificationMintUsername$_constructor_query_id_amount_owner_wallet_username_len_username INLINECALLDICT
+      NEWC
+      $AthTransferNotificationMintUsername$_store_cell INLINECALLDICT
+      s3 PUSH
+      s3 s10 XCHG
+      s8 s12 s12 XCHG3
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      1000000 PUSHINT
+      0 PUSHINT
+      s0 s4 XCHG
+      FALSE
+      s0 s4 XCHG
+      $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
+      NEWC
+      $ATHTransferAck$_store_cell INLINECALLDICT
+      s4 s8 XCHG
+      s8 s3 s0 XCHG3
+      $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s0 s4 XCHG
+      s0 s3 XCHG
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER

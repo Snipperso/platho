@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: UsernameRegistry
-BoC Size: 11995 bytes
+BoC Size: 12752 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 53
+Total structures: 55
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -97,6 +97,10 @@ Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_wallet
 TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 = AthTransferNotificationAck`
 Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128}`
 
+### AthTransferNotificationMintUsername
+TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
+Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+
 ### ATHTransferRequest
 TL-B: `ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest`
 Signature: `ATHTransferRequest{query_id:uint64,amount:uint128,recipient:address,response_destination:address}`
@@ -105,6 +109,10 @@ Signature: `ATHTransferRequest{query_id:uint64,amount:uint128,recipient:address,
 TL-B: `ath_transfer_request_with_notify#41544814 query_id:uint64 amount:uint128 recipient:address response_destination:address notify_destination:address notify_value:uint128 = ATHTransferRequestWithNotify`
 Signature: `ATHTransferRequestWithNotify{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_destination:address,notify_value:uint128}`
 
+### ATHTransferRequestMintUsername
+TL-B: `ath_transfer_request_mint_username#41544816 query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 username_len:uint8 username:remainder<slice> = ATHTransferRequestMintUsername`
+Signature: `ATHTransferRequestMintUsername{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_value:uint128,username_len:uint8,username:remainder<slice>}`
+
 ### ATHInternalTransfer
 TL-B: `ath_internal_transfer#41544812 query_id:uint64 amount:uint128 sender_owner:address response_destination:address = ATHInternalTransfer`
 Signature: `ATHInternalTransfer{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address}`
@@ -112,6 +120,10 @@ Signature: `ATHInternalTransfer{query_id:uint64,amount:uint128,sender_owner:addr
 ### ATHInternalTransferWithNotify
 TL-B: `ath_internal_transfer_with_notify#41544815 query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_destination:address notify_value:uint128 = ATHInternalTransferWithNotify`
 Signature: `ATHInternalTransferWithNotify{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_destination:address,notify_value:uint128}`
+
+### ATHInternalTransferMintUsername
+TL-B: `ath_internal_transfer_mint_username#41544817 query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 username_len:uint8 username:remainder<slice> = ATHInternalTransferMintUsername`
+Signature: `ATHInternalTransferMintUsername{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_value:uint128,username_len:uint8,username:remainder<slice>}`
 
 ### ATHTransferAck
 TL-B: `ath_transfer_ack#41544811 query_id:uint64 amount:uint128 = ATHTransferAck`
@@ -140,10 +152,6 @@ Signature: `BindOfficialAthWallet{deployment_manifest_hash:uint256,official_ath_
 ### SealGenesis
 TL-B: `seal_genesis#3a12d1ad deployment_manifest_hash:uint256 = SealGenesis`
 Signature: `SealGenesis{deployment_manifest_hash:uint256}`
-
-### AthTransferNotificationMintUsername
-TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
-Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### FlushTreasuryAthDue
 TL-B: `flush_treasury_ath_due#60a9bddb query_id:uint64 = FlushTreasuryAthDue`

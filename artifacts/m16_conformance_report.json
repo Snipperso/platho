@@ -13,17 +13,17 @@
   "per_contract": [
     {
       "contract": "ATHMaster.tact",
-      "non_comment_lines": 58,
-      "receive_handlers": 2,
-      "bounced_handlers": 0,
+      "non_comment_lines": 92,
+      "receive_handlers": 3,
+      "bounced_handlers": 1,
       "forbidden_hits": [],
       "empty_fallback_rejects": true
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 323,
-      "receive_handlers": 7,
-      "bounced_handlers": 4,
+      "non_comment_lines": 465,
+      "receive_handlers": 10,
+      "bounced_handlers": 6,
       "forbidden_hits": [],
       "empty_fallback_rejects": true
     },
@@ -61,7 +61,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 724,
+      "non_comment_lines": 717,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -78,18 +78,18 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "33e4c62fa48e4f6d8b3b93a00e025485c18a6b81efcd055768508c215b88cfbf",
-      "pinned": "33e4c62fa48e4f6d8b3b93a00e025485c18a6b81efcd055768508c215b88cfbf",
+      "built": "afb108307756106649dbfe5c9ccbe6ccdc058751c48dee0139f2c4a9814098ee",
+      "pinned": "afb108307756106649dbfe5c9ccbe6ccdc058751c48dee0139f2c4a9814098ee",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "a4ca0258ce36f72c4bab250c5ead87bc6db1b0ebe3832bad8c6961efaaedc730",
-      "pinned": "a4ca0258ce36f72c4bab250c5ead87bc6db1b0ebe3832bad8c6961efaaedc730",
+      "built": "6056df754b3495a2175ab38a840c55716127d1c9f58d2a63a97002a9af15d4ea",
+      "pinned": "6056df754b3495a2175ab38a840c55716127d1c9f58d2a63a97002a9af15d4ea",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24",
-      "pinned": "95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24",
+      "built": "03195e5c6813bc213db2df5976b241d606fc9304647684cf83134efa88d6083b",
+      "pinned": "03195e5c6813bc213db2df5976b241d606fc9304647684cf83134efa88d6083b",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -108,13 +108,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "6cc5a428588f43a706047ea2ae6595726596b17ee54c8703cdc9c8239a6d0742",
-      "pinned": "6cc5a428588f43a706047ea2ae6595726596b17ee54c8703cdc9c8239a6d0742",
+      "built": "35009f377483b91fe2f5ee638e1307f0e127fbfde4d81a040638d5c93ce2fa47",
+      "pinned": "35009f377483b91fe2f5ee638e1307f0e127fbfde4d81a040638d5c93ce2fa47",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "ec268816c42d788b55bd171a32b81d40073cb7f242c48138d521185508914353",
-      "pinned": "ec268816c42d788b55bd171a32b81d40073cb7f242c48138d521185508914353",
+      "built": "e87cb9e6d7c31b4011d262718f4d5fe2085e10efe42c2aefcfb5c40ebb583421",
+      "pinned": "e87cb9e6d7c31b4011d262718f4d5fe2085e10efe42c2aefcfb5c40ebb583421",
       "match": true
     }
   },
@@ -122,8 +122,9 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "7fa3412db904367ed6e6a09411393e18098810308d69c645480efd223b0cc42b",
+    "manifest_hash_hex": "e7f05aaab30f4791444c54c549c755264d941b0ab4ae8fb5378e4afdac3e521a",
     "blockers_before_final_genesis": [
+      "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
       "STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
