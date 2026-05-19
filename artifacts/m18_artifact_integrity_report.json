@@ -205,7 +205,7 @@
     "tests\\static-web-deploy-prep.test.ts": "8bc7c9e4aa4b9a5028f8e8a1b18ddd5c71de748aa3784a166baa2d69c5da921b",
     "tests\\transport-share.test.ts": "ccd1f7e679c61ebfca722d2b694f88653574ffcb49119508fbd8dec5072bd1e3",
     "tests\\username-nft-item.test.ts": "84f90a187afe4d982a43f06e43649d88dfc5b4921cdd40f5d2b463e6da86b506",
-    "tests\\username-registry-ath-wallet-integration.test.ts": "f25f54529b7dbea8cb6ec2f2f48fbc65648983fb67b247eac238717e56eb84e3",
+    "tests\\username-registry-ath-wallet-integration.test.ts": "d9de6317058da6f90841d42a85dd688fc5ec266be0ab459e5fa0f9c937bd9d62",
     "tests\\username-registry-auth-negative-matrix.test.ts": "12df25a9ef0c82340c932d13bcce6fcd1116b9be026f7f7723ca522243586942",
     "tests\\username-registry-boundary-negative.test.ts": "31290ee0d80baee23d72869bb8da6c96ef4c6277506b6e1fee9c6f1efb6f0b26",
     "tests\\username-registry-due-flush.test.ts": "faa5be8b01b2bf7b19526502f8e0394584630f902d704b62f1700423a0ebe187",
