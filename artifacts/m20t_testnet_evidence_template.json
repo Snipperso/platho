@@ -1,0 +1,62 @@
+{
+  "document": "PLATHO.V1.M20T_TESTNET_EVIDENCE_TEMPLATE",
+  "status": "TEMPLATE_NOT_EXECUTED",
+  "network": "testnet",
+  "notMainnetRouteFreeze": true,
+  "notProductionBuybackBurnUnlock": true,
+  "summary": {
+    "whatWasProven": [],
+    "whatWasNotProven": [
+      "mainnet STON.fi route freeze",
+      "mainnet router/pool/pTON code hash identity",
+      "mainnet liquidity and quote behavior",
+      "mainnet refund/excess/bounce behavior"
+    ]
+  },
+  "fundingGate": {
+    "requiredMinBalanceNanotons": "55000000000",
+    "observedBalanceNanotons": "FILL_AFTER_BALANCE_QUERY",
+    "status": "NOT_EXECUTED"
+  },
+  "probes": {
+    "accepts5105TonEnvelopeFromAuthorizedPath": {
+      "status": "NOT_EXECUTED",
+      "txHash": "FILL_OR_NOT_EXECUTED_REASON",
+      "explorerUrl": "FILL_OR_NOT_EXECUTED_REASON",
+      "balanceDeltaNanotons": "FILL_OR_NOT_EXECUTED_REASON",
+      "stateBefore": "FILL_OR_NOT_EXECUTED_REASON",
+      "stateAfter": "FILL_OR_NOT_EXECUTED_REASON"
+    },
+    "rejects50TonRawPrincipalAsIncompleteEnvelope": {
+      "status": "NOT_EXECUTED",
+      "txHash": "FILL_OR_NOT_EXECUTED_REASON",
+      "explorerUrl": "FILL_OR_NOT_EXECUTED_REASON",
+      "exitCodeOrBounce": "FILL_OR_NOT_EXECUTED_REASON"
+    },
+    "rejectsWrongSender": {
+      "status": "NOT_EXECUTED",
+      "txHash": "FILL_OR_NOT_EXECUTED_REASON",
+      "exitCodeOrBounce": "FILL_OR_NOT_EXECUTED_REASON"
+    },
+    "rejectsWrongAmount": {
+      "status": "NOT_EXECUTED",
+      "txHash": "FILL_OR_NOT_EXECUTED_REASON",
+      "exitCodeOrBounce": "FILL_OR_NOT_EXECUTED_REASON"
+    },
+    "duplicateOrReplayBehavior": {
+      "status": "NOT_EXECUTED",
+      "evidence": "FILL_OR_NOT_APPLICABLE_REASON"
+    },
+    "refundExcessBounceBehavior": {
+      "status": "NOT_EXECUTED",
+      "evidence": "FILL_OR_NOT_AVAILABLE_WITHOUT_ROUTE_HARNESS"
+    }
+  },
+  "suite": {
+    "command": "npm test",
+    "vitestPool": "vmThreads",
+    "exit": "NOT_EXECUTED",
+    "summary": "NOT_EXECUTED"
+  },
+  "requiredFinalStatement": "M20T testnet evidence is NOT mainnet route freeze evidence and does not unlock production BuybackBurn."
+}

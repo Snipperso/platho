@@ -1,0 +1,24 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/ath-wallet-derivation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1300[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH Master get_wallet_address(owner) equals local StateInit derivation [33m 1263[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-transfer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1923[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-XFER-01: owner-authorized transfer debits source wallet and credits deterministic recipient wallet [33m 1572[2mms[22m[39m
+ [32m✓[39m tests/deployment-ath-wallet-binding.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1927[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-04A/Vault: official ATH wallet is derived after Vault address exists, bound before seal, and frozen after seal [33m 1797[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2638[2mms[22m[39m
+     [33m[2m✓[22m[39m ATH-00: burn operation reduces total_supply by exact burned amount and debits wallet balance [33m 1626[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2928[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash [33m 1637[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-04: second binding attempt is rejected and cannot overwrite counterpart address [33m 324[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing [33m 396[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal [33m 566[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 3535[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee [33m 1647[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m30 passed[39m[22m[90m (30)[39m
+[2m   Start at [22m 03:11:51
+[2m   Duration [22m 6.76s[2m (transform 2.24s, setup 0ms, import 12.98s, tests 14.25s, environment 1ms)[22m
+

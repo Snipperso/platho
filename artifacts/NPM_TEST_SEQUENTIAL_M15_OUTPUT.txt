@@ -1,0 +1,136 @@
+\n=== RUN tests/ath-burn-finalization.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:04:48
+[2m   Duration [22m 1.46s[2m (transform 183ms, setup 0ms, import 487ms, tests 748ms, environment 0ms)[22m
+
+=== PASS tests/ath-burn-finalization.test.ts ===
+\n=== RUN tests/ath-wallet-derivation.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:04:50
+[2m   Duration [22m 1.14s[2m (transform 193ms, setup 0ms, import 484ms, tests 415ms, environment 0ms)[22m
+
+=== PASS tests/ath-wallet-derivation.test.ts ===
+\n=== RUN tests/ath-wallet-transfer.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:04:53
+[2m   Duration [22m 1.43s[2m (transform 146ms, setup 0ms, import 538ms, tests 578ms, environment 0ms)[22m
+
+=== PASS tests/ath-wallet-transfer.test.ts ===
+\n=== RUN tests/capsulehub.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 09:04:55
+[2m   Duration [22m 1.88s[2m (transform 162ms, setup 0ms, import 437ms, tests 1.22s, environment 0ms)[22m
+
+=== PASS tests/capsulehub.test.ts ===
+\n=== RUN tests/deployment-ath-wallet-binding.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 09:04:58
+[2m   Duration [22m 1.37s[2m (transform 310ms, setup 0ms, import 602ms, tests 554ms, environment 0ms)[22m
+
+=== PASS tests/deployment-ath-wallet-binding.test.ts ===
+\n=== RUN tests/deployment-binding.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 09:05:01
+[2m   Duration [22m 1.66s[2m (transform 243ms, setup 0ms, import 546ms, tests 845ms, environment 0ms)[22m
+
+=== PASS tests/deployment-binding.test.ts ===
+\n=== RUN tests/deployment-manifest-m15.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:05:04
+[2m   Duration [22m 1.60s[2m (transform 404ms, setup 0ms, import 760ms, tests 593ms, environment 0ms)[22m
+
+=== PASS tests/deployment-manifest-m15.test.ts ===
+\n=== RUN tests/fee-accumulator.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:05:06
+[2m   Duration [22m 1.43s[2m (transform 131ms, setup 0ms, import 425ms, tests 757ms, environment 0ms)[22m
+
+=== PASS tests/fee-accumulator.test.ts ===
+\n=== RUN tests/username-nft-item.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 09:05:09
+[2m   Duration [22m 1.15s[2m (transform 156ms, setup 0ms, import 452ms, tests 461ms, environment 0ms)[22m
+
+=== PASS tests/username-nft-item.test.ts ===
+\n=== RUN tests/username-registry-due-flush.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 09:05:11
+[2m   Duration [22m 1.74s[2m (transform 251ms, setup 0ms, import 548ms, tests 945ms, environment 0ms)[22m
+
+=== PASS tests/username-registry-due-flush.test.ts ===
+\n=== RUN tests/username-registry-foundation.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 09:05:14
+[2m   Duration [22m 1.46s[2m (transform 194ms, setup 0ms, import 488ms, tests 749ms, environment 0ms)[22m
+
+=== PASS tests/username-registry-foundation.test.ts ===
+\n=== RUN tests/username-registry-paid-mint.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m15_work[39m
+

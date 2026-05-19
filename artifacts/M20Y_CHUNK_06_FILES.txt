@@ -1,0 +1,4 @@
+tests/vault-m6-publish.test.ts
+tests/vault-prune-pending-publish.test.ts
+tests/vault-receive-intent.test.ts
+tests/vault-session-lifecycle.test.ts

@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m19_work[39m
+
+ [32m✓[39m tests/m19-stonfi-route-discovery.test.ts[2m > [22mM19A STON.fi route discovery / payload conformance draft[2m > [22mbuilds SDK v2.1-equivalent TON->jetton payload and places dex_min_out in minAskAmount[32m 7[2mms[22m[39m
+ [32m✓[39m tests/m19-stonfi-route-discovery.test.ts[2m > [22mM19A STON.fi route discovery / payload conformance draft[2m > [22muses SDK v2.1 default value formula: offer + router forward gas + pTON transfer gas[32m 3[2mms[22m[39m
+ [32m✓[39m tests/m19-stonfi-route-discovery.test.ts[2m > [22mM19A STON.fi route discovery / payload conformance draft[2m > [22mkeeps production BuybackBurn blocked until real ATH/TON route values and quote policy are pinned[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 11:23:17
+[2m   Duration [22m 428ms[2m (transform 52ms, setup 0ms, import 145ms, tests 12ms, environment 21ms)[22m
+

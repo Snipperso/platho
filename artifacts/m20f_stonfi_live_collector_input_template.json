@@ -1,0 +1,67 @@
+{
+  "document": "PLATHO.V1.M20F_STONFI_LIVE_COLLECTOR_INPUT",
+  "network": "mainnet",
+  "status": "DRAFT_MAINNET_ROUTE_FREEZE_INPUT",
+  "tonRpcEndpoint": null,
+  "addresses": {
+    "athMasterAddress": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+    "buybackBurnAddress": "REQUIRED_MAINNET_BUYBACKBURN_STATEINIT_ADDRESS",
+    "buybackBurnOfficialAthWalletAddress": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS"
+  },
+  "route": {
+    "offerAddress": "ton",
+    "askAddress": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+    "offerUnits": "50000000000",
+    "slippageTolerance": "0.01",
+    "dexV2": true,
+    "dexVersion": [
+      2
+    ],
+    "poolAddress": null,
+    "expectedRouterMajorVersion": 2,
+    "expectedRouterMinorVersion": 1
+  },
+  "routeControls": {
+    "queryId": "required: uint64 decimal query id",
+    "deadline": "required: uint64 decimal unix timestamp",
+    "buybackMinAthOutPer50TonAtomic": "required: positive atomic ATH minimum",
+    "referralAddress": null,
+    "referralValue": "10"
+  },
+  "codeHashes": {
+    "athMasterCodeHash": "required: 64 lowercase hex chars",
+    "athWalletCodeHash": "required: 64 lowercase hex chars",
+    "stonfiRouterCodeHash": "required: 64 lowercase hex chars",
+    "stonfiPoolCodeHash": "required: 64 lowercase hex chars",
+    "stonfiPtonCodeHash": "required: 64 lowercase hex chars",
+    "stonfiVaultCodeHash": null
+  },
+  "proofRefs": {
+    "athDeploymentManifest": "required: immutable ATH deployment manifest path/hash",
+    "buybackBurnStateInitVector": "required: immutable BuybackBurn StateInit vector path/hash",
+    "officialAthWalletDerivationVector": "required: immutable official BuybackBurn ATH wallet derivation vector path/hash",
+    "stonfiApiSimulationCapture": "required: immutable STON.fi API simulation capture path/hash",
+    "stonfiSdkOrApiTxParamsCapture": "required: immutable official STON.fi SDK/API tx params capture path/hash",
+    "routerPoolPtonCodeHashes": "required: immutable router/pool/pTON code hash proof path/hash",
+    "successExcessProof": "required: immutable success excess proof returning to BuybackBurn path/hash",
+    "minOutFailureRefundProof": "required: immutable min_out failure refund proof returning to BuybackBurn path/hash",
+    "ptonRefundProof": "required: immutable pTON refund proof returning to BuybackBurn path/hash",
+    "bounceOrFailureBehaviorProof": "required: immutable bounce/failure behavior proof path/hash"
+  },
+  "liveProofs": {
+    "sdkOrApiTxParamsCaptured": false,
+    "liveQuoteCaptured": false,
+    "successExcessesAddressObservedAsBuybackBurn": false,
+    "minOutFailureRefundObservedAsBuybackBurn": false,
+    "ptonRefundObservedAsBuybackBurn": false,
+    "bounceOrFailureBehaviorDocumented": false,
+    "evidenceRefs": {
+      "sdkTxParams": "required: immutable official tx params path/hash",
+      "liveQuote": "required: immutable live STON.fi simulation path/hash",
+      "successExcess": "required: immutable success excess proof path/hash",
+      "minOutFailureRefund": "required: immutable min_out refund proof path/hash",
+      "ptonRefund": "required: immutable pTON refund proof path/hash",
+      "bounceOrFailureBehavior": "required: immutable bounce/failure behavior proof path/hash"
+    }
+  }
+}

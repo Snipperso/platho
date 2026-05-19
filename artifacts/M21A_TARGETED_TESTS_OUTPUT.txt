@@ -1,0 +1,18 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m21a_work[39m
+
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1626[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 1098[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 525[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1331[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it [33m 1103[2mms[22m[39m
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2151[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 1273[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 491[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 383[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 10:28:49
+[2m   Duration [22m 3.75s[2m (transform 881ms, setup 0ms, import 3.66s, tests 5.11s, environment 0ms)[22m
+

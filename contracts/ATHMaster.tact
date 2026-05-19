@@ -1,0 +1,73 @@
+// Platho v1 ATH Master milestone-2 implementation.
+// Scope: fixed supply metadata/getters, deterministic wallet derivation, and authenticated burn finalization.
+// No mint/admin/pause/blacklist/tax/force-transfer/fallback behavior is implemented.
+
+import "./ATHWallet.tact";
+
+const ATH_TOTAL_SUPPLY_ATOMIC: Int = 100000000000000000;
+struct ATHJettonDataView {
+    total_supply: Int;
+    mintable: Bool;
+    admin_address: Address;
+    jetton_content: Cell;
+    jetton_wallet_code: Cell;
+}
+
+contract ATHMaster {
+    total_supply: Int as uint128;
+    treasury_owner: Address;
+    content: Cell;
+
+    init(treasury_owner: Address, content: Cell) {
+        self.total_supply = ATH_TOTAL_SUPPLY_ATOMIC;
+        self.treasury_owner = treasury_owner;
+        self.content = content;
+    }
+
+    fun derive_wallet_address(owner_address: Address): Address {
+        let owner_std: StdAddress = parseStdAddress(owner_address.asSlice());
+        let wallet_init: StateInit = initOf ATHWallet(0, owner_address, myAddress());
+        return contractAddressExt(owner_std.workchain, wallet_init.code, wallet_init.data);
+    }
+
+    receive(msg: ATHBurnNotification) {
+        throwUnless(14100, msg.amount > 0);
+        throwUnless(14101, sender() == self.derive_wallet_address(msg.owner_address));
+        throwUnless(14102, self.total_supply >= msg.amount);
+        throwUnless(14103, context().value >= ATH_BURN_NOTIFICATION_EXEC_RESERVE);
+
+        self.total_supply -= msg.amount;
+
+        message(MessageParameters {
+            to: msg.response_destination,
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: true,
+            body: ATHBurnFinalized {
+                query_id: msg.query_id,
+                amount: msg.amount,
+                owner_address: msg.owner_address
+            }.toCell()
+        });
+    }
+
+    get fun get_jetton_data(): ATHJettonDataView {
+        let wallet_init: StateInit = initOf ATHWallet(0, self.treasury_owner, myAddress());
+        return ATHJettonDataView {
+            total_supply: self.total_supply,
+            mintable: false,
+            admin_address: self.treasury_owner,
+            jetton_content: self.content,
+            jetton_wallet_code: wallet_init.code
+        };
+    }
+
+    get fun get_wallet_address(owner_address: Address): Address {
+        return self.derive_wallet_address(owner_address);
+    }
+
+    receive() {
+        // No fallback behavior. Empty inbound messages are rejected.
+        throw(13001);
+    }
+}

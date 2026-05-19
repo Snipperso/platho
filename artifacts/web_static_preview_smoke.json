@@ -1,0 +1,91 @@
+{
+  "document": "PLATHO.WEB_STATIC_PREVIEW_SMOKE.V1",
+  "generatedAt": "2026-05-18T18:31:12.588Z",
+  "url": "http://127.0.0.1:4185/",
+  "title": "Platho",
+  "status": "PASS",
+  "checks": {
+    "pageRendered": true,
+    "assetsOk": true,
+    "encryptionSelftestPassed": true,
+    "keySuiteHybrid": true,
+    "tonConnectInitialized": true,
+    "walletProofPayloadReady": true,
+    "noConsoleErrors": true,
+    "uiInteractionWorked": true
+  },
+  "finalState": {
+    "activeView": "chats",
+    "encryptionStatus": "hybrid passed",
+    "keySuiteStatus": "hybrid-v1 / 1184b",
+    "lastMessage": "smoke static preview",
+    "title": "Platho",
+    "tonConnectStatus": "not connected",
+    "url": "http://127.0.0.1:4185/",
+    "vaultRecordStatus": "proof required",
+    "walletProofStatus": "payload ready"
+  },
+  "assets": [
+    {
+      "path": "index.html",
+      "ok": true,
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 10658
+    },
+    {
+      "path": "manifest.webmanifest",
+      "ok": true,
+      "status": 200,
+      "type": "application/manifest+json; charset=utf-8",
+      "bytes": 552
+    },
+    {
+      "path": "tonconnect-manifest.json",
+      "ok": true,
+      "status": 200,
+      "type": "application/json; charset=utf-8",
+      "bytes": 112
+    },
+    {
+      "path": "sw.js",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8",
+      "bytes": 1813
+    },
+    {
+      "path": "app.js",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8",
+      "bytes": 15605
+    },
+    {
+      "path": "crypto/platho-crypto.mjs",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8",
+      "bytes": 70123
+    },
+    {
+      "path": "vendor/@tonconnect/ui/tonconnect-ui.min.js",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8",
+      "bytes": 422763
+    },
+    {
+      "path": "assets/platho-icon.png",
+      "ok": true,
+      "status": 200,
+      "type": "image/png",
+      "bytes": 3215
+    }
+  ],
+  "consoleErrors": [],
+  "notes": [
+    "Browser automation surface does not expose navigator.serviceWorker, so sw.js was checked as a served static asset and the app registration guard was observed as non-fatal."
+  ],
+  "screenshot": "artifacts/WEB_STATIC_PREVIEW_SMOKE.png"
+}

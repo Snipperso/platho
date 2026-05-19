@@ -1,0 +1,14 @@
+file:///mnt/data/platho_m15_work/node_modules/vitest/dist/chunks/cac.CVxlyDFd.js:406
+          throw new CACError(`Unknown option \`${name.length > 1 ? `--${name}` : `-${name}`}\``);
+                ^
+
+CACError: Unknown option `--poolOptions`
+    at Command.checkUnknownOptions (file:///mnt/data/platho_m15_work/node_modules/vitest/dist/chunks/cac.CVxlyDFd.js:406:17)
+    at CAC.runMatchedCommand (file:///mnt/data/platho_m15_work/node_modules/vitest/dist/chunks/cac.CVxlyDFd.js:606:13)
+    at CAC.parse (file:///mnt/data/platho_m15_work/node_modules/vitest/dist/chunks/cac.CVxlyDFd.js:547:12)
+    at file:///mnt/data/platho_m15_work/node_modules/vitest/dist/cli.js:11:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.16.0

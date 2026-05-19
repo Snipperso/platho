@@ -1,0 +1,65 @@
+
+> platho-deployment-binding-vault-capsulehub-milestone@1.0.0 test
+> vitest run --config vitest.all.config.ts
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_latest[39m
+
+ [32m✓[39m tests/capsulehub.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 3030[2mms[22m[39m
+     [33m[2m✓[22m[39m CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee [33m 843[2mms[22m[39m
+ [32m✓[39m tests/vault-external-session-gate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2721[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-EXT-01: valid signed request consumes nonce, debits max_charge, and creates pending publish when no ACK exists yet [33m 628[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation [33m 476[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07: duplicate external request cannot be accepted twice [33m 615[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation [33m 522[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-03: expired session rejected before mutation [33m 474[2mms[22m[39m
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2465[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 826[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 594[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 1043[2mms[22m[39m
+ [32m✓[39m tests/deployment-genesis-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1151[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-01/02/03: arbitrary sender cannot bind or seal Vault genesis [33m 501[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-05/06/07: arbitrary sender cannot bind/seal UsernameRegistry and controller has no post-seal authority [33m 385[2mms[22m[39m
+ [32m✓[39m tests/vault-receive-intent.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2575[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-14/15: create locks sender TON and claim credits recipient UserState [33m 404[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-16: cancel returns locked TON to sender and deletes intent [33m 364[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: wrong recipient or wrong secret cannot claim [33m 432[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: duplicate intent_id and insufficient sender balance are rejected without mutation [33m 489[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry [33m 433[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance [33m 449[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2074[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-01: FlushTreasuryAthDue transfers treasury due to immutable treasury ATH receiver and clears pending on ACK [33m 726[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-02: FlushBurnAthDue burns through official ATH wallet, authenticated master ACK clears pending, and total_supply decreases exactly [33m 480[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-03: treasury transfer failure restores treasury_due_ath and clears pending [33m 407[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-04: burn notification failure restores burn_due_ath, clears pending, and restores official wallet balance [33m 459[2mms[22m[39m
+ [32m✓[39m tests/username-registry-paid-mint.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1799[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-01: valid official ATH username mint deploys deterministic item, consumes pending, and credits treasury/burn due after ACK [33m 377[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-02: invalid uppercase username from official ATH wallet creates refund due and no pending/name record [33m 303[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-04: duplicate finalized username creates refund due for the second minter without changing the existing record [33m 369[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-05: price tiers are enforced as exact ATH amounts and underpay is refunded [33m 486[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1398[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing [33m 339[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal [33m 540[2mms[22m[39m
+ [32m✓[39m tests/vault-session-lifecycle.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2162[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-08A: OP_SET_SESSION after expired active session installs fresh expiry and keeps Message Budget allocated [33m 343[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-09/10: Message Budget top-up requires active session and revoke returns budget to ton_balance [33m 457[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-09A/REJECT-06B: expired active session can revoke but cannot top up Message Budget [33m 381[2mms[22m[39m
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1340[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 720[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 620[2mms[22m[39m
+ [32m✓[39m tests/username-registry-foundation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1146[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-03: item derivation follows owner workchain, including masterchain owner fixture [33m 307[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-04: official ATH wallet binds before seal and cannot be changed after seal [33m 333[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1154[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 752[2mms[22m[39m
+ [32m✓[39m tests/vault-ath-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1715[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-05: ATH withdrawal debits ath_balance and clears pending on official wallet ack [33m 342[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT-02A: ATH withdrawal bounce/failure restores ath_balance and clears pending [33m 337[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: ATH withdrawal rejects insufficient balance without mutation [33m 383[2mms[22m[39m
+ [32m✓[39m tests/username-registry-refund-flush.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1150[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-01: FlushAthRefundDue sends bounce-safe ATH transfer, clears due on recipient wallet ACK, and credits recipient ATH wallet [33m 712[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-02: official ATH wallet request bounce restores refund due and clears pending flush [33m 436[2mms[22m[39m
+ [32m✓[39m tests/username-registry-prune-pending-mint.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 883[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected [33m 514[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending [33m 368[2mms[22m[39m

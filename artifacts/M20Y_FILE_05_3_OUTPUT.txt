@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/username-registry-refund-flush.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1283[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-01: FlushAthRefundDue sends bounce-safe ATH transfer, clears due on recipient wallet ACK, and credits recipient ATH wallet [33m 918[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-02: official ATH wallet request bounce restores refund due and clears pending flush [33m 361[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 03:12:58
+[2m   Duration [22m 2.45s[2m (transform 353ms, setup 0ms, import 777ms, tests 1.28s, environment 30ms)[22m
+

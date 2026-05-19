@@ -1,0 +1,6 @@
+tests/m19g-buybackburn-state-machine.test.ts
+tests/m19h-buybackburn-funding-envelope.test.ts
+tests/m20u-buybackburn-implementation-readiness.test.ts
+tests/username-nft-item.test.ts
+tests/username-registry-due-flush.test.ts
+tests/username-registry-foundation.test.ts

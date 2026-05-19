@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m19b_work[39m
+
+ [32m✓[39m tests/m19b-stonfi-conservative-gas.test.ts[2m > [22mM19B STON.fi conservative gas / excess profile draft[2m > [22moverfunds route gas conservatively while preserving exact 50 TON offer and dex_min_out[32m 6[2mms[22m[39m
+ [32m✓[39m tests/m19b-stonfi-conservative-gas.test.ts[2m > [22mM19B STON.fi conservative gas / excess profile draft[2m > [22mchanging only conservative route funding changes total message value but not swap payload identity[32m 4[2mms[22m[39m
+ [32m✓[39m tests/m19b-stonfi-conservative-gas.test.ts[2m > [22mM19B STON.fi conservative gas / excess profile draft[2m > [22mrejects route profiles that leak STON.fi refund/excess to any address other than BuybackBurn[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 11:37:17
+[2m   Duration [22m 435ms[2m (transform 89ms, setup 0ms, import 172ms, tests 13ms, environment 21ms)[22m
+

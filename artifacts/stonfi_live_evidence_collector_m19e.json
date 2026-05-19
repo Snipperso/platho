@@ -1,0 +1,70 @@
+{
+  "milestone": "M19E_STONFI_LIVE_SDK_API_EVIDENCE_COLLECTOR",
+  "status": "WAITING_FOR_REAL_STONFI_LIVE_EVIDENCE",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "official_source": {
+    "package": "@ston-fi/sdk",
+    "version": "2.7.0",
+    "repository": "https://github.com/ston-fi/sdk/tree/main/packages/sdk",
+    "dexExport": "@ston-fi/sdk/dex/v2_1",
+    "sourceFiles": [
+      "src/contracts/dex/v2_1/router/BaseRouterV2_1.ts",
+      "src/contracts/dex/v2_1/constants.ts",
+      "src/contracts/pTON/v2_1/PtonV2_1.ts",
+      "src/contracts/pTON/v2_1/constants.ts"
+    ]
+  },
+  "supplied_input_source": null,
+  "route_freeze_ready": false,
+  "template_output": "artifacts/stonfi_live_evidence_input_template_m19e.json",
+  "candidate_output_when_supplied": null,
+  "required_input": [
+    "official @ston-fi/sdk/API pTON TON-transfer tx params body BOC for exact 50 TON -> ATH route",
+    "tx params `to` address, which must equal selected pTON wallet/proxy address",
+    "tx params `value`, which must equal 51.05 TON conservative route value",
+    "live quote output in atomic ATH units",
+    "dex_min_out inserted into the official sample",
+    "router/pool/pTON code hashes",
+    "success excess/refund/pTON-refund/bounce evidence flags backed by tx references"
+  ],
+  "fixture_self_test": {
+    "route_freeze_ready": true,
+    "issue_codes": [],
+    "decoded": {
+      "sdkTxTo": "0:51f22a5e02af0e314f222131cdb422c7fa7b3b90a70e62da012afa1192473677",
+      "sdkTxValueNanotons": "51050000000",
+      "ptonTransfer": {
+        "op": "0x01f3835d",
+        "queryId": "5786071451510446544",
+        "tonAmount": "50000000000",
+        "refundAddress": "0:731d541ed8d9fe9be9f966391fcab29574328729b6923b919c204687ac54c0f5",
+        "hasForwardPayload": true,
+        "forwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382"
+      },
+      "stonfiSwapPayload": {
+        "op": "0x6664de2a",
+        "askJettonWalletAddress": "0:fddfab1915ee53bb8842c2a1144933f46cf907ffdd213cd07788ed575487c26b",
+        "refundAddress": "0:731d541ed8d9fe9be9f966391fcab29574328729b6923b919c204687ac54c0f5",
+        "excessesAddress": "0:731d541ed8d9fe9be9f966391fcab29574328729b6923b919c204687ac54c0f5",
+        "deadline": "1800500000",
+        "details": {
+          "minAskAmount": "950000000000000",
+          "receiverAddress": "0:9b497f13390b257faf027cedae5ab2406d83624e5cb8d5f3ec7a3b0dc9c41ad7",
+          "dexCustomPayloadForwardGasAmount": "0",
+          "hasDexCustomPayload": false,
+          "refundForwardGasAmount": "0",
+          "hasRefundPayload": false,
+          "referralValue": "10",
+          "referralAddress": null
+        }
+      }
+    },
+    "rebuilt_hashes": {
+      "ptonTransferBodyHash": "689ec82cc6cc365181474fba1e45e4cf51f001521d5054bdde68c63007a59167",
+      "samplePtonTransferBodyHash": "689ec82cc6cc365181474fba1e45e4cf51f001521d5054bdde68c63007a59167",
+      "stonfiSwapForwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382",
+      "sampleStonfiSwapForwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382"
+    }
+  },
+  "supplied_report": null
+}

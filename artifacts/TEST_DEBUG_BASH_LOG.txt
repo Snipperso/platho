@@ -1,0 +1,68 @@
+Platho bash test debug started 2026-05-15T21:03:53.434Z
+Per-file timeout 90s
+Node v22.16.0
+
+[2026-05-15T21:03:53.705Z] START tests/ath-burn-finalization.test.ts
+[2026-05-15T21:04:02.880Z] END tests/ath-burn-finalization.test.ts status=PASS code=0 duration=9s
+--- stdout tail tests/ath-burn-finalization.test.ts ---
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/vault_m6[39m
+
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00: burn operation reduces total_supply by exact burned amount and debits wallet balance[33m 1385[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00C: ATH master accepts burn notification only from deterministic official ATH wallet[32m 203[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00D: wrong owner cannot burn another wallet owner balance[32m 208[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00B: transfer-to-dead-address is not treated as burn by ATH master[32m 147[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00E: underfunded ATHBurn does not debit wallet without total_supply decrease[33m 471[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts[2m > [22mATH burn finalization[2m > [22mATH-00F: burn notification bounce/failure restores wallet balance when master is unavailable[32m 150[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 21:03:57
+[2m   Duration [22m 4.96s[2m (transform 466ms, setup 0ms, import 1.69s, tests 2.57s, environment 0ms)[22m
+
+--- stderr tail tests/ath-burn-finalization.test.ts ---
+
+[2026-05-15T21:04:04.158Z] START tests/ath-wallet-derivation.test.ts
+[2026-05-15T21:04:12.139Z] END tests/ath-wallet-derivation.test.ts status=PASS code=0 duration=8s
+--- stdout tail tests/ath-wallet-derivation.test.ts ---
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/vault_m6[39m
+
+ [32m✓[39m tests/ath-wallet-derivation.test.ts[2m > [22mATH wallet derivation profile[2m > [22mcompiled wallet code hash comes from the ATH Wallet artifact[32m 31[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-derivation.test.ts[2m > [22mATH wallet derivation profile[2m > [22mATH Master get_wallet_address(owner) equals local StateInit derivation[33m 937[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 21:04:08
+[2m   Duration [22m 3.24s[2m (transform 430ms, setup 0ms, import 1.46s, tests 972ms, environment 0ms)[22m
+
+--- stderr tail tests/ath-wallet-derivation.test.ts ---
+
+[2026-05-15T21:04:13.417Z] START tests/capsulehub.test.ts
+[2026-05-15T21:04:22.875Z] END tests/capsulehub.test.ts status=PASS code=0 duration=9s
+--- stdout tail tests/capsulehub.test.ts ---
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/vault_m6[39m
+
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee[33m 1282[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-03: public direct publish rejects author spoofing[32m 188[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee[32m 160[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers[32m 250[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps[32m 189[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it[32m 247[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce[32m 203[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver[32m 127[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs[32m 210[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs[32m 198[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAP-REJECT-07: Vault-only publish from non-Vault sender rejected[32m 158[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mCAP-REJECT-08: Vault publish rejects protocol_fee_paid greater than full fee[32m 174[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts[2m > [22mCapsuleHub v1 milestone 1[2m > [22mNO-ADMIN: empty fallback rejected and cannot mutate state[32m 142[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 21:04:16
+[2m   Duration [22m 5.90s[2m (transform 566ms, setup 0ms, import 1.67s, tests 3.54s, environment 0ms)[22m
+
+--- stderr tail tests/capsulehub.test.ts ---
+
+[2026-05-15T21:04:24.144Z] START tests/deployment-binding.test.ts

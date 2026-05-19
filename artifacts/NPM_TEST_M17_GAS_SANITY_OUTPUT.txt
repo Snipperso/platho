@@ -1,0 +1,10 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m17_work[39m
+
+ [32m✓[39m tests/m17-gas-reserve-sanity.test.ts[2m > [22mM17 gas/reserve sanity pass[2m > [22mGAS-M17-01: implemented-subset money/publish flows stay below broad gas/fee sanity thresholds[33m 2431[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 10:41:33
+[2m   Duration [22m 3.62s[2m (transform 616ms, setup 0ms, import 902ms, tests 2.43s, environment 22ms)[22m
+

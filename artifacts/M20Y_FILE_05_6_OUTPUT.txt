@@ -1,0 +1,13 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/vault-key-records.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1671[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record [33m 715[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1 [33m 307[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: cannot register twice and cannot replace before registration [33m 349[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 03:13:13
+[2m   Duration [22m 2.79s[2m (transform 283ms, setup 0ms, import 684ms, tests 1.67s, environment 31ms)[22m
+

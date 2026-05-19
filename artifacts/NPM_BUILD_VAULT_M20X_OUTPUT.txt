@@ -1,0 +1,9 @@
+💼 Compiling project Vault ...
+   > Vault: tact compiler
+   > Vault: func compiler
+   > Packaging
+   > Vault
+   > Bindings
+   > Vault
+   > Reports
+   > Vault

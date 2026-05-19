@@ -1,0 +1,181 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockUsernameRegistryAckSink_MockUsernameRegistryAckSink.headers.fc
+;;
+;; Header files for MockUsernameRegistryAckSink
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockUsernameRegistryAckSink$_store
+builder $MockUsernameRegistryAckSink$_store(builder build_0, (int, int, slice) v) inline;
+
+;; $MockUsernameRegistryAckSink$_load
+(slice, ((int, int, slice))) $MockUsernameRegistryAckSink$_load(slice sc_0) inline;
+
+;; $MockUsernameRegistryAckSinkStateView$_to_external
+(int, int, slice) $MockUsernameRegistryAckSinkStateView$_to_external(((int, int, slice)) v) inline;
+
+;; $MockUsernameRegistryAckSink$init$_load
+(slice, ((slice))) $MockUsernameRegistryAckSink$init$_load(slice sc_0) inline;
+
+;; $MockUsernameRegistryAckSink$_contract_init
+(int, int, slice) $MockUsernameRegistryAckSink$_contract_init(slice $last_owner_wallet) impure inline;
+
+;; $MockUsernameRegistryAckSink$_contract_load
+(int, int, slice) $MockUsernameRegistryAckSink$_contract_load() impure inline;
+
+;; $MockUsernameRegistryAckSink$_contract_store
+() $MockUsernameRegistryAckSink$_contract_store((int, int, slice) v) impure inline;
+
+;; $MockUsernameRegistryAckSinkStateView$_constructor_ack_count_last_name_hash_last_owner_wallet
+((int, int, slice)) $MockUsernameRegistryAckSinkStateView$_constructor_ack_count_last_name_hash_last_owner_wallet(int $ack_count, int $last_name_hash, slice $last_owner_wallet) inline;
+
+;; $MockUsernameRegistryAckSink$_fun_get_state
+((int, int, slice), (int, int, slice)) $MockUsernameRegistryAckSink$_fun_get_state((int, int, slice) $self) impure inline_ref;
+
+
+;; MockUsernameRegistryAckSink_MockUsernameRegistryAckSink.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+;; MockUsernameRegistryAckSink_MockUsernameRegistryAckSink.storage.fc
+;;
+;; Type: MockUsernameRegistryAckSinkStateView
+;; TLB: _ ack_count:int257 last_name_hash:int257 last_owner_wallet:address = MockUsernameRegistryAckSinkStateView
+;;
+
+(int, int, slice) $MockUsernameRegistryAckSinkStateView$_to_external(((int, int, slice)) v) inline {
+    var (v'ack_count, v'last_name_hash, v'last_owner_wallet) = v; 
+    return (v'ack_count, v'last_name_hash, v'last_owner_wallet);
+}
+
+((int, int, slice)) $MockUsernameRegistryAckSinkStateView$_constructor_ack_count_last_name_hash_last_owner_wallet(int $ack_count, int $last_name_hash, slice $last_owner_wallet) inline {
+    return ($ack_count, $last_name_hash, $last_owner_wallet);
+}
+
+;;
+;; Type: MockUsernameRegistryAckSink
+;; TLB: _ ack_count:uint64 last_name_hash:uint256 last_owner_wallet:address = MockUsernameRegistryAckSink
+;;
+
+builder $MockUsernameRegistryAckSink$_store(builder build_0, (int, int, slice) v) inline {
+    var (v'ack_count, v'last_name_hash, v'last_owner_wallet) = v;
+    build_0 = build_0.store_uint(v'ack_count, 64);
+    build_0 = build_0.store_uint(v'last_name_hash, 256);
+    build_0 = build_0.store_slice(v'last_owner_wallet);
+    return build_0;
+}
+
+(slice, ((int, int, slice))) $MockUsernameRegistryAckSink$_load(slice sc_0) inline {
+    var v'ack_count = sc_0~load_uint(64);
+    var v'last_name_hash = sc_0~load_uint(256);
+    var v'last_owner_wallet = sc_0~load_msg_addr();
+    return (sc_0, (v'ack_count, v'last_name_hash, v'last_owner_wallet));
+}
+
+(slice, ((slice))) $MockUsernameRegistryAckSink$init$_load(slice sc_0) inline {
+    var v'last_owner_wallet = sc_0~load_msg_addr();
+    return (sc_0, (v'last_owner_wallet));
+}
+
+(int, int, slice) $MockUsernameRegistryAckSink$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MockUsernameRegistryAckSink$_load();
+    }
+    else {
+        (slice $last_owner_wallet) = $sc~$MockUsernameRegistryAckSink$init$_load();
+        $sc.end_parse();
+        return $MockUsernameRegistryAckSink$_contract_init($last_owner_wallet);
+    }
+}
+
+() $MockUsernameRegistryAckSink$_contract_store((int, int, slice) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MockUsernameRegistryAckSink$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockUsernameRegistryAckSink functions
+;;
+
+(int, int, slice) $MockUsernameRegistryAckSink$_contract_init(slice $last_owner_wallet) impure inline {
+    var (($self'ack_count, $self'last_name_hash, $self'last_owner_wallet)) = (null(), null(), null());
+    $self'ack_count = 0;
+    $self'last_name_hash = 0;
+    $self'last_owner_wallet = $last_owner_wallet;
+    return ($self'ack_count, $self'last_name_hash, $self'last_owner_wallet);
+}
+
+((int, int, slice), (int, int, slice)) $MockUsernameRegistryAckSink$_fun_get_state((int, int, slice) $self) impure inline_ref {
+    var (($self'ack_count, $self'last_name_hash, $self'last_owner_wallet)) = $self;
+    var $fresh$ret_164 = $MockUsernameRegistryAckSinkStateView$_constructor_ack_count_last_name_hash_last_owner_wallet($self'ack_count, $self'last_name_hash, $self'last_owner_wallet);
+    return (($self'ack_count, $self'last_name_hash, $self'last_owner_wallet), $fresh$ret_164);
+}
+
+;;
+;; Get methods of a Contract MockUsernameRegistryAckSink
+;;
+
+_ %get_state() method_id(86957) {
+    var self = $MockUsernameRegistryAckSink$_contract_load();
+    var res = self~$MockUsernameRegistryAckSink$_fun_get_state();
+    return $MockUsernameRegistryAckSinkStateView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract MockUsernameRegistryAckSink
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'ack_count, $self'last_name_hash, $self'last_owner_wallet) = $MockUsernameRegistryAckSink$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive UsernameItemDeployedAck message
+    if (op == 0xbba3ec19) {
+        var $msg'name_hash = in_msg~load_uint(256);
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        $self'ack_count = $self'ack_count + 1;
+        $self'last_name_hash = $msg'name_hash;
+        $self'last_owner_wallet = $msg'owner_wallet;
+        $MockUsernameRegistryAckSink$_contract_store(($self'ack_count, $self'last_name_hash, $self'last_owner_wallet));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(18999);
+        $MockUsernameRegistryAckSink$_contract_store(($self'ack_count, $self'last_name_hash, $self'last_owner_wallet));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

@@ -1,0 +1,163 @@
+{
+  "document": "PLATHO.V1.M20T_TESTNET_EVIDENCE",
+  "status": "LIVE_TESTNET_M20T_HARNESS_PASS",
+  "generatedAt": "2026-05-18T21:06:18.799Z",
+  "network": "testnet",
+  "runId": "1779138215",
+  "notMainnetRouteFreeze": true,
+  "notProductionBuybackBurnUnlock": true,
+  "productionFlagsRemainFalse": true,
+  "deployer": {
+    "address": "0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "walletVersion": "v4r2",
+    "secretMaterialPrinted": false,
+    "balanceBeforeNanotons": "57918803740",
+    "balanceAfterNanotons": "6543486764"
+  },
+  "contracts": {
+    "buybackBurnHarness": {
+      "address": "0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ",
+      "codeHash": "c112fda99950d9d55b9ca17c9b7e6f882814f112e890552557af26742a896cc7",
+      "stateInitHash": "8b224c8614ba553a66beea05d8e59c59633ecb26f0d14331ab493aedc9e437b7",
+      "explorerUrl": "https://testnet.tonviewer.com/0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ"
+    },
+    "feeAccumulatorHarness": {
+      "address": "0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "codeHash": "531d6e9cd9025f8d42ce576f441c2e8d329a9fc42b79ebaeb17b4e219f6f6197",
+      "stateInitHash": "53823684cdbabd01a8bbeae3c1ed1a07b4b098dc527838ee27089f8bce159a3b",
+      "explorerUrl": "https://testnet.tonviewer.com/0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "buybackFundingEnvelopeNanotons": "51050000000"
+    }
+  },
+  "steps": [
+    {
+      "label": "deploy_bind_buyback_harness",
+      "walletSeqnoBefore": 1,
+      "walletSeqnoAfter": 2,
+      "watchedAddress": "0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    },
+    {
+      "label": "deploy_prefund_fee_harness",
+      "walletSeqnoBefore": 2,
+      "walletSeqnoAfter": 3,
+      "watchedAddress": "0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    },
+    {
+      "label": "reject_50_ton_raw_principal",
+      "walletSeqnoBefore": 3,
+      "walletSeqnoAfter": 4,
+      "watchedAddress": "0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    },
+    {
+      "label": "reject_wrong_sender",
+      "walletSeqnoBefore": 4,
+      "walletSeqnoAfter": 5,
+      "watchedAddress": "0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    },
+    {
+      "label": "reject_wrong_amount_from_bound_fee",
+      "walletSeqnoBefore": 5,
+      "walletSeqnoAfter": 6,
+      "watchedAddress": "0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    },
+    {
+      "label": "accept_5105_ton_envelope",
+      "walletSeqnoBefore": 6,
+      "walletSeqnoAfter": 7,
+      "watchedAddress": "0QCLIkyGFLpVOma-6gXY5ZxZYz7LJvDRQzGrSTrtyeQ3t1IJ",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    },
+    {
+      "label": "reject_duplicate_replay",
+      "walletSeqnoBefore": 7,
+      "walletSeqnoAfter": 8,
+      "watchedAddress": "0QBTgjaEzbq9Aai76uPB7RoHtLCY3FJ4OO4nCJ-LzhWaOxVR",
+      "watchedLastTxHash": "NOT_COLLECTED_PUBLIC_RPC_RATE_LIMIT"
+    }
+  ],
+  "probes": {
+    "accepts5105TonEnvelopeFromAuthorizedPath": {
+      "status": "PASS",
+      "stateBefore": {
+        "fee": {
+          "buybackDueNanotons": "51050000000",
+          "flushCount": "0"
+        },
+        "buyback": {
+          "acceptedCount": "0",
+          "totalAcceptedNanotons": "0"
+        }
+      },
+      "stateAfter": {
+        "fee": {
+          "buybackDueNanotons": "0",
+          "flushCount": "1"
+        },
+        "buyback": {
+          "acceptedCount": "1",
+          "totalAcceptedNanotons": "51050000000",
+          "lastAmountNanotons": "51050000000"
+        }
+      }
+    },
+    "rejects50TonRawPrincipalAsIncompleteEnvelope": {
+      "status": "PASS",
+      "stateAfter": {
+        "feeBuybackDueNanotons": "51050000000",
+        "buybackAcceptedCount": "0"
+      }
+    },
+    "rejectsWrongSender": {
+      "status": "PASS",
+      "stateAfter": {
+        "buybackAcceptedCount": "0"
+      }
+    },
+    "rejectsWrongAmount": {
+      "status": "PASS",
+      "stateAfter": {
+        "buybackAcceptedCount": "0"
+      }
+    },
+    "duplicateOrReplayBehavior": {
+      "status": "PASS",
+      "stateAfter": {
+        "feeBuybackDueNanotons": "0",
+        "buybackAcceptedCount": "1"
+      }
+    },
+    "refundExcessBounceBehavior": {
+      "status": "NOT_EXECUTED",
+      "evidence": "NOT_AVAILABLE_WITHOUT_STONFI_ROUTE_HARNESS"
+    }
+  },
+  "suite": {
+    "command": "npm.cmd test",
+    "vitestPool": "vmThreads",
+    "exit": "0",
+    "summary": "56 test files passed; 214 tests passed"
+  },
+  "summary": {
+    "whatWasProven": [
+      "A full-size 51.05 TON M20T harness envelope can be forwarded from the bound fee-path harness to the BuybackBurn receiver harness on testnet.",
+      "The M20T fee-path harness rejects 50 TON raw principal as an incomplete buyback envelope.",
+      "The M20T BuybackBurn receiver harness rejects direct wrong-sender AcceptBurnReserve messages.",
+      "The M20T BuybackBurn receiver harness rejects a wrong AcceptBurnReserve amount forwarded by the bound fee-path harness.",
+      "A duplicate/replay FlushBuybackDue after the accepted envelope leaves one accepted envelope and zero fee-path due."
+    ],
+    "whatWasNotProven": [
+      "mainnet STON.fi route freeze",
+      "mainnet router/pool/pTON code hash identity",
+      "mainnet liquidity and quote behavior",
+      "mainnet refund/excess/bounce behavior",
+      "production BuybackBurn implementation readiness",
+      "production FeeAccumulator accumulation of 102.1 TON protocol fees for one 51.05 TON buyback due"
+    ]
+  },
+  "requiredFinalStatement": "M20T testnet evidence is NOT mainnet route freeze evidence and does not unlock production BuybackBurn."
+}

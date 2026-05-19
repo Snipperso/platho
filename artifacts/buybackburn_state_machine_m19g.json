@@ -1,0 +1,39 @@
+{
+  "document": "PLATHO.V1.BUYBACKBURN_ROUTE_INDEPENDENT_STATE_MACHINE_M19G",
+  "status": "FREEZE_CANDIDATE_NOT_PRODUCTION_CONTRACT",
+  "routeFreezeRequired": true,
+  "productionBuybackBurnImplementationReady": false,
+  "candidateOps": {
+    "ExecuteBuybackChunk": "0xF7869E84",
+    "StonfiRouteRefunded": "0xA1E973FE",
+    "RetryAthBurnDue": "0x92023D4C"
+  },
+  "values": {
+    "buybackOfferAmountNanotons": "50000000000",
+    "routeForwardGasNanotons": "1000000000",
+    "ptonTransferGasNanotons": "50000000",
+    "routeTotalValueNanotons": "51050000000"
+  },
+  "states": [
+    "IDLE",
+    "PENDING_STONFI_SWAP",
+    "PENDING_ATH_BURN"
+  ],
+  "transitions": [
+    "IDLE --ExecuteBuybackChunk(routeFreezeReady, exact 50 TON offer, 51.05 TON total, dex_min_out checks)--> PENDING_STONFI_SWAP",
+    "PENDING_STONFI_SWAP --official BuybackBurn ATH wallet notification amount >= dex_min_out--> PENDING_ATH_BURN",
+    "PENDING_STONFI_SWAP --route refund/failure proof--> IDLE + routeRefundDueNanotons",
+    "PENDING_ATH_BURN --ATHBurnFinalized from ATH Master exact amount--> IDLE + burnedAthAtomic",
+    "PENDING_ATH_BURN --ATHBurnFailed from official ATH wallet exact amount--> IDLE + athBurnRetryDueAtomic"
+  ],
+  "forbidden": [
+    "production BuybackBurn before STON.fi route freeze",
+    "fallback route",
+    "route switch",
+    "DeDust route",
+    "ignored-error send mode for money sends",
+    "clearing pending swap from router payload claims without ATH receipt",
+    "clearing pending burn without ATHBurnFinalized from ATH Master",
+    "treating transfer-to-dead-address as burn"
+  ]
+}

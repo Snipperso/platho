@@ -1,0 +1,106 @@
+{
+  "document": "PLATHO.V1.STONFI_ROUTE_EVIDENCE_DOSSIER_M19F",
+  "status": "TEMPLATE_NOT_FINAL_ROUTE_FREEZE",
+  "operatorGuideVersion": "M19F",
+  "immutableRules": {
+    "noProductionBuybackBurnUntilRouteFreezeReady": true,
+    "offerAmountNanotonsMustEqual": "50000000000",
+    "conservativeTotalSendValueNanotonsMustEqual": "51050000000",
+    "refundAndExcessReceiverMustBe": "BuybackBurn",
+    "successSignalMustBe": "ATH receipt by official BuybackBurn ATH wallet, then ATHBurnFinalized from ATH Master"
+  },
+  "requiredEvidenceChecklist": {
+    "athMasterAddressFinal": false,
+    "buybackBurnStateInitAddressFinal": false,
+    "buybackBurnOfficialAthWalletDerived": false,
+    "stonfiRouterAddressPinned": false,
+    "stonfiPoolAddressTonAthPinned": false,
+    "stonfiPtonWalletAddressPinned": false,
+    "codeHashesCaptured": false,
+    "officialSdkOrApiTxParamsCaptured": false,
+    "liveQuoteCaptured": false,
+    "successExcessesObservedToBuybackBurn": false,
+    "minOutFailureRefundObservedToBuybackBurn": false,
+    "ptonRefundObservedToBuybackBurn": false,
+    "bounceOrFailureBehaviorDocumented": false
+  },
+  "evidenceRefs": {
+    "athDeploymentManifest": "required: ATH deployment manifest artifact path/hash",
+    "buybackBurnStateInitVector": "required: BuybackBurn StateInit vector artifact path/hash",
+    "officialAthWalletDerivationVector": "required: official BuybackBurn ATH wallet derivation vector path/hash",
+    "stonfiSdkOrApiTxParams": "required: official @ston-fi/sdk/API tx params capture path/hash",
+    "liveQuote": "required: quote source, block/seqno/timestamp, and output amount path/hash",
+    "codeHashProofs": "required: router/pool/pTON code hash evidence path/hash",
+    "successExcessProof": "required: successful swap evidence where excesses return to BuybackBurn",
+    "minOutFailureRefundProof": "required: min_out failure evidence where refund returns to BuybackBurn",
+    "ptonRefundProof": "required: pTON refund evidence where refund returns to BuybackBurn",
+    "bounceOrFailureBehaviorProof": "required: documented router/pTON/pool bounce/failure behavior evidence"
+  },
+  "liveEvidenceInput": {
+    "document": "PLATHO.V1.STONFI_LIVE_EVIDENCE_INPUT_M19E",
+    "status": "TEMPLATE_NOT_FINAL_ROUTE_FREEZE",
+    "candidateLabel": "FILL_FROM_OFFICIAL_STONFI_V2_1_SDK_OR_API_TX_SAMPLE",
+    "officialSource": {
+      "package": "@ston-fi/sdk",
+      "version": "2.7.0",
+      "repository": "https://github.com/ston-fi/sdk/tree/main/packages/sdk",
+      "dexExport": "@ston-fi/sdk/dex/v2_1",
+      "sourceFiles": [
+        "src/contracts/dex/v2_1/router/BaseRouterV2_1.ts",
+        "src/contracts/dex/v2_1/constants.ts",
+        "src/contracts/pTON/v2_1/PtonV2_1.ts",
+        "src/contracts/pTON/v2_1/constants.ts"
+      ]
+    },
+    "addresses": {
+      "athMasterAddress": "EQ... final Platho ATH master address",
+      "buybackBurnAddress": "EQ... final BuybackBurn StateInit address",
+      "buybackBurnOfficialAthWalletAddress": "EQ... official BuybackBurn ATH wallet address",
+      "stonfiRouterAddress": "EQ... selected STON.fi v2.1 router address",
+      "stonfiPoolAddressTonAth": "EQ... selected STON.fi TON/ATH pool address",
+      "stonfiPtonWalletAddress": "EQ... pTON wallet / proxy address used by selected router route",
+      "stonfiVaultAddress": null,
+      "askJettonWalletAddress": "EQ... router-side ATH jetton wallet address used as ask_jetton_wallet_address"
+    },
+    "codeHashes": {
+      "athMasterCodeHash": "64 lowercase hex chars",
+      "athWalletCodeHash": "64 lowercase hex chars",
+      "stonfiRouterCodeHash": "64 lowercase hex chars",
+      "stonfiPoolCodeHash": "64 lowercase hex chars",
+      "stonfiPtonCodeHash": "64 lowercase hex chars",
+      "stonfiVaultCodeHash": null
+    },
+    "swap": {
+      "queryId": "uint64 decimal string from captured SDK/API tx params",
+      "deadline": "uint64 decimal string from captured SDK/API tx params",
+      "quoteOutAtomicAth": "live quote output in atomic ATH units",
+      "dexMinOutAtomicAth": "min_out used in captured SDK/API tx params",
+      "buybackMinAthOutPer50TonAtomic": "pinned circuit-breaker min ATH out for 50 TON"
+    },
+    "sdkTxParams": {
+      "source": "official_stonfi_sdk_or_api",
+      "sdkPackage": "@ston-fi/sdk",
+      "sdkVersion": "2.7.0 or exact official SDK/API version used",
+      "capturedAt": "ISO timestamp / block / tx evidence reference",
+      "to": "must equal stonfiPtonWalletAddress",
+      "valueNanotons": "51050000000",
+      "bodyBocBase64": "base64 BOC of official SDK/API pTON TON-transfer tx body"
+    },
+    "liveProofs": {
+      "sdkOrApiTxParamsCaptured": false,
+      "liveQuoteCaptured": false,
+      "successExcessesAddressObservedAsBuybackBurn": false,
+      "minOutFailureRefundObservedAsBuybackBurn": false,
+      "ptonRefundObservedAsBuybackBurn": false,
+      "bounceOrFailureBehaviorDocumented": false,
+      "evidenceRefs": {
+        "sdkTxParams": "required: file path / tx hash / capture id",
+        "liveQuote": "required: quote source and timestamp/block",
+        "successExcess": "required: successful swap tx evidence where excesses return to BuybackBurn",
+        "minOutFailureRefund": "required: failed min_out tx evidence where refund returns to BuybackBurn",
+        "ptonRefund": "required: pTON refund evidence where refund returns to BuybackBurn",
+        "bounceOrFailureBehavior": "required: router/pTON/pool bounce/failure behavior notes and tx evidence"
+      }
+    }
+  }
+}

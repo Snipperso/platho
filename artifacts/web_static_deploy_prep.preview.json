@@ -1,0 +1,820 @@
+{
+  "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
+  "generatedAt": "2026-05-18T20:47:29.335Z",
+  "mode": "preview",
+  "domain": "platho.app",
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
+  "status": "PREVIEW_STATIC_PACKAGE_READY",
+  "productionReady": false,
+  "noBackendRuntime": true,
+  "runtime": {
+    "fileCount": 102,
+    "totalBytes": 1917048,
+    "bundleSha256": "1beec3bc6c9c24833a870faf9e763d8d80f1ee89135b3b8b33c3c4f54d691bb4",
+    "files": [
+      {
+        "path": "app.js",
+        "bytes": 39595,
+        "sha256": "3556c2f2605db552eba89a4078f8cddde49e3183bf6b5f28f0abc58038c96dc5"
+      },
+      {
+        "path": "assets/icons/attach.svg",
+        "bytes": 313,
+        "sha256": "471c5657a2c13b70b4a0b03880280f84c3fdddcd3358bc3c97044beca78eb38a"
+      },
+      {
+        "path": "assets/icons/bolt.svg",
+        "bytes": 158,
+        "sha256": "eb0ec5676386cf19d3958d025e68e4810656d2f48e506a7f2d8bd457a0ac3499"
+      },
+      {
+        "path": "assets/icons/broadcast.svg",
+        "bytes": 279,
+        "sha256": "0b3cae7dd7189d68b2fa0c310d68808732747a168d2d0b48471f1f7f9380e092"
+      },
+      {
+        "path": "assets/icons/call.svg",
+        "bytes": 376,
+        "sha256": "bfa933b57624df33c216d89dad3104f113ed96d0b0d11f539f256ba4728523db"
+      },
+      {
+        "path": "assets/icons/chat.svg",
+        "bytes": 248,
+        "sha256": "6460c12c558a1f7347a864d1e573e23c6ffb937b15aa14ea7a0be87a8ff09865"
+      },
+      {
+        "path": "assets/icons/down.svg",
+        "bytes": 159,
+        "sha256": "9fc33e039235c691d16b236ab611161d3336171e0b3725b5dace77d6acda5d77"
+      },
+      {
+        "path": "assets/icons/gear.svg",
+        "bytes": 461,
+        "sha256": "e24a041c2f714b34bba311bdd2470d7324cf305c1f6177c77713a4cb2fe8482b"
+      },
+      {
+        "path": "assets/icons/more.svg",
+        "bytes": 191,
+        "sha256": "cb7316286ab5754c167f42e8ca4582e9ec52855a20dd9d96e8de8cc0f7d5e650"
+      },
+      {
+        "path": "assets/icons/plus.svg",
+        "bytes": 125,
+        "sha256": "069b59def41c91b277ff0bec92a23f1f1d4390ea49f44c36061a3477fe31b9ed"
+      },
+      {
+        "path": "assets/icons/refresh.svg",
+        "bytes": 179,
+        "sha256": "4f048af36124055cd90589bcd36d25555b595ee2e008bda281934b6f8d3c5030"
+      },
+      {
+        "path": "assets/icons/search.svg",
+        "bytes": 190,
+        "sha256": "ed6a2bb9d9bc98392ffd80113080cb752762079d1c5cd73b46de16faf1752259"
+      },
+      {
+        "path": "assets/icons/send.svg",
+        "bytes": 121,
+        "sha256": "1f97393d8878559a4ecd18144f30269a629ab99e2f4d01f1ec9f21957b88afc0"
+      },
+      {
+        "path": "assets/icons/up.svg",
+        "bytes": 157,
+        "sha256": "ba98de683017cc6d1dc135a1433fa8e30d0dbd913b2bd3c193837d13269aee53"
+      },
+      {
+        "path": "assets/icons/user.svg",
+        "bytes": 214,
+        "sha256": "79b433583ec44587eacd129d0f6f8f02ef279f91566e80be47e69e00ffa4989f"
+      },
+      {
+        "path": "assets/icons/vault.svg",
+        "bytes": 314,
+        "sha256": "0becc342f4c8e329bd1ebdd9448c9224e820ba8bea5563ea88e8c18e19dd3452"
+      },
+      {
+        "path": "assets/platho-icon.png",
+        "bytes": 3215,
+        "sha256": "aa0b6d9a2140848da96192d1b8c52a74d7dafbe89f68e47a4d6017f2b1b8f05a"
+      },
+      {
+        "path": "assets/platho-icon.svg",
+        "bytes": 356,
+        "sha256": "19b3be4429420b0bc5ebbaf033bd8700bacfbcaf9bf7cd497a4800b8dbeb9ee7"
+      },
+      {
+        "path": "crypto/platho-crypto.mjs",
+        "bytes": 70123,
+        "sha256": "d405ca9af903da9e870eec82255049b8d10c617035180715ab4875a41166e0f8"
+      },
+      {
+        "path": "crypto/ton-wallet-stateinit.mjs",
+        "bytes": 17160,
+        "sha256": "3dd87e86cdfc1a800055707d64e8a61b6609202d3baac07d7942718eeb420550"
+      },
+      {
+        "path": "encrypted-message-store.mjs",
+        "bytes": 10578,
+        "sha256": "bce04356e561ed060b9174c01d09eae3a7abefca59c468f1cd5fc3cebe37df1f"
+      },
+      {
+        "path": "index.html",
+        "bytes": 10657,
+        "sha256": "982ca8782c2529e7b5853e0a285b2525c2865479b9aee1eeb295789ec0a574aa"
+      },
+      {
+        "path": "manifest.webmanifest",
+        "bytes": 552,
+        "sha256": "eee17433e3981b1dc8157f80e4d183a94bf824394c0fa91743afa4727e4d0e3d"
+      },
+      {
+        "path": "no-backend-transport.mjs",
+        "bytes": 6759,
+        "sha256": "9ef144c17e478cca2361582b7880ef2dbb344fd1882d13d46c7c60f082ac0a6d"
+      },
+      {
+        "path": "platho-config.mjs",
+        "bytes": 6856,
+        "sha256": "912dd33d64c80c32a3a4418990385f1bae52a57ec9a39039d1254e66f791c5ad"
+      },
+      {
+        "path": "replay-store.mjs",
+        "bytes": 2994,
+        "sha256": "2a5631fb24440feefd6632cf85aae72593c665a00befdbe80d1ee87ac35e2fc4"
+      },
+      {
+        "path": "styles.css",
+        "bytes": 16083,
+        "sha256": "38a2e525682c91dd0b8fc54d3860eb5d64ab9af1132baf022e4ac8eb7b99a988"
+      },
+      {
+        "path": "sw.js",
+        "bytes": 2051,
+        "sha256": "856eb63555e6f802479132bea70c70ffce1fbeb79a1b20dff2447408bf3fccf9"
+      },
+      {
+        "path": "tonconnect-manifest.json",
+        "bytes": 112,
+        "sha256": "20e0f1e497cd0db34efedb4c6bca3350c9e8c0e28b7829b0dcfeb39d1e364754"
+      },
+      {
+        "path": "transport-share.mjs",
+        "bytes": 2046,
+        "sha256": "c912681964a2467ffd83f4e0d7edd23bbb94d8c393a77858d71234a09c9d739a"
+      },
+      {
+        "path": "vault-chain-provider.mjs",
+        "bytes": 6284,
+        "sha256": "160f8e0d065e8ef47b96795eaac41d7da80faa4e0196510276f750643d82ad18"
+      },
+      {
+        "path": "vault-ton-rpc-provider.mjs",
+        "bytes": 13479,
+        "sha256": "9769b9c7ffb8f775243306f139278aacd82727381497c06913cdf7e62ea1902e"
+      },
+      {
+        "path": "vendor/@noble/ciphers/LICENSE",
+        "bytes": 1161,
+        "sha256": "f36671a5487c9c5050efacb58011c37c24c55a889803cb036cf9d9a6347c1e2d"
+      },
+      {
+        "path": "vendor/@noble/ciphers/_arx.js",
+        "bytes": 16542,
+        "sha256": "716513b7eaa43115c3371420094eaa7dfb6d9d28d928e4237e705df1e9e2e2e1"
+      },
+      {
+        "path": "vendor/@noble/ciphers/_poly1305.js",
+        "bytes": 14291,
+        "sha256": "add658c1b6aaf894c023083ed14bd1d1126e15baa9e63ba97664c28e68a01703"
+      },
+      {
+        "path": "vendor/@noble/ciphers/_polyval.js",
+        "bytes": 12947,
+        "sha256": "87a6cdf9cad2cec61229404cc7f8da1214952a76114b8a6342a3e771f1127cd1"
+      },
+      {
+        "path": "vendor/@noble/ciphers/aes.js",
+        "bytes": 76796,
+        "sha256": "d079978bb7dac51e88586dd881ea3d7be010624b876d332f395f4a2b934f5fbc"
+      },
+      {
+        "path": "vendor/@noble/ciphers/chacha.js",
+        "bytes": 22648,
+        "sha256": "78a9d8f9e4061212370dd216debe1e8a0cc52b7f2f94325fe278af039f033e80"
+      },
+      {
+        "path": "vendor/@noble/ciphers/ff1.js",
+        "bytes": 8117,
+        "sha256": "c13c255ba20d60a3f19ff6446e72ecc623420c6952f56c1b9c31dca49b0cd25a"
+      },
+      {
+        "path": "vendor/@noble/ciphers/index.js",
+        "bytes": 1102,
+        "sha256": "38cb06129f98972c1ee031afc63e10c285d66384da60299e32d8cabd4b5625c9"
+      },
+      {
+        "path": "vendor/@noble/ciphers/package.json",
+        "bytes": 2449,
+        "sha256": "4038bb147bd3e6e862fcf93c2cb119007a6474038421f29a6a7d32967c6a1a1c"
+      },
+      {
+        "path": "vendor/@noble/ciphers/salsa.js",
+        "bytes": 15730,
+        "sha256": "624617b6135a84e68e4eafcd80b45d7c0406330641cfc18b978b3918b35838d3"
+      },
+      {
+        "path": "vendor/@noble/ciphers/utils.js",
+        "bytes": 29143,
+        "sha256": "cfb9806b3339c79544a48a7026ee3c868cd1f0a1555c5eef4854b7eec43ccb63"
+      },
+      {
+        "path": "vendor/@noble/ciphers/webcrypto.js",
+        "bytes": 6616,
+        "sha256": "eb4786239603cf1cd0dc21ee34faad0062e9a8b7c6d597f74ec09d84d02354f6"
+      },
+      {
+        "path": "vendor/@noble/curves/LICENSE",
+        "bytes": 1109,
+        "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/bls.js",
+        "bytes": 19813,
+        "sha256": "85d8a2c893c5dc68399620edb069125533fa7e894d7b25231d3077239398b425"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/curve.js",
+        "bytes": 24560,
+        "sha256": "fa597b90ed89a5c9fc659231b2af94679c290724d2db419fee0c3e3902902fb3"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/edwards.js",
+        "bytes": 30593,
+        "sha256": "4b58e733183b915d1b4c73c675e54f3d24e895f04ddff21bbb19dd848dae3c9e"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/fft.js",
+        "bytes": 21482,
+        "sha256": "b3ad080004e7d6db3839fef60de78ec12847ff508bd6a44c7e58c4658e5202b3"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/frost.js",
+        "bytes": 36562,
+        "sha256": "30ea2d4cb60117b06ea74cd06d1ee1a1270d2df728407fa437c7d5e382946591"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/hash-to-curve.js",
+        "bytes": 14886,
+        "sha256": "5ea9542031ac4c9c94e6817de1384d52b68fcfde9724fe06a06f3ab613a74c3f"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/modular.js",
+        "bytes": 33433,
+        "sha256": "3af2a1f790880bcffb7730f53b4a91ab87c32701be8f1848a236cfae83b1101b"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/montgomery.js",
+        "bytes": 7346,
+        "sha256": "86f9e542f8781197a3ba0de7a5456fb7d10eb23ffbdbf25ac3937aae0044b805"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/oprf.js",
+        "bytes": 17227,
+        "sha256": "26105837d73772874441a0b77c1bc292c35385cb46bdbd076c70dc59fb0ff0fa"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/poseidon.js",
+        "bytes": 18491,
+        "sha256": "c436d17050b6061fa4cb51262126cb7249bbf9d886133313c17f1bf87e6eab0f"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/tower.js",
+        "bytes": 35183,
+        "sha256": "86defd3414b13d629f527ef9d6db2090b696caa2fca7dd21eafb88c5329ed655"
+      },
+      {
+        "path": "vendor/@noble/curves/abstract/weierstrass.js",
+        "bytes": 63508,
+        "sha256": "188310386593be023ffadfd2fefc69b5efa79a63e0362bb8c9c11f0d5f4e673b"
+      },
+      {
+        "path": "vendor/@noble/curves/bls12-381.js",
+        "bytes": 32572,
+        "sha256": "a3bbb0a3ed0f1350a9a5bc0d7f8a454c851c670667ca3b3aaaba0a8d7115269a"
+      },
+      {
+        "path": "vendor/@noble/curves/bn254.js",
+        "bytes": 10726,
+        "sha256": "8dee7249cce4cbef90e297876c4959f56cebc09a483b48819d33b33e9b0ea057"
+      },
+      {
+        "path": "vendor/@noble/curves/ed25519.js",
+        "bytes": 28545,
+        "sha256": "28c6fd6157fe2d1c69ea4751844c3d8fe3ee1a496b4f10fb7b48a51c48857a21"
+      },
+      {
+        "path": "vendor/@noble/curves/ed448.js",
+        "bytes": 28149,
+        "sha256": "726f64e0d4bb2ed48d08c585c399676e45c8da672060c4edc6fe2abba816105f"
+      },
+      {
+        "path": "vendor/@noble/curves/index.js",
+        "bytes": 1467,
+        "sha256": "90cbdb0ee3135186dc63c6f640844d73907a4e7e2bebb7f7976fced115053fa2"
+      },
+      {
+        "path": "vendor/@noble/curves/misc.js",
+        "bytes": 10649,
+        "sha256": "1afe7ddde9822da4e11357e5bc838de94af5252c11b83cf094c1b837062173cb"
+      },
+      {
+        "path": "vendor/@noble/curves/nist.js",
+        "bytes": 11300,
+        "sha256": "1e577b2c76b769a585b402ca166614f1ae3c75116406889acddebba12c72c62d"
+      },
+      {
+        "path": "vendor/@noble/curves/package.json",
+        "bytes": 3243,
+        "sha256": "b305a9a8e20df7767458bff98aafb7423cb39e00f543fffea5a9e0b88e0ada9e"
+      },
+      {
+        "path": "vendor/@noble/curves/secp256k1.js",
+        "bytes": 20086,
+        "sha256": "ebd20b0ca873941f2186ddb0dbffeed25dda749d182298fe5f0d58fb2c6bb486"
+      },
+      {
+        "path": "vendor/@noble/curves/utils.js",
+        "bytes": 19271,
+        "sha256": "b4847e39fbb4a93e2a3e9f3945e41eabf6d58da5898cddaf45f7ed768f0e3758"
+      },
+      {
+        "path": "vendor/@noble/curves/webcrypto.js",
+        "bytes": 16890,
+        "sha256": "f64c2a0dcebe5423a7472316a456108b330dcac9f8e5a8240fa79432fcd984d4"
+      },
+      {
+        "path": "vendor/@noble/hashes/LICENSE",
+        "bytes": 1109,
+        "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec"
+      },
+      {
+        "path": "vendor/@noble/hashes/_blake.js",
+        "bytes": 2240,
+        "sha256": "d25543ec4f84723fa4aec60d2d55a90b51bb7eeb9f70c747f2f55503e67ee75b"
+      },
+      {
+        "path": "vendor/@noble/hashes/_md.js",
+        "bytes": 8372,
+        "sha256": "8227b9b5cabf078a9d7f7317f7a1ace6e46627539aa9364667aec724e1636f14"
+      },
+      {
+        "path": "vendor/@noble/hashes/_u64.js",
+        "bytes": 4972,
+        "sha256": "766b91a693a798f9d3cde97b25db4a6d0cef66b2ca21153d3d42424d37878870"
+      },
+      {
+        "path": "vendor/@noble/hashes/argon2.js",
+        "bytes": 23604,
+        "sha256": "234745e4cdeb7dda6df63f828532ba79463714778f772c6546066d489e28656b"
+      },
+      {
+        "path": "vendor/@noble/hashes/blake1.js",
+        "bytes": 23205,
+        "sha256": "88a0649706a8a01495028458a466f71eae83dc76a14a3a501dde7e086ce9d180"
+      },
+      {
+        "path": "vendor/@noble/hashes/blake2.js",
+        "bytes": 20415,
+        "sha256": "0349c61ff467cb14d413421b212616c0343f4dd4e36a0b1d626e1847dcabafd5"
+      },
+      {
+        "path": "vendor/@noble/hashes/blake3.js",
+        "bytes": 11322,
+        "sha256": "fa2cf9aa74cc1a4c2e3a3c4b6bc2c9e7b060fa01f9b8b472ba9cfa6cdb516563"
+      },
+      {
+        "path": "vendor/@noble/hashes/eskdf.js",
+        "bytes": 9488,
+        "sha256": "0e9224c728638dd84c5ae36bc3bd497ba5d469d79ffe4a678aa14542066aca53"
+      },
+      {
+        "path": "vendor/@noble/hashes/hkdf.js",
+        "bytes": 5315,
+        "sha256": "c0de209ef30cc76c14781d7746e6802b44eb17b7bfad6c07e5c17c5806c9836d"
+      },
+      {
+        "path": "vendor/@noble/hashes/hmac.js",
+        "bytes": 3143,
+        "sha256": "137ed94227806b351a55b09801287a4dba72d2a35d3838730becf641271bc3dd"
+      },
+      {
+        "path": "vendor/@noble/hashes/index.js",
+        "bytes": 1166,
+        "sha256": "3c9667faad18381e2bb97e6cb66db21f61bd25eb38d0b433619bb25c463f0355"
+      },
+      {
+        "path": "vendor/@noble/hashes/legacy.js",
+        "bytes": 11867,
+        "sha256": "4722d1db35565d162f60f56065a6c283397188f582255b2a3cef809837b254cd"
+      },
+      {
+        "path": "vendor/@noble/hashes/package.json",
+        "bytes": 2971,
+        "sha256": "df2580ed1896b0deffc07437c6a8d83fcf233e4c4c1e77c12e491563222c4719"
+      },
+      {
+        "path": "vendor/@noble/hashes/pbkdf2.js",
+        "bytes": 6004,
+        "sha256": "d61f870b99cf8e67b6df0ae5f582c74177445844d6a92ea51e8060032d05b555"
+      },
+      {
+        "path": "vendor/@noble/hashes/scrypt.js",
+        "bytes": 12029,
+        "sha256": "fa8355cfeac385ec3bedf5902c51f109df3a16622c7efa9926f5dc4cdf9361c2"
+      },
+      {
+        "path": "vendor/@noble/hashes/sha2.js",
+        "bytes": 19112,
+        "sha256": "0fb8e3c3f2c73a890be2524ac5d2542aaed4decff69e561231a86131203b3973"
+      },
+      {
+        "path": "vendor/@noble/hashes/sha3-addons.js",
+        "bytes": 30659,
+        "sha256": "2111ee351601d648828ce66b532662cf1f1e2fa27ae2e4b1bbecf97159fb301f"
+      },
+      {
+        "path": "vendor/@noble/hashes/sha3.js",
+        "bytes": 14905,
+        "sha256": "55b453d0a65c657aa408ec86d4ea8dd8f96740cd68963ea9ef180db4004f878f"
+      },
+      {
+        "path": "vendor/@noble/hashes/utils.js",
+        "bytes": 20182,
+        "sha256": "e2adfc13c846487feff0410bd5508a1d66f5ebadc3188f3a40a6b55449981e2f"
+      },
+      {
+        "path": "vendor/@noble/hashes/webcrypto.js",
+        "bytes": 6841,
+        "sha256": "549577dbf7db80b5faad042045eb4f39692088578bf4a4603b31f781b5e7ca9e"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/LICENSE",
+        "bytes": 1109,
+        "sha256": "0dea4b70b40ca57e3cfe30186e3dbd245147fe4d83ac566e92e70203aac59034"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/_crystals.js",
+        "bytes": 7752,
+        "sha256": "7ff49f3f09213990027d5f307df5c84b36c9a47313a7d1069acd581b3e30eada"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/falcon.js",
+        "bytes": 126747,
+        "sha256": "19ccfacfdf97eb9330cde5628133b6ccb7e425ac9af3a48ad9c4d7fff90c0f56"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/hybrid.js",
+        "bytes": 32893,
+        "sha256": "d34a54df90fe07baf2af075aab4c046ac5f06caf3af1998f82a9b711c727a140"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/index.js",
+        "bytes": 1045,
+        "sha256": "4c196731af6be58a3d86c7a79ab12778cd925c05526a927a279595600a3a3ee7"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/ml-dsa.js",
+        "bytes": 29265,
+        "sha256": "210a020b4933275edf89201e2a5168ee404190f2d5cfa676d0cb13b7a1072276"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/ml-kem.js",
+        "bytes": 20106,
+        "sha256": "c008845afa0118b39f2e37c5a4dc83cecac5bb7fef261d68fb4ca9561c58a326"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/package.json",
+        "bytes": 2426,
+        "sha256": "40963a943deda8d07352543d7263316b7bac48b04bab121d3cf4d6fcce5a47f9"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/slh-dsa.js",
+        "bytes": 34525,
+        "sha256": "8f51711a4fbd32bc25efcd73f6fda77a2971af279f8d5f165fa93881cab2c1a7"
+      },
+      {
+        "path": "vendor/@noble/post-quantum/utils.js",
+        "bytes": 15333,
+        "sha256": "b3d97248f0a16ea60119de0585def637a8aa3f27c4124d8825e1709588de53f8"
+      },
+      {
+        "path": "vendor/@tonconnect/ui/tonconnect-ui.min.js",
+        "bytes": 422763,
+        "sha256": "ab1d010e9b9d9af37e98bdfa6248068eccdbeb7bbbee99d86364abd1d9a7611a"
+      },
+      {
+        "path": "vendor/qrcode-generator/package.json",
+        "bytes": 632,
+        "sha256": "c5f5225b0eff05b3073b8ed89f5b45ec48e6619b62490d89da75383f2063afbd"
+      },
+      {
+        "path": "vendor/qrcode-generator/qrcode.js",
+        "bytes": 56513,
+        "sha256": "b8c4e98c89451099ebab4759c4b399cbcf488e8edf593fdfa976ef80cee693f5"
+      }
+    ],
+    "excludedWebFiles": [
+      "CRYPTO_PROTOCOL.md",
+      "NO_BACKEND_ARCHITECTURE.md",
+      "preview-desktop.png",
+      "preview-mobile.png",
+      "static-server.js",
+      "vendor/@noble/ciphers/README.md",
+      "vendor/@noble/ciphers/_arx.d.ts",
+      "vendor/@noble/ciphers/_arx.d.ts.map",
+      "vendor/@noble/ciphers/_arx.js.map",
+      "vendor/@noble/ciphers/_poly1305.d.ts",
+      "vendor/@noble/ciphers/_poly1305.d.ts.map",
+      "vendor/@noble/ciphers/_poly1305.js.map",
+      "vendor/@noble/ciphers/_polyval.d.ts",
+      "vendor/@noble/ciphers/_polyval.d.ts.map",
+      "vendor/@noble/ciphers/_polyval.js.map",
+      "vendor/@noble/ciphers/aes.d.ts",
+      "vendor/@noble/ciphers/aes.d.ts.map",
+      "vendor/@noble/ciphers/aes.js.map",
+      "vendor/@noble/ciphers/chacha.d.ts",
+      "vendor/@noble/ciphers/chacha.d.ts.map",
+      "vendor/@noble/ciphers/chacha.js.map",
+      "vendor/@noble/ciphers/ff1.d.ts",
+      "vendor/@noble/ciphers/ff1.d.ts.map",
+      "vendor/@noble/ciphers/ff1.js.map",
+      "vendor/@noble/ciphers/index.d.ts",
+      "vendor/@noble/ciphers/index.d.ts.map",
+      "vendor/@noble/ciphers/index.js.map",
+      "vendor/@noble/ciphers/salsa.d.ts",
+      "vendor/@noble/ciphers/salsa.d.ts.map",
+      "vendor/@noble/ciphers/salsa.js.map",
+      "vendor/@noble/ciphers/src/_arx.ts",
+      "vendor/@noble/ciphers/src/_poly1305.ts",
+      "vendor/@noble/ciphers/src/_polyval.ts",
+      "vendor/@noble/ciphers/src/aes.ts",
+      "vendor/@noble/ciphers/src/chacha.ts",
+      "vendor/@noble/ciphers/src/ff1.ts",
+      "vendor/@noble/ciphers/src/index.ts",
+      "vendor/@noble/ciphers/src/salsa.ts",
+      "vendor/@noble/ciphers/src/utils.ts",
+      "vendor/@noble/ciphers/src/webcrypto.ts",
+      "vendor/@noble/ciphers/utils.d.ts",
+      "vendor/@noble/ciphers/utils.d.ts.map",
+      "vendor/@noble/ciphers/utils.js.map",
+      "vendor/@noble/ciphers/webcrypto.d.ts",
+      "vendor/@noble/ciphers/webcrypto.d.ts.map",
+      "vendor/@noble/ciphers/webcrypto.js.map",
+      "vendor/@noble/curves/README.md",
+      "vendor/@noble/curves/abstract/bls.d.ts",
+      "vendor/@noble/curves/abstract/bls.d.ts.map",
+      "vendor/@noble/curves/abstract/bls.js.map",
+      "vendor/@noble/curves/abstract/curve.d.ts",
+      "vendor/@noble/curves/abstract/curve.d.ts.map",
+      "vendor/@noble/curves/abstract/curve.js.map",
+      "vendor/@noble/curves/abstract/edwards.d.ts",
+      "vendor/@noble/curves/abstract/edwards.d.ts.map",
+      "vendor/@noble/curves/abstract/edwards.js.map",
+      "vendor/@noble/curves/abstract/fft.d.ts",
+      "vendor/@noble/curves/abstract/fft.d.ts.map",
+      "vendor/@noble/curves/abstract/fft.js.map",
+      "vendor/@noble/curves/abstract/frost.d.ts",
+      "vendor/@noble/curves/abstract/frost.d.ts.map",
+      "vendor/@noble/curves/abstract/frost.js.map",
+      "vendor/@noble/curves/abstract/hash-to-curve.d.ts",
+      "vendor/@noble/curves/abstract/hash-to-curve.d.ts.map",
+      "vendor/@noble/curves/abstract/hash-to-curve.js.map",
+      "vendor/@noble/curves/abstract/modular.d.ts",
+      "vendor/@noble/curves/abstract/modular.d.ts.map",
+      "vendor/@noble/curves/abstract/modular.js.map",
+      "vendor/@noble/curves/abstract/montgomery.d.ts",
+      "vendor/@noble/curves/abstract/montgomery.d.ts.map",
+      "vendor/@noble/curves/abstract/montgomery.js.map",
+      "vendor/@noble/curves/abstract/oprf.d.ts",
+      "vendor/@noble/curves/abstract/oprf.d.ts.map",
+      "vendor/@noble/curves/abstract/oprf.js.map",
+      "vendor/@noble/curves/abstract/poseidon.d.ts",
+      "vendor/@noble/curves/abstract/poseidon.d.ts.map",
+      "vendor/@noble/curves/abstract/poseidon.js.map",
+      "vendor/@noble/curves/abstract/tower.d.ts",
+      "vendor/@noble/curves/abstract/tower.d.ts.map",
+      "vendor/@noble/curves/abstract/tower.js.map",
+      "vendor/@noble/curves/abstract/weierstrass.d.ts",
+      "vendor/@noble/curves/abstract/weierstrass.d.ts.map",
+      "vendor/@noble/curves/abstract/weierstrass.js.map",
+      "vendor/@noble/curves/bls12-381.d.ts",
+      "vendor/@noble/curves/bls12-381.d.ts.map",
+      "vendor/@noble/curves/bls12-381.js.map",
+      "vendor/@noble/curves/bn254.d.ts",
+      "vendor/@noble/curves/bn254.d.ts.map",
+      "vendor/@noble/curves/bn254.js.map",
+      "vendor/@noble/curves/ed25519.d.ts",
+      "vendor/@noble/curves/ed25519.d.ts.map",
+      "vendor/@noble/curves/ed25519.js.map",
+      "vendor/@noble/curves/ed448.d.ts",
+      "vendor/@noble/curves/ed448.d.ts.map",
+      "vendor/@noble/curves/ed448.js.map",
+      "vendor/@noble/curves/index.d.ts",
+      "vendor/@noble/curves/index.d.ts.map",
+      "vendor/@noble/curves/index.js.map",
+      "vendor/@noble/curves/misc.d.ts",
+      "vendor/@noble/curves/misc.d.ts.map",
+      "vendor/@noble/curves/misc.js.map",
+      "vendor/@noble/curves/nist.d.ts",
+      "vendor/@noble/curves/nist.d.ts.map",
+      "vendor/@noble/curves/nist.js.map",
+      "vendor/@noble/curves/secp256k1.d.ts",
+      "vendor/@noble/curves/secp256k1.d.ts.map",
+      "vendor/@noble/curves/secp256k1.js.map",
+      "vendor/@noble/curves/src/abstract/bls.ts",
+      "vendor/@noble/curves/src/abstract/curve.ts",
+      "vendor/@noble/curves/src/abstract/edwards.ts",
+      "vendor/@noble/curves/src/abstract/fft.ts",
+      "vendor/@noble/curves/src/abstract/frost.ts",
+      "vendor/@noble/curves/src/abstract/hash-to-curve.ts",
+      "vendor/@noble/curves/src/abstract/modular.ts",
+      "vendor/@noble/curves/src/abstract/montgomery.ts",
+      "vendor/@noble/curves/src/abstract/oprf.ts",
+      "vendor/@noble/curves/src/abstract/poseidon.ts",
+      "vendor/@noble/curves/src/abstract/tower.ts",
+      "vendor/@noble/curves/src/abstract/weierstrass.ts",
+      "vendor/@noble/curves/src/bls12-381.ts",
+      "vendor/@noble/curves/src/bn254.ts",
+      "vendor/@noble/curves/src/ed25519.ts",
+      "vendor/@noble/curves/src/ed448.ts",
+      "vendor/@noble/curves/src/index.ts",
+      "vendor/@noble/curves/src/misc.ts",
+      "vendor/@noble/curves/src/nist.ts",
+      "vendor/@noble/curves/src/secp256k1.ts",
+      "vendor/@noble/curves/src/utils.ts",
+      "vendor/@noble/curves/src/webcrypto.ts",
+      "vendor/@noble/curves/utils.d.ts",
+      "vendor/@noble/curves/utils.d.ts.map",
+      "vendor/@noble/curves/utils.js.map",
+      "vendor/@noble/curves/webcrypto.d.ts",
+      "vendor/@noble/curves/webcrypto.d.ts.map",
+      "vendor/@noble/curves/webcrypto.js.map",
+      "vendor/@noble/hashes/README.md",
+      "vendor/@noble/hashes/_blake.d.ts",
+      "vendor/@noble/hashes/_blake.d.ts.map",
+      "vendor/@noble/hashes/_blake.js.map",
+      "vendor/@noble/hashes/_md.d.ts",
+      "vendor/@noble/hashes/_md.d.ts.map",
+      "vendor/@noble/hashes/_md.js.map",
+      "vendor/@noble/hashes/_u64.d.ts",
+      "vendor/@noble/hashes/_u64.d.ts.map",
+      "vendor/@noble/hashes/_u64.js.map",
+      "vendor/@noble/hashes/argon2.d.ts",
+      "vendor/@noble/hashes/argon2.d.ts.map",
+      "vendor/@noble/hashes/argon2.js.map",
+      "vendor/@noble/hashes/blake1.d.ts",
+      "vendor/@noble/hashes/blake1.d.ts.map",
+      "vendor/@noble/hashes/blake1.js.map",
+      "vendor/@noble/hashes/blake2.d.ts",
+      "vendor/@noble/hashes/blake2.d.ts.map",
+      "vendor/@noble/hashes/blake2.js.map",
+      "vendor/@noble/hashes/blake3.d.ts",
+      "vendor/@noble/hashes/blake3.d.ts.map",
+      "vendor/@noble/hashes/blake3.js.map",
+      "vendor/@noble/hashes/eskdf.d.ts",
+      "vendor/@noble/hashes/eskdf.d.ts.map",
+      "vendor/@noble/hashes/eskdf.js.map",
+      "vendor/@noble/hashes/hkdf.d.ts",
+      "vendor/@noble/hashes/hkdf.d.ts.map",
+      "vendor/@noble/hashes/hkdf.js.map",
+      "vendor/@noble/hashes/hmac.d.ts",
+      "vendor/@noble/hashes/hmac.d.ts.map",
+      "vendor/@noble/hashes/hmac.js.map",
+      "vendor/@noble/hashes/index.d.ts",
+      "vendor/@noble/hashes/index.d.ts.map",
+      "vendor/@noble/hashes/index.js.map",
+      "vendor/@noble/hashes/legacy.d.ts",
+      "vendor/@noble/hashes/legacy.d.ts.map",
+      "vendor/@noble/hashes/legacy.js.map",
+      "vendor/@noble/hashes/pbkdf2.d.ts",
+      "vendor/@noble/hashes/pbkdf2.d.ts.map",
+      "vendor/@noble/hashes/pbkdf2.js.map",
+      "vendor/@noble/hashes/scrypt.d.ts",
+      "vendor/@noble/hashes/scrypt.d.ts.map",
+      "vendor/@noble/hashes/scrypt.js.map",
+      "vendor/@noble/hashes/sha2.d.ts",
+      "vendor/@noble/hashes/sha2.d.ts.map",
+      "vendor/@noble/hashes/sha2.js.map",
+      "vendor/@noble/hashes/sha3-addons.d.ts",
+      "vendor/@noble/hashes/sha3-addons.d.ts.map",
+      "vendor/@noble/hashes/sha3-addons.js.map",
+      "vendor/@noble/hashes/sha3.d.ts",
+      "vendor/@noble/hashes/sha3.d.ts.map",
+      "vendor/@noble/hashes/sha3.js.map",
+      "vendor/@noble/hashes/src/_blake.ts",
+      "vendor/@noble/hashes/src/_md.ts",
+      "vendor/@noble/hashes/src/_u64.ts",
+      "vendor/@noble/hashes/src/argon2.ts",
+      "vendor/@noble/hashes/src/blake1.ts",
+      "vendor/@noble/hashes/src/blake2.ts",
+      "vendor/@noble/hashes/src/blake3.ts",
+      "vendor/@noble/hashes/src/eskdf.ts",
+      "vendor/@noble/hashes/src/hkdf.ts",
+      "vendor/@noble/hashes/src/hmac.ts",
+      "vendor/@noble/hashes/src/index.ts",
+      "vendor/@noble/hashes/src/legacy.ts",
+      "vendor/@noble/hashes/src/pbkdf2.ts",
+      "vendor/@noble/hashes/src/scrypt.ts",
+      "vendor/@noble/hashes/src/sha2.ts",
+      "vendor/@noble/hashes/src/sha3-addons.ts",
+      "vendor/@noble/hashes/src/sha3.ts",
+      "vendor/@noble/hashes/src/utils.ts",
+      "vendor/@noble/hashes/src/webcrypto.ts",
+      "vendor/@noble/hashes/utils.d.ts",
+      "vendor/@noble/hashes/utils.d.ts.map",
+      "vendor/@noble/hashes/utils.js.map",
+      "vendor/@noble/hashes/webcrypto.d.ts",
+      "vendor/@noble/hashes/webcrypto.d.ts.map",
+      "vendor/@noble/hashes/webcrypto.js.map",
+      "vendor/@noble/post-quantum/README.md",
+      "vendor/@noble/post-quantum/_crystals.d.ts",
+      "vendor/@noble/post-quantum/_crystals.d.ts.map",
+      "vendor/@noble/post-quantum/_crystals.js.map",
+      "vendor/@noble/post-quantum/falcon.d.ts",
+      "vendor/@noble/post-quantum/falcon.d.ts.map",
+      "vendor/@noble/post-quantum/falcon.js.map",
+      "vendor/@noble/post-quantum/hybrid.d.ts",
+      "vendor/@noble/post-quantum/hybrid.d.ts.map",
+      "vendor/@noble/post-quantum/hybrid.js.map",
+      "vendor/@noble/post-quantum/index.d.ts",
+      "vendor/@noble/post-quantum/index.d.ts.map",
+      "vendor/@noble/post-quantum/index.js.map",
+      "vendor/@noble/post-quantum/ml-dsa.d.ts",
+      "vendor/@noble/post-quantum/ml-dsa.d.ts.map",
+      "vendor/@noble/post-quantum/ml-dsa.js.map",
+      "vendor/@noble/post-quantum/ml-kem.d.ts",
+      "vendor/@noble/post-quantum/ml-kem.d.ts.map",
+      "vendor/@noble/post-quantum/ml-kem.js.map",
+      "vendor/@noble/post-quantum/slh-dsa.d.ts",
+      "vendor/@noble/post-quantum/slh-dsa.d.ts.map",
+      "vendor/@noble/post-quantum/slh-dsa.js.map",
+      "vendor/@noble/post-quantum/src/_crystals.ts",
+      "vendor/@noble/post-quantum/src/falcon.ts",
+      "vendor/@noble/post-quantum/src/hybrid.ts",
+      "vendor/@noble/post-quantum/src/index.ts",
+      "vendor/@noble/post-quantum/src/ml-dsa.ts",
+      "vendor/@noble/post-quantum/src/ml-kem.ts",
+      "vendor/@noble/post-quantum/src/slh-dsa.ts",
+      "vendor/@noble/post-quantum/src/utils.ts",
+      "vendor/@noble/post-quantum/utils.d.ts",
+      "vendor/@noble/post-quantum/utils.d.ts.map",
+      "vendor/@noble/post-quantum/utils.js.map"
+    ]
+  },
+  "checks": {
+    "serviceWorkerIncluded": true,
+    "tonConnectManifestDomainMatches": true,
+    "tonConnectIconDomainMatches": true,
+    "pwaStartUrlIsStatic": true,
+    "pwaScopeIsStatic": true,
+    "envFilesIncluded": false,
+    "serverRuntimeIncluded": false,
+    "productionMarkersCleared": false
+  },
+  "blockers": [],
+  "warnings": [
+    "STATIC_PACKAGE_IS_NON_PRODUCTION",
+    "PWA_MODE_NOT_PRODUCTION",
+    "PWA_NETWORK_NOT_MAINNET",
+    "CRYPTO_PROD_REMAINING_WORK",
+    "PROD_CHECKLIST_OPEN_BLOCKERS",
+    "TESTNET_ENV_PRESENT"
+  ],
+  "productionFindings": [
+    {
+      "id": "PWA_MODE_NOT_PRODUCTION",
+      "file": "web/platho-config.mjs",
+      "message": "PWA config is not in production mode."
+    },
+    {
+      "id": "PWA_NETWORK_NOT_MAINNET",
+      "file": "web/platho-config.mjs",
+      "message": "PWA config does not target mainnet."
+    },
+    {
+      "id": "CRYPTO_PROD_REMAINING_WORK",
+      "file": "web/CRYPTO_PROTOCOL.md",
+      "message": "Crypto protocol still documents production blockers."
+    },
+    {
+      "id": "PROD_CHECKLIST_OPEN_BLOCKERS",
+      "file": "PRODUCTION_READINESS.md",
+      "message": "Production readiness checklist still has open hard blockers."
+    },
+    {
+      "id": "TESTNET_ENV_PRESENT",
+      "file": ".env.testnet.local",
+      "message": "Testnet env file is present. Production deploy must not run from this workspace/config."
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+[2026-05-15T21:05:29.594Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee
+[2026-05-15T21:05:30.859Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee state=pass
+[2026-05-15T21:05:30.861Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-03: public direct publish rejects author spoofing
+[2026-05-15T21:05:31.082Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-03: public direct publish rejects author spoofing state=pass
+[2026-05-15T21:05:31.083Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee
+[2026-05-15T21:05:31.243Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee state=pass
+[2026-05-15T21:05:31.244Z] TEST_START file=tests/capsulehub.test.ts name=CAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers
+[2026-05-15T21:05:31.468Z] TEST_END file=tests/capsulehub.test.ts name=CAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers state=pass
+[2026-05-15T21:05:31.469Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps
+[2026-05-15T21:05:31.682Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps state=pass
+[2026-05-15T21:05:31.683Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it
+[2026-05-15T21:05:31.950Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it state=pass
+[2026-05-15T21:05:31.951Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce
+[2026-05-15T21:05:32.198Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce state=pass
+[2026-05-15T21:05:32.199Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver
+[2026-05-15T21:05:32.392Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver state=pass
+[2026-05-15T21:05:32.394Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs
+[2026-05-15T21:05:32.631Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs state=pass
+[2026-05-15T21:05:32.633Z] TEST_START file=tests/capsulehub.test.ts name=CAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs
+[2026-05-15T21:05:32.863Z] TEST_END file=tests/capsulehub.test.ts name=CAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs state=pass
+[2026-05-15T21:05:32.865Z] TEST_START file=tests/capsulehub.test.ts name=CAP-REJECT-07: Vault-only publish from non-Vault sender rejected
+[2026-05-15T21:05:33.023Z] TEST_END file=tests/capsulehub.test.ts name=CAP-REJECT-07: Vault-only publish from non-Vault sender rejected state=pass
+[2026-05-15T21:05:33.025Z] TEST_START file=tests/capsulehub.test.ts name=CAP-REJECT-08: Vault publish rejects protocol_fee_paid greater than full fee
+[2026-05-15T21:05:33.186Z] TEST_END file=tests/capsulehub.test.ts name=CAP-REJECT-08: Vault publish rejects protocol_fee_paid greater than full fee state=pass
+[2026-05-15T21:05:33.187Z] TEST_START file=tests/capsulehub.test.ts name=NO-ADMIN: empty fallback rejected and cannot mutate state
+[2026-05-15T21:05:33.345Z] TEST_END file=tests/capsulehub.test.ts name=NO-ADMIN: empty fallback rejected and cannot mutate state state=pass
+[2026-05-15T21:05:35.554Z] TEST_START file=tests/vault-receive-intent.test.ts name=VAULT-HAPPY-14/15: create locks sender TON and claim credits recipient UserState
+[2026-05-15T21:05:37.194Z] TEST_END file=tests/vault-receive-intent.test.ts name=VAULT-HAPPY-14/15: create locks sender TON and claim credits recipient UserState state=pass
+[2026-05-15T21:05:37.197Z] TEST_START file=tests/vault-receive-intent.test.ts name=VAULT-HAPPY-16: cancel returns locked TON to sender and deletes intent
+[2026-05-15T21:05:37.680Z] TEST_END file=tests/vault-receive-intent.test.ts name=VAULT-HAPPY-16: cancel returns locked TON to sender and deletes intent state=pass
+[2026-05-15T21:05:37.681Z] TEST_START file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: wrong recipient or wrong secret cannot claim
+[2026-05-15T21:05:38.085Z] TEST_END file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: wrong recipient or wrong secret cannot claim state=pass
+[2026-05-15T21:05:38.086Z] TEST_START file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: duplicate intent_id and insufficient sender balance are rejected without mutation
+[2026-05-15T21:05:38.567Z] TEST_END file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: duplicate intent_id and insufficient sender balance are rejected without mutation state=pass
+[2026-05-15T21:05:38.569Z] TEST_START file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry
+[2026-05-15T21:05:38.989Z] TEST_END file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry state=pass
+[2026-05-15T21:05:38.991Z] TEST_START file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance
+[2026-05-15T21:05:39.433Z] TEST_END file=tests/vault-receive-intent.test.ts name=VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance state=pass
+[2026-05-15T21:05:41.913Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-01/02: first TON deposit creates UserState, later deposit does not create another user
+[2026-05-15T21:05:43.173Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-01/02: first TON deposit creates UserState, later deposit does not create another user state=pass
+[2026-05-15T21:05:43.174Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-04/REJECT-02B: TON withdrawal debits balance and action failure cannot leave negative state
+[2026-05-15T21:05:43.505Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-04/REJECT-02B: TON withdrawal debits balance and action failure cannot leave negative state state=pass
+[2026-05-15T21:05:43.506Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-08: OP_SET_SESSION can create UserState and SessionState with fresh session_id
+[2026-05-15T21:05:43.733Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-08: OP_SET_SESSION can create UserState and SessionState with fresh session_id state=pass
+[2026-05-15T21:05:43.734Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-08A: OP_SET_SESSION after expired active session installs fresh expiry and keeps Message Budget allocated
+[2026-05-15T21:05:44.057Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-08A: OP_SET_SESSION after expired active session installs fresh expiry and keeps Message Budget allocated state=pass
+[2026-05-15T21:05:44.059Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-09/10: Message Budget top-up requires active session and revoke returns budget to ton_balance
+[2026-05-15T21:05:44.416Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-09/10: Message Budget top-up requires active session and revoke returns budget to ton_balance state=pass
+[2026-05-15T21:05:44.418Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-09A/REJECT-06B: expired active session can revoke but cannot top up Message Budget
+[2026-05-15T21:05:44.735Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=VAULT-HAPPY-09A/REJECT-06B: expired active session can revoke but cannot top up Message Budget state=pass
+[2026-05-15T21:05:44.737Z] TEST_START file=tests/vault-session-lifecycle.test.ts name=NO-ADMIN: empty fallback is rejected and cannot mutate Vault accounting
+[2026-05-15T21:05:44.913Z] TEST_END file=tests/vault-session-lifecycle.test.ts name=NO-ADMIN: empty fallback is rejected and cannot mutate Vault accounting state=pass
+[2026-05-15T21:05:46.912Z] TEST_START file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-01/07C/07E: valid signed request consumes nonce and charges bounded invalid-signed-request amount while no CapsuleHub send exists
+[2026-05-15T21:05:48.668Z] TEST_END file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-01/07C/07E: valid signed request consumes nonce and charges bounded invalid-signed-request amount while no CapsuleHub send exists state=pass
+[2026-05-15T21:05:48.670Z] TEST_START file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation
+[2026-05-15T21:05:49.148Z] TEST_END file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation state=pass
+[2026-05-15T21:05:49.150Z] TEST_START file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-07: duplicate external request cannot be accepted twice
+[2026-05-15T21:05:49.562Z] TEST_END file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-07: duplicate external request cannot be accepted twice state=pass
+[2026-05-15T21:05:49.564Z] TEST_START file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation
+[2026-05-15T21:05:49.987Z] TEST_END file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation state=pass
+[2026-05-15T21:05:49.989Z] TEST_START file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-03: expired session rejected before mutation
+[2026-05-15T21:05:50.377Z] TEST_END file=tests/vault-external-session-gate.test.ts name=VAULT-EXT-03: expired session rejected before mutation state=pass
+[2026-05-15T21:05:52.418Z] TEST_START file=tests/vault-ath-integration.test.ts name=VAULT-HAPPY-03: first ATH deposit from official wallet creates UserState and credits ath_balance
+[2026-05-15T21:05:53.698Z] TEST_END file=tests/vault-ath-integration.test.ts name=VAULT-HAPPY-03: first ATH deposit from official wallet creates UserState and credits ath_balance state=pass
+[2026-05-15T21:05:53.701Z] TEST_START file=tests/vault-ath-integration.test.ts name=VAULT-REJECT-11: ATH notification from non-official wallet is rejected
+[2026-05-15T21:05:53.958Z] TEST_END file=tests/vault-ath-integration.test.ts name=VAULT-REJECT-11: ATH notification from non-official wallet is rejected state=pass
+[2026-05-15T21:05:53.959Z] TEST_START file=tests/vault-ath-integration.test.ts name=VAULT-REJECT-11A: first ATH deposit without sufficient forwarded TON is rejected
+[2026-05-15T21:05:54.214Z] TEST_END file=tests/vault-ath-integration.test.ts name=VAULT-REJECT-11A: first ATH deposit without sufficient forwarded TON is rejected state=pass
+[2026-05-15T21:05:54.216Z] TEST_START file=tests/vault-ath-integration.test.ts name=VAULT-HAPPY-05: ATH withdrawal debits ath_balance and clears pending on official wallet ack
+[2026-05-15T21:05:54.610Z] TEST_END file=tests/vault-ath-integration.test.ts name=VAULT-HAPPY-05: ATH withdrawal debits ath_balance and clears pending on official wallet ack state=pass
+[2026-05-15T21:05:54.612Z] TEST_START file=tests/vault-ath-integration.test.ts name=VAULT-REJECT-02A: ATH withdrawal bounce/failure restores ath_balance and clears pending
+[2026-05-15T21:05:54.928Z] TEST_END file=tests/vault-ath-integration.test.ts name=VAULT-REJECT-02A: ATH withdrawal bounce/failure restores ath_balance and clears pending state=pass
+[2026-05-15T21:05:54.929Z] TEST_START file=tests/vault-ath-integration.test.ts name=VAULT-REJECT: ATH withdrawal rejects insufficient balance without mutation
+[2026-05-15T21:05:55.255Z] TEST_END file=tests/vault-ath-integration.test.ts name=VAULT-REJECT: ATH withdrawal rejects insufficient balance without mutation state=pass
+[2026-05-15T21:05:56.957Z] TEST_START file=tests/vault-key-records.test.ts name=VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record
+[2026-05-15T21:05:58.109Z] TEST_END file=tests/vault-key-records.test.ts name=VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record state=pass
+[2026-05-15T21:05:58.112Z] TEST_START file=tests/vault-key-records.test.ts name=VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1
+[2026-05-15T21:05:58.451Z] TEST_END file=tests/vault-key-records.test.ts name=VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1 state=pass
+[2026-05-15T21:05:58.453Z] TEST_START file=tests/vault-key-records.test.ts name=VAULT-REJECT: cannot register twice and cannot replace before registration
+[2026-05-15T21:05:58.821Z] TEST_END file=tests/vault-key-records.test.ts name=VAULT-REJECT: cannot register twice and cannot replace before registration state=pass
+[2026-05-15T21:05:58.823Z] TEST_START file=tests/vault-key-records.test.ts name=VAULT-REJECT: invalid suite/key profile is rejected without mutating current key
+[2026-05-15T21:05:59.138Z] TEST_END file=tests/vault-key-records.test.ts name=VAULT-REJECT: invalid suite/key profile is rejected without mutating current key state=pass
+[2026-05-15T21:06:02.026Z] TEST_START file=tests/ath-burn-finalization.test.ts name=ATH-00: burn operation reduces total_supply by exact burned amount and debits wallet balance
+[2026-05-15T21:06:03.511Z] TEST_END file=tests/ath-burn-finalization.test.ts name=ATH-00: burn operation reduces total_supply by exact burned amount and debits wallet balance state=pass
+[2026-05-15T21:06:03.515Z] TEST_START file=tests/ath-burn-finalization.test.ts name=ATH-00C: ATH master accepts burn notification only from deterministic official ATH wallet
+[2026-05-15T21:06:03.733Z] TEST_END file=tests/ath-burn-finalization.test.ts name=ATH-00C: ATH master accepts burn notification only from deterministic official ATH wallet state=pass
+[2026-05-15T21:06:03.735Z] TEST_START file=tests/ath-burn-finalization.test.ts name=ATH-00D: wrong owner cannot burn another wallet owner balance
+[2026-05-15T21:06:03.940Z] TEST_END file=tests/ath-burn-finalization.test.ts name=ATH-00D: wrong owner cannot burn another wallet owner balance state=pass
+[2026-05-15T21:06:03.941Z] TEST_START file=tests/ath-burn-finalization.test.ts name=ATH-00B: transfer-to-dead-address is not treated as burn by ATH master
+[2026-05-15T21:06:04.097Z] TEST_END file=tests/ath-burn-finalization.test.ts name=ATH-00B: transfer-to-dead-address is not treated as burn by ATH master state=pass
+[2026-05-15T21:06:04.099Z] TEST_START file=tests/ath-burn-finalization.test.ts name=ATH-00E: underfunded ATHBurn does not debit wallet without total_supply decrease
+[2026-05-15T21:06:04.628Z] TEST_END file=tests/ath-burn-finalization.test.ts name=ATH-00E: underfunded ATHBurn does not debit wallet without total_supply decrease state=pass
+[2026-05-15T21:06:04.630Z] TEST_START file=tests/ath-burn-finalization.test.ts name=ATH-00F: burn notification bounce/failure restores wallet balance when master is unavailable
+[2026-05-15T21:06:04.849Z] TEST_END file=tests/ath-burn-finalization.test.ts name=ATH-00F: burn notification bounce/failure restores wallet balance when master is unavailable state=pass
+[2026-05-15T21:06:06.990Z] TEST_START file=tests/fee-accumulator.test.ts name=FEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only
+[2026-05-15T21:06:08.091Z] TEST_END file=tests/fee-accumulator.test.ts name=FEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only state=pass
+[2026-05-15T21:06:08.093Z] TEST_START file=tests/fee-accumulator.test.ts name=FEE-DUE-01/01A/01B: split is internal only, exact in nanotons, dust goes to buyback
+[2026-05-15T21:06:08.321Z] TEST_END file=tests/fee-accumulator.test.ts name=FEE-DUE-01/01A/01B: split is internal only, exact in nanotons, dust goes to buyback state=pass
+[2026-05-15T21:06:08.322Z] TEST_START file=tests/fee-accumulator.test.ts name=FEE-DUE-05: treasury flush uses immutable terminal receiver and debits treasury_due_ton only by requested amount
+[2026-05-15T21:06:08.497Z] TEST_END file=tests/fee-accumulator.test.ts name=FEE-DUE-05: treasury flush uses immutable terminal receiver and debits treasury_due_ton only by requested amount state=pass
+[2026-05-15T21:06:08.498Z] TEST_START file=tests/fee-accumulator.test.ts name=FEE-DUE-06: buyback flush bounce restores buyback_due_ton
+[2026-05-15T21:06:08.729Z] TEST_END file=tests/fee-accumulator.test.ts name=FEE-DUE-06: buyback flush bounce restores buyback_due_ton state=pass
+[2026-05-15T21:06:08.731Z] TEST_START file=tests/fee-accumulator.test.ts name=FEE-DUE-07: buyback flush to deployed receiver is not treated as treasury final profile
+[2026-05-15T21:06:08.963Z] TEST_END file=tests/fee-accumulator.test.ts name=FEE-DUE-07: buyback flush to deployed receiver is not treated as treasury final profile state=pass
+[2026-05-15T21:06:08.964Z] TEST_START file=tests/fee-accumulator.test.ts name=NO-ADMIN: empty fallback is rejected and cannot mutate accounting
+[2026-05-15T21:06:09.136Z] TEST_END file=tests/fee-accumulator.test.ts name=NO-ADMIN: empty fallback is rejected and cannot mutate accounting state=pass
+[2026-05-15T21:06:11.230Z] TEST_START file=tests/deployment-binding.test.ts name=DEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash
+[2026-05-15T21:06:12.727Z] TEST_END file=tests/deployment-binding.test.ts name=DEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash state=pass
+[2026-05-15T21:06:12.730Z] TEST_START file=tests/deployment-binding.test.ts name=DEPLOY-BIND-04: second binding attempt is rejected and cannot overwrite counterpart address
+[2026-05-15T21:06:13.071Z] TEST_END file=tests/deployment-binding.test.ts name=DEPLOY-BIND-04: second binding attempt is rejected and cannot overwrite counterpart address state=pass
+[2026-05-15T21:06:13.073Z] TEST_START file=tests/deployment-binding.test.ts name=DEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing
+[2026-05-15T21:06:13.435Z] TEST_END file=tests/deployment-binding.test.ts name=DEPLOY-BIND-05/06: user operations before seal are rejected and seal fails if binding is missing state=pass
+[2026-05-15T21:06:13.436Z] TEST_START file=tests/deployment-binding.test.ts name=DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal
+[2026-05-15T21:06:13.921Z] TEST_END file=tests/deployment-binding.test.ts name=DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal state=pass
+[2026-05-15T21:06:16.507Z] TEST_START file=tests/ath-wallet-derivation.test.ts name=compiled wallet code hash comes from the ATH Wallet artifact
+[2026-05-15T21:06:16.540Z] TEST_END file=tests/ath-wallet-derivation.test.ts name=compiled wallet code hash comes from the ATH Wallet artifact state=pass
+[2026-05-15T21:06:16.542Z] TEST_START file=tests/ath-wallet-derivation.test.ts name=ATH Master get_wallet_address(owner) equals local StateInit derivation
+[2026-05-15T21:06:17.461Z] TEST_END file=tests/ath-wallet-derivation.test.ts name=ATH Master get_wallet_address(owner) equals local StateInit derivation state=pass

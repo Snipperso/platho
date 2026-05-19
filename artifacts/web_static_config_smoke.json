@@ -1,0 +1,62 @@
+{
+  "document": "PLATHO.WEB_STATIC_CONFIG_SMOKE.V1",
+  "generatedAt": "2026-05-18T18:49:02.319Z",
+  "status": "PASS",
+  "checks": {
+    "configRendered": true,
+    "cryptoSelftestPassed": true,
+    "keySuiteHybrid": true,
+    "tabNavigationWorked": true,
+    "assetsOk": true,
+    "noConsoleErrors": true
+  },
+  "state": {
+    "balanceCards": 3,
+    "brandNetwork": "testnet",
+    "chatCount": "3 active threads",
+    "encryption": "hybrid passed",
+    "keySuite": "hybrid-v1 / 1184b",
+    "networkLabel": "testnet",
+    "publicFeedCount": 3,
+    "threadCount": 4,
+    "walletLabel": "v4r2 testnet",
+    "walletProof": "payload ready"
+  },
+  "views": {
+    "publicView4": "public",
+    "vaultView4": "vault",
+    "profileView4": "profile",
+    "finalView4": "chats"
+  },
+  "assets": [
+    {
+      "path": "platho-config.mjs",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "app.js",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "sw.js",
+      "ok": true,
+      "status": 200,
+      "type": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "ok": true,
+      "status": 200,
+      "type": "application/manifest+json; charset=utf-8"
+    }
+  ],
+  "consoleErrors": [],
+  "notes": [
+    "Typed message smoke was skipped because the browser automation clipboard hook is unavailable in this session; tab navigation and config-driven rendering were verified."
+  ],
+  "screenshot": "artifacts/WEB_STATIC_CONFIG_SMOKE.png"
+}

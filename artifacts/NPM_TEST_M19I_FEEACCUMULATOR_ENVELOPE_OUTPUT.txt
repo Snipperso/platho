@@ -1,0 +1,30 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m19h[39m
+
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-01: production contracts contain no ignored-error send mode, session-spender contract, or rescue/governance/admin-control message surface[32m 18[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-02: all production contracts reject empty fallback explicitly[32m 6[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-03: built code hashes match the pinned artifacts exactly[32m 183[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-01: manifest hash is canonical cell hash over sorted addresses, code hashes, state init hashes, constants, and blockers[33m 329[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-04: implemented-subset manifest remains canonical and explicitly non-final while blockers remain[32m 288[2mms[22m[39m
+ [32m✓[39m tests/m18-artifact-integrity.test.ts[2m > [22mM18 artifact integrity and reproducibility lock[2m > [22mM18-ARTIFACT-01: generated artifacts, vectors, code hashes, and implemented-subset manifest match the current build[33m 510[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts[2m > [22mM16 production conformance static checks[2m > [22mM16-CONF-05: source tree contains no extra production routes/adapters/migration hooks beyond the implemented subset[32m 4[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-01: one buyback funding envelope is 51.05 TON total while preserving exactly 50 TON offer principal[32m 8[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only[33m 1655[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-02: 100 TON accumulated protocol fees split to only 50 TON buyback due, which is insufficient for one conservative envelope[33m 1730[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-01/01A/01B: split is internal only, exact in nanotons, dust goes to buyback[32m 249[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-03: 102.10 TON accumulated protocol fees produce exactly one 51.05 TON buyback funding envelope and bounce restores it[33m 382[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-05: treasury flush uses immutable terminal receiver and debits treasury_due_ton only by requested amount[33m 396[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-04: FeeAccumulator contract pins the same 51.05 TON buyback funding envelope constant as the profile[32m 2[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts[2m > [22mM19H BuybackBurn funding envelope profile[2m > [22mM19H-05: FeeAccumulator rejects 50 TON offer principal even when buyback_due_ton can fund a full envelope[33m 367[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-06: M19H buyback flush bounce restores the complete 51.05 TON envelope[33m 409[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it[33m 2144[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-07: M19H buyback flush to deployed receiver debits exactly one complete 51.05 TON envelope[32m 228[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts[2m > [22mDeployment manifest M15 implemented-subset profile[2m > [22mDEPLOY-M15-03/06: official client profile rejects final genesis while blockers remain and detects manifest-hash mismatch[32m 74[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mFEE-DUE-08/M19H: raw 50 TON buyback offer principal is rejected as an incomplete funding envelope[32m 211[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts[2m > [22mFeeAccumulator v1 milestone[2m > [22mNO-ADMIN: empty fallback is rejected and cannot mutate accounting[32m 158[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m   Start at [22m 16:35:26
+[2m   Duration [22m 7.29s[2m (transform 4.34s, setup 0ms, import 14.09s, tests 9.39s, environment 1ms)[22m
+

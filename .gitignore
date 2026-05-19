@@ -1,0 +1,41 @@
+# Platho local/testnet secrets and machine-local state
+.env
+.env.*
+!.env.example
+!.env.testnet.example
+*.local
+*.secret
+*.mnemonic
+*.seed
+*.pem
+*.key
+
+# TON/Codex local deployment scratch
+artifacts/*_LOCAL_SECRET*
+artifacts/*_PRIVATE*
+artifacts/*_MNEMONIC*
+artifacts/*_SEED*
+artifacts/m20t_live_testnet_run.local.json
+artifacts/m20t_wallet_private.local.json
+artifacts/platho-web-static-*/
+
+# Browser smoke-test profiles and local runtime state
+.edge-smoke/
+.edge-smoke-tonconnect/
+platho-gitdir/
+gitdir-probe/
+
+# Dependencies and generated caches
+node_modules/
+coverage/
+.cache/
+.vite/
+
+# Logs and OS/editor noise
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db

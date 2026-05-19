@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/username-registry-prune-pending-mint.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1248[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected [33m 936[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending [33m 309[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 03:12:53
+[2m   Duration [22m 2.28s[2m (transform 275ms, setup 0ms, import 654ms, tests 1.25s, environment 29ms)[22m
+

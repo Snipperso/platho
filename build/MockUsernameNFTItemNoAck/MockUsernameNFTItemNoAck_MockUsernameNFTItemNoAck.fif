@@ -1,0 +1,117 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck.fc` 
+PROGRAM{
+  DECLPROC $MockUsernameNFTItemNoAck$_store
+  DECLPROC $MockUsernameNFTItemNoAck$_load
+  DECLPROC $MockUsernameNFTItemNoAck$_contract_init
+  DECLPROC $MockUsernameNFTItemNoAck$_contract_load
+  DECLPROC $MockUsernameNFTItemNoAck$_contract_store
+  DECLPROC $MockUsernameNFTItemNoAck$_fun_get_accepted_count
+  109210 DECLMETHOD %get_accepted_count
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  $MockUsernameNFTItemNoAck$_store PROCINLINE:<{
+    SWAP
+    64 STU
+  }>
+  $MockUsernameNFTItemNoAck$_load PROCINLINE:<{
+    64 LDU
+    SWAP
+  }>
+  $MockUsernameNFTItemNoAck$_contract_init PROCINLINE:<{
+    0 PUSHINT
+  }>
+  $MockUsernameNFTItemNoAck$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $MockUsernameNFTItemNoAck$_load INLINECALLDICT
+      NIP
+    }>ELSE<{
+      DROP
+      $MockUsernameNFTItemNoAck$_contract_init INLINECALLDICT
+    }>
+  }>
+  $MockUsernameNFTItemNoAck$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    SWAP
+    $MockUsernameNFTItemNoAck$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $MockUsernameNFTItemNoAck$_fun_get_accepted_count PROCREF:<{
+    DUP
+  }>
+  %get_accepted_count PROC:<{
+    $MockUsernameNFTItemNoAck$_contract_load INLINECALLDICT
+    $MockUsernameNFTItemNoAck$_fun_get_accepted_count INLINECALLDICT
+    NIP
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $MockUsernameNFTItemNoAck$_contract_load INLINECALLDICT
+    s0 s2 XCHG
+    IFJMP:<{
+      2DROP
+    }>
+    0 PUSHINT
+    OVER
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      SWAP
+      32 LDU
+      DROP
+    }>ELSE<{
+      s2 POP
+    }>
+    DUP
+    1671232620 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      INC
+      $MockUsernameNFTItemNoAck$_contract_store INLINECALLDICT
+    }>
+    DUP
+    665640843 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      $MockUsernameNFTItemNoAck$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    SWAP
+    33 LESSINT
+    AND
+    IFJMP:<{
+      18998 PUSHINT
+      THROWANY
+      $MockUsernameNFTItemNoAck$_contract_store INLINECALLDICT
+    }>
+    DROP
+    130 THROW
+  }>
+}END>c

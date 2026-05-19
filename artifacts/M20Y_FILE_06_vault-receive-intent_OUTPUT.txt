@@ -1,0 +1,16 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/vault-receive-intent.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2615[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-14/15: create locks sender TON and claim credits recipient UserState [33m 849[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-16: cancel returns locked TON to sender and deletes intent [33m 333[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: wrong recipient or wrong secret cannot claim [33m 356[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: duplicate intent_id and insufficient sender balance are rejected without mutation [33m 398[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry [33m 327[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance [33m 348[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 03:13:42
+[2m   Duration [22m 3.66s[2m (transform 277ms, setup 0ms, import 679ms, tests 2.61s, environment 28ms)[22m
+

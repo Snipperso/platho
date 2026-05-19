@@ -1,0 +1,20 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/m19g-buybackburn-state-machine.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/m20u-buybackburn-implementation-readiness.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/username-nft-item.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1197[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-NFT-01: item StateInit deterministically binds owner wallet, registry address, and name hash [33m 801[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1380[2mms[22m[39m
+     [33m[2m✓[22m[39m M19H-02: 100 TON accumulated protocol fees split to only 50 TON buyback due, which is insufficient for one conservative envelope [33m 925[2mms[22m[39m
+ [32m✓[39m tests/username-registry-foundation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1700[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-01: price getter enforces pinned name length tiers without accepting 1-3 char names [33m 962[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2067[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-01: FlushTreasuryAthDue transfers treasury due to immutable treasury ATH receiver and clears pending on ACK [33m 1362[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-02: FlushBurnAthDue burns through official ATH wallet, authenticated master ACK clears pending, and total_supply decreases exactly [33m 327[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m28 passed[39m[22m[90m (28)[39m
+[2m   Start at [22m 03:12:11
+[2m   Duration [22m 4.75s[2m (transform 2.01s, setup 0ms, import 9.00s, tests 6.36s, environment 1ms)[22m
+

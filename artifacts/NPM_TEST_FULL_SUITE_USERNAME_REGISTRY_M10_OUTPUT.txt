@@ -1,0 +1,9 @@
+npm test -- --reporter=json --outputFile=artifacts/vitest_m10_npm_results.json --testTimeout=30000
+
+success: True
+numTotalTestSuites: 30
+numPassedTestSuites: 30
+numFailedTestSuites: 0
+numTotalTests: 76
+numPassedTests: 76
+numFailedTests: 0

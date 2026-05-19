@@ -1,0 +1,335 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; M20TFeeAccumulatorHarness_M20TFeeAccumulatorHarness.headers.fc
+;;
+;; Header files for M20TFeeAccumulatorHarness
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $AcceptBurnReserve$_store
+builder $AcceptBurnReserve$_store(builder build_0, (int) v) inline;
+
+;; $AcceptBurnReserve$_store_cell
+cell $AcceptBurnReserve$_store_cell((int) v, builder b) inline;
+
+;; $AcceptBurnReserve$_load_bounced
+(slice, ((int))) $AcceptBurnReserve$_load_bounced(slice sc_0) inline;
+
+;; $M20TFeeAccumulatorHarness$_store
+builder $M20TFeeAccumulatorHarness$_store(builder build_0, (int, slice, slice, int, int, int) v) inline;
+
+;; $M20TFeeAccumulatorHarness$_load
+(slice, ((int, slice, slice, int, int, int))) $M20TFeeAccumulatorHarness$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $M20TFeeAccumulatorHarnessStateView$_to_external
+(int, slice, slice, int, int, int) $M20TFeeAccumulatorHarnessStateView$_to_external(((int, slice, slice, int, int, int)) v) inline;
+
+;; $M20TFeeAccumulatorHarness$init$_load
+(slice, ((slice, slice, int, int))) $M20TFeeAccumulatorHarness$init$_load(slice sc_0) inline;
+
+;; $M20TFeeAccumulatorHarness$_contract_init
+(int, slice, slice, int, int, int) $M20TFeeAccumulatorHarness$_contract_init(slice $controller_address, slice $buyback_burn_address, int $initial_buyback_due_ton, int $run_id) impure inline;
+
+;; $M20TFeeAccumulatorHarness$_contract_load
+(int, slice, slice, int, int, int) $M20TFeeAccumulatorHarness$_contract_load() impure inline;
+
+;; $M20TFeeAccumulatorHarness$_contract_store
+() $M20TFeeAccumulatorHarness$_contract_store((int, slice, slice, int, int, int) v) impure inline;
+
+;; $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount
+((int, slice, slice, int, int, int)) $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount(int $run_id, slice $controller_address, slice $buyback_burn_address, int $buyback_due_ton, int $flush_count, int $last_flush_amount) inline;
+
+;; $M20TFeeAccumulatorHarness$_fun_get_state
+((int, slice, slice, int, int, int), (int, slice, slice, int, int, int)) $M20TFeeAccumulatorHarness$_fun_get_state((int, slice, slice, int, int, int) $self) impure inline_ref;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $AcceptBurnReserve$_constructor_amount
+((int)) $AcceptBurnReserve$_constructor_amount(int $amount) inline;
+
+
+;; M20TFeeAccumulatorHarness_M20TFeeAccumulatorHarness.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+;; M20TFeeAccumulatorHarness_M20TFeeAccumulatorHarness.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: AcceptBurnReserve
+;; Header: 0x594ba505
+;; TLB: accept_burn_reserve#594ba505 amount:uint128 = AcceptBurnReserve
+;;
+
+builder $AcceptBurnReserve$_store(builder build_0, (int) v) inline {
+    var (v'amount) = v;
+    build_0 = store_uint(build_0, 1498129669, 32);
+    build_0 = build_0.store_uint(v'amount, 128);
+    return build_0;
+}
+
+cell $AcceptBurnReserve$_store_cell((int) v, builder b) inline {
+    return $AcceptBurnReserve$_store(b, v).end_cell();
+}
+
+(slice, ((int))) $AcceptBurnReserve$_load_bounced(slice sc_0) inline {
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'amount));
+}
+
+((int)) $AcceptBurnReserve$_constructor_amount(int $amount) inline {
+    return ($amount);
+}
+
+;;
+;; Type: M20TFeeAccumulatorHarnessStateView
+;; TLB: _ run_id:int257 controller_address:address buyback_burn_address:address buyback_due_ton:int257 flush_count:int257 last_flush_amount:int257 = M20TFeeAccumulatorHarnessStateView
+;;
+
+(int, slice, slice, int, int, int) $M20TFeeAccumulatorHarnessStateView$_to_external(((int, slice, slice, int, int, int)) v) inline {
+    var (v'run_id, v'controller_address, v'buyback_burn_address, v'buyback_due_ton, v'flush_count, v'last_flush_amount) = v; 
+    return (v'run_id, v'controller_address, v'buyback_burn_address, v'buyback_due_ton, v'flush_count, v'last_flush_amount);
+}
+
+((int, slice, slice, int, int, int)) $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount(int $run_id, slice $controller_address, slice $buyback_burn_address, int $buyback_due_ton, int $flush_count, int $last_flush_amount) inline {
+    return ($run_id, $controller_address, $buyback_burn_address, $buyback_due_ton, $flush_count, $last_flush_amount);
+}
+
+;;
+;; Type: M20TFeeAccumulatorHarness
+;; TLB: _ run_id:uint64 controller_address:address buyback_burn_address:address buyback_due_ton:uint128 flush_count:uint64 last_flush_amount:uint128 = M20TFeeAccumulatorHarness
+;;
+
+builder $M20TFeeAccumulatorHarness$_store(builder build_0, (int, slice, slice, int, int, int) v) inline {
+    var (v'run_id, v'controller_address, v'buyback_burn_address, v'buyback_due_ton, v'flush_count, v'last_flush_amount) = v;
+    build_0 = build_0.store_uint(v'run_id, 64);
+    build_0 = build_0.store_slice(v'controller_address);
+    build_0 = build_0.store_slice(v'buyback_burn_address);
+    build_0 = build_0.store_uint(v'buyback_due_ton, 128);
+    build_0 = build_0.store_uint(v'flush_count, 64);
+    build_0 = build_0.store_uint(v'last_flush_amount, 128);
+    return build_0;
+}
+
+(slice, ((int, slice, slice, int, int, int))) $M20TFeeAccumulatorHarness$_load(slice sc_0) inline {
+    var v'run_id = sc_0~load_uint(64);
+    var v'controller_address = sc_0~load_msg_addr();
+    var v'buyback_burn_address = sc_0~load_msg_addr();
+    var v'buyback_due_ton = sc_0~load_uint(128);
+    var v'flush_count = sc_0~load_uint(64);
+    var v'last_flush_amount = sc_0~load_uint(128);
+    return (sc_0, (v'run_id, v'controller_address, v'buyback_burn_address, v'buyback_due_ton, v'flush_count, v'last_flush_amount));
+}
+
+(slice, ((slice, slice, int, int))) $M20TFeeAccumulatorHarness$init$_load(slice sc_0) inline {
+    var v'controller_address = sc_0~load_msg_addr();
+    var v'buyback_burn_address = sc_0~load_msg_addr();
+    var v'initial_buyback_due_ton = sc_0~load_int(257);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'run_id = sc_1~load_int(257);
+    return (sc_0, (v'controller_address, v'buyback_burn_address, v'initial_buyback_due_ton, v'run_id));
+}
+
+(int, slice, slice, int, int, int) $M20TFeeAccumulatorHarness$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$M20TFeeAccumulatorHarness$_load();
+    }
+    else {
+        (slice $controller_address, slice $buyback_burn_address, int $initial_buyback_due_ton, int $run_id) = $sc~$M20TFeeAccumulatorHarness$init$_load();
+        $sc.end_parse();
+        return $M20TFeeAccumulatorHarness$_contract_init($controller_address, $buyback_burn_address, $initial_buyback_due_ton, $run_id);
+    }
+}
+
+() $M20TFeeAccumulatorHarness$_contract_store((int, slice, slice, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $M20TFeeAccumulatorHarness$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract M20TFeeAccumulatorHarness functions
+;;
+
+(int, slice, slice, int, int, int) $M20TFeeAccumulatorHarness$_contract_init(slice $controller_address, slice $buyback_burn_address, int $initial_buyback_due_ton, int $run_id) impure inline {
+    var (($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount)) = (null(), null(), null(), null(), null(), null());
+    throw_unless(21102, ($run_id > 0));
+    throw_unless(21100, ($initial_buyback_due_ton == 51050000000));
+    $self'run_id = $run_id;
+    $self'controller_address = $controller_address;
+    $self'buyback_burn_address = $buyback_burn_address;
+    $self'buyback_due_ton = $initial_buyback_due_ton;
+    $self'flush_count = 0;
+    $self'last_flush_amount = 0;
+    return ($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount);
+}
+
+((int, slice, slice, int, int, int), (int, slice, slice, int, int, int)) $M20TFeeAccumulatorHarness$_fun_get_state((int, slice, slice, int, int, int) $self) impure inline_ref {
+    var (($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount)) = $self;
+    var $fresh$ret_39 = $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount);
+    return (($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount), $fresh$ret_39);
+}
+
+;;
+;; Get methods of a Contract M20TFeeAccumulatorHarness
+;;
+
+_ %get_state() method_id(86957) {
+    var self = $M20TFeeAccumulatorHarness$_contract_load();
+    var res = self~$M20TFeeAccumulatorHarness$_fun_get_state();
+    return $M20TFeeAccumulatorHarnessStateView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract M20TFeeAccumulatorHarness
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount) = $M20TFeeAccumulatorHarness$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for AcceptBurnReserve message
+        if (op == 0x594ba505) {
+            var ($msg'amount) = in_msg~$AcceptBurnReserve$_load_bounced();
+            throw_unless(21130, ( equal_slices_bits(__tact_context_get_sender(), $self'buyback_burn_address) ));
+            throw_unless(21131, ($msg'amount > 0));
+            $self'buyback_due_ton = $self'buyback_due_ton + $msg'amount;
+            $M20TFeeAccumulatorHarness$_contract_store(($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount));
+            return ();
+        }
+        
+        return ();
+    }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive M20TFeeHarnessTopUp message
+    if (op == 0x4d325446) {
+        var $msg = empty_tuple();
+        throw_unless(21101, ( equal_slices_bits(__tact_context_get_sender(), $self'controller_address) ));
+        $M20TFeeAccumulatorHarness$_contract_store(($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount));
+        return ();
+    }
+    
+    ;; Receive FlushBuybackDue message
+    if (op == 0xb3d2c52d) {
+        var $msg'amount = in_msg~load_uint(128);
+        throw_unless(21110, ( equal_slices_bits(__tact_context_get_sender(), $self'controller_address) ));
+        throw_unless(21111, ($msg'amount > 0));
+        throw_unless(21112, ($msg'amount == 51050000000));
+        throw_unless(21113, ($msg'amount <= $self'buyback_due_ton));
+        throw_unless(21114, ($Context$_get_value(__tact_context_get()) >= 3000000));
+        $self'buyback_due_ton = $self'buyback_due_ton - $msg'amount;
+        $self'flush_count = $self'flush_count + 1;
+        $self'last_flush_amount = $msg'amount;
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'buyback_burn_address, $msg'amount, true, 0, $AcceptBurnReserve$_store_cell($AcceptBurnReserve$_constructor_amount($msg'amount), begin_cell())));
+        $M20TFeeAccumulatorHarness$_contract_store(($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount));
+        return ();
+    }
+    
+    ;; Receive M20TForwardWrongAcceptBurnReserve message
+    if (op == 0x4d324657) {
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'forward_value = in_msg~load_uint(128);
+        throw_unless(21120, ( equal_slices_bits(__tact_context_get_sender(), $self'controller_address) ));
+        throw_unless(21121, ($Context$_get_value(__tact_context_get()) >= ($msg'forward_value + 3000000)));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'buyback_burn_address, $msg'forward_value, false, 0, $AcceptBurnReserve$_store_cell($AcceptBurnReserve$_constructor_amount($msg'amount), begin_cell())));
+        $M20TFeeAccumulatorHarness$_contract_store(($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(21199);
+        $M20TFeeAccumulatorHarness$_contract_store(($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

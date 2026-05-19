@@ -1,0 +1,54 @@
+{
+  "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
+  "version": 15,
+  "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
+  "manifest_hash_hex": "80942cd7f18a536fec3ce28c6308e6ca5f041811e6dcaf3dce8f4a6b36b85536",
+  "manifest_hash_uint256": "58157847482910257092516388026289306294894910718691913842061062020707254818102",
+  "manifest_cell_hash_hex": "80942cd7f18a536fec3ce28c6308e6ca5f041811e6dcaf3dce8f4a6b36b85536",
+  "addresses": {
+    "ath_master": "EQDbvC2DsMRN90jH0VZQWi_v-XHlFa1zTZB4NNMv2MwbL6lT",
+    "ath_treasury_owner": "EQA2cSC9Qk1GRw63Y1P0dnfKGZ-ewHKyjV23z1VWnSl5cNbp",
+    "capsulehub": "EQC4HIq6D6DwjntoIEFeGszLMTx5TaPb1N7RDsJLRd2VeVM8",
+    "capsulehub_initial_vault_placeholder": "EQCDLfXCIBPKx3pEATMLQ8Oxm12B0gQCHc1QdctLzNFlwTWD",
+    "fee_accumulator": "EQD0k42RwuB6pbcfuFxS-tZ-ZodL1Y6H54Bo8O1-Ve4ATbyO",
+    "fee_accumulator_buyback_burn_blocked_not_final": "EQBDEX-v3Bk11sA5MqijZMYFq_rl-xEqtmxI6nEVisN-k04P",
+    "fee_accumulator_ton_treasury_receiver": "EQCLe5n3iA8iT7Foi-4KelkN-6Q-7qbuSKSCq-pdBNNzGagv",
+    "treasury_ath_receiver": "EQDnbwJ64I5cqhK_A-P7qMGQ_tWSvjWMyUqO7LkoTf8rFnMO",
+    "username_registry": "EQDv-AWV-dj5SfJoj-z6dl5ia-IjATpYBxh068GdE8m2_cy7",
+    "username_registry_initial_ath_wallet_placeholder": "EQDmbkp0-mP5zJtxg1jAc_buyKYD_GqOe-HwumL-5ugZYUpr",
+    "username_registry_official_ath_wallet": "EQBhVFv7uW2pTzWvAQLjrEORW1RCR94Mj9bA_en_ncBrXydx",
+    "vault": "EQBXxiyvkYWAzh_X1T9KiOxpcYN5K8wJgXfi6vPWa5eJVYui",
+    "vault_initial_ath_wallet_placeholder": "EQArGA7xrjs6VZdpQdRZJ5xMupr7G2-qsU_iqhBIOM1WtD2_",
+    "vault_initial_capsulehub_placeholder": "EQCY-CYQTcmjZIXdyzhWLkXfTBRU3HdLCDM2A8-PLp9GWvjH",
+    "vault_official_ath_wallet": "EQBckSaM2KXvs2MWJUeZy-T-4c_xTZoMS4AL5VV6N0AMGdf0"
+  },
+  "code_hashes": {
+    "ath_master": "143c2255d9bf3ae853947e45560afeb6ad0a0648361ed2350c714c3e9d6d2328",
+    "ath_wallet": "7b4b51d5044ddd869d277dd037fd738a4f38696dc47c0960808e6891ca61a7d5",
+    "capsulehub": "add81654c2263f725fcc93cf3c9caf3229c8f164870511b90f967174a953db85",
+    "fee_accumulator": "ed272b10bc841ce09da511dbe3c10cffa89659791480d0390d3e7bbde08af503",
+    "username_nft_item": "aeae8569040208929451ecbd632606c31de78e43425603997d88b85a403d8830",
+    "username_registry": "77374ee9f1f832ed10f4ab428ff89c72e2784b200a88aad686ce225002574390",
+    "vault": "5cedd91640c2d12f61f805881172683f7ec27ff5e044514ab855517a6910f489"
+  },
+  "state_init_hashes": {
+    "ath_master": "dbbc2d83b0c44df748c7d156505a2feff971e515ad734d907834d32fd8cc1b2f",
+    "capsulehub_initial": "b81c8aba0fa0f08e7b6820415e1acccb313c794da3dbd4ded10ec24b45dd9579",
+    "fee_accumulator": "f4938d91c2e07aa5b71fb85c52fad67e66874bd58e87e78068f0ed7e55ee004d",
+    "username_registry_initial": "eff80595f9d8f949f2688fecfa765e626be223013a58071874ebc19d13c9b6fd",
+    "username_registry_official_ath_wallet": "61545bfbb96da94f35af0102e3ac43915b544247de0c8fd6c0fde9ff9dc06b5f",
+    "vault_initial": "57c62caf918580ce1fd7d53f4a88ec697183792bcc098177e2eaf3d66b978955",
+    "vault_official_ath_wallet": "5c91268cd8a5efb36316254799cbe4fee1cff14d9a0c4b800be5557a37400c19"
+  },
+  "constants": {
+    "ath_total_supply_atomic": "100000000000000000",
+    "username_pending_mint_stale_ttl_seconds": "86400",
+    "username_item_ack_forward_reserve_nanotons": "3000000",
+    "vault_pending_publish_stale_ttl_seconds": "86400"
+  },
+  "blockers_before_final_genesis": [
+    "BUYBACK_BURN_CONTRACT_NOT_IMPLEMENTED_UNTIL_STONFI_ROUTE_VALUES_ARE_PINNED",
+    "STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED",
+    "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_BUYBACK_BLOCKED_ADDRESS_WITH_REAL_BUYBACKBURN_STATEINIT_ADDRESS"
+  ]
+}

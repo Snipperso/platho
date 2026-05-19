@@ -1,0 +1,33 @@
+### tests/ath-burn-finalization.test.ts tests/ath-wallet-derivation.test.ts tests/ath-wallet-transfer.test.ts tests/fee-accumulator.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_audit_fix[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 18:20:54
+[2m   Duration [22m 7.07s[2m (transform 1.49s, setup 0ms, import 9.47s, tests 11.26s, environment 1ms)[22m
+
+### tests/m19-stonfi-route-discovery.test.ts tests/m19b-stonfi-conservative-gas.test.ts tests/m19c-stonfi-route-freeze-gate.test.ts tests/m19d-stonfi-route-candidate-intake.test.ts tests/m19e-stonfi-live-evidence-collector.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_audit_fix[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 18:21:05
+[2m   Duration [22m 2.88s[2m (transform 1.05s, setup 0ms, import 6.37s, tests 612ms, environment 1ms)[22m
+
+### tests/m19f-stonfi-route-evidence-dossier.test.ts tests/m19g-buybackburn-state-machine.test.ts tests/m19h-buybackburn-funding-envelope.test.ts tests/m20u-buybackburn-implementation-readiness.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_audit_fix[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m   Start at [22m 18:21:11
+[2m   Duration [22m 4.17s[2m (transform 1.15s, setup 0ms, import 5.05s, tests 1.65s, environment 1ms)[22m
+

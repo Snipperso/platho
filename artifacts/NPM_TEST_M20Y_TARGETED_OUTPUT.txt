@@ -1,0 +1,13 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/m16-conformance-static.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 125[2mms[22m[39m
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1490[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 876[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 365[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 03:10:26
+[2m   Duration [22m 2.65s[2m (transform 803ms, setup 0ms, import 1.62s, tests 1.62s, environment 0ms)[22m
+

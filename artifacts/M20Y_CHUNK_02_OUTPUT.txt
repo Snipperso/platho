@@ -1,0 +1,22 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/m16-conformance-static.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 307[2mms[22m[39m
+ [32m✓[39m tests/m18-artifact-integrity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 383[2mms[22m[39m
+     [33m[2m✓[22m[39m M18-ARTIFACT-01: generated artifacts, vectors, code hashes, and implemented-subset manifest match the current build [33m 381[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1583[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it [33m 1221[2mms[22m[39m
+ [32m✓[39m tests/deployment-genesis-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2303[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-01/02/03: arbitrary sender cannot bind or seal Vault genesis [33m 1510[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-04: arbitrary sender cannot bind or seal CapsuleHub genesis [33m 387[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-05/06/07: arbitrary sender cannot bind/seal UsernameRegistry and controller has no post-seal authority [33m 402[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2524[2mms[22m[39m
+     [33m[2m✓[22m[39m FEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only [33m 1164[2mms[22m[39m
+ [32m✓[39m tests/m17-gas-reserve-sanity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 3094[2mms[22m[39m
+     [33m[2m✓[22m[39m GAS-M17-01: implemented-subset money/publish flows stay below broad gas/fee sanity thresholds [33m 3092[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 03:11:59
+[2m   Duration [22m 5.85s[2m (transform 3.38s, setup 0ms, import 10.74s, tests 10.19s, environment 1ms)[22m
+

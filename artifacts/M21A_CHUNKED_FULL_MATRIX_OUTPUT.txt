@@ -1,0 +1,12 @@
+M21A chunked full regression matrix
+
+Chunk 1: 8 files / 36 tests / EXIT=0
+Chunk 2: 8 files / 27 tests / EXIT=0
+Chunk 3: 8 files / 38 tests / EXIT=0
+Chunk 4A: 4 files / 15 tests / EXIT=0
+Chunk 4B: 4 files / 14 tests / EXIT=0
+Chunk 5: 2 files / 13 tests / EXIT=0
+
+TOTAL: 34 test files / 143 tests / 0 failed chunks
+
+Note: one-shot npm test in this sandbox produced passing output for many files but did not complete before the outer execution timeout, so the canonical M21A verification proof is the explicit chunked matrix above.

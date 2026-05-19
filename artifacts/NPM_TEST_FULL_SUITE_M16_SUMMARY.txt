@@ -1,0 +1,9 @@
+Full suite command:
+npm test -- --reporter=dot --testTimeout=30000
+
+Reported result before outer timeout:
+Test Files: 22 passed
+Tests: 97 passed
+Duration: 29.77s
+
+Note: Vitest printed pass summary but did not terminate before the outer timeout wrapper. This matches the existing test-runner hang behavior documented in prior milestones.

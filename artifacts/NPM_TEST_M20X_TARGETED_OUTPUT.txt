@@ -1,0 +1,30 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_latest[39m
+
+ [32m✓[39m tests/m16-conformance-static.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 550[2mms[22m[39m
+ [32m✓[39m tests/m18-artifact-integrity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 654[2mms[22m[39m
+     [33m[2m✓[22m[39m M18-ARTIFACT-01: generated artifacts, vectors, code hashes, and implemented-subset manifest match the current build [33m 606[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2787[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-01: manifest hash is canonical cell hash over sorted addresses, code hashes, state init hashes, constants, and blockers [33m 391[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it [33m 2128[2mms[22m[39m
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 3949[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 2826[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 1118[2mms[22m[39m
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 5240[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 3227[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 993[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 1015[2mms[22m[39m
+ [32m✓[39m tests/vault-external-session-gate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 5362[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-EXT-01: valid signed request consumes nonce, debits max_charge, and creates pending publish when no ACK exists yet [33m 2555[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation [33m 799[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07: duplicate external request cannot be accepted twice [33m 917[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation [33m 551[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-03: expired session rejected before mutation [33m 533[2mms[22m[39m
+ [32m✓[39m tests/m17-gas-reserve-sanity.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 5720[2mms[22m[39m
+     [33m[2m✓[22m[39m GAS-M17-01: implemented-subset money/publish flows stay below broad gas/fee sanity thresholds [33m 5716[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 00:27:27
+[2m   Duration [22m 10.04s[2m (transform 4.13s, setup 0ms, import 19.89s, tests 24.26s, environment 2ms)[22m
+

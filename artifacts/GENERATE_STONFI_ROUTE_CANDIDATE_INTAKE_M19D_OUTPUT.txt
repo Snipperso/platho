@@ -1,0 +1,7 @@
+{
+  "status": "WAITING_FOR_REAL_STONFI_ROUTE_EVIDENCE",
+  "route_freeze_ready": false,
+  "supplied_candidate_source": null,
+  "template_output": "artifacts/stonfi_route_candidate_input_template_m19d.json",
+  "output": "artifacts/stonfi_route_candidate_intake_m19d.json"
+}

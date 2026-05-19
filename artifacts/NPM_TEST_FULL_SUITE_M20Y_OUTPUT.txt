@@ -1,0 +1,67 @@
+
+> platho-deployment-binding-vault-capsulehub-milestone@1.0.0 test
+> vitest run --config vitest.all.config.ts
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/m20y_work[39m
+
+ [32m✓[39m tests/vault-m6-publish.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2548[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-01: valid external private publish reaches CapsuleHub, receives ACK, and clears PendingPublish [33m 1242[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget [33m 492[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate [33m 812[2mms[22m[39m
+ [32m✓[39m tests/capsulehub.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 1517[2mms[22m[39m
+ [32m✓[39m tests/vault-external-session-gate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2067[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M6-EXT-01: valid signed request consumes nonce, debits max_charge, and creates pending publish when no ACK exists yet [33m 439[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation [33m 373[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07: duplicate external request cannot be accepted twice [33m 483[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation [33m 407[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-EXT-03: expired session rejected before mutation [33m 364[2mms[22m[39m
+ [32m✓[39m tests/deployment-genesis-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1195[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-01/02/03: arbitrary sender cannot bind or seal Vault genesis [33m 508[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-04: arbitrary sender cannot bind or seal CapsuleHub genesis [33m 352[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-AUTH-05/06/07: arbitrary sender cannot bind/seal UsernameRegistry and controller has no post-seal authority [33m 334[2mms[22m[39m
+ [32m✓[39m tests/vault-receive-intent.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2144[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-14/15: create locks sender TON and claim credits recipient UserState [33m 324[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-16: cancel returns locked TON to sender and deletes intent [33m 302[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: wrong recipient or wrong secret cannot claim [33m 321[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: duplicate intent_id and insufficient sender balance are rejected without mutation [33m 385[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry [33m 332[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance [33m 479[2mms[22m[39m
+ [32m✓[39m tests/username-registry-due-flush.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1709[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-01: FlushTreasuryAthDue transfers treasury due to immutable treasury ATH receiver and clears pending on ACK [33m 501[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-02: FlushBurnAthDue burns through official ATH wallet, authenticated master ACK clears pending, and total_supply decreases exactly [33m 359[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-03: treasury transfer failure restores treasury_due_ath and clears pending [33m 321[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M12-04: burn notification failure restores burn_due_ath, clears pending, and restores official wallet balance [33m 527[2mms[22m[39m
+ [32m✓[39m tests/username-registry-paid-mint.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1568[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-01: valid official ATH username mint deploys deterministic item, consumes pending, and credits treasury/burn due after ACK [33m 407[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-04: duplicate finalized username creates refund due for the second minter without changing the existing record [33m 314[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M10-05: price tiers are enforced as exact ATH amounts and underpay is refunded [33m 409[2mms[22m[39m
+ [32m✓[39m tests/deployment-binding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1124[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal [33m 402[2mms[22m[39m
+ [32m✓[39m tests/vault-session-lifecycle.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1626[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-09/10: Message Budget top-up requires active session and revoke returns budget to ton_balance [33m 332[2mms[22m[39m
+ [32m✓[39m tests/vault-prune-pending-publish.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1194[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected [33m 548[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending [33m 645[2mms[22m[39m
+ [32m✓[39m tests/username-registry-foundation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 956[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M9-04: official ATH wallet binds before seal and cannot be changed after seal [33m 360[2mms[22m[39m
+ [32m✓[39m tests/m19c-stonfi-route-freeze-gate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/fee-accumulator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 970[2mms[22m[39m
+ [32m✓[39m tests/ath-burn-finalization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 572[2mms[22m[39m
+ [32m✓[39m tests/deployment-manifest-m15.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 606[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-M15-02/05/09: Vault, CapsuleHub, and UsernameRegistry can seal to the same implemented-subset manifest hash and expose it [33m 377[2mms[22m[39m
+ [32m✓[39m tests/vault-ath-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1233[2mms[22m[39m
+ [32m✓[39m tests/username-registry-refund-flush.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 794[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-01: FlushAthRefundDue sends bounce-safe ATH transfer, clears due on recipient wallet ACK, and credits recipient ATH wallet [33m 465[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M11-02: official ATH wallet request bounce restores refund due and clears pending flush [33m 328[2mms[22m[39m
+ [32m✓[39m tests/username-registry-prune-pending-mint.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 813[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected [33m 377[2mms[22m[39m
+     [33m[2m✓[22m[39m USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending [33m 435[2mms[22m[39m
+ [32m✓[39m tests/vault-key-records.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1118[2mms[22m[39m
+     [33m[2m✓[22m[39m VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record [32m 300[2mms[22m[39m
+ [32m✓[39m tests/deployment-ath-wallet-binding.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 508[2mms[22m[39m
+     [33m[2m✓[22m[39m DEPLOY-04A/Vault: official ATH wallet is derived after Vault address exists, bound before seal, and frozen after seal [33m 456[2mms[22m[39m
+ [32m✓[39m tests/m19h-buybackburn-funding-envelope.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 588[2mms[22m[39m
+ [32m✓[39m tests/m16-conformance-static.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 179[2mms[22m[39m
+ [32m✓[39m tests/m19g-buybackburn-state-machine.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/ath-wallet-transfer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 275[2mms[22m[39m

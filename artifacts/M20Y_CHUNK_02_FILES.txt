@@ -1,0 +1,6 @@
+tests/deployment-genesis-auth.test.ts
+tests/deployment-manifest-m15.test.ts
+tests/fee-accumulator.test.ts
+tests/m16-conformance-static.test.ts
+tests/m17-gas-reserve-sanity.test.ts
+tests/m18-artifact-integrity.test.ts

@@ -1,0 +1,185 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/MockVaultAthWallet/MockVaultAthWallet_MockVaultAthWallet.fc` 
+PROGRAM{
+  DECLPROC $AthTransferNotification$_store
+  DECLPROC $AthTransferNotification$_store_cell
+  DECLPROC $VaultAthTransferAck$_store
+  DECLPROC $VaultAthTransferAck$_store_cell
+  DECLPROC $MockVaultAthWallet$_load
+  DECLPROC $MockVaultAthWallet$_contract_load
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $AthTransferNotification$_constructor_query_id_amount_sender_wallet
+  DECLPROC $VaultAthTransferAck$_constructor_query_id_amount
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  $AthTransferNotification$_store PROCINLINE:<{
+    1194171773 PUSHINT
+    s0 s4 XCHG2
+    32 STU
+    s1 s2 XCHG
+    64 STU
+    128 STU
+    STSLICE
+  }>
+  $AthTransferNotification$_store_cell PROCINLINE:<{
+    3 -ROLL
+    $AthTransferNotification$_store INLINECALLDICT
+    ENDC
+  }>
+  $VaultAthTransferAck$_store PROCINLINE:<{
+    1096042513 PUSHINT
+    s0 s3 XCHG2
+    32 STU
+    64 STU
+    128 STU
+  }>
+  $VaultAthTransferAck$_store_cell PROCINLINE:<{
+    -ROT
+    $VaultAthTransferAck$_store INLINECALLDICT
+    ENDC
+  }>
+  $MockVaultAthWallet$_load PROCINLINE:<{
+    1 LDI
+    SWAP
+  }>
+  $MockVaultAthWallet$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    $MockVaultAthWallet$_load INLINECALLDICT
+    NIP
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $AthTransferNotification$_constructor_query_id_amount_sender_wallet PROCINLINE:<{
+  }>
+  $VaultAthTransferAck$_constructor_query_id_amount PROCINLINE:<{
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $MockVaultAthWallet$_contract_load INLINECALLDICT
+    s0 s2 XCHG
+    IFJMP:<{
+      2DROP
+    }>
+    0 PUSHINT
+    OVER
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      SWAP
+      32 LDU
+      s0 s2 XCHG
+    }>
+    OVER
+    1296127044 PUSHINT
+    EQUAL
+    IFJMP:<{
+      s2 s3 XCHG
+      3 BLKDROP
+      64 LDU
+      LDMSGADDR
+      LDMSGADDR
+      128 LDU
+      DROP
+      0 PUSHINT
+      TRUE
+      s5 s2 XCHG2
+      64 PUSHINT
+      s0 s4 XCHG
+      $AthTransferNotification$_constructor_query_id_amount_sender_wallet INLINECALLDICT
+      NEWC
+      $AthTransferNotification$_store_cell INLINECALLDICT
+      s3 s4 XCHG
+      s1 s2 XCHG
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+    }>
+    OVER
+    1096042512 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      64 LDU
+      128 LDU
+      LDMSGADDR
+      NIP
+      LDMSGADDR
+      DROP
+      17000 PUSHINT
+      s0 s4 XCHG2
+      THROWANYIF
+      0 PUSHINT
+      TRUE
+      s0 s3 XCHG
+      64 PUSHINT
+      s0 s3 XCHG
+      $VaultAthTransferAck$_constructor_query_id_amount INLINECALLDICT
+      NEWC
+      $VaultAthTransferAck$_store_cell INLINECALLDICT
+      s3 s3 s0 XCHG3
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+    }>
+    s3 POP
+    NIP
+    0 EQINT
+    SWAP
+    33 LESSINT
+    AND
+    IFJMP:<{
+      17001 PUSHINT
+      THROWANY
+    }>
+    130 THROW
+  }>
+}END>c

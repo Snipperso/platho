@@ -1,0 +1,219 @@
+import { describe, expect, it } from 'vitest';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { createHash } from 'crypto';
+import {
+  Vault,
+  BindOfficialAthWallet,
+  SealGenesis,
+  WithdrawAth,
+} from '../build/Vault/Vault_Vault';
+import {
+  ATHWallet,
+  ATHTransferRequestWithNotify,
+} from '../build/ATHWallet/ATHWallet_ATHWallet';
+
+const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
+
+function addressHash(address: Address): bigint {
+  return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
+}
+
+function fixtureAddress(label: string, workchain = 0): Address {
+  return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
+}
+
+async function athWalletAddress(owner: Address, athMaster: Address): Promise<Address> {
+  const init = await ATHWallet.init(0n, owner, athMaster);
+  return contractAddress(owner.workChain, init);
+}
+
+async function deployAthWallet(
+  blockchain: Blockchain,
+  owner: Address,
+  athMaster: Address,
+  athBalance: bigint,
+  tonBalance = toNano('1'),
+) {
+  const zeroInit = await ATHWallet.init(0n, owner, athMaster);
+  const dataInit = await ATHWallet.init(athBalance, owner, athMaster);
+  const address = contractAddress(owner.workChain, zeroInit);
+  await blockchain.setShardAccount(address, createShardAccount({
+    address,
+    code: zeroInit.code,
+    data: dataInit.data,
+    balance: tonBalance,
+    workchain: address.workChain,
+  }));
+  return blockchain.openContract(new ATHWallet(address, zeroInit));
+}
+
+async function setup() {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+
+  const controller = await blockchain.treasury('vault-ath-controller');
+  const user = await blockchain.treasury('vault-ath-user');
+  const recipient = await blockchain.treasury('vault-ath-recipient');
+  const capsuleHub = await blockchain.treasury('vault-ath-capsulehub');
+  const athMaster = fixtureAddress('VAULT_ATH_MASTER');
+
+  const vaultInit = await Vault.init(
+    controller.address,
+    athMaster,
+    capsuleHub.address,
+    addressHash(controller.address),
+    true,
+    false,
+    0n,
+  );
+  const vaultAddress = contractAddress(0, vaultInit);
+  const officialVaultAthWallet = await athWalletAddress(vaultAddress, athMaster);
+
+  await blockchain.setShardAccount(vaultAddress, createShardAccount({
+    address: vaultAddress,
+    code: vaultInit.code,
+    data: vaultInit.data,
+    balance: toNano('2'),
+    workchain: vaultAddress.workChain,
+  }));
+  const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
+
+  await vault.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindOfficialAthWallet',
+    deployment_manifest_hash: MANIFEST_HASH,
+    official_ath_wallet_address: officialVaultAthWallet,
+  } as BindOfficialAthWallet);
+  await vault.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'SealGenesis',
+    deployment_manifest_hash: MANIFEST_HASH,
+  } as SealGenesis);
+
+  const userAthWallet = await deployAthWallet(blockchain, user.address, athMaster, 5_000n);
+
+  return {
+    blockchain,
+    vault,
+    user,
+    recipient,
+    athMaster,
+    userAthWallet,
+    officialVaultAthWallet,
+  };
+}
+
+async function depositAth(params: {
+  vault: any;
+  user: any;
+  userAthWallet: any;
+  amount: bigint;
+  queryId: bigint;
+  notifyValue?: bigint;
+  requestValue?: bigint;
+}) {
+  return await params.userAthWallet.send(params.user.getSender(), { value: params.requestValue ?? toNano('0.25') }, {
+    $$type: 'ATHTransferRequestWithNotify',
+    query_id: params.queryId,
+    amount: params.amount,
+    recipient: params.vault.address,
+    response_destination: params.user.address,
+    notify_destination: params.vault.address,
+    notify_value: params.notifyValue ?? toNano('0.03'),
+  } as ATHTransferRequestWithNotify);
+}
+
+describe('Vault ATH integration with production ATHWallet', () => {
+  it('VAULT-ATH-01: production ATHWallet transfer-with-notify credits Vault internal ath_balance', async () => {
+    const { vault, user, userAthWallet } = await setup();
+
+    await depositAth({ vault, user, userAthWallet, amount: 1_000n, queryId: 1n });
+
+    const state = await vault.getGetUser(user.address);
+    const source = await userAthWallet.getGetWalletData();
+    expect(state.exists).toBe(true);
+    expect(state.ath_balance).toBe(1_000n);
+    expect(source.balance).toBe(4_000n);
+    expect((await vault.getGetGlobal()).user_count).toBe(1n);
+    expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(1n);
+  });
+
+  it('VAULT-ATH-02: insufficient notification value is rejected before debiting the source wallet', async () => {
+    const { vault, user, userAthWallet } = await setup();
+
+    await depositAth({
+      vault,
+      user,
+      userAthWallet,
+      amount: 1_000n,
+      queryId: 2n,
+      notifyValue: toNano('0.001'),
+      requestValue: toNano('0.25'),
+    });
+
+    const state = await vault.getGetUser(user.address);
+    const source = await userAthWallet.getGetWalletData();
+    expect(state.exists).toBe(false);
+    expect(source.balance).toBe(5_000n);
+    expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(0n);
+  });
+
+  it('VAULT-ATH-03: withdrawal clears pending only after recipient ATH wallet ACK', async () => {
+    const { blockchain, vault, user, recipient, userAthWallet, athMaster, officialVaultAthWallet } = await setup();
+
+    await depositAth({ vault, user, userAthWallet, amount: 2_000n, queryId: 3n });
+    expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
+
+    await vault.send(user.getSender(), { value: toNano('0.25') }, {
+      $$type: 'WithdrawAth',
+      query_id: 10n,
+      amount: 750n,
+      recipient: recipient.address,
+    } as WithdrawAth);
+
+    const recipientAthWalletAddress = await athWalletAddress(recipient.address, athMaster);
+    const recipientAthWallet = blockchain.openContract(new ATHWallet(recipientAthWalletAddress));
+    const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+
+    expect((await vault.getGetUser(user.address)).ath_balance).toBe(1_250n);
+    expect((await vault.getGetPendingAthWithdrawal(10n)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
+    expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(1_250n);
+  });
+
+  it('VAULT-ATH-03B: underfunded withdrawal is rejected before debiting internal ATH or creating pending state', async () => {
+    const { blockchain, vault, user, recipient, userAthWallet, officialVaultAthWallet } = await setup();
+
+    await depositAth({ vault, user, userAthWallet, amount: 2_000n, queryId: 31n });
+    await vault.send(user.getSender(), { value: toNano('0.003') }, {
+      $$type: 'WithdrawAth',
+      query_id: 32n,
+      amount: 750n,
+      recipient: recipient.address,
+    } as WithdrawAth);
+
+    const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+
+    expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
+    expect((await vault.getGetPendingAthWithdrawal(32n)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(2_000n);
+  });
+
+  it('VAULT-ATH-04: repeated deposit query_id is rejected before creating uncredited official-wallet balance', async () => {
+    const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setup();
+
+    await depositAth({ vault, user, userAthWallet, amount: 1_000n, queryId: 42n });
+    await depositAth({ vault, user, userAthWallet, amount: 700n, queryId: 42n });
+
+    const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+    const state = await vault.getGetUser(user.address);
+    const source = await userAthWallet.getGetWalletData();
+    const official = await officialWallet.getGetWalletData();
+
+    expect(state.ath_balance).toBe(1_000n);
+    expect(source.balance).toBe(4_000n);
+    expect(official.balance).toBe(1_000n);
+    expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(1n);
+  });
+});

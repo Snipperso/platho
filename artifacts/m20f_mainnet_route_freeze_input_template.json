@@ -1,0 +1,28 @@
+{
+  "document": "PLATHO.V1.M20F_MAINNET_ROUTE_FREEZE_INPUT",
+  "network": "mainnet",
+  "status": "DRAFT_MAINNET_ROUTE_FREEZE_INPUT",
+  "addresses": {
+    "athMasterAddress": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+    "buybackBurnStateInitAddress": "REQUIRED_MAINNET_BUYBACKBURN_STATEINIT_ADDRESS",
+    "buybackBurnOfficialAthWalletAddress": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
+    "stonfiRouterAddress": "REQUIRED_FROM_STONFI_API_SIMULATION_ROUTER_ADDRESS",
+    "stonfiPoolAddressTonAth": "REQUIRED_FROM_STONFI_API_SIMULATION_OR_POOL_QUERY",
+    "stonfiPtonMasterAddress": "REQUIRED_FROM_STONFI_API_SIMULATION_ROUTER_PTON_MASTER",
+    "stonfiPtonWalletAddress": "REQUIRED_FROM_OFFICIAL_SDK_TX_PARAMS_TO_ADDRESS",
+    "askJettonWalletAddress": "REQUIRED_FROM_OFFICIAL_SDK_SWAP_PAYLOAD"
+  },
+  "evidenceRefs": {
+    "athDeploymentManifest": "required: immutable artifact path/hash for final ATH deployment",
+    "buybackBurnStateInitVector": "required: immutable artifact path/hash for final BuybackBurn StateInit",
+    "officialAthWalletDerivationVector": "required: immutable artifact path/hash for official BuybackBurn ATH wallet derivation",
+    "stonfiApiSimulationCapture": "required: STON.fi API /v1/swap/simulate capture path/hash",
+    "stonfiSdkOrApiTxParamsCapture": "required: official @ston-fi/sdk/API tx params capture path/hash",
+    "routerPoolPtonCodeHashes": "required: mainnet router/pool/pTON code hash proof path/hash",
+    "successExcessProof": "required: successful swap tx evidence where excesses return to BuybackBurn",
+    "minOutFailureRefundProof": "required: min_out failure tx evidence where refund returns to BuybackBurn",
+    "ptonRefundProof": "required: pTON refund tx evidence where refund returns to BuybackBurn",
+    "bounceOrFailureBehaviorProof": "required: documented bounce/failure behavior evidence"
+  },
+  "m19fDossierPath": "artifacts/stonfi_route_evidence_dossier_m19f.json"
+}

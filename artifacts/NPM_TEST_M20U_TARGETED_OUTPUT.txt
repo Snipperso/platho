@@ -1,0 +1,14 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/mnt/data/platho_m20t[39m
+
+ [32m✓[39m tests/m20u-buybackburn-implementation-readiness.test.ts[2m > [22mM20U BuybackBurn implementation readiness gate[2m > [22mkeeps production BuybackBurn blocked while testnet probe and mainnet route freeze are missing[32m 8[2mms[22m[39m
+ [32m✓[39m tests/m20u-buybackburn-implementation-readiness.test.ts[2m > [22mM20U BuybackBurn implementation readiness gate[2m > [22mdoes not treat testnet completion alone as mainnet route freeze or production readiness[32m 2[2mms[22m[39m
+ [32m✓[39m tests/m20u-buybackburn-implementation-readiness.test.ts[2m > [22mM20U BuybackBurn implementation readiness gate[2m > [22mrequires both testnet evidence and mainnet route freeze before readiness can flip[32m 1[2mms[22m[39m
+ [32m✓[39m tests/m20u-buybackburn-implementation-readiness.test.ts[2m > [22mM20U BuybackBurn implementation readiness gate[2m > [22mpreserves the M19H funding split: 50 TON offer plus 1.05 TON route funding equals 51.05 TON envelope[32m 1[2mms[22m[39m
+ [32m✓[39m tests/m20u-buybackburn-implementation-readiness.test.ts[2m > [22mM20U BuybackBurn implementation readiness gate[2m > [22mcarries explicit Codex guardrails against secret leaks and testnet/mainnet mixing[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 17:33:30
+[2m   Duration [22m 1.70s[2m (transform 440ms, setup 0ms, import 828ms, tests 16ms, environment 69ms)[22m
+

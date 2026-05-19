@@ -1,0 +1,69 @@
+{
+  "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
+  "version": 15,
+  "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
+  "manifest_hash_hex": "7fa3412db904367ed6e6a09411393e18098810308d69c645480efd223b0cc42b",
+  "manifest_hash_uint256": "57732177687828356411638183680107622423961405644535609093182799687208613495851",
+  "manifest_cell_hash_hex": "7fa3412db904367ed6e6a09411393e18098810308d69c645480efd223b0cc42b",
+  "addresses": {
+    "ath_master": "EQCSw67d9v7DQYwa0Z1yoys_uDkk3qO3BWrf9c1lxVGaw2kl",
+    "ath_treasury_owner": "EQA2cSC9Qk1GRw63Y1P0dnfKGZ-ewHKyjV23z1VWnSl5cNbp",
+    "buyback_burn": "EQBimzEtYcu7cM72EwL6tLCyB8uH1txdbo4_lGXonxdcHWvU",
+    "buyback_burn_initial_genesis_controller": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
+    "buyback_burn_official_ath_wallet": "EQDIIKNrr0UBgxc5apYH6S17uLutv_beOBD54rPQwz01Migw",
+    "capsulehub": "EQAWKR0AQxOq6QJ2hv42OZtUm3gFofWAXycRJuY0wH5UzVC5",
+    "capsulehub_initial_vault_placeholder": "EQCDLfXCIBPKx3pEATMLQ8Oxm12B0gQCHc1QdctLzNFlwTWD",
+    "fee_accumulator": "EQDPCJ9OoA4_zz0rHWiFZ74_rzgjMRyOaK4Dwfj-3JyV_j13",
+    "fee_accumulator_buyback_burn": "EQBimzEtYcu7cM72EwL6tLCyB8uH1txdbo4_lGXonxdcHWvU",
+    "fee_accumulator_ton_treasury_receiver": "EQCLe5n3iA8iT7Foi-4KelkN-6Q-7qbuSKSCq-pdBNNzGagv",
+    "treasury_ath_receiver": "EQDnbwJ64I5cqhK_A-P7qMGQ_tWSvjWMyUqO7LkoTf8rFnMO",
+    "username_registry": "EQCOaO7fiGUeh2-55m2DPp83Wg179RdGZkwUHWTtOxwvV2Vm",
+    "username_registry_initial_ath_wallet_placeholder": "EQDmbkp0-mP5zJtxg1jAc_buyKYD_GqOe-HwumL-5ugZYUpr",
+    "genesis_controller_one_shot": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
+    "username_registry_official_ath_wallet": "EQBN4bijSOSAaMMydWKbOdtv7S1Yib8HHhGFjqfRMhKQZFmV",
+    "vault": "EQDYwRuUZd4JPJ_KiHrCv-p7cPxO1Wfq5svurICcCfjz7bPc",
+    "vault_ath_master": "EQCSw67d9v7DQYwa0Z1yoys_uDkk3qO3BWrf9c1lxVGaw2kl",
+    "vault_initial_controller_slot": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
+    "vault_initial_genesis_controller": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
+    "vault_initial_capsulehub_placeholder": "EQCY-CYQTcmjZIXdyzhWLkXfTBRU3HdLCDM2A8-PLp9GWvjH",
+    "vault_official_ath_wallet": "EQBPq9RTkTWwXzLNMueMP5leNTY9pDwIOhOMQ-uJ9OI7VwbB"
+  },
+  "code_hashes": {
+    "ath_master": "33e4c62fa48e4f6d8b3b93a00e025485c18a6b81efcd055768508c215b88cfbf",
+    "ath_wallet": "a4ca0258ce36f72c4bab250c5ead87bc6db1b0ebe3832bad8c6961efaaedc730",
+    "buyback_burn": "95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24",
+    "capsulehub": "2522af15971a775b873a335c6637e961ab8a54d29446738f7c8390449c5c6cf6",
+    "fee_accumulator": "7273fe39e2ac54f61ccfc3b0811df1e352acc1b31ff8b028061c0411929404c1",
+    "username_nft_item": "23f13b3c91120c089244c411b855c69a71a42bc0244740e1cc6c266f71c1f1ea",
+    "username_registry": "6cc5a428588f43a706047ea2ae6595726596b17ee54c8703cdc9c8239a6d0742",
+    "vault": "ec268816c42d788b55bd171a32b81d40073cb7f242c48138d521185508914353"
+  },
+  "state_init_hashes": {
+    "ath_master": "92c3aeddf6fec3418c1ad19d72a32b3fb83924dea3b7056adff5cd65c5519ac3",
+    "buyback_burn_initial": "629b312d61cbbb70cef61302fab4b0b207cb87d6dc5d6e8e3f9465e89f175c1d",
+    "buyback_burn_official_ath_wallet": "c820a36baf45018317396a9607e92d7bb8bbadbff6de3810f9e2b3d0c33d3532",
+    "capsulehub_initial": "16291d004313aae9027686fe36399b549b7805a1f5805f271126e634c07e54cd",
+    "fee_accumulator": "cf089f4ea00e3fcf3d2b1d688567be3faf3823311c8e68ae03c1f8fedc9c95fe",
+    "username_registry_initial": "8e68eedf88651e876fb9e66d833e9f375a0d7bf51746664c141d64ed3b1c2f57",
+    "username_registry_official_ath_wallet": "4de1b8a348e48068c33275629b39db6fed2d5889bf071e11858ea7d132129064",
+    "vault_initial": "d8c11b9465de093c9fca887ac2bfea7b70fc4ed567eae6cbeeac809c09f8f3ed",
+    "vault_official_ath_wallet": "4fabd4539135b05f32cd32e78c3f995e35363da43c083a138c43eb89f4e23b57"
+  },
+  "constants": {
+    "ath_total_supply_atomic": "100000000000000000",
+    "buyback_offer_amount_nanotons": "50000000000",
+    "buyback_funding_envelope_nanotons": "51050000000",
+    "username_pending_mint_stale_ttl_seconds": "86400",
+    "username_item_ack_forward_reserve_nanotons": "3000000",
+    "vault_pending_publish_stale_ttl_seconds": "86400",
+    "vault_activity_airdrop_total_atomic": "30000000000000000",
+    "vault_activity_airdrop_reward_per_message_atomic": "10000000000",
+    "vault_activity_airdrop_per_wallet_cap_atomic": "0"
+  },
+  "blockers_before_final_genesis": [
+    "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
+    "STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED",
+    "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
+    "VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS"
+  ]
+}

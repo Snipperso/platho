@@ -1,0 +1,229 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/M20TBuybackBurnHarness/M20TBuybackBurnHarness_M20TBuybackBurnHarness.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get_sender
+  DECLPROC $M20TBuybackBurnHarness$_store
+  DECLPROC $M20TBuybackBurnHarness$_load
+  DECLPROC $M20TBuybackBurnHarnessStateView$_to_external
+  DECLPROC $M20TBuybackBurnHarness$init$_load
+  DECLPROC $M20TBuybackBurnHarness$_contract_init
+  DECLPROC $M20TBuybackBurnHarness$_contract_load
+  DECLPROC $M20TBuybackBurnHarness$_contract_store
+  DECLPROC $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount
+  DECLPROC $M20TBuybackBurnHarness$_fun_get_state
+  86957 DECLMETHOD %get_state
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $M20TBuybackBurnHarness$_store PROCINLINE:<{
+    s6 s7 XCHG2
+    64 STU
+    s1 s4 XCHG
+    STSLICE
+    s1 s2 XCHG
+    STSLICE
+    1 STI
+    64 STU
+    128 STU
+    128 STU
+  }>
+  $M20TBuybackBurnHarness$_load PROCINLINE:<{
+    64 LDU
+    LDMSGADDR
+    LDMSGADDR
+    1 LDI
+    64 LDU
+    128 LDU
+    128 LDU
+    7 -ROLL
+  }>
+  $M20TBuybackBurnHarnessStateView$_to_external PROCINLINE:<{
+  }>
+  $M20TBuybackBurnHarness$init$_load PROCINLINE:<{
+    LDMSGADDR
+    257 PUSHINT
+    LDIX
+    -ROT
+  }>
+  $M20TBuybackBurnHarness$_contract_init PROCINLINE:<{
+    21004 PUSHINT
+    OVER
+    0 GTINT
+    THROWANYIFNOT
+    OVER
+    FALSE
+    0 PUSHINT
+    s0 s0 PUSH2
+    s5 s6 XCHG
+    s4 s5 XCHG
+  }>
+  $M20TBuybackBurnHarness$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $M20TBuybackBurnHarness$_load INLINECALLDICT
+      1 7 BLKDROP2
+    }>ELSE<{
+      $M20TBuybackBurnHarness$init$_load INLINECALLDICT
+      s0 s2 XCHG
+      ENDS
+      SWAP
+      $M20TBuybackBurnHarness$_contract_init INLINECALLDICT
+    }>
+  }>
+  $M20TBuybackBurnHarness$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    7 -ROLL
+    $M20TBuybackBurnHarness$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount PROCINLINE:<{
+  }>
+  $M20TBuybackBurnHarness$_fun_get_state PROCREF:<{
+    s6 s3 s4 PUSH3
+    s5 s4 s3 PUSH3
+    $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount INLINECALLDICT
+  }>
+  %get_state PROC:<{
+    $M20TBuybackBurnHarness$_contract_load INLINECALLDICT
+    $M20TBuybackBurnHarness$_fun_get_state INLINECALLDICT
+    7 6 BLKDROP2
+    $M20TBuybackBurnHarnessStateView$_to_external INLINECALLDICT
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $M20TBuybackBurnHarness$_contract_load INLINECALLDICT
+    s0 s8 XCHG
+    IFJMP:<{
+      8 BLKDROP
+    }>
+    0 PUSHINT
+    s7 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s7 XCHG
+      32 LDU
+      s0 s8 XCHG
+    }>
+    OVER
+    1295134786 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s3 POP
+      s0 s5 XCHG
+      LDMSGADDR
+      DROP
+      21000 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s5 PUSH
+      SDEQ
+      THROWANYIFNOT
+      21001 PUSHINT
+      s0 s2 XCHG
+      NOT
+      s1 s2 XCHG
+      THROWANYIFNOT
+      21002 PUSHINT
+      s1 s3 PUSH2
+      SDEQ
+      NOT
+      THROWANYIFNOT
+      s3 s5 XCHG
+      s4 s1 s3 XCHG3
+      TRUE
+      3 -ROLL
+      $M20TBuybackBurnHarness$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1295144011 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s6 POP
+      21003 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s5 PUSH
+      SDEQ
+      THROWANYIFNOT
+      s4 s6 XCHG
+      2 4 BLKSWAP
+      $M20TBuybackBurnHarness$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1498129669 PUSHINT
+    EQUAL
+    IFJMP:<{
+      3 BLKDROP
+      s6 POP
+      s0 s4 XCHG
+      128 LDU
+      DROP
+      21010 PUSHINT
+      s5 PUSH
+      THROWANYIFNOT
+      21011 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s3 PUSH
+      SDEQ
+      THROWANYIFNOT
+      21012 PUSHINT
+      OVER
+      51050000000 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      21013 PUSHINT
+      s0 s6 XCHG
+      0 EQINT
+      s1 s6 XCHG
+      THROWANYIFNOT
+      s4 PUSH
+      s3 s5 XCHG
+      s2 s4 XCHG
+      1 PUSHINT
+      s0 s1 s4 XCHG3
+      $M20TBuybackBurnHarness$_contract_store INLINECALLDICT
+    }>
+    s8 POP
+    0 EQINT
+    s0 s7 XCHG
+    33 LESSINT
+    s1 s7 XCHG
+    AND
+    IFJMP:<{
+      21099 PUSHINT
+      THROWANY
+      s4 s6 XCHG
+      2 4 BLKSWAP
+      $M20TBuybackBurnHarness$_contract_store INLINECALLDICT
+    }>
+    7 BLKDROP
+    130 THROW
+  }>
+}END>c
