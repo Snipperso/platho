@@ -21,6 +21,7 @@ This file is the production freeze checklist. If any hard blocker below is still
 ```powershell
 npm.cmd run crypto:selftest
 npm.cmd run m20f:address-preflight
+npm.cmd run m20f:derive-addresses
 npm.cmd run m20u:readiness
 npm.cmd run m20f:collect
 npm.cmd run m20f:preflight
