@@ -76,6 +76,7 @@ async function createRefundDue(blockchain: Blockchain, registry: any, officialAt
     $$type: 'AthTransferNotificationMintUsername',
     query_id: 501n,
     amount,
+    sender_key: 0n,
     owner_wallet: ownerWallet,
     username_len: 6n,
     username: usernameSlice('Larisa'),

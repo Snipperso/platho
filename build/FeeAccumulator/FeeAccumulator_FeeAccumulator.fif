@@ -312,21 +312,23 @@ PROGRAM{
       15035 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      3000000 PUSHINT
+      5000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s5 s5 XCPU
       SUB
+      s5 PUSH
+      2000000 PUSHINT
+      ADD
       TRUE
       1 PUSHINT
-      s7 PUSH
+      s0 s8 XCHG
       $AcceptBurnReserve$_constructor_amount INLINECALLDICT
       NEWC
       $AcceptBurnReserve$_store_cell INLINECALLDICT
       s5 PUSH
       s0 s4 XCHG
-      s0 s9 XCHG
-      3 -ROLL
+      s9 s9 XCHG2
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true

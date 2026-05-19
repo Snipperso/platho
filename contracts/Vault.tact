@@ -13,6 +13,7 @@ const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT: Int = 30000000;
 const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT: Int = 3000000;
 const VAULT_PENDING_PUBLISH_STALE_TTL: Int = 86400; // 24 hours
+const VAULT_DEPOSIT_TON_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 30000000;
 const ASSET_TON: Int = 1;
@@ -708,10 +709,10 @@ contract Vault {
         throwUnless(16010, msg.amount > 0);
         let exists: Bool = self.users.exists(sender());
         if (!exists) {
-            throwUnless(16011, context().value >= msg.amount + VAULT_USER_STATE_STORAGE_ENDOWMENT);
+            throwUnless(16011, context().value >= msg.amount + VAULT_USER_STATE_STORAGE_ENDOWMENT + VAULT_DEPOSIT_TON_EXEC_RESERVE);
             self.user_count += 1;
         } else {
-            throwUnless(16012, context().value >= msg.amount);
+            throwUnless(16012, context().value >= msg.amount + VAULT_DEPOSIT_TON_EXEC_RESERVE);
         }
 
         let user: UserState = self.getUserOrEmpty(sender());
@@ -733,6 +734,7 @@ contract Vault {
                     mode: SendDefaultMode,
                     body: AthTransferNotificationAck {
                         query_id: msg.query_id,
+                        sender_key: msg.sender_key,
                         amount: msg.amount
                     }.toCell()
                 });
@@ -760,6 +762,7 @@ contract Vault {
             mode: SendDefaultMode,
             body: AthTransferNotificationAck {
                 query_id: msg.query_id,
+                sender_key: msg.sender_key,
                 amount: msg.amount
             }.toCell()
         });

@@ -8,6 +8,7 @@ const TREASURY_SHARE_BPS: Int = 5000;
 const FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 2000000;
 const FEEACCUMULATOR_SPLIT_EXEC_RESERVE: Int = 2000000;
 const FEEACCUMULATOR_FLUSH_EXEC_RESERVE: Int = 3000000;
+const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 // M19H BuybackBurn funding envelope: exact 50 TON offer + 1.05 TON route funding.
 // FeeAccumulator must only flush complete buyback execution envelopes, not raw 50 TON offer chunks.
 const BUYBACK_FUNDING_ENVELOPE_NANOTONS: Int = 51050000000;
@@ -101,13 +102,13 @@ contract FeeAccumulator {
         // 50 TON is only the STON.fi offer principal; 1.05 TON route funding is part of the protocol-owned envelope.
         throwUnless(15034, msg.amount == BUYBACK_FUNDING_ENVELOPE_NANOTONS);
         throwUnless(15031, msg.amount <= self.buyback_due_ton);
-        throwUnless(15035, context().value >= FEEACCUMULATOR_FLUSH_EXEC_RESERVE);
+        throwUnless(15035, context().value >= FEEACCUMULATOR_FLUSH_EXEC_RESERVE + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE);
 
         self.buyback_due_ton -= msg.amount;
 
         message(MessageParameters {
             to: self.buyback_burn_address,
-            value: msg.amount,
+            value: msg.amount + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE,
             bounce: true,
             mode: SendPayFwdFeesSeparately,
             body: AcceptBurnReserve { amount: msg.amount }.toCell()

@@ -21,6 +21,7 @@ import {
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
+const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
 const SESSION_STATE_STORAGE_ENDOWMENT = 5_000_000n;
 const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 5_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
@@ -124,10 +125,14 @@ async function setupAth() {
 }
 
 async function depositTon(vault: any, user: any, amount: bigint) {
-  await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT }, {
+  await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT + DEPOSIT_TON_EXEC_RESERVE }, {
     $$type: 'DepositTon',
     amount,
   } as DepositTon);
+}
+
+async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
+  return (await blockchain.getContract(address)).balance;
 }
 
 async function depositAth(params: {
@@ -154,28 +159,57 @@ describe('Vault value/storage boundary negative matrix', () => {
     const { vault, user } = await setupPlain();
     const amount = 1_000_000n;
 
-    await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT - 1n }, {
+    await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT + DEPOSIT_TON_EXEC_RESERVE - 1n }, {
       $$type: 'DepositTon',
       amount,
     } as DepositTon);
     expect((await vault.getGetUser(user.address)).exists).toBe(false);
 
-    await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT }, {
+    await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT + DEPOSIT_TON_EXEC_RESERVE }, {
       $$type: 'DepositTon',
       amount,
     } as DepositTon);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
 
-    await vault.send(user.getSender(), { value: amount - 1n }, {
+    await vault.send(user.getSender(), { value: amount + DEPOSIT_TON_EXEC_RESERVE - 1n }, {
       $$type: 'DepositTon',
       amount,
     } as DepositTon);
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
+
+    await vault.send(user.getSender(), { value: amount + DEPOSIT_TON_EXEC_RESERVE }, {
+      $$type: 'DepositTon',
+      amount,
+    } as DepositTon);
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount * 2n);
+  });
+
+  it('VAULT-BND-01B: DepositTon caller-funded reserve keeps credited TON liability backed', async () => {
+    const { blockchain, vault, user } = await setupPlain();
+    const amount = 1_000_000n;
+
+    let before = await contractBalance(blockchain, vault.address);
+    await vault.send(user.getSender(), { value: amount + USER_STATE_STORAGE_ENDOWMENT + DEPOSIT_TON_EXEC_RESERVE }, {
+      $$type: 'DepositTon',
+      amount,
+    } as DepositTon);
+    let after = await contractBalance(blockchain, vault.address);
+    expect(after - before).toBeGreaterThanOrEqual(amount);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
 
     await vault.send(user.getSender(), { value: amount }, {
       $$type: 'DepositTon',
       amount,
     } as DepositTon);
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
+
+    before = await contractBalance(blockchain, vault.address);
+    await vault.send(user.getSender(), { value: amount + DEPOSIT_TON_EXEC_RESERVE }, {
+      $$type: 'DepositTon',
+      amount,
+    } as DepositTon);
+    after = await contractBalance(blockchain, vault.address);
+    expect(after - before).toBeGreaterThanOrEqual(amount);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount * 2n);
   });
 

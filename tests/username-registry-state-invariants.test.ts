@@ -121,6 +121,7 @@ async function sendMint(params: {
     $$type: 'AthTransferNotificationMintUsername',
     query_id: params.queryId,
     amount: params.amount,
+    sender_key: 0n,
     owner_wallet: params.owner,
     username_len: BigInt(Buffer.from(params.username, 'ascii').length),
     username: usernameSlice(params.username),

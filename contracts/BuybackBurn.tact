@@ -14,6 +14,7 @@ const BUYBACK_FUNDING_ENVELOPE_NANOTONS: Int = 51050000000;
 const BUYBACK_ATH_NOTIFY_ACK_VALUE: Int = 1000000;
 const BUYBACK_ATH_BURN_REQUEST_VALUE: Int = 30000000;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE: Int = 35000000;
+const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_DEADLINE_MAX_AHEAD_SECONDS: Int = 900;
 const BUYBACK_ROUTE_REFUND_RECOVERY_GRACE_SECONDS: Int = 900;
@@ -339,7 +340,7 @@ contract BuybackBurn {
         throwUnless(22200, self.route_frozen);
         throwUnless(22201, sender() == self.fee_accumulator_address);
         throwUnless(22202, msg.amount == BUYBACK_FUNDING_ENVELOPE_NANOTONS);
-        throwUnless(22203, context().value >= msg.amount);
+        throwUnless(22203, context().value >= msg.amount + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE);
         self.reserve_due_ton += msg.amount;
         self.accepted_reserve_count += 1;
     }
@@ -391,6 +392,7 @@ contract BuybackBurn {
             mode: SendDefaultMode,
             body: AthTransferNotificationAck {
                 query_id: msg.query_id,
+                sender_key: msg.sender_key,
                 amount: msg.amount
             }.toCell()
         });

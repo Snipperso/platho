@@ -15,6 +15,7 @@ import { createFundingEnvelopeProfileM19H } from '../scripts/buybackburn_funding
 const DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const SPLIT_EXEC_RESERVE = 2_000_000n;
 const FLUSH_EXEC_RESERVE = 3_000_000n;
+const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
 const OP_ACCEPT_BURN_RESERVE = 0x594BA505;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -52,6 +53,12 @@ async function setup(options?: { buybackDeployed?: boolean; initialBalance?: big
 
 async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
   return (await blockchain.getContract(address)).balance;
+}
+
+function inboundValue(tx: any): bigint {
+  const info = tx?.inMessage?.info;
+  if (info?.type !== 'internal') throw new Error('missing inbound internal value');
+  return info.value.coins;
 }
 
 async function depositAndSplit(fee: any, donor: any, amount: bigint) {
@@ -123,7 +130,7 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
     await depositAndSplit(fee, donor, oneEnvelope * 2n);
     expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
 
-    const underfundedBuybackFlush = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE - 1n }, {
+    const underfundedBuybackFlush = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE - 1n }, {
       $$type: 'FlushBuybackDue',
       amount: oneEnvelope,
     } as FlushBuybackDue);
@@ -132,6 +139,19 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
       to: buyback,
       op: OP_ACCEPT_BURN_RESERVE,
     })).toBeUndefined();
+    expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
+
+    const exactBuybackFlush = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE }, {
+      $$type: 'FlushBuybackDue',
+      amount: oneEnvelope,
+    } as FlushBuybackDue);
+    const sentEnvelope = findTransaction(exactBuybackFlush.transactions, {
+      from: fee.address,
+      to: buyback,
+      op: OP_ACCEPT_BURN_RESERVE,
+    });
+    expect(sentEnvelope).toBeDefined();
+    expect(inboundValue(sentEnvelope)).toBe(oneEnvelope + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE);
     expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
   });
 });

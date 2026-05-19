@@ -16,7 +16,7 @@ Scope: static and manifest-level conformance checks over the implemented M15 sub
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: 35d787ed07e4eb7e29ba90465430b210484fd3e3ed147e511563d768b874dc89
+- Hash: f77bbf37539eb667c62b5b55edc75b162bbd2fc44c04cdd00be59c24639631ea
 
 ## Remaining final-genesis blockers
 
@@ -31,10 +31,10 @@ Scope: static and manifest-level conformance checks over the implemented M15 sub
 | Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects |
 |---|---:|---:|---:|---|
 | ATHMaster.tact | 92 | 3 | 1 | true |
-| ATHWallet.tact | 465 | 10 | 6 | true |
-| BuybackBurn.tact | 475 | 13 | 2 | true |
+| ATHWallet.tact | 489 | 10 | 6 | true |
+| BuybackBurn.tact | 477 | 13 | 2 | true |
 | CapsuleHub.tact | 399 | 8 | 1 | true |
-| FeeAccumulator.tact | 99 | 5 | 1 | true |
+| FeeAccumulator.tact | 100 | 5 | 1 | true |
 | UsernameNFTItem.tact | 48 | 3 | 0 | true |
-| UsernameRegistry.tact | 719 | 14 | 3 | true |
-| Vault.tact | 1365 | 20 | 3 | true |
+| UsernameRegistry.tact | 720 | 14 | 3 | true |
+| Vault.tact | 1368 | 20 | 3 | true |

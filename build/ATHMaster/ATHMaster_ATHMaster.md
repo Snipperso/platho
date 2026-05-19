@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: ATHMaster
-BoC Size: 3877 bytes
+BoC Size: 4035 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 33
@@ -70,16 +70,16 @@ TL-B: `ath_genesis_supply_ack#41544806 query_id:uint64 amount:uint128 owner_addr
 Signature: `ATHGenesisSupplyAck{query_id:uint64,amount:uint128,owner_address:address}`
 
 ### AthTransferNotification
-TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_wallet:address = AthTransferNotification`
-Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_wallet:address}`
+TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_key:uint32 sender_wallet:address = AthTransferNotification`
+Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_key:uint32,sender_wallet:address}`
 
 ### AthTransferNotificationAck
-TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 = AthTransferNotificationAck`
-Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128}`
+TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck`
+Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128,sender_key:uint32}`
 
 ### AthTransferNotificationMintUsername
-TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
-Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
+Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,sender_key:uint32,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### ATHTransferRequest
 TL-B: `ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest`

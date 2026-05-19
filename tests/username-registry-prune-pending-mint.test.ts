@@ -96,6 +96,7 @@ async function createStuckPendingMint(ctx: Awaited<ReturnType<typeof deploySeale
     $$type: 'AthTransferNotificationMintUsername',
     query_id: 13001n,
     amount: PRICE_6_PLUS,
+    sender_key: 0n,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),

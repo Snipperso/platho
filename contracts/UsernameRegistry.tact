@@ -287,7 +287,7 @@ contract UsernameRegistry {
         }
     }
 
-    fun sendAthNotificationAck(query_id: Int, amount: Int) {
+    fun sendAthNotificationAck(query_id: Int, sender_key: Int, amount: Int) {
         message(MessageParameters {
             to: sender(),
             value: USERNAME_ATH_NOTIFICATION_ACK_VALUE,
@@ -295,6 +295,7 @@ contract UsernameRegistry {
             mode: SendDefaultMode,
             body: AthTransferNotificationAck {
                 query_id: query_id,
+                sender_key: sender_key,
                 amount: amount
             }.toCell()
         });
@@ -387,7 +388,7 @@ contract UsernameRegistry {
         if (!self.isValidUsernameBytes(msg.username_len, msg.username)) {
             self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.amount);
+            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
             return;
         }
 
@@ -397,21 +398,21 @@ contract UsernameRegistry {
         if (msg.amount != price) {
             self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.amount);
+            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
             return;
         }
 
         if (self.name_records.exists(name_hash)) {
             self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.amount);
+            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
             return;
         }
 
         if (self.pending_mints.exists(name_hash)) {
             self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.amount);
+            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
             return;
         }
 
@@ -442,7 +443,7 @@ contract UsernameRegistry {
             body: ResendDeployedAck {}.toCell()
         });
 
-        self.sendAthNotificationAck(msg.query_id, msg.amount);
+        self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
     }
 
     receive(msg: UsernameItemDeployedAck) {

@@ -15,6 +15,7 @@ import {
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
+const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
 const SESSION_STATE_STORAGE_ENDOWMENT = 5_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
 const ASSET_TON = 1n;
@@ -102,10 +103,12 @@ describe('Vault TON/session state-machine invariants', () => {
     async function assertModel() {
       let expectedUserCount = 0n;
       let expectedSessionCount = 0n;
+      let expectedTonLiabilities = 0n;
       for (let i = 0; i < users.length; i += 1) {
         const expected = model[i];
         if (expected.exists) {
           expectedUserCount += 1n;
+          expectedTonLiabilities += expected.ton + expected.budget;
         }
         if (expected.sessionExists) {
           expectedSessionCount += 1n;
@@ -135,12 +138,18 @@ describe('Vault TON/session state-machine invariants', () => {
       expect(global.receive_intent_count).toBe(BigInt(intents.size));
 
       for (const intent of intents.values()) {
+        expectedTonLiabilities += intent.amount;
         const view = await vault.getGetReceiveIntent(intent.id);
         expect(view.exists).toBe(true);
         expect(view.sender_wallet.toString()).toBe(users[intent.sender].address.toString());
         expect(view.recipient_wallet.toString()).toBe(users[intent.recipient].address.toString());
         expect(view.asset).toBe(ASSET_TON);
         expect(view.amount).toBe(intent.amount);
+      }
+
+      const vaultBalance = (await blockchain.getContract(vault.address)).balance;
+      if (vaultBalance < expectedTonLiabilities) {
+        throw new Error(`${debugContext}: Vault under-backed, balance=${vaultBalance}, liabilities=${expectedTonLiabilities}`);
       }
     }
 
@@ -150,7 +159,7 @@ describe('Vault TON/session state-machine invariants', () => {
 
       if (op === 0) {
         const amount = BigInt(100_000 + (rng() % 900_000));
-        const required = amount + (model[i].exists ? 0n : USER_STATE_STORAGE_ENDOWMENT);
+        const required = amount + DEPOSIT_TON_EXEC_RESERVE + (model[i].exists ? 0n : USER_STATE_STORAGE_ENDOWMENT);
         const underfunded = (rng() % 7) === 0;
         debugContext = `step ${step} deposit user=${i} amount=${amount} underfunded=${underfunded}`;
         await vault.send(users[i].getSender(), { value: underfunded ? required - 1n : required + toNano('0.01') }, {
