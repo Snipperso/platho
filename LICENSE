@@ -1,0 +1,24 @@
+Source Available - All Rights Reserved
+
+Copyright (c) 2026 Platho.
+
+This repository is published for transparency, review, reproducibility, and
+public inspection of the Platho protocol, contracts, and static application
+code.
+
+No license is granted to copy, modify, distribute, sublicense, sell, host,
+deploy, or create derivative works from this source code unless explicit
+written permission is granted by the Platho project.
+
+Viewing, cloning, and locally running the repository for personal inspection,
+security review, or reproducibility testing is permitted, provided that no
+public redistribution, hosted deployment, derivative product, or commercial use
+is made from the code.
+
+Third-party dependencies and vendored packages remain governed by their own
+licenses. Those licenses apply only to the third-party materials they cover and
+do not grant rights to the Platho project code.
+
+The code is experimental and pre-mainnet. No warranty is provided, including any
+implied warranty of merchantability, fitness for a particular purpose,
+non-infringement, correctness, security, or production suitability.
