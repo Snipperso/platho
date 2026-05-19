@@ -3058,6 +3058,12 @@ PROGRAM{
       22 s() PUSH
       0 GTINT
       THROWANYIFNOT
+      16019 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
       267 PUSHINT
       __tact_context_get_sender INLINECALLDICT
       s15 PUSH

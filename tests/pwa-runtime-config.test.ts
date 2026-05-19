@@ -15,6 +15,7 @@ const productionConfig = {
   tonConnect: {
     manifestUrl: './tonconnect-manifest.json',
     expectedDomain: 'platho.app',
+    expectedChain: '-239',
   },
   vault: {
     address: '0:1111111111111111111111111111111111111111111111111111111111111111',
@@ -83,5 +84,18 @@ describe('PWA runtime config guard', () => {
 
     expect(report.ok).toBe(false);
     expect(report.findings.map((finding) => finding.id)).toContain('PWA_VAULT_CHAIN_PROVIDER_REQUIRED');
+  });
+
+  it('PWA-CONFIG-05: TON Connect expectedChain must match the configured network', () => {
+    const report = validatePlathoAppConfig({
+      ...productionConfig,
+      tonConnect: {
+        ...productionConfig.tonConnect,
+        expectedChain: '-3',
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.findings.map((finding) => finding.id)).toContain('PWA_TONCONNECT_CHAIN_MISMATCH');
   });
 });

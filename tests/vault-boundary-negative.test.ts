@@ -7,6 +7,7 @@ import {
   BindOfficialAthWallet,
   SealGenesis,
   DepositTon,
+  WithdrawTon,
   SetSession,
   RegisterMessagingKeys,
   CreateReceiveIntent,
@@ -23,6 +24,7 @@ const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef123456789
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
 const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
+const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 const SESSION_STATE_STORAGE_ENDOWMENT = 5_000_000n;
 const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 5_000_000n;
@@ -213,6 +215,30 @@ describe('Vault value/storage boundary negative matrix', () => {
     after = await contractBalance(blockchain, vault.address);
     expect(after - before).toBeGreaterThanOrEqual(amount);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount * 2n);
+  });
+
+  it('VAULT-BND-01C: WithdrawTon requires caller-funded reserve and does not spend Vault backing on fees', async () => {
+    const { blockchain, vault, user, recipient } = await setupPlain();
+    const amount = 50_000_000n;
+    await depositTon(vault, user, amount);
+
+    await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE - 1n }, {
+      $$type: 'WithdrawTon',
+      amount,
+      recipient: recipient.address,
+    } as WithdrawTon);
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
+
+    const beforeVaultBalance = await contractBalance(blockchain, vault.address);
+    await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE }, {
+      $$type: 'WithdrawTon',
+      amount,
+      recipient: recipient.address,
+    } as WithdrawTon);
+    const afterVaultBalance = await contractBalance(blockchain, vault.address);
+
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(0n);
+    expect(beforeVaultBalance - afterVaultBalance).toBeLessThanOrEqual(amount);
   });
 
   it('VAULT-BND-02: SetSession and RegisterMessagingKeys honor exact storage boundaries', async () => {

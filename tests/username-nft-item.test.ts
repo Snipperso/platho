@@ -11,6 +11,10 @@ import {
   MockUsernameRegistryAckSink,
 } from '../build/MockUsernameRegistryAckSink/MockUsernameRegistryAckSink_MockUsernameRegistryAckSink';
 
+const ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
+const ITEM_ACK_EXEC_RESERVE = 1_000_000n;
+const ITEM_ACK_RESEND_RESERVE = ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE;
+
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
 }
@@ -75,19 +79,22 @@ describe('UsernameNFTItem v1 milestone', () => {
   });
 
   it('USERNAME-NFT-04: underfunded ResendDeployedAck is rejected to prevent storage-reserve drain', async () => {
-    const { caller, registry, item } = await deployItem();
+    const { blockchain, caller, registry, item, itemAddress } = await deployItem();
 
-    await item.send(caller.getSender(), { value: toNano('0.001') }, {
+    await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_RESERVE - 1n }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
     expect((await registry.getGetState()).ack_count).toBe(0n);
 
-    await item.send(caller.getSender(), { value: toNano('0.003') }, {
+    const beforeItemBalance = (await blockchain.getContract(itemAddress)).balance;
+    await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_RESERVE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
+    const afterItemBalance = (await blockchain.getContract(itemAddress)).balance;
 
     expect((await registry.getGetState()).ack_count).toBe(1n);
+    expect(afterItemBalance).toBeGreaterThanOrEqual(beforeItemBalance);
   });
 
   it('USERNAME-NFT-03: TopUpStorageReserve grants no ownership/name mutation and empty fallback is rejected', async () => {
