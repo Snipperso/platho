@@ -227,6 +227,7 @@ struct SessionState {
     session_id: Int as uint256;
     nonce: Int as uint64;
     expires_at: Int as uint32;
+    message_budget_ton: Int as uint128;
     active: Bool;
 }
 
@@ -564,6 +565,8 @@ contract Vault {
             } else {
                 user.ton_balance += refundAmount;
             }
+            session.message_budget_ton = user.message_budget_ton;
+            self.sessions.set(pending.owner_wallet, session);
         } else {
             user.ton_balance += refundAmount;
         }
@@ -683,6 +686,7 @@ contract Vault {
         throwUnless(15014, msg.deployment_manifest_hash > 1);
         throwUnless(15015, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(15016, msg.official_ath_wallet_address != sender());
+        throwUnless(15017, msg.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
         self.deployment_manifest_hash = msg.deployment_manifest_hash;
         self.vault_ath_wallet_address = msg.official_ath_wallet_address;
     }
@@ -694,6 +698,7 @@ contract Vault {
         throwUnless(15021, self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(15022, self.capsule_hub_bound);
         throwUnless(15023, self.vault_ath_wallet_address != sender());
+        throwUnless(15024, self.vault_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
         self.genesis_config_hash = VAULT_ACTIVITY_AIRDROP_TOTAL_ATH;
         self.sealed = true;
     }
@@ -883,12 +888,14 @@ contract Vault {
             self.session_count += 1;
         }
 
+        let user: UserState = self.getUserOrEmpty(sender());
         let sessionId: Int = self.computeSessionId(sender(), msg.session_pubkey);
         self.sessions.set(sender(), SessionState {
             session_pubkey: msg.session_pubkey,
             session_id: sessionId,
             nonce: 0,
             expires_at: msg.expires_at,
+            message_budget_ton: user.message_budget_ton,
             active: true
         });
     }
@@ -904,6 +911,7 @@ contract Vault {
         session.active = false;
         user.ton_balance += user.message_budget_ton;
         user.message_budget_ton = 0;
+        session.message_budget_ton = 0;
         throwUnless(16042, user.budget_epoch < UINT64_MAX);
         user.budget_epoch += 1;
 
@@ -922,6 +930,9 @@ contract Vault {
 
         user.ton_balance -= msg.amount;
         user.message_budget_ton += msg.amount;
+        let session: SessionState = self.sessions.get(sender())!!;
+        session.message_budget_ton = user.message_budget_ton;
+        self.sessions.set(sender(), session);
         self.users.set(sender(), user);
     }
 
@@ -1130,6 +1141,8 @@ contract Vault {
         throwUnless(16414, now() <= session.expires_at);
         throwUnless(16415, now() <= validUntil);
         throwUnless(16416, session.nonce < UINT64_MAX);
+        throwUnless(16419, session.message_budget_ton >= INVALID_SESSION_REQUEST_CHARGE_TON);
+        throwUnless(16420, maxCharge >= INVALID_SESSION_REQUEST_CHARGE_TON);
 
         let sigHash: Int = self.computeSessionPublishHash(op, owner, sessionId, sessionNonce, validUntil, publishKind, sizeClass, cryptoSuite, maxCharge, hashesRef);
         let sigSlice: Slice = signatureRef.beginParse();
@@ -1141,10 +1154,20 @@ contract Vault {
         acceptMessage();
 
         let userOpt: UserState? = self.users.get(owner);
-        throwUnless(16418, userOpt != null);
+        if (userOpt == null) {
+            session.nonce += 1;
+            session.message_budget_ton = 0;
+            self.sessions.set(owner, session);
+            return;
+        }
         let user: UserState = userOpt!!;
-        throwUnless(16419, user.message_budget_ton >= INVALID_SESSION_REQUEST_CHARGE_TON);
-        throwUnless(16420, maxCharge >= INVALID_SESSION_REQUEST_CHARGE_TON);
+        if (user.message_budget_ton < INVALID_SESSION_REQUEST_CHARGE_TON) {
+            session.nonce += 1;
+            session.message_budget_ton = user.message_budget_ton;
+            self.sessions.set(owner, session);
+            self.users.set(owner, user);
+            return;
+        }
 
         session.nonce += 1;
 
@@ -1203,12 +1226,14 @@ contract Vault {
 
         if (postAcceptInvalid) {
             user.message_budget_ton -= INVALID_SESSION_REQUEST_CHARGE_TON;
+            session.message_budget_ton = user.message_budget_ton;
             self.sessions.set(owner, session);
             self.users.set(owner, user);
             return;
         }
 
         user.message_budget_ton -= maxCharge;
+        session.message_budget_ton = user.message_budget_ton;
         self.sessions.set(owner, session);
         self.users.set(owner, user);
 

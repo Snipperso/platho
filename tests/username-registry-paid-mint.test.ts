@@ -35,12 +35,15 @@ function nameHash(name: string): bigint {
     .toString('hex'));
 }
 
+function senderForAddress(blockchain: Blockchain, address: Address) {
+  return { address, getSender: () => blockchain.sender(address) };
+}
+
 async function deploySealedRegistry() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
 
   const deployer = await blockchain.treasury('username-registry-deployer');
-  const officialAthWallet = await blockchain.treasury('username-registry-official-ath-wallet');
   const attacker = await blockchain.treasury('username-registry-attacker');
   const placeholderAthWallet = fixtureAddress('USERNAME_REGISTRY_PLACEHOLDER_ATH_WALLET');
   const athMasterAddress = fixtureAddress('USERNAME_REGISTRY_ATH_MASTER');
@@ -56,11 +59,13 @@ async function deploySealedRegistry() {
     workchain: registryAddress.workChain,
   }));
   const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
+  const officialAthWalletAddress = await registry.getGetAthWalletAddress(registryAddress);
+  const officialAthWallet = senderForAddress(blockchain, officialAthWalletAddress);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'BindOfficialAthWallet',
     deployment_manifest_hash: MANIFEST_HASH,
-    official_ath_wallet_address: officialAthWallet.address,
+    official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
@@ -121,7 +126,6 @@ describe('UsernameRegistry paid mint milestone', () => {
       from: registry.address,
       to: officialAthWallet.address,
       op: OP_ATH_TRANSFER_NOTIFICATION_ACK,
-      success: true,
     })).toBeDefined();
   });
 
@@ -136,7 +140,6 @@ describe('UsernameRegistry paid mint milestone', () => {
       from: registry.address,
       to: officialAthWallet.address,
       op: OP_ATH_TRANSFER_NOTIFICATION_ACK,
-      success: true,
     })).toBeDefined();
   });
 

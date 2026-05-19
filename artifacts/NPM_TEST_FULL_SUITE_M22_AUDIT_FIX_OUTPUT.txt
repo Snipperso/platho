@@ -1,0 +1,5 @@
+﻿Platho M22 audit-fix full-suite proof
+Command: npm.cmd test -- --reporter=json --outputFile=artifacts\NPM_TEST_FULL_SUITE_M22_AUDIT_FIX_RESULTS.json
+Exit code: 0
+Summary: success=true; numTotalTests=263; numPassedTests=263; numFailedTests=0; JSON report path=artifacts/NPM_TEST_FULL_SUITE_M22_AUDIT_FIX_RESULTS.json
+Plain-text run immediately before JSON proof: npm.cmd test => Test Files 65 passed (65), Tests 263 passed (263), Duration 64.52s

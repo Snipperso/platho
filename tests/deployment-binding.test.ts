@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { Vault, BindDeploymentManifest as VaultBind, BindOfficialAthWallet as VaultBindAth, SealGenesis as VaultSeal, DepositTon } from '../build/Vault/Vault_Vault';
 import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal, PublishPublicDirect } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 
@@ -16,6 +17,11 @@ function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
 }
 
+async function deriveAthWallet(owner: Address, athMasterAddress: Address): Promise<Address> {
+  const walletInit = await ATHWallet.init(0n, owner, athMasterAddress);
+  return contractAddress(owner.workChain, walletInit);
+}
+
 async function deployUnboundPair() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -23,10 +29,10 @@ async function deployUnboundPair() {
   const deployer = await blockchain.treasury('deployer');
   const user = await blockchain.treasury('user');
   const feeAccumulator = await blockchain.treasury('fee-accumulator');
-  const athWallet = await blockchain.treasury('vault-ath-wallet');
 
   const vaultInit = await Vault.init(deployer.address, deployer.address, fixtureAddress('UNBOUND_CAPSULE_PLACEHOLDER'), addressHash(deployer.address), false, false, 0n);
   const vaultAddress = contractAddress(0, vaultInit);
+  const officialAthWallet = await deriveAthWallet(vaultAddress, deployer.address);
   await blockchain.setShardAccount(vaultAddress, createShardAccount({
     address: vaultAddress,
     code: vaultInit.code,
@@ -47,12 +53,12 @@ async function deployUnboundPair() {
   }));
   const capsule = blockchain.openContract(new CapsuleHub(capsuleAddress, capsuleInit));
 
-  return { blockchain, deployer, user, athWallet, vault, vaultAddress, capsule, capsuleAddress };
+  return { blockchain, deployer, user, officialAthWallet, vault, vaultAddress, capsule, capsuleAddress };
 }
 
 describe('Deployment binding profile', () => {
   it('DEPLOY-BIND-01/02/03/08: Vault and CapsuleHub bind each other once before seal and expose manifest hash', async () => {
-    const { vault, capsule, vaultAddress, capsuleAddress, deployer, athWallet } = await deployUnboundPair();
+    const { vault, capsule, vaultAddress, capsuleAddress, deployer, officialAthWallet } = await deployUnboundPair();
 
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindDeploymentManifest',
@@ -68,7 +74,7 @@ describe('Deployment binding profile', () => {
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
       deployment_manifest_hash: MANIFEST_HASH,
-      official_ath_wallet_address: athWallet.address,
+      official_ath_wallet_address: officialAthWallet,
     } as VaultBindAth);
 
     const vg = await vault.getGetGlobal();
@@ -134,7 +140,7 @@ describe('Deployment binding profile', () => {
   });
 
   it('DEPLOY-BIND-07/09: post-seal binding is rejected forever and user operations work only after seal', async () => {
-    const { vault, capsule, vaultAddress, capsuleAddress, deployer, user, athWallet } = await deployUnboundPair();
+    const { vault, capsule, vaultAddress, capsuleAddress, deployer, user, officialAthWallet } = await deployUnboundPair();
 
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindDeploymentManifest',
@@ -149,7 +155,7 @@ describe('Deployment binding profile', () => {
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
       deployment_manifest_hash: MANIFEST_HASH,
-      official_ath_wallet_address: athWallet.address,
+      official_ath_wallet_address: officialAthWallet,
     } as VaultBindAth);
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
@@ -176,7 +182,7 @@ describe('Deployment binding profile', () => {
     } as VaultBindAth);
     const sealedGlobal = await vault.getGetGlobal();
     expect(sealedGlobal.capsule_hub_address.equals(capsuleAddress)).toBe(true);
-    expect(sealedGlobal.vault_ath_wallet_address.equals(athWallet.address)).toBe(true);
+    expect(sealedGlobal.vault_ath_wallet_address.equals(officialAthWallet)).toBe(true);
 
     await vault.send(user.getSender(), { value: toNano('1.1') }, {
       $$type: 'DepositTon',

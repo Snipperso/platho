@@ -61,7 +61,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 717,
+      "non_comment_lines": 719,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -69,7 +69,7 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 1340,
+      "non_comment_lines": 1365,
       "receive_handlers": 20,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -108,13 +108,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "35009f377483b91fe2f5ee638e1307f0e127fbfde4d81a040638d5c93ce2fa47",
-      "pinned": "35009f377483b91fe2f5ee638e1307f0e127fbfde4d81a040638d5c93ce2fa47",
+      "built": "dfb36c6ee6916de449285754935bafd765e6443f87deb2c38194b0951522461d",
+      "pinned": "dfb36c6ee6916de449285754935bafd765e6443f87deb2c38194b0951522461d",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "e87cb9e6d7c31b4011d262718f4d5fe2085e10efe42c2aefcfb5c40ebb583421",
-      "pinned": "e87cb9e6d7c31b4011d262718f4d5fe2085e10efe42c2aefcfb5c40ebb583421",
+      "built": "954379d687880713d87b7c780ed8d3e2213999f0d3b601b2ff5f94a95df1109e",
+      "pinned": "954379d687880713d87b7c780ed8d3e2213999f0d3b601b2ff5f94a95df1109e",
       "match": true
     }
   },
@@ -122,7 +122,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "e7f05aaab30f4791444c54c549c755264d941b0ab4ae8fb5378e4afdac3e521a",
+    "manifest_hash_hex": "35d787ed07e4eb7e29ba90465430b210484fd3e3ed147e511563d768b874dc89",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

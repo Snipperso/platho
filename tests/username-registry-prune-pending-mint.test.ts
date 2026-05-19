@@ -34,12 +34,15 @@ function nameHash(name: string): bigint {
     .toString('hex'));
 }
 
+function senderForAddress(blockchain: Blockchain, address: Address) {
+  return { address, getSender: () => blockchain.sender(address) };
+}
+
 async function deploySealedRegistry() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
 
   const deployer = await blockchain.treasury('username-registry-m13-deployer');
-  const officialAthWallet = await blockchain.treasury('username-registry-m13-official-ath-wallet');
   const pruner = await blockchain.treasury('username-registry-m13-pruner');
   const placeholderAthWallet = fixtureAddress('USERNAME_REGISTRY_PLACEHOLDER_ATH_WALLET_M13');
   const athMasterAddress = fixtureAddress('USERNAME_REGISTRY_ATH_MASTER_M13');
@@ -55,11 +58,13 @@ async function deploySealedRegistry() {
     workchain: registryAddress.workChain,
   }));
   const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
+  const officialAthWalletAddress = await registry.getGetAthWalletAddress(registryAddress);
+  const officialAthWallet = senderForAddress(blockchain, officialAthWalletAddress);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'BindOfficialAthWallet',
     deployment_manifest_hash: MANIFEST_HASH,
-    official_ath_wallet_address: officialAthWallet.address,
+    official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {

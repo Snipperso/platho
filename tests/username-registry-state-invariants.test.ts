@@ -58,11 +58,14 @@ function priceFor(name: string): bigint {
   return PRICE_6_PLUS;
 }
 
+function senderForAddress(blockchain: Blockchain, address: Address) {
+  return { address, getSender: () => blockchain.sender(address) };
+}
+
 async function deploySealedRegistry() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
   const deployer = await blockchain.treasury('username-inv-deployer');
-  const officialAthWallet = await blockchain.treasury('username-inv-official-ath-wallet');
   const pruner = await blockchain.treasury('username-inv-pruner');
   const placeholderAthWallet = fixtureAddress('PLACEHOLDER_ATH_WALLET');
   const athMasterAddress = fixtureAddress('ATH_MASTER');
@@ -78,11 +81,13 @@ async function deploySealedRegistry() {
     workchain: registryAddress.workChain,
   }));
   const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
+  const officialAthWalletAddress = await registry.getGetAthWalletAddress(registryAddress);
+  const officialAthWallet = senderForAddress(blockchain, officialAthWalletAddress);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'BindOfficialAthWallet',
     deployment_manifest_hash: MANIFEST_HASH,
-    official_ath_wallet_address: officialAthWallet.address,
+    official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',

@@ -92,8 +92,8 @@ describe('UsernameRegistry foundation milestone', () => {
   });
 
   it('USERNAME-REG-M9-04: official ATH wallet binds before seal and cannot be changed after seal', async () => {
-    const { deployer, registry } = await deployRegistry();
-    const officialAthWallet = fixtureAddress('USERNAME_REGISTRY_OFFICIAL_ATH_WALLET');
+    const { deployer, registry, registryAddress } = await deployRegistry();
+    const officialAthWallet = await registry.getGetAthWalletAddress(registryAddress);
     const attackerWallet = fixtureAddress('USERNAME_REGISTRY_ATTACKER_ATH_WALLET');
 
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
@@ -127,6 +127,28 @@ describe('UsernameRegistry foundation milestone', () => {
     state = await registry.getGetGlobal();
     expect(state.official_ath_wallet_address.equals(officialAthWallet)).toBe(true);
     expect(state.official_ath_wallet_address.equals(attackerWallet)).toBe(false);
+  });
+
+  it('USERNAME-REG-M9-04A: pre-seal binding rejects a non-derived official ATH wallet', async () => {
+    const { deployer, registry, registryAddress } = await deployRegistry();
+    const wrongOfficialAthWallet = fixtureAddress('USERNAME_REGISTRY_AUDIT_F007_WRONG_ATH_WALLET');
+    const derivedOfficialAthWallet = await registry.getGetAthWalletAddress(registryAddress);
+
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: wrongOfficialAthWallet,
+    } as BindOfficialAthWallet);
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+
+    const state = await registry.getGetGlobal();
+    expect(state.sealed).toBe(false);
+    expect(state.official_ath_wallet_bound).toBe(false);
+    expect(state.official_ath_wallet_address.equals(wrongOfficialAthWallet)).toBe(false);
+    expect(state.official_ath_wallet_address.equals(derivedOfficialAthWallet)).toBe(false);
   });
 
   it('USERNAME-REG-M9-05: seal fails without official ATH wallet binding and storage top-up grants no authority', async () => {

@@ -3376,6 +3376,7 @@ export type SessionState = {
     session_id: bigint;
     nonce: bigint;
     expires_at: bigint;
+    message_budget_ton: bigint;
     active: boolean;
 }
 
@@ -3386,6 +3387,7 @@ export function storeSessionState(src: SessionState) {
         b_0.storeUint(src.session_id, 256);
         b_0.storeUint(src.nonce, 64);
         b_0.storeUint(src.expires_at, 32);
+        b_0.storeUint(src.message_budget_ton, 128);
         b_0.storeBit(src.active);
     };
 }
@@ -3396,8 +3398,9 @@ export function loadSessionState(slice: Slice) {
     const _session_id = sc_0.loadUintBig(256);
     const _nonce = sc_0.loadUintBig(64);
     const _expires_at = sc_0.loadUintBig(32);
+    const _message_budget_ton = sc_0.loadUintBig(128);
     const _active = sc_0.loadBit();
-    return { $$type: 'SessionState' as const, session_pubkey: _session_pubkey, session_id: _session_id, nonce: _nonce, expires_at: _expires_at, active: _active };
+    return { $$type: 'SessionState' as const, session_pubkey: _session_pubkey, session_id: _session_id, nonce: _nonce, expires_at: _expires_at, message_budget_ton: _message_budget_ton, active: _active };
 }
 
 export function loadTupleSessionState(source: TupleReader) {
@@ -3405,8 +3408,9 @@ export function loadTupleSessionState(source: TupleReader) {
     const _session_id = source.readBigNumber();
     const _nonce = source.readBigNumber();
     const _expires_at = source.readBigNumber();
+    const _message_budget_ton = source.readBigNumber();
     const _active = source.readBoolean();
-    return { $$type: 'SessionState' as const, session_pubkey: _session_pubkey, session_id: _session_id, nonce: _nonce, expires_at: _expires_at, active: _active };
+    return { $$type: 'SessionState' as const, session_pubkey: _session_pubkey, session_id: _session_id, nonce: _nonce, expires_at: _expires_at, message_budget_ton: _message_budget_ton, active: _active };
 }
 
 export function loadGetterTupleSessionState(source: TupleReader) {
@@ -3414,8 +3418,9 @@ export function loadGetterTupleSessionState(source: TupleReader) {
     const _session_id = source.readBigNumber();
     const _nonce = source.readBigNumber();
     const _expires_at = source.readBigNumber();
+    const _message_budget_ton = source.readBigNumber();
     const _active = source.readBoolean();
-    return { $$type: 'SessionState' as const, session_pubkey: _session_pubkey, session_id: _session_id, nonce: _nonce, expires_at: _expires_at, active: _active };
+    return { $$type: 'SessionState' as const, session_pubkey: _session_pubkey, session_id: _session_id, nonce: _nonce, expires_at: _expires_at, message_budget_ton: _message_budget_ton, active: _active };
 }
 
 export function storeTupleSessionState(source: SessionState) {
@@ -3424,6 +3429,7 @@ export function storeTupleSessionState(source: SessionState) {
     builder.writeNumber(source.session_id);
     builder.writeNumber(source.nonce);
     builder.writeNumber(source.expires_at);
+    builder.writeNumber(source.message_budget_ton);
     builder.writeBoolean(source.active);
     return builder.build();
 }
@@ -4390,7 +4396,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"message_budget_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"budget_epoch","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
-    {"name":"SessionState","header":null,"fields":[{"name":"session_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"session_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"active","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"SessionState","header":null,"fields":[{"name":"session_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"session_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"message_budget_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"active","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"expires_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultKeyRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultUserView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"ton_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"message_budget_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"budget_epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
