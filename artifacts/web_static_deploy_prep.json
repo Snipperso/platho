@@ -1,10 +1,10 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-18T20:47:29.335Z",
-  "mode": "preview",
+  "generatedAt": "2026-05-19T19:36:33.398Z",
+  "mode": "production",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
-  "status": "PREVIEW_STATIC_PACKAGE_READY",
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
+  "status": "BLOCKED_BY_PREPROD",
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
@@ -781,15 +781,14 @@
     "serverRuntimeIncluded": false,
     "productionMarkersCleared": false
   },
-  "blockers": [],
-  "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION",
+  "blockers": [
     "PWA_MODE_NOT_PRODUCTION",
     "PWA_NETWORK_NOT_MAINNET",
     "CRYPTO_PROD_REMAINING_WORK",
     "PROD_CHECKLIST_OPEN_BLOCKERS",
     "TESTNET_ENV_PRESENT"
   ],
+  "warnings": [],
   "productionFindings": [
     {
       "id": "PWA_MODE_NOT_PRODUCTION",

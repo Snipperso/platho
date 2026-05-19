@@ -10,8 +10,8 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | ATH_BURN_SUCCESS | 1 | 1313202 | 1313202 | 7932 |
 | CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3350005 | 1258690 | 13586 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 4 | 2023140 | 619113 | 4582 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 21346669 | 4246127 | 32492 |
-| VAULT_EXTERNAL_PUBLISH | 2 | 11073093 | 6558447 | 46503 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 21349790 | 4246127 | 32492 |
+| VAULT_EXTERNAL_PUBLISH | 2 | 11337893 | 6682647 | 46654 |
 
 ## Operation details
 
@@ -54,14 +54,14 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | flush_treasury_due_ath | 5 | 4207437 | 1315968 | 17911 | 0 | 0 |
 | flush_burn_due_ath | 5 | 3143425 | 1030689 | 14930 | 0 | 0 |
 | stuck_pending_mint_creation_no_ack | 3 | 2691645 | 2314243 | 32492 | 1 | 1 |
-| prune_stale_pending_mint | 2 | 1537387 | 1252993 | 15069 | 0 | 0 |
+| prune_stale_pending_mint | 2 | 1540508 | 1256114 | 15069 | 0 | 0 |
 
 ### VAULT_EXTERNAL_PUBLISH
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| external_private_publish_to_capsulehub_ack | 3 | 6558447 | 3383157 | 46503 | 0 | 0 |
-| external_private_publish_to_missing_capsulehub_bounce | 3 | 4514646 | 3383157 | 46503 | 1 | 0 |
+| external_private_publish_to_capsulehub_ack | 3 | 6682647 | 3393224 | 46654 | 0 | 0 |
+| external_private_publish_to_missing_capsulehub_bounce | 3 | 4655246 | 3393224 | 46654 | 1 | 0 |
 
 ## Result
 

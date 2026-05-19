@@ -18,6 +18,7 @@ import {
   BindOfficialAthWallet as RegistryBindAth,
   SealGenesis as RegistrySeal,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x67656e657369735f617574685f6d616e69666573745f763100000000000001n;
 
@@ -30,6 +31,11 @@ function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
 }
 
+async function deriveAthWallet(owner: Address, athMasterAddress: Address): Promise<Address> {
+  const walletInit = await ATHWallet.init(0n, owner, athMasterAddress);
+  return contractAddress(owner.workChain, walletInit);
+}
+
 async function deployUnsealedVaultCapsulePair() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -37,13 +43,13 @@ async function deployUnsealedVaultCapsulePair() {
   const genesisController = await blockchain.treasury('genesis-controller');
   const attacker = await blockchain.treasury('genesis-attacker');
   const feeAccumulator = await blockchain.treasury('genesis-fee-accumulator');
-  const athWallet = await blockchain.treasury('genesis-vault-ath-wallet');
 
   const vaultPlaceholder = fixtureAddress('GENESIS_AUTH_VAULT_CAPSULE_PLACEHOLDER');
   const capsulePlaceholder = fixtureAddress('GENESIS_AUTH_CAPSULE_VAULT_PLACEHOLDER');
 
   const vaultInit = await Vault.init(genesisController.address, genesisController.address, vaultPlaceholder, addressHash(genesisController.address), false, false, 0n);
   const vaultAddress = contractAddress(0, vaultInit);
+  const officialAthWallet = await deriveAthWallet(vaultAddress, genesisController.address);
   await blockchain.setShardAccount(vaultAddress, createShardAccount({
     address: vaultAddress,
     code: vaultInit.code,
@@ -64,7 +70,7 @@ async function deployUnsealedVaultCapsulePair() {
   }));
   const capsule = blockchain.openContract(new CapsuleHub(capsuleAddress, capsuleInit));
 
-  return { blockchain, genesisController, attacker, athWallet, vault, vaultAddress, vaultPlaceholder, capsule, capsuleAddress, capsulePlaceholder };
+  return { blockchain, genesisController, attacker, officialAthWallet, vault, vaultAddress, vaultPlaceholder, capsule, capsuleAddress, capsulePlaceholder };
 }
 
 async function deployUnsealedUsernameRegistry() {
@@ -101,7 +107,7 @@ async function deployUnsealedUsernameRegistry() {
 
 describe('Deployment genesis controller auth', () => {
   it('DEPLOY-AUTH-01/02/03: arbitrary sender cannot bind or seal Vault genesis', async () => {
-    const { genesisController, attacker, athWallet, vault, capsuleAddress, vaultPlaceholder } = await deployUnsealedVaultCapsulePair();
+    const { genesisController, attacker, officialAthWallet, vault, capsuleAddress, vaultPlaceholder } = await deployUnsealedVaultCapsulePair();
     const attackerCapsule = fixtureAddress('GENESIS_AUTH_ATTACKER_CAPSULE');
     const attackerAthWallet = fixtureAddress('GENESIS_AUTH_ATTACKER_ATH_WALLET');
 
@@ -133,7 +139,7 @@ describe('Deployment genesis controller auth', () => {
     await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
       deployment_manifest_hash: MANIFEST_HASH,
-      official_ath_wallet_address: athWallet.address,
+      official_ath_wallet_address: officialAthWallet,
     } as VaultBindAth);
 
     await vault.send(attacker.getSender(), { value: toNano('0.05') }, {
@@ -186,7 +192,7 @@ describe('Deployment genesis controller auth', () => {
 
   it('DEPLOY-AUTH-05/06/07: arbitrary sender cannot bind/seal UsernameRegistry and controller has no post-seal authority', async () => {
     const { genesisController, attacker, registry, placeholderAthWallet } = await deployUnsealedUsernameRegistry();
-    const officialAthWallet = fixtureAddress('GENESIS_AUTH_REGISTRY_OFFICIAL_ATH_WALLET');
+    const officialAthWallet = await registry.getGetAthWalletAddress(registry.address);
     const attackerAthWallet = fixtureAddress('GENESIS_AUTH_REGISTRY_ATTACKER_ATH_WALLET');
 
     await registry.send(attacker.getSender(), { value: toNano('0.05') }, {

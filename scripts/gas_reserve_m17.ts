@@ -505,9 +505,10 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   const deployer = await blockchain.treasury('m17-vault-deployer');
   const user = await blockchain.treasury('m17-vault-user');
   const feeAccumulator = await blockchain.treasury('m17-vault-fee-accumulator');
-  const athWallet = await blockchain.treasury('m17-vault-ath-wallet');
-  const vaultInit = await Vault.init(deployer.address, athWallet.address, fixtureAddress('M17_UNBOUND_CAPSULE_PLACEHOLDER'), addressHash(deployer.address), false, false, 0n);
+  const athMasterAddress = fixtureAddress('M17_VAULT_ATH_MASTER');
+  const vaultInit = await Vault.init(deployer.address, athMasterAddress, fixtureAddress('M17_UNBOUND_CAPSULE_PLACEHOLDER'), addressHash(deployer.address), false, false, 0n);
   const vaultAddress = contractAddress(0, vaultInit);
+  const officialAthWallet = contractAddress(vaultAddress.workChain, await ATHWallet.init(0n, vaultAddress, athMasterAddress));
   await blockchain.setShardAccount(vaultAddress, createShardAccount({ address: vaultAddress, code: vaultInit.code, data: vaultInit.data, balance: toNano('3'), workchain: vaultAddress.workChain }));
   const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
   const capsuleInit = await CapsuleHub.init(feeAccumulator.address, fixtureAddress('M17_UNBOUND_VAULT_PLACEHOLDER'), false, false, 0n, deployer.address);
@@ -516,7 +517,7 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   const capsule = blockchain.openContract(new CapsuleHub(capsuleAddress, capsuleInit));
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST_HASH, counterpart_address: capsuleAddress } as VaultBind);
   await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST_HASH, counterpart_address: vaultAddress } as CapsuleBind);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindOfficialAthWallet', deployment_manifest_hash: MANIFEST_HASH, official_ath_wallet_address: athWallet.address } as VaultBindAth);
+  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindOfficialAthWallet', deployment_manifest_hash: MANIFEST_HASH, official_ath_wallet_address: officialAthWallet } as VaultBindAth);
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as VaultSeal);
   await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as CapsuleSeal);
 
@@ -529,7 +530,7 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
 
   // Create stale pending by publishing to missing CapsuleHub, then prune.
   const missingCapsule = fixtureAddress('M17_MISSING_CAPSULEHUB_FOR_PRUNE');
-  const vault2Init = await Vault.init(athWallet.address, athWallet.address, missingCapsule, GENESIS_HASH, true, true, MANIFEST_HASH);
+  const vault2Init = await Vault.init(officialAthWallet, athMasterAddress, missingCapsule, GENESIS_HASH, true, true, MANIFEST_HASH);
   const vault2Address = contractAddress(0, vault2Init);
   await blockchain.setShardAccount(vault2Address, createShardAccount({ address: vault2Address, code: vault2Init.code, data: vault2Init.data, balance: toNano('3'), workchain: vault2Address.workChain }));
   const vault2 = blockchain.openContract(new Vault(vault2Address, vault2Init));

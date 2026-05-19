@@ -53,15 +53,7 @@ async function deploySealedRegistryWithMockOfficial() {
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
   const mockOfficialInit = await MockVaultAthWallet.init(false);
-  const mockOfficialAddress = contractAddress(0, mockOfficialInit);
 
-  await blockchain.setShardAccount(mockOfficialAddress, createShardAccount({
-    address: mockOfficialAddress,
-    code: mockOfficialInit.code,
-    data: mockOfficialInit.data,
-    balance: toNano('2'),
-    workchain: mockOfficialAddress.workChain,
-  }));
   await blockchain.setShardAccount(registryAddress, createShardAccount({
     address: registryAddress,
     code: registryInit.code,
@@ -71,6 +63,14 @@ async function deploySealedRegistryWithMockOfficial() {
   }));
 
   const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
+  const mockOfficialAddress = await registry.getGetAthWalletAddress(registryAddress);
+  await blockchain.setShardAccount(mockOfficialAddress, createShardAccount({
+    address: mockOfficialAddress,
+    code: mockOfficialInit.code,
+    data: mockOfficialInit.data,
+    balance: toNano('2'),
+    workchain: mockOfficialAddress.workChain,
+  }));
   const mockOfficial = blockchain.openContract(new MockVaultAthWallet(mockOfficialAddress, mockOfficialInit));
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {

@@ -129,4 +129,45 @@ describe('Deployment ATH wallet binding profile', () => {
     expect(afterRebindAttempt.vault_ath_wallet_address.equals(officialAthWallet)).toBe(true);
     expect(afterRebindAttempt.vault_ath_wallet_address.equals(wrong)).toBe(false);
   });
+
+  it('DEPLOY-04A/Vault: pre-seal binding rejects a non-derived official ATH wallet', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_700_000_000;
+
+    const deployer = await blockchain.treasury('audit-f007-vault-binder');
+    const treasuryOwner = fixtureAddress('AUDIT_F007_ATH_TREASURY_OWNER');
+    const capsulePlaceholder = fixtureAddress('AUDIT_F007_CAPSULE_PLACEHOLDER');
+    const wrongOfficialAthWallet = fixtureAddress('AUDIT_F007_WRONG_ATH_WALLET');
+
+    const athMasterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const athMasterAddress = contractAddress(0, athMasterInit);
+    const vaultInit = await Vault.init(deployer.address, athMasterAddress, capsulePlaceholder, addressHash(deployer.address), true, false, MANIFEST_HASH);
+    const vaultAddress = contractAddress(0, vaultInit);
+    const derivedOfficialAthWallet = await deriveAthWallet(vaultAddress, athMasterAddress);
+
+    await blockchain.setShardAccount(vaultAddress, createShardAccount({
+      address: vaultAddress,
+      code: vaultInit.code,
+      data: vaultInit.data,
+      balance: toNano('2'),
+      workchain: vaultAddress.workChain,
+    }));
+    const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
+
+    await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: wrongOfficialAthWallet,
+    } as VaultBindAth);
+    await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as VaultSeal);
+
+    const state = await vault.getGetGlobal();
+    expect(state.sealed).toBe(false);
+    expect(state.vault_ath_wallet_address.equals(deployer.address)).toBe(true);
+    expect(state.vault_ath_wallet_address.equals(wrongOfficialAthWallet)).toBe(false);
+    expect(state.vault_ath_wallet_address.equals(derivedOfficialAthWallet)).toBe(false);
+  });
 });

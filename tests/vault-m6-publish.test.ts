@@ -17,6 +17,7 @@ import {
   BindDeploymentManifest as CapsuleBind,
   SealGenesis as CapsuleSeal,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -40,6 +41,11 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
+}
+
+async function deriveAthWallet(owner: Address, athMasterAddress: Address): Promise<Address> {
+  const walletInit = await ATHWallet.init(0n, owner, athMasterAddress);
+  return contractAddress(owner.workChain, walletInit);
 }
 
 function bufToBigInt(buf: Buffer): bigint {
@@ -107,10 +113,10 @@ async function deployBoundPair() {
   const deployer = await blockchain.treasury('m6-deployer');
   const user = await blockchain.treasury('m6-user');
   const feeAccumulator = await blockchain.treasury('m6-fee-accumulator');
-  const athWallet = await blockchain.treasury('m6-vault-ath-wallet');
 
   const vaultInit = await Vault.init(deployer.address, deployer.address, fixtureAddress('M6_UNBOUND_CAPSULE_PLACEHOLDER'), addressHash(deployer.address), false, false, 0n);
   const vaultAddress = contractAddress(0, vaultInit);
+  const officialAthWallet = await deriveAthWallet(vaultAddress, deployer.address);
   await blockchain.setShardAccount(vaultAddress, createShardAccount({
     address: vaultAddress,
     code: vaultInit.code,
@@ -144,7 +150,7 @@ async function deployBoundPair() {
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'BindOfficialAthWallet',
     deployment_manifest_hash: MANIFEST_HASH,
-    official_ath_wallet_address: athWallet.address,
+    official_ath_wallet_address: officialAthWallet,
   } as VaultBindAth);
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',

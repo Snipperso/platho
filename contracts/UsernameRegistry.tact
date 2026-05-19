@@ -361,6 +361,7 @@ contract UsernameRegistry {
         throwUnless(19031, !self.official_ath_wallet_bound);
         throwUnless(19032, self.genesis_config_hash == 0);
         throwUnless(19034, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(19035, msg.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
         self.deployment_manifest_hash = msg.deployment_manifest_hash;
         self.genesis_config_hash = 1;
         self.official_ath_wallet_address = msg.official_ath_wallet_address;
@@ -373,6 +374,7 @@ contract UsernameRegistry {
         throwUnless(19040, msg.deployment_manifest_hash > 1);
         throwUnless(19041, self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(19042, self.official_ath_wallet_bound);
+        throwUnless(19043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
         self.genesis_config_hash = msg.deployment_manifest_hash;
         self.sealed = true;
     }

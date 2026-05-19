@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-18T18:43:09.791Z",
+  "generatedAt": "2026-05-19T19:36:33.398Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 96,
-    "totalBytes": 1802486,
-    "bundleSha256": "179f8cb78f5ee5cf6fc084a3b2402cccf3946e0db0edfd0739e55353047ab336",
+    "fileCount": 102,
+    "totalBytes": 1917048,
+    "bundleSha256": "1beec3bc6c9c24833a870faf9e763d8d80f1ee89135b3b8b33c3c4f54d691bb4",
     "files": [
       {
         "path": "app.js",
-        "bytes": 20307,
-        "sha256": "40c35d409a0bc284910141c5327c31b3cf73b6d0c6d480f0b81c96a92915b6ea"
+        "bytes": 39595,
+        "sha256": "3556c2f2605db552eba89a4078f8cddde49e3183bf6b5f28f0abc58038c96dc5"
       },
       {
         "path": "assets/icons/attach.svg",
@@ -113,14 +113,24 @@
         "sha256": "3dd87e86cdfc1a800055707d64e8a61b6609202d3baac07d7942718eeb420550"
       },
       {
+        "path": "encrypted-message-store.mjs",
+        "bytes": 10578,
+        "sha256": "bce04356e561ed060b9174c01d09eae3a7abefca59c468f1cd5fc3cebe37df1f"
+      },
+      {
         "path": "index.html",
-        "bytes": 8454,
-        "sha256": "9cf0ab4e8920fa1e328d578070168a811609d89b30f2f63a768396b169178624"
+        "bytes": 10657,
+        "sha256": "982ca8782c2529e7b5853e0a285b2525c2865479b9aee1eeb295789ec0a574aa"
       },
       {
         "path": "manifest.webmanifest",
         "bytes": 552,
         "sha256": "eee17433e3981b1dc8157f80e4d183a94bf824394c0fa91743afa4727e4d0e3d"
+      },
+      {
+        "path": "no-backend-transport.mjs",
+        "bytes": 6759,
+        "sha256": "9ef144c17e478cca2361582b7880ef2dbb344fd1882d13d46c7c60f082ac0a6d"
       },
       {
         "path": "platho-config.mjs",
@@ -134,13 +144,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 13232,
-        "sha256": "c04f71f354f7c43846541b6b308376a5e5486e6afc58ec88a9a61baf2827f64d"
+        "bytes": 16083,
+        "sha256": "38a2e525682c91dd0b8fc54d3860eb5d64ab9af1132baf022e4ac8eb7b99a988"
       },
       {
         "path": "sw.js",
-        "bytes": 1838,
-        "sha256": "777ee2286f7786f1c884a9a7b35242ab53ae2c2885bba184d16e54fc109427dd"
+        "bytes": 2051,
+        "sha256": "856eb63555e6f802479132bea70c70ffce1fbeb79a1b20dff2447408bf3fccf9"
       },
       {
         "path": "tonconnect-manifest.json",
@@ -148,9 +158,19 @@
         "sha256": "20e0f1e497cd0db34efedb4c6bca3350c9e8c0e28b7829b0dcfeb39d1e364754"
       },
       {
+        "path": "transport-share.mjs",
+        "bytes": 2046,
+        "sha256": "c912681964a2467ffd83f4e0d7edd23bbb94d8c393a77858d71234a09c9d739a"
+      },
+      {
         "path": "vault-chain-provider.mjs",
         "bytes": 6284,
         "sha256": "160f8e0d065e8ef47b96795eaac41d7da80faa4e0196510276f750643d82ad18"
+      },
+      {
+        "path": "vault-ton-rpc-provider.mjs",
+        "bytes": 13479,
+        "sha256": "9769b9c7ffb8f775243306f139278aacd82727381497c06913cdf7e62ea1902e"
       },
       {
         "path": "vendor/@noble/ciphers/LICENSE",
@@ -491,6 +511,16 @@
         "path": "vendor/@tonconnect/ui/tonconnect-ui.min.js",
         "bytes": 422763,
         "sha256": "ab1d010e9b9d9af37e98bdfa6248068eccdbeb7bbbee99d86364abd1d9a7611a"
+      },
+      {
+        "path": "vendor/qrcode-generator/package.json",
+        "bytes": 632,
+        "sha256": "c5f5225b0eff05b3073b8ed89f5b45ec48e6619b62490d89da75383f2063afbd"
+      },
+      {
+        "path": "vendor/qrcode-generator/qrcode.js",
+        "bytes": 56513,
+        "sha256": "b8c4e98c89451099ebab4759c4b399cbcf488e8edf593fdfa976ef80cee693f5"
       }
     ],
     "excludedWebFiles": [
