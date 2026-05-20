@@ -47,6 +47,7 @@ function completeInput(overrides: Partial<M20FStonfiLiveCollectorInput> = {}): M
       queryId: '123456',
       deadline: '1893456000',
       buybackMinAthOutPer50TonAtomic: '95000000000',
+      buybackRouteAthNotifyValueUpstreamNanotons: '40000000',
       referralAddress: null,
       referralValue: '10',
     },
@@ -225,5 +226,23 @@ describe('M20F STON.fi live collector', () => {
     expect(report.route_freeze_ready).toBe(false);
     expect(report.issue_codes).toContain('SIM_ROUTER_VERSION_NOT_V2_1');
     expect(report.sdkTxParams).toBe(null);
+  });
+
+  it('rejects final input whose buyback ATH notify upstream value is the unsafe 35M boundary', async () => {
+    let called = false;
+    const input = completeInput({
+      routeControls: { buybackRouteAthNotifyValueUpstreamNanotons: '35000000' } as any,
+    });
+    const report = await collectM20FStonfiLiveEvidence(input, {
+      capturedAt: () => 'TEST_TIME',
+      simulateSwap: async () => {
+        called = true;
+        return simulationFor(input);
+      },
+    });
+
+    expect(called).toBe(false);
+    expect(report.status).toBe('BLOCKED_INPUT_NOT_READY');
+    expect(report.issue_codes).toContain('BAD_BUYBACK_ROUTE_ATH_NOTIFY_VALUE');
   });
 });

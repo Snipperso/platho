@@ -1,0 +1,52 @@
+{
+  "profile": "PLATHO.V1.M43.DEPLOYMENT_GATES",
+  "status": "PASS",
+  "findings_closed": [
+    {
+      "id": "DEPLOY-01",
+      "title": "Production gates did not know about newly found safe-min / reserve boundaries",
+      "resolution": "M20F route-freeze input and live collector now require explicit safe value bounds: BuybackBurn route ATH notify upstream value >= 40,000,000 nanotons, Vault ATH deposit owner request value >= 50,000,000 nanotons, and username mint owner request value >= 50,000,000 nanotons. Missing or unsafe values keep M20F blocked."
+    },
+    {
+      "id": "DEPLOY-02",
+      "title": "On-chain manifest hash alone does not prove bound counterpart addresses match the manifest",
+      "resolution": "Added mainnet:genesis:verify, a final getter-vs-manifest verifier. It compares final manifest status/hash, code hashes, seal flags, and bound counterpart addresses across Vault, CapsuleHub, UsernameRegistry, BuybackBurn, FeeAccumulator, and ATHMaster before mainnet genesis can be treated as verified."
+    },
+    {
+      "id": "DEPLOY-03",
+      "title": "Historical CURRENT_CODE_HASHES_M19G/M19H artifacts could be mistaken for current release evidence",
+      "resolution": "Historical milestone-specific CURRENT_CODE_HASHES_M19G/M19H files now carry explicit DEPRECATED_HISTORICAL_ARTIFACT markers pointing operators to artifacts/CURRENT_CODE_HASHES.txt as the only canonical current code-hash source."
+    }
+  ],
+  "source_changes": [
+    "scripts/m20f_mainnet_route_freeze_preflight.ts",
+    "scripts/m20f_stonfi_live_collector.ts",
+    "scripts/mainnet_genesis_verify.ts",
+    "package.json",
+    "tests/m20f-mainnet-route-freeze-preflight.test.ts",
+    "tests/m20f-stonfi-live-collector.test.ts",
+    "tests/mainnet-genesis-verify.test.ts",
+    "tests/artifact-code-hash-hygiene.test.ts"
+  ],
+  "artifacts": [
+    "artifacts/m20f_mainnet_route_freeze_input_template.json",
+    "artifacts/m20f_mainnet_route_freeze_preflight.json",
+    "artifacts/m20f_stonfi_live_collector_input_template.json",
+    "artifacts/m20f_stonfi_live_collector.json",
+    "artifacts/mainnet_genesis_verify_input_template.json",
+    "artifacts/mainnet_genesis_verify_report.json",
+    "artifacts/MAINNET_GENESIS_VERIFY.md",
+    "artifacts/MAINNET_GENESIS_VERIFIED.txt",
+    "artifacts/CURRENT_CODE_HASHES_M19G.txt",
+    "artifacts/CURRENT_CODE_HASHES_M19H.txt"
+  ],
+  "verification": {
+    "focused_deploy_gate_tests": "PASS: 8 files / 30 tests",
+    "full_suite": "PASS: 70 files / 300 tests",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS",
+    "preprod_check": "BLOCKED as expected",
+    "web_deploy_prepare_prod": "BLOCKED_BY_PREPROD as expected"
+  },
+  "production_note": "Production remains blocked until final mainnet inputs, M20F STON.fi route evidence, final genesis manifest, funding proofs, and the new mainnet genesis getter-vs-manifest verifier all pass."
+}

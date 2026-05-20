@@ -1,0 +1,16 @@
+{
+  "document": "PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT",
+  "status": "BLOCKED_MISSING_INPUT",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "mainnet_genesis_verified": false,
+  "issue_codes": [
+    "MISSING_INPUT"
+  ],
+  "issues": [
+    {
+      "code": "MISSING_INPUT",
+      "message": "Supply a final mainnet genesis getter snapshot input."
+    }
+  ],
+  "checked_manifest_hash": null
+}

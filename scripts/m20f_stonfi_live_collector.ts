@@ -16,7 +16,7 @@ import {
   StonfiLiveEvidenceInputM19E,
   collectLiveEvidenceM19E,
 } from './stonfi_live_evidence_collector_m19e';
-import { M20F_OFFICIAL_SOURCES, isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
+import { M20F_OFFICIAL_SOURCES, M20F_SAFE_VALUE_BOUNDS, isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
 const EXPECTED_ROUTER_MAJOR_VERSION = 2;
@@ -99,6 +99,7 @@ export interface M20FStonfiLiveCollectorInput {
     queryId: string;
     deadline: string;
     buybackMinAthOutPer50TonAtomic: string;
+    buybackRouteAthNotifyValueUpstreamNanotons: string;
     referralAddress?: string | null;
     referralValue?: string;
   };
@@ -210,6 +211,7 @@ export function createM20FStonfiLiveCollectorInputTemplate(): M20FStonfiLiveColl
       queryId: 'required: uint64 decimal query id',
       deadline: 'required: uint64 decimal unix timestamp',
       buybackMinAthOutPer50TonAtomic: 'required: positive atomic ATH minimum',
+      buybackRouteAthNotifyValueUpstreamNanotons: 'required: decimal nanotons, production-safe value >= 40000000',
       referralAddress: null,
       referralValue: DEFAULT_REFERRAL_VALUE,
     },
@@ -299,6 +301,12 @@ export function validateM20FStonfiLiveCollectorInput(input: M20FStonfiLiveCollec
   if (!isDecimalString(input.routeControls.deadline)) issues.push(issue('BAD_DEADLINE', 'routeControls.deadline must be a uint64 decimal string.'));
   if (!isDecimalString(input.routeControls.buybackMinAthOutPer50TonAtomic) || BigInt(input.routeControls.buybackMinAthOutPer50TonAtomic || '0') <= 0n) {
     issues.push(issue('BAD_BUYBACK_MIN_OUT', 'buybackMinAthOutPer50TonAtomic must be a positive decimal string.'));
+  }
+  if (
+    !isDecimalString(input.routeControls.buybackRouteAthNotifyValueUpstreamNanotons)
+    || BigInt(input.routeControls.buybackRouteAthNotifyValueUpstreamNanotons || '0') < BigInt(M20F_SAFE_VALUE_BOUNDS.buybackRouteAthNotifyValueUpstreamMinNanotons)
+  ) {
+    issues.push(issue('BAD_BUYBACK_ROUTE_ATH_NOTIFY_VALUE', 'buybackRouteAthNotifyValueUpstreamNanotons must be at least 40,000,000 nanotons.'));
   }
 
   for (const [key, value] of Object.entries(input.codeHashes ?? {})) {

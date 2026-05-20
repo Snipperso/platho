@@ -24,5 +24,12 @@
     "ptonRefundProof": "required: pTON refund tx evidence where refund returns to BuybackBurn",
     "bounceOrFailureBehaviorProof": "required: documented bounce/failure behavior evidence"
   },
+  "safeValueBounds": {
+    "buybackRouteAthNotifyValueUpstreamNanotons": "required: decimal nanotons, production-safe value >= 40000000",
+    "vaultAthDepositOwnerRequestValueNanotons": "required: decimal nanotons, production-safe value >= 50000000",
+    "usernameMintOwnerRequestValueNanotons": "required: decimal nanotons, production-safe value >= 50000000",
+    "buybackRouteAthNotifyBoundaryProof": "required: sandbox/live proof that 35M is unsafe and configured upstream notify value completes BuybackBurn burn path",
+    "athNotifyOwnerRequestBoundaryProof": "required: sandbox proof that configured Vault deposit and username mint request values complete the full ATHWallet notify path"
+  },
   "m19fDossierPath": "artifacts/stonfi_route_evidence_dossier_m19f.json"
 }

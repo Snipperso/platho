@@ -25,6 +25,7 @@
     "queryId": "required: uint64 decimal query id",
     "deadline": "required: uint64 decimal unix timestamp",
     "buybackMinAthOutPer50TonAtomic": "required: positive atomic ATH minimum",
+    "buybackRouteAthNotifyValueUpstreamNanotons": "required: decimal nanotons, production-safe value >= 40000000",
     "referralAddress": null,
     "referralValue": "10"
   },
