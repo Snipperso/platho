@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { findTransaction } from '@ton/test-utils';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
@@ -139,6 +140,12 @@ async function contractBalance(blockchain: Blockchain, address: Address): Promis
   return (await blockchain.getContract(address)).balance;
 }
 
+function inboundValue(tx: any): bigint {
+  const info = tx?.inMessage?.info;
+  if (info?.type !== 'internal') throw new Error('missing inbound internal value');
+  return info.value.coins;
+}
+
 async function depositAth(params: {
   vault: any;
   user: any;
@@ -230,13 +237,20 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
 
     const beforeVaultBalance = await contractBalance(blockchain, vault.address);
-    await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE }, {
+    const withdraw = await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE }, {
       $$type: 'WithdrawTon',
       amount,
       recipient: recipient.address,
     } as WithdrawTon);
     const afterVaultBalance = await contractBalance(blockchain, vault.address);
+    const recipientTx = findTransaction(withdraw.transactions, {
+      from: vault.address,
+      to: recipient.address,
+      success: true,
+    });
 
+    expect(recipientTx).toBeDefined();
+    expect(inboundValue(recipientTx)).toBe(amount);
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(0n);
     expect(beforeVaultBalance - afterVaultBalance).toBeLessThanOrEqual(amount);
   });
@@ -388,6 +402,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetPendingAthWithdrawal(21n)).exists).toBe(false);
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_250n);
     expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);
+    expect((await vault.getGetUser(user.address)).ton_balance).toBeGreaterThan(0n);
   });
 
   it('VAULT-BND-05: ATH withdrawals scope pending ids by owner wallet, not only client query_id', async () => {

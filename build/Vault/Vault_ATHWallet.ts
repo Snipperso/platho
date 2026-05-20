@@ -3113,6 +3113,7 @@ export type PendingAthWithdrawal = {
     recipient: Address;
     recipient_ath_wallet: Address;
     amount: bigint;
+    refundable_ton_amount: bigint;
     created_at: bigint;
 }
 
@@ -3123,7 +3124,10 @@ export function storePendingAthWithdrawal(src: PendingAthWithdrawal) {
         b_0.storeAddress(src.recipient);
         b_0.storeAddress(src.recipient_ath_wallet);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.created_at, 32);
+        const b_1 = new Builder();
+        b_1.storeUint(src.refundable_ton_amount, 128);
+        b_1.storeUint(src.created_at, 32);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -3133,8 +3137,10 @@ export function loadPendingAthWithdrawal(slice: Slice) {
     const _recipient = sc_0.loadAddress();
     const _recipient_ath_wallet = sc_0.loadAddress();
     const _amount = sc_0.loadUintBig(128);
-    const _created_at = sc_0.loadUintBig(32);
-    return { $$type: 'PendingAthWithdrawal' as const, owner_wallet: _owner_wallet, recipient: _recipient, recipient_ath_wallet: _recipient_ath_wallet, amount: _amount, created_at: _created_at };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _refundable_ton_amount = sc_1.loadUintBig(128);
+    const _created_at = sc_1.loadUintBig(32);
+    return { $$type: 'PendingAthWithdrawal' as const, owner_wallet: _owner_wallet, recipient: _recipient, recipient_ath_wallet: _recipient_ath_wallet, amount: _amount, refundable_ton_amount: _refundable_ton_amount, created_at: _created_at };
 }
 
 export function loadTuplePendingAthWithdrawal(source: TupleReader) {
@@ -3142,8 +3148,9 @@ export function loadTuplePendingAthWithdrawal(source: TupleReader) {
     const _recipient = source.readAddress();
     const _recipient_ath_wallet = source.readAddress();
     const _amount = source.readBigNumber();
+    const _refundable_ton_amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthWithdrawal' as const, owner_wallet: _owner_wallet, recipient: _recipient, recipient_ath_wallet: _recipient_ath_wallet, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthWithdrawal' as const, owner_wallet: _owner_wallet, recipient: _recipient, recipient_ath_wallet: _recipient_ath_wallet, amount: _amount, refundable_ton_amount: _refundable_ton_amount, created_at: _created_at };
 }
 
 export function loadGetterTuplePendingAthWithdrawal(source: TupleReader) {
@@ -3151,8 +3158,9 @@ export function loadGetterTuplePendingAthWithdrawal(source: TupleReader) {
     const _recipient = source.readAddress();
     const _recipient_ath_wallet = source.readAddress();
     const _amount = source.readBigNumber();
+    const _refundable_ton_amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthWithdrawal' as const, owner_wallet: _owner_wallet, recipient: _recipient, recipient_ath_wallet: _recipient_ath_wallet, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthWithdrawal' as const, owner_wallet: _owner_wallet, recipient: _recipient, recipient_ath_wallet: _recipient_ath_wallet, amount: _amount, refundable_ton_amount: _refundable_ton_amount, created_at: _created_at };
 }
 
 export function storeTuplePendingAthWithdrawal(source: PendingAthWithdrawal) {
@@ -3161,6 +3169,7 @@ export function storeTuplePendingAthWithdrawal(source: PendingAthWithdrawal) {
     builder.writeAddress(source.recipient);
     builder.writeAddress(source.recipient_ath_wallet);
     builder.writeNumber(source.amount);
+    builder.writeNumber(source.refundable_ton_amount);
     builder.writeNumber(source.created_at);
     return builder.build();
 }
@@ -4575,7 +4584,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PrunePendingPublish","header":1913380205,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"TopUpStorageReserve","header":840283645,"fields":[]},
-    {"name":"PendingAthWithdrawal","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingAthWithdrawal","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"refundable_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingPublish","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"session_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"budget_epoch","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"capsulehub_call_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"refundable_budget_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -4677,6 +4686,7 @@ export const VAULT_STATE_GROWTH_EXEC_RESERVE = 2000000n;
 export const VAULT_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
 export const VAULT_ATH_WITHDRAW_MIN_VALUE = 30000000n;
 export const VAULT_WITHDRAW_TON_EXEC_RESERVE = 2000000n;
+export const VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE = 2000000n;
 export const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2000000n;
 export const ASSET_TON = 1n;
 export const ASSET_ATH = 2n;
