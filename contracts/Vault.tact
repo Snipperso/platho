@@ -18,6 +18,7 @@ const VAULT_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 30000000;
 const VAULT_WITHDRAW_TON_EXEC_RESERVE: Int = 2000000;
+const VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE: Int = 2000000;
 const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000;
 const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
@@ -180,6 +181,7 @@ struct PendingAthWithdrawal {
     recipient: Address;
     recipient_ath_wallet: Address;
     amount: Int as uint128;
+    refundable_ton_amount: Int as uint128;
     created_at: Int as uint32;
 }
 
@@ -593,6 +595,22 @@ contract Vault {
         self.users.set(pending.owner_wallet, user);
     }
 
+    fun refundPendingAthWithdrawalTon(pending: PendingAthWithdrawal, amount: Int) {
+        let refundAmount: Int = 0;
+        if (amount > VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE) {
+            refundAmount = amount - VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE;
+        }
+        if (refundAmount > pending.refundable_ton_amount) {
+            refundAmount = pending.refundable_ton_amount;
+        }
+        if (refundAmount <= 0) {
+            return;
+        }
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        user.ton_balance += refundAmount;
+        self.users.set(pending.owner_wallet, user);
+    }
+
     fun creditActivityAirdrop(owner: Address) {
         if (self.genesis_config_hash <= 0) {
             return;
@@ -803,7 +821,7 @@ contract Vault {
             to: msg.recipient,
             value: msg.amount,
             bounce: false,
-            mode: SendDefaultMode,
+            mode: SendPayFwdFeesSeparately,
             body: null
         });
     }
@@ -827,6 +845,7 @@ contract Vault {
             recipient: msg.recipient,
             recipient_ath_wallet: recipientAthWallet,
             amount: msg.amount,
+            refundable_ton_amount: context().value,
             created_at: now()
         });
         self.pending_ath_withdrawal_count += 1;
@@ -852,6 +871,7 @@ contract Vault {
         let pending: PendingAthWithdrawal = pendingOpt!!;
         throwUnless(16029, pending.amount == msg.amount);
         throwUnless(16030, sender() == pending.recipient_ath_wallet);
+        self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
         self.pending_ath_withdrawal_count -= 1;
     }
@@ -867,6 +887,7 @@ contract Vault {
         let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
         user.ath_balance += pending.amount;
         self.users.set(pending.owner_wallet, user);
+        self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
         self.pending_ath_withdrawal_count -= 1;
     }
@@ -882,6 +903,7 @@ contract Vault {
         let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
         user.ath_balance += pending.amount;
         self.users.set(pending.owner_wallet, user);
+        self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
         self.pending_ath_withdrawal_count -= 1;
     }
@@ -1195,13 +1217,6 @@ contract Vault {
             return;
         }
         let user: UserState = userOpt!!;
-        if (user.message_budget_ton < INVALID_SESSION_REQUEST_CHARGE_TON) {
-            session.nonce += 1;
-            session.message_budget_ton = user.message_budget_ton;
-            self.sessions.set(owner, session);
-            self.users.set(owner, user);
-            return;
-        }
 
         session.nonce += 1;
 
@@ -1259,7 +1274,6 @@ contract Vault {
         }
 
         if (postAcceptInvalid) {
-            user.message_budget_ton -= INVALID_SESSION_REQUEST_CHARGE_TON;
             session.message_budget_ton = user.message_budget_ton;
             self.sessions.set(owner, session);
             self.users.set(owner, user);

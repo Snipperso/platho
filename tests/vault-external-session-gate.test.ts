@@ -321,7 +321,7 @@ describe('Vault milestone 6: external session pre-accept gate and pending publis
     expect(afterSecond.message_budget_ton).toBe(afterFirst.message_budget_ton);
   });
 
-  it('VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge rejected before mutation', async () => {
+  it('VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge consumes replay nonce without burning budget', async () => {
     const { vault, user, blockchain } = await setup();
     const kp = keyPairFromSeed(Buffer.alloc(32, 10));
     const pub = bufToBigInt(kp.publicKey);
@@ -348,12 +348,12 @@ describe('Vault milestone 6: external session pre-accept gate and pending publis
       secretKey: kp.secretKey,
     });
 
-    await vault.sendExternal(bad);
+    await tryExternal(vault, bad);
 
     const after = await vault.getGetUser(user.address);
     const afterSession = await vault.getGetSession(user.address);
     expect(afterSession.nonce).toBe(1n);
-    expect(before.message_budget_ton - after.message_budget_ton).toBe(toNano('0.002'));
+    expect(after.message_budget_ton).toBe(before.message_budget_ton);
   });
 
   it('VAULT-EXT-03: expired session rejected before mutation', async () => {

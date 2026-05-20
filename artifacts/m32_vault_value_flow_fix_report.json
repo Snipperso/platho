@@ -1,0 +1,35 @@
+{
+  "profile": "PLATHO.V1.M32.VAULT_VALUE_FLOW_FIX",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "findings_addressed": [
+    {
+      "id": "VLT-01",
+      "title": "WithdrawTon debited full user ledger amount while recipient received amount minus forward fee",
+      "resolution": "WithdrawTon now sends the withdrawn principal with SendPayFwdFeesSeparately, so the recipient inbound value equals the user ledger debit."
+    },
+    {
+      "id": "VLT-02",
+      "title": "WithdrawAth callback/excess TON remained as unaccounted Vault balance",
+      "resolution": "PendingAthWithdrawal now stores a refundable TON cap; ATH ack/failure/bounce callbacks credit returned value minus a 2,000,000 nanotons local callback reserve back to the user's internal ton_balance."
+    },
+    {
+      "id": "VLT-03",
+      "title": "Malformed signed external session requests burned message budget after acceptMessage",
+      "resolution": "Malformed signed external requests still consume nonce after acceptMessage for replay protection, but no longer debit message_budget_ton unless the request passes deterministic validation and dispatches a publish."
+    }
+  ],
+  "vault_code_hash": "411a974272b457cf465f132646234723e6862dcc21c7ed2d1215e1c738ee615f",
+  "implemented_subset_manifest_hash": "662416e1324f9c1649eb3b99b2d152657b91aa9fdd632581484f146661f688ba",
+  "notes": [
+    "Full deterministic validation after Ed25519 but before acceptMessage does not fit TON external gas credit in sandbox. The accepted invalid path therefore advances nonce as replay protection and preserves budget.",
+    "ATH withdrawal TON refunds are capped by the original attached value and reduced by a local callback execution reserve to avoid creating under-backed internal TON liability."
+  ],
+  "verification": {
+    "build": "npm.cmd run build: PASS",
+    "focused_vault_tests": "npm.cmd run test:file -- tests\\vault-session-lifecycle.test.ts tests\\vault-boundary-negative.test.ts tests\\vault-external-session-gate.test.ts tests\\vault-m6-publish.test.ts tests\\vault-prune-pending-publish.test.ts tests\\vault-ath-integration.test.ts tests\\vault-receive-intent.test.ts tests\\vault-auth-negative-matrix.test.ts tests\\vault-ath-invariants.test.ts tests\\vault-ton-state-invariants.test.ts: 10 files / 42 tests PASS",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "production_note": "This closes the local Vault value-flow findings in this pass only. The implemented-subset manifest remains non-final while mainnet genesis and STON.fi route blockers remain open."
+}
