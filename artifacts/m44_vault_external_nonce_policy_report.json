@@ -3,8 +3,8 @@
   "status": "PASS",
   "finding_note": {
     "id": "VLT-03-SPEC-NOTE",
-    "title": "Vault external invalid signed request consumes nonce without burning Message Budget",
-    "decision": "This is intentional v1 anti-replay policy, not a forgotten value-flow bug. Invalid signatures and pre-accept structural/session failures reject without nonce or budget mutation. Validly signed malformed profile/max_charge requests are accepted only far enough to consume nonce and then return without Message Budget debit, CapsuleHub publish, or PLATO fee."
+    "title": "Vault external invalid signed request consumes nonce and charges invalid-request Message Budget",
+    "decision": "This is intentional v1 anti-replay and budget-backed gas policy. Invalid signatures and pre-accept structural/session failures reject without nonce or budget mutation. Validly signed malformed profile/max_charge requests are accepted only far enough to consume nonce, charge the bounded invalid-request budget fee, and then return without CapsuleHub publish or PLATO fee."
   },
   "source_changes": [
     "artifacts/platho_v1_spec_v0_3_2_vault_m6_aligned.md"
@@ -12,5 +12,5 @@
   "verification": {
     "focused_vault_external_tests": "PASS: tests/vault-external-session-gate.test.ts, 1 file / 8 tests"
   },
-  "production_note": "Clients should treat any signed external session request as nonce-consuming once submitted if the signature is valid, even when the request is malformed or stale. Re-sign with the next nonce after any validly signed external submission."
+  "production_note": "Clients should treat any signed external session request as nonce-consuming once submitted if the signature is valid, even when the request is malformed or stale. Re-sign with the next nonce after any validly signed external submission; malformed signed requests also consume the invalid-request Message Budget fee."
 }

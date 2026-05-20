@@ -19,6 +19,7 @@ const KIND_PUBLIC = 2n;
 const SIZE_STANDARD = 1n;
 const SUITE_PUBLIC = 0n;
 const SUITE_CLASSICAL = 1n;
+const INVALID_SESSION_REQUEST_CHARGE_TON = 6_000_000n;
 
 const BODY_HASH = 0x1111000000000000000000000000000000000000000000000000000000000001n;
 const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
@@ -321,7 +322,7 @@ describe('Vault milestone 6: external session pre-accept gate and pending publis
     expect(afterSecond.message_budget_ton).toBe(afterFirst.message_budget_ton);
   });
 
-  it('VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge consumes replay nonce without burning budget', async () => {
+  it('VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge consumes replay nonce and charges invalid-request budget', async () => {
     const { vault, user, blockchain } = await setup();
     const kp = keyPairFromSeed(Buffer.alloc(32, 10));
     const pub = bufToBigInt(kp.publicKey);
@@ -352,8 +353,10 @@ describe('Vault milestone 6: external session pre-accept gate and pending publis
 
     const after = await vault.getGetUser(user.address);
     const afterSession = await vault.getGetSession(user.address);
+    const afterGlobal = await vault.getGetGlobal();
     expect(afterSession.nonce).toBe(1n);
-    expect(after.message_budget_ton).toBe(before.message_budget_ton);
+    expect(before.message_budget_ton - after.message_budget_ton).toBe(INVALID_SESSION_REQUEST_CHARGE_TON);
+    expect(afterGlobal.pending_publish_count).toBe(0n);
   });
 
   it('VAULT-EXT-03: expired session rejected before mutation', async () => {

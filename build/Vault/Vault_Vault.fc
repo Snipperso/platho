@@ -2118,6 +2118,7 @@ _ %get_global() method_id(126899) {
         var $msg'recipient = in_msg~load_msg_addr();
         ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'sessions, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'session_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_requireSealed();
         throw_unless(16020, ($msg'amount > 0));
+        throw_unless(16018, ( ~ equal_slices_bits($msg'recipient, $global_myAddress()) ));
         throw_unless(16019, ($Context$_get_value(__tact_context_get()) >= 2000000));
         tuple $userOpt = $UserState$_load_opt(__tact_dict_get_slice_cell($self'users, 267, __tact_context_get_sender()));
         throw_unless(16021, (~ null?($userOpt)));
@@ -2137,6 +2138,7 @@ _ %get_global() method_id(126899) {
         var $msg'recipient = in_msg~load_msg_addr();
         ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'sessions, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'session_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_requireSealed();
         throw_unless(16023, ($msg'amount > 0));
+        throw_unless(16017, ( ~ equal_slices_bits($msg'recipient, $global_myAddress()) ));
         throw_unless(16027, ($Context$_get_value(__tact_context_get()) >= 30000000));
         tuple $userOpt = $UserState$_load_opt(__tact_dict_get_slice_cell($self'users, 267, __tact_context_get_sender()));
         throw_unless(16024, (~ null?($userOpt)));
@@ -2513,8 +2515,8 @@ _ %get_global() method_id(126899) {
     throw_unless(16414, ($global_now() <= $session'expires_at));
     throw_unless(16415, ($global_now() <= $validUntil));
     throw_unless(16416, ($session'nonce < 18446744073709551615));
-    throw_unless(16419, ($session'message_budget_ton >= 2000000));
-    throw_unless(16420, ($maxCharge >= 2000000));
+    throw_unless(16419, ($session'message_budget_ton >= 6000000));
+    throw_unless(16420, ($maxCharge >= 6000000));
     int $sigHash = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'sessions, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'session_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_computeSessionPublishHash($op, $owner, $sessionId, $sessionNonce, $validUntil, $publishKind, $sizeClass, $cryptoSuite, $maxCharge, $hashesRef);
     slice $sigSlice = $Cell$_fun_beginParse($signatureRef);
     slice $sigBits = $sigSlice~load_bits(512);
@@ -2580,6 +2582,11 @@ _ %get_global() method_id(126899) {
         }
     }
     if ($postAcceptInvalid) {
+        int $invalidCharge = 6000000;
+        if (($user'message_budget_ton < $invalidCharge)) {
+            $invalidCharge = $user'message_budget_ton;
+        }
+        $user'message_budget_ton = $user'message_budget_ton - $invalidCharge;
         $session'message_budget_ton = $user'message_budget_ton;
         $self'sessions~__tact_dict_set_slice_cell(267, $owner, $SessionState$_store_cell(($session'session_pubkey, $session'session_id, $session'nonce, $session'expires_at, $session'message_budget_ton, $session'active), begin_cell()));
         $self'users~__tact_dict_set_slice_cell(267, $owner, $UserState$_store_cell(($user'ton_balance, $user'ath_balance, $user'message_budget_ton, $user'budget_epoch, $user'current_key_id), begin_cell()));

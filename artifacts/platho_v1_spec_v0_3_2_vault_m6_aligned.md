@@ -436,7 +436,7 @@ publish_bounce_id is not an authentication proof
 ACK authenticity uses full publish_id
 Vault recomputes full publish_id from PendingPublish fields
 if pending_publishes[publish_bounce_id] already exists before send, Vault MUST NOT send to CapsuleHub
-collision before send is a controlled post-accept invalid signed request: nonce consumed, no Message Budget debit, no PLATO fee, no CapsuleHub publish
+collision before send is a controlled post-accept invalid signed request: nonce consumed, invalid-request Message Budget charge, no PLATO fee, no CapsuleHub publish
 ```
 
 Vault -> CapsuleHub publish sends must be:
@@ -778,8 +778,8 @@ Invalid signatures and pre-accept structural/session failures reject without non
 
 Current Vault v1 policy deliberately does **not** require full deterministic publish-profile validation before
 `accept_message`, because the full profile/hash/max-charge validation path exceeds TON external gas credit in sandbox.
-Instead, a validly signed malformed request is accepted only far enough to consume replay nonce, while preserving
-Message Budget.
+Instead, a validly signed malformed request is accepted only far enough to consume replay nonce and charge the bounded
+invalid-request budget fee.
 
 ### 6.9 Post-Accept Atomic Debit
 
@@ -817,7 +817,7 @@ Post-accept deterministic validation failures are controlled invalid signed requ
 
 ```text
 nonce remains consumed
-message_budget_ton is unchanged
+message_budget_ton -= min(message_budget_ton, INVALID_SESSION_REQUEST_CHARGE_TON)
 no CapsuleHub publish
 no PLATO fee
 ```
