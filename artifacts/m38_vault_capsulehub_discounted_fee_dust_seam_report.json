@@ -1,0 +1,24 @@
+{
+  "profile": "PLATHO.V1.M38.VAULT_CAPSULEHUB_DISCOUNTED_FEE_DUST_SEAM",
+  "status": "PASS",
+  "finding": "VCH-01",
+  "summary": "Added a seam regression proving Vault discounted protocol fee dust can be flushed from CapsuleHub into a real FeeAccumulator.",
+  "source_changes": [
+    "tests/vault-m6-publish.test.ts"
+  ],
+  "contract_changes": [],
+  "covered_flow": [
+    "Vault user ATH balance is set to ATH_FULL_DISCOUNT_AMOUNT - 1 through the official Vault ATH wallet notification path.",
+    "Vault external private publish computes a discounted protocol fee of 1 nanotON.",
+    "CapsuleHub accepts the Vault publish and accrues 1 nanotON.",
+    "CapsuleHub FlushFees(1) succeeds because the whole accrued bucket is being flushed.",
+    "A real FeeAccumulator receives and accounts the 1 nanotON principal."
+  ],
+  "verification": {
+    "focused_tests": "npm.cmd run test:file -- tests\\vault-m6-publish.test.ts tests\\vault-prune-pending-publish.test.ts tests\\capsulehub-boundary-negative.test.ts tests\\capsulehub.test.ts",
+    "focused_tests_result": "4 files / 25 tests PASS",
+    "full_suite": "npm.cmd test",
+    "full_suite_result": "67 files / 284 tests PASS"
+  },
+  "production_note": "No contract bytecode changed in this milestone. The implemented-subset manifest remains non-final until mainnet route, funding, address, and final-genesis evidence blockers are closed."
+}

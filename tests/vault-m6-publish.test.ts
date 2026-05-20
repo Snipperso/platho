@@ -9,6 +9,7 @@ import {
   BindOfficialAthWallet as VaultBindAth,
   SealGenesis as VaultSeal,
   DepositTon,
+  AthTransferNotification,
   SetSession,
   TopUpMessageBudget,
 } from '../build/Vault/Vault_Vault';
@@ -16,7 +17,9 @@ import {
   CapsuleHub,
   BindDeploymentManifest as CapsuleBind,
   SealGenesis as CapsuleSeal,
+  FlushFees,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
@@ -31,8 +34,10 @@ const BODY_HASH = 0x111100000000000000000000000000000000000000000000000000000000
 const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
 const HEADER1 = 0x3333000000000000000000000000000000000000000000000000000000000003n;
 const PLATO_PRIVATE_STANDARD_FEE_TON = 5_000_000n;
+const ATH_FULL_DISCOUNT_AMOUNT = 10_000_000_000_000n;
 const AIRDROP_TOTAL = 30_000_000_000_000_000n;
 const AIRDROP_REWARD_PER_MESSAGE = 10_000_000_000n;
+const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = 4_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -112,7 +117,8 @@ async function deployBoundPair() {
 
   const deployer = await blockchain.treasury('m6-deployer');
   const user = await blockchain.treasury('m6-user');
-  const feeAccumulator = await blockchain.treasury('m6-fee-accumulator');
+  const feeTreasury = await blockchain.treasury('m6-fee-treasury');
+  const buybackReceiver = fixtureAddress('M6_BUYBACK_RECEIVER');
 
   const vaultInit = await Vault.init(deployer.address, deployer.address, fixtureAddress('M6_UNBOUND_CAPSULE_PLACEHOLDER'), addressHash(deployer.address), false, false, 0n);
   const vaultAddress = contractAddress(0, vaultInit);
@@ -126,7 +132,18 @@ async function deployBoundPair() {
   }));
   const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
 
-  const capsuleInit = await CapsuleHub.init(feeAccumulator.address, fixtureAddress('M6_UNBOUND_VAULT_PLACEHOLDER'), false, false, 0n, deployer.address);
+  const feeAccumulatorInit = await FeeAccumulator.init(feeTreasury.address, buybackReceiver);
+  const feeAccumulatorAddress = contractAddress(0, feeAccumulatorInit);
+  await blockchain.setShardAccount(feeAccumulatorAddress, createShardAccount({
+    address: feeAccumulatorAddress,
+    code: feeAccumulatorInit.code,
+    data: feeAccumulatorInit.data,
+    balance: toNano('2'),
+    workchain: feeAccumulatorAddress.workChain,
+  }));
+  const feeAccumulator = blockchain.openContract(new FeeAccumulator(feeAccumulatorAddress, feeAccumulatorInit));
+
+  const capsuleInit = await CapsuleHub.init(feeAccumulatorAddress, fixtureAddress('M6_UNBOUND_VAULT_PLACEHOLDER'), false, false, 0n, deployer.address);
   const capsuleAddress = contractAddress(0, capsuleInit);
   await blockchain.setShardAccount(capsuleAddress, createShardAccount({
     address: capsuleAddress,
@@ -161,7 +178,7 @@ async function deployBoundPair() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as CapsuleSeal);
 
-  return { blockchain, vault, capsule, user };
+  return { blockchain, deployer, vault, capsule, feeAccumulator, officialAthWallet, user };
 }
 
 async function deployBounceVault() {
@@ -254,6 +271,51 @@ describe('Vault milestone 6: external publish orchestration', () => {
     expect(vg.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
     expect(vg.airdrop_reward_per_message_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
     expect(vg.airdrop_total_allocation_ath).toBe(AIRDROP_TOTAL);
+  });
+
+  it('VAULT-CAPSULE-DUST-01: discounted Vault fee dust flushes from CapsuleHub into real FeeAccumulator', async () => {
+    const { blockchain, deployer, vault, capsule, feeAccumulator, officialAthWallet, user } = await deployBoundPair();
+    const kp = keyPairFromSeed(Buffer.alloc(32, 69));
+    const now = blockchain.now ?? 0;
+
+    await fundSession(vault, user, bufToBigInt(kp.publicKey), now + 1000);
+    await vault.send(blockchain.sender(officialAthWallet), { value: toNano('0.03') }, {
+      $$type: 'AthTransferNotification',
+      query_id: 9001n,
+      amount: ATH_FULL_DISCOUNT_AMOUNT - 1n,
+      sender_key: 1n,
+      sender_wallet: user.address,
+    } as AthTransferNotification);
+
+    expect((await vault.getGetUser(user.address)).ath_balance).toBe(ATH_FULL_DISCOUNT_AMOUNT - 1n);
+
+    const session = await vault.getGetSession(user.address);
+    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    const external = await buildExternalRequest({
+      vault,
+      op: OP_PRIVATE,
+      owner: user.address,
+      sessionId: session.session_id,
+      nonce: 0n,
+      validUntil: BigInt(now + 100),
+      publishKind: KIND_PRIVATE,
+      sizeClass: SIZE_STANDARD,
+      cryptoSuite: SUITE_CLASSICAL,
+      maxCharge,
+      secretKey: kp.secretKey,
+    });
+
+    await vault.sendExternal(external);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(1n);
+
+    await capsule.send(deployer.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
+      $$type: 'FlushFees',
+      amount: 1n,
+    } as FlushFees);
+
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(0n);
+    expect((await feeAccumulator.getGetState()).accumulated_ton).toBe(1n);
   });
 
   it('VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish and refunds through active message budget', async () => {
