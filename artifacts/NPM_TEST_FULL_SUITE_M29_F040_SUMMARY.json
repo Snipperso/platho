@@ -1,0 +1,10 @@
+{
+    "command":  "npm.cmd test -- --reporter=json --outputFile artifacts/NPM_TEST_FULL_SUITE_M29_F040_RESULTS.json",
+    "exitCode":  0,
+    "testFiles":  67,
+    "totalTests":  276,
+    "passedTests":  276,
+    "failedTests":  0,
+    "success":  true,
+    "timestamp":  "2026-05-20T08:47:21.9199937Z"
+}

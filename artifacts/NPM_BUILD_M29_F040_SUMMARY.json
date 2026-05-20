@@ -1,0 +1,6 @@
+{
+    "command":  "npm.cmd run build",
+    "exitCode":  0,
+    "timestamp":  "2026-05-20T08:37:41.7684168Z",
+    "output":  "artifacts/NPM_BUILD_M29_F040_OUTPUT.txt"
+}

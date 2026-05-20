@@ -1,0 +1,21 @@
+{
+    "fullExitCode":  0,
+    "prodExitCode":  0,
+    "fullVulnerabilities":  {
+                                "info":  0,
+                                "low":  0,
+                                "moderate":  0,
+                                "high":  0,
+                                "critical":  0,
+                                "total":  0
+                            },
+    "prodVulnerabilities":  {
+                                "info":  0,
+                                "low":  0,
+                                "moderate":  0,
+                                "high":  0,
+                                "critical":  0,
+                                "total":  0
+                            },
+    "timestamp":  "2026-05-20T08:40:49.4951139Z"
+}
