@@ -22,6 +22,7 @@
     "m20f:derive-addresses": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_mainnet_address_derivation.ts",
     "m20f:preflight": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_mainnet_route_freeze_preflight.ts",
     "m20f:collect": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_stonfi_live_collector.ts",
+    "mainnet:genesis:verify": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_genesis_verify.ts",
     "web:deploy:prepare": "node scripts/prepare_static_web_deploy.mjs --mode preview",
     "web:deploy:prepare:prod": "node scripts/prepare_static_web_deploy.mjs --mode production",
     "preprod:check": "node scripts/preprod_guard.mjs",

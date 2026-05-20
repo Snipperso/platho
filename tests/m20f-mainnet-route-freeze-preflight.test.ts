@@ -40,6 +40,13 @@ function completeInput(overrides: Partial<M20FMainnetRouteFreezeInput> = {}): M2
       ptonRefundProof: 'tx:pton-refund-mainnet',
       bounceOrFailureBehaviorProof: 'tx:bounce-failure-mainnet',
     },
+    safeValueBounds: {
+      buybackRouteAthNotifyValueUpstreamNanotons: '40000000',
+      vaultAthDepositOwnerRequestValueNanotons: '50000000',
+      usernameMintOwnerRequestValueNanotons: '50000000',
+      buybackRouteAthNotifyBoundaryProof: 'sha256:buyback-notify-boundary-mainnet',
+      athNotifyOwnerRequestBoundaryProof: 'sha256:ath-notify-owner-boundary-mainnet',
+    },
     m19fDossierPath: 'artifacts/stonfi_route_evidence_dossier_m19f.json',
   };
 
@@ -112,6 +119,49 @@ describe('M20F mainnet STON.fi route-freeze preflight', () => {
       expect(report.missingInputs).toEqual([]);
       expect(report.rejectedNonProdInputs).toEqual([]);
       expect(report.blockers).toEqual(['M19F_ROUTE_EVIDENCE_DOSSIER_NOT_READY']);
+    } finally {
+      rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks final route input when buyback ATH notify value proof is below the safe upstream bound', () => {
+    const artifactsDir = withM20TArtifact();
+    try {
+      const report = createM20FMainnetRouteFreezePreflight({
+        artifactsDir,
+        input: completeInput({
+          safeValueBounds: {
+            ...completeInput().safeValueBounds,
+            buybackRouteAthNotifyValueUpstreamNanotons: '35000000',
+          },
+        }),
+        m19fRouteFreezeReady: true,
+      });
+
+      expect(report.route_freeze_ready).toBe(false);
+      expect(report.status).toBe('BLOCKED_MISSING_FINAL_MAINNET_INPUTS');
+      expect(report.missingInputs).toContain('buybackRouteAthNotifyValueUpstreamNanotons');
+    } finally {
+      rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks final route input when owner-facing ATH notify request values are not full-path safe', () => {
+    const artifactsDir = withM20TArtifact();
+    try {
+      const report = createM20FMainnetRouteFreezePreflight({
+        artifactsDir,
+        input: completeInput({
+          safeValueBounds: {
+            ...completeInput().safeValueBounds,
+            usernameMintOwnerRequestValueNanotons: '40000000',
+          },
+        }),
+        m19fRouteFreezeReady: true,
+      });
+
+      expect(report.route_freeze_ready).toBe(false);
+      expect(report.missingInputs).toContain('usernameMintOwnerRequestValueNanotons');
     } finally {
       rmSync(artifactsDir, { recursive: true, force: true });
     }

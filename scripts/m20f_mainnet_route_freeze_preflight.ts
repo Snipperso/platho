@@ -17,6 +17,11 @@ export const M20F_OFFICIAL_SOURCES = {
   apiPackageVersionVerifiedByNpm: '0.32.0',
 } as const;
 
+export const M20F_SAFE_VALUE_BOUNDS = {
+  buybackRouteAthNotifyValueUpstreamMinNanotons: '40000000',
+  athNotifyOwnerRequestValueSafeMinNanotons: '50000000',
+} as const;
+
 export interface M20FMainnetRouteFreezeInput {
   document: 'PLATHO.V1.M20F_MAINNET_ROUTE_FREEZE_INPUT';
   network: 'mainnet';
@@ -43,6 +48,13 @@ export interface M20FMainnetRouteFreezeInput {
     ptonRefundProof: string;
     bounceOrFailureBehaviorProof: string;
   };
+  safeValueBounds: {
+    buybackRouteAthNotifyValueUpstreamNanotons: string;
+    vaultAthDepositOwnerRequestValueNanotons: string;
+    usernameMintOwnerRequestValueNanotons: string;
+    buybackRouteAthNotifyBoundaryProof: string;
+    athNotifyOwnerRequestBoundaryProof: string;
+  };
   m19fDossierPath: string;
 }
 
@@ -63,6 +75,7 @@ export interface M20FMainnetRouteFreezePreflight {
     routeForwardGasNanotons: string;
     ptonTransferGasNanotons: string;
   };
+  safe_value_bounds: typeof M20F_SAFE_VALUE_BOUNDS;
   m20t: {
     evidenceSource: string;
     status: string | null;
@@ -107,6 +120,10 @@ function isParseableTonAddress(value: string): boolean {
   }
 }
 
+function isDecimalString(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9]+$/.test(value);
+}
+
 export function isTestnetFriendlyAddress(value: string): boolean {
   return /^[0k]Q/.test(value.trim());
 }
@@ -141,6 +158,13 @@ function makeTemplate(): M20FMainnetRouteFreezeInput {
       minOutFailureRefundProof: 'required: min_out failure tx evidence where refund returns to BuybackBurn',
       ptonRefundProof: 'required: pTON refund tx evidence where refund returns to BuybackBurn',
       bounceOrFailureBehaviorProof: 'required: documented bounce/failure behavior evidence',
+    },
+    safeValueBounds: {
+      buybackRouteAthNotifyValueUpstreamNanotons: 'required: decimal nanotons, production-safe value >= 40000000',
+      vaultAthDepositOwnerRequestValueNanotons: 'required: decimal nanotons, production-safe value >= 50000000',
+      usernameMintOwnerRequestValueNanotons: 'required: decimal nanotons, production-safe value >= 50000000',
+      buybackRouteAthNotifyBoundaryProof: 'required: sandbox/live proof that 35M is unsafe and configured upstream notify value completes BuybackBurn burn path',
+      athNotifyOwnerRequestBoundaryProof: 'required: sandbox proof that configured Vault deposit and username mint request values complete the full ATHWallet notify path',
     },
     m19fDossierPath: 'artifacts/stonfi_route_evidence_dossier_m19f.json',
   };
@@ -179,6 +203,39 @@ function collectInputFindings(input: M20FMainnetRouteFreezeInput | null) {
   }
 
   for (const [key, value] of Object.entries(input.evidenceRefs ?? {})) {
+    if (isPlaceholder(value)) missingInputs.push(key);
+    if (typeof value === 'string' && hasNonProdMarker(value)) rejectedNonProdInputs.push(key);
+  }
+
+  const safeBounds = input.safeValueBounds ?? {} as M20FMainnetRouteFreezeInput['safeValueBounds'];
+  const numericBounds = [
+    {
+      key: 'buybackRouteAthNotifyValueUpstreamNanotons',
+      min: BigInt(M20F_SAFE_VALUE_BOUNDS.buybackRouteAthNotifyValueUpstreamMinNanotons),
+    },
+    {
+      key: 'vaultAthDepositOwnerRequestValueNanotons',
+      min: BigInt(M20F_SAFE_VALUE_BOUNDS.athNotifyOwnerRequestValueSafeMinNanotons),
+    },
+    {
+      key: 'usernameMintOwnerRequestValueNanotons',
+      min: BigInt(M20F_SAFE_VALUE_BOUNDS.athNotifyOwnerRequestValueSafeMinNanotons),
+    },
+  ] as const;
+
+  for (const { key, min } of numericBounds) {
+    const value = safeBounds[key];
+    if (!isDecimalString(value)) {
+      missingInputs.push(key);
+      continue;
+    }
+    if (BigInt(value) < min) {
+      missingInputs.push(key);
+    }
+  }
+
+  for (const key of ['buybackRouteAthNotifyBoundaryProof', 'athNotifyOwnerRequestBoundaryProof'] as const) {
+    const value = safeBounds[key];
     if (isPlaceholder(value)) missingInputs.push(key);
     if (typeof value === 'string' && hasNonProdMarker(value)) rejectedNonProdInputs.push(key);
   }
@@ -245,6 +302,7 @@ export function createM20FMainnetRouteFreezePreflight(options: {
       routeForwardGasNanotons: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_ROUTE_FORWARD_GAS.toString(),
       ptonTransferGasNanotons: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_PTON_TRANSFER_GAS.toString(),
     },
+    safe_value_bounds: M20F_SAFE_VALUE_BOUNDS,
     m20t,
     inputSource,
     m19fDossierPath,
@@ -259,6 +317,8 @@ export function createM20FMainnetRouteFreezePreflight(options: {
       'Generate official @ston-fi/sdk/@ston-fi/api tx params from the simulation result.',
       'Capture router, pool, pTON, ATH master, and ATH wallet code hashes on mainnet.',
       'Prove success excesses, min_out failure refund, pTON refund, and bounce/failure behavior return to BuybackBurn.',
+      'Prove BuybackBurn ATH route notify value is production-safe: upstream notify value must be >= 40,000,000 nanotons and must not leave BuybackBurn pending.',
+      'Pin Vault ATH deposit and username mint owner request values to >= 50,000,000 nanotons or stricter current safe bounds.',
       'Feed the complete evidence dossier through M19F; only then may M20F_ROUTE_FREEZE_READY become true.',
     ],
   };
@@ -276,6 +336,8 @@ function writeMarkdown(report: M20FMainnetRouteFreezePreflight) {
     `- M19F route freeze ready: ${report.m19fRouteFreezeReady}`,
     `- M20F route freeze ready: ${report.route_freeze_ready}`,
     `- Production BuybackBurn unlocked: ${report.production_buyback_burn_unlocked}`,
+    `- Buyback route ATH notify upstream min: ${report.safe_value_bounds.buybackRouteAthNotifyValueUpstreamMinNanotons}`,
+    `- ATH notify owner request safe min: ${report.safe_value_bounds.athNotifyOwnerRequestValueSafeMinNanotons}`,
     '',
     '## Blockers',
     '',

@@ -8,6 +8,8 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_INPUTS
 - M19F route freeze ready: false
 - M20F route freeze ready: false
 - Production BuybackBurn unlocked: false
+- Buyback route ATH notify upstream min: 40000000
+- ATH notify owner request safe min: 50000000
 
 ## Blockers
 
@@ -45,6 +47,8 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_INPUTS
 - Generate official @ston-fi/sdk/@ston-fi/api tx params from the simulation result.
 - Capture router, pool, pTON, ATH master, and ATH wallet code hashes on mainnet.
 - Prove success excesses, min_out failure refund, pTON refund, and bounce/failure behavior return to BuybackBurn.
+- Prove BuybackBurn ATH route notify value is production-safe: upstream notify value must be >= 40,000,000 nanotons and must not leave BuybackBurn pending.
+- Pin Vault ATH deposit and username mint owner request values to >= 50,000,000 nanotons or stricter current safe bounds.
 - Feed the complete evidence dossier through M19F; only then may M20F_ROUTE_FREEZE_READY become true.
 
 M20F is not complete until M19F passes with real mainnet evidence. Testnet M20T evidence must stay separate.

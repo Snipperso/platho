@@ -1,0 +1,353 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { Address } from '@ton/core';
+import { isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
+
+const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
+
+type Issue = { code: string; message: string };
+
+type ManifestLike = {
+  profile: string;
+  status: string;
+  manifest_hash_hex: string;
+  addresses: Record<string, string>;
+  code_hashes: Record<string, string>;
+  blockers_before_final_genesis?: string[];
+};
+
+type BaseSnapshot = {
+  address: string;
+  code_hash: string;
+  sealed?: boolean;
+  deployment_manifest_hash?: string;
+};
+
+export interface MainnetGenesisVerifyInput {
+  document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_INPUT';
+  network: 'mainnet';
+  manifest: ManifestLike;
+  snapshot: {
+    ath_master: BaseSnapshot & {
+      treasury_owner_address: string;
+      treasury_supply_deployed: boolean;
+    };
+    vault: BaseSnapshot & {
+      capsule_hub_address: string;
+      vault_ath_wallet_address: string;
+      ath_master_address: string;
+    };
+    capsulehub: BaseSnapshot & {
+      vault_address: string;
+      fee_accumulator_address: string;
+    };
+    username_registry: BaseSnapshot & {
+      official_ath_wallet_address: string;
+      ath_master_address: string;
+      treasury_ath_receiver: string;
+    };
+    buyback_burn: BaseSnapshot & {
+      fee_accumulator_address: string;
+      official_ath_wallet_address: string;
+      ath_master_address: string;
+      route_frozen: boolean;
+      stonfi_pool_address_ton_ath: string;
+    };
+    fee_accumulator: BaseSnapshot & {
+      buyback_burn_address: string;
+      ton_treasury_receiver: string;
+    };
+  };
+  evidenceRefs: {
+    getterSnapshotSource: string;
+    codeHashProofSource: string;
+    finalManifestSource: string;
+  };
+}
+
+export interface MainnetGenesisVerifyReport {
+  document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT';
+  status: 'BLOCKED_MISSING_INPUT' | 'BLOCKED_GENESIS_MISMATCH' | 'MAINNET_GENESIS_VERIFIED';
+  generated_at: 'DETERMINISTIC_ARTIFACT';
+  mainnet_genesis_verified: boolean;
+  issue_codes: string[];
+  issues: Issue[];
+  checked_manifest_hash: string | null;
+}
+
+function readJson(path: string): any {
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+function issue(code: string, message: string): Issue {
+  return { code, message };
+}
+
+function isHex64(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
+}
+
+function isPlaceholder(value: unknown): boolean {
+  if (typeof value !== 'string') return true;
+  const v = value.trim();
+  return v.length === 0 || v.includes('REQUIRED_') || v.includes('required:') || v.includes('EQ...') || v.includes('<');
+}
+
+function isParseableMainnetAddress(value: unknown): boolean {
+  if (typeof value !== 'string' || isPlaceholder(value)) return false;
+  try {
+    Address.parse(value);
+    return !isTestnetFriendlyAddress(value);
+  } catch {
+    return false;
+  }
+}
+
+function sameAddress(a: string, b: string): boolean {
+  return Address.parse(a).equals(Address.parse(b));
+}
+
+function addEq(issues: Issue[], code: string, actual: unknown, expected: unknown, label: string) {
+  if (actual !== expected) {
+    issues.push(issue(code, `${label} mismatch: expected ${expected}, got ${actual}`));
+  }
+}
+
+function addAddressEq(issues: Issue[], code: string, actual: string, expected: string, label: string) {
+  if (!isParseableMainnetAddress(actual) || !isParseableMainnetAddress(expected) || !sameAddress(actual, expected)) {
+    issues.push(issue(code, `${label} address mismatch: expected ${expected}, got ${actual}`));
+  }
+}
+
+function addTrue(issues: Issue[], code: string, actual: boolean | undefined, label: string) {
+  if (actual !== true) {
+    issues.push(issue(code, `${label} must be true`));
+  }
+}
+
+function checkBase(
+  issues: Issue[],
+  manifest: ManifestLike,
+  snapshot: BaseSnapshot,
+  contractKey: string,
+  addressKey: string,
+  codeHashKey: string,
+) {
+  addAddressEq(issues, `${contractKey.toUpperCase()}_ADDRESS_MISMATCH`, snapshot.address, manifest.addresses[addressKey], `${contractKey}.address`);
+  addEq(issues, `${contractKey.toUpperCase()}_CODE_HASH_MISMATCH`, snapshot.code_hash?.toLowerCase(), manifest.code_hashes[codeHashKey], `${contractKey}.code_hash`);
+}
+
+function checkSealed(issues: Issue[], manifest: ManifestLike, snapshot: BaseSnapshot, contractKey: string) {
+  addTrue(issues, `${contractKey.toUpperCase()}_NOT_SEALED`, snapshot.sealed, `${contractKey}.sealed`);
+  addEq(issues, `${contractKey.toUpperCase()}_MANIFEST_HASH_MISMATCH`, snapshot.deployment_manifest_hash, manifest.manifest_hash_hex, `${contractKey}.deployment_manifest_hash`);
+}
+
+export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyInput {
+  const requiredManifest: ManifestLike = {
+    profile: 'PLATHO.V1.FINAL_GENESIS_MANIFEST',
+    status: 'FINAL_GENESIS',
+    manifest_hash_hex: 'required: 64 lowercase hex final manifest hash',
+    addresses: {
+      ath_master: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+      ath_treasury_owner: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
+      vault: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+      vault_official_ath_wallet: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+      capsulehub: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
+      fee_accumulator: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
+      fee_accumulator_ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
+      buyback_burn: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
+      buyback_burn_official_ath_wallet: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
+      username_registry: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
+      username_registry_official_ath_wallet: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
+      treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
+      stonfi_pool_address_ton_ath: 'REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS',
+    },
+    code_hashes: {
+      ath_master: 'required: current ATHMaster code hash',
+      vault: 'required: current Vault code hash',
+      capsulehub: 'required: current CapsuleHub code hash',
+      username_registry: 'required: current UsernameRegistry code hash',
+      buyback_burn: 'required: current BuybackBurn code hash',
+      fee_accumulator: 'required: current FeeAccumulator code hash',
+    },
+    blockers_before_final_genesis: [],
+  };
+
+  const base = {
+    address: 'REQUIRED_MAINNET_CONTRACT_ADDRESS',
+    code_hash: 'required: current contract code hash',
+    sealed: true,
+    deployment_manifest_hash: 'required: final manifest hash',
+  };
+
+  return {
+    document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_INPUT',
+    network: 'mainnet',
+    manifest: requiredManifest,
+    snapshot: {
+      ath_master: {
+        address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        code_hash: 'required: current ATHMaster code hash',
+        treasury_owner_address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
+        treasury_supply_deployed: true,
+      },
+      vault: {
+        ...base,
+        address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+        capsule_hub_address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
+        vault_ath_wallet_address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+      },
+      capsulehub: {
+        ...base,
+        address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
+        vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+        fee_accumulator_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
+      },
+      username_registry: {
+        ...base,
+        address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
+        official_ath_wallet_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
+      },
+      buyback_burn: {
+        ...base,
+        address: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
+        fee_accumulator_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
+        official_ath_wallet_address: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        route_frozen: true,
+        stonfi_pool_address_ton_ath: 'REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS',
+      },
+      fee_accumulator: {
+        address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
+        code_hash: 'required: current FeeAccumulator code hash',
+        buyback_burn_address: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
+        ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
+      },
+    },
+    evidenceRefs: {
+      getterSnapshotSource: 'required: immutable getter snapshot path/hash',
+      codeHashProofSource: 'required: immutable code hash proof path/hash',
+      finalManifestSource: 'required: immutable final manifest path/hash',
+    },
+  };
+}
+
+export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | null): MainnetGenesisVerifyReport {
+  if (!input) {
+    return {
+      document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT',
+      status: 'BLOCKED_MISSING_INPUT',
+      generated_at: 'DETERMINISTIC_ARTIFACT',
+      mainnet_genesis_verified: false,
+      issue_codes: ['MISSING_INPUT'],
+      issues: [issue('MISSING_INPUT', 'Supply a final mainnet genesis getter snapshot input.')],
+      checked_manifest_hash: null,
+    };
+  }
+
+  const issues: Issue[] = [];
+  const manifest = input.manifest;
+
+  if (input.document !== 'PLATHO.V1.MAINNET_GENESIS_VERIFY_INPUT') issues.push(issue('BAD_DOCUMENT_TYPE', 'Input document type is invalid.'));
+  if (input.network !== 'mainnet') issues.push(issue('NETWORK_NOT_MAINNET', 'Genesis verifier only accepts mainnet snapshots.'));
+  if (manifest.status !== 'FINAL_GENESIS') issues.push(issue('MANIFEST_NOT_FINAL_GENESIS', 'Manifest status must be FINAL_GENESIS.'));
+  if (!isHex64(manifest.manifest_hash_hex)) issues.push(issue('BAD_MANIFEST_HASH', 'manifest_hash_hex must be a 32-byte lowercase hex hash.'));
+  if ((manifest.blockers_before_final_genesis ?? []).length > 0) issues.push(issue('FINAL_GENESIS_BLOCKERS_NOT_EMPTY', 'Final manifest must not contain open blockers.'));
+
+  for (const [key, value] of Object.entries(manifest.addresses ?? {})) {
+    if (!isParseableMainnetAddress(value)) issues.push(issue(`BAD_MANIFEST_ADDRESS_${key.toUpperCase()}`, `${key} must be a parseable mainnet address.`));
+  }
+  for (const [key, value] of Object.entries(manifest.code_hashes ?? {})) {
+    if (!isHex64(value)) issues.push(issue(`BAD_MANIFEST_CODE_HASH_${key.toUpperCase()}`, `${key} code hash must be 32-byte hex.`));
+  }
+
+  const s = input.snapshot;
+  checkBase(issues, manifest, s.ath_master, 'ath_master', 'ath_master', 'ath_master');
+  addAddressEq(issues, 'ATH_MASTER_TREASURY_OWNER_MISMATCH', s.ath_master.treasury_owner_address, manifest.addresses.ath_treasury_owner, 'ath_master.treasury_owner_address');
+  addTrue(issues, 'ATH_TREASURY_SUPPLY_NOT_DEPLOYED', s.ath_master.treasury_supply_deployed, 'ath_master.treasury_supply_deployed');
+
+  checkBase(issues, manifest, s.vault, 'vault', 'vault', 'vault');
+  checkSealed(issues, manifest, s.vault, 'vault');
+  addAddressEq(issues, 'VAULT_CAPSULE_HUB_ADDRESS_MISMATCH', s.vault.capsule_hub_address, manifest.addresses.capsulehub, 'vault.capsule_hub_address');
+  addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MISMATCH', s.vault.vault_ath_wallet_address, manifest.addresses.vault_official_ath_wallet, 'vault.vault_ath_wallet_address');
+  addAddressEq(issues, 'VAULT_ATH_MASTER_MISMATCH', s.vault.ath_master_address, manifest.addresses.ath_master, 'vault.ath_master_address');
+
+  checkBase(issues, manifest, s.capsulehub, 'capsulehub', 'capsulehub', 'capsulehub');
+  checkSealed(issues, manifest, s.capsulehub, 'capsulehub');
+  addAddressEq(issues, 'CAPSULEHUB_VAULT_ADDRESS_MISMATCH', s.capsulehub.vault_address, manifest.addresses.vault, 'capsulehub.vault_address');
+  addAddressEq(issues, 'CAPSULEHUB_FEE_ACCUMULATOR_MISMATCH', s.capsulehub.fee_accumulator_address, manifest.addresses.fee_accumulator, 'capsulehub.fee_accumulator_address');
+
+  checkBase(issues, manifest, s.username_registry, 'username_registry', 'username_registry', 'username_registry');
+  checkSealed(issues, manifest, s.username_registry, 'username_registry');
+  addAddressEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.username_registry.official_ath_wallet_address, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.official_ath_wallet_address');
+  addAddressEq(issues, 'USERNAME_REGISTRY_ATH_MASTER_MISMATCH', s.username_registry.ath_master_address, manifest.addresses.ath_master, 'username_registry.ath_master_address');
+  addAddressEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.username_registry.treasury_ath_receiver, manifest.addresses.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
+
+  checkBase(issues, manifest, s.buyback_burn, 'buyback_burn', 'buyback_burn', 'buyback_burn');
+  checkSealed(issues, manifest, s.buyback_burn, 'buyback_burn');
+  addTrue(issues, 'BUYBACK_ROUTE_NOT_FROZEN', s.buyback_burn.route_frozen, 'buyback_burn.route_frozen');
+  addAddressEq(issues, 'BUYBACK_FEE_ACCUMULATOR_MISMATCH', s.buyback_burn.fee_accumulator_address, manifest.addresses.fee_accumulator, 'buyback_burn.fee_accumulator_address');
+  addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_MISMATCH', s.buyback_burn.official_ath_wallet_address, manifest.addresses.buyback_burn_official_ath_wallet, 'buyback_burn.official_ath_wallet_address');
+  addAddressEq(issues, 'BUYBACK_ATH_MASTER_MISMATCH', s.buyback_burn.ath_master_address, manifest.addresses.ath_master, 'buyback_burn.ath_master_address');
+  addAddressEq(issues, 'BUYBACK_STONFI_POOL_MISMATCH', s.buyback_burn.stonfi_pool_address_ton_ath, manifest.addresses.stonfi_pool_address_ton_ath, 'buyback_burn.stonfi_pool_address_ton_ath');
+
+  checkBase(issues, manifest, s.fee_accumulator, 'fee_accumulator', 'fee_accumulator', 'fee_accumulator');
+  addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
+  addAddressEq(issues, 'FEE_ACCUMULATOR_TON_TREASURY_MISMATCH', s.fee_accumulator.ton_treasury_receiver, manifest.addresses.fee_accumulator_ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
+
+  for (const [key, value] of Object.entries(input.evidenceRefs ?? {})) {
+    if (isPlaceholder(value)) issues.push(issue(`MISSING_EVIDENCE_REF_${key.toUpperCase()}`, `${key} must point to immutable release evidence.`));
+  }
+
+  return {
+    document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT',
+    status: issues.length === 0 ? 'MAINNET_GENESIS_VERIFIED' : 'BLOCKED_GENESIS_MISMATCH',
+    generated_at: 'DETERMINISTIC_ARTIFACT',
+    mainnet_genesis_verified: issues.length === 0,
+    issue_codes: issues.map((i) => i.code),
+    issues,
+    checked_manifest_hash: manifest.manifest_hash_hex ?? null,
+  };
+}
+
+function markdown(report: MainnetGenesisVerifyReport) {
+  const lines = [
+    '# Mainnet Genesis Verify',
+    '',
+    `Status: ${report.status}`,
+    '',
+    `- mainnet_genesis_verified: ${report.mainnet_genesis_verified}`,
+    `- checked_manifest_hash: ${report.checked_manifest_hash ?? 'none'}`,
+    '',
+    '## Issues',
+    '',
+    ...(report.issues.length > 0 ? report.issues.map((item) => `- ${item.code}: ${item.message}`) : ['- none']),
+    '',
+  ];
+  return lines.join('\n');
+}
+
+export function writeMainnetGenesisVerifyArtifacts(inputPath?: string) {
+  mkdirSync(ARTIFACTS_DIR, { recursive: true });
+  writeFileSync(join(ARTIFACTS_DIR, 'mainnet_genesis_verify_input_template.json'), `${JSON.stringify(createMainnetGenesisVerifyInputTemplate(), null, 2)}\n`);
+
+  const input = inputPath && existsSync(inputPath) ? readJson(inputPath) as MainnetGenesisVerifyInput : null;
+  const report = verifyMainnetGenesisSnapshot(input);
+  writeFileSync(join(ARTIFACTS_DIR, 'mainnet_genesis_verify_report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  writeFileSync(join(ARTIFACTS_DIR, 'MAINNET_GENESIS_VERIFY.md'), markdown(report));
+  writeFileSync(join(ARTIFACTS_DIR, 'MAINNET_GENESIS_VERIFIED.txt'), `${report.mainnet_genesis_verified}\n`);
+  return report;
+}
+
+if (require.main === module) {
+  const report = writeMainnetGenesisVerifyArtifacts(process.argv[2]);
+  console.log(JSON.stringify({
+    status: report.status,
+    mainnet_genesis_verified: report.mainnet_genesis_verified,
+    issue_codes: report.issue_codes,
+    output: 'artifacts/mainnet_genesis_verify_report.json',
+  }, null, 2));
+}

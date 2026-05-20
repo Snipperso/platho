@@ -1,0 +1,89 @@
+{
+  "document": "PLATHO.V1.MAINNET_GENESIS_VERIFY_INPUT",
+  "network": "mainnet",
+  "manifest": {
+    "profile": "PLATHO.V1.FINAL_GENESIS_MANIFEST",
+    "status": "FINAL_GENESIS",
+    "manifest_hash_hex": "required: 64 lowercase hex final manifest hash",
+    "addresses": {
+      "ath_master": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "ath_treasury_owner": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+      "vault": "REQUIRED_MAINNET_VAULT_ADDRESS",
+      "vault_official_ath_wallet": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
+      "capsulehub": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
+      "fee_accumulator": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
+      "fee_accumulator_ton_treasury_receiver": "REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS",
+      "buyback_burn": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
+      "buyback_burn_official_ath_wallet": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
+      "username_registry": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
+      "username_registry_official_ath_wallet": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS",
+      "stonfi_pool_address_ton_ath": "REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS"
+    },
+    "code_hashes": {
+      "ath_master": "required: current ATHMaster code hash",
+      "vault": "required: current Vault code hash",
+      "capsulehub": "required: current CapsuleHub code hash",
+      "username_registry": "required: current UsernameRegistry code hash",
+      "buyback_burn": "required: current BuybackBurn code hash",
+      "fee_accumulator": "required: current FeeAccumulator code hash"
+    },
+    "blockers_before_final_genesis": []
+  },
+  "snapshot": {
+    "ath_master": {
+      "address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "code_hash": "required: current ATHMaster code hash",
+      "treasury_owner_address": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+      "treasury_supply_deployed": true
+    },
+    "vault": {
+      "address": "REQUIRED_MAINNET_VAULT_ADDRESS",
+      "code_hash": "required: current contract code hash",
+      "sealed": true,
+      "deployment_manifest_hash": "required: final manifest hash",
+      "capsule_hub_address": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
+      "vault_ath_wallet_address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS"
+    },
+    "capsulehub": {
+      "address": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
+      "code_hash": "required: current contract code hash",
+      "sealed": true,
+      "deployment_manifest_hash": "required: final manifest hash",
+      "vault_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
+      "fee_accumulator_address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS"
+    },
+    "username_registry": {
+      "address": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
+      "code_hash": "required: current contract code hash",
+      "sealed": true,
+      "deployment_manifest_hash": "required: final manifest hash",
+      "official_ath_wallet_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS"
+    },
+    "buyback_burn": {
+      "address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
+      "code_hash": "required: current contract code hash",
+      "sealed": true,
+      "deployment_manifest_hash": "required: final manifest hash",
+      "fee_accumulator_address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
+      "official_ath_wallet_address": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "route_frozen": true,
+      "stonfi_pool_address_ton_ath": "REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS"
+    },
+    "fee_accumulator": {
+      "address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
+      "code_hash": "required: current FeeAccumulator code hash",
+      "buyback_burn_address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
+      "ton_treasury_receiver": "REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS"
+    }
+  },
+  "evidenceRefs": {
+    "getterSnapshotSource": "required: immutable getter snapshot path/hash",
+    "codeHashProofSource": "required: immutable code hash proof path/hash",
+    "finalManifestSource": "required: immutable final manifest path/hash"
+  }
+}
