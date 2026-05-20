@@ -4,6 +4,7 @@
 
 const USERNAME_ITEM_ACK_FORWARD_RESERVE: Int = 3000000;
 const USERNAME_ITEM_ACK_EXEC_RESERVE: Int = 1000000;
+const USERNAME_ITEM_ACK_MAX_RESEND_VALUE: Int = 20000000;
 
 message(0x639CFC6C) ResendDeployedAck {}
 
@@ -36,6 +37,7 @@ contract UsernameNFTItem {
         // Permissionless ACK resend is allowed, but the caller must fund both
         // the forwarded ACK value and this item's local execution reserve.
         throwUnless(18002, context().value >= USERNAME_ITEM_ACK_FORWARD_RESERVE + USERNAME_ITEM_ACK_EXEC_RESERVE);
+        throwUnless(18003, context().value <= USERNAME_ITEM_ACK_MAX_RESEND_VALUE);
         message(MessageParameters {
             to: self.username_registry_address,
             value: USERNAME_ITEM_ACK_FORWARD_RESERVE,

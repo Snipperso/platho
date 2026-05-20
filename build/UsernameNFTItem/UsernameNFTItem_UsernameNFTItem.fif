@@ -156,6 +156,12 @@ PROGRAM{
       4000000 PUSHINT
       GEQ
       THROWANYIFNOT
+      18003 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      20000000 PUSHINT
+      LEQ
+      THROWANYIFNOT
       3000000 PUSHINT
       TRUE
       0 PUSHINT
