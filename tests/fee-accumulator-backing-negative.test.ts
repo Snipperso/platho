@@ -15,6 +15,7 @@ import { createFundingEnvelopeProfileM19H } from '../scripts/buybackburn_funding
 const DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const SPLIT_EXEC_RESERVE = 2_000_000n;
 const FLUSH_EXEC_RESERVE = 5_000_000n;
+const MIN_TREASURY_FLUSH_TON = FLUSH_EXEC_RESERVE;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
 const OP_ACCEPT_BURN_RESERVE = 0x594BA505;
 
@@ -137,6 +138,54 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
     const afterBalance = await contractBalance(blockchain, fee.address);
     expect((await fee.getGetState()).treasury_due_ton).toBe(0n);
     expect(beforeBalance - afterBalance).toBeLessThanOrEqual(treasuryDue);
+  });
+
+  it('FEE-BACKING-02B: treasury flush rejects dust partial fragments but permits final dust flush', async () => {
+    const { fee, donor, operator, treasury } = await setup();
+    await depositAndSplit(fee, donor, MIN_TREASURY_FLUSH_TON * 4n);
+
+    const startingTreasuryDue = (await fee.getGetState()).treasury_due_ton;
+    expect(startingTreasuryDue).toBe(MIN_TREASURY_FLUSH_TON * 2n);
+
+    const partialDust = 10_000n;
+    const rejectedDust = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
+      $$type: 'FlushTreasuryDue',
+      amount: partialDust,
+    } as FlushTreasuryDue);
+    expect(findTransaction(rejectedDust.transactions, {
+      from: fee.address,
+      to: treasury.address,
+      success: true,
+    })).toBeUndefined();
+    expect((await fee.getGetState()).treasury_due_ton).toBe(startingTreasuryDue);
+
+    const acceptedPartial = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
+      $$type: 'FlushTreasuryDue',
+      amount: MIN_TREASURY_FLUSH_TON,
+    } as FlushTreasuryDue);
+    expect(findTransaction(acceptedPartial.transactions, {
+      from: fee.address,
+      to: treasury.address,
+      success: true,
+    })).toBeDefined();
+    expect((await fee.getGetState()).treasury_due_ton).toBe(MIN_TREASURY_FLUSH_TON);
+
+    const finalDust = 10_000n;
+    const second = await setup();
+    await depositAndSplit(second.fee, second.donor, finalDust * 2n);
+    expect((await second.fee.getGetState()).treasury_due_ton).toBe(finalDust);
+
+    const acceptedFinalDust = await second.fee.send(second.operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
+      $$type: 'FlushTreasuryDue',
+      amount: finalDust,
+    } as FlushTreasuryDue);
+    const finalDustTx = findTransaction(acceptedFinalDust.transactions, {
+      from: second.fee.address,
+      to: second.treasury.address,
+    });
+    expect(finalDustTx).toBeDefined();
+    expect(inboundValue(finalDustTx)).toBe(finalDust);
+    expect((await second.fee.getGetState()).treasury_due_ton).toBe(0n);
   });
 
   it('FEE-BACKING-03: buyback flush requires caller-funded reserve before sending the envelope', async () => {

@@ -255,6 +255,17 @@ PROGRAM{
       s1 s5 PUSH2
       LEQ
       THROWANYIFNOT
+      15023 PUSHINT
+      OVER
+      5000000 PUSHINT
+      GEQ
+      IF:<{
+        TRUE
+      }>ELSE<{
+        s1 s5 PUSH2
+        EQUAL
+      }>
+      THROWANYIFNOT
       15022 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT

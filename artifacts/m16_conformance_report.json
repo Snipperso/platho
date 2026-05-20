@@ -50,7 +50,7 @@
     },
     {
       "contract": "FeeAccumulator.tact",
-      "non_comment_lines": 103,
+      "non_comment_lines": 105,
       "receive_handlers": 6,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -107,8 +107,8 @@
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
-      "built": "ff084907becac5dcc98b372162bab7f6f2a364f4383e5f51676fd069f64db2e3",
-      "pinned": "ff084907becac5dcc98b372162bab7f6f2a364f4383e5f51676fd069f64db2e3",
+      "built": "471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f",
+      "pinned": "471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "8b3fa3c3ea993fac281a104a9bd14637b5c571fca79d98bc1b16d95479c09947",
+    "manifest_hash_hex": "03d558e83478b0f42f1a52d4cee889b08a715bed19b714140f6e2af5a89562cc",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

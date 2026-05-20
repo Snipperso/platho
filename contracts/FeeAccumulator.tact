@@ -8,6 +8,7 @@ const TREASURY_SHARE_BPS: Int = 5000;
 const FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 2000000;
 const FEEACCUMULATOR_SPLIT_EXEC_RESERVE: Int = 2000000;
 const FEEACCUMULATOR_FLUSH_EXEC_RESERVE: Int = 5000000;
+const FEEACCUMULATOR_MIN_TREASURY_FLUSH_TON: Int = FEEACCUMULATOR_FLUSH_EXEC_RESERVE;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 // M19H BuybackBurn funding envelope: exact 50 TON offer + 1.05 TON route funding.
 // FeeAccumulator must only flush complete buyback execution envelopes, not raw 50 TON offer chunks.
@@ -85,6 +86,7 @@ contract FeeAccumulator {
     receive(msg: FlushTreasuryDue) {
         throwUnless(15020, msg.amount > 0);
         throwUnless(15021, msg.amount <= self.treasury_due_ton);
+        throwUnless(15023, msg.amount >= FEEACCUMULATOR_MIN_TREASURY_FLUSH_TON || msg.amount == self.treasury_due_ton);
         throwUnless(15022, context().value >= FEEACCUMULATOR_FLUSH_EXEC_RESERVE);
 
         self.treasury_due_ton -= msg.amount;
