@@ -2093,7 +2093,7 @@ PROGRAM{
       22343 PUSHINT
       30 s() PUSH
       s2 PUSH
-      LEQ
+      EQUAL
       THROWANYIFNOT
       22344 PUSHINT
       __tact_context_get INLINECALLDICT

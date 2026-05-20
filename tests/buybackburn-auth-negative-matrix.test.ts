@@ -481,6 +481,7 @@ describe('BuybackBurn auth and negative matrix', () => {
 
     for (const [value, msg] of [
       [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 0n, amount: 100_000n }],
+      [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 1n }],
       [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_001n }],
       [ATH_BURN_REQUEST_VALUE - 1n, { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_000n }],
     ] as const) {
@@ -488,6 +489,7 @@ describe('BuybackBurn auth and negative matrix', () => {
       state = await env.buyback.getGetBuybackBurnState();
       expect(state.phase).toBe(PHASE_IDLE);
       expect(state.ath_burn_retry_due_atomic).toBe(100_000n);
+      expect((await env.buyback.getGetBuybackBurnTotals()).executed_buyback_count).toBe(0n);
     }
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
