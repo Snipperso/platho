@@ -176,6 +176,41 @@ describe('ATH wallet derivation profile', () => {
     expect(await contractBalance(blockchain, treasuryWalletAddress)).toBeLessThan(toNano('0.01'));
   });
 
+  it('ATH Master tiny DeployTreasurySupply overpayment does not cancel genesis credit', async () => {
+    const blockchain = await Blockchain.create();
+    const treasuryOwner = await blockchain.treasury('ath-genesis-dust-overpay-owner');
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterAddress = contractAddress(0, masterInit);
+    await blockchain.setShardAccount(
+      masterAddress,
+      createShardAccount({
+        address: masterAddress,
+        code: masterInit.code,
+        data: masterInit.data,
+        balance: toNano('1'),
+        workchain: masterAddress.workChain,
+      }),
+    );
+
+    const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+    const treasuryWalletAddress = await master.getGetWalletAddress(treasuryOwner.address);
+    const treasuryWalletInit = await ATHWallet.init(0n, treasuryOwner.address, masterAddress);
+    const treasuryWallet = blockchain.openContract(new ATHWallet(treasuryWalletAddress, treasuryWalletInit));
+
+    const result = await master.send(treasuryOwner.getSender(), { value: ATH_GENESIS_SUPPLY_REQUIRED_VALUE + 1n }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 34n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect(findTransaction(result.transactions, {
+      from: master.address,
+      to: treasuryWalletAddress,
+      success: true,
+    })).toBeDefined();
+    expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+  });
+
   it('ATH treasury wallet rejects direct genesis supply credit from a non-master sender', async () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-direct-owner');
