@@ -9,6 +9,7 @@ import {
   ATHInternalTransfer,
   ATHInternalTransferWithNotify,
   ATHTransferRequest,
+  ATHTransferRequestMintUsername,
   ATHTransferRequestWithNotify,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster, ATHBurnNotification } from '../build/ATHMaster/ATHMaster_ATHMaster';
@@ -281,5 +282,65 @@ describe('ATH wallet/master value boundary negative matrix', () => {
 
     expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
     expect((await master.getGetJettonData()).total_supply).toBe(before.total_supply - 100n);
+  });
+
+  it('ATH-BND-07: tiny notify owner excess does not cancel an otherwise valid transfer', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-bnd-notify-dust-source');
+    const recipientOwner = await blockchain.treasury('ath-bnd-notify-dust-recipient');
+    const master = fixtureAddress('OWNER_NOTIFY_DUST_MASTER');
+    const { wallet: sourceWallet } = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+
+    const result = await sourceWallet.send(sourceOwner.getSender(), { value: ATH_OWNER_NOTIFY_MIN_VALUE + 1n }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 70n,
+      amount: 100n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      notify_destination: recipientOwner.address,
+      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+    } as ATHTransferRequestWithNotify);
+
+    expect(findTransaction(result.transactions, {
+      from: sourceWallet.address,
+      to: recipientAddress,
+      success: true,
+    })).toBeDefined();
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
+  });
+
+  it('ATH-BND-08: tiny mint-notify owner excess does not cancel an otherwise valid transfer', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-bnd-mint-dust-source');
+    const recipientOwner = await blockchain.treasury('ath-bnd-mint-dust-recipient');
+    const master = fixtureAddress('OWNER_MINT_DUST_MASTER');
+    const { wallet: sourceWallet } = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+
+    const username = Buffer.from('platho', 'ascii');
+    const result = await sourceWallet.send(sourceOwner.getSender(), { value: ATH_OWNER_NOTIFY_MIN_VALUE + 1n }, {
+      $$type: 'ATHTransferRequestMintUsername',
+      query_id: 80n,
+      amount: 100n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+      username_len: BigInt(username.length),
+      username: beginCell().storeBuffer(username).endCell().beginParse(),
+    } as ATHTransferRequestMintUsername);
+
+    expect(findTransaction(result.transactions, {
+      from: sourceWallet.address,
+      to: recipientAddress,
+      success: true,
+    })).toBeDefined();
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
   });
 });

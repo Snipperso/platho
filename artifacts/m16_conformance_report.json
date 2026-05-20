@@ -23,7 +23,7 @@
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 559,
+      "non_comment_lines": 560,
       "receive_handlers": 11,
       "bounced_handlers": 6,
       "forbidden_hits": [],
@@ -87,18 +87,18 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "cb8a4df55f9db17167802559122a7e435ff0b3d354e550c0c3121ad5bbc2e0c6",
-      "pinned": "cb8a4df55f9db17167802559122a7e435ff0b3d354e550c0c3121ad5bbc2e0c6",
+      "built": "f9b151cedf35b20bc2a5b85986e2f98f5068cb22f7669b773ef3c145fe4b0d4b",
+      "pinned": "f9b151cedf35b20bc2a5b85986e2f98f5068cb22f7669b773ef3c145fe4b0d4b",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "d6452b3d9f5170cc84a25b3dcd5cdcd77ae7c0b342848cef5872c6f2e002f1f6",
-      "pinned": "d6452b3d9f5170cc84a25b3dcd5cdcd77ae7c0b342848cef5872c6f2e002f1f6",
+      "built": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
+      "pinned": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "75d0cafca41bb5a5da6e5024e298ac915e4af56d326b24acc0dceae50d43c53b",
-      "pinned": "75d0cafca41bb5a5da6e5024e298ac915e4af56d326b24acc0dceae50d43c53b",
+      "built": "23eaae1747dbde64a98d55095ce3715f56fbec15fb3fc80c0fe3af3eb45c6c42",
+      "pinned": "23eaae1747dbde64a98d55095ce3715f56fbec15fb3fc80c0fe3af3eb45c6c42",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -117,13 +117,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "862624edc726af1e489dac6778997c9ccbf356626eef476f4afeaa78991a199a",
-      "pinned": "862624edc726af1e489dac6778997c9ccbf356626eef476f4afeaa78991a199a",
+      "built": "f56f018c96332f480437578cd55c3b9501e06129e75f4c81700ebe9bc7be880e",
+      "pinned": "f56f018c96332f480437578cd55c3b9501e06129e75f4c81700ebe9bc7be880e",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "f33d567e5ce2696b9e594f440131ec124557c2102d1d1da73a82a44cf75e5362",
-      "pinned": "f33d567e5ce2696b9e594f440131ec124557c2102d1d1da73a82a44cf75e5362",
+      "built": "419273f08cbb6036894a10a505bff41a0bef19eedbaec4281620fcc0912058d4",
+      "pinned": "419273f08cbb6036894a10a505bff41a0bef19eedbaec4281620fcc0912058d4",
       "match": true
     }
   },
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "b610641bc6d64c48891c1ce06c3343b39c3982ff03a7013c204b22e5a3361134",
+    "manifest_hash_hex": "3bfbfcde97348358427a77e9485c85e3aee7d34630f18fbc43888954dd280bca",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

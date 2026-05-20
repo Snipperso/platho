@@ -6,7 +6,7 @@
     {
       "id": "ATHW-01",
       "title": "Notify and mint-notify owner requests forwarded caller overpayment into the recipient ATH wallet",
-      "resolution": "Notify-style owner requests now forward only the canonical downstream notification envelope and return owner overpayment to the response destination instead of stranding it as unaccounted recipient wallet TON."
+      "resolution": "Notify-style owner requests now forward only the canonical downstream notification envelope and return non-dust owner overpayment to the response destination instead of stranding it as unaccounted recipient wallet TON. M46 refines dust handling: excess below 100,000 nanotons is retained as source-wallet storage reserve rather than sent as a potentially failing refund action."
     },
     {
       "id": "ATHW-02",
@@ -24,8 +24,9 @@
     "owner_first_hop_exec_reserve_nanotons": "2000000",
     "burn": "requires burn notification reserve plus owner first-hop reserve; forwards caller-funded remainder with SendPayFwdFeesSeparately",
     "simple_transfer": "requires recipient execution reserve plus owner first-hop reserve; forwards caller-funded remainder with SendPayFwdFeesSeparately",
-    "notify_transfer": "requires notify value plus ACK value plus recipient execution/storage reserves plus owner first-hop reserve; forwards only the canonical notify envelope and refunds excess",
-    "mint_username_transfer": "same bounded canonical envelope and excess refund policy as notify transfer"
+    "notify_transfer": "requires notify value plus ACK value plus recipient execution/storage reserves plus owner first-hop reserve; forwards only the canonical notify envelope and refunds non-dust excess",
+    "mint_username_transfer": "same bounded canonical envelope and non-dust excess refund policy as notify transfer",
+    "owner_excess_refund_min_value_nanotons": "100000"
   },
   "verification": {
     "build": "npm.cmd run build: PASS",

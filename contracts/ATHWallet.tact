@@ -10,6 +10,7 @@ const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 7000000;
 const ATH_OWNER_REQUEST_EXEC_RESERVE: Int = 2000000;
 const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE: Int = 10000000;
+const ATH_OWNER_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
@@ -216,7 +217,7 @@ contract ATHWallet {
     }
 
     fun refund_owner_excess(destination: Address, amount: Int) {
-        if (amount <= 0) {
+        if (amount < ATH_OWNER_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
 
