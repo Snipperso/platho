@@ -255,6 +255,20 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect(beforeVaultBalance - afterVaultBalance).toBeLessThanOrEqual(amount);
   });
 
+  it('VAULT-BND-01D: WithdrawTon to the Vault itself is rejected before debiting internal TON', async () => {
+    const { vault, user } = await setupPlain();
+    const amount = 50_000_000n;
+    await depositTon(vault, user, amount);
+
+    await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE }, {
+      $$type: 'WithdrawTon',
+      amount,
+      recipient: vault.address,
+    } as WithdrawTon);
+
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
+  });
+
   it('VAULT-BND-02: SetSession and RegisterMessagingKeys honor exact storage boundaries', async () => {
     const lowSession = await setupPlain();
     const sessionRequired = USER_STATE_STORAGE_ENDOWMENT + SESSION_STATE_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
@@ -403,6 +417,36 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_250n);
     expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);
     expect((await vault.getGetUser(user.address)).ton_balance).toBeGreaterThan(0n);
+  });
+
+  it('VAULT-BND-04B: WithdrawAth to the Vault itself is rejected before debiting internal ATH', async () => {
+    const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setupAth();
+    const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+
+    await depositAth({
+      vault,
+      user,
+      userAthWallet,
+      amount: 2_000n,
+      queryId: 30n,
+      notifyValue: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+    });
+    const beforeUser = await vault.getGetUser(user.address);
+    const beforeOfficial = await officialWallet.getGetWalletData();
+
+    await vault.send(user.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
+      $$type: 'WithdrawAth',
+      query_id: 31n,
+      amount: 750n,
+      recipient: vault.address,
+    } as WithdrawAth);
+
+    const afterUser = await vault.getGetUser(user.address);
+    const afterOfficial = await officialWallet.getGetWalletData();
+    expect(afterUser.ath_balance).toBe(beforeUser.ath_balance);
+    expect(afterOfficial.balance).toBe(beforeOfficial.balance);
+    expect((await vault.getGetPendingAthWithdrawalFor(user.address, 31n)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
   });
 
   it('VAULT-BND-05: ATH withdrawals scope pending ids by owner wallet, not only client query_id', async () => {

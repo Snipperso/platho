@@ -54,7 +54,7 @@ const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 30000000000000000;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
 const VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE: Int = 6000000;
 const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 2000000;
-const INVALID_SESSION_REQUEST_CHARGE_TON: Int = 2000000;
+const INVALID_SESSION_REQUEST_CHARGE_TON: Int = VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE;
 const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE: Int = 3000000;
 const CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE: Int = 4000000;
 const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 3000000;
@@ -808,6 +808,7 @@ contract Vault {
     receive(msg: WithdrawTon) {
         self.requireSealed();
         throwUnless(16020, msg.amount > 0);
+        throwUnless(16018, msg.recipient != myAddress());
         throwUnless(16019, context().value >= VAULT_WITHDRAW_TON_EXEC_RESERVE);
         let userOpt: UserState? = self.users.get(sender());
         throwUnless(16021, userOpt != null);
@@ -829,6 +830,7 @@ contract Vault {
     receive(msg: WithdrawAth) {
         self.requireSealed();
         throwUnless(16023, msg.amount > 0);
+        throwUnless(16017, msg.recipient != myAddress());
         throwUnless(16027, context().value >= VAULT_ATH_WITHDRAW_MIN_VALUE);
         let userOpt: UserState? = self.users.get(sender());
         throwUnless(16024, userOpt != null);
@@ -1274,6 +1276,11 @@ contract Vault {
         }
 
         if (postAcceptInvalid) {
+            let invalidCharge: Int = INVALID_SESSION_REQUEST_CHARGE_TON;
+            if (user.message_budget_ton < invalidCharge) {
+                invalidCharge = user.message_budget_ton;
+            }
+            user.message_budget_ton -= invalidCharge;
             session.message_budget_ton = user.message_budget_ton;
             self.sessions.set(owner, session);
             self.users.set(owner, user);

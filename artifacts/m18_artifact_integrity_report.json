@@ -42,9 +42,9 @@
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "f5ccdf80e77aa4c59e4d41e4c1370795c6644f9309827c8c872e46c365e27d12",
-      "pinned": "f5ccdf80e77aa4c59e4d41e4c1370795c6644f9309827c8c872e46c365e27d12",
-      "current_file": "f5ccdf80e77aa4c59e4d41e4c1370795c6644f9309827c8c872e46c365e27d12",
+      "built": "f33d567e5ce2696b9e594f440131ec124557c2102d1d1da73a82a44cf75e5362",
+      "pinned": "f33d567e5ce2696b9e594f440131ec124557c2102d1d1da73a82a44cf75e5362",
+      "current_file": "f33d567e5ce2696b9e594f440131ec124557c2102d1d1da73a82a44cf75e5362",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -82,8 +82,8 @@
     "m17_gas_report_passes": true
   },
   "manifest": {
-    "stored_hash": "02ae87e7990dec8cb9d18558b330b508310497f11823bc0099709f9bc6f36546",
-    "rebuilt_hash": "02ae87e7990dec8cb9d18558b330b508310497f11823bc0099709f9bc6f36546",
+    "stored_hash": "b610641bc6d64c48891c1ce06c3343b39c3982ff03a7013c204b22e5a3361134",
+    "rebuilt_hash": "b610641bc6d64c48891c1ce06c3343b39c3982ff03a7013c204b22e5a3361134",
     "match": true,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
     "blockers_before_final_genesis": [
@@ -95,14 +95,14 @@
     ]
   },
   "stable_artifact_lock": {
-    "artifacts/CURRENT_CODE_HASHES.txt": "ae77761a954b408dabba9aec2ee615394dd09d1606509d9d8e86b64f0f3d6ed2",
+    "artifacts/CURRENT_CODE_HASHES.txt": "e582281a91c81a880647f3ed43d70c376e6a05ce154d45abbeb7faa7ad6b4140",
     "artifacts/ATHMASTER_CODE_HASH.txt": "45127ed48b4ab779e7a486d2475b224bff3d7e194c16aedb891b02ec32a66960",
     "artifacts/ATH_WALLET_CODE_HASH.txt": "b7b49c9e913efd5356e4d95bf68d379e94eae0d7a5a98a57d3e94ef88d5542a1",
     "artifacts/BUYBACKBURN_CODE_HASH.txt": "275cf9d3134075fbda3f5c940730838377a3a56786c719d8bd988bf942c01c3c",
     "artifacts/CAPSULEHUB_CODE_HASH.txt": "363fdb60533b2714e3602bb98575a0cd952a0f9569a04ee42e92e644298e536a",
     "artifacts/FEEACCUMULATOR_CODE_HASH.txt": "1a538ef8d88844563e1d6f83b6ff910e8420bd051b6ae3cfefce5eb784407252",
     "artifacts/FEE_ACCUMULATOR_CODE_HASH.txt": "1a538ef8d88844563e1d6f83b6ff910e8420bd051b6ae3cfefce5eb784407252",
-    "artifacts/VAULT_CODE_HASH.txt": "99cdf8d69c6dca7f2dc9d2dd901c62723a4ad85e141a775d997f95d857b0c396",
+    "artifacts/VAULT_CODE_HASH.txt": "ad15cbece7b68cb207e2239e0126852b5ddbe42479280427756e0dd4f78f62f4",
     "artifacts/USERNAME_NFT_ITEM_CODE_HASH.txt": "5737ba854354d084c2f4cca6691171f22501bb2ae5842e086171fda68b4e16dc",
     "artifacts/USERNAME_REGISTRY_CODE_HASH.txt": "b3767ac8459e9d46c2f3d5041e0d4e7007d5f4b575d7ebf1cf9108c016e1c22f",
     "artifacts/ath_wallet_derivation_vectors.json": "7086359fd0ebdc3a244e9ef2dbd355fa5345f2cff746e122956d3ca3f7b5cbc9",
@@ -110,9 +110,9 @@
     "artifacts/username_nft_item_vectors.json": "40fad0e5803d68d20496223f30da67a70223adefeee980fb7b33509573a02777",
     "artifacts/username_registry_foundation_vectors.json": "f3923d876bc5665d8c24273ddd9dcd4666cb7141932e6cf294d1b08ec56b1057",
     "artifacts/username_registry_mint_vectors.json": "09615101963ca0586a7ed9c7575089df809e8a2cc9e7447453c49228a24bb553",
-    "artifacts/deployment_manifest_implemented_subset_m15.json": "8d35bc061e761c18ba2ca4c9616ad70f4ea1e6f45a8b6125f1ab5b639a16ef59",
-    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "b28aa68277e035d4dec963507262cd679f7c587eccfa9c75ea31f9c6d52e41d4",
-    "artifacts/m16_conformance_report.json": "3aef199258a594efa84ebb378a8f432bf2441c9f72c90da761f92f77825b733b",
+    "artifacts/deployment_manifest_implemented_subset_m15.json": "c6e0020d9a083cfec4c5fe8aa4c456a75cdeeccd2340e676f562bf2c8a70424e",
+    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "955191461b8feec28df903833c1e5c17b8240a74a756eab5bb8b76dd4c5d4a97",
+    "artifacts/m16_conformance_report.json": "8037943b7eac3ba8a4d2922b0ffef4589eaf54203505a2c567cb5bcc3d2eb4fe",
     "artifacts/m17_gas_reserve_sanity_report.json": "0914f392b6d9694892de8f2b3753fb03de2b97c8c361c8fea181a2993ea3952d",
     "artifacts/platho_v1_open_values_v0_18_artifact_integrity.md": "a7c1973794154e626df35e5d0100ad941ac4d83b362864840b012b74268d94bb",
     "artifacts/SPEC_CHANGELOG_M18_ARTIFACT_INTEGRITY.md": "709b8f4e475e2fbcb257170a4f561717e011920f44f741fde12b784b0ea4bbaf"
@@ -132,7 +132,7 @@
     "contracts\\MockVaultAthWallet.tact": "031df398d48e9fda8b46aeb8862aa4a9b18c35e7569853e3b7722782e0c9ca75",
     "contracts\\UsernameNFTItem.tact": "3399e7e5ce92620f968d1fe5024f56abbccbb0f79c0bc5b25213f6d3232675cf",
     "contracts\\UsernameRegistry.tact": "33b0c5d685b9b36f247ac2475dab473ad15c7841062fe8f2884d096dedcd7312",
-    "contracts\\Vault.tact": "4a5cd614040c6bd3897b795a4c4c50ce4bfc43af0803150128a1a26bf056cf44",
+    "contracts\\Vault.tact": "d0c5a30a8da3f44a2bd6228f685ebd9200d2a25b8996fcba985ae2ada6eecc42",
     "scripts\\artifact_integrity_m18.ts": "567f98c700f24603054c384056c0d0fa3971ac12473bd6534bfcfc86e40932a4",
     "scripts\\buyback_flush_preflight.ts": "785cb7cf401ba8e3fae8a0d9db8fb25f695650025b28825e192808901c3e29ed",
     "scripts\\buybackburn_contract_readiness_m20u.ts": "2b0ba2518756898cd684679a1a70aaea5a6b7ebaa0114e01581ad43d4f82f781",
@@ -226,8 +226,8 @@
     "tests\\vault-ath-integration.test.ts": "36a3b6a3e45ca31a011a644029258048329f53df370d3d29a7dc4fe8f653be00",
     "tests\\vault-ath-invariants.test.ts": "a37db4d34d7e44c9c29db73ad8c472db9b401d1da44afbdb3566bb7a45b8dfae",
     "tests\\vault-auth-negative-matrix.test.ts": "3d7e7fa0406ea02dcacbe2155611a1f39d2214a7c7ec4102f5e230af5a5fbf9a",
-    "tests\\vault-boundary-negative.test.ts": "e76c4f56f37dd410583c5ce0bf84654a7e9fab1932711d6782166e5ec32da781",
-    "tests\\vault-external-session-gate.test.ts": "16e5cc489f5acd01adfeab585c5cf9837bc4359a20ea5ee6097b1dc74d17097b",
+    "tests\\vault-boundary-negative.test.ts": "e56cd5bcf56568d776986e72b23db1fe1298d498bc253b3dd8c2f71432fe3992",
+    "tests\\vault-external-session-gate.test.ts": "83817b626c77c457a2855134cd1d47568d4a866b7f496ed1c7a381e3d13d3638",
     "tests\\vault-key-records.test.ts": "dfdf4c0ab714ae71f2c5daf4c017bef3293215c83663eb8fd9388362fb91f200",
     "tests\\vault-m6-publish.test.ts": "477bef7c4911e0f0fa8eccdb5827464b7e4b48f3a03ba8b4fb27c72cc815ee8b",
     "tests\\vault-prune-pending-publish.test.ts": "5f63f1471c8044e3001b963ac2c354acca89accbb7c3db7da2567f33b0b0d0f0",

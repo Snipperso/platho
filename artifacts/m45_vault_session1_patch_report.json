@@ -1,0 +1,56 @@
+{
+  "profile": "PLATHO.V1.M45.VAULT_SESSION1_PATCH",
+  "status": "PASS",
+  "date": "2026-05-20",
+  "scope": [
+    "contracts/Vault.tact",
+    "tests/vault-external-session-gate.test.ts",
+    "tests/vault-boundary-negative.test.ts"
+  ],
+  "addressed_findings": [
+    {
+      "id": "VLT-01",
+      "severity": "Medium",
+      "title": "Validly signed malformed external session publish spent Vault TON without charging Message Budget",
+      "resolution": "Post-accept invalid signed requests consume nonce and debit the bounded invalid-request Message Budget charge before returning without publish."
+    },
+    {
+      "id": "VLT-02",
+      "severity": "Medium",
+      "title": "WithdrawTon to Vault self-recipient could turn user ledger TON into uncredited reserve",
+      "resolution": "WithdrawTon rejects recipient == myAddress() before debiting the user ledger."
+    },
+    {
+      "id": "VLT-03",
+      "severity": "Medium",
+      "title": "WithdrawAth to Vault self-recipient could destroy the user's internal ATH claim",
+      "resolution": "WithdrawAth rejects recipient == myAddress() before debiting the user ledger or creating a pending withdrawal."
+    }
+  ],
+  "policy": {
+    "invalid_session_request_charge_ton": "6000000",
+    "post_accept_invalid_behavior": [
+      "nonce consumed",
+      "message_budget_ton debited by min(available_budget, invalid_session_request_charge_ton)",
+      "no pending publish",
+      "no CapsuleHub publish",
+      "no PLATO fee"
+    ]
+  },
+  "verification": {
+    "vault_build": "PASS: node scripts\\tact_build.js --config tact.config.json --project Vault",
+    "full_build": "PASS: npm.cmd run build",
+    "vault_external_session_gate": "PASS: 1 file / 8 tests",
+    "vault_boundary_negative": "PASS: 1 file / 9 tests",
+    "vault_focused_suite": "PASS: 12 files / 54 tests",
+    "full_suite": "PASS: 70 files / 302 tests",
+    "m15_deployment_manifest": "PASS",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "hashes": {
+    "VAULT_CODE_HASH": "f33d567e5ce2696b9e594f440131ec124557c2102d1d1da73a82a44cf75e5362",
+    "DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH": "b610641bc6d64c48891c1ce06c3343b39c3982ff03a7013c204b22e5a3361134"
+  },
+  "production_note": "Implemented-subset manifest remains non-final until mainnet genesis and STON.fi route evidence gates are closed."
+}

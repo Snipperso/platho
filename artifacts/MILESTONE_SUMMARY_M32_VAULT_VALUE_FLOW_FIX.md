@@ -8,7 +8,7 @@ Scope: fixes local Vault money/liveness findings from the Vault audit section.
 
 - VLT-01: `WithdrawTon` now uses `SendPayFwdFeesSeparately`, so the recipient receives the exact `amount` debited from the user ledger.
 - VLT-02: `WithdrawAth` stores a refundable TON cap and credits returned ACK/failure/bounce value back to the user's internal `ton_balance`, after a `2_000_000` nanotons callback reserve deduction.
-- VLT-03: malformed signed external session requests no longer burn `message_budget_ton`. They still advance nonce after `acceptMessage()` because accepted external messages need replay protection.
+- VLT-03: superseded by M45. Malformed signed external session requests still advance nonce after `acceptMessage()` because accepted external messages need replay protection, and now also charge the bounded invalid-request Message Budget fee.
 
 ## External Session Note
 
@@ -16,7 +16,7 @@ Full deterministic validation after Ed25519 verification but before `acceptMessa
 
 - invalid signatures are rejected before `acceptMessage()`;
 - valid signatures are accepted immediately;
-- malformed signed requests advance nonce but do not debit budget;
+- malformed signed requests advance nonce and charge the bounded invalid-request Message Budget fee;
 - valid publish requests debit the canonical `maxCharge` and dispatch normally.
 
 ## Verification

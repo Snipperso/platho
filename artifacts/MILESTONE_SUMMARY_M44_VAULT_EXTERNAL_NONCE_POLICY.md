@@ -7,9 +7,9 @@ v1 policy decision.
 
 ## Decision
 
-Validly signed malformed external session requests consume replay nonce but do
-not debit Message Budget, do not publish to CapsuleHub, and do not charge a
-PLATO fee.
+Validly signed malformed external session requests consume replay nonce and
+charge the bounded invalid-request Message Budget fee, but do not publish to
+CapsuleHub and do not charge a PLATO fee.
 
 Invalid signatures and pre-accept structural/session failures still reject
 without nonce or budget mutation.
@@ -18,9 +18,9 @@ without nonce or budget mutation.
 
 Full deterministic publish-profile validation before `acceptMessage()` exceeds
 TON external gas credit in sandbox. The safe v1 behavior is to accept a valid
-signature only far enough to consume nonce for replay protection, then return
-cleanly without value mutation when the deterministic profile/max-charge checks
-fail.
+signature only far enough to consume nonce for replay protection, charge the
+session-funded invalid-request fee, then return cleanly when the deterministic
+profile/max-charge checks fail.
 
 ## Verification
 
