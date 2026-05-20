@@ -7,7 +7,7 @@ Scope: fixes local ATHMaster genesis supply deployment value-flow findings from 
 ## Closed Findings
 
 - ATHM-01: `DeployTreasurySupply` no longer accepts the old `3_000_000` nanotons exact minimum that could not deliver the required downstream reserve after first-hop fees.
-- ATHM-02: `DeployTreasurySupply` no longer forwards caller overpayment into the treasury ATH wallet as unaccounted TON balance.
+- ATHM-02: `DeployTreasurySupply` no longer forwards caller overpayment into the treasury ATH wallet as unaccounted TON balance. M47 refines this rule: dust excess below `100_000` nanotons is retained as ATHMaster reserve instead of attempting a refund that can fail the action phase.
 
 ## Current Rule
 
@@ -15,21 +15,22 @@ Scope: fixes local ATHMaster genesis supply deployment value-flow findings from 
 - Downstream treasury ATH wallet value: `3_000_000` nanotons.
 - ATHMaster first-hop execution reserve: `2_000_000` nanotons.
 - Outbound genesis credit uses `SendPayFwdFeesSeparately`.
-- Caller overpayment is refunded to `response_destination`, which must equal `treasury_owner`.
+- Caller non-dust overpayment is refunded to `response_destination`, which must equal `treasury_owner`.
+- Dust overpayment below `100_000` nanotons is retained as ATHMaster reserve.
 
 ## Verification
 
 - `npm.cmd run build`: PASS
-- `npm.cmd run test:file -- tests\ath-wallet-derivation.test.ts tests\ath-wallet-boundary-negative.test.ts tests\ath-burn-finalization.test.ts tests\mainnet-ath-master-derivation.test.ts`: 4 files / 21 tests PASS
-- `npm.cmd test`: 67 files / 282 tests PASS
+- `npm.cmd run test:file -- tests\ath-wallet-derivation.test.ts tests\ath-wallet-boundary-negative.test.ts tests\ath-burn-finalization.test.ts tests\mainnet-ath-master-derivation.test.ts`: 4 files / 24 tests PASS
+- `npm.cmd test`: 70 files / 305 tests PASS
 - M16 conformance: PASS
 - M18 artifact integrity: PASS
 
 ## Hashes
 
-- `ATHMASTER_CODE_HASH=83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5`
-- `ATH_WALLET_CODE_HASH=bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4`
-- `DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH=70abd184bfc44ef281059e088a0755853b3b0d14950b374c36dddf0fb13c5080`
+- `ATHMASTER_CODE_HASH=4d88d83ed5d795eb25f947e8c9f1d19ad7cbedeae93562e27d73b65b54f5a62f`
+- `ATH_WALLET_CODE_HASH=5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a`
+- `DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH=8b3fa3c3ea993fac281a104a9bd14637b5c571fca79d98bc1b16d95479c09947`
 
 ## Mainnet Note
 

@@ -571,7 +571,7 @@ _ %get_wallet_address(slice $owner_address) method_id(103289) {
         slice $treasury_wallet = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($self'treasury_owner);
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($treasury_wallet, $downstream_value, true, 1, $wallet_init'code, $wallet_init'data, $ATHGenesisSupplyCredit$_store_cell($ATHGenesisSupplyCredit$_constructor_query_id_amount_response_destination($msg'query_id, $self'total_supply, $msg'response_destination), begin_cell())));
         int $excess = ($Context$_get_value(__tact_context_get()) - $required_value);
-        if (($excess > 0)) {
+        if (($excess >= 100000)) {
             $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'response_destination, $excess, false, 0, null()));
         }
         $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));

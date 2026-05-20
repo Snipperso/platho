@@ -6,6 +6,7 @@ import "./ATHWallet.tact";
 
 const ATH_TOTAL_SUPPLY_ATOMIC: Int = 100000000000000000;
 const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE: Int = 2000000;
+const ATH_MASTER_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 
 message(0x41544807) DeployTreasurySupply {
     query_id: Int as uint64;
@@ -88,7 +89,7 @@ contract ATHMaster {
         });
 
         let excess: Int = context().value - required_value;
-        if (excess > 0) {
+        if (excess >= ATH_MASTER_EXCESS_REFUND_MIN_VALUE) {
             message(MessageParameters {
                 to: msg.response_destination,
                 value: excess,

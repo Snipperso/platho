@@ -503,7 +503,8 @@ PROGRAM{
       s0 s4 XCHG2
       SUB
       DUP
-      0 GTINT
+      100000 PUSHINT
+      GEQ
       IF:<{
         s1 s5 XCHG
         FALSE

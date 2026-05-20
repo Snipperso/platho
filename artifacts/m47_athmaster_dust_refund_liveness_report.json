@@ -1,0 +1,39 @@
+{
+  "profile": "PLATHO.V1.M47.ATHMASTER_DUST_REFUND_LIVENESS",
+  "status": "PASS",
+  "date": "2026-05-20",
+  "scope": [
+    "contracts/ATHMaster.tact",
+    "tests/ath-wallet-derivation.test.ts"
+  ],
+  "finding_closed": {
+    "id": "ATHM-01",
+    "severity": "P1_MONEY_LIVENESS",
+    "title": "Tiny DeployTreasurySupply overpayment could fail action phase and trap caller TON in ATHMaster",
+    "resolution": "ATHMaster skips excess refunds below 100,000 nanotons so dust refund action failure cannot roll back treasury supply deployment."
+  },
+  "policy": {
+    "required_value_nanotons": "5000000",
+    "downstream_wallet_value_nanotons": "3000000",
+    "owner_first_hop_exec_reserve_nanotons": "2000000",
+    "excess_refund_min_value_nanotons": "100000",
+    "dust_excess_behavior": "retained in ATHMaster balance as reserve",
+    "non_dust_excess_behavior": "refunded to response_destination"
+  },
+  "regressions": [
+    "DeployTreasurySupply with required_value + 1 nanotON succeeds and credits treasury ATH wallet"
+  ],
+  "verification": {
+    "build": "PASS: npm.cmd run build",
+    "focused_athmaster_tests": "PASS: tests/ath-wallet-derivation.test.ts tests/ath-burn-finalization.test.ts tests/ath-wallet-boundary-negative.test.ts tests/mainnet-ath-master-derivation.test.ts, 4 files / 24 tests",
+    "full_suite": "PASS: npm.cmd test, 70 files / 305 tests",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "hashes": {
+    "ATHMASTER_CODE_HASH": "4d88d83ed5d795eb25f947e8c9f1d19ad7cbedeae93562e27d73b65b54f5a62f",
+    "ATH_WALLET_CODE_HASH": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
+    "DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH": "8b3fa3c3ea993fac281a104a9bd14637b5c571fca79d98bc1b16d95479c09947"
+  },
+  "production_note": "Production remains blocked by existing mainnet genesis, route, address, and final evidence gates."
+}

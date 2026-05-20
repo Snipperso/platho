@@ -11,18 +11,20 @@
     {
       "id": "ATHM-02",
       "title": "DeployTreasurySupply overpayment was forwarded into the treasury ATH wallet as unaccounted TON balance",
-      "resolution": "ATHMaster now forwards only the canonical downstream genesis envelope to the treasury ATH wallet and refunds any caller overpayment to the treasury owner response destination."
+      "resolution": "ATHMaster now forwards only the canonical downstream genesis envelope to the treasury ATH wallet and refunds non-dust caller overpayment to the treasury owner response destination. M47 refines dust handling: excess below 100,000 nanotons is retained as ATHMaster reserve rather than sent as a potentially failing refund action."
     }
   ],
-  "ath_master_code_hash": "83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5",
-  "ath_wallet_code_hash": "bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4",
-  "implemented_subset_manifest_hash": "70abd184bfc44ef281059e088a0755853b3b0d14950b374c36dddf0fb13c5080",
+  "ath_master_code_hash": "4d88d83ed5d795eb25f947e8c9f1d19ad7cbedeae93562e27d73b65b54f5a62f",
+  "ath_wallet_code_hash": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
+  "implemented_subset_manifest_hash": "8b3fa3c3ea993fac281a104a9bd14637b5c571fca79d98bc1b16d95479c09947",
   "genesis_deploy_policy": {
     "downstream_wallet_value_nanotons": "3000000",
     "master_first_hop_exec_reserve_nanotons": "2000000",
     "required_value_nanotons": "5000000",
     "outbound_mode": "SendPayFwdFeesSeparately",
-    "overpayment_policy": "refund to response_destination"
+    "overpayment_policy": "refund non-dust excess to response_destination",
+    "excess_refund_min_value_nanotons": "100000",
+    "dust_excess_policy": "retain in ATHMaster balance as storage reserve"
   },
   "mainnet_derivation_update": {
     "script": "scripts/mainnet_ath_master_derivation.ts",
@@ -33,8 +35,8 @@
   },
   "verification": {
     "build": "npm.cmd run build: PASS",
-    "focused_tests": "npm.cmd run test:file -- tests\\ath-wallet-derivation.test.ts tests\\ath-wallet-boundary-negative.test.ts tests\\ath-burn-finalization.test.ts tests\\mainnet-ath-master-derivation.test.ts: 4 files / 21 tests PASS",
-    "full_suite": "npm.cmd test: 67 files / 282 tests PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\ath-wallet-derivation.test.ts tests\\ath-wallet-boundary-negative.test.ts tests\\ath-burn-finalization.test.ts tests\\mainnet-ath-master-derivation.test.ts: 4 files / 24 tests PASS",
+    "full_suite": "npm.cmd test: 70 files / 305 tests PASS",
     "m16_conformance": "PASS",
     "m18_artifact_integrity": "PASS"
   },
