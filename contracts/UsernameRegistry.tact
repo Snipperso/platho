@@ -283,12 +283,16 @@ contract UsernameRegistry {
         }
     }
 
-    fun requireRefundDueAndNotificationAckReserve(owner_wallet: Address) {
+    fun requireRefundDueAndNotificationAckReserve(owner_wallet: Address): Int {
         let existing: Int? = self.ath_refunds_due.get(owner_wallet);
         if (existing == null) {
-            throwUnless(19124, context().value >= USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE);
+            let required: Int = USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
+            throwUnless(19124, context().value >= required);
+            return required;
         } else {
-            throwUnless(19125, context().value >= USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE);
+            let required: Int = USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
+            throwUnless(19125, context().value >= required);
+            return required;
         }
     }
 
@@ -303,6 +307,21 @@ contract UsernameRegistry {
                 sender_key: sender_key,
                 amount: amount
             }.toCell()
+        });
+    }
+
+    fun refundRejectedMintExcess(owner_wallet: Address, retained_value: Int) {
+        let excess: Int = context().value - retained_value;
+        if (excess <= 0) {
+            return;
+        }
+
+        message(MessageParameters {
+            to: owner_wallet,
+            value: excess,
+            bounce: false,
+            mode: SendDefaultMode,
+            body: null
         });
     }
 
@@ -400,9 +419,10 @@ contract UsernameRegistry {
         throwUnless(19121, msg.amount > 0);
 
         if (!self.isValidUsernameBytes(msg.username_len, msg.username)) {
-            self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
+            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
             self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
+            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
             return;
         }
 
@@ -410,23 +430,26 @@ contract UsernameRegistry {
         let price: Int = self.priceForLength(msg.username_len);
 
         if (msg.amount != price) {
-            self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
+            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
             self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
+            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
             return;
         }
 
         if (self.name_records.exists(name_hash)) {
-            self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
+            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
             self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
+            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
             return;
         }
 
         if (self.pending_mints.exists(name_hash)) {
-            self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
+            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
             self.addRefundDue(msg.owner_wallet, msg.amount);
             self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
+            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
             return;
         }
 
