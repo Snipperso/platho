@@ -24,6 +24,7 @@ const BUYBACK_ROUTE_REFUND_RECOVERY_MIN_NANOTONS: Int = 49000000000;
 const BUYBACK_PHASE_IDLE: Int = 0;
 const BUYBACK_PHASE_PENDING_STONFI_SWAP: Int = 1;
 const BUYBACK_PHASE_PENDING_ATH_BURN: Int = 2;
+const UINT64_MAX: Int = 18446744073709551615;
 const STONFI_V2_1_DEX_OP_SWAP: Int = 0x6664de2a;
 const STONFI_V2_1_PTON_OP_TON_TRANSFER: Int = 0x01f3835d;
 
@@ -232,14 +233,13 @@ contract BuybackBurn {
         throwUnless(22043, dexMinOut <= quoteOut);
     }
 
-    fun requireFreshQueryId(queryId: Int) {
-        throwUnless(22044, queryId > self.last_terminal_query_id);
+    fun requireNextQueryId(queryId: Int) {
+        throwUnless(22045, queryId < UINT64_MAX);
+        throwUnless(22044, queryId == self.last_terminal_query_id + 1);
     }
 
     fun recordTerminalQueryId(queryId: Int) {
-        if (queryId > self.last_terminal_query_id) {
-            self.last_terminal_query_id = queryId;
-        }
+        self.last_terminal_query_id = queryId;
     }
 
     fun stonfiSwapPayload(deadline: Int, dexMinOut: Int): Cell {
@@ -382,7 +382,7 @@ contract BuybackBurn {
         throwUnless(22211, self.phase == BUYBACK_PHASE_IDLE);
         throwUnless(22212, self.reserve_due_ton >= BUYBACK_FUNDING_ENVELOPE_NANOTONS);
         throwUnless(22213, msg.query_id > 0);
-        self.requireFreshQueryId(msg.query_id);
+        self.requireNextQueryId(msg.query_id);
         throwUnless(22214, msg.deadline > now());
         throwUnless(22215, msg.deadline <= now() + BUYBACK_DEADLINE_MAX_AHEAD_SECONDS);
         throwUnless(22216, context().value >= BUYBACK_PTON_TRANSFER_GAS_NANOTONS);
@@ -460,7 +460,7 @@ contract BuybackBurn {
         self.requireSealed();
         throwUnless(22340, self.phase == BUYBACK_PHASE_IDLE);
         throwUnless(22341, msg.query_id > 0);
-        self.requireFreshQueryId(msg.query_id);
+        self.requireNextQueryId(msg.query_id);
         throwUnless(22342, msg.amount > 0);
         throwUnless(22343, msg.amount <= self.ath_burn_retry_due_atomic);
         throwUnless(22344, context().value >= BUYBACK_ATH_BURN_REQUEST_VALUE);

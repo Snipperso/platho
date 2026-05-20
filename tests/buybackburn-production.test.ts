@@ -42,6 +42,7 @@ const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
 const OP_PTON_TON_TRANSFER = 0x01f3835d;
+const UINT64_MAX = 18446744073709551615n;
 
 function routeRefundCredit(value: bigint): bigint {
   return value > ROUTE_REFUND_EXEC_RESERVE ? value - ROUTE_REFUND_EXEC_RESERVE : 0n;
@@ -208,7 +209,7 @@ async function acceptReserve(env: Awaited<ReturnType<typeof setup>>) {
   } as AcceptBurnReserve);
 }
 
-async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 77n) {
+async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 1n) {
   return await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
     $$type: 'ExecuteBuybackChunk',
     query_id: queryId,
@@ -370,7 +371,7 @@ describe('Production BuybackBurn candidate', () => {
 
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.01') }, {
       $$type: 'ExecuteBuybackChunk',
-      query_id: 76n,
+      query_id: 1n,
       deadline: BigInt((env.blockchain.now ?? 0) + 600),
       quote_out_atomic_ath: 100_000n,
       dex_min_out_atomic_ath: 95_000n,
@@ -378,7 +379,7 @@ describe('Production BuybackBurn candidate', () => {
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_IDLE);
     expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
 
-    const result = await executeBuyback(env, 77n);
+    const result = await executeBuyback(env, 1n);
     const ptonTx = findTransaction(result.transactions, {
       from: env.buyback.address,
       to: env.stonfiPtonWallet.address,
@@ -390,7 +391,7 @@ describe('Production BuybackBurn candidate', () => {
     const decoded = decodePtonTonTransferBodyV21(inboundBody(ptonTx));
     const swap = decodeStonfiSwapBodyV21(decoded.forwardPayload!);
 
-    expect(decoded.queryId).toBe('77');
+    expect(decoded.queryId).toBe('1');
     expect(decoded.tonAmount).toBe(OFFER.toString());
     expect(addressRaw(decoded.refundAddress)).toBe(addressRaw(env.buyback.address));
     expect(addressRaw(swap.refundAddress)).toBe(addressRaw(env.buyback.address));
@@ -408,7 +409,7 @@ describe('Production BuybackBurn candidate', () => {
     });
     await acceptReserve(env);
 
-    const result = await executeBuyback(env, 88n);
+    const result = await executeBuyback(env, 1n);
     const ptonTx = findTransaction(result.transactions, {
       from: env.buyback.address,
       to: undeployedPtonWallet,
@@ -423,8 +424,37 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.route_refund_due_ton <= ENVELOPE).toBe(true);
     expect(state.pending_query_id).toBe(0n);
 
-    await executeBuyback(env, 89n);
+    await executeBuyback(env, 2n);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_IDLE);
+  });
+
+  it('BUYBACK-04F: rejects uint64_max query jumps so permissionless callers cannot brick future buybacks', async () => {
+    const env = await setup();
+    const undeployedPtonWallet = fixtureAddress('UNDEPLOYED_PTON_WALLET_F039');
+    await freezeAndSeal(env, {
+      stonfi_pton_wallet_address: undeployedPtonWallet,
+    });
+    await acceptReserve(env);
+
+    await executeBuyback(env, UINT64_MAX);
+    let state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.reserve_due_ton).toBe(ENVELOPE);
+    expect(state.last_terminal_query_id).toBe(0n);
+
+    await executeBuyback(env, 1n);
+    state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.reserve_due_ton).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(1n);
+    expect(state.route_refund_due_ton > 0n).toBe(true);
+
+    await acceptReserve(env);
+    await executeBuyback(env, 2n);
+    state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.reserve_due_ton).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(2n);
   });
 
   it('BUYBACK-04C: route refund/excess cannot prematurely clear a pending swap, but can be recovered after grace', async () => {
@@ -432,7 +462,7 @@ describe('Production BuybackBurn candidate', () => {
     const refundValue = toNano('50.5');
     await freezeAndSeal(env);
     await acceptReserve(env);
-    await executeBuyback(env, 89n);
+    await executeBuyback(env, 1n);
 
     await env.buyback.send(env.stonfiRouter.getSender(), { value: refundValue }, null);
     let state = await env.buyback.getGetBuybackBurnState();
@@ -441,16 +471,16 @@ describe('Production BuybackBurn candidate', () => {
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 89n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
-    expect(state.pending_query_id).toBe(89n);
+    expect(state.pending_query_id).toBe(1n);
 
     env.blockchain.now = (env.blockchain.now ?? 0) + 1501;
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 89n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
 
     state = await env.buyback.getGetBuybackBurnState();
@@ -467,18 +497,18 @@ describe('Production BuybackBurn candidate', () => {
     await acceptReserve(env);
 
     await env.buyback.send(env.stonfiRouter.getSender(), { value: oldRouteDue }, null);
-    await executeBuyback(env, 90n);
+    await executeBuyback(env, 1n);
     await env.buyback.send(env.stonfiRouter.getSender(), { value: smallExcess }, null);
 
     env.blockchain.now = (env.blockchain.now ?? 0) + 1501;
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 90n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
 
     const state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
-    expect(state.pending_query_id).toBe(90n);
+    expect(state.pending_query_id).toBe(1n);
     expect(state.route_refund_due_ton).toBe(routeRefundCredit(oldRouteDue) + routeRefundCredit(smallExcess));
   });
 
@@ -512,7 +542,7 @@ describe('Production BuybackBurn candidate', () => {
     const env = await setup();
     await freezeAndSeal(env);
     await acceptReserve(env);
-    await executeBuyback(env, 99n);
+    await executeBuyback(env, 1n);
 
     const stonfiSourceWallet = await deployAthWallet(
       env.blockchain,
@@ -523,7 +553,7 @@ describe('Production BuybackBurn candidate', () => {
 
     await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
       $$type: 'ATHTransferRequestWithNotify',
-      query_id: 99n,
+      query_id: 1n,
       amount: 100_000n,
       recipient: env.buyback.address,
       response_destination: env.stonfiPoolOwner.address,
@@ -544,7 +574,7 @@ describe('Production BuybackBurn candidate', () => {
     expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
 
     await acceptReserve(env);
-    await executeBuyback(env, 99n);
+    await executeBuyback(env, 1n);
     const afterReuseAttempt = await env.buyback.getGetBuybackBurnState();
     expect(afterReuseAttempt.phase).toBe(PHASE_IDLE);
     expect(afterReuseAttempt.reserve_due_ton).toBe(ENVELOPE);
@@ -554,7 +584,7 @@ describe('Production BuybackBurn candidate', () => {
     const env = await setup({ deployAthMaster: false });
     await freezeAndSeal(env);
     await acceptReserve(env);
-    await executeBuyback(env, 100n);
+    await executeBuyback(env, 1n);
 
     const stonfiSourceWallet = await deployAthWallet(
       env.blockchain,
@@ -565,7 +595,7 @@ describe('Production BuybackBurn candidate', () => {
 
     await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
       $$type: 'ATHTransferRequestWithNotify',
-      query_id: 100n,
+      query_id: 1n,
       amount: 100_000n,
       recipient: env.buyback.address,
       response_destination: env.stonfiPoolOwner.address,
@@ -594,7 +624,7 @@ describe('Production BuybackBurn candidate', () => {
 
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.01') }, {
       $$type: 'RetryAthBurnDue',
-      query_id: 101n,
+      query_id: 2n,
       amount: 100_000n,
     } as RetryAthBurnDue);
 
@@ -604,7 +634,7 @@ describe('Production BuybackBurn candidate', () => {
 
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
       $$type: 'RetryAthBurnDue',
-      query_id: 101n,
+      query_id: 2n,
       amount: 100_000n,
     } as RetryAthBurnDue);
 
