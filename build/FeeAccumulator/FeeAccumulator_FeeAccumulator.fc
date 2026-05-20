@@ -311,6 +311,7 @@ _ %get_state() method_id(86957) {
         var $msg'amount = in_msg~load_uint(128);
         throw_unless(15020, ($msg'amount > 0));
         throw_unless(15021, ($msg'amount <= $self'treasury_due_ton));
+        throw_unless(15023, ( (($msg'amount >= 5000000)) ? (true) : (($msg'amount == $self'treasury_due_ton)) ));
         throw_unless(15022, ($Context$_get_value(__tact_context_get()) >= 5000000));
         $self'treasury_due_ton = $self'treasury_due_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'treasury_receiver_address, $msg'amount, false, 1, null()));

@@ -1,0 +1,62 @@
+{
+  "profile": "PLATHO.V1.M48.FEEACCUMULATOR_TREASURY_FLUSH_FRAGMENT_GUARD",
+  "date": "2026-05-20",
+  "status": "PASS",
+  "finding": "FEEACC-01",
+  "contract": "FeeAccumulator",
+  "codeChange": {
+    "file": "contracts/FeeAccumulator.tact",
+    "minTreasuryFlushNanotons": "5000000",
+    "policy": "FlushTreasuryDue amount must be >= min treasury flush or exactly the remaining treasury_due_ton."
+  },
+  "regressions": [
+    {
+      "file": "tests/fee-accumulator-backing-negative.test.ts",
+      "test": "FEE-BACKING-02B",
+      "coverage": [
+        "rejects dust partial treasury flush",
+        "permits minimum-size partial treasury flush",
+        "permits final dust flush equal to remaining due"
+      ]
+    }
+  ],
+  "hashes": {
+    "feeAccumulatorCodeHash": "471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f",
+    "implementedSubsetManifestHash": "03d558e83478b0f42f1a52d4cee889b08a715bed19b714140f6e2af5a89562cc"
+  },
+  "verification": {
+    "build": {
+      "command": "npm.cmd run build",
+      "status": "PASS"
+    },
+    "focusedTests": {
+      "command": "npm.cmd run test:file -- tests\\\\fee-accumulator.test.ts tests\\\\fee-accumulator-backing-negative.test.ts tests\\\\m19h-buybackburn-funding-envelope.test.ts tests\\\\buybackburn-production.test.ts --reporter=dot",
+      "status": "PASS",
+      "files": 4,
+      "tests": 28
+    },
+    "codeHashes": {
+      "command": "node scripts\\\\hash_codes.js",
+      "status": "PASS"
+    },
+    "deploymentManifest": {
+      "command": "npx.cmd ts-node scripts\\\\deployment_manifest_m15.ts",
+      "status": "PASS"
+    },
+    "conformanceM16": {
+      "command": "npx.cmd ts-node scripts\\\\conformance_m16.ts",
+      "status": "PASS"
+    },
+    "artifactIntegrityM18": {
+      "command": "npx.cmd ts-node scripts\\\\artifact_integrity_m18.ts",
+      "status": "PASS"
+    },
+    "fullSuite": {
+      "command": "npm.cmd test",
+      "status": "PASS",
+      "files": 70,
+      "tests": 306
+    }
+  },
+  "productionApproval": false
+}

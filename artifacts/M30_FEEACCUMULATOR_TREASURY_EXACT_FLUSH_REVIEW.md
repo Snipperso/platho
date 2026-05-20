@@ -34,10 +34,21 @@ expect(inboundValue(treasuryFlushTx)).toBe(treasuryDue);
 
 This checks the actual message value received by the treasury path, not only the post-flush state bucket.
 
+## M48 Fragmentation Guard Update
+
+M48 adds a second treasury flush hardening step after `FEEACC-01`.
+
+`FlushTreasuryDue` is still permissionless, but it now rejects dust partial fragments. A treasury flush amount must be either at least `5,000,000` nanotons or exactly the remaining `treasury_due_ton`, so final dust tails remain clearable.
+
+See:
+
+- `artifacts/MILESTONE_SUMMARY_M48_FEEACCUMULATOR_TREASURY_FLUSH_FRAGMENT_GUARD.md`
+- `artifacts/m48_feeaccumulator_treasury_flush_fragment_guard_report.json`
+
 ## Updated Evidence
 
-- FeeAccumulator code hash: `ff084907becac5dcc98b372162bab7f6f2a364f4383e5f51676fd069f64db2e3`
-- Implemented-subset manifest hash: `64c49e4eb7964234f860069761ffb2a83a41d6af925980c1578987be86ac70bd`
+- FeeAccumulator code hash: `471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f`
+- Implemented-subset manifest hash: `03d558e83478b0f42f1a52d4cee889b08a715bed19b714140f6e2af5a89562cc`
 
 Regenerated artifacts:
 
@@ -54,12 +65,12 @@ Regenerated artifacts:
 ## Verification
 
 - `npm.cmd run build`: PASS.
-- Focused FeeAccumulator suite: PASS, 2 files / 10 tests.
+- Focused FeeAccumulator / BuybackBurn seam suite: PASS, 4 files / 28 tests.
 - `node scripts/hash_codes.js`: PASS.
 - `scripts/deployment_manifest_m15.ts`: PASS.
 - `scripts/conformance_m16.ts`: PASS.
 - `scripts/artifact_integrity_m18.ts`: PASS.
-- `npm.cmd test`: PASS, 67 files / 276 tests.
+- `npm.cmd test`: PASS, 70 files / 306 tests.
 
 Retained proof artifacts:
 
