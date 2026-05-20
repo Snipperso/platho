@@ -41,6 +41,7 @@ const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
+const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
 const OP_PTON_TON_TRANSFER = 0x01f3835d;
 const UINT64_MAX = 18446744073709551615n;
 
@@ -558,7 +559,7 @@ describe('Production BuybackBurn candidate', () => {
       recipient: env.buyback.address,
       response_destination: env.stonfiPoolOwner.address,
       notify_destination: env.buyback.address,
-      notify_value: toNano('0.1'),
+      notify_value: BUYBACK_ROUTE_NOTIFY_MIN_VALUE,
     } as ATHTransferRequestWithNotify);
 
     const state = await env.buyback.getGetBuybackBurnState();
@@ -600,7 +601,7 @@ describe('Production BuybackBurn candidate', () => {
       recipient: env.buyback.address,
       response_destination: env.stonfiPoolOwner.address,
       notify_destination: env.buyback.address,
-      notify_value: toNano('0.1'),
+      notify_value: BUYBACK_ROUTE_NOTIFY_MIN_VALUE,
     } as ATHTransferRequestWithNotify);
 
     let state = await env.buyback.getGetBuybackBurnState();

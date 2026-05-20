@@ -1,15 +1,15 @@
 {
   "profile": "PLATHO.V1.USERNAME_REGISTRY_FOUNDATION_M9",
-  "username_registry_code_hash": "0c4aaf8fd4c5c0d2bed14a8979454d11ed0a38a67d87cf18adc6bdeeeb06d92b",
+  "username_registry_code_hash": "7894e8e91e4959b70b3be353c5cce500eb27f8b4c454aa2b6b83983d202d7887",
   "username_nft_item_code_hash": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
-  "ath_wallet_code_hash": "bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4",
-  "username_registry_initial_address": "EQCKtxQ7khsl0NyAoVL8o3s8Z-czepKlPAF3AUi8VB93hgzt",
+  "ath_wallet_code_hash": "b1edef475b60e5f4da111b8226a767aa807f96b9382acb659fa97a4672535b98",
+  "username_registry_initial_address": "EQD08iE7Ee1dWMRQ-oX6Jk5jL7STQXc4Zb24K4-iZxINeSbJ",
   "username_registry_initial_data_cell_hash": "b870b7ca2a55c8c670bf505586ff4fa844b8cbb42136b14821730413dd5a06bb",
-  "username_registry_initial_state_init_hash": "8ab7143b921b25d0dc80a152fca37b3c67e7337a92a53c01770148bc541f7786",
+  "username_registry_initial_state_init_hash": "f4f2213b11ed5d58c450fa85fa264e632fb49341773865bdb82b8fa267120d79",
   "ath_master_fixture_address": "EQCIIoSHaPnCu7Gb02vLNTPncP_ML5j61JYYDTvLKLcVUHg3",
-  "username_registry_official_ath_wallet_address": "EQBZRnMxLnh05e_LYEDxnC2MZpJT_wFZB7a0C0ucmKcW9it6",
-  "username_registry_official_ath_wallet_data_cell_hash": "b1debc650d14c6d4e68590832bf674641037bb8754e292f4ffc5b9449d173dd2",
-  "username_registry_official_ath_wallet_state_init_hash": "594673312e7874e5efcb6040f19c2d8c669253ff015907b6b40b4b9c98a716f6",
+  "username_registry_official_ath_wallet_address": "EQAcDOTKLFjSQ_4v1FvC7m2e2QmKvfjuT6NxUCN3J92hwAne",
+  "username_registry_official_ath_wallet_data_cell_hash": "9552ed41a909b8da935390a31d6d7b662e6b5ebaf0ccab0c40613cc9e46fac9f",
+  "username_registry_official_ath_wallet_state_init_hash": "1c0ce4ca2c58d243fe2fd45bc2ee6d9ed9098abdf8ee4fa37150237727dda1c0",
   "prices": [
     {
       "name_len": 1,
@@ -48,18 +48,18 @@
       "owner_wallet": "EQAl4qJO_H2E477w3rtoX6VFhJcEE_cOKxl5RhOU7qiPtI66",
       "owner_workchain": 0,
       "name_hash": "6e4bc608c66b0c4c5ff6dc247619526b193faac5d937b88c2608420796fa8bb3",
-      "username_item_data_cell_hash": "ac9c781efe66b10057748d83501e911de3352ac45dc232e9a32f3c079d947172",
-      "username_item_state_init_hash": "8c61636aaf2872c07ec78a64e23c488f0879597d4abde6705309a56c639153e8",
-      "derived_item_address": "EQCMYWNqryhywH7HimTiPEiPCHlZfUq95nBTCaVsY5FT6E0G"
+      "username_item_data_cell_hash": "3d4394b2477004071d07c9b095091ce408566d03d7e11a52fe806d67abd1cf62",
+      "username_item_state_init_hash": "b2dfb7116fb6ae65cb817571dd44dcccdbc0f844e4fde4dde142adc3b45efef6",
+      "derived_item_address": "EQCy37cRb7auZcuBdXHdRNzM28D4ROT95N3hQq3DtF7-9m_-"
     },
     {
       "name": "larisa",
       "owner_wallet": "Ef89JjyTPQ3oxuduyQGj35WhVuC30BPe5XbUiLpg8YGKtAX2",
       "owner_workchain": -1,
       "name_hash": "432558c4322c9af1cb3cf1b5b3f1fc4472ad3622ce08591f6c7f8785c1dc073b",
-      "username_item_data_cell_hash": "870e62a5cd860aa35f83c34fd703f6f6a81657b4ea3b9f63b8bbf1733dfe9bbc",
-      "username_item_state_init_hash": "7e5028b8365fd38da938dbeeb9412d1a53f853966941b53c193697889440063a",
-      "derived_item_address": "Ef9-UCi4Nl_Tjak42-65QS0aU_hTlmlBtTwZNpeIlEAGOp5R"
+      "username_item_data_cell_hash": "fffe38765048fb2ee6ded552d19ffdc79cb5d791696bee01e282928d101bfa08",
+      "username_item_state_init_hash": "68699499e65e71c59aab6f13a450b45ddcb6822b4d35ac3ef841e06c828268c3",
+      "derived_item_address": "Ef9oaZSZ5l5xxZqrbxOkULRd3LaCK001rD74QeBsgoJow2gC"
     }
   ]
 }

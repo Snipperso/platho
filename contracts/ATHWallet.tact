@@ -469,7 +469,7 @@ contract ATHWallet {
         message(MessageParameters {
             to: msg.notify_destination,
             value: msg.notify_value,
-            mode: SendDefaultMode,
+            mode: SendPayFwdFeesSeparately,
             bounce: true,
             body: AthTransferNotification {
                 query_id: msg.query_id,
@@ -513,7 +513,7 @@ contract ATHWallet {
         message(MessageParameters {
             to: self.owner_address,
             value: msg.notify_value,
-            mode: SendDefaultMode,
+            mode: SendPayFwdFeesSeparately,
             bounce: true,
             body: AthTransferNotificationMintUsername {
                 query_id: msg.query_id,

@@ -87,18 +87,18 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5",
-      "pinned": "83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5",
+      "built": "fecd0b4fd3435ed3b7ca88d3542e7c452bc474c3c9bbb8103bbe19f3f64710ce",
+      "pinned": "fecd0b4fd3435ed3b7ca88d3542e7c452bc474c3c9bbb8103bbe19f3f64710ce",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4",
-      "pinned": "bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4",
+      "built": "b1edef475b60e5f4da111b8226a767aa807f96b9382acb659fa97a4672535b98",
+      "pinned": "b1edef475b60e5f4da111b8226a767aa807f96b9382acb659fa97a4672535b98",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "c0aa01fbea33817bc1954ccafb0f09f32c32d0c0b2b5ed9763b24bbd80541250",
-      "pinned": "c0aa01fbea33817bc1954ccafb0f09f32c32d0c0b2b5ed9763b24bbd80541250",
+      "built": "94eeb47e3a6bf90c7e0ebf374a34acd699ce3163bb8df6b30c550f8b0f777c0f",
+      "pinned": "94eeb47e3a6bf90c7e0ebf374a34acd699ce3163bb8df6b30c550f8b0f777c0f",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -117,13 +117,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "0c4aaf8fd4c5c0d2bed14a8979454d11ed0a38a67d87cf18adc6bdeeeb06d92b",
-      "pinned": "0c4aaf8fd4c5c0d2bed14a8979454d11ed0a38a67d87cf18adc6bdeeeb06d92b",
+      "built": "7894e8e91e4959b70b3be353c5cce500eb27f8b4c454aa2b6b83983d202d7887",
+      "pinned": "7894e8e91e4959b70b3be353c5cce500eb27f8b4c454aa2b6b83983d202d7887",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "53c9f01402710f9248c278d9ae5dd03c449cb7ec80f0fd7cea2d0cd052447350",
-      "pinned": "53c9f01402710f9248c278d9ae5dd03c449cb7ec80f0fd7cea2d0cd052447350",
+      "built": "b1c08d999bb7eb0f664e7296ea20ff2997b8221340c1cd177e3b5839dd2c59c0",
+      "pinned": "b1c08d999bb7eb0f664e7296ea20ff2997b8221340c1cd177e3b5839dd2c59c0",
       "match": true
     }
   },
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "2d73f3908e64af8443172376fc096555136d152b589ee60412c09eefd0c241cd",
+    "manifest_hash_hex": "21e60483d3e1a0cf20166e9894a28882c28a6d960ce63ff34297fbeafdddd5ac",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
