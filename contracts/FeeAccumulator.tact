@@ -93,7 +93,7 @@ contract FeeAccumulator {
             to: self.treasury_receiver_address,
             value: msg.amount,
             bounce: false,
-            mode: SendDefaultMode,
+            mode: SendPayFwdFeesSeparately,
             body: null
         });
     }
