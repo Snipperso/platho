@@ -5,6 +5,8 @@
 **Scope:** immutable TON-based Platho v1 contracts and official client rules  
 **Design stance:** closed-world v1. No hidden extension hooks. No upgrade/admin/fallback paths. Future systems are separate protocol deployments, not v1 features.
 
+**BuybackBurn ABI note, 2026-05-20:** this v0.3.3 table is superseded for active BuybackBurn ABI by `artifacts/M29_BUYBACKBURN_ABI_AND_EVIDENCE_REVIEW.md`. The production source of truth is the BY* table implemented in `contracts/BuybackBurn.tact` and exported by `build/BuybackBurn/BuybackBurn_BuybackBurn.ts`; older `ExecuteBuyback` / `BuybackBounceRecovery` / `PruneStuckBuyback` names below are historical milestone context only.
+
 ---
 
 ## 0. Core Philosophy
