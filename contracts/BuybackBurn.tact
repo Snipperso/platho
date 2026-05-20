@@ -462,7 +462,7 @@ contract BuybackBurn {
         throwUnless(22341, msg.query_id > 0);
         self.requireNextQueryId(msg.query_id);
         throwUnless(22342, msg.amount > 0);
-        throwUnless(22343, msg.amount <= self.ath_burn_retry_due_atomic);
+        throwUnless(22343, msg.amount == self.ath_burn_retry_due_atomic);
         throwUnless(22344, context().value >= BUYBACK_ATH_BURN_REQUEST_VALUE);
 
         self.ath_burn_retry_due_atomic -= msg.amount;

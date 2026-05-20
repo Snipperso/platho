@@ -1,0 +1,27 @@
+{
+  "profile": "PLATHO.V1.M35.BUYBACKBURN_RETRY_ACCOUNTING_FIX",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "findings_closed": [
+    {
+      "id": "BB-01",
+      "title": "Partial RetryAthBurnDue could inflate executed_buyback_count by splitting one failed burn retry into multiple successful burn batches",
+      "resolution": "RetryAthBurnDue now requires msg.amount == ath_burn_retry_due_atomic, so each failed buyback retry must burn the full due amount in one terminal cycle."
+    }
+  ],
+  "buyback_burn_code_hash": "c0aa01fbea33817bc1954ccafb0f09f32c32d0c0b2b5ed9763b24bbd80541250",
+  "implemented_subset_manifest_hash": "af36c4040075c9dded8929c5ddbd2ebd8eefe1ab9d3791aefc846ad3be8fd729",
+  "retry_policy": {
+    "partial_retry_allowed": false,
+    "required_amount_rule": "msg.amount == ath_burn_retry_due_atomic",
+    "counter_semantics": "executed_buyback_count increments once per successful original buyback or full failed-buyback retry terminal cycle"
+  },
+  "verification": {
+    "build": "npm.cmd run build: PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\buybackburn-production.test.ts tests\\buybackburn-auth-negative-matrix.test.ts tests\\m20u-buybackburn-implementation-readiness.test.ts tests\\m29-buybackburn-abi-freeze.test.ts: 4 files / 25 tests PASS",
+    "full_suite": "npm.cmd test: 67 files / 282 tests PASS",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "production_note": "This closes the local BuybackBurn retry accounting finding only. The implemented-subset manifest remains non-final while mainnet genesis and STON.fi route blockers remain open."
+}
