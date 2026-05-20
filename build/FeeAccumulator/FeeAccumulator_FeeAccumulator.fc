@@ -220,8 +220,8 @@ builder $FeeAccumulator$_store(builder build_0, (slice, slice, int, int, int) v)
 
 ((slice, slice, int, int, int), (int, int, int, slice, slice)) $FeeAccumulator$_fun_get_state((slice, slice, int, int, int) $self) impure inline_ref {
     var (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton)) = $self;
-    var $fresh$ret_27 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_treasury_receiver_address_buyback_burn_address($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'treasury_receiver_address, $self'buyback_burn_address);
-    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton), $fresh$ret_27);
+    var $fresh$ret_0 = $FeeAccumulatorStateView$_constructor_accumulated_ton_treasury_due_ton_buyback_due_ton_treasury_receiver_address_buyback_burn_address($self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton, $self'treasury_receiver_address, $self'buyback_burn_address);
+    return (($self'treasury_receiver_address, $self'buyback_burn_address, $self'accumulated_ton, $self'treasury_due_ton, $self'buyback_due_ton), $fresh$ret_0);
 }
 
 ;;

@@ -80,8 +80,8 @@ builder $MockUsernameNFTItemNoAck$_store(builder build_0, (int) v) inline {
 
 ((int), int) $MockUsernameNFTItemNoAck$_fun_get_accepted_count((int) $self) impure inline_ref {
     var (($self'accepted_count)) = $self;
-    var $fresh$ret_200 = $self'accepted_count;
-    return (($self'accepted_count), $fresh$ret_200);
+    var $fresh$ret_0 = $self'accepted_count;
+    return (($self'accepted_count), $fresh$ret_0);
 }
 
 ;;

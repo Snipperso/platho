@@ -116,8 +116,8 @@ builder $MockUsernameRegistryAckSink$_store(builder build_0, (int, int, slice) v
 
 ((int, int, slice), (int, int, slice)) $MockUsernameRegistryAckSink$_fun_get_state((int, int, slice) $self) impure inline_ref {
     var (($self'ack_count, $self'last_name_hash, $self'last_owner_wallet)) = $self;
-    var $fresh$ret_199 = $MockUsernameRegistryAckSinkStateView$_constructor_ack_count_last_name_hash_last_owner_wallet($self'ack_count, $self'last_name_hash, $self'last_owner_wallet);
-    return (($self'ack_count, $self'last_name_hash, $self'last_owner_wallet), $fresh$ret_199);
+    var $fresh$ret_0 = $MockUsernameRegistryAckSinkStateView$_constructor_ack_count_last_name_hash_last_owner_wallet($self'ack_count, $self'last_name_hash, $self'last_owner_wallet);
+    return (($self'ack_count, $self'last_name_hash, $self'last_owner_wallet), $fresh$ret_0);
 }
 
 ;;
