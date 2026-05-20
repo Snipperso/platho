@@ -14,6 +14,16 @@ import {
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
+const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
+const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
+const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 2_000_000n;
+const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2_000_000n;
+const ATH_OWNER_REQUEST_EXEC_RESERVE = 2_000_000n;
+const ATH_OWNER_NOTIFY_MIN_VALUE = ATH_TRANSFER_NOTIFY_MIN_VALUE
+  + ATH_TRANSFER_NOTIFY_ACK_VALUE
+  + ATH_TRANSFER_NOTIFY_EXEC_RESERVE
+  + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT
+  + ATH_OWNER_REQUEST_EXEC_RESERVE;
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
@@ -167,8 +177,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     await depositAth({ vault, user, userAthWallet, amount: 2_000n, queryId: 3n });
     expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
+    const beforeUser = await vault.getGetUser(user.address);
 
-    await vault.send(user.getSender(), { value: toNano('0.25') }, {
+    await vault.send(user.getSender(), { value: toNano('0.03') }, {
       $$type: 'WithdrawAth',
       query_id: 10n,
       amount: 750n,
@@ -178,8 +189,11 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const recipientAthWalletAddress = await athWalletAddress(recipient.address, athMaster);
     const recipientAthWallet = blockchain.openContract(new ATHWallet(recipientAthWalletAddress));
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+    const afterUser = await vault.getGetUser(user.address);
 
-    expect((await vault.getGetUser(user.address)).ath_balance).toBe(1_250n);
+    expect(afterUser.ath_balance).toBe(1_250n);
+    expect(afterUser.ton_balance).toBeGreaterThan(beforeUser.ton_balance);
+    expect(afterUser.ton_balance - beforeUser.ton_balance).toBeLessThanOrEqual(toNano('0.03'));
     expect((await vault.getGetPendingAthWithdrawal(10n)).exists).toBe(false);
     expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
     expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);
@@ -220,5 +234,43 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(source.balance).toBe(4_000n);
     expect(official.balance).toBe(1_000n);
     expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(1n);
+  });
+
+  it('VAULT-ATH-05: canonical owner notify value reaches Vault without trapping large official-wallet TON excess', async () => {
+    const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setup();
+
+    await depositAth({
+      vault,
+      user,
+      userAthWallet,
+      amount: 1_000n,
+      queryId: 50n,
+      notifyValue: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+      requestValue: ATH_TRANSFER_NOTIFY_MIN_VALUE
+        + ATH_TRANSFER_NOTIFY_ACK_VALUE
+        + ATH_TRANSFER_NOTIFY_EXEC_RESERVE
+        + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT,
+    });
+
+    expect((await vault.getGetUser(user.address)).exists).toBe(false);
+    expect((await userAthWallet.getGetWalletData()).balance).toBe(5_000n);
+
+    await depositAth({
+      vault,
+      user,
+      userAthWallet,
+      amount: 1_000n,
+      queryId: 51n,
+      notifyValue: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+      requestValue: ATH_OWNER_NOTIFY_MIN_VALUE,
+    });
+
+    const userState = await vault.getGetUser(user.address);
+    const source = await userAthWallet.getGetWalletData();
+
+    expect(userState.exists).toBe(true);
+    expect(userState.ath_balance).toBe(1_000n);
+    expect(source.balance).toBe(4_000n);
+    expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.01'));
   });
 });
