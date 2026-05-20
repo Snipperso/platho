@@ -41,7 +41,7 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 404,
+      "non_comment_lines": 406,
       "receive_handlers": 9,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -102,8 +102,8 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "c901c2915b1626dabc4b222f56679ef305961bed058eb373c7f35682145373d3",
-      "pinned": "c901c2915b1626dabc4b222f56679ef305961bed058eb373c7f35682145373d3",
+      "built": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
+      "pinned": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "64c49e4eb7964234f860069761ffb2a83a41d6af925980c1578987be86ac70bd",
+    "manifest_hash_hex": "719646897ce007c5aa628426f154304569641df7a485ba71d0745c11a7f1609b",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
