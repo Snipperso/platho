@@ -1,0 +1,27 @@
+{
+  "profile": "PLATHO.V1.M40.FEEACCUMULATOR_BUYBACKBURN_FLUSH_PREFLIGHT",
+  "status": "PASS",
+  "finding": "FEEACCUMULATOR_BUYBACKBURN_PREMATURE_FLUSH_LOW",
+  "summary": "Added an operator preflight guard for FeeAccumulator -> BuybackBurn FlushBuybackDue so premature flush attempts are blocked before caller-funded reserve can be donated to FeeAccumulator balance.",
+  "source_changes": [
+    "scripts/buyback_flush_preflight.ts",
+    "tests/buyback-flush-preflight.test.ts",
+    "package.json"
+  ],
+  "contract_changes": [],
+  "guarded_flow": [
+    "FlushBuybackDue amount must equal the exact 51.05 TON funding envelope.",
+    "FeeAccumulator.buyback_due_ton must cover the exact envelope.",
+    "FeeAccumulator.buyback_burn_address must equal the intended BuybackBurn address.",
+    "BuybackBurn must be sealed.",
+    "BuybackBurn route_frozen must be true.",
+    "BuybackBurn fee_accumulator_address must equal the source FeeAccumulator address."
+  ],
+  "verification": {
+    "focused_tests": "npm.cmd run test:file -- tests\\fee-accumulator.test.ts tests\\fee-accumulator-backing-negative.test.ts tests\\m19h-buybackburn-funding-envelope.test.ts tests\\buybackburn-production.test.ts tests\\buybackburn-auth-negative-matrix.test.ts tests\\buyback-flush-preflight.test.ts",
+    "focused_tests_result": "6 files / 39 tests PASS",
+    "full_suite": "npm.cmd test",
+    "full_suite_result": "68 files / 291 tests PASS"
+  },
+  "production_note": "No contract bytecode changed. This is an operational guard for a Low premature-flush reserve donation scenario; principal accounting in the FeeAccumulator -> BuybackBurn seam remains covered by existing contract tests."
+}
