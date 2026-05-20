@@ -968,7 +968,7 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
 
 ((int, slice, slice, cell, cell), ()) $ATHWallet$_fun_refund_owner_excess((int, slice, slice, cell, cell) $self, slice $destination, int $amount) impure inline_ref {
     var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)) = $self;
-    if (($amount <= 0)) {
+    if (($amount < 100000)) {
         return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications), ());
     }
     $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($destination, $amount, false, 0, null()));

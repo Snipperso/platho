@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: UsernameRegistry
-BoC Size: 14426 bytes
+BoC Size: 14429 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 57

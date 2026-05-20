@@ -10,7 +10,7 @@ production mint seam.
 - UNSEAM-01: old `35M` / `36M` / `37M` owner request values do not debit
   source ATH or create Registry state, while `50M` reaches the full mint path.
 - UNSEAM-02: username mint overpayment is covered by the existing bounded
-  ATHWallet owner-facing mint path and owner excess refund behavior.
+  ATHWallet owner-facing mint path and non-dust owner excess refund behavior.
 
 ## Change
 

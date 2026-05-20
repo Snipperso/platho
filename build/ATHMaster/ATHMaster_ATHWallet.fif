@@ -522,7 +522,8 @@ PROGRAM{
   }>
   $ATHWallet$_fun_refund_owner_excess PROCREF:<{
     DUP
-    1 LESSINT
+    100000 PUSHINT
+    LESS
     IFJMP:<{
       2DROP
     }>

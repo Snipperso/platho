@@ -6,14 +6,14 @@ Scope: fixes local ATHWallet owner-facing value-flow findings from the ATHWallet
 
 ## Closed Findings
 
-- ATHW-01: notify and mint-notify owner requests no longer forward large caller overpayment into the recipient ATH wallet. The source wallet forwards only the canonical downstream envelope and refunds excess to the response destination.
+- ATHW-01: notify and mint-notify owner requests no longer forward large caller overpayment into the recipient ATH wallet. The source wallet forwards only the canonical downstream envelope and refunds excess to the response destination. M46 refines this rule: dust excess below `100_000` nanotons is retained as source-wallet storage reserve instead of attempting a refund that can fail the action phase.
 - ATHW-02: owner-facing burn, simple transfer, notify, and mint-notify requests now include a `2_000_000` nanotons first-hop execution reserve before ATH is debited.
 
 ## Current Rule
 
 - Burn requires `ATH_BURN_NOTIFICATION_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE`; it forwards the caller-funded remainder because `ATHMaster` returns remaining value with the burn finalization callback.
 - Simple transfer requires `ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE`; it forwards the caller-funded remainder because the recipient ATH wallet returns remaining value with `ATHTransferAck`.
-- Notify and mint-notify require the downstream notify envelope plus `ATH_OWNER_REQUEST_EXEC_RESERVE`; they forward only the bounded envelope and refund overpayment because their downstream path sends fixed notification and ACK values.
+- Notify and mint-notify require the downstream notify envelope plus `ATH_OWNER_REQUEST_EXEC_RESERVE`; they forward only the bounded envelope and refund non-dust overpayment because their downstream path sends fixed notification and ACK values.
 
 ## Verification
 
