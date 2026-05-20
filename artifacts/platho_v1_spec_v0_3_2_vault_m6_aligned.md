@@ -436,7 +436,7 @@ publish_bounce_id is not an authentication proof
 ACK authenticity uses full publish_id
 Vault recomputes full publish_id from PendingPublish fields
 if pending_publishes[publish_bounce_id] already exists before send, Vault MUST NOT send to CapsuleHub
-collision before send is a controlled post-accept invalid signed request: nonce consumed, bounded invalid-request charge, no PLATO fee, no CapsuleHub publish
+collision before send is a controlled post-accept invalid signed request: nonce consumed, no Message Budget debit, no PLATO fee, no CapsuleHub publish
 ```
 
 Vault -> CapsuleHub publish sends must be:
@@ -755,45 +755,69 @@ No alternative v1 session-signature preimage exists.
 
 ### 6.8 Pre-Accept Checks
 
-Before `accept_message`, Vault parses only compact request and checks:
+Before `accept_message`, Vault parses only the compact request fields that fit TON external gas credit and checks:
 
 ```text
 magic == "PLSR"
 version == 1
-op is private/public session external publish
-op matches publish_kind
-size_class and crypto_suite allowed for publish_kind
 owner_wallet valid
 session active
 session_id matches
 nonce matches
 not expired
 now <= valid_until
-max_charge == canonical_current_discounted_max_charge_for_declared_publish
-max_charge <= message_budget_ton
+session mirrored message_budget_ton >= INVALID_SESSION_REQUEST_CHARGE_TON
+max_charge >= INVALID_SESSION_REQUEST_CHARGE_TON
+signature_ref is exactly 512 signature bits with no trailing bits/refs
 Ed25519 signature valid
 ```
 
 Only then may Vault call `accept_message`.
 
+Invalid signatures and pre-accept structural/session failures reject without nonce or budget mutation.
+
+Current Vault v1 policy deliberately does **not** require full deterministic publish-profile validation before
+`accept_message`, because the full profile/hash/max-charge validation path exceeds TON external gas credit in sandbox.
+Instead, a validly signed malformed request is accepted only far enough to consume replay nonce, while preserving
+Message Budget.
+
 ### 6.9 Post-Accept Atomic Debit
 
-Immediately after `accept_message`:
+Immediately after `accept_message`, Vault consumes replay nonce:
 
 ```text
 sessions[owner_wallet].nonce += 1
+```
+
+Then Vault validates the deterministic publish profile:
+
+```text
+op is private/public session external publish
+op matches publish_kind
+hashes_ref is exactly body_hash || header0 || header1
+body_hash != 0
+size_class and crypto_suite allowed for publish_kind
+header fields match publish_kind / size_class / crypto_suite
+max_charge == canonical_current_discounted_max_charge_for_declared_publish
+max_charge <= message_budget_ton
+no pending publish_bounce_id collision
+```
+
+If validation passes, Vault performs the publish debit:
+
+```text
 users[owner_wallet].message_budget_ton -= compact_request.max_charge
 escrowed_session_charge = compact_request.max_charge
 ```
 
-No unhandled throw/revert is allowed between accept and debit.
+No unhandled throw/revert is allowed after `accept_message`. Post-accept invalid paths return cleanly after persisting
+the consumed nonce.
 
-Post-accept failures are controlled invalid signed requests:
+Post-accept deterministic validation failures are controlled invalid signed requests:
 
 ```text
-charge INVALID_SESSION_REQUEST_CHARGE_TON
-refund max_charge - INVALID_SESSION_REQUEST_CHARGE_TON to message_budget_ton
 nonce remains consumed
+message_budget_ton is unchanged
 no CapsuleHub publish
 no PLATO fee
 ```
