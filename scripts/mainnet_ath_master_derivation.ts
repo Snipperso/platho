@@ -5,6 +5,9 @@ import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const ATH_TOTAL_SUPPLY_ATOMIC = '100000000000000000';
+const ATH_GENESIS_SUPPLY_DOWNSTREAM_VALUE_NANOTONS = '3000000';
+const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE_NANOTONS = '2000000';
+const ATH_GENESIS_SUPPLY_REQUIRED_VALUE_NANOTONS = '5000000';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
 const DEFAULT_INPUT_PATH = join(ARTIFACTS_DIR, 'mainnet_ath_master_derivation_input.json');
@@ -60,6 +63,9 @@ export interface MainnetAthMasterDerivationReport {
     senderAddress: string | null;
     recipientAthWalletAddress: string | null;
     amountAtomic: string;
+    requiredValueNanotons: string;
+    downstreamWalletValueNanotons: string;
+    ownerFirstHopExecReserveNanotons: string;
     proofRequired: string;
   };
   nextM20FInputs: {
@@ -234,6 +240,9 @@ export async function createMainnetAthMasterDerivationReport(options: {
       senderAddress: input?.treasuryOwnerAddress ?? null,
       recipientAthWalletAddress: null,
       amountAtomic: ATH_TOTAL_SUPPLY_ATOMIC,
+      requiredValueNanotons: ATH_GENESIS_SUPPLY_REQUIRED_VALUE_NANOTONS,
+      downstreamWalletValueNanotons: ATH_GENESIS_SUPPLY_DOWNSTREAM_VALUE_NANOTONS,
+      ownerFirstHopExecReserveNanotons: ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE_NANOTONS,
       proofRequired: 'required: post-deploy transaction plus official treasury ATH wallet balance proof',
     },
     nextM20FInputs: {
@@ -289,6 +298,9 @@ export async function createMainnetAthMasterDerivationReport(options: {
       senderAddress: friendly(treasuryOwner),
       recipientAthWalletAddress: friendly(treasuryOwnerAthWalletAddress),
       amountAtomic: ATH_TOTAL_SUPPLY_ATOMIC,
+      requiredValueNanotons: ATH_GENESIS_SUPPLY_REQUIRED_VALUE_NANOTONS,
+      downstreamWalletValueNanotons: ATH_GENESIS_SUPPLY_DOWNSTREAM_VALUE_NANOTONS,
+      ownerFirstHopExecReserveNanotons: ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE_NANOTONS,
       proofRequired: 'required: post-deploy transaction plus official treasury ATH wallet balance proof',
     },
     nextM20FInputs: {
@@ -330,6 +342,9 @@ function markdown(report: MainnetAthMasterDerivationReport) {
     `- senderAddress: ${report.treasurySupplyDeployment.senderAddress ?? 'not ready'}`,
     `- recipientAthWalletAddress: ${report.treasurySupplyDeployment.recipientAthWalletAddress ?? 'not ready'}`,
     `- amountAtomic: ${report.treasurySupplyDeployment.amountAtomic}`,
+    `- requiredValueNanotons: ${report.treasurySupplyDeployment.requiredValueNanotons}`,
+    `- downstreamWalletValueNanotons: ${report.treasurySupplyDeployment.downstreamWalletValueNanotons}`,
+    `- ownerFirstHopExecReserveNanotons: ${report.treasurySupplyDeployment.ownerFirstHopExecReserveNanotons}`,
     `- proofRequired: ${report.treasurySupplyDeployment.proofRequired}`,
     '',
     '## Blockers',

@@ -14,7 +14,7 @@
   "per_contract": [
     {
       "contract": "ATHMaster.tact",
-      "non_comment_lines": 92,
+      "non_comment_lines": 105,
       "receive_handlers": 3,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -87,8 +87,8 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "005fe31e1e3ce7850498b501ca137dba7c38676dd86ccbbe3b563f9a283b2ec3",
-      "pinned": "005fe31e1e3ce7850498b501ca137dba7c38676dd86ccbbe3b563f9a283b2ec3",
+      "built": "83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5",
+      "pinned": "83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "c89a46b2d5a077412460da163b0285229973300d65973f9cd7d722fa5ea74a4f",
+    "manifest_hash_hex": "70abd184bfc44ef281059e088a0755853b3b0d14950b374c36dddf0fb13c5080",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

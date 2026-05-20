@@ -97,6 +97,9 @@ describe('Mainnet ATH Master derivation', () => {
     expect(report.treasurySupplyDeployment.senderAddress).toBe(input.treasuryOwnerAddress);
     expect(report.treasurySupplyDeployment.recipientAthWalletAddress).toBe(report.derived.treasuryOwnerAthWalletAddress);
     expect(report.treasurySupplyDeployment.amountAtomic).toBe('100000000000000000');
+    expect(report.treasurySupplyDeployment.requiredValueNanotons).toBe('5000000');
+    expect(report.treasurySupplyDeployment.downstreamWalletValueNanotons).toBe('3000000');
+    expect(report.treasurySupplyDeployment.ownerFirstHopExecReserveNanotons).toBe('2000000');
     expect(report.nextM20FInputs.athMasterAddress).toBe(report.derived.athMasterAddress);
     expect(report.nextM20FInputs.athMasterCodeHash).toBe(report.derived.athMasterCodeHash);
   });

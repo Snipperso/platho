@@ -27,6 +27,9 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS
 - senderAddress: not ready
 - recipientAthWalletAddress: not ready
 - amountAtomic: 100000000000000000
+- requiredValueNanotons: 5000000
+- downstreamWalletValueNanotons: 3000000
+- ownerFirstHopExecReserveNanotons: 2000000
 - proofRequired: required: post-deploy transaction plus official treasury ATH wallet balance proof
 
 ## Blockers

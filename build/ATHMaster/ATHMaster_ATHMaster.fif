@@ -20,6 +20,7 @@ PROGRAM{
   DECLPROC $global_newAddress
   DECLPROC $global_contractAddressExt
   DECLPROC $ATHWallet$_init_child
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $SendParameters$_constructor_to_value_bounce_mode_code_data_body
   DECLPROC $ATHMaster$_fun_derive_wallet_address
   DECLPROC $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code
@@ -180,6 +181,9 @@ PROGRAM{
     3 2 BLKSWAP
     $ATHWallet$init$_store INLINECALLDICT
     ENDC
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
   }>
   $SendParameters$_constructor_to_value_bounce_mode_code_data_body PROCINLINE:<{
     s3 s6 XCHG
@@ -398,34 +402,35 @@ PROGRAM{
       100000000000000000 PUSHINT
       EQUAL
       THROWANYIFNOT
+      3000000 PUSHINT
+      5000000 PUSHINT
       14124 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      3000000 PUSHINT
+      s2 PUSH
       GEQ
       THROWANYIFNOT
       TRUE
       0 PUSHINT
           MYADDR
-      s4 s(-1) PUXC
+      s6 s(-1) PUXC
       $ATHWallet$_init_child INLINECALLDICT
-      s4 PUSH
-      s4 s6 XCHG
-      s7 s3 s3 XCHG3
-      s0 s5 XCHG
+      s6 PUSH
+      s4 s8 XCHG
+      s9 s3 s3 XCHG3
+      s0 s7 XCHG
       $ATHMaster$_fun_derive_wallet_address INLINECALLDICT
-      0 PUSHINT
       TRUE
-      s8 s6 XCPU
-      64 PUSHINT
-      s0 s12 XCHG
+      1 PUSHINT
+      s8 s6 s12 XCPU2
       $ATHGenesisSupplyCredit$_constructor_query_id_amount_response_destination INLINECALLDICT
       NEWC
       $ATHGenesisSupplyCredit$_store_cell INLINECALLDICT
-      s6 s5 s0 XCHG3
-      s4 s8 XCHG
-      s3 s10 XCHG
-      s9 s7 s0 XCHG3
+      s2 s6 XCHG
+      s5 s7 XCHG
+      s1 s4 XCHG
+      s3 s8 XCHG
+      s11 s9 s0 XCHG3
       $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -493,7 +498,40 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s0 s1 s3 XCHG3
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s0 s4 XCHG2
+      SUB
+      DUP
+      0 GTINT
+      IF:<{
+        s1 s5 XCHG
+        FALSE
+        0 PUSHINT
+        PUSHNULL
+        $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        DROP
+        s4 POP
+      }>
+      3 ROLL
       $ATHMaster$_contract_store INLINECALLDICT
     }>
     s5 POP
