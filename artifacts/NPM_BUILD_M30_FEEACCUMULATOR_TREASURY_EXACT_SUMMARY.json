@@ -1,0 +1,6 @@
+{
+    "command":  "npm.cmd run build",
+    "exitCode":  0,
+    "timestamp":  "2026-05-20T09:17:46.9874043Z",
+    "output":  "artifacts/NPM_BUILD_M30_FEEACCUMULATOR_TREASURY_EXACT_OUTPUT.txt"
+}

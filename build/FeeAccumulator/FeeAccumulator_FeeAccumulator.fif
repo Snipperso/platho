@@ -265,7 +265,7 @@ PROGRAM{
       SUB
       FALSE
       s4 s5 s5 PUXC2
-      0 PUSHINT
+      1 PUSHINT
       PUSHNULL
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC

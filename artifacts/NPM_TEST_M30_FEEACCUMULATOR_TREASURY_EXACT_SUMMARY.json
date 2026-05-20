@@ -1,0 +1,21 @@
+{
+    "focused":  {
+                    "command":  "npm.cmd run test:file -- tests/fee-accumulator-backing-negative.test.ts tests/fee-accumulator.test.ts --reporter=json --outputFile artifacts/NPM_TEST_M30_FEEACCUMULATOR_FOCUSED_RESULTS.json",
+                    "exitCode":  0,
+                    "testFiles":  2,
+                    "totalTests":  10,
+                    "passedTests":  10,
+                    "failedTests":  0,
+                    "success":  true
+                },
+    "full":  {
+                 "command":  "npm.cmd test -- --reporter=json --outputFile artifacts/NPM_TEST_FULL_SUITE_M30_FEEACCUMULATOR_TREASURY_EXACT_RESULTS.json",
+                 "exitCode":  0,
+                 "testFiles":  67,
+                 "totalTests":  276,
+                 "passedTests":  276,
+                 "failedTests":  0,
+                 "success":  true
+             },
+    "timestamp":  "2026-05-20T09:21:36.4338950Z"
+}

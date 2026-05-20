@@ -123,10 +123,17 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
     expect((await fee.getGetState()).treasury_due_ton).toBe(treasuryDue);
 
     const beforeBalance = await contractBalance(blockchain, fee.address);
-    await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
+    const exactTreasuryFlush = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
       $$type: 'FlushTreasuryDue',
       amount: treasuryDue,
     } as FlushTreasuryDue);
+    const treasuryFlushTx = findTransaction(exactTreasuryFlush.transactions, {
+      from: fee.address,
+      to: treasury.address,
+      success: true,
+    });
+    expect(treasuryFlushTx).toBeDefined();
+    expect(inboundValue(treasuryFlushTx)).toBe(treasuryDue);
     const afterBalance = await contractBalance(blockchain, fee.address);
     expect((await fee.getGetState()).treasury_due_ton).toBe(0n);
     expect(beforeBalance - afterBalance).toBeLessThanOrEqual(treasuryDue);

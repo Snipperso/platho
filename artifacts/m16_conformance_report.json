@@ -107,8 +107,8 @@
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
-      "built": "0ee52b7f0b6461a0efa32b63b718270ea0f76efce9418ae6ae1a6f7b49bc00f7",
-      "pinned": "0ee52b7f0b6461a0efa32b63b718270ea0f76efce9418ae6ae1a6f7b49bc00f7",
+      "built": "ff084907becac5dcc98b372162bab7f6f2a364f4383e5f51676fd069f64db2e3",
+      "pinned": "ff084907becac5dcc98b372162bab7f6f2a364f4383e5f51676fd069f64db2e3",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "5680fad4f703a24c26fa72be25b821aced902d5d967ffe4702507e3c7157de08",
+    "manifest_hash_hex": "64c49e4eb7964234f860069761ffb2a83a41d6af925980c1578987be86ac70bd",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
