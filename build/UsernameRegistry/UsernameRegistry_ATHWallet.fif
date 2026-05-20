@@ -512,7 +512,7 @@ PROGRAM{
   $ATHWallet$_fun_notify_transfer_value PROCREF:<{
     1000000 PUSHINT
     ADD
-    2000000 PUSHINT
+    7000000 PUSHINT
     ADD
     2000000 PUSHINT
     ADD
@@ -1326,7 +1326,7 @@ PROGRAM{
       s10 PUSH
       $ATHWallet$_fun_notify_transfer_value INLINECALLDICT
       DUP
-      2000000 PUSHINT
+      10000000 PUSHINT
       ADD
       14307 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -1478,7 +1478,7 @@ PROGRAM{
       s7 PUSH
       $ATHWallet$_fun_notify_transfer_value INLINECALLDICT
       DUP
-      2000000 PUSHINT
+      10000000 PUSHINT
       ADD
       14506 PUSHINT
       __tact_context_get INLINECALLDICT
@@ -1697,7 +1697,7 @@ PROGRAM{
       s8 PUSH
       1000000 PUSHINT
       ADD
-      2000000 PUSHINT
+      7000000 PUSHINT
       ADD
       2000000 PUSHINT
       ADD
@@ -1839,7 +1839,7 @@ PROGRAM{
       s11 PUSH
       1000000 PUSHINT
       ADD
-      2000000 PUSHINT
+      7000000 PUSHINT
       ADD
       2000000 PUSHINT
       ADD

@@ -962,7 +962,7 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
 
 ((int, slice, slice, cell, cell), int) $ATHWallet$_fun_notify_transfer_value((int, slice, slice, cell, cell) $self, int $notify_value) impure inline_ref {
     var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)) = $self;
-    var $fresh$ret_52 = ((($notify_value + 1000000) + 2000000) + 2000000);
+    var $fresh$ret_52 = ((($notify_value + 1000000) + 7000000) + 2000000);
     return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications), $fresh$ret_52);
 }
 
@@ -1195,7 +1195,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14305, ($self'balance >= $msg'amount));
         throw_unless(14306, ($msg'notify_value >= 30000000));
         int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
-        int $required_value = ($downstream_value + 2000000);
+        int $required_value = ($downstream_value + 10000000);
         throw_unless(14307, ($Context$_get_value(__tact_context_get()) >= $required_value));
         $self'balance = $self'balance - $msg'amount;
         slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
@@ -1222,7 +1222,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14504, ($self'balance >= $msg'amount));
         throw_unless(14505, ($msg'notify_value >= 30000000));
         int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
-        int $required_value = ($downstream_value + 2000000);
+        int $required_value = ($downstream_value + 10000000);
         throw_unless(14506, ($Context$_get_value(__tact_context_get()) >= $required_value));
         $self'balance = $self'balance - $msg'amount;
         slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
@@ -1261,7 +1261,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14311, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
         throw_unless(14312, ( equal_slices_bits($msg'notify_destination, $self'owner_address) ));
         throw_unless(14313, ($msg'notify_value > 0));
-        throw_unless(14314, ($Context$_get_value(__tact_context_get()) >= ((($msg'notify_value + 1000000) + 2000000) + 2000000)));
+        throw_unless(14314, ($Context$_get_value(__tact_context_get()) >= ((($msg'notify_value + 1000000) + 7000000) + 2000000)));
         int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_compute_sender_key($msg'sender_owner);
         int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14315, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
@@ -1288,7 +1288,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14510, ($msg'amount > 0));
         throw_unless(14511, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
         throw_unless(14512, ($msg'notify_value > 0));
-        throw_unless(14513, ($Context$_get_value(__tact_context_get()) >= ((($msg'notify_value + 1000000) + 2000000) + 2000000)));
+        throw_unless(14513, ($Context$_get_value(__tact_context_get()) >= ((($msg'notify_value + 1000000) + 7000000) + 2000000)));
         int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_compute_sender_key($msg'sender_owner);
         int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14514, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
