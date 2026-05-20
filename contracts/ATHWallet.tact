@@ -7,8 +7,9 @@ const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 2000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
-const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 2000000;
+const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 7000000;
 const ATH_OWNER_REQUEST_EXEC_RESERVE: Int = 2000000;
+const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE: Int = 10000000;
 const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
@@ -362,7 +363,7 @@ contract ATHWallet {
         throwUnless(14305, self.balance >= msg.amount);
         throwUnless(14306, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
         let downstream_value: Int = self.notify_transfer_value(msg.notify_value);
-        let required_value: Int = downstream_value + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        let required_value: Int = downstream_value + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE;
         throwUnless(14307, context().value >= required_value);
 
         self.balance -= msg.amount;
@@ -398,7 +399,7 @@ contract ATHWallet {
         throwUnless(14504, self.balance >= msg.amount);
         throwUnless(14505, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
         let downstream_value: Int = self.notify_transfer_value(msg.notify_value);
-        let required_value: Int = downstream_value + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        let required_value: Int = downstream_value + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE;
         throwUnless(14506, context().value >= required_value);
 
         self.balance -= msg.amount;

@@ -1,0 +1,39 @@
+{
+  "profile": "PLATHO.V1.M42.USERNAME_REGISTRY_ATHWALLET_NFTITEM_SEAM",
+  "status": "PASS",
+  "findings_closed": [
+    {
+      "id": "UNSEAM-01",
+      "title": "Exact/min ATHTransferRequestMintUsername values could be accepted by the source wallet but fail before Registry",
+      "resolution": "ATHWallet owner-facing notify and mint paths now require downstream notify value plus ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE. Regression proves 35M/36M/37M do not debit source ATH, while 50M reaches Registry and finalizes a name."
+    },
+    {
+      "id": "UNSEAM-02",
+      "title": "Username mint overpayment could be trapped in the official Registry ATH wallet",
+      "resolution": "Already covered by the current bounded ATHWallet owner-facing mint path: source wallet forwards only canonical downstream value and refunds owner excess. Existing production-wallet test keeps official Registry ATHWallet TON balance below 0.01 TON even with a 0.25 TON request."
+    }
+  ],
+  "source_changes": [
+    "contracts/ATHWallet.tact",
+    "tests/ath-wallet-boundary-negative.test.ts",
+    "tests/vault-ath-integration.test.ts",
+    "tests/username-registry-ath-wallet-integration.test.ts"
+  ],
+  "contract_changes": [
+    "ATHWallet notify downstream execution reserve increased to 7,000,000 nanotons and owner-facing notify/mint first-hop reserve set to 10,000,000 nanotons."
+  ],
+  "covered_flows": [
+    "35,000,000 nanotons owner request value does not debit source ATH or create a Registry record.",
+    "36,000,000 nanotons owner request value does not debit source ATH or create a Registry record.",
+    "37,000,000 nanotons owner request value does not debit source ATH or create a Registry record.",
+    "50,000,000 nanotons owner request value reaches user ATHWallet -> official Registry ATHWallet -> UsernameRegistry -> UsernameNFTItem deploy/ACK and finalizes the record.",
+    "Overpay request value remains bounded by existing ATHWallet excess refund behavior."
+  ],
+  "verification": {
+    "focused_tests": "npm.cmd run test:file -- tests\\username-registry-ath-wallet-integration.test.ts tests\\username-registry-paid-mint.test.ts tests\\username-registry-refund-flush.test.ts tests\\username-registry-due-flush.test.ts tests\\username-registry-prune-pending-mint.test.ts tests\\username-nft-item.test.ts tests\\ath-wallet-boundary-negative.test.ts tests\\vault-ath-integration.test.ts",
+    "focused_tests_result": "PASS: 8 files / 36 tests",
+    "full_suite": "npm.cmd test",
+    "full_suite_result": "PASS: 68 files / 292 tests"
+  },
+  "production_note": "ATHWallet code hash changes in this milestone. This locks the UsernameRegistry -> ATHWallet -> UsernameNFTItem seam behavior after the prior ATHWallet exact-value forwarding and owner-excess refund fixes."
+}

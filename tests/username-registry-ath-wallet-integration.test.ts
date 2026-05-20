@@ -18,6 +18,9 @@ const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_USERNAME_MINT_NOTIFICATION = 0x89129D5F;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
+const USERNAME_MINT_NOTIFY_VALUE = 30_000_000n;
+const USERNAME_MINT_OLD_OWNER_MIN_VALUE = 35_000_000n;
+const USERNAME_MINT_CANONICAL_OWNER_VALUE = 50_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -120,14 +123,15 @@ async function mintViaProductionWallet(params: {
   amount: bigint;
   queryId: bigint;
   username: string;
+  requestValue?: bigint;
 }) {
-  return await params.userAthWallet.send(params.user.getSender(), { value: toNano('0.25') }, {
+  return await params.userAthWallet.send(params.user.getSender(), { value: params.requestValue ?? toNano('0.25') }, {
     $$type: 'ATHTransferRequestMintUsername',
     query_id: params.queryId,
     amount: params.amount,
     recipient: params.registry.address,
     response_destination: params.user.address,
-    notify_value: toNano('0.03'),
+    notify_value: USERNAME_MINT_NOTIFY_VALUE,
     username_len: BigInt(Buffer.from(params.username, 'ascii').length),
     username: usernameSlice(params.username),
   } as ATHTransferRequestMintUsername);
@@ -197,6 +201,63 @@ describe('UsernameRegistry integration with production ATHWallet', () => {
     expect(findTransaction(result.transactions, {
       from: registry.address,
       to: user.address,
+      success: true,
+    })).toBeDefined();
+  });
+
+  it('USERNAME-ATH-PROD-03: old 35M/36M/37M owner values do not debit source ATH, while 50M reaches Registry full path', async () => {
+    const { registry, user, userAthWallet, officialAthWallet } = await setup();
+
+    await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: PRICE_6_PLUS,
+      queryId: 44n,
+      username: 'minaa',
+      requestValue: USERNAME_MINT_OLD_OWNER_MIN_VALUE,
+    });
+    await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: PRICE_6_PLUS,
+      queryId: 45n,
+      username: 'minab',
+      requestValue: USERNAME_MINT_OLD_OWNER_MIN_VALUE + 1_000_000n,
+    });
+    await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: PRICE_6_PLUS,
+      queryId: 46n,
+      username: 'minac',
+      requestValue: USERNAME_MINT_OLD_OWNER_MIN_VALUE + 2_000_000n,
+    });
+
+    expect((await registry.getGetNameRecord(nameHash('minaa'))).exists).toBe(false);
+    expect((await registry.getGetNameRecord(nameHash('minab'))).exists).toBe(false);
+    expect((await registry.getGetNameRecord(nameHash('minac'))).exists).toBe(false);
+    expect((await userAthWallet.getGetWalletData()).balance).toBe(PRICE_6_PLUS * 2n);
+
+    const result = await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: PRICE_6_PLUS,
+      queryId: 47n,
+      username: 'minokay',
+      requestValue: USERNAME_MINT_CANONICAL_OWNER_VALUE,
+    });
+
+    expect((await registry.getGetNameRecord(nameHash('minokay'))).exists).toBe(true);
+    expect((await userAthWallet.getGetWalletData()).balance).toBe(PRICE_6_PLUS);
+    expect((await officialAthWallet.getGetWalletData()).balance).toBe(PRICE_6_PLUS);
+    expect(findTransaction(result.transactions, {
+      from: officialAthWallet.address,
+      to: registry.address,
+      op: OP_USERNAME_MINT_NOTIFICATION,
       success: true,
     })).toBeDefined();
   });
