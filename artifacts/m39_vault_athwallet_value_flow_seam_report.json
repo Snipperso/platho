@@ -1,0 +1,31 @@
+{
+  "profile": "PLATHO.V1.M39.VAULT_ATHWALLET_VALUE_FLOW_SEAM",
+  "status": "PASS",
+  "findings": [
+    "VAH-01",
+    "VAH-02",
+    "VAH-03"
+  ],
+  "summary": "Added seam regressions for Vault ATH withdrawal TON refunding and owner-facing ATH notify deposit value boundaries.",
+  "source_changes": [
+    "tests/vault-ath-integration.test.ts"
+  ],
+  "contract_changes": [],
+  "covered_flows": [
+    "WithdrawAth with the canonical 0.03 TON value clears pending, transfers ATH, and credits returned callback value back to the user's internal TON balance.",
+    "Old notify-transfer minimum without the owner first-hop reserve does not debit the source ATH wallet or credit Vault.",
+    "Canonical owner notify value reaches the official Vault ATH wallet and Vault without trapping large TON excess in the official ATH wallet."
+  ],
+  "existing_contract_evidence": [
+    "M32 Vault value-flow fix: PendingAthWithdrawal stores refundable TON cap and refunds callback value minus local reserve.",
+    "ATHWallet owner-facing notify transfers use bounded downstream value and refund owner overpayment.",
+    "ATHWallet boundary tests cover owner notify first-hop minimum."
+  ],
+  "verification": {
+    "focused_tests": "npm.cmd run test:file -- tests\\vault-ath-integration.test.ts tests\\vault-ath-invariants.test.ts tests\\ath-wallet-transfer.test.ts tests\\ath-wallet-boundary-negative.test.ts",
+    "focused_tests_result": "4 files / 20 tests PASS",
+    "full_suite": "npm.cmd test",
+    "full_suite_result": "67 files / 285 tests PASS"
+  },
+  "production_note": "No contract bytecode changed in this milestone. The implemented-subset manifest remains non-final until mainnet route, funding, address, and final-genesis evidence blockers are closed."
+}
