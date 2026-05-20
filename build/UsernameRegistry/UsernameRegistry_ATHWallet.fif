@@ -1741,7 +1741,7 @@ PROGRAM{
       $PendingAthTransferNotification$_store_cell INLINECALLDICT
       s1 s7 s0 XCHG3
       __tact_dict_set_int_cell INLINECALLDICT
-      0 PUSHINT
+      1 PUSHINT
       TRUE
       s8 s7 s(-1) PUXC2
       s14 s13 PUXC
@@ -1883,7 +1883,7 @@ PROGRAM{
       $PendingAthTransferNotification$_store_cell INLINECALLDICT
       s1 s7 s0 XCHG3
       __tact_dict_set_int_cell INLINECALLDICT
-      0 PUSHINT
+      1 PUSHINT
       TRUE
       s9 PUSH
       s4 s9 XCPU

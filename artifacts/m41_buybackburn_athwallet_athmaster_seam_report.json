@@ -1,0 +1,56 @@
+{
+  "profile": "PLATHO.V1.M41.BUYBACKBURN_ATHWALLET_ATHMASTER_SEAM",
+  "status": "PASS",
+  "findings_closed": [
+    {
+      "id": "BBATH-01",
+      "title": "BuybackBurn could remain stuck in PENDING_STONFI_SWAP when upstream ATHWallet notify_value was exactly 35,000,000 nanotons",
+      "resolution": "ATHWallet now sends AthTransferNotification and AthTransferNotificationMintUsername with SendPayFwdFeesSeparately, so notify_value is delivered as exact destination value instead of being reduced by forward fees."
+    }
+  ],
+  "findings_acknowledged": [
+    {
+      "id": "BBATH-02",
+      "title": "Excess notify/burn TON can accumulate in BuybackBurn balance",
+      "resolution": "Not fixed in contract. Tests now use the production boundary 35,000,000 nanotons instead of 0.1 TON for the BuybackBurn happy paths, reducing route overpay pressure."
+    },
+    {
+      "id": "BBATH-03",
+      "title": "Partial RetryAthBurnDue could inflate executed_buyback_count",
+      "resolution": "Already closed by M35: RetryAthBurnDue.amount must equal ath_burn_retry_due_atomic."
+    }
+  ],
+  "source_changes": [
+    "contracts/ATHWallet.tact",
+    "tests/buybackburn-production.test.ts",
+    "tests/buybackburn-auth-negative-matrix.test.ts"
+  ],
+  "artifact_changes": [
+    "build/ATHWallet/*",
+    "build/ATHMaster/*",
+    "build/BuybackBurn/*",
+    "build/Vault/*",
+    "build/UsernameRegistry/*",
+    "artifacts/CURRENT_CODE_HASHES.txt",
+    "artifacts/deployment_manifest_implemented_subset_m15.json",
+    "artifacts/m16_conformance_report.json",
+    "artifacts/m18_artifact_integrity_report.json"
+  ],
+  "code_hashes": {
+    "ATH_WALLET_CODE_HASH": "b1edef475b60e5f4da111b8226a767aa807f96b9382acb659fa97a4672535b98",
+    "ATHMASTER_CODE_HASH": "fecd0b4fd3435ed3b7ca88d3542e7c452bc474c3c9bbb8103bbe19f3f64710ce",
+    "BUYBACKBURN_CODE_HASH": "94eeb47e3a6bf90c7e0ebf374a34acd699ce3163bb8df6b30c550f8b0f777c0f",
+    "VAULT_CODE_HASH": "b1c08d999bb7eb0f664e7296ea20ff2997b8221340c1cd177e3b5839dd2c59c0",
+    "USERNAME_REGISTRY_CODE_HASH": "7894e8e91e4959b70b3be353c5cce500eb27f8b4c454aa2b6b83983d202d7887"
+  },
+  "verification": {
+    "build": "npm.cmd run build: PASS",
+    "hash_codes": "node scripts\\hash_codes.js: PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\buybackburn-production.test.ts tests\\buybackburn-auth-negative-matrix.test.ts tests\\ath-burn-finalization.test.ts tests\\ath-wallet-transfer.test.ts",
+    "focused_tests_result": "4 files / 30 tests PASS",
+    "m18_artifact_integrity": "PASS",
+    "full_suite": "npm.cmd test",
+    "full_suite_result": "68 files / 291 tests PASS"
+  },
+  "production_note": "This closes the BuybackBurn -> ATHWallet -> ATHMaster notify boundary liveness risk. Production remains blocked by the existing mainnet route, funding, address, and final-genesis evidence gates."
+}

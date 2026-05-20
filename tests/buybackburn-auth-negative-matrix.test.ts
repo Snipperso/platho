@@ -33,6 +33,7 @@ const OFFER = toNano('50');
 const PTON_TRANSFER_GAS = 50_000_000n;
 const ACCOUNTING_RECYCLE_EXEC_RESERVE = 2_000_000n;
 const ATH_BURN_REQUEST_VALUE = 30_000_000n;
+const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const PHASE_PENDING_ATH_BURN = 2n;
@@ -203,7 +204,7 @@ async function sendStonfiAthNotify(
   sender: ReturnType<typeof env.stonfiPoolOwner.getSender>,
   amount: bigint,
   queryId: bigint,
-  notifyValue = toNano('0.1'),
+  notifyValue = BUYBACK_ROUTE_NOTIFY_MIN_VALUE,
 ) {
   const sourceWallet = await deployAthWallet(
     env.blockchain,
