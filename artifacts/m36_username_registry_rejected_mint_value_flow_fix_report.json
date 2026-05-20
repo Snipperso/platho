@@ -1,0 +1,32 @@
+{
+  "profile": "PLATHO.V1.M36.USERNAME_REGISTRY_REJECTED_MINT_VALUE_FLOW_FIX",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "findings_closed": [
+    {
+      "id": "UNREG-01",
+      "title": "Rejected username mint retained most of the production ATHWallet notify TON in UsernameRegistry balance",
+      "resolution": "Rejected mint branches now retain only the bounded refund-due storage reserve, notification ACK value, and local execution reserve, then refund excess TON to the owner wallet."
+    }
+  ],
+  "username_registry_code_hash": "7d640cf5c5708c49e32f8afa94e8e283c9f85f4db7ee09d3b8295ad56c05193f",
+  "implemented_subset_manifest_hash": "b5c23fc5265fdbe03bfb91d1aac3304c5621a170e6739f23d854251a211fb0c1",
+  "rejected_mint_policy": {
+    "new_refund_due_retained_nanotons": "7000000",
+    "existing_refund_due_retained_nanotons": "3000000",
+    "components": {
+      "refund_due_storage_endowment_nanotons": "4000000",
+      "notification_ack_value_nanotons": "1000000",
+      "local_state_growth_exec_reserve_nanotons": "2000000"
+    },
+    "excess_policy": "refund to owner_wallet with bounce=false"
+  },
+  "verification": {
+    "build": "npm.cmd run build: PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\username-registry-foundation.test.ts tests\\username-registry-paid-mint.test.ts tests\\username-registry-refund-flush.test.ts tests\\username-registry-due-flush.test.ts tests\\username-registry-prune-pending-mint.test.ts tests\\username-registry-boundary-negative.test.ts tests\\username-registry-auth-negative-matrix.test.ts tests\\username-registry-ath-wallet-integration.test.ts tests\\username-registry-state-invariants.test.ts: 9 files / 34 tests PASS",
+    "full_suite": "npm.cmd test: 67 files / 282 tests PASS",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "production_note": "This closes the local UsernameRegistry rejected-mint TON retention finding only. The implemented-subset manifest remains non-final while mainnet genesis and STON.fi route blockers remain open."
+}

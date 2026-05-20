@@ -54,9 +54,9 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "99e7f9f1908026373b0622516426f56e1f45142c9d2b539fba0e12c3cc5a55db",
-      "pinned": "99e7f9f1908026373b0622516426f56e1f45142c9d2b539fba0e12c3cc5a55db",
-      "current_file": "99e7f9f1908026373b0622516426f56e1f45142c9d2b539fba0e12c3cc5a55db",
+      "built": "7d640cf5c5708c49e32f8afa94e8e283c9f85f4db7ee09d3b8295ad56c05193f",
+      "pinned": "7d640cf5c5708c49e32f8afa94e8e283c9f85f4db7ee09d3b8295ad56c05193f",
+      "current_file": "7d640cf5c5708c49e32f8afa94e8e283c9f85f4db7ee09d3b8295ad56c05193f",
       "match": true
     },
     "MOCK_VAULT_ATH_WALLET_CODE_HASH": {
@@ -82,8 +82,8 @@
     "m17_gas_report_passes": true
   },
   "manifest": {
-    "stored_hash": "af36c4040075c9dded8929c5ddbd2ebd8eefe1ab9d3791aefc846ad3be8fd729",
-    "rebuilt_hash": "af36c4040075c9dded8929c5ddbd2ebd8eefe1ab9d3791aefc846ad3be8fd729",
+    "stored_hash": "b5c23fc5265fdbe03bfb91d1aac3304c5621a170e6739f23d854251a211fb0c1",
+    "rebuilt_hash": "b5c23fc5265fdbe03bfb91d1aac3304c5621a170e6739f23d854251a211fb0c1",
     "match": true,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
     "blockers_before_final_genesis": [
@@ -95,7 +95,7 @@
     ]
   },
   "stable_artifact_lock": {
-    "artifacts/CURRENT_CODE_HASHES.txt": "94f288f7bff57ef74faa16535dfc0678f25f4b6180bef1522a60f4195158d220",
+    "artifacts/CURRENT_CODE_HASHES.txt": "0283f5bc121fa830408c172012fc39104b959ac832423682a456cf3f046dc567",
     "artifacts/ATHMASTER_CODE_HASH.txt": "6025ddb3a6cdd25bafe31d87171e6171363b5358dfefa86232abc55ef33b9866",
     "artifacts/ATH_WALLET_CODE_HASH.txt": "a5d79c6e58961a03ed026e8ef06f814939b229780f3b0d5ad30a9a426363662a",
     "artifacts/BUYBACKBURN_CODE_HASH.txt": "7a944e79a17362b1863d43d19fd050943995e3f60f0917a6f3013512ec854a29",
@@ -104,15 +104,15 @@
     "artifacts/FEE_ACCUMULATOR_CODE_HASH.txt": "1a538ef8d88844563e1d6f83b6ff910e8420bd051b6ae3cfefce5eb784407252",
     "artifacts/VAULT_CODE_HASH.txt": "e0fc5ab34e6143ceca9665d2a04ac4869d18d181877a37420d2d090bf8eb765f",
     "artifacts/USERNAME_NFT_ITEM_CODE_HASH.txt": "9090cc1681ada1e4ca0a8634df204844b431d913f3b86afc14da00170b60a977",
-    "artifacts/USERNAME_REGISTRY_CODE_HASH.txt": "b877f0d74cb052a925ddbb6dd4e2ffac84d1bd698fb4cfd56362b679843a41ed",
+    "artifacts/USERNAME_REGISTRY_CODE_HASH.txt": "831027266c3fa90b3aee92e674e3287d52595bcf4a69323e1d1283b02a2eccc3",
     "artifacts/ath_wallet_derivation_vectors.json": "80c8c30ab8cc10e604047d37c0878c7d9c9af7da533d5fc2655c3d427dd543da",
     "artifacts/deployment_ath_wallet_binding_vectors.json": "6aaeafa8c65882517b701494e5b623f60bae5de37dc5a23a725f97ec165d47c8",
     "artifacts/username_nft_item_vectors.json": "f46f1586d7a00643d1537bf61afc5b7db211ee4329f2e43caae8baeba1cb38aa",
-    "artifacts/username_registry_foundation_vectors.json": "140e8244a39e0624e2286fffc44759a027d3e6cc765ae4e03fd1e17b2f75ffc2",
-    "artifacts/username_registry_mint_vectors.json": "d3f4172fef373dcc0eb9450904959241a579a32cfdb8d73ba94f2c2cfa216046",
-    "artifacts/deployment_manifest_implemented_subset_m15.json": "a5d26b1abec3bb6d2df68300787c904e9e0ca2d6c52d3c203045c1cc58d2bfa6",
-    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "b6355ee9ebf53e07dab3fc6ab6612024c2e82173b99d1e1bf483dbfcc3445f4c",
-    "artifacts/m16_conformance_report.json": "e810850a42e3b133599f92f8bfac40e38d407a9e6d870f47c8fd299ace7cd730",
+    "artifacts/username_registry_foundation_vectors.json": "afc4e1ccb85705f4ef883d5c6cb6bf7f8b2a75234e4f289212b612c5d33c1330",
+    "artifacts/username_registry_mint_vectors.json": "be959b89011ade3f2bb16fc2deca8a1bd348da9464645502098203599e130219",
+    "artifacts/deployment_manifest_implemented_subset_m15.json": "1bf152d87f0c0309c20d2ad2d6e8a3a7a7fc212e255097fc3539e10f006278c6",
+    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "62daddedc8dfb6b76433929a6d87a5a2f92e735e3b7e925c0a619f0ea3f6c7a4",
+    "artifacts/m16_conformance_report.json": "5c7ab1e3623f5394de5746fe398d167bd39bb220ac29ac904484a2ace17f2307",
     "artifacts/m17_gas_reserve_sanity_report.json": "0914f392b6d9694892de8f2b3753fb03de2b97c8c361c8fea181a2993ea3952d",
     "artifacts/platho_v1_open_values_v0_18_artifact_integrity.md": "a7c1973794154e626df35e5d0100ad941ac4d83b362864840b012b74268d94bb",
     "artifacts/SPEC_CHANGELOG_M18_ARTIFACT_INTEGRITY.md": "709b8f4e475e2fbcb257170a4f561717e011920f44f741fde12b784b0ea4bbaf"
@@ -131,7 +131,7 @@
     "contracts\\MockVaultAckSink.tact": "8dd3cc0619da928a38f85d16088b1f700ca044a38bb61a62d416e35b3393d5dd",
     "contracts\\MockVaultAthWallet.tact": "031df398d48e9fda8b46aeb8862aa4a9b18c35e7569853e3b7722782e0c9ca75",
     "contracts\\UsernameNFTItem.tact": "4cea7f40c409f2dc0aaca2fec2c76a3eb5f7bf12338943b59fbbc509711769d5",
-    "contracts\\UsernameRegistry.tact": "c3c20d8c101aba0807180763b9fd55b7e38b73273a8593d6f293f36f2d2d6a1a",
+    "contracts\\UsernameRegistry.tact": "33b0c5d685b9b36f247ac2475dab473ad15c7841062fe8f2884d096dedcd7312",
     "contracts\\Vault.tact": "4a5cd614040c6bd3897b795a4c4c50ce4bfc43af0803150128a1a26bf056cf44",
     "scripts\\artifact_integrity_m18.ts": "567f98c700f24603054c384056c0d0fa3971ac12473bd6534bfcfc86e40932a4",
     "scripts\\buybackburn_contract_readiness_m20u.ts": "2b0ba2518756898cd684679a1a70aaea5a6b7ebaa0114e01581ad43d4f82f781",
@@ -208,7 +208,7 @@
     "tests\\storage-topup-abi.test.ts": "5cd432b3317567db7a4e745db88b23dfe9d358fed51dfcdba29b0735083fdff2",
     "tests\\transport-share.test.ts": "ccd1f7e679c61ebfca722d2b694f88653574ffcb49119508fbd8dec5072bd1e3",
     "tests\\username-nft-item.test.ts": "369c991067a2f28d0e120bcdd4a0c29bc754ca203554961e7e50c1f1576ccc1d",
-    "tests\\username-registry-ath-wallet-integration.test.ts": "2e8ed8b2744bd40c7fc80f91a8e411e534753fc89869c51f1c22cb3049b5e63e",
+    "tests\\username-registry-ath-wallet-integration.test.ts": "98b1802f864ebcc66e1a674213a3cbcf94416b50bf2cdb17d081297fb0f208b0",
     "tests\\username-registry-auth-negative-matrix.test.ts": "1a9a634009278bef0d75071a9a400b493d0143c25bf4341cea0e2bb02a0022b3",
     "tests\\username-registry-boundary-negative.test.ts": "ca6663ae952bf36b684854da5be910d322fbdd767c45491f4a571084dee2326a",
     "tests\\username-registry-due-flush.test.ts": "8fc7f1675294cd23348c91d66e9af734a6747b31b4bfa85319274a4c47af6f46",

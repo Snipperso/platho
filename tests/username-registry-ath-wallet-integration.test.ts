@@ -172,11 +172,12 @@ describe('UsernameRegistry integration with production ATHWallet', () => {
   });
 
   it('USERNAME-ATH-PROD-02: underpay through production wallet records refund due and does not mint', async () => {
-    const { registry, user, userAthWallet, officialAthWallet } = await setup();
+    const { blockchain, registry, user, userAthWallet, officialAthWallet } = await setup();
     const username = 'underp';
     const underpay = PRICE_6_PLUS - 1n;
+    const beforeRegistryBalance = await contractBalance(blockchain, registry.address);
 
-    await mintViaProductionWallet({
+    const result = await mintViaProductionWallet({
       user,
       userAthWallet,
       registry,
@@ -187,9 +188,16 @@ describe('UsernameRegistry integration with production ATHWallet', () => {
 
     const record = await registry.getGetNameRecord(nameHash(username));
     const official = await officialAthWallet.getGetWalletData();
+    const afterRegistryBalance = await contractBalance(blockchain, registry.address);
 
     expect(record.exists).toBe(false);
     expect(await registry.getGetRefundDue(user.address)).toBe(underpay);
     expect(official.balance).toBe(underpay);
+    expect(afterRegistryBalance - beforeRegistryBalance).toBeLessThan(toNano('0.015'));
+    expect(findTransaction(result.transactions, {
+      from: registry.address,
+      to: user.address,
+      success: true,
+    })).toBeDefined();
   });
 });

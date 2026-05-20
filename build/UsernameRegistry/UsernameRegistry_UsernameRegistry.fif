@@ -85,6 +85,7 @@ PROGRAM{
   DECLPROC $UsernameRegistry$_fun_requireRefundDueAndNotificationAckReserve
   DECLPROC $AthTransferNotificationAck$_constructor_query_id_sender_key_amount
   DECLPROC $UsernameRegistry$_fun_sendAthNotificationAck
+  DECLPROC $UsernameRegistry$_fun_refundRejectedMintExcess
   DECLPROC $UsernameRegistry$_fun_restoreRefundDue
   DECLPROC $UsernameRegistry$_fun_computeRefundFlushId
   DECLPROC $UsernameRegistry$_fun_clearPendingRefundFlush
@@ -1024,21 +1025,22 @@ PROGRAM{
     257 PUSHINT
     __tact_dict_get_slice_int INLINECALLDICT
     ISNULL
-    IF:<{
+    IFJMP:<{
+      7000000 PUSHINT
       19124 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      7000000 PUSHINT
-      GEQ
-      THROWANYIFNOT
-    }>ELSE<{
-      19125 PUSHINT
-      __tact_context_get INLINECALLDICT
-      $Context$_get_value INLINECALLDICT
-      3000000 PUSHINT
+      s2 PUSH
       GEQ
       THROWANYIFNOT
     }>
+    3000000 PUSHINT
+    19125 PUSHINT
+    __tact_context_get INLINECALLDICT
+    $Context$_get_value INLINECALLDICT
+    s2 PUSH
+    GEQ
+    THROWANYIFNOT
   }>
   $AthTransferNotificationAck$_constructor_query_id_sender_key_amount PROCINLINE:<{
     SWAP
@@ -1055,6 +1057,38 @@ PROGRAM{
     $AthTransferNotificationAck$_store_cell INLINECALLDICT
     s1 s4 XCHG
     s3 s3 s0 XCHG3
+    $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+        NEWC
+        b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+        1 STI               // store `bounce`
+        b{000} STSLICECONST // store bounced = false and src = addr_none
+        STSLICE             // store `to`
+        SWAP
+        STGRAMS             // store `value`
+        106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+        STZEROES
+        // → Stack state
+        // s0: Builder
+        // s1: `body`
+        // s2: `mode`
+        STDICT
+        ENDC
+        SWAP
+        SENDRAWMSG
+  }>
+  $UsernameRegistry$_fun_refundRejectedMintExcess PROCREF:<{
+    __tact_context_get INLINECALLDICT
+    $Context$_get_value INLINECALLDICT
+    SWAP
+    SUB
+    DUP
+    1 LESSINT
+    IFJMP:<{
+      2DROP
+    }>
+    FALSE
+    0 PUSHINT
+    PUSHNULL
     $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
         NEWC
         b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2277,16 +2311,26 @@ PROGRAM{
         24 s() PUSH
         $UsernameRegistry$_fun_requireRefundDueAndNotificationAckReserve INLINECALLDICT
         22 s() 23 s() XCHG
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        s0 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 23 s() XCHG
+        19 s() 23 s() XCHG
+        18 s() 23 s() XCHG
+        17 s() 23 s() XCHG
+        16 s() 23 s() XCHG
+        s15 23 s() XCHG
+        s14 23 s() XCHG
+        s13 23 s() XCHG
+        s12 23 s() XCHG
+        s11 23 s() XCHG
+        s10 23 s() XCHG
+        s9 23 s() XCHG
+        s0 23 s() XCHG
+        s0 s8 XCHG
+        s0 s7 XCHG
+        s0 s6 XCHG
+        5 -ROLL
         25 s() PUSH
+        27 s() PUSH
         $UsernameRegistry$_fun_addRefundDue INLINECALLDICT
         22 s() 25 s() XCHG
         21 s() 24 s() XCHG
@@ -2299,8 +2343,32 @@ PROGRAM{
         s14 17 s() XCHG
         s13 16 s() XCHG
         s12 s15 XCHG
-        3 12 BLKSWAP
+        s11 s14 XCHG
+        s10 s13 XCHG
+        s9 s12 XCHG
+        s8 s11 XCHG
+        s7 s10 XCHG
+        s6 s9 XCHG
+        s5 s8 XCHG
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        s1 27 s() XCHG
+        s0 26 s() XCHG
         $UsernameRegistry$_fun_sendAthNotificationAck INLINECALLDICT
+        22 s() 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 20 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 18 s() XCHG
+        s15 17 s() XCHG
+        s14 16 s() XCHG
+        s13 s15 XCHG
+        2 13 BLKSWAP
+        $UsernameRegistry$_fun_refundRejectedMintExcess INLINECALLDICT
         $UsernameRegistry$_contract_store INLINECALLDICT
       }>
       22 s() 23 s() XCHG
@@ -2333,16 +2401,26 @@ PROGRAM{
         24 s() PUSH
         $UsernameRegistry$_fun_requireRefundDueAndNotificationAckReserve INLINECALLDICT
         22 s() 23 s() XCHG
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        s0 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 23 s() XCHG
+        19 s() 23 s() XCHG
+        18 s() 23 s() XCHG
+        17 s() 23 s() XCHG
+        16 s() 23 s() XCHG
+        s15 23 s() XCHG
+        s14 23 s() XCHG
+        s13 23 s() XCHG
+        s12 23 s() XCHG
+        s11 23 s() XCHG
+        s10 23 s() XCHG
+        s9 23 s() XCHG
+        s0 23 s() XCHG
+        s0 s8 XCHG
+        s0 s7 XCHG
+        s0 s6 XCHG
+        5 -ROLL
         25 s() PUSH
+        27 s() PUSH
         $UsernameRegistry$_fun_addRefundDue INLINECALLDICT
         22 s() 25 s() XCHG
         21 s() 24 s() XCHG
@@ -2355,8 +2433,32 @@ PROGRAM{
         s14 17 s() XCHG
         s13 16 s() XCHG
         s12 s15 XCHG
-        3 12 BLKSWAP
+        s11 s14 XCHG
+        s10 s13 XCHG
+        s9 s12 XCHG
+        s8 s11 XCHG
+        s7 s10 XCHG
+        s6 s9 XCHG
+        s5 s8 XCHG
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        s1 27 s() XCHG
+        s0 26 s() XCHG
         $UsernameRegistry$_fun_sendAthNotificationAck INLINECALLDICT
+        22 s() 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 20 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 18 s() XCHG
+        s15 17 s() XCHG
+        s14 16 s() XCHG
+        s13 s15 XCHG
+        2 13 BLKSWAP
+        $UsernameRegistry$_fun_refundRejectedMintExcess INLINECALLDICT
         $UsernameRegistry$_contract_store INLINECALLDICT
       }>
       s10 PUSH
@@ -2377,16 +2479,26 @@ PROGRAM{
         24 s() PUSH
         $UsernameRegistry$_fun_requireRefundDueAndNotificationAckReserve INLINECALLDICT
         22 s() 23 s() XCHG
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        s0 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 23 s() XCHG
+        19 s() 23 s() XCHG
+        18 s() 23 s() XCHG
+        17 s() 23 s() XCHG
+        16 s() 23 s() XCHG
+        s15 23 s() XCHG
+        s14 23 s() XCHG
+        s13 23 s() XCHG
+        s12 23 s() XCHG
+        s11 23 s() XCHG
+        s10 23 s() XCHG
+        s9 23 s() XCHG
+        s0 23 s() XCHG
+        s0 s8 XCHG
+        s0 s7 XCHG
+        s0 s6 XCHG
+        5 -ROLL
         25 s() PUSH
+        27 s() PUSH
         $UsernameRegistry$_fun_addRefundDue INLINECALLDICT
         22 s() 25 s() XCHG
         21 s() 24 s() XCHG
@@ -2399,8 +2511,32 @@ PROGRAM{
         s14 17 s() XCHG
         s13 16 s() XCHG
         s12 s15 XCHG
-        3 12 BLKSWAP
+        s11 s14 XCHG
+        s10 s13 XCHG
+        s9 s12 XCHG
+        s8 s11 XCHG
+        s7 s10 XCHG
+        s6 s9 XCHG
+        s5 s8 XCHG
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        s1 27 s() XCHG
+        s0 26 s() XCHG
         $UsernameRegistry$_fun_sendAthNotificationAck INLINECALLDICT
+        22 s() 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 20 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 18 s() XCHG
+        s15 17 s() XCHG
+        s14 16 s() XCHG
+        s13 s15 XCHG
+        2 13 BLKSWAP
+        $UsernameRegistry$_fun_refundRejectedMintExcess INLINECALLDICT
         $UsernameRegistry$_contract_store INLINECALLDICT
       }>
       s9 PUSH
@@ -2421,16 +2557,26 @@ PROGRAM{
         24 s() PUSH
         $UsernameRegistry$_fun_requireRefundDueAndNotificationAckReserve INLINECALLDICT
         22 s() 23 s() XCHG
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        s0 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 23 s() XCHG
+        19 s() 23 s() XCHG
+        18 s() 23 s() XCHG
+        17 s() 23 s() XCHG
+        16 s() 23 s() XCHG
+        s15 23 s() XCHG
+        s14 23 s() XCHG
+        s13 23 s() XCHG
+        s12 23 s() XCHG
+        s11 23 s() XCHG
+        s10 23 s() XCHG
+        s9 23 s() XCHG
+        s0 23 s() XCHG
+        s0 s8 XCHG
+        s0 s7 XCHG
+        s0 s6 XCHG
+        5 -ROLL
         25 s() PUSH
+        27 s() PUSH
         $UsernameRegistry$_fun_addRefundDue INLINECALLDICT
         22 s() 25 s() XCHG
         21 s() 24 s() XCHG
@@ -2443,8 +2589,32 @@ PROGRAM{
         s14 17 s() XCHG
         s13 16 s() XCHG
         s12 s15 XCHG
-        3 12 BLKSWAP
+        s11 s14 XCHG
+        s10 s13 XCHG
+        s9 s12 XCHG
+        s8 s11 XCHG
+        s7 s10 XCHG
+        s6 s9 XCHG
+        s5 s8 XCHG
+        s4 s7 XCHG
+        s3 s6 XCHG
+        s5 s1 s3 XCHG3
+        s4 s2 XCHG2
+        s1 27 s() XCHG
+        s0 26 s() XCHG
         $UsernameRegistry$_fun_sendAthNotificationAck INLINECALLDICT
+        22 s() 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 20 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 18 s() XCHG
+        s15 17 s() XCHG
+        s14 16 s() XCHG
+        s13 s15 XCHG
+        2 13 BLKSWAP
+        $UsernameRegistry$_fun_refundRejectedMintExcess INLINECALLDICT
         $UsernameRegistry$_contract_store INLINECALLDICT
       }>
       19122 PUSHINT
