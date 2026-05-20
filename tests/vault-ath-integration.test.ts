@@ -48,6 +48,10 @@ async function deployAthWallet(
   return blockchain.openContract(new ATHWallet(address, zeroInit));
 }
 
+async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
+  return (await blockchain.getContract(address)).balance;
+}
+
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -124,7 +128,7 @@ async function depositAth(params: {
 
 describe('Vault ATH integration with production ATHWallet', () => {
   it('VAULT-ATH-01: production ATHWallet transfer-with-notify credits Vault internal ath_balance', async () => {
-    const { vault, user, userAthWallet } = await setup();
+    const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setup();
 
     await depositAth({ vault, user, userAthWallet, amount: 1_000n, queryId: 1n });
 
@@ -135,6 +139,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(source.balance).toBe(4_000n);
     expect((await vault.getGetGlobal()).user_count).toBe(1n);
     expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(1n);
+    expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.01'));
   });
 
   it('VAULT-ATH-02: insufficient notification value is rejected before debiting the source wallet', async () => {

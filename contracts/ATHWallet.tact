@@ -8,6 +8,7 @@ const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 2000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 2000000;
+const ATH_OWNER_REQUEST_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
@@ -209,6 +210,24 @@ contract ATHWallet {
         return (query_id * ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD) + sender_key;
     }
 
+    fun notify_transfer_value(notify_value: Int): Int {
+        return notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+    }
+
+    fun refund_owner_excess(destination: Address, amount: Int) {
+        if (amount <= 0) {
+            return;
+        }
+
+        message(MessageParameters {
+            to: destination,
+            value: amount,
+            bounce: false,
+            mode: SendDefaultMode,
+            body: null
+        });
+    }
+
     fun refund_bounced_notification(query_id: Int, sender_key: Int, amount: Int) {
         throwUnless(14330, amount > 0);
         throwUnless(14331, self.balance >= amount);
@@ -246,14 +265,16 @@ contract ATHWallet {
         throwUnless(14001, msg.amount > 0);
         throwUnless(14002, self.balance >= msg.amount);
         throwUnless(14005, msg.response_destination == self.owner_address);
-        throwUnless(14006, context().value >= ATH_BURN_NOTIFICATION_EXEC_RESERVE);
+        let required_value: Int = ATH_BURN_NOTIFICATION_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        throwUnless(14006, context().value >= required_value);
+        let downstream_value: Int = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE;
 
         self.balance -= msg.amount;
 
         message(MessageParameters {
             to: self.ath_master_address,
-            value: 0,
-            mode: SendRemainingValue,
+            value: downstream_value,
+            mode: SendPayFwdFeesSeparately,
             bounce: true,
             body: ATHBurnNotification {
                 query_id: msg.query_id,
@@ -307,7 +328,9 @@ contract ATHWallet {
         throwUnless(14201, msg.response_destination == self.owner_address);
         throwUnless(14202, msg.amount > 0);
         throwUnless(14203, self.balance >= msg.amount);
-        throwUnless(14204, context().value >= ATH_INTERNAL_TRANSFER_EXEC_RESERVE);
+        let required_value: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        throwUnless(14204, context().value >= required_value);
+        let downstream_value: Int = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE;
 
         self.balance -= msg.amount;
 
@@ -316,9 +339,9 @@ contract ATHWallet {
 
         send(SendParameters {
             to: recipient_wallet,
-            value: 0,
+            value: downstream_value,
             bounce: true,
-            mode: SendRemainingValue,
+            mode: SendPayFwdFeesSeparately,
             code: recipient_init.code,
             data: recipient_init.data,
             body: ATHInternalTransfer {
@@ -338,7 +361,9 @@ contract ATHWallet {
         throwUnless(14304, msg.notify_value > 0);
         throwUnless(14305, self.balance >= msg.amount);
         throwUnless(14306, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14307, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+        let downstream_value: Int = self.notify_transfer_value(msg.notify_value);
+        let required_value: Int = downstream_value + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        throwUnless(14307, context().value >= required_value);
 
         self.balance -= msg.amount;
 
@@ -347,9 +372,9 @@ contract ATHWallet {
 
         send(SendParameters {
             to: recipient_wallet,
-            value: 0,
+            value: downstream_value,
             bounce: true,
-            mode: SendRemainingValue,
+            mode: SendPayFwdFeesSeparately,
             code: recipient_init.code,
             data: recipient_init.data,
             body: ATHInternalTransferWithNotify {
@@ -361,6 +386,8 @@ contract ATHWallet {
                 notify_value: msg.notify_value
             }.toCell()
         });
+
+        self.refund_owner_excess(msg.response_destination, context().value - required_value);
     }
 
     receive(msg: ATHTransferRequestMintUsername) {
@@ -370,7 +397,9 @@ contract ATHWallet {
         throwUnless(14503, msg.notify_value > 0);
         throwUnless(14504, self.balance >= msg.amount);
         throwUnless(14505, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14506, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+        let downstream_value: Int = self.notify_transfer_value(msg.notify_value);
+        let required_value: Int = downstream_value + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        throwUnless(14506, context().value >= required_value);
 
         self.balance -= msg.amount;
 
@@ -379,9 +408,9 @@ contract ATHWallet {
 
         send(SendParameters {
             to: recipient_wallet,
-            value: 0,
+            value: downstream_value,
             bounce: true,
-            mode: SendRemainingValue,
+            mode: SendPayFwdFeesSeparately,
             code: recipient_init.code,
             data: recipient_init.data,
             body: ATHInternalTransferMintUsername {
@@ -394,6 +423,8 @@ contract ATHWallet {
                 username: msg.username
             }.toCell()
         });
+
+        self.refund_owner_excess(msg.response_destination, context().value - required_value);
     }
 
     receive(msg: ATHInternalTransfer) {

@@ -56,6 +56,9 @@ PROGRAM{
   DECLPROC $ATHWallet$_fun_compute_notification_id
   DECLPROC $ATHWallet$_fun_compute_sender_key
   DECLPROC $ATHWallet$_fun_compute_pending_notification_key
+  DECLPROC $ATHWallet$_fun_notify_transfer_value
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $ATHWallet$_fun_refund_owner_excess
   DECLPROC $SendParameters$_constructor_to_value_bounce_mode_code_data_body
   DECLPROC $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
   DECLPROC $ATHWallet$_fun_refund_bounced_notification
@@ -505,6 +508,45 @@ PROGRAM{
     32 LSHIFT#
     SWAP
     ADD
+  }>
+  $ATHWallet$_fun_notify_transfer_value PROCREF:<{
+    1000000 PUSHINT
+    ADD
+    2000000 PUSHINT
+    ADD
+    2000000 PUSHINT
+    ADD
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $ATHWallet$_fun_refund_owner_excess PROCREF:<{
+    DUP
+    1 LESSINT
+    IFJMP:<{
+      2DROP
+    }>
+    FALSE
+    0 PUSHINT
+    PUSHNULL
+    $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+        NEWC
+        b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+        1 STI               // store `bounce`
+        b{000} STSLICECONST // store bounced = false and src = addr_none
+        STSLICE             // store `to`
+        SWAP
+        STGRAMS             // store `value`
+        106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+        STZEROES
+        // → Stack state
+        // s0: Builder
+        // s1: `body`
+        // s2: `mode`
+        STDICT
+        ENDC
+        SWAP
+        SENDRAWMSG
   }>
   $SendParameters$_constructor_to_value_bounce_mode_code_data_body PROCINLINE:<{
     s3 s6 XCHG
@@ -994,26 +1036,30 @@ PROGRAM{
       s1 s5 PUSH2
       SDEQ
       THROWANYIFNOT
+      4000000 PUSHINT
       14006 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      2000000 PUSHINT
+      ROT
       GEQ
       THROWANYIFNOT
-      s5 s1 XCPU
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
       SUB
-      0 PUSHINT
-      64 PUSHINT
+      s6 s2 XCPU
+      SUB
+      1 PUSHINT
       s4 s3 s6 XC2PU
       TRUE
-      s0 s9 XCHG
+      s0 s4 XCHG
       $ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination INLINECALLDICT
       NEWC
       $ATHBurnNotification$_store_cell INLINECALLDICT
       s4 PUSH
       s0 s4 XCHG
-      s3 s1 s3 XCHG3
-      s7 s7 XCHG2
+      s0 s7 XCHG
+      3 -ROLL
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1125,34 +1171,39 @@ PROGRAM{
       s7 s3 PUSH2
       GEQ
       THROWANYIFNOT
+      4000000 PUSHINT
       14204 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      2000000 PUSHINT
+      ROT
       GEQ
       THROWANYIFNOT
-      s6 s2 XCPU
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
+      SUB
+      s7 s3 XCPU
       SUB
       s0 s4 XCHG
-      s3 s5 XCHG
-      s0 s7 s8 XCHG3
-      s7 PUSH
+      s3 s6 XCHG
+      s5 s8 s9 XCHG3
+      s5 PUSH
       $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
       0 PUSHINT
-      s0 s9 s4 XC2PU
+      s0 s7 s4 XC2PU
       $ATHWallet$_init_child INLINECALLDICT
-      0 PUSHINT
       TRUE
-      s9 s12 s7 XC2PU
-      64 PUSHINT
-      s0 s12 XCHG
+      s12 s9 s6 XC2PU
+      1 PUSHINT
+      s0 s13 XCHG
       $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination INLINECALLDICT
       NEWC
       $ATHInternalTransfer$_store_cell INLINECALLDICT
-      s6 s10 XCHG
-      s5 s8 XCHG
-      s4 s11 XCHG
-      s3 s9 XCHG
+      s6 s7 XCHG
+      s5 s9 XCHG
+      s4 s8 XCHG
+      s3 s10 XCHG
+      s1 s11 s0 XCHG3
       $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1220,7 +1271,7 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s1 s4 s4 XCHG3
+      s1 s3 s4 XCHG3
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1269,41 +1320,42 @@ PROGRAM{
       30000000 PUSHINT
       GEQ
       THROWANYIFNOT
+      s4 s8 XCHG
+      s3 s7 XCHG
+      s6 s9 s10 XCHG3
+      s10 PUSH
+      $ATHWallet$_fun_notify_transfer_value INLINECALLDICT
+      DUP
+      2000000 PUSHINT
+      ADD
       14307 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       s2 PUSH
-      1000000 PUSHINT
-      ADD
-      2000000 PUSHINT
-      ADD
-      2000000 PUSHINT
-      ADD
       GEQ
       THROWANYIFNOT
-      s8 s4 XCPU
+      s6 s10 XCPU
       SUB
-      s0 s4 XCHG
-      s3 s7 XCHG
-      s6 s9 s10 XCHG3
-      s7 PUSH
+      4 2 BLKSWAP
+      s9 PUSH
       $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
       0 PUSHINT
-      s0 s9 s4 XC2PU
+      s0 s11 s4 XC2PU
       $ATHWallet$_init_child INLINECALLDICT
-      s7 s12 XCHG2
-      0 PUSHINT
+      s9 s12 XCHG2
       TRUE
-      64 PUSHINT
-      s8 PUSH
-      s12 s1 s3 XCHG3
-      s15 s14 XCHG2
+      1 PUSHINT
+      s7 PUSH
+      s13 s2 s(-1) PUXC2
+      s1 17 s() XCHG
+      s0 18 s() XCHG
       $ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value INLINECALLDICT
       NEWC
       $ATHInternalTransferWithNotify$_store_cell INLINECALLDICT
-      5 5 REVERSE
-      s4 s7 XCHG
-      s3 s10 XCHG
+      s6 s10 XCHG
+      s5 s10 XCHG
+      s4 s12 XCHG
+      s3 s13 XCHG
       s8 s11 s0 XCHG3
       $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
           NEWC
@@ -1372,8 +1424,14 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s4 s1 s3 XCHG3
-      s0 s2 XCHG
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SWAP
+      SUB
+      s1 s3 XCHG
+      s1 s6 XCHG
+      s4 s4 s0 XCHG3
+      $ATHWallet$_fun_refund_owner_excess INLINECALLDICT
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
@@ -1414,46 +1472,43 @@ PROGRAM{
       30000000 PUSHINT
       GEQ
       THROWANYIFNOT
+      s4 s9 XCHG
+      s3 s8 XCHG
+      s7 s10 s11 XCHG3
+      s7 PUSH
+      $ATHWallet$_fun_notify_transfer_value INLINECALLDICT
+      DUP
+      2000000 PUSHINT
+      ADD
       14506 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      s4 PUSH
-      1000000 PUSHINT
-      ADD
-      2000000 PUSHINT
-      ADD
-      2000000 PUSHINT
-      ADD
+      s2 PUSH
       GEQ
       THROWANYIFNOT
-      s9 s5 XCPU
+      s6 s7 XCPU
       SUB
-      s0 s4 XCHG
-      s3 s8 XCHG
-      s7 s10 s11 XCHG3
+      4 2 BLKSWAP
       s11 PUSH
       $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
       0 PUSHINT
       s0 s13 s4 XC2PU
       $ATHWallet$_init_child INLINECALLDICT
-      s8 s7 s0 XCHG3
-      0 PUSHINT
+      s10 s9 s0 XCHG3
       TRUE
-      64 PUSHINT
-      s8 PUSH
-      s0 s4 XCHG
-      s3 s14 XCHG
-      s2 s13 XCHG
-      s1 16 s() XCHG
-      s0 s15 XCHG
+      1 PUSHINT
+      s7 PUSH
+      s3 s15 XCPU
+      s15 s1 s3 XCHG3
+      s1 18 s() XCHG
+      s0 19 s() XCHG
       $ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username INLINECALLDICT
       NEWC
       $ATHInternalTransferMintUsername$_store_cell INLINECALLDICT
       s6 s11 XCHG
-      s5 s8 XCHG
-      s4 s7 XCHG
-      s3 s10 XCHG
-      s8 s9 s0 XCHG3
+      s4 s13 XCHG
+      s3 s9 XCHG
+      s7 s12 s0 XCHG3
       $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1521,7 +1576,13 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      s2 s4 XCHG2
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s0 s5 XCHG2
+      SUB
+      s1 s5 s0 XCHG3
+      s1 s3 XCHG
+      $ATHWallet$_fun_refund_owner_excess INLINECALLDICT
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER

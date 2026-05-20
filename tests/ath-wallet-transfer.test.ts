@@ -34,6 +34,10 @@ async function deployWallet(blockchain: Blockchain, owner: Address, master: Addr
   return blockchain.openContract(new ATHWallet(address, zeroInit));
 }
 
+async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
+  return (await blockchain.getContract(address)).balance;
+}
+
 describe('ATH wallet transfer profile', () => {
   it('ATH-XFER-01: owner-authorized transfer debits source wallet and credits deterministic recipient wallet', async () => {
     const blockchain = await Blockchain.create();
@@ -141,6 +145,30 @@ describe('ATH wallet transfer profile', () => {
 
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
     expect((await recipientWallet.getGetWalletData()).balance).toBe(300n);
+  });
+
+  it('ATH-XFER-04B: notify transfer does not strand owner overpayment in recipient ATH wallet', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-transfer-notify-excess-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-notify-excess-recipient');
+    const master = fixtureAddress('ATH_TRANSFER_NOTIFY_EXCESS_MASTER');
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 414n,
+      amount: 100n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      notify_destination: recipientOwner.address,
+      notify_value: toNano('0.03'),
+    } as ATHTransferRequestWithNotify);
+
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
+    expect(await contractBalance(blockchain, recipientAddress)).toBeLessThan(toNano('0.01'));
   });
 
   it('ATH-XFER-05: stale notify pending can be pruned when destination never ACKs', async () => {

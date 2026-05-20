@@ -61,6 +61,10 @@ async function deployAthWallet(
   return blockchain.openContract(new ATHWallet(address, zeroInit));
 }
 
+async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
+  return (await blockchain.getContract(address)).balance;
+}
+
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -131,7 +135,7 @@ async function mintViaProductionWallet(params: {
 
 describe('UsernameRegistry integration with production ATHWallet', () => {
   it('USERNAME-ATH-PROD-01: user wallet can mint through official ATH wallet, not a direct test-only notification', async () => {
-    const { registry, user, userAthWallet, officialAthWallet } = await setup();
+    const { blockchain, registry, user, userAthWallet, officialAthWallet } = await setup();
     const username = 'platho';
     const hash = nameHash(username);
 
@@ -152,6 +156,7 @@ describe('UsernameRegistry integration with production ATHWallet', () => {
     expect(record.owner_wallet.equals(user.address)).toBe(true);
     expect(source.balance).toBe(PRICE_6_PLUS);
     expect(official.balance).toBe(PRICE_6_PLUS);
+    expect(await contractBalance(blockchain, officialAthWallet.address)).toBeLessThan(toNano('0.01'));
     expect(findTransaction(result.transactions, {
       from: officialAthWallet.address,
       to: registry.address,

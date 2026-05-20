@@ -228,8 +228,8 @@ builder $M20TFeeAccumulatorHarness$_store(builder build_0, (int, slice, slice, i
 
 ((int, slice, slice, int, int, int), (int, slice, slice, int, int, int)) $M20TFeeAccumulatorHarness$_fun_get_state((int, slice, slice, int, int, int) $self) impure inline_ref {
     var (($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount)) = $self;
-    var $fresh$ret_59 = $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount);
-    return (($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount), $fresh$ret_59);
+    var $fresh$ret_0 = $M20TFeeAccumulatorHarnessStateView$_constructor_run_id_controller_address_buyback_burn_address_buyback_due_ton_flush_count_last_flush_amount($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount);
+    return (($self'run_id, $self'controller_address, $self'buyback_burn_address, $self'buyback_due_ton, $self'flush_count, $self'last_flush_amount), $fresh$ret_0);
 }
 
 ;;
