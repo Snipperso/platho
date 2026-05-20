@@ -1,0 +1,30 @@
+{
+  "profile": "PLATHO.V1.M37.USERNAME_NFT_ITEM_ACK_OVERPAY_GUARD",
+  "status": "PASS",
+  "finding": "UNFT-LOW-01",
+  "summary": "UsernameNFTItem.ResendDeployedAck now rejects large overpayment instead of trapping excess TON in the item balance.",
+  "source_changes": [
+    "contracts/UsernameNFTItem.tact",
+    "tests/username-nft-item.test.ts"
+  ],
+  "policy": {
+    "resend_min_value_nanotons": "4000000",
+    "resend_max_value_nanotons": "20000000",
+    "rationale": "Keep the initial UsernameRegistry deploy-and-ACK path funded by the existing 20M item deploy reserve, while rejecting oversized permissionless recovery sends such as 0.05 TON."
+  },
+  "code_hashes": {
+    "USERNAME_NFT_ITEM_CODE_HASH": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
+    "USERNAME_REGISTRY_CODE_HASH": "0c4aaf8fd4c5c0d2bed14a8979454d11ed0a38a67d87cf18adc6bdeeeb06d92b"
+  },
+  "deployment_manifest_implemented_subset_m15_hash": "2d73f3908e64af8443172376fc096555136d152b589ee60412c09eefd0c241cd",
+  "verification": {
+    "build": "npm.cmd run build",
+    "focused_tests": "npm.cmd run test:file -- tests\\username-nft-item.test.ts tests\\username-registry-boundary-negative.test.ts tests\\username-registry-paid-mint.test.ts tests\\username-registry-prune-pending-mint.test.ts",
+    "focused_tests_result": "4 files / 20 tests PASS",
+    "conformance_m16": "PASS",
+    "artifact_integrity_m18": "PASS",
+    "full_suite": "npm.cmd test",
+    "full_suite_result": "67 files / 283 tests PASS"
+  },
+  "production_note": "Deployment manifest remains IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS until mainnet route/funding/address evidence blockers are closed."
+}

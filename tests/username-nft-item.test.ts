@@ -68,7 +68,7 @@ describe('UsernameNFTItem v1 milestone', () => {
   it('USERNAME-NFT-02: ResendDeployedAck is permissionless and sends immutable owner/name identity to registry', async () => {
     const { caller, registry, item, ownerWallet, usernameHash } = await deployItem();
 
-    await item.send(caller.getSender(), { value: toNano('0.05') }, {
+    await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_RESERVE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
@@ -95,6 +95,16 @@ describe('UsernameNFTItem v1 milestone', () => {
 
     expect((await registry.getGetState()).ack_count).toBe(1n);
     expect(afterItemBalance).toBeGreaterThanOrEqual(beforeItemBalance);
+  });
+
+  it('USERNAME-NFT-05: ResendDeployedAck rejects large overpayment instead of trapping excess TON', async () => {
+    const { caller, registry, item } = await deployItem();
+
+    await item.send(caller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ResendDeployedAck',
+    } as ResendDeployedAck);
+
+    expect((await registry.getGetState()).ack_count).toBe(0n);
   });
 
   it('USERNAME-NFT-03: TopUpStorageReserve grants no ownership/name mutation and empty fallback is rejected', async () => {

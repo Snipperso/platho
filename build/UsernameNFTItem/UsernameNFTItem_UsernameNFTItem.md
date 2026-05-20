@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: UsernameNFTItem
-BoC Size: 350 bytes
+BoC Size: 368 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 15

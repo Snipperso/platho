@@ -59,7 +59,7 @@
     },
     {
       "contract": "UsernameNFTItem.tact",
-      "non_comment_lines": 49,
+      "non_comment_lines": 51,
       "receive_handlers": 3,
       "bounced_handlers": 0,
       "forbidden_hits": [],
@@ -112,13 +112,13 @@
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
-      "built": "96861964c8a76cd1d34b16dfcb9f8a4e68ffd652b00ac66ee7dc7410630e16b0",
-      "pinned": "96861964c8a76cd1d34b16dfcb9f8a4e68ffd652b00ac66ee7dc7410630e16b0",
+      "built": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
+      "pinned": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "7d640cf5c5708c49e32f8afa94e8e283c9f85f4db7ee09d3b8295ad56c05193f",
-      "pinned": "7d640cf5c5708c49e32f8afa94e8e283c9f85f4db7ee09d3b8295ad56c05193f",
+      "built": "0c4aaf8fd4c5c0d2bed14a8979454d11ed0a38a67d87cf18adc6bdeeeb06d92b",
+      "pinned": "0c4aaf8fd4c5c0d2bed14a8979454d11ed0a38a67d87cf18adc6bdeeeb06d92b",
       "match": true
     },
     "VAULT_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "b5c23fc5265fdbe03bfb91d1aac3304c5621a170e6739f23d854251a211fb0c1",
+    "manifest_hash_hex": "2d73f3908e64af8443172376fc096555136d152b589ee60412c09eefd0c241cd",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
