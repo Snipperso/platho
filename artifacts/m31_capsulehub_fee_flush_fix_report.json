@@ -1,0 +1,34 @@
+{
+  "profile": "PLATHO.V1.M31.CAPSULEHUB_FEE_FLUSH_ACCOUNTING_FIX",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "findings_closed": [
+    {
+      "id": "CH-01",
+      "title": "CapsuleHub FlushFees forwarded ACK reserve as unaccounted FeeAccumulator balance",
+      "resolution": "FlushFees now forwards only amount + FeeAccumulator deposit execution reserve and uses SendPayFwdFeesSeparately."
+    },
+    {
+      "id": "CH-02",
+      "title": "Discounted Vault fee dust below minimum could remain unflushable",
+      "resolution": "FlushFees keeps the normal minimum partial-flush rule but permits amount == accrued_plato_fee_ton for final dust flushes."
+    }
+  ],
+  "capsulehub_code_hash": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
+  "implemented_subset_manifest_hash": "719646897ce007c5aa628426f154304569641df7a485ba71d0745c11a7f1609b",
+  "reserve_policy": {
+    "flush_local_exec_reserve_nanotons": "2000000",
+    "feeaccumulator_deposit_exec_reserve_nanotons": "2000000",
+    "minimum_partial_flush_nanotons": "5000000",
+    "caller_value_required_nanotons": "4000000",
+    "outbound_value_to_feeaccumulator": "amount + 2000000"
+  },
+  "verification": {
+    "build": "npm.cmd run build: PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\capsulehub.test.ts tests\\capsulehub-state-invariants.test.ts tests\\capsulehub-boundary-negative.test.ts tests\\fee-accumulator-backing-negative.test.ts tests\\fee-accumulator.test.ts: 5 files / 30 tests PASS",
+    "full_suite": "npm.cmd test: 67 files / 277 tests PASS",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "production_note": "This closes the local CapsuleHub fee flush accounting findings only. The implemented-subset manifest remains non-final while mainnet genesis and STON.fi route blockers remain open."
+}

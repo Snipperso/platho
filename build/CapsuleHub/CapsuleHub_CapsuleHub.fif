@@ -1294,28 +1294,39 @@ PROGRAM{
       $CapsuleHub$_fun_requireSealed INLINECALLDICT
       13200 PUSHINT
       18 s() PUSH
-      5000000 PUSHINT
-      GEQ
+      0 GTINT
       THROWANYIFNOT
       13201 PUSHINT
       18 s() PUSH
       s10 PUSH
       LEQ
       THROWANYIFNOT
+      13205 PUSHINT
+      18 s() PUSH
+      5000000 PUSHINT
+      GEQ
+      IF:<{
+        TRUE
+      }>ELSE<{
+        18 s() PUSH
+        s10 PUSH
+        EQUAL
+      }>
+      THROWANYIFNOT
       13202 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      32000000 PUSHINT
+      4000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s0 s8 XCHG
       17 s() PUSH
       SUB
       17 s() PUSH
-      30000000 PUSHINT
+      2000000 PUSHINT
       ADD
       TRUE
-      0 PUSHINT
+      1 PUSHINT
       s0 20 s() XCHG
       $DepositProtocolFee$_constructor_amount INLINECALLDICT
       NEWC
