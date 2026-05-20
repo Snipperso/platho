@@ -30,7 +30,7 @@ PROGRAM{
   DECLPROC $BuybackBurn$_fun_deriveOwnAthWalletAddress
   DECLPROC $BuybackBurn$_fun_acceptManifestHash
   DECLPROC $BuybackBurn$_fun_validateMinOut
-  DECLPROC $BuybackBurn$_fun_requireFreshQueryId
+  DECLPROC $BuybackBurn$_fun_requireNextQueryId
   DECLPROC $BuybackBurn$_fun_recordTerminalQueryId
   DECLPROC $BuybackBurn$_fun_stonfiSwapPayload
   DECLPROC $BuybackBurn$_fun_ptonTonTransferBody
@@ -468,20 +468,21 @@ PROGRAM{
     LEQ
     THROWANYIFNOT
   }>
-  $BuybackBurn$_fun_requireFreshQueryId PROCREF:<{
+  $BuybackBurn$_fun_requireNextQueryId PROCREF:<{
+    22045 PUSHINT
+    OVER
+    64 PUSHPOW2DEC
+    LESS
+    THROWANYIFNOT
     22044 PUSHINT
-    s1 s5 XCPU
-    GREATER
+    s5 PUSH
+    INC
+    s1 s2 XCHG
+    EQUAL
     THROWANYIFNOT
   }>
   $BuybackBurn$_fun_recordTerminalQueryId PROCREF:<{
-    s0 s4 PUSH2
-    GREATER
-    IF:<{
-      s4 POP
-    }>ELSE<{
-      DROP
-    }>
+    s4 POP
   }>
   $BuybackBurn$_fun_stonfiSwapPayload PROCREF:<{
     FALSE
@@ -1599,7 +1600,7 @@ PROGRAM{
       0 GTINT
       THROWANYIFNOT
       33 s() PUSH
-      $BuybackBurn$_fun_requireFreshQueryId INLINECALLDICT
+      $BuybackBurn$_fun_requireNextQueryId INLINECALLDICT
       22214 PUSHINT
           NOW
       34 s() PUSH
@@ -2080,7 +2081,7 @@ PROGRAM{
       0 GTINT
       THROWANYIFNOT
       32 s() PUSH
-      $BuybackBurn$_fun_requireFreshQueryId INLINECALLDICT
+      $BuybackBurn$_fun_requireNextQueryId INLINECALLDICT
       s6 POP
       s6 POP
       s8 POP

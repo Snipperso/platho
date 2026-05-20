@@ -187,7 +187,7 @@ async function acceptReserve(env: Awaited<ReturnType<typeof setup>>) {
   } as AcceptBurnReserve);
 }
 
-async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 77n) {
+async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 1n) {
   await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
     $$type: 'ExecuteBuybackChunk',
     query_id: queryId,
@@ -325,12 +325,13 @@ describe('BuybackBurn auth and negative matrix', () => {
     const now = BigInt(env.blockchain.now ?? 0);
     const invalidExecs: ExecuteBuybackChunk[] = [
       { $$type: 'ExecuteBuybackChunk', query_id: 0n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 2n, deadline: now, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 3n, deadline: now + 901n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 4n, deadline: now + 600n, quote_out_atomic_ath: 0n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 5n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 94_999n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 6n, deadline: now + 600n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 189_999n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 7n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 100_001n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 2n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 901n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 0n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 94_999n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 189_999n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 100_001n },
     ];
 
     for (const msg of invalidExecs) {
@@ -342,7 +343,7 @@ describe('BuybackBurn auth and negative matrix', () => {
 
     await env.buyback.send(env.operator.getSender(), { value: PTON_TRANSFER_GAS - 1n }, {
       $$type: 'ExecuteBuybackChunk',
-      query_id: 8n,
+      query_id: 1n,
       deadline: now + 600n,
       quote_out_atomic_ath: 100_000n,
       dex_min_out_atomic_ath: 95_000n,
@@ -350,14 +351,14 @@ describe('BuybackBurn auth and negative matrix', () => {
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_IDLE);
     expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
 
-    await executeBuyback(env, 9n);
+    await executeBuyback(env, 1n);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
     await acceptReserve(env);
-    await executeBuyback(env, 10n);
+    await executeBuyback(env, 2n);
     const pending = await env.buyback.getGetBuybackBurnState();
     expect(pending.phase).toBe(PHASE_PENDING_STONFI_SWAP);
-    expect(pending.pending_query_id).toBe(9n);
+    expect(pending.pending_query_id).toBe(1n);
     expect(pending.reserve_due_ton).toBe(ENVELOPE);
   });
 
@@ -365,28 +366,28 @@ describe('BuybackBurn auth and negative matrix', () => {
     const env = await setup();
     await freezeAndSeal(env);
     await acceptReserve(env);
-    await executeBuyback(env, 20n);
+    await executeBuyback(env, 1n);
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'AthTransferNotification',
-      query_id: 20n,
+      query_id: 1n,
       amount: 100_000n,
       sender_key: 0n,
       sender_wallet: env.stonfiPoolOwner.address,
     } as AthTransferNotification);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
-    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 94_999n, 20n);
+    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 94_999n, 1n);
     let state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
 
-    await sendStonfiAthNotify(env, env.wrongPoolOwner.address, env.wrongPoolOwner.getSender(), 100_000n, 20n);
+    await sendStonfiAthNotify(env, env.wrongPoolOwner.address, env.wrongPoolOwner.getSender(), 100_000n, 1n);
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
 
-    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 100_000n, 20n, toNano('0.02'));
+    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 100_000n, 1n, toNano('0.02'));
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
@@ -400,38 +401,38 @@ describe('BuybackBurn auth and negative matrix', () => {
     expect((await env.buyback.getGetBuybackBurnState()).route_refund_due_ton).toBe(0n);
 
     await acceptReserve(env);
-    await executeBuyback(env, 30n);
+    await executeBuyback(env, 1n);
 
     await env.buyback.send(env.stonfiRouter.getSender(), { value: toNano('48.999') }, null);
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 30n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
     env.blockchain.now = (env.blockchain.now ?? 0) + 1501;
     await env.buyback.send(env.attacker.getSender(), { value: ROUTE_REFUND_RECOVERY_EXEC_RESERVE - 1n }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 30n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 30n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
     await env.buyback.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.005') }, null);
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 31n,
+      query_id: 2n,
     } as RecoverStonfiRouteRefund);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
-      query_id: 30n,
+      query_id: 1n,
     } as RecoverStonfiRouteRefund);
     let state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_IDLE);
@@ -470,9 +471,9 @@ describe('BuybackBurn auth and negative matrix', () => {
     const env = await setup({ deployAthMaster: false });
     await freezeAndSeal(env);
     await acceptReserve(env);
-    await executeBuyback(env, 40n);
+    await executeBuyback(env, 1n);
 
-    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 100_000n, 40n);
+    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 100_000n, 1n);
 
     let state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_IDLE);
@@ -480,8 +481,8 @@ describe('BuybackBurn auth and negative matrix', () => {
 
     for (const [value, msg] of [
       [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 0n, amount: 100_000n }],
-      [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 41n, amount: 100_001n }],
-      [ATH_BURN_REQUEST_VALUE - 1n, { $$type: 'RetryAthBurnDue', query_id: 41n, amount: 100_000n }],
+      [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_001n }],
+      [ATH_BURN_REQUEST_VALUE - 1n, { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_000n }],
     ] as const) {
       await env.buyback.send(env.attacker.getSender(), { value }, msg as RetryAthBurnDue);
       state = await env.buyback.getGetBuybackBurnState();
@@ -491,7 +492,7 @@ describe('BuybackBurn auth and negative matrix', () => {
 
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'ATHBurnFailed',
-      query_id: 40n,
+      query_id: 1n,
       amount: 100_000n,
     } as ATHBurnFailed);
     state = await env.buyback.getGetBuybackBurnState();
@@ -508,7 +509,7 @@ describe('BuybackBurn auth and negative matrix', () => {
 
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
       $$type: 'RetryAthBurnDue',
-      query_id: 41n,
+      query_id: 2n,
       amount: 100_000n,
     } as RetryAthBurnDue);
 
