@@ -5,6 +5,7 @@
 import "./ATHWallet.tact";
 
 const ATH_TOTAL_SUPPLY_ATOMIC: Int = 100000000000000000;
+const ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE: Int = 2000000;
 
 message(0x41544807) DeployTreasurySupply {
     query_id: Int as uint64;
@@ -64,7 +65,9 @@ contract ATHMaster {
         throwUnless(14121, !self.treasury_supply_deployed);
         throwUnless(14122, msg.response_destination == self.treasury_owner);
         throwUnless(14123, self.total_supply == ATH_TOTAL_SUPPLY_ATOMIC);
-        throwUnless(14124, context().value >= ATH_GENESIS_SUPPLY_EXEC_RESERVE + ATH_GENESIS_SUPPLY_ACK_VALUE);
+        let downstream_value: Int = ATH_GENESIS_SUPPLY_EXEC_RESERVE + ATH_GENESIS_SUPPLY_ACK_VALUE;
+        let required_value: Int = downstream_value + ATH_GENESIS_SUPPLY_OWNER_EXEC_RESERVE;
+        throwUnless(14124, context().value >= required_value);
 
         self.treasury_supply_deployed = true;
 
@@ -72,9 +75,9 @@ contract ATHMaster {
         let treasury_wallet: Address = self.derive_wallet_address(self.treasury_owner);
         send(SendParameters {
             to: treasury_wallet,
-            value: 0,
+            value: downstream_value,
             bounce: true,
-            mode: SendRemainingValue,
+            mode: SendPayFwdFeesSeparately,
             code: wallet_init.code,
             data: wallet_init.data,
             body: ATHGenesisSupplyCredit {
@@ -83,6 +86,17 @@ contract ATHMaster {
                 response_destination: msg.response_destination
             }.toCell()
         });
+
+        let excess: Int = context().value - required_value;
+        if (excess > 0) {
+            message(MessageParameters {
+                to: msg.response_destination,
+                value: excess,
+                bounce: false,
+                mode: SendDefaultMode,
+                body: null
+            });
+        }
     }
 
     bounced(msg: bounced<ATHGenesisSupplyCredit>) {

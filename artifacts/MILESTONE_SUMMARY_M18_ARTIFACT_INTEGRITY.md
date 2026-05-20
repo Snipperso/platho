@@ -24,8 +24,8 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 
 ## Manifest
 
-- Stored hash: c89a46b2d5a077412460da163b0285229973300d65973f9cd7d722fa5ea74a4f
-- Rebuilt hash: c89a46b2d5a077412460da163b0285229973300d65973f9cd7d722fa5ea74a4f
+- Stored hash: 70abd184bfc44ef281059e088a0755853b3b0d14950b374c36dddf0fb13c5080
+- Rebuilt hash: 70abd184bfc44ef281059e088a0755853b3b0d14950b374c36dddf0fb13c5080
 - Match: true
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
 
@@ -33,7 +33,7 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 
 | Key | Built | Pinned | Match |
 |---|---|---|---|
-| ATHMASTER_CODE_HASH | 005fe31e1e3ce7850498b501ca137dba7c38676dd86ccbbe3b563f9a283b2ec3 | 005fe31e1e3ce7850498b501ca137dba7c38676dd86ccbbe3b563f9a283b2ec3 | true |
+| ATHMASTER_CODE_HASH | 83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5 | 83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5 | true |
 | ATH_WALLET_CODE_HASH | bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4 | bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4 | true |
 | BUYBACKBURN_CODE_HASH | f76fa64b76e786944003d89437da46b015eda511136fc761fc5b77743300307a | f76fa64b76e786944003d89437da46b015eda511136fc761fc5b77743300307a | true |
 | CAPSULEHUB_CODE_HASH | 8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed | 8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed | true |

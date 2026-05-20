@@ -1,0 +1,42 @@
+{
+  "profile": "PLATHO.V1.M34.ATHMASTER_GENESIS_VALUE_FLOW_FIX",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "findings_closed": [
+    {
+      "id": "ATHM-01",
+      "title": "DeployTreasurySupply accepted exact 3,000,000 nanotons even though downstream genesis credit could not receive the required reserve after first-hop fees",
+      "resolution": "DeployTreasurySupply now requires a 5,000,000 nanotons caller value: 3,000,000 nanotons downstream genesis envelope plus a 2,000,000 nanotons ATHMaster first-hop execution reserve. The treasury wallet receives the downstream envelope with SendPayFwdFeesSeparately."
+    },
+    {
+      "id": "ATHM-02",
+      "title": "DeployTreasurySupply overpayment was forwarded into the treasury ATH wallet as unaccounted TON balance",
+      "resolution": "ATHMaster now forwards only the canonical downstream genesis envelope to the treasury ATH wallet and refunds any caller overpayment to the treasury owner response destination."
+    }
+  ],
+  "ath_master_code_hash": "83e0d67eea0dbf385aa716a931ce093f9fed25cad4304bc8caa866eec34a7cb5",
+  "ath_wallet_code_hash": "bee2548d5aa56c9c45acd0ad7901052eb578858a6b8b95a57b83950b5a0baeb4",
+  "implemented_subset_manifest_hash": "70abd184bfc44ef281059e088a0755853b3b0d14950b374c36dddf0fb13c5080",
+  "genesis_deploy_policy": {
+    "downstream_wallet_value_nanotons": "3000000",
+    "master_first_hop_exec_reserve_nanotons": "2000000",
+    "required_value_nanotons": "5000000",
+    "outbound_mode": "SendPayFwdFeesSeparately",
+    "overpayment_policy": "refund to response_destination"
+  },
+  "mainnet_derivation_update": {
+    "script": "scripts/mainnet_ath_master_derivation.ts",
+    "requiredValueNanotons": "5000000",
+    "downstreamWalletValueNanotons": "3000000",
+    "ownerFirstHopExecReserveNanotons": "2000000",
+    "current_status": "BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS"
+  },
+  "verification": {
+    "build": "npm.cmd run build: PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\ath-wallet-derivation.test.ts tests\\ath-wallet-boundary-negative.test.ts tests\\ath-burn-finalization.test.ts tests\\mainnet-ath-master-derivation.test.ts: 4 files / 21 tests PASS",
+    "full_suite": "npm.cmd test: 67 files / 282 tests PASS",
+    "m16_conformance": "PASS",
+    "m18_artifact_integrity": "PASS"
+  },
+  "production_note": "This closes the local ATHMaster genesis value-flow findings only. The implemented-subset manifest remains non-final while mainnet genesis and STON.fi route blockers remain open."
+}
