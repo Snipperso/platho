@@ -148,8 +148,14 @@ registry MUST be sealed
 query_id MUST be > 0
 query_id MUST NOT be used by any pending ATH due flush
 threshold: treasury_due_ath MUST be > 0
+treasury_ath_receiver_address MUST be a basechain std address
 context().value MUST be >= USERNAME_ATH_TRANSFER_EXEC_RESERVE
 ```
+
+Seal also enforces the same basechain treasury receiver policy. The v1 treasury
+flush profile does not support masterchain treasury receivers; fixed ATH
+transfer envelopes are sized for basechain recipient ATH wallets.
+
 
 Effects before send:
 

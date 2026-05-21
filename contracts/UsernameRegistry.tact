@@ -20,6 +20,7 @@ const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
+const USERNAME_MINT_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
 const USERNAME_MAX_LENGTH: Int = 32;
 const USERNAME_SPLIT_BASE_BPS: Int = 10000;
@@ -271,6 +272,11 @@ contract UsernameRegistry {
         return contractAddressExt(owner_std.workchain, wallet_init.code, wallet_init.data);
     }
 
+    fun isBasechainAddress(address: Address): Bool {
+        let std: StdAddress = parseStdAddress(address.asSlice());
+        return std.workchain == 0;
+    }
+
     fun addRefundDue(owner_wallet: Address, amount: Int) {
         throwUnless(19110, amount > 0);
         let existing: Int? = self.ath_refunds_due.get(owner_wallet);
@@ -312,7 +318,7 @@ contract UsernameRegistry {
 
     fun refundRejectedMintExcess(owner_wallet: Address, retained_value: Int) {
         let excess: Int = context().value - retained_value;
-        if (excess <= 0) {
+        if (excess < USERNAME_MINT_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
 
@@ -409,6 +415,7 @@ contract UsernameRegistry {
         throwUnless(19041, self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(19042, self.official_ath_wallet_bound);
         throwUnless(19043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
+        throwUnless(19044, self.isBasechainAddress(self.treasury_ath_receiver_address));
         self.genesis_config_hash = msg.deployment_manifest_hash;
         self.sealed = true;
     }
@@ -417,6 +424,7 @@ contract UsernameRegistry {
         self.requireSealed();
         throwUnless(19120, sender() == self.official_ath_wallet_address);
         throwUnless(19121, msg.amount > 0);
+        throwUnless(19126, self.isBasechainAddress(msg.owner_wallet));
 
         if (!self.isValidUsernameBytes(msg.username_len, msg.username)) {
             let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
@@ -453,7 +461,8 @@ contract UsernameRegistry {
             return;
         }
 
-        throwUnless(19122, context().value >= USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE);
+        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
+        throwUnless(19122, context().value >= retainedValue);
 
         let item_address: Address = self.deriveItemAddress(msg.owner_wallet, name_hash);
         throwUnless(19123, !self.pending_item_to_name_hash.exists(item_address));
@@ -481,6 +490,7 @@ contract UsernameRegistry {
         });
 
         self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
+        self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
     }
 
     receive(msg: UsernameItemDeployedAck) {
@@ -528,6 +538,7 @@ contract UsernameRegistry {
         self.requireNoDueFlushQuery(msg.query_id);
         throwUnless(19211, self.treasury_due_ath > 0);
         throwUnless(19212, context().value >= USERNAME_ATH_TRANSFER_EXEC_RESERVE + USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE);
+        throwUnless(19213, self.isBasechainAddress(self.treasury_ath_receiver_address));
 
         let amount: Int = self.treasury_due_ath;
         self.treasury_due_ath = 0;
@@ -586,6 +597,7 @@ contract UsernameRegistry {
     receive(msg: FlushAthRefundDue) {
         self.requireSealed();
         throwUnless(19151, msg.query_id > 0);
+        throwUnless(19152, self.isBasechainAddress(msg.owner_wallet));
         let refundFlushId: Int = self.computeRefundFlushId(msg.owner_wallet, msg.query_id);
         self.requireNoDueFlushQuery(refundFlushId);
 

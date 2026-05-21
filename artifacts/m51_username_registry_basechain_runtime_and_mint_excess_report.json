@@ -1,0 +1,78 @@
+{
+  "profile": "PLATHO.V1.M51.USERNAME_REGISTRY_BASECHAIN_RUNTIME_AND_MINT_EXCESS",
+  "date": "2026-05-21",
+  "status": "PASS",
+  "findings": [
+    "UREG-01",
+    "UREG-02"
+  ],
+  "contract": "UsernameRegistry",
+  "codeChange": {
+    "file": "contracts/UsernameRegistry.tact",
+    "basechainRuntimeProfile": {
+      "paidMintOwnerWallet": true,
+      "refundFlushOwnerWallet": true,
+      "treasuryReceiverSealAndFlush": true,
+      "derivationVectorsStillIncludeNonBasechainAddressMath": true
+    },
+    "successfulMintExcessRefund": {
+      "enabled": true,
+      "minimumRefundNanotons": "100000",
+      "dustMayRemainAsRegistryReserve": true
+    }
+  },
+  "regressions": [
+    {
+      "file": "tests/username-registry-paid-mint.test.ts",
+      "coverage": [
+        "successful mint returns meaningful notify excess to owner wallet",
+        "masterchain owner mint rejects before name, pending, or refund state"
+      ]
+    },
+    {
+      "file": "tests/username-registry-boundary-negative.test.ts",
+      "coverage": [
+        "masterchain treasury receiver cannot seal registry runtime profile"
+      ]
+    }
+  ],
+  "hashes": {
+    "usernameRegistryCodeHash": "637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1",
+    "implementedSubsetManifestHash": "d3a3c28b14cb73b3dc5f53cdcc2d02850bfefe693b6c8c23daf57ccc59247a60"
+  },
+  "verification": {
+    "build": {
+      "command": "npm.cmd run build",
+      "status": "PASS"
+    },
+    "focusedTests": {
+      "command": "npm.cmd run test:file -- tests\\\\username-registry-foundation.test.ts tests\\\\username-registry-paid-mint.test.ts tests\\\\username-registry-refund-flush.test.ts tests\\\\username-registry-due-flush.test.ts tests\\\\username-registry-prune-pending-mint.test.ts tests\\\\username-registry-ath-wallet-integration.test.ts tests\\\\username-registry-auth-negative-matrix.test.ts tests\\\\username-registry-boundary-negative.test.ts tests\\\\username-registry-state-invariants.test.ts tests\\\\username-nft-item.test.ts --reporter=dot",
+      "status": "PASS",
+      "files": 10,
+      "tests": 43
+    },
+    "codeHashes": {
+      "command": "node scripts\\\\hash_codes.js",
+      "status": "PASS"
+    },
+    "deploymentManifest": {
+      "command": "npx.cmd ts-node scripts\\\\deployment_manifest_m15.ts",
+      "status": "PASS"
+    },
+    "conformanceM16": {
+      "command": "npx.cmd ts-node scripts\\\\conformance_m16.ts",
+      "status": "PASS"
+    },
+    "artifactIntegrityM18": {
+      "command": "npx.cmd ts-node scripts\\\\artifact_integrity_m18.ts",
+      "status": "PASS"
+    },
+    "fullSuite": {
+      "command": "npm.cmd test",
+      "status": "PASS",
+      "files": 71,
+      "tests": 314
+    }
+  },
+  "productionApproval": false
+}

@@ -24,8 +24,8 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 
 ## Manifest
 
-- Stored hash: 42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7
-- Rebuilt hash: 42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7
+- Stored hash: d3a3c28b14cb73b3dc5f53cdcc2d02850bfefe693b6c8c23daf57ccc59247a60
+- Rebuilt hash: d3a3c28b14cb73b3dc5f53cdcc2d02850bfefe693b6c8c23daf57ccc59247a60
 - Match: true
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
 
@@ -40,7 +40,7 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 | FEEACCUMULATOR_CODE_HASH | 471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f | 471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f | true |
 | VAULT_CODE_HASH | 419273f08cbb6036894a10a505bff41a0bef19eedbaec4281620fcc0912058d4 | 419273f08cbb6036894a10a505bff41a0bef19eedbaec4281620fcc0912058d4 | true |
 | USERNAME_NFT_ITEM_CODE_HASH | bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e | bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e | true |
-| USERNAME_REGISTRY_CODE_HASH | f56f018c96332f480437578cd55c3b9501e06129e75f4c81700ebe9bc7be880e | f56f018c96332f480437578cd55c3b9501e06129e75f4c81700ebe9bc7be880e | true |
+| USERNAME_REGISTRY_CODE_HASH | 637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1 | 637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1 | true |
 | MOCK_VAULT_ATH_WALLET_CODE_HASH | 2cd0395b0bbbd0aa6c19398e8e43031e6435bdb5cf7d2e924b4c7e13155df809 | 2cd0395b0bbbd0aa6c19398e8e43031e6435bdb5cf7d2e924b4c7e13155df809 | true |
 | MOCK_USERNAME_NFT_ITEM_NO_ACK_CODE_HASH | ad3e0f5a28fd5d8dfac0461993bf3b3f8a4110ce42d18bb5ef0f5f4989656a9b | ad3e0f5a28fd5d8dfac0461993bf3b3f8a4110ce42d18bb5ef0f5f4989656a9b | true |
 

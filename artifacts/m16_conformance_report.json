@@ -68,7 +68,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 766,
+      "non_comment_lines": 777,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -117,8 +117,8 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "f56f018c96332f480437578cd55c3b9501e06129e75f4c81700ebe9bc7be880e",
-      "pinned": "f56f018c96332f480437578cd55c3b9501e06129e75f4c81700ebe9bc7be880e",
+      "built": "637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1",
+      "pinned": "637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1",
       "match": true
     },
     "VAULT_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7",
+    "manifest_hash_hex": "d3a3c28b14cb73b3dc5f53cdcc2d02850bfefe693b6c8c23daf57ccc59247a60",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

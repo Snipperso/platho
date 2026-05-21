@@ -81,6 +81,7 @@ PROGRAM{
   DECLPROC $UsernameRegistry$_fun_computeNameHash
   DECLPROC $UsernameRegistry$_fun_deriveItemAddress
   DECLPROC $UsernameRegistry$_fun_deriveAthWalletAddress
+  DECLPROC $UsernameRegistry$_fun_isBasechainAddress
   DECLPROC $UsernameRegistry$_fun_addRefundDue
   DECLPROC $UsernameRegistry$_fun_requireRefundDueAndNotificationAckReserve
   DECLPROC $AthTransferNotificationAck$_constructor_query_id_sender_key_amount
@@ -978,6 +979,11 @@ PROGRAM{
     $ATHWallet$_init_child INLINECALLDICT
     $global_contractAddressExt INLINECALLDICT
   }>
+  $UsernameRegistry$_fun_isBasechainAddress PROCREF:<{
+        REWRITESTDADDR
+    DROP
+    0 EQINT
+  }>
   $UsernameRegistry$_fun_addRefundDue PROCREF:<{
     19110 PUSHINT
     OVER
@@ -1082,7 +1088,8 @@ PROGRAM{
     SWAP
     SUB
     DUP
-    1 LESSINT
+    100000 PUSHINT
+    LESS
     IFJMP:<{
       2DROP
     }>
@@ -2220,32 +2227,61 @@ PROGRAM{
       s2 24 s() XCHG
       s1 25 s() XCHG
       $UsernameRegistry$_fun_deriveAthWalletAddress INLINECALLDICT
+      s1 25 s() XCHG
+      SDEQ
+      s1 23 s() XCHG
+      THROWANYIFNOT
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      19044 PUSHINT
+      19 s() PUSH
+      s0 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 s1 s3 XCHG3
+      s1 24 s() XCHG
+      $UsernameRegistry$_fun_isBasechainAddress INLINECALLDICT
       17 s() POP
       18 s() POP
-      s1 23 s() XCHG
+      s1 22 s() XCHG
       s0 s15 XCHG
-      SDEQ
-      s1 21 s() XCHG
       THROWANYIFNOT
-      18 s() 21 s() XCHG
-      17 s() 20 s() XCHG
-      16 s() 19 s() XCHG
-      s15 18 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
       TRUE
       s0 18 s() XCHG
-      s14 17 s() XCHG
-      s12 s15 XCHG
-      s11 s14 XCHG
-      s10 s13 XCHG
-      s9 s12 XCHG
-      s8 s11 XCHG
-      s7 s10 XCHG
-      s6 s9 XCHG
-      s5 s8 XCHG
-      s4 s7 XCHG
-      s3 s6 XCHG
-      s0 s1 s5 XCHG3
-      s4 s3 XCHG2
+      s15 17 s() XCHG
+      s0 16 s() XCHG
+      s13 s15 XCHG
+      s12 s14 XCHG
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s9 s11 XCHG
+      s8 s10 XCHG
+      s7 s9 XCHG
+      s6 s8 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s3 s5 XCHG
+      s4 s3 s0 XCHG3
+      s1 s2 XCHG
       $UsernameRegistry$_contract_store INLINECALLDICT
     }>
     OVER
@@ -2292,6 +2328,38 @@ PROGRAM{
       25 s() PUSH
       0 GTINT
       THROWANYIFNOT
+      21 s() 22 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 22 s() XCHG
+      18 s() 22 s() XCHG
+      17 s() 22 s() XCHG
+      16 s() 22 s() XCHG
+      s15 22 s() XCHG
+      s14 22 s() XCHG
+      s13 22 s() XCHG
+      s12 22 s() XCHG
+      s11 22 s() XCHG
+      s10 22 s() XCHG
+      s9 22 s() XCHG
+      s0 22 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      19126 PUSHINT
+      s0 23 s() XCHG
+      27 s() PUSH
+      $UsernameRegistry$_fun_isBasechainAddress INLINECALLDICT
+      s1 24 s() XCHG
+      THROWANYIFNOT
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
       27 s() PUSH
       29 s() PUSH
       $UsernameRegistry$_fun_isValidUsernameBytes INLINECALLDICT
@@ -2617,14 +2685,34 @@ PROGRAM{
         $UsernameRegistry$_fun_refundRejectedMintExcess INLINECALLDICT
         $UsernameRegistry$_contract_store INLINECALLDICT
       }>
+      29000000 PUSHINT
       19122 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      29000000 PUSHINT
+      s2 PUSH
       GEQ
       THROWANYIFNOT
-      25 s() PUSH
-      27 s() PUSH
+      22 s() 23 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 23 s() XCHG
+      19 s() 23 s() XCHG
+      18 s() 23 s() XCHG
+      17 s() 23 s() XCHG
+      16 s() 23 s() XCHG
+      s15 23 s() XCHG
+      s14 23 s() XCHG
+      s13 23 s() XCHG
+      s12 23 s() XCHG
+      s11 23 s() XCHG
+      s10 23 s() XCHG
+      s9 23 s() XCHG
+      s0 23 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      26 s() PUSH
+      28 s() PUSH
       $UsernameRegistry$_fun_deriveItemAddress INLINECALLDICT
       19123 PUSHINT
       s10 PUSH
@@ -2636,31 +2724,31 @@ PROGRAM{
       257 PUSHINT
       20000000 PUSHINT
           NOW
-      29 s() PUSH
+      30 s() PUSH
       s0 s2 XCHG
-      31 s() PUSH
+      32 s() PUSH
       s0 s2 XCHG
-      29 s() PUSH
+      30 s() PUSH
       s6 s2 s(-1) PUXC2
       $PendingUsernameMint$_constructor_owner_wallet_name_hash_price_paid_item_address_item_deploy_value_created_at INLINECALLDICT
       NEWC
       $PendingUsernameMint$_store_cell INLINECALLDICT
       s2 s12 XCHG
-      29 s() PUSH
+      30 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       s0 s9 XCHG
       267 PUSHINT
       s11 PUSH
-      29 s() PUSH
+      30 s() PUSH
       257 PUSHINT
       __tact_dict_set_slice_int INLINECALLDICT
       s0 s15 XCHG
       INC
           MYADDR
-      s2 27 s() XCHG
-      SWAP
-      s0 28 s() XCHG
+      28 s() PUSH
+      s0 s2 XCHG
+      s0 30 s() XCHG
       $UsernameNFTItem$_init_child INLINECALLDICT
       20000000 PUSHINT
       TRUE
@@ -2668,7 +2756,7 @@ PROGRAM{
       $ResendDeployedAck$_constructor_ INLINECALLDICT
       NEWC
       $ResendDeployedAck$_store_cell INLINECALLDICT
-      s6 s14 XCHG
+      s6 s15 XCHG
       s3 s5 XCHG
       s4 s3 s0 XCHG3
       s1 s2 XCHG
@@ -2739,25 +2827,41 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      20 s() 25 s() XCHG
-      19 s() 24 s() XCHG
-      18 s() 23 s() XCHG
-      17 s() 22 s() XCHG
-      16 s() 21 s() XCHG
-      s15 20 s() XCHG
-      s14 19 s() XCHG
-      s13 18 s() XCHG
-      s14 17 s() XCHG
-      s11 16 s() XCHG
-      s10 s15 XCHG
-      s9 s14 XCHG
-      s8 s13 XCHG
-      s6 s12 XCHG
-      s6 s11 XCHG
-      s5 s10 XCHG
-      5 5 BLKSWAP
-      s4 s0 s0 XCHG3
+      21 s() 25 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 23 s() XCHG
+      18 s() 22 s() XCHG
+      17 s() 21 s() XCHG
+      16 s() 20 s() XCHG
+      s15 19 s() XCHG
+      s14 18 s() XCHG
+      17 s() 26 s() XCHG
+      s12 16 s() XCHG
+      s11 s15 XCHG
+      s10 s14 XCHG
+      s9 s13 XCHG
+      s7 s12 XCHG
+      s9 s11 XCHG
+      s6 s10 XCHG
+      s5 s9 XCHG
+      s4 s8 XCHG
+      s3 s7 XCHG
+      s6 s1 s4 XCHG3
+      s3 s1 s3 XCHG3
+      s0 27 s() XCHG
+      s0 s5 XCHG2
       $UsernameRegistry$_fun_sendAthNotificationAck INLINECALLDICT
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $UsernameRegistry$_fun_refundRejectedMintExcess INLINECALLDICT
       $UsernameRegistry$_contract_store INLINECALLDICT
     }>
     OVER
@@ -2923,7 +3027,7 @@ PROGRAM{
       THROWANYIFNOT
       21 s() 22 s() XCHG
       20 s() 22 s() XCHG
-      0 PUSHINT
+      19213 PUSHINT
       23 s() PUSH
       s0 21 s() XCHG
       s0 20 s() XCHG
@@ -2931,19 +3035,15 @@ PROGRAM{
       s0 18 s() XCHG
       s0 17 s() XCHG
       s0 16 s() XCHG
-      s0 s15 XCHG
-      s13 s14 XCHG2
-      s1 s12 XCHG
-      s1 s11 XCHG
-      s1 s10 XCHG
+      15 -ROLL
       s0 24 s() XCHG
-      s1 s9 XCHG
-      s1 s8 XCHG
-      s1 s7 XCHG
-      s1 s6 XCHG
-      s1 s5 XCHG
-      s1 s4 XCHG
-      s3 s3 s0 XCHG3
+      $UsernameRegistry$_fun_isBasechainAddress INLINECALLDICT
+      s1 24 s() XCHG
+      THROWANYIFNOT
+      0 PUSHINT
+      20 s() PUSH
+      s1 s13 XCHG
+      s1 24 s() XCHG
       $UsernameRegistry$_fun_deriveAthWalletAddress INLINECALLDICT
       257 PUSHINT
           NOW
@@ -3142,15 +3242,40 @@ PROGRAM{
       24 s() PUSH
       0 GTINT
       THROWANYIFNOT
-      22 s() 23 s() XCHG
       21 s() 22 s() XCHG
-      20 s() 21 s() XCHG
-      19 s() 20 s() XCHG
-      18 s() 19 s() XCHG
-      17 s() 18 s() XCHG
-      16 s() 17 s() XCHG
-      s15 16 s() XCHG
-      15 ROLL
+      20 s() 22 s() XCHG
+      19 s() 22 s() XCHG
+      18 s() 22 s() XCHG
+      17 s() 22 s() XCHG
+      16 s() 22 s() XCHG
+      s15 22 s() XCHG
+      s14 22 s() XCHG
+      s13 22 s() XCHG
+      s12 22 s() XCHG
+      s11 22 s() XCHG
+      s10 22 s() XCHG
+      s9 22 s() XCHG
+      s0 22 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      19152 PUSHINT
+      s0 23 s() XCHG
+      25 s() PUSH
+      $UsernameRegistry$_fun_isBasechainAddress INLINECALLDICT
+      s1 24 s() XCHG
+      THROWANYIFNOT
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
       24 s() PUSH
       SWAP
       $UsernameRegistry$_fun_computeRefundFlushId INLINECALLDICT
