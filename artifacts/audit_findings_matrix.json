@@ -1,0 +1,50 @@
+{
+  "profile": "PLATHO.V1.AUDIT_FINDINGS_MATRIX",
+  "date": "2026-05-21",
+  "status": "LIVE_COORDINATION_MATRIX",
+  "productionApproval": false,
+  "purpose": "Track acknowledged audit findings across rounds so already-triaged issues are not rediscovered as new blockers without new evidence.",
+  "findings": [
+    {
+      "id": "UNFT-01",
+      "area": "UsernameNFTItem.ResendDeployedAck",
+      "severity": "P2_LOW_MEDIUM_MONEY_FOOTGUN",
+      "status": "ACKNOWLEDGED_OPEN",
+      "summary": "Permissionless ResendDeployedAck can retain caller-funded TON in the item balance when the Registry rejects the ACK, for example after pending mint is already absent. The loss is capped by the current 20_000_000 nanotON resend max.",
+      "notP0P1Rationale": [
+        "ATH principal is not lost.",
+        "Username records and Registry accounting are not corrupted.",
+        "Caller funds the resend.",
+        "Maximum accepted resend value caps the exposure."
+      ],
+      "currentDecision": "Do not bluntly require exact 4_000_000 nanotons because initial Registry deploy uses the same ACK body and intentionally funds item storage with the deploy reserve.",
+      "nextActionOptions": [
+        "Document ResendDeployedAck as caller-funded top-up/recovery behavior.",
+        "Split initial deploy ACK from public resend ABI.",
+        "Add resend-specific bounded refund semantics with dust-safe behavior."
+      ],
+      "relatedArtifacts": [
+        "artifacts/MILESTONE_SUMMARY_M37_USERNAME_NFT_ITEM_ACK_OVERPAY_GUARD.md",
+        "artifacts/m37_username_nft_item_ack_overpay_guard_report.json"
+      ]
+    },
+    {
+      "id": "VCAP-01",
+      "area": "Vault <-> CapsuleHub late ACK after stale prune",
+      "severity": "P2_MONEY_LIVENESS",
+      "status": "ACKNOWLEDGED_OPEN",
+      "summary": "If PrunePendingPublish removes a stale PendingPublish and the real CapsuleHub ACK arrives later, Vault rejects it because routing state is gone. The ACK value is bounce:false, so returned TON becomes raw Vault balance and is not credited to the user.",
+      "notP0P1Rationale": [
+        "Normal Vault -> CapsuleHub publish flow remains passing.",
+        "The issue requires delayed ACK/bounce beyond the stale pending TTL.",
+        "Forged ACK and forged Vault publish paths remain rejected."
+      ],
+      "currentDecision": "Do not close by making ACK bounceable alone; without symmetric CapsuleHub recovery that only moves the stuck-value problem to the other side of the seam.",
+      "preferredFix": "On prune, move minimal routing/refund data into a compact tombstone. Late authenticated ACK/bounce can then credit capped returned TON to active message_budget_ton when the epoch is active, otherwise to ton_balance, until tombstone expiry.",
+      "relatedArtifacts": [
+        "artifacts/m38_vault_capsulehub_discounted_fee_dust_seam_report.json",
+        "artifacts/MILESTONE_SUMMARY_M38_VAULT_CAPSULEHUB_DISCOUNTED_FEE_DUST_SEAM.md"
+      ]
+    }
+  ]
+}
