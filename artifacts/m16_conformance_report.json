@@ -102,8 +102,8 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
-      "pinned": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
+      "built": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
+      "pinned": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "05a803beff4382dce069c994492c3a50534aec2aed0040d28ce3e0e0ffcbde5b",
+    "manifest_hash_hex": "42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

@@ -1,0 +1,82 @@
+{
+  "profile": "PLATHO.V1.M50.CAPSULEHUB_DIRECT_PUBLISH_EXACT_VALUE",
+  "date": "2026-05-21",
+  "status": "PASS",
+  "finding": "CAPHUB-01",
+  "contract": "CapsuleHub",
+  "codeChange": {
+    "file": "contracts/CapsuleHub.tact",
+    "policy": "Direct PublishPrivateDirect and PublishPublicDirect require exact context value equal to the computed required amount.",
+    "vaultPublishUnchanged": true,
+    "directOverpaymentRejected": true
+  },
+  "regressions": [
+    {
+      "file": "tests/capsulehub-boundary-negative.test.ts",
+      "coverage": [
+        "private direct publish rejects required minus one",
+        "private direct publish rejects required plus one",
+        "public direct same-page overpay using first-page reserve is rejected",
+        "public direct same-page exact no-page value succeeds"
+      ]
+    },
+    {
+      "file": "tests/capsulehub.test.ts",
+      "coverage": [
+        "direct publish happy paths use exact required values",
+        "same-page public direct publish uses the no-page exact value",
+        "fee accrual and flush setup no longer depends on broad direct overpayment"
+      ]
+    },
+    {
+      "file": "scripts/gas_reserve_m17.ts",
+      "coverage": [
+        "CapsuleHub M17 gas reserve scenario uses exact direct publish values"
+      ]
+    }
+  ],
+  "hashes": {
+    "capsuleHubCodeHash": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
+    "implementedSubsetManifestHash": "42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7"
+  },
+  "verification": {
+    "build": {
+      "command": "npm.cmd run build",
+      "status": "PASS"
+    },
+    "focusedTests": {
+      "command": "npm.cmd run test:file -- tests\\\\capsulehub.test.ts tests\\\\capsulehub-boundary-negative.test.ts tests\\\\capsulehub-auth-negative-matrix.test.ts tests\\\\capsulehub-state-invariants.test.ts tests\\\\vault-m6-publish.test.ts tests\\\\vault-prune-pending-publish.test.ts tests\\\\vault-external-session-gate.test.ts tests\\\\deployment-binding.test.ts tests\\\\deployment-genesis-auth.test.ts tests\\\\deployment-ath-wallet-binding.test.ts --reporter=dot",
+      "status": "PASS",
+      "files": 10,
+      "tests": 48
+    },
+    "codeHashes": {
+      "command": "node scripts\\\\hash_codes.js",
+      "status": "PASS"
+    },
+    "deploymentManifest": {
+      "command": "npx.cmd ts-node scripts\\\\deployment_manifest_m15.ts",
+      "status": "PASS"
+    },
+    "gasReserveM17": {
+      "command": "npx.cmd ts-node scripts\\\\gas_reserve_m17.ts",
+      "status": "PASS",
+      "scenarios": 6
+    },
+    "conformanceM16": {
+      "command": "npx.cmd ts-node scripts\\\\conformance_m16.ts",
+      "status": "PASS"
+    },
+    "artifactIntegrityM18": {
+      "command": "npx.cmd ts-node scripts\\\\artifact_integrity_m18.ts",
+      "status": "PASS"
+    },
+    "fullSuite": {
+      "command": "npm.cmd test",
+      "status": "PASS",
+      "files": 70,
+      "tests": 307
+    }
+  },
+  "productionApproval": false
+}

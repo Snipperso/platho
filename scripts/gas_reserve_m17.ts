@@ -262,8 +262,8 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({ address, code: init.code, data: init.data, balance: toNano('2'), workchain: address.workChain }));
   const capsule = blockchain.openContract(new CapsuleHub(address, init));
-  const privateValue = toNano('0.1');
-  const publicValue = toNano('0.1');
+  const privateValue = 23_000_000n;
+  const publicValue = 22_000_000n;
   const flushValue = toNano('0.05');
   const privateRes = await capsule.send(author.getSender(), { value: privateValue }, {
     $$type: 'PublishPrivateDirect',

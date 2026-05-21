@@ -293,7 +293,7 @@ contract CapsuleHub {
         }
 
         let required: Int = fee + self.privateExecReserve(msg.size_class) + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT + pageCharge;
-        throwUnless(13007, context().value >= required);
+        throwUnless(13007, context().value == required);
 
         let uid: Int = self.computePrivateEntryUid(entryId, msg.header_0_hash, msg.header_1_hash, msg.body_hash);
 
@@ -321,7 +321,7 @@ contract CapsuleHub {
         }
 
         let required: Int = PLATO_PUBLIC_POST_FEE_TON + CAPSULEHUB_PUBLIC_EXEC_RESERVE + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT + pageCharge;
-        throwUnless(13104, context().value >= required);
+        throwUnless(13104, context().value == required);
 
         let uid: Int = self.computePublicEntryUid(entryId, msg.author_wallet, msg.body_hash);
 

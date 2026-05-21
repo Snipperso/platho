@@ -700,7 +700,7 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       ROT
-      GEQ
+      EQUAL
       THROWANYIFNOT
       s15 19 s() XCHG
       s14 18 s() XCHG
@@ -821,7 +821,7 @@ PROGRAM{
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       ROT
-      GEQ
+      EQUAL
       THROWANYIFNOT
       16 s() 18 s() XCHG
       s15 17 s() XCHG

@@ -30,9 +30,9 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
-      "pinned": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
-      "current_file": "8669ba06c90a9d909e29567cd3437f0ae93bfca65f04538d89fc564a26379eed",
+      "built": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
+      "pinned": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
+      "current_file": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -82,8 +82,8 @@
     "m17_gas_report_passes": true
   },
   "manifest": {
-    "stored_hash": "05a803beff4382dce069c994492c3a50534aec2aed0040d28ce3e0e0ffcbde5b",
-    "rebuilt_hash": "05a803beff4382dce069c994492c3a50534aec2aed0040d28ce3e0e0ffcbde5b",
+    "stored_hash": "42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7",
+    "rebuilt_hash": "42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7",
     "match": true,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
     "blockers_before_final_genesis": [
@@ -95,11 +95,11 @@
     ]
   },
   "stable_artifact_lock": {
-    "artifacts/CURRENT_CODE_HASHES.txt": "86522a4cd90987b54ff356edf292e9287a6c9c723cea0918e99e4925ac7fbcfd",
+    "artifacts/CURRENT_CODE_HASHES.txt": "3a60535c5a941f1acb498407274b108722b23c30ccfe061c995eb0540e6892a1",
     "artifacts/ATHMASTER_CODE_HASH.txt": "c7ce50216704c6fb70fceb966bee72ac0c93f9671f115f7dfc5c335709187a8e",
     "artifacts/ATH_WALLET_CODE_HASH.txt": "eb679a3f52ff27ac313145eeaaeb8c6cda822fe42752569c69973cd3db5bfa9d",
     "artifacts/BUYBACKBURN_CODE_HASH.txt": "4477faa360eb9780226c0725e82265c479c9f3195d4f6678c0d6f1d06bcd95b2",
-    "artifacts/CAPSULEHUB_CODE_HASH.txt": "363fdb60533b2714e3602bb98575a0cd952a0f9569a04ee42e92e644298e536a",
+    "artifacts/CAPSULEHUB_CODE_HASH.txt": "39eb41ee1def44dd79274a339c94d61b968d37c3fd17ba9be88e126a2e34cdf5",
     "artifacts/FEEACCUMULATOR_CODE_HASH.txt": "98651ed08a3057c804e164b3be982bfeb975f3d2436d7dab98d830b77cb74f79",
     "artifacts/FEE_ACCUMULATOR_CODE_HASH.txt": "98651ed08a3057c804e164b3be982bfeb975f3d2436d7dab98d830b77cb74f79",
     "artifacts/VAULT_CODE_HASH.txt": "c5f82d2e9f4aa9a36dec0cc21c211e22a62e739008dade59c50a18cd6e9f64e7",
@@ -110,10 +110,10 @@
     "artifacts/username_nft_item_vectors.json": "40fad0e5803d68d20496223f30da67a70223adefeee980fb7b33509573a02777",
     "artifacts/username_registry_foundation_vectors.json": "9bf61d7e2a88f81e2eaab2d18142b66351eaec3e7fd4a5cf42c0f255ad0c30a0",
     "artifacts/username_registry_mint_vectors.json": "720cf1a81819c08750f3b314b6eff3069a8c044de80c31dbdaaf89df56ad0bd7",
-    "artifacts/deployment_manifest_implemented_subset_m15.json": "12c3d95ba3540310f8edd4930c3bc6fa7507bca716f2a9d109a3769493cb6da3",
-    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "df59e51357dd9e1d17dcfece1fc486c03832b4a375694a3655294f22b5a368fa",
-    "artifacts/m16_conformance_report.json": "31bdb2ba348d68334f13922eb0cbface25fde5016fd83571e1a037716af7a7ed",
-    "artifacts/m17_gas_reserve_sanity_report.json": "0914f392b6d9694892de8f2b3753fb03de2b97c8c361c8fea181a2993ea3952d",
+    "artifacts/deployment_manifest_implemented_subset_m15.json": "56a7e4b5287b641b60fd8d971f9636d44093f96e7b0263dc5de9e98080b31e82",
+    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "ac01e8fe7bf3005217662b8d4fa20246a23c91736bfd1a6cfa9a173f33d24c65",
+    "artifacts/m16_conformance_report.json": "13137277f176aa4dcc2e2e3fcf9ea8c0992ad1b3569c5430df5b3f8eeaadec89",
+    "artifacts/m17_gas_reserve_sanity_report.json": "9d42562e3cfd7f3136473a4c70e24d125c96c147d5c3f29d107def7c191172da",
     "artifacts/platho_v1_open_values_v0_18_artifact_integrity.md": "a7c1973794154e626df35e5d0100ad941ac4d83b362864840b012b74268d94bb",
     "artifacts/SPEC_CHANGELOG_M18_ARTIFACT_INTEGRITY.md": "709b8f4e475e2fbcb257170a4f561717e011920f44f741fde12b784b0ea4bbaf"
   },
@@ -121,7 +121,7 @@
     "contracts\\ATHMaster.tact": "d079db9f72df3d6bcd72cc68022818e818718f372207c2639bd5da8d5915c1ac",
     "contracts\\ATHWallet.tact": "d7c4b61cb2a69841dede3bca23ab2a81b2737589386181616226b0e07e63c0ad",
     "contracts\\BuybackBurn.tact": "bf906488252a0db32f025b0f3af220ad9c5c207da7092e31dba43e28a2164952",
-    "contracts\\CapsuleHub.tact": "955f8f8ef0058c98e6de778af6f6a30abeff8d6f7a9b1dbb759183d20748ffdd",
+    "contracts\\CapsuleHub.tact": "0d3fa7b9035997b0cad0678664daccd0b7c5062d2d9935cf6464553e629df631",
     "contracts\\FeeAccumulator.tact": "18c18d3050e8297cf49b91823fa42b7147742306f5a0d2eef3de6607fd712905",
     "contracts\\M20TBuybackBurnHarness.tact": "1a23b25d80c7bdf1aef1a3316fca449ad1aced671f3193f20d4661c67ed4eec5",
     "contracts\\M20TFeeAccumulatorHarness.tact": "24ef7cfcc5e3978860bdd4d3edcdca5c02f5d6d28a278c979096dbd8f8cc64bc",
@@ -140,7 +140,7 @@
     "scripts\\buybackburn_state_machine_m19g.ts": "cd5c8e68d6b1532d168dbbef4aa8c91b6fd4bb767c5ef39844afb779b2c9cdbc",
     "scripts\\conformance_m16.ts": "15c7067919e39c6912cdad08000b1d76ce74afb8ffa97ea8ca3142df27d0b58b",
     "scripts\\deployment_manifest_m15.ts": "3970c35818460f98ef17993066602938350649866c5bbd4ca4389f2ea0d67828",
-    "scripts\\gas_reserve_m17.ts": "10a6b0277317939bb2e9b7ccf620436b4a7668b6e6a4998e3cba3a6ebfd04520",
+    "scripts\\gas_reserve_m17.ts": "b848a4cac4a6ba3675005eda8cccb340f3bc279cc67e8be61af7d09b298fafef",
     "scripts\\generate_ath_wallet_vectors.ts": "aaab92637b149764072c416db6584a1e23c5247cda9cb011812a2cdd68fa8bcd",
     "scripts\\generate_deployment_ath_binding_vectors.ts": "f23c4da471bfffc36594b865db2109a087556bdfbb0a0692622b9254e7305569",
     "scripts\\generate_username_nft_item_vectors.ts": "efed90e65ac6793d5700ec0918a8387cfed1ba9847b26d727cf6cff977d2476e",
@@ -174,9 +174,9 @@
     "tests\\buybackburn-auth-negative-matrix.test.ts": "74d123c404330ca6b59502a1dd4ec78f05b26f9028704fae32b01eb411ca0d25",
     "tests\\buybackburn-production.test.ts": "ff6e857963551f608b7ffb915af59ca994648e1aac0df1717e00227b1ff73338",
     "tests\\capsulehub-auth-negative-matrix.test.ts": "c9bc93c6a58b298e69b96a92d0f11ecd7e64349e7f94e725aa76965c2cb45134",
-    "tests\\capsulehub-boundary-negative.test.ts": "647a46aeb843f860d51ce4e16cd2632eea96644fef5345b7d96882865ef5446e",
+    "tests\\capsulehub-boundary-negative.test.ts": "9d949732de1f45f073320ddf9e3a2c9470c707b815ccb6dfcdeb178a7d749547",
     "tests\\capsulehub-state-invariants.test.ts": "9b94fd85316049f885c0041d46f1b8ca7426410b4ebcd2b262be0afd15dc5b6b",
-    "tests\\capsulehub.test.ts": "5dc721504a44fb250b12deeb3497145b2b1febed18ef1db85df52e2f2f7b8ff8",
+    "tests\\capsulehub.test.ts": "55290beba5f9a4d70a8527a155fd2993cd9d7d7feaff5e54f47be2d56bcdc01e",
     "tests\\deployment-ath-wallet-binding.test.ts": "d737fc8e4c4036e27290c3ed01e0e0a9882cc44a6763a27cf19872176196b87d",
     "tests\\deployment-binding.test.ts": "f3597bea88fafc472e70e02750633805c02de5f9e99eadac7f24f9517637939c",
     "tests\\deployment-genesis-auth.test.ts": "50f2d6372b268fc97780aca8cb005d3f6fa702133c0e663c360cf975d3fa19ef",

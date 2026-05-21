@@ -121,6 +121,9 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
     await capsule.send(author.getSender(), { value: required - 1n }, privateDirect());
     expect((await capsule.getGetState()).private_entry_count).toBe(0n);
 
+    await capsule.send(author.getSender(), { value: required + 1n }, privateDirect());
+    expect((await capsule.getGetState()).private_entry_count).toBe(0n);
+
     await capsule.send(author.getSender(), { value: required }, privateDirect());
     const state = await capsule.getGetState();
     expect(state.private_entry_count).toBe(1n);
@@ -150,6 +153,9 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
 
     await capsule.send(author.getSender(), { value: publicRequired - 1n }, publicDirect(author.address));
     expect((await capsule.getGetState()).public_entry_count).toBe(0n);
+
+    await capsule.send(author.getSender(), { value: publicRequired }, publicDirect(author.address));
+    expect((await capsule.getGetState()).public_entry_count).toBe(1n);
 
     await capsule.send(author.getSender(), { value: publicRequired }, publicDirect(author.address));
     expect((await capsule.getGetState()).public_entry_count).toBe(1n);
