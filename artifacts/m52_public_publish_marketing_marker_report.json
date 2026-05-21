@@ -1,0 +1,100 @@
+{
+  "profile": "PLATHO.V1.M52.PUBLIC_PUBLISH_MARKETING_MARKER",
+  "date": "2026-05-21",
+  "status": "PASS",
+  "productionApproval": false,
+  "decision": {
+    "publicOnly": true,
+    "privatePublishUnchanged": true,
+    "officialUiRendersMarker": false,
+    "markerAscii": "sent via Platho.App",
+    "markerHex": "0x73656e742076696120506c6174686f2e417070",
+    "encoding": "uint152",
+    "byteAlignedInPublicMessageBody": true
+  },
+  "codeChange": {
+    "contracts/CapsuleHub.tact": [
+      "PublishPublicDirect includes and enforces marketing_note",
+      "PublishPublicFromVault includes and enforces marketing_note"
+    ],
+    "contracts/Vault.tact": [
+      "Vault public session publish sends marketing_note to CapsuleHub"
+    ],
+    "contracts/MockVaultAckSink.tact": [
+      "Mock forwarding ABI includes marketing_note"
+    ]
+  },
+  "regressions": [
+    {
+      "file": "tests/capsulehub-boundary-negative.test.ts",
+      "coverage": [
+        "public direct publish rejects wrong marker",
+        "Vault public publish rejects wrong marker",
+        "serialized public publish body contains clear ASCII marker bytes"
+      ]
+    },
+    {
+      "file": "tests/capsulehub.test.ts",
+      "coverage": [
+        "direct public publish happy paths include marker",
+        "Vault public publish happy paths include marker"
+      ]
+    },
+    {
+      "file": "scripts/gas_reserve_m17.ts",
+      "coverage": [
+        "CapsuleHub public direct gas reserve scenario includes marker"
+      ]
+    }
+  ],
+  "hashes": {
+    "athWalletCodeHash": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
+    "athMasterCodeHash": "4d88d83ed5d795eb25f947e8c9f1d19ad7cbedeae93562e27d73b65b54f5a62f",
+    "buybackBurnCodeHash": "272c14fb673dbb5ff51c9945b16325902d22925d48ea458c53612d8aed032acd",
+    "capsuleHubCodeHash": "d085e00659e51525f54cfdb023379646ee55f81001598cc541d22a91b9b0aa34",
+    "feeAccumulatorCodeHash": "471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f",
+    "vaultCodeHash": "2c3d46775d2509ff5c3c7b8f839589bc26a6e69e9a453d0e6248ca6cf3f723b3",
+    "usernameNftItemCodeHash": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
+    "usernameRegistryCodeHash": "637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1",
+    "implementedSubsetManifestHash": "8ac43f43f884f48ae640efc78303b7bbbd9367aa447fb8e763887d4fbde3b730"
+  },
+  "verification": {
+    "build": {
+      "command": "npm.cmd run build",
+      "status": "PASS"
+    },
+    "focusedTests": {
+      "command": "npm.cmd run test:file -- tests\\\\capsulehub.test.ts tests\\\\capsulehub-boundary-negative.test.ts tests\\\\capsulehub-auth-negative-matrix.test.ts tests\\\\capsulehub-state-invariants.test.ts tests\\\\vault-m6-publish.test.ts tests\\\\vault-external-session-gate.test.ts tests\\\\vault-prune-pending-publish.test.ts -- --reporter=dot",
+      "status": "PASS",
+      "files": 7,
+      "tests": 40
+    },
+    "codeHashes": {
+      "command": "node scripts\\\\hash_codes.js",
+      "status": "PASS"
+    },
+    "deploymentManifest": {
+      "command": "npx.cmd ts-node scripts\\\\deployment_manifest_m15.ts",
+      "status": "PASS"
+    },
+    "gasReserveM17": {
+      "command": "npx.cmd ts-node scripts\\\\gas_reserve_m17.ts",
+      "status": "PASS",
+      "scenarios": 6
+    },
+    "conformanceM16": {
+      "command": "npx.cmd ts-node scripts\\\\conformance_m16.ts",
+      "status": "PASS"
+    },
+    "artifactIntegrityM18": {
+      "command": "npx.cmd ts-node scripts\\\\artifact_integrity_m18.ts",
+      "status": "PASS"
+    },
+    "fullSuite": {
+      "command": "npm.cmd test",
+      "status": "PASS",
+      "files": 71,
+      "tests": 316
+    }
+  }
+}

@@ -575,12 +575,14 @@ _ %get_state() method_id(86957) {
     
     ;; Receive PublishPublicDirect message
     if (op == 0xdd65eef9) {
+        var $msg'marketing_note = in_msg~load_uint(152);
         var $msg'author_wallet = in_msg~load_msg_addr();
         var $msg'body_hash = in_msg~load_uint(256);
         var $msg'protocol_fee_paid = in_msg~load_uint(128);
         ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
         throw_unless(13100, ($self'public_latest_id < 18446744073709551615));
         throw_unless(13101, ( equal_slices_bits(__tact_context_get_sender(), $msg'author_wallet) ));
+        throw_unless(13105, ($msg'marketing_note == 2573421624129493433291659589718684717235138672));
         throw_unless(13102, ($msg'body_hash != 0));
         throw_unless(13103, ($msg'protocol_fee_paid == 5000000));
         int $entryId = $self'public_latest_id;
@@ -651,13 +653,16 @@ _ %get_state() method_id(86957) {
     if (op == 0x8c2a76b7) {
         var $msg'bounce_id = in_msg~load_uint(64);
         var $msg'publish_id = in_msg~load_uint(256);
+        var $msg'marketing_note = in_msg~load_uint(152);
         var $msg'author_wallet = in_msg~load_msg_addr();
-        var $msg'body_hash = in_msg~load_uint(256);
-        var $msg'protocol_fee_paid = in_msg~load_uint(128);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'body_hash = sc_1~load_uint(256);
+        var $msg'protocol_fee_paid = sc_1~load_uint(128);
         ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
         throw_unless(13400, ( equal_slices_bits(__tact_context_get_sender(), $self'vault_address) ));
         throw_unless(13401, ($self'public_latest_id < 18446744073709551615));
         throw_unless(13402, ($msg'publish_id != 0));
+        throw_unless(13407, ($msg'marketing_note == 2573421624129493433291659589718684717235138672));
         throw_unless(13403, ($msg'body_hash != 0));
         throw_unless(13404, ($msg'protocol_fee_paid >= 0));
         throw_unless(13405, ($msg'protocol_fee_paid <= 5000000));

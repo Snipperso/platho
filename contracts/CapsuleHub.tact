@@ -33,6 +33,7 @@ const ENTRY_UID_DOMAIN_DIRECT_PRIVATE: Int = 0xD1190101;
 const ENTRY_UID_DOMAIN_DIRECT_PUBLIC: Int = 0xD1190102;
 const ENTRY_UID_DOMAIN_VAULT_PRIVATE: Int = 0xD1190201;
 const ENTRY_UID_DOMAIN_VAULT_PUBLIC: Int = 0xD1190202;
+const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
 
 message(0x90E2E0CB) BindDeploymentManifest {
     deployment_manifest_hash: Int as uint256;
@@ -53,6 +54,7 @@ message(0x7A0EBFEF) PublishPrivateDirect {
 }
 
 message(0xDD65EEF9) PublishPublicDirect {
+    marketing_note: Int as uint152;
     author_wallet: Address;
     body_hash: Int as uint256;
     protocol_fee_paid: Int as uint128;
@@ -72,6 +74,7 @@ message(0xA4F862C0) PublishPrivateFromVault {
 message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
     publish_id: Int as uint256;
+    marketing_note: Int as uint152;
     author_wallet: Address;
     body_hash: Int as uint256;
     protocol_fee_paid: Int as uint128;
@@ -311,6 +314,7 @@ contract CapsuleHub {
         self.requireSealed();
         throwUnless(13100, self.public_latest_id < 18446744073709551615);
         throwUnless(13101, sender() == msg.author_wallet);
+        throwUnless(13105, msg.marketing_note == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
         throwUnless(13102, msg.body_hash != 0);
         throwUnless(13103, msg.protocol_fee_paid == PLATO_PUBLIC_POST_FEE_TON);
 
@@ -384,6 +388,7 @@ contract CapsuleHub {
         throwUnless(13400, sender() == self.vault_address);
         throwUnless(13401, self.public_latest_id < 18446744073709551615);
         throwUnless(13402, msg.publish_id != 0);
+        throwUnless(13407, msg.marketing_note == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
         throwUnless(13403, msg.body_hash != 0);
         throwUnless(13404, msg.protocol_fee_paid >= 0);
         throwUnless(13405, msg.protocol_fee_paid <= PLATO_PUBLIC_POST_FEE_TON);

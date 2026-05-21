@@ -26,6 +26,8 @@ Reasoning:
 
 Audit implication: absence of page maps is not a code bug for v1. Any future on-chain retrieval interface must reopen CapsuleHub storage economics, getters, wrappers, tests, code hashes, and release evidence.
 
+Public publish marketing marker: CapsuleHub v1 public publish messages carry a fixed byte-aligned `uint152` marker equal to ASCII `sent via Platho.App` in the transaction message body. This is an on-chain annotation only; it is not persisted as retrievable page content and the official messenger UI must not render it as part of the public post text. Private publish messages do not carry the marker.
+
 ## Storage Top-Up ABI
 
 Decision: v1 exposes explicit no-authority storage top-up handlers for contracts whose current opcode table pins a top-up operation:

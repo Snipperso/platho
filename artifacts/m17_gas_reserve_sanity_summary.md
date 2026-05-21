@@ -8,9 +8,9 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 |---|---:|---:|---:|---:|
 | ATH_TRANSFER_SUCCESS | 1 | 2378103 | 2378103 | 9847 |
 | ATH_BURN_SUCCESS | 1 | 1321536 | 1321536 | 7932 |
-| CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3363605 | 1258690 | 13586 |
+| CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3366249 | 1258690 | 13586 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 4 | 2038073 | 632179 | 4778 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 22178420 | 4536481 | 32478 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 23260938 | 4636681 | 38299 |
 | VAULT_EXTERNAL_PUBLISH | 2 | 11394627 | 6717781 | 46783 |
 
 ## Operation details
@@ -32,8 +32,8 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
 | private_direct_publish | 2 | 1258690 | 905734 | 13586 | 0 | 0 |
-| public_direct_publish | 2 | 1102358 | 772601 | 11589 | 0 | 0 |
-| flush_fee_to_missing_accumulator_bounce | 3 | 1002557 | 711133 | 10247 | 0 | 0 |
+| public_direct_publish | 2 | 1096468 | 753201 | 11298 | 0 | 0 |
+| flush_fee_to_missing_accumulator_bounce | 3 | 1011091 | 719667 | 10375 | 0 | 0 |
 
 ### FEEACCUMULATOR_SPLIT_FLUSH
 
@@ -48,13 +48,13 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| valid_username_mint_with_item_ack | 4 | 3955801 | 2317221 | 32478 | 1 | 1 |
-| invalid_username_refund_due | 3 | 1884556 | 1625955 | 23604 | 2 | 1 |
-| flush_ath_refund_due | 5 | 4536481 | 1447889 | 21099 | 0 | 0 |
-| flush_treasury_due_ath | 5 | 4315258 | 1423789 | 17911 | 0 | 0 |
+| valid_username_mint_with_item_ack | 5 | 4366089 | 2727509 | 38299 | 2 | 1 |
+| invalid_username_refund_due | 3 | 2022156 | 1763555 | 25668 | 2 | 1 |
+| flush_ath_refund_due | 5 | 4636681 | 1548089 | 22602 | 0 | 0 |
+| flush_treasury_due_ath | 5 | 4330124 | 1423789 | 18134 | 0 | 0 |
 | flush_burn_due_ath | 5 | 3151758 | 1030689 | 14930 | 0 | 0 |
-| stuck_pending_mint_creation_no_ack | 3 | 2717356 | 2317221 | 32478 | 1 | 1 |
-| prune_stale_pending_mint | 2 | 1617210 | 1332816 | 15788 | 0 | 0 |
+| stuck_pending_mint_creation_no_ack | 4 | 3127644 | 2727509 | 38299 | 2 | 1 |
+| prune_stale_pending_mint | 2 | 1626486 | 1342092 | 15788 | 0 | 0 |
 
 ### VAULT_EXTERNAL_PUBLISH
 

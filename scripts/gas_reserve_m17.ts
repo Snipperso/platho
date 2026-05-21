@@ -33,6 +33,7 @@ import {
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USERNAME_MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
+const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const HALF_PRICE = 50_000_000_000n;
@@ -277,6 +278,7 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const publicRes = await capsule.send(author.getSender(), { value: publicValue }, {
     $$type: 'PublishPublicDirect',
     author_wallet: author.address,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: 4n,
     protocol_fee_paid: 5_000_000n,
   } as PublishPublicDirect);

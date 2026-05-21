@@ -60,10 +60,10 @@ cell $PublishPrivateFromVault$_store_cell((int, int, int, int, int, int, int, in
 (slice, ((int))) $PublishPrivateFromVault$_load_bounced(slice sc_0) inline;
 
 ;; $PublishPublicFromVault$_store
-builder $PublishPublicFromVault$_store(builder build_0, (int, int, slice, int, int) v) inline;
+builder $PublishPublicFromVault$_store(builder build_0, (int, int, int, slice, int, int) v) inline;
 
 ;; $PublishPublicFromVault$_store_cell
-cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder b) inline;
+cell $PublishPublicFromVault$_store_cell((int, int, int, slice, int, int) v, builder b) inline;
 
 ;; $PublishPublicFromVault$_load_bounced
 (slice, ((int))) $PublishPublicFromVault$_load_bounced(slice sc_0) inline;
@@ -395,8 +395,8 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
 ((int, int, int, int, int, int, int, int)) $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, int $protocol_fee_paid) inline;
 
-;; $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid
-((int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline;
+;; $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid
+((int, int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $marketing_note, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline;
 
 
 ;; Vault_Vault.stdlib.fc
@@ -766,21 +766,24 @@ cell $PublishPrivateFromVault$_store_cell((int, int, int, int, int, int, int, in
 ;;
 ;; Type: PublishPublicFromVault
 ;; Header: 0x8c2a76b7
-;; TLB: publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault
+;; TLB: publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 marketing_note:uint152 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault
 ;;
 
-builder $PublishPublicFromVault$_store(builder build_0, (int, int, slice, int, int) v) inline {
-    var (v'bounce_id, v'publish_id, v'author_wallet, v'body_hash, v'protocol_fee_paid) = v;
+builder $PublishPublicFromVault$_store(builder build_0, (int, int, int, slice, int, int) v) inline {
+    var (v'bounce_id, v'publish_id, v'marketing_note, v'author_wallet, v'body_hash, v'protocol_fee_paid) = v;
     build_0 = store_uint(build_0, 2351593143, 32);
     build_0 = build_0.store_uint(v'bounce_id, 64);
     build_0 = build_0.store_uint(v'publish_id, 256);
+    build_0 = build_0.store_uint(v'marketing_note, 152);
     build_0 = build_0.store_slice(v'author_wallet);
-    build_0 = build_0.store_uint(v'body_hash, 256);
-    build_0 = build_0.store_uint(v'protocol_fee_paid, 128);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'body_hash, 256);
+    build_1 = build_1.store_uint(v'protocol_fee_paid, 128);
+    build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
-cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder b) inline {
+cell $PublishPublicFromVault$_store_cell((int, int, int, slice, int, int) v, builder b) inline {
     return $PublishPublicFromVault$_store(b, v).end_cell();
 }
 
@@ -789,8 +792,8 @@ cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder 
     return (sc_0, (v'bounce_id));
 }
 
-((int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline {
-    return ($bounce_id, $publish_id, $author_wallet, $body_hash, $protocol_fee_paid);
+((int, int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $marketing_note, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline {
+    return ($bounce_id, $publish_id, $marketing_note, $author_wallet, $body_hash, $protocol_fee_paid);
 }
 
 ;;
@@ -2602,7 +2605,7 @@ _ %get_global() method_id(126899) {
     if (($publishKind == 1)) {
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'capsule_hub_address, $callValue, true, 1, $PublishPrivateFromVault$_store_cell($PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid($bounceId, $publishId, $sizeClass, $cryptoSuite, $header0, $header1, $bodyHash, $protocolFee), begin_cell())));
     } else {
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'capsule_hub_address, $callValue, true, 1, $PublishPublicFromVault$_store_cell($PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid($bounceId, $publishId, $owner, $bodyHash, $protocolFee), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'capsule_hub_address, $callValue, true, 1, $PublishPublicFromVault$_store_cell($PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid($bounceId, $publishId, 2573421624129493433291659589718684717235138672, $owner, $bodyHash, $protocolFee), begin_cell())));
     }
     $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'sessions, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'session_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
 }

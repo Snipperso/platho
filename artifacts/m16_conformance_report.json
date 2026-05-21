@@ -41,7 +41,7 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 406,
+      "non_comment_lines": 411,
       "receive_handlers": 9,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -77,7 +77,7 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 1423,
+      "non_comment_lines": 1426,
       "receive_handlers": 21,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -102,8 +102,8 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
-      "pinned": "5e91fea9b5a796d53f6cb7cd5d26d7aced33154eafa4e73d996d59625e74ed84",
+      "built": "d085e00659e51525f54cfdb023379646ee55f81001598cc541d22a91b9b0aa34",
+      "pinned": "d085e00659e51525f54cfdb023379646ee55f81001598cc541d22a91b9b0aa34",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -122,8 +122,8 @@
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "419273f08cbb6036894a10a505bff41a0bef19eedbaec4281620fcc0912058d4",
-      "pinned": "419273f08cbb6036894a10a505bff41a0bef19eedbaec4281620fcc0912058d4",
+      "built": "2c3d46775d2509ff5c3c7b8f839589bc26a6e69e9a453d0e6248ca6cf3f723b3",
+      "pinned": "2c3d46775d2509ff5c3c7b8f839589bc26a6e69e9a453d0e6248ca6cf3f723b3",
       "match": true
     }
   },
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "d3a3c28b14cb73b3dc5f53cdcc2d02850bfefe693b6c8c23daf57ccc59247a60",
+    "manifest_hash_hex": "8ac43f43f884f48ae640efc78303b7bbbd9367aa447fb8e763887d4fbde3b730",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

@@ -12,6 +12,7 @@ message(0xA4F862C0) PublishPrivateFromVault {
 message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
     publish_id: Int as uint256;
+    marketing_note: Int as uint152;
     author_wallet: Address;
     body_hash: Int as uint256;
     protocol_fee_paid: Int as uint128;
@@ -40,6 +41,7 @@ message(0xFA001002) ForwardVaultPublic {
     capsule_hub_address: Address;
     bounce_id: Int as uint64;
     publish_id: Int as uint256;
+    marketing_note: Int as uint152;
     author_wallet: Address;
     body_hash: Int as uint256;
     protocol_fee_paid: Int as uint128;
@@ -94,6 +96,7 @@ contract MockVaultAckSink {
             body: PublishPublicFromVault {
                 bounce_id: msg.bounce_id,
                 publish_id: msg.publish_id,
+                marketing_note: msg.marketing_note,
                 author_wallet: msg.author_wallet,
                 body_hash: msg.body_hash,
                 protocol_fee_paid: msg.protocol_fee_paid

@@ -194,8 +194,8 @@ TL-B: `publish_private_from_vault#a4f862c0 bounce_id:uint64 publish_id:uint256 s
 Signature: `PublishPrivateFromVault{bounce_id:uint64,publish_id:uint256,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,protocol_fee_paid:uint128}`
 
 ### PublishPublicFromVault
-TL-B: `publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault`
-Signature: `PublishPublicFromVault{bounce_id:uint64,publish_id:uint256,author_wallet:address,body_hash:uint256,protocol_fee_paid:uint128}`
+TL-B: `publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 marketing_note:uint152 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault`
+Signature: `PublishPublicFromVault{bounce_id:uint64,publish_id:uint256,marketing_note:uint152,author_wallet:address,body_hash:uint256,protocol_fee_paid:uint128}`
 
 ### CapsuleHubPublishAck
 TL-B: `capsule_hub_publish_ack#874e576a publish_id:uint256 entry_id:uint64 entry_uid:uint256 = CapsuleHubPublishAck`

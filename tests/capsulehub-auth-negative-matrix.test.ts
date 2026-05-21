@@ -15,6 +15,7 @@ import { MockVaultAckSink } from '../build/MockVaultAckSink/MockVaultAckSink_Moc
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const PRIVATE_FEE = 5_000_000n;
 const PUBLIC_FEE = 5_000_000n;
+const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(`PLATHO.V1.CAPSULE.AUTH.${label}`).digest('hex'));
@@ -84,6 +85,7 @@ function publicDirect(author: Address, overrides?: Partial<PublishPublicDirect>)
   return {
     $$type: 'PublishPublicDirect',
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256('public-body'),
     protocol_fee_paid: PUBLIC_FEE,
     ...overrides,
