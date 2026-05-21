@@ -559,7 +559,7 @@ _ %get_state() method_id(86957) {
             $pageCharge = 10000000;
         }
         int $required = (((($fee + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_privateExecReserve($msg'size_class)) + 1000000) + 4000000) + $pageCharge);
-        throw_unless(13007, ($Context$_get_value(__tact_context_get()) >= $required));
+        throw_unless(13007, ($Context$_get_value(__tact_context_get()) == $required));
         int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_computePrivateEntryUid($entryId, $msg'header_0_hash, $msg'header_1_hash, $msg'body_hash);
         $self'last_private_entry_id = $entryId;
         $self'last_private_entry_uid = $uid;
@@ -589,7 +589,7 @@ _ %get_state() method_id(86957) {
             $pageCharge = 10000000;
         }
         int $required = (12000000 + $pageCharge);
-        throw_unless(13104, ($Context$_get_value(__tact_context_get()) >= $required));
+        throw_unless(13104, ($Context$_get_value(__tact_context_get()) == $required));
         int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_computePublicEntryUid($entryId, $msg'author_wallet, $msg'body_hash);
         $self'last_public_entry_id = $entryId;
         $self'last_public_entry_uid = $uid;

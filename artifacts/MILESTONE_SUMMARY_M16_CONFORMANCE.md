@@ -17,7 +17,7 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: 05a803beff4382dce069c994492c3a50534aec2aed0040d28ce3e0e0ffcbde5b
+- Hash: 42438ea2b44a7fc618aad511802ee88fefeada99bd66d57b8f505c73f9cb3ec7
 
 ## Remaining final-genesis blockers
 

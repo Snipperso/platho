@@ -19,6 +19,26 @@ import {
 const PLATO_PRIVATE_STANDARD_FEE = 5_000_000n;
 const PLATO_PRIVATE_LONG_TERM_FEE = 10_000_000n;
 const PLATO_PUBLIC_FEE = 5_000_000n;
+const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE = 3_000_000n;
+const CAPSULEHUB_PUBLIC_EXEC_RESERVE = 3_000_000n;
+const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE = 1_000_000n;
+const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 4_000_000n;
+const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 3_000_000n;
+const CAPSULEHUB_PAGE_STORAGE_ENDOWMENT = 10_000_000n;
+const CAPSULEHUB_PRIVATE_STANDARD_DIRECT_REQUIRED = PLATO_PRIVATE_STANDARD_FEE
+  + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
+  + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE
+  + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
+  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT;
+const CAPSULEHUB_PUBLIC_DIRECT_REQUIRED = PLATO_PUBLIC_FEE
+  + CAPSULEHUB_PUBLIC_EXEC_RESERVE
+  + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE
+  + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
+  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT;
+const CAPSULEHUB_PUBLIC_DIRECT_NO_PAGE_REQUIRED = PLATO_PUBLIC_FEE
+  + CAPSULEHUB_PUBLIC_EXEC_RESERVE
+  + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE
+  + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
 const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
@@ -162,7 +182,7 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee', async () => {
     const { capsule, author } = await setup();
 
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
     let state = await capsule.getGetState();
     expect(state.public_latest_id).toBe(1n);
     expect(state.last_public_entry_id).toBe(0n);
@@ -171,7 +191,7 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(state.public_page_count).toBe(1n);
 
     const firstUid = state.last_public_entry_uid;
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_NO_PAGE_REQUIRED }, publicMsg(author.address));
     state = await capsule.getGetState();
     expect(state.public_latest_id).toBe(2n);
     expect(state.last_public_entry_id).toBe(1n);
@@ -194,7 +214,7 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee', async () => {
     const { capsule, author } = await setup();
 
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, privateMsg());
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PRIVATE_STANDARD_DIRECT_REQUIRED }, privateMsg());
     const state = await capsule.getGetState();
     expect(state.private_latest_id).toBe(1n);
     expect(state.last_private_entry_id).toBe(0n);
@@ -223,7 +243,7 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(state.public_latest_id).toBe(0n);
     expect(state.public_entry_count).toBe(0n);
 
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
     state = await capsule.getGetState();
     expect(state.public_latest_id).toBe(1n);
     expect(state.last_public_entry_id).toBe(0n);
@@ -238,7 +258,7 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect((await capsule.getGetState()).public_latest_id).toBe(0n);
 
     // First page with page reserve succeeds.
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
     expect((await capsule.getGetState()).public_page_count).toBe(1n);
 
     // Second entry on same page succeeds without page reserve.
@@ -251,7 +271,7 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce', async () => {
     const { capsule, author, operator } = await setup({ feeAccumulatorDeployed: false });
 
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
 
     await capsule.send(operator.getSender(), { value: toNano('0.1') }, {
@@ -266,7 +286,7 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver', async () => {
     const { blockchain, capsule, author, operator, feeAccumulator } = await setup({ feeAccumulatorDeployed: true });
 
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
 
     const flush = await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
       $$type: 'FlushFees',
@@ -295,7 +315,7 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-FEE-06: dust or locally underfunded FlushFees cannot drain CapsuleHub reserve', async () => {
     const { capsule, author, operator } = await setup({ feeAccumulatorDeployed: true });
 
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
+    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
 
     await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE - 1n }, {
       $$type: 'FlushFees',
