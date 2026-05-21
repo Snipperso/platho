@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-18T20:47:29.335Z",
+  "generatedAt": "2026-05-21T13:34:58.190Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 102,
-    "totalBytes": 1917048,
-    "bundleSha256": "1beec3bc6c9c24833a870faf9e763d8d80f1ee89135b3b8b33c3c4f54d691bb4",
+    "fileCount": 104,
+    "totalBytes": 1931279,
+    "bundleSha256": "79f419bfc2e47d81cdfd5547020e4f2efda4133e4dff574ba131d350f055d237",
     "files": [
       {
         "path": "app.js",
-        "bytes": 39595,
-        "sha256": "3556c2f2605db552eba89a4078f8cddde49e3183bf6b5f28f0abc58038c96dc5"
+        "bytes": 43657,
+        "sha256": "aaf0d748f7ab2d1a45e54eed1fbddb93f275368e6a8ae0d73345963813a67e6c"
       },
       {
         "path": "assets/icons/attach.svg",
@@ -103,9 +103,14 @@
         "sha256": "19b3be4429420b0bc5ebbaf033bd8700bacfbcaf9bf7cd497a4800b8dbeb9ee7"
       },
       {
+        "path": "channels/platho.app/feed.json",
+        "bytes": 455,
+        "sha256": "f9c2a6fbe811e658043ceb3e4232ef34e12c17987560e65481eb0904f2b42721"
+      },
+      {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 70123,
-        "sha256": "d405ca9af903da9e870eec82255049b8d10c617035180715ab4875a41166e0f8"
+        "bytes": 70946,
+        "sha256": "3eb0e23a24f7de33708fb6a3d28350a64ac12f036581825e19ba8c9ede7e9d01"
       },
       {
         "path": "crypto/ton-wallet-stateinit.mjs",
@@ -134,8 +139,13 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 6856,
-        "sha256": "912dd33d64c80c32a3a4418990385f1bae52a57ec9a39039d1254e66f791c5ad"
+        "bytes": 6939,
+        "sha256": "903444de719a7df5b8d8ca918734f87f821b5a54e42b3772dda96a22eef0462a"
+      },
+      {
+        "path": "public-channel-subscriptions.mjs",
+        "bytes": 8477,
+        "sha256": "da2eddd2c86b62db36ba18b82b3c256e071274155c0e81685b932c7e3af597b7"
       },
       {
         "path": "replay-store.mjs",
@@ -144,13 +154,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 16083,
-        "sha256": "38a2e525682c91dd0b8fc54d3860eb5d64ab9af1132baf022e4ac8eb7b99a988"
+        "bytes": 16337,
+        "sha256": "181d9cbcda0c4984c92264bf75997e2c1127733e9f9aee48e14575e978e975f8"
       },
       {
         "path": "sw.js",
-        "bytes": 2051,
-        "sha256": "856eb63555e6f802479132bea70c70ffce1fbeb79a1b20dff2447408bf3fccf9"
+        "bytes": 2128,
+        "sha256": "65d044906e1bc7373925cb05fbfe26c88a44ca352c4c8c9bcc37df8eb56eefa6"
       },
       {
         "path": "tonconnect-manifest.json",

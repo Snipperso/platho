@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "channelId": "platho.app",
+  "updatedAt": "2026-05-21T12:00:00.000Z",
+  "posts": [
+    {
+      "id": "platho-app-genesis-2026-05-21",
+      "createdAt": "2026-05-21T12:00:00.000Z",
+      "author": "platho.app",
+      "title": "Platho public channel",
+      "text": "This read-only channel is loaded from the public feed source. Wallet connection is not required to read it.",
+      "bodyHash": null,
+      "entryUid": null
+    }
+  ]
+}

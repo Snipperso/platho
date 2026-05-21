@@ -432,6 +432,7 @@ button {
   border: 1px solid var(--line);
   line-height: 1.38;
   font-size: 15px;
+  white-space: pre-wrap;
 }
 
 .message.out .bubble {
@@ -476,6 +477,17 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #0d1012;
+}
+
+.composer[data-read-only="true"] input {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.composer[data-read-only="true"] .send-button,
+.composer[data-read-only="true"] .icon-button {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .public-pane,
