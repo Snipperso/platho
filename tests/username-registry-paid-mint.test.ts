@@ -17,6 +17,7 @@ const PRICE_4 = 10_000_000_000_000n;
 const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
+const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 20_000_000n + 1_000_000n + 2_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -158,6 +159,42 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
     const global = await registry.getGetGlobal();
     expect(global.name_record_count).toBe(0n);
+    expect(global.pending_mint_count).toBe(0n);
+    expect(global.refund_due_count).toBe(0n);
+  });
+
+  it('USERNAME-REG-M10-09: successful mint returns meaningful notify excess to the owner wallet', async () => {
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
+    const owner = await blockchain.treasury('username-registry-success-excess-owner');
+    const hash = nameHash('excess');
+
+    const result = await sendMint(
+      registry,
+      officialAthWallet,
+      owner.address,
+      'excess',
+      PRICE_6_PLUS,
+      SUCCESSFUL_MINT_REQUIRED_VALUE + 1_000_000n,
+    );
+
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(true);
+    expect(findTransaction(result.transactions, {
+      from: registry.address,
+      to: owner.address,
+    })).toBeDefined();
+  });
+
+  it('USERNAME-REG-M10-10: masterchain owner mint is rejected before pending or refund state', async () => {
+    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const ownerWallet = fixtureAddress('USERNAME_M10_MASTERCHAIN_OWNER', -1);
+    const hash = nameHash('master');
+
+    await sendMint(registry, officialAthWallet, ownerWallet, 'master', PRICE_6_PLUS);
+
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect(await registry.getGetRefundDue(ownerWallet)).toBe(0n);
+    const global = await registry.getGetGlobal();
     expect(global.pending_mint_count).toBe(0n);
     expect(global.refund_due_count).toBe(0n);
   });

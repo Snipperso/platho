@@ -89,6 +89,35 @@ async function deploySealedRegistryWithTreasuryOfficial() {
   return { blockchain, registry, officialAthWallet, caller };
 }
 
+async function deployUnsealedRegistryWithTreasuryReceiver(workchain: number) {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+  const deployer = await blockchain.treasury('username-boundary-treasury-workchain-deployer');
+  const placeholderAthWallet = fixtureAddress('WORKCHAIN_PLACEHOLDER_ATH_WALLET');
+  const athMasterAddress = fixtureAddress('WORKCHAIN_ATH_MASTER');
+  const treasuryAthReceiver = fixtureAddress('WORKCHAIN_TREASURY_ATH_RECEIVER', workchain);
+
+  const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
+  const registryAddress = contractAddress(0, registryInit);
+  await blockchain.setShardAccount(registryAddress, createShardAccount({
+    address: registryAddress,
+    code: registryInit.code,
+    data: registryInit.data,
+    balance: toNano('3'),
+    workchain: registryAddress.workChain,
+  }));
+  const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
+  const officialAthWalletAddress = await registry.getGetAthWalletAddress(registryAddress);
+
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindOfficialAthWallet',
+    deployment_manifest_hash: MANIFEST_HASH,
+    official_ath_wallet_address: officialAthWalletAddress,
+  } as BindOfficialAthWallet);
+
+  return { registry, deployer };
+}
+
 async function deployRegistryWithAthSystem(officialWalletBalance: bigint) {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -383,5 +412,16 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     expect((await ctx.registry.getGetPendingRefundFlushFor(owner1, queryId)).exists).toBe(true);
     expect((await ctx.registry.getGetPendingRefundFlushFor(owner2, queryId)).exists).toBe(true);
     expect((await ctx.registry.getGetGlobal()).pending_refund_flush_count).toBe(2n);
+  });
+
+  it('USERNAME-REG-BND-06: masterchain treasury receiver cannot seal the registry runtime profile', async () => {
+    const { registry, deployer } = await deployUnsealedRegistryWithTreasuryReceiver(-1);
+
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+
+    expect((await registry.getGetGlobal()).sealed).toBe(false);
   });
 });

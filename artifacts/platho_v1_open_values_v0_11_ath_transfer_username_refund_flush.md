@@ -137,8 +137,14 @@ registry MUST be sealed
 query_id MUST be > 0
 pending_refund_flushes[query_id] MUST NOT exist
 ath_refunds_due[owner_wallet] MUST exist and be > 0
+owner_wallet MUST be a basechain std address for the supported v1 runtime refund profile
 context().value MUST be >= USERNAME_ATH_TRANSFER_EXEC_RESERVE
 ```
+
+The v1 refund flush profile does not support masterchain owner wallets. Fixed
+ATH transfer envelopes are sized for basechain recipient ATH wallets; supporting
+other workchains requires a separate envelope/recovery profile.
+
 
 Pinned reserve:
 

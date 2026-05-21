@@ -70,9 +70,15 @@ msg.sender MUST equal stored official_ath_wallet_address
 amount MUST be > 0
 payload username remaining slice MUST contain no refs
 payload username bits MUST equal username_len * 8
+owner_wallet MUST be a basechain std address for the supported v1 runtime mint profile
 ```
 
 Payload claims about ATH master/owner are not sufficient; runtime sender authentication remains the official ATH wallet check.
+
+The deterministic UsernameNFTItem address derivation profile can still produce
+vectors for non-basechain owners as address mathematics, but paid mint execution
+is basechain-only in v1. Fixed mint/NFT/ACK envelopes are not sized for
+masterchain downstream deployment and transfer paths.
 
 ---
 
@@ -162,6 +168,11 @@ The notification must also carry enough value for the registry to ACK the offici
 ```text
 context().value >= USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE
 ```
+
+Meaningful excess notification TON above the retained value is returned to
+`owner_wallet` on successful mint. Dust below the implementation refund
+threshold may remain as registry reserve to avoid dust refund action-phase
+failure.
 
 The registry creates:
 
