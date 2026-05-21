@@ -486,9 +486,11 @@ contract BuybackBurn {
     receive(msg: RecycleRouteRefundReserve) {
         self.requireSealed();
         throwUnless(22360, self.phase == BUYBACK_PHASE_IDLE);
-        throwUnless(22361, self.route_refund_due_ton >= BUYBACK_FUNDING_ENVELOPE_NANOTONS);
         throwUnless(22362, context().value >= BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE);
-        self.route_refund_due_ton -= BUYBACK_FUNDING_ENVELOPE_NANOTONS;
+        let callerTopUp: Int = context().value - BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE;
+        let recycleAvailable: Int = self.route_refund_due_ton + callerTopUp;
+        throwUnless(22361, recycleAvailable >= BUYBACK_FUNDING_ENVELOPE_NANOTONS);
+        self.route_refund_due_ton = recycleAvailable - BUYBACK_FUNDING_ENVELOPE_NANOTONS;
         self.reserve_due_ton += BUYBACK_FUNDING_ENVELOPE_NANOTONS;
     }
 
