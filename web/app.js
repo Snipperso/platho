@@ -33,9 +33,21 @@ import {
   createTransportSharePayload,
   parseTransportShareText,
 } from './transport-share.mjs';
+import {
+  DEFAULT_PUBLIC_CHANNELS,
+  normalizePublicChannelFeed,
+  publicChannelSubscriptionsToThreads,
+  publicChannelThreadsToFeedItems,
+  readPublicChannelFeedCache,
+  readPublicChannelSubscriptions,
+  subscribedPublicChannels,
+  writePublicChannelFeedCache,
+  writePublicChannelSubscriptions,
+} from './public-channel-subscriptions.mjs';
 
 const appConfig = PLATHO_APP_CONFIG;
-const threads = (appConfig.preview?.threads ?? []).map((thread) => ({
+const publicChannelRegistry = appConfig.publicChannels ?? DEFAULT_PUBLIC_CHANNELS;
+const previewThreads = (appConfig.preview?.threads ?? []).map((thread) => ({
   ...thread,
   messages: (thread.messages ?? []).map((message) => ({ ...message })),
 }));
@@ -51,6 +63,7 @@ const activeSubtitle = document.querySelector('#activeSubtitle');
 const search = document.querySelector('#threadSearch');
 const composer = document.querySelector('#composer');
 const messageInput = document.querySelector('#messageInput');
+const sendButton = document.querySelector('.send-button');
 const encryptionStatus = document.querySelector('#encryptionStatus');
 const keySuiteStatus = document.querySelector('#keySuiteStatus');
 const keyAuthStatus = document.querySelector('#keyAuthStatus');
@@ -93,7 +106,11 @@ const copyTransportTextButton = document.querySelector('#copyTransportTextButton
 const importTransportTextButton = document.querySelector('#importTransportTextButton');
 const shareTransportTextButton = document.querySelector('#shareTransportTextButton');
 
-let activeThreadId = threads[0].id;
+let threads = [];
+let publicChannelThreads = [];
+let publicChannelSubscriptions = null;
+let publicChannelFeedCache = {};
+let activeThreadId = null;
 let localIdentity = null;
 let localRecipientKeyPair = null;
 let localRecipientPublicBundle = null;
@@ -115,6 +132,10 @@ let visibleTransportPackage = null;
 
 const TRANSPORT_STATE_KEY = 'platho.transport.v1';
 const TRANSPORT_MAX_ITEMS = 20;
+
+function localStorageOrNull() {
+  return typeof localStorage === 'undefined' ? null : localStorage;
+}
 
 function setText(node, value) {
   if (node) node.textContent = value ?? '';
@@ -214,10 +235,70 @@ function renderConfiguredShell() {
   setText(walletRuntimeLabel, ui.walletLabel);
   setText(localStateLabel, ui.localStateLabel);
   setText(networkRuntimeLabel, ui.networkLabel ?? appConfig.network?.label);
-  renderPublicFeed(ui.publicFeed);
   renderVaultCards(ui.vaultCards);
   renderVaultActions(ui.vaultActions);
   renderLedgerRows(ui.ledgerRows);
+}
+
+function clonePreviewThreads() {
+  return previewThreads.map((thread) => ({
+    ...thread,
+    messages: (thread.messages ?? []).map((message) => ({ ...message })),
+  }));
+}
+
+function rebuildThreadsFromPublicSubscriptions(options = {}) {
+  const preserveActive = options.preserveActive ?? true;
+  const previousActive = activeThreadId;
+  const nonPublicThreads = threads.length > 0
+    ? threads.filter((thread) => !thread.publicChannelId)
+    : clonePreviewThreads();
+
+  publicChannelThreads = publicChannelSubscriptionsToThreads(
+    publicChannelSubscriptions,
+    publicChannelRegistry,
+    publicChannelFeedCache,
+  );
+  threads = [...publicChannelThreads, ...nonPublicThreads];
+
+  const preferredPublicThreadId = publicChannelThreads.find(
+    (thread) => thread.publicChannelId === publicChannelSubscriptions?.activeChannelId,
+  )?.id;
+  if (preserveActive && previousActive && threads.some((thread) => thread.id === previousActive)) {
+    activeThreadId = previousActive;
+  } else {
+    activeThreadId = preferredPublicThreadId ?? threads[0]?.id ?? null;
+  }
+
+  renderPublicFeed(publicChannelThreadsToFeedItems(publicChannelThreads));
+  setText(chatCountLabel, `${threads.length} active threads`);
+}
+
+async function syncPublicChannels() {
+  const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry);
+  let changed = false;
+  for (const channel of channels) {
+    try {
+      const response = await fetch(channel.sourceUrl, { cache: 'no-cache' });
+      if (!response.ok) throw new Error(`Public channel feed unavailable: ${channel.id}`);
+      const feed = normalizePublicChannelFeed(await response.json(), channel.id);
+      publicChannelFeedCache = {
+        ...publicChannelFeedCache,
+        [channel.id]: {
+          feed,
+          syncedAt: new Date().toISOString(),
+        },
+      };
+      changed = true;
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  if (!changed) return;
+  writePublicChannelFeedCache(localStorageOrNull(), publicChannelFeedCache);
+  rebuildThreadsFromPublicSubscriptions();
+  renderThreads();
+  renderConversation();
 }
 
 async function bootReplayStore() {
@@ -560,7 +641,8 @@ async function shareTransportPackage(pkg, statusText) {
 
 async function appendImportedCapsuleMessage(opened, pkg) {
   const targetThread = threads.find((item) => item.id === pkg.threadId)
-    ?? threads.find((item) => item.id === activeThreadId)
+    ?? threads.find((item) => item.id === activeThreadId && !item.readOnly)
+    ?? threads.find((item) => !item.readOnly)
     ?? threads[0];
   activeThreadId = targetThread.id;
   const message = {
@@ -677,10 +759,19 @@ function renderThreads() {
 
 function renderConversation() {
   const thread = threads.find((item) => item.id === activeThreadId) ?? threads[0];
+  if (!thread) return;
   activeAvatar.textContent = thread.avatar;
   activeTitle.textContent = thread.name;
   activeSubtitle.textContent = thread.subtitle;
   messageStrip.innerHTML = '';
+  const isReadOnly = thread.readOnly === true;
+
+  if (composer) composer.dataset.readOnly = isReadOnly ? 'true' : 'false';
+  if (messageInput) {
+    messageInput.disabled = isReadOnly;
+    messageInput.placeholder = isReadOnly ? 'Read-only channel' : 'Message';
+  }
+  if (sendButton) sendButton.disabled = isReadOnly;
 
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
@@ -711,6 +802,11 @@ composer.addEventListener('submit', async (event) => {
   const text = messageInput.value.trim();
   if (!text) return;
   const thread = threads.find((item) => item.id === activeThreadId) ?? threads[0];
+  if (thread.readOnly) {
+    messageInput.value = '';
+    renderConversation();
+    return;
+  }
   const message = { type: 'out', text, meta: 'local' };
   if (localIdentity && localRecipientKeyPair && localSignedPublicBundle) {
     try {
@@ -1101,11 +1197,17 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
+publicChannelSubscriptions = readPublicChannelSubscriptions(localStorageOrNull(), publicChannelRegistry);
+writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+publicChannelFeedCache = readPublicChannelFeedCache(localStorageOrNull());
+rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
+rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderThreads();
 renderConversation();
 transportState = readTransportState();
 refreshTransportUi();
+syncPublicChannels();
 bootTonConnect();
 bootReplayStore();
 bootEncryptedMessageHistory();

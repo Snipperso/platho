@@ -40,9 +40,18 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   crypto: {
     signedBundlePurpose: 'pwa-preview',
   },
+  publicChannels: [
+    {
+      id: 'platho.app',
+      name: 'platho.app',
+      avatar: 'P',
+      subtitle: 'official read-only channel',
+      sourceUrl: './channels/platho.app/feed.json',
+    },
+  ],
   ui: {
     brandNetworkLabel: 'testnet',
-    chatCountLabel: '3 active threads',
+    chatCountLabel: 'threads',
     publicSubtitle: 'latest capsules',
     vaultSubtitle: 'testnet account',
     profileHandle: '@platho',
@@ -51,23 +60,6 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     walletLabel: 'v4r2 testnet',
     networkLabel: 'testnet',
     localStateLabel: 'device only',
-    publicFeed: [
-      {
-        meta: ['platho.eth', 'sealed', '1h'],
-        title: 'Route evidence waits for on-chain proof',
-        text: 'Testnet funding is accumulating for the M20T probe. Production BuybackBurn remains locked.',
-      },
-      {
-        meta: ['vault', 'public', '4h'],
-        title: 'ATH wallet reserve hardening passed',
-        text: 'Boundary checks cover internal transfers, notify flow, and burn notifications.',
-      },
-      {
-        meta: ['capsulehub', 'ack', 'yesterday'],
-        compact: true,
-        text: 'ACK reserve and fee backing remain pinned after the final pass.',
-      },
-    ],
     vaultCards: [
       { label: 'TON', value: '5.9999', caption: 'available' },
       { label: 'ATH', value: '0', caption: 'official wallet' },

@@ -25,6 +25,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'platho-config.mjs',
   'no-backend-transport.mjs',
   'transport-share.mjs',
+  'public-channel-subscriptions.mjs',
   'encrypted-message-store.mjs',
   'vault-ton-rpc-provider.mjs',
   'sw.js',
@@ -117,6 +118,7 @@ export function shouldIncludeWebRuntimeFile(relativePath) {
   if (!path || path.includes('..')) return false;
   if (ROOT_RUNTIME_FILES.has(path)) return true;
   if (first === 'assets') return true;
+  if (first === 'channels') return ext === '.json';
   if (first === 'crypto') return ext === '.mjs';
   if (first !== 'vendor') return false;
 

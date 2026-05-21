@@ -1,4 +1,4 @@
-const CACHE_NAME = 'platho-pwa-prototype-v17';
+const CACHE_NAME = 'platho-pwa-prototype-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const ASSETS = [
   './platho-config.mjs',
   './no-backend-transport.mjs',
   './transport-share.mjs',
+  './public-channel-subscriptions.mjs',
+  './channels/platho.app/feed.json',
   './encrypted-message-store.mjs',
   './vault-ton-rpc-provider.mjs',
   './crypto/platho-crypto.mjs',
