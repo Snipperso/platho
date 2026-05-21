@@ -36,6 +36,7 @@ const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff00001111222233334444
 const ROUTE_EVIDENCE_HASH = 0x111122223333444455556666777788889999aaaabbbbccccddddeeeeffff0000n;
 const ENVELOPE = toNano('51.05');
 const ACCEPT_RESERVE_EXEC_RESERVE = 2_000_000n;
+const ACCOUNTING_RECYCLE_EXEC_RESERVE = 2_000_000n;
 const ROUTE_REFUND_EXEC_RESERVE = 2_000_000n;
 const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
@@ -530,12 +531,39 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE + dust));
     expect(state.reserve_due_ton).toBe(0n);
 
-    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+    await env.buyback.send(env.attacker.getSender(), { value: ACCOUNTING_RECYCLE_EXEC_RESERVE }, {
       $$type: 'RecycleRouteRefundReserve',
     } as RecycleRouteRefundReserve);
 
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE + dust) - ENVELOPE);
+    expect(state.reserve_due_ton).toBe(ENVELOPE);
+  });
+
+  it('BUYBACK-04G: exact full route refund can be recycled with caller-funded shortfall top-up', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+
+    await env.buyback.send(env.stonfiRouter.getSender(), { value: ENVELOPE }, null);
+    let state = await env.buyback.getGetBuybackBurnState();
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE));
+    expect(state.route_refund_due_ton).toBeLessThan(ENVELOPE);
+    expect(state.reserve_due_ton).toBe(0n);
+
+    await env.buyback.send(env.attacker.getSender(), { value: ACCOUNTING_RECYCLE_EXEC_RESERVE }, {
+      $$type: 'RecycleRouteRefundReserve',
+    } as RecycleRouteRefundReserve);
+    state = await env.buyback.getGetBuybackBurnState();
+    expect(state.route_refund_due_ton).toBe(routeRefundCredit(ENVELOPE));
+    expect(state.reserve_due_ton).toBe(0n);
+
+    const shortfall = ENVELOPE - state.route_refund_due_ton;
+    await env.buyback.send(env.attacker.getSender(), { value: ACCOUNTING_RECYCLE_EXEC_RESERVE + shortfall }, {
+      $$type: 'RecycleRouteRefundReserve',
+    } as RecycleRouteRefundReserve);
+
+    state = await env.buyback.getGetBuybackBurnState();
+    expect(state.route_refund_due_ton).toBe(0n);
     expect(state.reserve_due_ton).toBe(ENVELOPE);
   });
 

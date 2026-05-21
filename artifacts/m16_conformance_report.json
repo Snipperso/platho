@@ -32,7 +32,7 @@
     },
     {
       "contract": "BuybackBurn.tact",
-      "non_comment_lines": 509,
+      "non_comment_lines": 511,
       "receive_handlers": 14,
       "bounced_handlers": 2,
       "forbidden_hits": [],
@@ -97,8 +97,8 @@
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "23eaae1747dbde64a98d55095ce3715f56fbec15fb3fc80c0fe3af3eb45c6c42",
-      "pinned": "23eaae1747dbde64a98d55095ce3715f56fbec15fb3fc80c0fe3af3eb45c6c42",
+      "built": "272c14fb673dbb5ff51c9945b16325902d22925d48ea458c53612d8aed032acd",
+      "pinned": "272c14fb673dbb5ff51c9945b16325902d22925d48ea458c53612d8aed032acd",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -131,7 +131,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "03d558e83478b0f42f1a52d4cee889b08a715bed19b714140f6e2af5a89562cc",
+    "manifest_hash_hex": "05a803beff4382dce069c994492c3a50534aec2aed0040d28ce3e0e0ffcbde5b",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",

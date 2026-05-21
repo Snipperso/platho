@@ -2258,18 +2258,23 @@ PROGRAM{
       s13 PUSH
       0 EQINT
       THROWANYIFNOT
-      22361 PUSHINT
-      s6 PUSH
-      51050000000 PUSHINT
-      GEQ
-      THROWANYIFNOT
       22362 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
       2000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s0 s5 XCHG
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
+      SUB
+      s1 s6 XCHG
+      ADD
+      22361 PUSHINT
+      OVER
+      51050000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
       51050000000 PUSHINT
       SUB
       s0 s11 XCHG
