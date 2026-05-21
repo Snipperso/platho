@@ -2893,6 +2893,7 @@ export type PublishPublicFromVault = {
     $$type: 'PublishPublicFromVault';
     bounce_id: bigint;
     publish_id: bigint;
+    marketing_note: bigint;
     author_wallet: Address;
     body_hash: bigint;
     protocol_fee_paid: bigint;
@@ -2904,9 +2905,12 @@ export function storePublishPublicFromVault(src: PublishPublicFromVault) {
         b_0.storeUint(2351593143, 32);
         b_0.storeUint(src.bounce_id, 64);
         b_0.storeUint(src.publish_id, 256);
+        b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
-        b_0.storeUint(src.body_hash, 256);
-        b_0.storeUint(src.protocol_fee_paid, 128);
+        const b_1 = new Builder();
+        b_1.storeUint(src.body_hash, 256);
+        b_1.storeUint(src.protocol_fee_paid, 128);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -2915,34 +2919,39 @@ export function loadPublishPublicFromVault(slice: Slice) {
     if (sc_0.loadUint(32) !== 2351593143) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
     const _publish_id = sc_0.loadUintBig(256);
+    const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
-    const _body_hash = sc_0.loadUintBig(256);
-    const _protocol_fee_paid = sc_0.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _body_hash = sc_1.loadUintBig(256);
+    const _protocol_fee_paid = sc_1.loadUintBig(128);
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _body_hash = source.readBigNumber();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _body_hash = source.readBigNumber();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
     builder.writeNumber(source.publish_id);
+    builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
     builder.writeNumber(source.body_hash);
     builder.writeNumber(source.protocol_fee_paid);
@@ -4580,7 +4589,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"ClaimReceiveIntent","header":2582433020,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"secret32","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"CancelReceiveIntent","header":841519988,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PrunePendingPublish","header":1913380205,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"TopUpStorageReserve","header":840283645,"fields":[]},
@@ -4720,6 +4729,7 @@ export const CRYPTO_SUITE_PUBLIC_NONE = 0n;
 export const PLATO_PRIVATE_STANDARD_FEE_TON = 5000000n;
 export const PLATO_PRIVATE_LONG_TERM_FEE_TON = 10000000n;
 export const PLATO_PUBLIC_POST_FEE_TON = 5000000n;
+export const PLATHO_PUBLIC_MARKETING_NOTE_ASCII = 2573421624129493433291659589718684717235138672n;
 export const ATH_FULL_DISCOUNT_AMOUNT = 10000000000000n;
 export const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH = 30000000000000000n;
 export const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH = 10000000000n;

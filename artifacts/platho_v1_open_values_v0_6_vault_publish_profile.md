@@ -141,11 +141,20 @@ CapsuleHub.PublishPublicFromVault = 0x8C2A76B7
 PublishPublicFromVault {
   publish_bounce_id: uint64
   publish_id:        uint256
+  marketing_note:    uint152 = ASCII "sent via Platho.App"
   author_wallet:     MsgAddress
   body_hash:         uint256
   protocol_fee_paid: coins uint128
 }
 ```
+
+`marketing_note` is fixed to:
+
+```text
+0x73656e742076696120506c6174686f2e417070
+```
+
+It is a public-channel-only on-chain marker and is not part of the user-rendered message body. Private publish messages have no marketing marker.
 
 ---
 

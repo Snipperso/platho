@@ -15,10 +15,10 @@ builder $PublishPrivateFromVault$_store(builder build_0, (int, int, int, int, in
 cell $PublishPrivateFromVault$_store_cell((int, int, int, int, int, int, int, int) v, builder b) inline;
 
 ;; $PublishPublicFromVault$_store
-builder $PublishPublicFromVault$_store(builder build_0, (int, int, slice, int, int) v) inline;
+builder $PublishPublicFromVault$_store(builder build_0, (int, int, int, slice, int, int) v) inline;
 
 ;; $PublishPublicFromVault$_store_cell
-cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder b) inline;
+cell $PublishPublicFromVault$_store_cell((int, int, int, slice, int, int) v, builder b) inline;
 
 ;; $MockVaultAckSink$_store
 builder $MockVaultAckSink$_store(builder build_0, (int, int, int, int) v) inline;
@@ -50,8 +50,8 @@ builder $MockVaultAckSink$_store(builder build_0, (int, int, int, int) v) inline
 ;; $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
 ((int, int, int, int, int, int, int, int)) $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, int $protocol_fee_paid) inline;
 
-;; $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid
-((int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline;
+;; $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid
+((int, int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $marketing_note, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline;
 
 
 ;; MockVaultAckSink_MockVaultAckSink.stdlib.fc
@@ -123,26 +123,29 @@ cell $PublishPrivateFromVault$_store_cell((int, int, int, int, int, int, int, in
 ;;
 ;; Type: PublishPublicFromVault
 ;; Header: 0x8c2a76b7
-;; TLB: publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault
+;; TLB: publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 marketing_note:uint152 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault
 ;;
 
-builder $PublishPublicFromVault$_store(builder build_0, (int, int, slice, int, int) v) inline {
-    var (v'bounce_id, v'publish_id, v'author_wallet, v'body_hash, v'protocol_fee_paid) = v;
+builder $PublishPublicFromVault$_store(builder build_0, (int, int, int, slice, int, int) v) inline {
+    var (v'bounce_id, v'publish_id, v'marketing_note, v'author_wallet, v'body_hash, v'protocol_fee_paid) = v;
     build_0 = store_uint(build_0, 2351593143, 32);
     build_0 = build_0.store_uint(v'bounce_id, 64);
     build_0 = build_0.store_uint(v'publish_id, 256);
+    build_0 = build_0.store_uint(v'marketing_note, 152);
     build_0 = build_0.store_slice(v'author_wallet);
-    build_0 = build_0.store_uint(v'body_hash, 256);
-    build_0 = build_0.store_uint(v'protocol_fee_paid, 128);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'body_hash, 256);
+    build_1 = build_1.store_uint(v'protocol_fee_paid, 128);
+    build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
-cell $PublishPublicFromVault$_store_cell((int, int, slice, int, int) v, builder b) inline {
+cell $PublishPublicFromVault$_store_cell((int, int, int, slice, int, int) v, builder b) inline {
     return $PublishPublicFromVault$_store(b, v).end_cell();
 }
 
-((int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline {
-    return ($bounce_id, $publish_id, $author_wallet, $body_hash, $protocol_fee_paid);
+((int, int, int, slice, int, int)) $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid(int $bounce_id, int $publish_id, int $marketing_note, slice $author_wallet, int $body_hash, int $protocol_fee_paid) inline {
+    return ($bounce_id, $publish_id, $marketing_note, $author_wallet, $body_hash, $protocol_fee_paid);
 }
 
 ;;
@@ -280,12 +283,13 @@ _ %get_state() method_id(86957) {
         var $msg'capsule_hub_address = in_msg~load_msg_addr();
         var $msg'bounce_id = in_msg~load_uint(64);
         var $msg'publish_id = in_msg~load_uint(256);
-        var $msg'author_wallet = in_msg~load_msg_addr();
+        var $msg'marketing_note = in_msg~load_uint(152);
         slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'author_wallet = sc_1~load_msg_addr();
         var $msg'body_hash = sc_1~load_uint(256);
         var $msg'protocol_fee_paid = sc_1~load_uint(128);
         var $msg'value_to_capsule = sc_1~load_uint(128);
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'capsule_hub_address, $msg'value_to_capsule, true, 0, $PublishPublicFromVault$_store_cell($PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid($msg'bounce_id, $msg'publish_id, $msg'author_wallet, $msg'body_hash, $msg'protocol_fee_paid), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'capsule_hub_address, $msg'value_to_capsule, true, 0, $PublishPublicFromVault$_store_cell($PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid($msg'bounce_id, $msg'publish_id, $msg'marketing_note, $msg'author_wallet, $msg'body_hash, $msg'protocol_fee_paid), begin_cell())));
         $MockVaultAckSink$_contract_store(($self'ack_count, $self'last_publish_id, $self'last_entry_id, $self'last_entry_uid));
         return ();
     }

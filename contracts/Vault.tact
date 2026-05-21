@@ -49,6 +49,7 @@ const CRYPTO_SUITE_PUBLIC_NONE: Int = 0;
 const PLATO_PRIVATE_STANDARD_FEE_TON: Int = 5000000;
 const PLATO_PRIVATE_LONG_TERM_FEE_TON: Int = 10000000;
 const PLATO_PUBLIC_POST_FEE_TON: Int = 5000000;
+const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
 const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 30000000000000000;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
@@ -158,6 +159,7 @@ message(0xA4F862C0) PublishPrivateFromVault {
 message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
     publish_id: Int as uint256;
+    marketing_note: Int as uint152;
     author_wallet: Address;
     body_hash: Int as uint256;
     protocol_fee_paid: Int as uint128;
@@ -1332,6 +1334,7 @@ contract Vault {
                 body: PublishPublicFromVault {
                     bounce_id: bounceId,
                     publish_id: publishId,
+                    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
                     author_wallet: owner,
                     body_hash: bodyHash,
                     protocol_fee_paid: protocolFee

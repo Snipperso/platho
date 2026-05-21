@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
@@ -8,6 +8,8 @@ import {
   PublishPublicDirect,
   PublishPrivateFromVault,
   PublishPublicFromVault,
+  storePublishPublicDirect,
+  storePublishPublicFromVault,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { MockVaultAckSink } from '../build/MockVaultAckSink/MockVaultAckSink_MockVaultAckSink';
 
@@ -22,6 +24,7 @@ const PRIVATE_ENTRY_STORAGE = 4_000_000n;
 const PUBLIC_ENTRY_STORAGE = 3_000_000n;
 const PAGE_STORAGE = 10_000_000n;
 const ACK_RESERVE = 30_000_000n;
+const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(`PLATHO.V1.CAPSULE.BND.${label}`).digest('hex'));
@@ -80,6 +83,7 @@ function publicDirect(author: Address, overrides?: Partial<PublishPublicDirect>)
   return {
     $$type: 'PublishPublicDirect',
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256('public-body'),
     protocol_fee_paid: PUBLIC_FEE,
     ...overrides,
@@ -107,6 +111,7 @@ function vaultPublic(author: Address, overrides?: Partial<PublishPublicFromVault
     bounce_id: 2n,
     publish_id: hash256('vault-public-publish'),
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256('vault-public-body'),
     protocol_fee_paid: PUBLIC_FEE,
     ...overrides,
@@ -188,5 +193,32 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
     await capsule.send(blockchain.sender(mockVaultAddress), { value: vaultPublicRequired }, vaultPublic(author.address));
     expect((await capsule.getGetState()).public_entry_count).toBe(1n);
     expect((await mockVault.getGetState()).ack_count).toBe(2n);
+  });
+
+  it('CAPSULE-BND-04: public publish requires the Platho marketing marker', async () => {
+    const { blockchain, capsule, mockVault, mockVaultAddress, author } = await setup();
+    const publicRequired = PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE;
+    const vaultPublicRequired = publicRequired + ACK_RESERVE;
+
+    await capsule.send(author.getSender(), { value: publicRequired }, publicDirect(author.address, {
+      marketing_note: 0n,
+    }));
+    expect((await capsule.getGetState()).public_entry_count).toBe(0n);
+
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: vaultPublicRequired }, vaultPublic(author.address, {
+      marketing_note: 0n,
+    }));
+    expect((await capsule.getGetState()).public_entry_count).toBe(0n);
+    expect((await mockVault.getGetState()).ack_count).toBe(0n);
+  });
+
+  it('CAPSULE-BND-05: public marker serializes as clear ASCII in the publish body', () => {
+    const author = fixtureAddress('MARKER_SERIALIZATION_AUTHOR');
+    const marker = Buffer.from('sent via Platho.App', 'utf8').toString('hex');
+    const directBody = beginCell().store(storePublishPublicDirect(publicDirect(author))).endCell();
+    const vaultBody = beginCell().store(storePublishPublicFromVault(vaultPublic(author))).endCell();
+
+    expect(directBody.toBoc().toString('hex')).toContain(marker);
+    expect(vaultBody.toBoc().toString('hex')).toContain(marker);
   });
 });

@@ -788,6 +788,7 @@ export function dictValueParserPublishPrivateDirect(): DictionaryValue<PublishPr
 
 export type PublishPublicDirect = {
     $$type: 'PublishPublicDirect';
+    marketing_note: bigint;
     author_wallet: Address;
     body_hash: bigint;
     protocol_fee_paid: bigint;
@@ -797,6 +798,7 @@ export function storePublishPublicDirect(src: PublishPublicDirect) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(3714445049, 32);
+        b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
         b_0.storeUint(src.body_hash, 256);
         b_0.storeUint(src.protocol_fee_paid, 128);
@@ -806,28 +808,32 @@ export function storePublishPublicDirect(src: PublishPublicDirect) {
 export function loadPublishPublicDirect(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 3714445049) { throw Error('Invalid prefix'); }
+    const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
     const _body_hash = sc_0.loadUintBig(256);
     const _protocol_fee_paid = sc_0.loadUintBig(128);
-    return { $$type: 'PublishPublicDirect' as const, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicDirect' as const, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicDirect(source: TupleReader) {
+    const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _body_hash = source.readBigNumber();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicDirect' as const, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicDirect' as const, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicDirect(source: TupleReader) {
+    const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _body_hash = source.readBigNumber();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicDirect' as const, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicDirect' as const, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicDirect(source: PublishPublicDirect) {
     const builder = new TupleBuilder();
+    builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
     builder.writeNumber(source.body_hash);
     builder.writeNumber(source.protocol_fee_paid);
@@ -941,6 +947,7 @@ export type PublishPublicFromVault = {
     $$type: 'PublishPublicFromVault';
     bounce_id: bigint;
     publish_id: bigint;
+    marketing_note: bigint;
     author_wallet: Address;
     body_hash: bigint;
     protocol_fee_paid: bigint;
@@ -952,9 +959,12 @@ export function storePublishPublicFromVault(src: PublishPublicFromVault) {
         b_0.storeUint(2351593143, 32);
         b_0.storeUint(src.bounce_id, 64);
         b_0.storeUint(src.publish_id, 256);
+        b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
-        b_0.storeUint(src.body_hash, 256);
-        b_0.storeUint(src.protocol_fee_paid, 128);
+        const b_1 = new Builder();
+        b_1.storeUint(src.body_hash, 256);
+        b_1.storeUint(src.protocol_fee_paid, 128);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -963,34 +973,39 @@ export function loadPublishPublicFromVault(slice: Slice) {
     if (sc_0.loadUint(32) !== 2351593143) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
     const _publish_id = sc_0.loadUintBig(256);
+    const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
-    const _body_hash = sc_0.loadUintBig(256);
-    const _protocol_fee_paid = sc_0.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _body_hash = sc_1.loadUintBig(256);
+    const _protocol_fee_paid = sc_1.loadUintBig(128);
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _body_hash = source.readBigNumber();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _body_hash = source.readBigNumber();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
     builder.writeNumber(source.publish_id);
+    builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
     builder.writeNumber(source.body_hash);
     builder.writeNumber(source.protocol_fee_paid);
@@ -1529,7 +1544,7 @@ function initCapsuleHub_init_args(src: CapsuleHub_init_args) {
 }
 
 async function CapsuleHub_init(fee_accumulator_address: Address, vault_address: Address, vault_bound: boolean, sealed: boolean, deployment_manifest_hash: bigint, genesis_controller_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241022c01000d32000114ff00f4a413f4bcf2c80b0102016202290130d001d072d721d200d200fa4021103450666f04f86102f8620303feed44d0d200018e3ffa40fa40d200d200d3ffd401d0fa40d33fd33fd37fd33fd33fd33fd33fd33fd33fd430d0d3ffd3ff300c11110c0c11100c10cf10ce10cd57110f11100f550e8e27fa40fa40d200d200810101d700d401d0fa4030161514433006d155047054700054700054700020e21112e302705611d74920c21fe30004050602f411108020d7217021d749c21f9430d31f01de8210ff775609ba8f5ad37f01310f11100f10ef10de10cd10bc10ab109a10891078106710561045103411114130db3c813393f8425612c705f2f48133945612c200f2f4111118a00f11100f10ef10de10cd10bc10ab109a080910671056104510344130e05f0f5f03260f000e311111d31f111204c421821090e2e0cbba8fcf5b1110d3fffa4030011111011112db3cdb3c3f81326e0eb31ef2f481326f5610c300f2f48132702bc000923b7f940b5610bae21bf2f410df10de7f0e10bd0c109b108a107910681057104610354403e02182103a12d1adba08090f0704b88fd15b1110d3ff300f11100f10ef10de10cd10bc10ab109a10891078106710561045103411114130db3cdb3c3d8132785611c300f2f42b8132791112ba01111101f2f481327a2df2f410ef10de10cd7f0d550be02182107a0ebfefba08090f0a000e8132652eb3f2f40014813282f8422dc705f2f4043ce302218210dd65eef9bae302218210a4f862c0bae3022182108c2a76b7ba0b10151e03fc5b1110d307d307d3ffd3ffd3ffd37f301110111411100f11130f0e11120e0d11110d0c11140c0b11130b0a11120a0911110908111408071113070611120605111105041114040311130302111202011115011116db3c8132c82b843fb9f2f456118132c91116db3c01111501f2f48132ca5613c300f2f48132cb5612c30026170c03faf2f48132cc5615c300f2f40f11100f550e11135613db3c8132cd21c200f2f48132ce561722baf2f42b0f11120f0e11110e0d11100d0c11120c0b11110b0a11100a09111209081111080711100706111206051111050411100403111203021111020111100111127011125613db3c9782089896805713de11101111111018210d03f00f11100f550e1116db3c01111601a082080f4240a082083d0900a05611a08132cff8416f24135f0358baf2f40f11130f0e11120e0d11110d0c11100c553b0311140354411302111502011116db3c323304a41111c2009305a405de08a4111116a00d11100d10cf10be10ad109c108b1069081047030644451a0e0f0046c813cbffcbffcbffc9c88210d119010101cb1ff842cf1612cb3ff82301cb1fccc9f9000088c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402fe5b1110fa40d3ffd37f301110111111100f11110f0e11110e0d11110d0c11110c0b11110b0a11110a0911110908111108071111070611110605111105041111040311110302111102011112011113db3c81332c2a843fb9f2f481332df8425613c705f2f481332e5613c300f2f481332f561482084c4b40baf2f4290f11110f261104fe5e3d0c11100c0b11110b0a11100a09111109081110080711110706111006051111050411100403111103021110020111110111107011125611db3c9782089896805713de8208b71b005613a0813330f8416f24135f0358baf2f41110111211100f11110f0e11100e551d21011114011115db3c313203a41110c200e30007a421121314003cc88210d119010201cb1ff842cf1613cb3ff82301cb1f01cf16cbffc9f900000604a40400c6111116a00d11100d10cf10be10ad109c108b107a1079081047103645144013c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402fa5b1110d33f31d3ffd307d307d3ffd3ffd430d0d3ffd37f301110111511100f11140f0e11130e0d11120d0c11110c0b11150b0a11140a0911130908111208071111070611150605111405041113040311120302111102011116011117db3c8133f4f8425611c705f2f48133f52b843fb9f2f48133f65616c300f2f45614261603fe8133f71115db3c01111401f2f48133f85612c300f2f48133f95611c300f2f48133fa5616c300f2f40f11100f550e11125613db3c8133fb21c200f2f456178133fd02bbf2f42a0f11110f5e3d0c11100c0b11110b0a11100a091111090811100807111107061110060511110504111004031111030211100201111101111070171819003821c0019320c0019170e2925b7fe001c00292c002923070e2917fe070002a20c001963082084c4b40e0c002958208989680e07003fe11125611db3c9782089896805713de1110111111100f11100f550e1115db3c561801a082080f4240a082083d0900a05612a08209c9c380a08133fef8416f24135f0322bef2f41111111311111110111211100f11110f0e11100e10df10ce10bd10ac109b108a10791068105710461035443056150356174313011116011119211a1b001cc0029582083d0900e082082dc6c002fcdb3c32335611544116a41112c2009307a407de0aa4111518a0f8416f24135f0311148209c9c380a101111401a111127011127009c855208210874e576a5004cb1f12cbffcb3fcbffc92e04031113030211120250884343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000b11100b10af109e108d107c106b106a1c1d0042c813cbffcbffcbffc9c88210d119020101cb1f5613cf1612cbff12cb3fccc9f900009c1049106847605e225502c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5403f2e3022182107a861031bae30257122082105331b880ba8e4d3057100e11100e551dc87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed54e0c0001111c12101111101b0e3025f0f5bf2c0821f252802fe5b1110d33f31d3fffa40d3ffd37f301110111211105e3e0d11110d0c11120c0b11110b0a11120a0911110908111208071111070611120605111105041112040311110302111202011113011114db3c813458f8425611c705f2f48134592a843fb9f2f481345a5612c300f2f481345b5614c300f2f481345d561582084c4b40262002fabbf2f4290f11110f5e3d0c11100c0b11110b0a11100a09111109081110080711110706111006051111050411100403111103021110020111110111107011125611db3c9782089896805713de561682082dc6c0a082080f4240a082082dc6c0a05613a08209c9c380a081345ef8416f24135f0322bef2f41111111211112122000aa93807c00002fe1110111111100f11100f10ef10de10cd10bc10ab109a108910781067105610451034413021561502011117011118db3c313256122205a41112c2009306a406de09a4111518a0f8416f24135f0311148209c9c380a101111401a111117011137003c855208210874e576a5004cb1f12cbffcb3fcbffc92e04031112031113592324003ec858cf16cbffc9c88210d119020201cb1f5613cf1612cbff12cb3fccc9f90000ea4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000b11100b10af109e108d107c106b105a1069105847654433c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402fe5b1110d37f300f11100f10ef10de10cd10bc10ab109a10891078106710561045103411114130db3c8133905612c200f2f481339156122abbf2f4813395561282084c4b40be917f9456122abae2f2f4813392f8416f24135f0382083d0900bef2f4085611a1561182081e8480a07f711114c8018210ff77560958cb1fcb7fc92627000c8132642ef2f400ee5613041115014343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000f11100f10ef10de10cd10bc10ab109a10895506c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed54009e8136aff2f00e11100e551dc87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402fba0a75bda89a1a400031c7ff481f481a401a401a7ffa803a1f481a67fa67fa6ffa67fa67fa67fa67fa67fa67fa861a1a7ffa7fe601822221818222018219e219c219aae221e22201eaa1d1c4ff481f481a401a401020203ae01a803a1f480602c2a2886600da2aa08e0a8e000a8e000a8e00041c5b678ae22ae22ae22ae232a2b0038547dec547dcb5616561656135610561056105610561056105610561000345711571157115711571157115711571157115711571157115711d5453fa1');
+    const __code = Cell.fromHex('b5ee9c7241022b01000d0d000114ff00f4a413f4bcf2c80b0102016202280130d001d072d721d200d200fa4021103450666f04f86102f8620303feed44d0d200018e3ffa40fa40d200d200d3ffd401d0fa40d33fd33fd37fd33fd33fd33fd33fd33fd33fd430d0d3ffd3ff300c11110c0c11100c10cf10ce10cd57110f11100f550e8e27fa40fa40d200d200810101d700d401d0fa4030161514433006d155047054700054700054700020e21112e302705611d74920c21fe30004050602f411108020d7217021d749c21f9430d31f01de8210ff775609ba8f5ad37f01310f11100f10ef10de10cd10bc10ab109a10891078106710561045103411114130db3c813393f8425612c705f2f48133945612c200f2f4111118a00f11100f10ef10de10cd10bc10ab109a080910671056104510344130e05f0f5f032522000e311111d31f111204c421821090e2e0cbba8fcf5b1110d3fffa4030011111011112db3cdb3c3f81326e0eb31ef2f481326f5610c300f2f48132702bc000923b7f940b5610bae21bf2f410df10de7f0e10bd0c109b108a107910681057104610354403e02182103a12d1adba0809220704b88fd15b1110d3ff300f11100f10ef10de10cd10bc10ab109a10891078106710561045103411114130db3cdb3c3d8132785611c300f2f42b8132791112ba01111101f2f481327a2df2f410ef10de10cd7f0d550be02182107a0ebfefba0809220a000e8132652eb3f2f40014813282f8422dc705f2f4043ce302218210dd65eef9bae302218210a4f862c0bae3022182108c2a76b7ba0b0f131c03fc5b1110d307d307d3ffd3ffd3ffd37f301110111411100f11130f0e11120e0d11110d0c11140c0b11130b0a11120a0911110908111408071113070611120605111105041114040311130302111202011115011116db3c8132c82b843fb9f2f456118132c91116db3c01111501f2f48132ca5613c300f2f48132cb5612c30025150c03faf2f48132cc5615c300f2f40f11100f550e11135613db3c8132cd21c200f2f48132ce561722baf2f42b0f11120f0e11110e0d11100d0c11120c0b11110b0a11100a09111209081111080711100706111206051111050411100403111203021111020111100111127011125613db3c9782089896805713de111011111110161e0d03f00f11100f550e1116db3c01111601a082080f4240a082083d0900a05611a08132cff8416f24135f0358baf2f40f11130f0e11120e0d11110d0c11100c553b0311140354411302111502011116db3c323304a41111c2009305a405de08a4111116a00d11100d10cf10be10ad109c108b106908104703064445180e220046c813cbffcbffcbffc9c88210d119010101cb1ff842cf1612cb3ff82301cb1fccc9f90002fe5b1110d397fa40d3ffd37f301110111211105e3e0d11110d0c11120c0b11110b0a11120a0911110908111208071111070611120605111105041112040311110302111202011113011114db3c81332c2a843fb9f2f481332df8425614c705f2f48133311112828873656e742076696120506c6174686f2e417070ba01111201251003fef2f481332e5613c300f2f481332f561482084c4b40baf2f4280f11100f0e11100e0d11100d0c11100c0b11100b0a11100a09111009111008070655407011125611db3c9782089896805713de8208b71b005613a0813330f8416f24135f0358baf2f41110111211100f11110f0e11100e551d21011114011115db3c313203a41e1112003cc88210d119010201cb1ff842cf1613cb3ff82301cb1f01cf16cbffc9f90000dc1110c2009304a404de07a4111116a00d11100d10cf10be10ad109c108b107a1079081047103645144013c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402fa5b1110d33f31d3ffd307d307d3ffd3ffd430d0d3ffd37f301110111511100f11140f0e11130e0d11120d0c11110c0b11150b0a11140a0911130908111208071111070611150605111405041113040311120302111102011116011117db3c8133f4f8425611c705f2f48133f52b843fb9f2f48133f65616c300f2f45614251403fe8133f71115db3c01111401f2f48133f85612c300f2f48133f95611c300f2f48133fa5616c300f2f40f11100f550e11125613db3c8133fb21c200f2f456178133fd02bbf2f42a0f11110f5e3d0c11100c0b11110b0a11100a091111090811100807111107061110060511110504111004031111030211100201111101111070151617003821c0019320c0019170e2925b7fe001c00292c002923070e2917fe070002a20c001963082084c4b40e0c002958208989680e07003fe11125611db3c9782089896805713de1110111111100f11100f550e1115db3c561801a082080f4240a082083d0900a05612a08209c9c380a08133fef8416f24135f0322bef2f41111111311111110111211100f11110f0e11100e10df10ce10bd10ac109b108a107910681057104610354430561503561743130111160111191e1819001cc0029582083d0900e082082dc6c002fcdb3c32335611544116a41112c2009307a407de0aa4111518a0f8416f24135f0311148209c9c380a101111401a111127011127009c855208210874e576a5004cb1f12cbffcb3fcbffc92e04031113030211120250884343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000b11100b10af109e108d107c106b106a1a1b0042c813cbffcbffcbffc9c88210d119020101cb1f5613cf1612cbff12cb3fccc9f900009c1049106847605e225502c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5403fe8f7c5b1110d33f31d3ffd397fa40d430d0d3ffd37f301110111311100f11120f0e11110e0d11130d0c11120c0b11110b0a11130a0911120908111108071113070611120605111105041113040311120302111102011114011115db3c813458f8425611c705f2f48134592a843fb9f2f481345a5614c300f2f481345f1113e0251d2302fa828873656e742076696120506c6174686f2e417070ba01111301f2f481345b5614c300f2f481345d561582084c4b40bbf2f4280f11100f0e11100e0d11100d0c11100c0b11100b0a11100a09111009111008070655407011135611db3c9782089896805714de561682082dc6c0a082080f4240a082082dc6c0a05614a01e1f000aa93807c00002f88209c9c380a081345ef8416f24135f0322bef2f41111111211111110111111100f11100f10ef10de10cd10bc10ab109a108910781067105610451034413021561602011115011118db3c313256102205a41113c2009306a406de09a4111518a0f8416f24135f0311148209c9c380a101111401a111127011117003c82021003ec858cf16cbffc9c88210d119020201cb1f5613cf1612cbff12cb3fccc9f900019e55208210874e576a5004cb1f12cbffcb3fcbffc92e04031113031111594343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000b11100b10af109e108d107c106b105a106910584715446413220088c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402ee2182107a861031bae30257122082105331b880ba8e4d3057100e11100e551dc87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed54e0c0001111c12101111101b0e3025f0f5bf2c082242702fe5b1110d37f300f11100f10ef10de10cd10bc10ab109a10891078106710561045103411114130db3c8133905612c200f2f481339156122abbf2f4813395561282084c4b40be917f9456122abae2f2f4813392f8416f24135f0382083d0900bef2f4085611a1561182081e8480a07f711114c8018210ff77560958cb1fcb7fc92526000c8132642ef2f400ee5613041115014343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000f11100f10ef10de10cd10bc10ab109a10895506c87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed54009e8136aff2f00e11100e551dc87f01ca001111111055e0011110011111ce1ece1cca001aca0018cbff06c8ce15cb3f13cb3fcb7fcb3fcb3f12cb3f12cb3f12cb3f12cb3f02c8cbff13cbffcdcdc9ed5402fba0a75bda89a1a400031c7ff481f481a401a401a7ffa803a1f481a67fa67fa6ffa67fa67fa67fa67fa67fa67fa861a1a7ffa7fe601822221818222018219e219c219aae221e22201eaa1d1c4ff481f481a401a401020203ae01a803a1f480602c2a2886600da2aa08e0a8e000a8e000a8e00041c5b678ae22ae22ae22ae23292a0038547dec547dcb5616561656135610561056105610561056105610561000345711571157115711571157115711571157115711571157115711dfc4868b');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initCapsuleHub_init_args({ $$type: 'CapsuleHub_init_args', fee_accumulator_address, vault_address, vault_bound, sealed, deployment_manifest_hash, genesis_controller_address })(builder);
@@ -1629,9 +1644,9 @@ const CapsuleHub_types: ABIType[] = [
     {"name":"BindDeploymentManifest","header":2430787787,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"counterpart_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PublishPrivateDirect","header":2047786991,"fields":[{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicDirect","header":3714445049,"fields":[{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicDirect","header":3714445049,"fields":[{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushFees","header":2055606321,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"TopUpStorageReserve","header":1395767424,"fields":[]},
@@ -1698,6 +1713,7 @@ export const ENTRY_UID_DOMAIN_DIRECT_PRIVATE = 3508076801n;
 export const ENTRY_UID_DOMAIN_DIRECT_PUBLIC = 3508076802n;
 export const ENTRY_UID_DOMAIN_VAULT_PRIVATE = 3508077057n;
 export const ENTRY_UID_DOMAIN_VAULT_PUBLIC = 3508077058n;
+export const PLATHO_PUBLIC_MARKETING_NOTE_ASCII = 2573421624129493433291659589718684717235138672n;
 
 export class CapsuleHub implements Contract {
     

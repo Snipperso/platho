@@ -84,6 +84,7 @@ all storage endowment constants
 all reserve constants
 all TTL constants
 all route constants
+public publish marketing marker
 STON.fi route values
 ATH full discount amount
 ```
@@ -423,6 +424,7 @@ CapsuleHub.PublishPublicFromVault = 0x8C2A76B7
 PublishPublicFromVault {
   publish_bounce_id: uint64
   publish_id:        uint256
+  marketing_note:    uint152 = ASCII "sent via Platho.App"
   author_wallet:     MsgAddress
   body_hash:         uint256
   protocol_fee_paid: coins
@@ -495,6 +497,17 @@ msg.sender == author_wallet
 ```
 
 The author cannot be supplied only in payload/arguments.
+
+Direct public publish and Vault public publish must include the public marketing marker:
+
+```text
+marketing_note = uint152 ASCII "sent via Platho.App"
+hex            = 0x73656e742076696120506c6174686f2e417070
+```
+
+The marker is a public-channel-only on-chain message-body annotation. It is not rendered as user message text by the official client. Private publish messages MUST NOT include this marker.
+
+For byte-level auditability, `PublishPublicDirect` stores `marketing_note` immediately after the opcode, and `PublishPublicFromVault` stores `marketing_note` immediately after `publish_id`, before the `author_wallet` address field.
 
 ### 5.6 Private Validation
 

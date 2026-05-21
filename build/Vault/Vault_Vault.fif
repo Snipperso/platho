@@ -129,7 +129,7 @@ PROGRAM{
   DECLPROC $ReceiveIntent$_constructor_sender_wallet_recipient_wallet_asset_amount_commitment_expires_at_client_nonce_created_at_claimed
   DECLPROC $PendingPublish$_constructor_owner_wallet_session_id_budget_epoch_nonce_publish_kind_body_hash_protocol_fee_paid_capsulehub_call_value_refundable_budget_amount_created_at
   DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
-  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid
+  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid
   91785 DECLMETHOD %get_user
   103014 DECLMETHOD %get_session
   104356 DECLMETHOD %get_key_record
@@ -292,18 +292,23 @@ PROGRAM{
   }>
   $PublishPublicFromVault$_store PROCINLINE:<{
     2351593143 PUSHINT
-    s0 s6 XCHG2
+    s0 s7 XCHG2
     32 STU
-    s1 s4 XCHG
+    s1 s5 XCHG
     64 STU
-    s1 s2 XCHG
+    s1 s3 XCHG
     256 STU
+    152 STU
     STSLICE
+    SWAP
+    NEWC
     256 STU
+    s1 s2 XCHG
     128 STU
+    STBREFR
   }>
   $PublishPublicFromVault$_store_cell PROCINLINE:<{
-    5 -ROLL
+    6 -ROLL
     $PublishPublicFromVault$_store INLINECALLDICT
     ENDC
   }>
@@ -2087,7 +2092,7 @@ PROGRAM{
   }>
   $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid PROCINLINE:<{
   }>
-  $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid PROCINLINE:<{
+  $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid PROCINLINE:<{
   }>
   %get_user PROC:<{
     $Vault$_contract_load INLINECALLDICT
@@ -5808,19 +5813,20 @@ PROGRAM{
       24 s() POP
       s2 s11 XCHG
       s1 25 s() XCHG
-      s0 18 s() XCHG
       TRUE
-      s0 s11 XCHG
       1 PUSHINT
-      s0 26 s() XCHG
-      $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid INLINECALLDICT
+      2573421624129493433291659589718684717235138672 PUSHINT
+      s0 s3 XCHG
+      s2 21 s() XCHG
+      s0 27 s() XCHG
+      s1 s13 XCHG
+      $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPublicFromVault$_store_cell INLINECALLDICT
       s1 s0 s3 PUXC2
       s3 s6 XCHG
-      s2 s9 XCHG
-      s0 23 s() XCHG
-      SWAP
+      s2 17 s() XCHG
+      s9 s9 XCHG2
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -5839,10 +5845,12 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
+      s4 18 s() XCHG
       s13 17 s() XCHG
       s7 s13 XCHG
       s6 s12 XCHG
-      s6 s7 XCHG
+      s4 s7 XCHG
+      s4 s6 XCHG
     }>
     18 s() 20 s() XCHG
     s1 19 s() XCHG

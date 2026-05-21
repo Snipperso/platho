@@ -43,6 +43,7 @@ const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
 const OP_DEPOSIT_PROTOCOL_FEE = 0xff775609;
+const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(label).digest('hex'));
@@ -141,6 +142,7 @@ function publicMsg(author: Address, overrides?: Partial<PublishPublicDirect>): P
   return {
     $$type: 'PublishPublicDirect',
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256('public-body'),
     protocol_fee_paid: PLATO_PUBLIC_FEE,
     ...overrides,
@@ -171,6 +173,7 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
     bounce_id: 1002n,
     publish_id: hash256('vault-public-publish-id'),
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256('vault-public-body'),
     protocol_fee_paid: PLATO_PUBLIC_FEE,
     value_to_capsule: 100_000_000n,
@@ -416,6 +419,7 @@ describe('CapsuleHub v1 milestone 1', () => {
       bounce_id: 666n,
       publish_id: hash256('evil'),
       author_wallet: author.address,
+      marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
       body_hash: hash256('evil-body'),
       protocol_fee_paid: PLATO_PUBLIC_FEE,
     });

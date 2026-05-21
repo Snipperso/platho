@@ -14,7 +14,7 @@ PROGRAM{
   DECLPROC $MockVaultAckSink$_fun_get_state
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
-  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid
+  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid
   86957 DECLMETHOD %get_state
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
@@ -48,18 +48,23 @@ PROGRAM{
   }>
   $PublishPublicFromVault$_store PROCINLINE:<{
     2351593143 PUSHINT
-    s0 s6 XCHG2
+    s0 s7 XCHG2
     32 STU
-    s1 s4 XCHG
+    s1 s5 XCHG
     64 STU
-    s1 s2 XCHG
+    s1 s3 XCHG
     256 STU
+    152 STU
     STSLICE
+    SWAP
+    NEWC
     256 STU
+    s1 s2 XCHG
     128 STU
+    STBREFR
   }>
   $PublishPublicFromVault$_store_cell PROCINLINE:<{
-    5 -ROLL
+    6 -ROLL
     $PublishPublicFromVault$_store INLINECALLDICT
     ENDC
   }>
@@ -118,7 +123,7 @@ PROGRAM{
   }>
   $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid PROCINLINE:<{
   }>
-  $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid PROCINLINE:<{
+  $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid PROCINLINE:<{
   }>
   %get_state PROC:<{
     $MockVaultAckSink$_contract_load INLINECALLDICT
@@ -219,23 +224,24 @@ PROGRAM{
       LDMSGADDR
       64 LDU
       256 LDU
-      LDMSGADDR
+      152 LDU
       LDREF
       DROP
       CTOS
+      LDMSGADDR
       256 LDU
       128 LDU
       128 LDU
       DROP
+      s3 s6 XCHG
       s5 s4 s0 XCHG3
       TRUE
-      s4 s6 XCHG2
+      s7 s6 XCHG2
       0 PUSHINT
       s0 s6 XCHG
-      $PublishPublicFromVault$_constructor_bounce_id_publish_id_author_wallet_body_hash_protocol_fee_paid INLINECALLDICT
+      $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPublicFromVault$_store_cell INLINECALLDICT
-      s3 s3 s0 XCHG3
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true

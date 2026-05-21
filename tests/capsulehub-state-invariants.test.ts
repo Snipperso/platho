@@ -23,6 +23,7 @@ const VAULT_PUBLIC_REQUIRED = PUBLIC_REQUIRED + ACK_RESERVE;
 const PAGE_SIZE = 256n;
 const PRIVATE_NO_PAGE_REQUIRED = 5_000_000n + 3_000_000n + 1_000_000n + 4_000_000n;
 const PUBLIC_NO_PAGE_REQUIRED = 5_000_000n + 3_000_000n + 1_000_000n + 3_000_000n;
+const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(`PLATHO.V1.CAPSULE.INV.${label}`).digest('hex'));
@@ -89,6 +90,7 @@ function publicDirect(author: Address, step: number, overrides?: Partial<Publish
   return {
     $$type: 'PublishPublicDirect',
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256(`public-${step}`),
     protocol_fee_paid: PUBLIC_FEE,
     ...overrides,
@@ -116,6 +118,7 @@ function vaultPublic(author: Address, step: number, overrides?: Partial<PublishP
     bounce_id: BigInt(20_000 + step),
     publish_id: hash256(`vault-public-${step}`),
     author_wallet: author,
+    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     body_hash: hash256(`vault-public-body-${step}`),
     protocol_fee_paid: PUBLIC_FEE,
     ...overrides,
