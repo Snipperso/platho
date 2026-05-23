@@ -197,16 +197,18 @@ const publicCancelCommentButton = document.querySelector('#publicCancelCommentBu
 const vaultSubtitle = document.querySelector('#vaultSubtitle');
 const refreshVaultButton = document.querySelector('#refreshVaultButton');
 const balanceGrid = document.querySelector('#balanceGrid');
-const vaultMoveForm = document.querySelector('#vaultMoveForm');
-const vaultMoveFromLabel = document.querySelector('#vaultMoveFromLabel');
-const vaultMoveToLabel = document.querySelector('#vaultMoveToLabel');
-const vaultMoveFromBalance = document.querySelector('#vaultMoveFromBalance');
-const vaultMoveToBalance = document.querySelector('#vaultMoveToBalance');
-const vaultMoveAmountInput = document.querySelector('#vaultMoveAmountInput');
-const vaultMoveAssetSelect = document.querySelector('#vaultMoveAssetSelect');
-const vaultMoveMaxButton = document.querySelector('#vaultMoveMaxButton');
-const vaultMoveDirectionButton = document.querySelector('#vaultMoveDirectionButton');
-const vaultMoveSubmitButton = document.querySelector('#vaultMoveSubmitButton');
+const vaultMoveCards = Array.from(document.querySelectorAll('[data-vault-move-asset]')).map((form) => ({
+  asset: form.dataset.vaultMoveAsset === 'ATH' ? 'ATH' : 'TON',
+  form,
+  input: form.querySelector('[data-vault-move-input]'),
+  walletBalance: form.querySelector('[data-vault-wallet-balance]'),
+  vaultBalance: form.querySelector('[data-vault-vault-balance]'),
+  fromLabel: form.querySelector('[data-vault-from-label]'),
+  toLabel: form.querySelector('[data-vault-to-label]'),
+  maxButton: form.querySelector('[data-vault-max-button]'),
+  directionButton: form.querySelector('[data-vault-direction-button]'),
+  submitButton: form.querySelector('[data-vault-submit-button]'),
+}));
 const actionGrid = document.querySelector('#actionGrid');
 const ledgerRows = document.querySelector('#ledgerRows');
 const profileHandle = document.querySelector('#profileHandle');
@@ -243,7 +245,7 @@ let privateImageAttachment = null;
 let publicImageAttachment = null;
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
-let vaultMoveDirection = 'to-vault';
+let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
 let vaultPocketState = {
   wallet: { ton_balance: null, ath_balance: null },
   vault: { ton_balance: null, ath_balance: null },
@@ -3018,48 +3020,49 @@ refreshVaultButton?.addEventListener('click', async () => {
   }
 });
 
-vaultMoveAssetSelect?.addEventListener('change', () => {
-  refreshVaultMoveWidget();
-});
-
-vaultMoveDirectionButton?.addEventListener('click', () => {
-  vaultMoveDirection = vaultMoveDirection === 'to-vault' ? 'from-vault' : 'to-vault';
-  refreshVaultMoveWidget();
-});
-
-vaultMoveMaxButton?.addEventListener('click', () => {
-  const max = vaultMoveMaxAmount();
-  if (max === null) return;
-  vaultMoveAmountInput.value = formatVaultMoveAmountInput(max);
-  refreshVaultMoveWidget();
-});
-
-vaultMoveForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (!plathoWallet) return;
-  const asset = vaultMoveAsset();
-  const raw = vaultMoveAmountInput?.value ?? '';
-  try {
-    vaultMoveSubmitButton.disabled = true;
-    const amount = asset === 'ATH' ? parseAthAmountAtomic(raw) : parseTonAmountNanotons(raw);
-    if (asset === 'TON' && vaultMoveDirection === 'to-vault') {
-      await submitVaultDepositTonAmount(amount);
-    } else if (asset === 'TON') {
-      await submitVaultWithdrawTonAmount(amount);
-    } else if (vaultMoveDirection === 'to-vault') {
-      await submitVaultDepositAthAmount(amount);
-    } else {
-      await submitVaultWithdrawAthAmount(amount);
-    }
-    if (vaultMoveAmountInput) vaultMoveAmountInput.value = '';
-    await refreshVaultDashboard();
-  } catch (error) {
-    setVaultStatus('move blocked');
-    console.error(error);
-  } finally {
+for (const card of vaultMoveCards) {
+  card.directionButton?.addEventListener('click', () => {
+    vaultMoveDirections = {
+      ...vaultMoveDirections,
+      [card.asset]: vaultMoveDirections[card.asset] === 'to-vault' ? 'from-vault' : 'to-vault',
+    };
     refreshVaultMoveWidget();
-  }
-});
+  });
+
+  card.maxButton?.addEventListener('click', () => {
+    const max = vaultMoveMaxAmount(card.asset);
+    if (max === null) return;
+    if (card.input) card.input.value = formatVaultMoveAmountInput(max);
+    refreshVaultMoveWidget();
+  });
+
+  card.form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!plathoWallet) return;
+    const raw = card.input?.value ?? '';
+    const direction = vaultMoveDirection(card.asset);
+    try {
+      if (card.submitButton) card.submitButton.disabled = true;
+      const amount = card.asset === 'ATH' ? parseAthAmountAtomic(raw) : parseTonAmountNanotons(raw);
+      if (card.asset === 'TON' && direction === 'to-vault') {
+        await submitVaultDepositTonAmount(amount);
+      } else if (card.asset === 'TON') {
+        await submitVaultWithdrawTonAmount(amount);
+      } else if (direction === 'to-vault') {
+        await submitVaultDepositAthAmount(amount);
+      } else {
+        await submitVaultWithdrawAthAmount(amount);
+      }
+      if (card.input) card.input.value = '';
+      await refreshVaultDashboard();
+    } catch (error) {
+      setVaultStatus('move blocked');
+      console.error(error);
+    } finally {
+      refreshVaultMoveWidget();
+    }
+  });
+}
 
 publicSyncWindowSelect?.addEventListener('change', async () => {
   const value = writePublicSyncWindow(publicSyncWindowSelect.value);
@@ -4066,41 +4069,20 @@ function renderVaultPocketCards(walletBalances, vaultUser) {
       ath_balance: vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ath_balance) : null,
     },
   };
-  renderVaultCards([
-    {
-      label: 'Wallet TON',
-      value: optionalBalanceText(walletBalances?.ton_balance, formatTonNanotons),
-      caption: 'connected wallet',
-    },
-    {
-      label: 'Wallet ATH',
-      value: optionalBalanceText(walletBalances?.ath_balance, formatAthAtomic),
-      caption: 'connected wallet',
-    },
-    {
-      label: 'Vault TON',
-      value: vaultUser?.exists === true ? formatTonNanotons(vaultUser.ton_balance) : '-',
-      caption: 'inside Vault',
-    },
-    {
-      label: 'Vault ATH',
-      value: vaultUser?.exists === true ? formatAthAtomic(vaultUser.ath_balance) : '-',
-      caption: 'inside Vault',
-    },
-  ]);
+  renderVaultCards([]);
   refreshVaultMoveWidget();
 }
 
-function vaultMoveAsset() {
-  return vaultMoveAssetSelect?.value === 'ATH' ? 'ATH' : 'TON';
+function vaultMoveDirection(asset) {
+  return vaultMoveDirections[asset] === 'from-vault' ? 'from-vault' : 'to-vault';
 }
 
-function vaultMoveSourcePocket() {
-  return vaultMoveDirection === 'to-vault' ? 'wallet' : 'vault';
+function vaultMoveSourcePocket(asset) {
+  return vaultMoveDirection(asset) === 'to-vault' ? 'wallet' : 'vault';
 }
 
-function vaultMoveTargetPocket() {
-  return vaultMoveDirection === 'to-vault' ? 'vault' : 'wallet';
+function vaultMoveTargetPocket(asset) {
+  return vaultMoveDirection(asset) === 'to-vault' ? 'vault' : 'wallet';
 }
 
 function vaultMoveBalance(pocket, asset) {
@@ -4111,15 +4093,13 @@ function vaultMoveBalance(pocket, asset) {
 
 function vaultMoveFormattedBalance(pocket, asset) {
   const balance = vaultMoveBalance(pocket, asset);
-  const formatted = asset === 'ATH'
+  return asset === 'ATH'
     ? optionalBalanceText(balance, formatAthAtomic)
     : optionalBalanceText(balance, formatTonNanotons);
-  return `Balance ${formatted}`;
 }
 
-function vaultMoveMaxAmount() {
-  const asset = vaultMoveAsset();
-  const source = vaultMoveSourcePocket();
+function vaultMoveMaxAmount(asset) {
+  const source = vaultMoveSourcePocket(asset);
   const balance = vaultMoveBalance(source, asset);
   if (balance === null || balance === undefined) return null;
   if (asset === 'TON' && source === 'wallet') {
@@ -4131,29 +4111,31 @@ function vaultMoveMaxAmount() {
 }
 
 function refreshVaultMoveWidget() {
-  const asset = vaultMoveAsset();
-  const source = vaultMoveSourcePocket();
-  const target = vaultMoveTargetPocket();
-  const sourceLabel = source === 'wallet' ? 'Wallet' : 'Vault';
-  const targetLabel = target === 'wallet' ? 'Wallet' : 'Vault';
-  setText(vaultMoveFromLabel, sourceLabel);
-  setText(vaultMoveToLabel, targetLabel);
-  setText(vaultMoveFromBalance, vaultMoveFormattedBalance(source, asset));
-  setText(vaultMoveToBalance, vaultMoveFormattedBalance(target, asset));
-  if (vaultMoveSubmitButton) {
-    vaultMoveSubmitButton.textContent = vaultMoveDirection === 'to-vault'
-      ? `Move ${asset} to Vault`
-      : `Move ${asset} to Wallet`;
-    vaultMoveSubmitButton.disabled = !plathoWallet;
+  for (const card of vaultMoveCards) {
+    const direction = vaultMoveDirection(card.asset);
+    const source = vaultMoveSourcePocket(card.asset);
+    const target = vaultMoveTargetPocket(card.asset);
+    const sourceLabel = source === 'wallet' ? 'Wallet' : 'Vault';
+    const targetLabel = target === 'wallet' ? 'Wallet' : 'Vault';
+    setText(card.walletBalance, vaultMoveFormattedBalance('wallet', card.asset));
+    setText(card.vaultBalance, vaultMoveFormattedBalance('vault', card.asset));
+    setText(card.fromLabel, sourceLabel);
+    setText(card.toLabel, targetLabel);
+    if (card.submitButton) {
+      card.submitButton.textContent = direction === 'to-vault'
+        ? `Move ${card.asset} to Vault`
+        : `Move ${card.asset} to Wallet`;
+      card.submitButton.disabled = !plathoWallet;
+    }
+    if (card.form) {
+      card.form.dataset.direction = direction;
+      card.form.dataset.source = source;
+      card.form.dataset.target = target;
+    }
+    if (card.input) card.input.disabled = !plathoWallet;
+    if (card.maxButton) card.maxButton.disabled = !plathoWallet;
+    if (card.directionButton) card.directionButton.disabled = !plathoWallet;
   }
-  if (vaultMoveForm) {
-    vaultMoveForm.dataset.direction = vaultMoveDirection;
-    vaultMoveForm.dataset.asset = asset;
-  }
-  if (vaultMoveAmountInput) vaultMoveAmountInput.disabled = !plathoWallet;
-  if (vaultMoveAssetSelect) vaultMoveAssetSelect.disabled = !plathoWallet;
-  if (vaultMoveMaxButton) vaultMoveMaxButton.disabled = !plathoWallet;
-  if (vaultMoveDirectionButton) vaultMoveDirectionButton.disabled = !plathoWallet;
 }
 
 async function refreshVaultDashboard() {

@@ -88,12 +88,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     walletLabel: 'v5r1 testnet',
     networkLabel: 'testnet',
     localStateLabel: 'device only',
-    vaultCards: [
-      { label: 'Wallet TON', value: '-', caption: 'connected wallet' },
-      { label: 'Wallet ATH', value: '-', caption: 'connected wallet' },
-      { label: 'Vault TON', value: '-', caption: 'inside Vault' },
-      { label: 'Vault ATH', value: '-', caption: 'inside Vault' },
-    ],
+    vaultCards: [],
     vaultActions: [],
     ledgerRows: [],
   },

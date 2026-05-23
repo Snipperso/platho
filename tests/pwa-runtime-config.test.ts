@@ -64,12 +64,7 @@ describe('PWA runtime config guard', () => {
       subtitle: PLATHO_APP_CONFIG.ui.vaultSubtitle,
     });
 
-    expect(PLATHO_APP_CONFIG.ui.vaultCards.map((card) => card.label)).toEqual([
-      'Wallet TON',
-      'Wallet ATH',
-      'Vault TON',
-      'Vault ATH',
-    ]);
+    expect(PLATHO_APP_CONFIG.ui.vaultCards).toEqual([]);
     expect(PLATHO_APP_CONFIG.ui.vaultActions).toEqual([]);
     expect(PLATHO_APP_CONFIG.ui.ledgerRows).toEqual([]);
     expect(vaultText).not.toMatch(/M20T|readiness|faucet|testgiver/i);
@@ -134,12 +129,16 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toMatch(/id="transferAthButton"/);
     expect(html).toMatch(/id="burnAthButton"/);
     expect(html).toMatch(/Wallet and Vault are separate for security/);
-    expect(html).toMatch(/id="vaultMoveForm"/);
-    expect(html).toMatch(/id="vaultMoveAmountInput"/);
-    expect(html).toMatch(/id="vaultMoveAssetSelect"/);
-    expect(html).toMatch(/id="vaultMoveDirectionButton"/);
-    expect(html).toMatch(/id="vaultMoveSubmitButton"/);
-    expect(html).toMatch(/Move to Vault/);
+    expect(html).toMatch(/id="vaultMoveTonForm"/);
+    expect(html).toMatch(/id="vaultMoveAthForm"/);
+    expect(html).toMatch(/id="vaultMoveTonWalletBalance"/);
+    expect(html).toMatch(/id="vaultMoveTonVaultBalance"/);
+    expect(html).toMatch(/id="vaultMoveAthWalletBalance"/);
+    expect(html).toMatch(/id="vaultMoveAthVaultBalance"/);
+    expect(html).toMatch(/id="vaultMoveTonDirectionButton"/);
+    expect(html).toMatch(/id="vaultMoveAthDirectionButton"/);
+    expect(html).toMatch(/Move TON to Vault/);
+    expect(html).toMatch(/Move ATH to Vault/);
     expect(html).not.toMatch(/Wallet runtime|Key auth|Vault record|Replay store|Local state/);
     expect(app).not.toMatch(/window\.prompt|window\.alert/);
     expect(html).not.toMatch(/Messaging key backup|exportMessagingKeyBackupButton|importMessagingKeyBackupButton|messagingKeyBackupInput/);

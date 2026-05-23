@@ -199,40 +199,67 @@ Wallet required</div>
             </button>
           </header>
 
-          <div class="balance-grid" id="balanceGrid"></div>
+          <div class="vault-move-list" id="vaultMoveList">
+            <form class="vault-asset-move-card" id="vaultMoveTonForm" data-vault-move-asset="TON">
+              <header class="vault-asset-move-header">
+                <div>
+                  <span>TON</span>
+                  <strong>Move TON</strong>
+                </div>
+                <div class="vault-asset-balances">
+                  <span>Wallet <strong id="vaultMoveTonWalletBalance" data-vault-wallet-balance>-</strong></span>
+                  <span>Vault <strong id="vaultMoveTonVaultBalance" data-vault-vault-balance>-</strong></span>
+                </div>
+              </header>
 
-          <form class="vault-move-card" id="vaultMoveForm">
-            <section class="vault-move-pocket" aria-label="Move from">
-              <div>
-                <span>From</span>
-                <strong id="vaultMoveFromLabel">Wallet</strong>
-                <small id="vaultMoveFromBalance">Balance -</small>
+              <div class="vault-asset-move-body">
+                <div class="vault-asset-route">
+                  <span id="vaultMoveTonFromLabel" data-vault-from-label>Wallet</span>
+                  <button class="vault-asset-switch" id="vaultMoveTonDirectionButton" type="button" data-vault-direction-button aria-label="Switch TON direction" title="Switch direction">
+                    <span class="icon icon-down"></span>
+                    <span class="icon icon-up"></span>
+                  </button>
+                  <span id="vaultMoveTonToLabel" data-vault-to-label>Vault</span>
+                </div>
+                <div class="vault-asset-amount">
+                  <input id="vaultMoveTonAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+                  <button id="vaultMoveTonMaxButton" data-vault-max-button type="button">MAX</button>
+                </div>
               </div>
-              <div class="vault-move-amount">
-                <input id="vaultMoveAmountInput" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
-                <select id="vaultMoveAssetSelect" aria-label="Asset">
-                  <option value="TON">TON</option>
-                  <option value="ATH">ATH</option>
-                </select>
-                <button id="vaultMoveMaxButton" type="button">MAX</button>
+
+              <button class="vault-move-submit" id="vaultMoveTonSubmitButton" data-vault-submit-button type="submit">Move TON to Vault</button>
+            </form>
+
+            <form class="vault-asset-move-card" id="vaultMoveAthForm" data-vault-move-asset="ATH">
+              <header class="vault-asset-move-header">
+                <div>
+                  <span>ATH</span>
+                  <strong>Move ATH</strong>
+                </div>
+                <div class="vault-asset-balances">
+                  <span>Wallet <strong id="vaultMoveAthWalletBalance" data-vault-wallet-balance>-</strong></span>
+                  <span>Vault <strong id="vaultMoveAthVaultBalance" data-vault-vault-balance>-</strong></span>
+                </div>
+              </header>
+
+              <div class="vault-asset-move-body">
+                <div class="vault-asset-route">
+                  <span id="vaultMoveAthFromLabel" data-vault-from-label>Wallet</span>
+                  <button class="vault-asset-switch" id="vaultMoveAthDirectionButton" type="button" data-vault-direction-button aria-label="Switch ATH direction" title="Switch direction">
+                    <span class="icon icon-down"></span>
+                    <span class="icon icon-up"></span>
+                  </button>
+                  <span id="vaultMoveAthToLabel" data-vault-to-label>Vault</span>
+                </div>
+                <div class="vault-asset-amount">
+                  <input id="vaultMoveAthAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+                  <button id="vaultMoveAthMaxButton" data-vault-max-button type="button">MAX</button>
+                </div>
               </div>
-            </section>
 
-            <button class="vault-move-switch" id="vaultMoveDirectionButton" type="button" aria-label="Switch direction" title="Switch direction">
-              <span class="icon icon-down"></span>
-              <span class="icon icon-up"></span>
-            </button>
-
-            <section class="vault-move-pocket" aria-label="Move to">
-              <div>
-                <span>To</span>
-                <strong id="vaultMoveToLabel">Vault</strong>
-                <small id="vaultMoveToBalance">Balance -</small>
-              </div>
-            </section>
-
-            <button class="vault-move-submit" id="vaultMoveSubmitButton" type="submit">Move to Vault</button>
-          </form>
+              <button class="vault-move-submit" id="vaultMoveAthSubmitButton" data-vault-submit-button type="submit">Move ATH to Vault</button>
+            </form>
+          </div>
 
           <div class="action-grid" id="actionGrid"></div>
 
