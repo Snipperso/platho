@@ -247,9 +247,7 @@ export function decodeVaultUserViewStack(result) {
     exists: readStackBool(stack, 0, 'Vault user exists'),
     ton_balance: readStackInt(stack, 1, 'Vault user ton_balance'),
     ath_balance: readStackInt(stack, 2, 'Vault user ath_balance'),
-    message_budget_ton: readStackInt(stack, 3, 'Vault user message_budget_ton'),
-    budget_epoch: readStackInt(stack, 4, 'Vault user budget_epoch'),
-    current_key_id: readStackInt(stack, 5, 'Vault user current_key_id'),
+    current_key_id: readStackInt(stack, 3, 'Vault user current_key_id'),
   };
 }
 
@@ -274,18 +272,6 @@ export function decodeVaultKeyRecordViewStack(result) {
     created_lt: readStackInt(stack, 10, 'Vault key record created_lt'),
     revoked_at: readStackInt(stack, 11, 'Vault key record revoked_at'),
     revoked_lt: readStackInt(stack, 12, 'Vault key record revoked_lt'),
-  };
-}
-
-export function decodeVaultSessionViewStack(result) {
-  const stack = extractStack(result);
-  return {
-    exists: readStackBool(stack, 0, 'Vault session exists'),
-    session_pubkey: readStackInt(stack, 1, 'Vault session session_pubkey'),
-    session_id: readStackInt(stack, 2, 'Vault session session_id'),
-    nonce: readStackInt(stack, 3, 'Vault session nonce'),
-    expires_at: readStackInt(stack, 4, 'Vault session expires_at'),
-    active: readStackBool(stack, 5, 'Vault session active'),
   };
 }
 
@@ -326,17 +312,16 @@ export function decodeVaultGlobalViewStack(result) {
     vault_ath_wallet_address: readStackAddress(stack, 4, 'Vault global vault_ath_wallet_address'),
     ath_master_address: readStackAddress(stack, 5, 'Vault global ath_master_address'),
     user_count: readStackInt(stack, 6, 'Vault global user_count'),
-    session_count: readStackInt(stack, 7, 'Vault global session_count'),
-    key_record_count: readStackInt(stack, 8, 'Vault global key_record_count'),
-    receive_intent_count: readStackInt(stack, 9, 'Vault global receive_intent_count'),
-    pending_ath_withdrawal_count: readStackInt(stack, 10, 'Vault global pending_ath_withdrawal_count'),
-    pending_publish_count: readStackInt(stack, 11, 'Vault global pending_publish_count'),
-    processed_ath_deposit_count: readStackInt(stack, 12, 'Vault global processed_ath_deposit_count'),
-    pending_publish_stale_ttl: readStackInt(stack, 13, 'Vault global pending_publish_stale_ttl'),
-    airdrop_remaining_ath: readStackInt(stack, 14, 'Vault global airdrop_remaining_ath'),
-    airdrop_distributed_ath: readStackInt(stack, 15, 'Vault global airdrop_distributed_ath'),
-    airdrop_reward_per_message_ath: readStackInt(stack, 16, 'Vault global airdrop_reward_per_message_ath'),
-    airdrop_total_allocation_ath: readStackInt(stack, 17, 'Vault global airdrop_total_allocation_ath'),
+    key_record_count: readStackInt(stack, 7, 'Vault global key_record_count'),
+    receive_intent_count: readStackInt(stack, 8, 'Vault global receive_intent_count'),
+    pending_ath_withdrawal_count: readStackInt(stack, 9, 'Vault global pending_ath_withdrawal_count'),
+    pending_publish_count: readStackInt(stack, 10, 'Vault global pending_publish_count'),
+    processed_ath_deposit_count: readStackInt(stack, 11, 'Vault global processed_ath_deposit_count'),
+    pending_publish_stale_ttl: readStackInt(stack, 12, 'Vault global pending_publish_stale_ttl'),
+    airdrop_remaining_ath: readStackInt(stack, 13, 'Vault global airdrop_remaining_ath'),
+    airdrop_distributed_ath: readStackInt(stack, 14, 'Vault global airdrop_distributed_ath'),
+    airdrop_reward_per_message_ath: readStackInt(stack, 15, 'Vault global airdrop_reward_per_message_ath'),
+    airdrop_total_allocation_ath: readStackInt(stack, 16, 'Vault global airdrop_total_allocation_ath'),
   };
 }
 
@@ -434,16 +419,6 @@ export function createVaultTonRpcProvider(options = {}) {
         stack: [stackAddress(ownerWallet)],
       }));
     },
-    async getSession(ownerWallet, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
-      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      return decodeVaultSessionViewStack(await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_session',
-        stack: [stackAddress(ownerWallet)],
-      }));
-    },
     async getKeyRecord(keyId, callOptions = {}) {
       const transport = resolveTransport(options);
       if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
@@ -517,13 +492,13 @@ export function createVaultTonRpcProvider(options = {}) {
         stack: [stackAddress(ownerWallet), stackNumber(queryId)],
       }));
     },
-    async getCanonicalSessionMaxCharge(ownerWallet, publishKind, sizeClass, cryptoSuite, callOptions = {}) {
+    async getCanonicalPublishCharge(ownerWallet, publishKind, sizeClass, cryptoSuite, callOptions = {}) {
       const transport = resolveTransport(options);
       if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
       const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
       const result = await transport.runGetMethod({
         address: vaultAddress,
-        method: 'get_canonical_session_max_charge',
+        method: 'get_canonical_publish_charge',
         stack: [
           stackAddress(ownerWallet),
           stackNumber(publishKind),
@@ -531,31 +506,7 @@ export function createVaultTonRpcProvider(options = {}) {
           stackNumber(cryptoSuite),
         ],
       });
-      return readStackInt(extractStack(result), 0, 'Vault canonical session max charge');
-    },
-    async getSessionPublishHash(args, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
-      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      const result = await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_session_publish_hash',
-        stack: [
-          stackNumber(args.op),
-          stackAddress(args.owner),
-          stackNumber(args.sessionId),
-          stackNumber(args.sessionNonce),
-          stackNumber(args.validUntil),
-          stackNumber(args.publishKind),
-          stackNumber(args.sizeClass),
-          stackNumber(args.cryptoSuite),
-          stackNumber(args.maxCharge),
-          stackNumber(args.bodyHash),
-          stackNumber(args.header0),
-          stackNumber(args.header1),
-        ],
-      });
-      return readStackInt(extractStack(result), 0, 'Vault session publish hash');
+      return readStackInt(extractStack(result), 0, 'Vault canonical publish charge');
     },
     async getGlobal(callOptions = {}) {
       const transport = resolveTransport(options);
@@ -566,11 +517,6 @@ export function createVaultTonRpcProvider(options = {}) {
         method: 'get_global',
         stack: [],
       }));
-    },
-    async sendExternalMessage(boc, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.sendBoc) throw new VaultTonRpcProviderError('TON RPC sendBoc transport is not configured');
-      return transport.sendBoc({ boc, vaultAddress: resolveVaultAddress(options.vaultAddress, callOptions) });
     },
   };
 }

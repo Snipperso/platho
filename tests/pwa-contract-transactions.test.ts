@@ -5,11 +5,10 @@ import {
   storeClaimReceiveIntent,
   storeCreateReceiveIntent,
   storeDepositTon,
+  storePublishPrivateFromWallet,
+  storePublishPublicFromWallet,
   storeRegisterMessagingKeys,
   storeReplaceMessagingKeys,
-  storeRevokeSession,
-  storeSetSession,
-  storeTopUpMessageBudget,
   storeWithdrawAth,
   storeWithdrawTon,
 } from '../build/Vault/Vault_Vault';
@@ -34,26 +33,20 @@ import {
   RECEIVE_ASSETS,
   USERNAME_REGISTRY_RESERVES_NANOTONS,
   VAULT_CRYPTO_SUITE,
-  VAULT_EXTERNAL_MAGIC,
-  VAULT_EXTERNAL_OPS,
-  VAULT_EXTERNAL_VERSION,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
   buildAthWalletMessageBody,
   buildUsernameRegistryMessageBody,
-  buildVaultExternalPublishBoc,
   buildVaultMessageBody,
   createAthWalletMessage,
   createPublicPostPayload,
   createWalletTransaction,
-  createVaultSessionKey,
   createVaultWalletMessage,
   createUsernameRegistryWalletMessage,
   estimateAthWalletAttachedValueNanotons,
   estimateUsernameRegistryAttachedValueNanotons,
   estimateVaultAttachedValueNanotons,
   readPublicPostPayload,
-  signVaultSessionHash,
 } from '../web/pwa-contract-transactions.mjs';
 import {
   finalPrivateBodyCell,
@@ -97,6 +90,27 @@ function bigintToBuffer(value: bigint, bytes = 32) {
 const EMPTY_PQ_CELL = beginCell().endCell();
 const PQ_PUBKEY_BYTES = Buffer.alloc(1184, 0x55);
 const PQ_PUBKEY_CELL = snakeCellFromBytes(PQ_PUBKEY_BYTES);
+const PRIVATE_HEADER_0 = finalPrivateHeader0Cell();
+const PRIVATE_HEADER_1 = finalPrivateHeader1Cell();
+const PRIVATE_BODY = finalPrivateBodyCell();
+
+function privatePublishFixture(maxCharge = 58_000_000n) {
+  return {
+    client_nonce: 3n,
+    max_charge: maxCharge,
+    publish: {
+      publish_kind: VAULT_PUBLISH_KIND.PRIVATE,
+      size_class: VAULT_SIZE_CLASS.STANDARD,
+      crypto_suite: VAULT_CRYPTO_SUITE.CLASSICAL,
+      header_0_hash: cellPayload(PRIVATE_HEADER_0).hash,
+      header_1_hash: cellPayload(PRIVATE_HEADER_1).hash,
+      body_hash: cellPayload(PRIVATE_BODY).hash,
+      header_0_cell: cellPayload(PRIVATE_HEADER_0),
+      header_1_cell: cellPayload(PRIVATE_HEADER_1),
+      body_cell: cellPayload(PRIVATE_BODY),
+    },
+  };
+}
 
 describe('PWA contract transaction builders', () => {
   it.each([
@@ -121,19 +135,21 @@ describe('PWA contract transaction builders', () => {
       }),
     ],
     [
-      'TopUpMessageBudget',
-      { amount: 10_000_000n },
-      storeTopUpMessageBudget({ $$type: 'TopUpMessageBudget', amount: 10_000_000n }),
-    ],
-    [
-      'SetSession',
-      { session_pubkey: 0x1234n, expires_at: 1_800_000_000n },
-      storeSetSession({ $$type: 'SetSession', session_pubkey: 0x1234n, expires_at: 1_800_000_000n }),
-    ],
-    [
-      'RevokeSession',
-      {},
-      storeRevokeSession({ $$type: 'RevokeSession' }),
+      'PublishPrivateFromWallet',
+      privatePublishFixture(),
+      storePublishPrivateFromWallet({
+        $$type: 'PublishPrivateFromWallet',
+        client_nonce: 3n,
+        max_charge: 58_000_000n,
+        size_class: VAULT_SIZE_CLASS.STANDARD,
+        crypto_suite: VAULT_CRYPTO_SUITE.CLASSICAL,
+        header_0_hash: BigInt(cellPayload(PRIVATE_HEADER_0).hash),
+        header_1_hash: BigInt(cellPayload(PRIVATE_HEADER_1).hash),
+        body_hash: BigInt(cellPayload(PRIVATE_BODY).hash),
+        header_0: PRIVATE_HEADER_0,
+        header_1: PRIVATE_HEADER_1,
+        body: PRIVATE_BODY,
+      }),
     ],
     [
       'RegisterMessagingKeys',
@@ -210,9 +226,8 @@ describe('PWA contract transaction builders', () => {
   it('PWA-TX-02: quotes exact explicit Vault reserve values used by the PWA', () => {
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: false })).toBe(12_001_000n);
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: true })).toBe(2_001_000n);
-    expect(estimateVaultAttachedValueNanotons('SetSession', {}, { userExists: false, sessionExists: false })).toBe(17_000_000n);
-    expect(estimateVaultAttachedValueNanotons('SetSession', {}, { userExists: true, sessionExists: false })).toBe(7_000_000n);
-    expect(estimateVaultAttachedValueNanotons('SetSession', {}, { userExists: true, sessionExists: true })).toBe(0n);
+    expect(estimateVaultAttachedValueNanotons('PublishPrivateFromWallet', { max_charge: 58_000_000n })).toBe(58_000_000n);
+    expect(estimateVaultAttachedValueNanotons('PublishPublicFromWallet', { maxCharge: 57_000_000n })).toBe(57_000_000n);
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 1n }, { userExists: false })).toBe(17_000_000n);
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
     expect(estimateVaultAttachedValueNanotons('CreateReceiveIntent')).toBe(7_000_000n);
@@ -391,80 +406,30 @@ describe('PWA contract transaction builders', () => {
     })));
   });
 
-  it('PWA-TX-04: creates session keys and signs Vault session publish hashes', () => {
-    const secretKey = new Uint8Array(32).fill(9);
-    const key = createVaultSessionKey({ secretKey });
-    const hash = 0x1234n;
+  it('PWA-TX-04: creates wallet-funded private Vault publish messages', () => {
+    const fixture = privatePublishFixture(58_000_000n);
+    const message = createVaultWalletMessage('PublishPrivateFromWallet', fixture, {
+      vaultAddress: VAULT,
+    });
 
-    expect(key.secretKey).toEqual(secretKey);
-    expect(key.publicKey).toHaveLength(32);
-    expect(key.session_pubkey).toBe(BigInt(`0x${Buffer.from(key.publicKey).toString('hex')}`));
-    expect(signVaultSessionHash(hash, secretKey)).toHaveLength(64);
-  });
-
-  it('PWA-TX-05: builds Vault external private publish BoC matching @ton/core layout', () => {
-    const secretKey = new Uint8Array(32).fill(7);
-    const publishHash = 0x987654321n;
-    const header0Cell = finalPrivateHeader0Cell();
-    const header1Cell = finalPrivateHeader1Cell();
-    const bodyCell = finalPrivateBodyCell();
-    const publish = {
-      publish_kind: VAULT_PUBLISH_KIND.PRIVATE,
+    expect(message.address).toBe(VAULT);
+    expect(message.amount).toBe('58000000');
+    expect(message.payload).toBe(generatedBody(storePublishPrivateFromWallet({
+      $$type: 'PublishPrivateFromWallet',
+      client_nonce: 3n,
+      max_charge: 58_000_000n,
       size_class: VAULT_SIZE_CLASS.STANDARD,
       crypto_suite: VAULT_CRYPTO_SUITE.CLASSICAL,
-      header_0_hash: cellPayload(header0Cell).hash,
-      header_1_hash: cellPayload(header1Cell).hash,
-      body_hash: cellPayload(bodyCell).hash,
-      header_0_cell: cellPayload(header0Cell),
-      header_1_cell: cellPayload(header1Cell),
-      body_cell: cellPayload(bodyCell),
-    };
-    const signature = signVaultSessionHash(publishHash, secretKey);
-    const hashesRef = beginCell()
-      .storeUint(BigInt(publish.body_hash), 256)
-      .storeUint(BigInt(publish.header_0_hash), 256)
-      .storeUint(BigInt(publish.header_1_hash), 256)
-      .endCell();
-    const signatureRef = beginCell().storeBuffer(Buffer.from(signature)).endCell();
-    const payloadRef = beginCell()
-      .storeRef(header0Cell)
-      .storeRef(header1Cell)
-      .storeRef(bodyCell)
-      .endCell();
-    const expected = beginCell()
-      .storeUint(VAULT_EXTERNAL_MAGIC, 32)
-      .storeUint(VAULT_EXTERNAL_VERSION, 8)
-      .storeUint(VAULT_EXTERNAL_OPS.PublishPrivateBySessionExternal, 32)
-      .storeAddress(Address.parseRaw(OWNER))
-      .storeUint(0x5555n, 256)
-      .storeUint(3n, 64)
-      .storeUint(1_800_000_000n, 32)
-      .storeUint(VAULT_PUBLISH_KIND.PRIVATE, 8)
-      .storeUint(VAULT_SIZE_CLASS.STANDARD, 8)
-      .storeUint(VAULT_CRYPTO_SUITE.CLASSICAL, 8)
-      .storeUint(58_000_000n, 128)
-      .storeRef(hashesRef)
-      .storeRef(signatureRef)
-      .storeRef(payloadRef)
-      .endCell()
-      .toBoc({ idx: false, crc32: false })
-      .toString('base64');
-
-    expect(buildVaultExternalPublishBoc({
-      publish,
-      owner: OWNER,
-      sessionId: 0x5555n,
-      sessionNonce: 3n,
-      validUntil: 1_800_000_000n,
-      maxCharge: 58_000_000n,
-      sessionPublishHash: publishHash,
-      sessionSecretKey: secretKey,
-    })).toBe(expected);
+      header_0_hash: BigInt(fixture.publish.header_0_hash),
+      header_1_hash: BigInt(fixture.publish.header_1_hash),
+      body_hash: BigInt(fixture.publish.body_hash),
+      header_0: PRIVATE_HEADER_0,
+      header_1: PRIVATE_HEADER_1,
+      body: PRIVATE_BODY,
+    })));
   });
 
-  it('PWA-TX-09: creates public post payload cells and public external publish BoCs', async () => {
-    const secretKey = new Uint8Array(32).fill(8);
-    const publishHash = 0x777777n;
+  it('PWA-TX-09: creates public post payload cells and wallet-funded public publish messages', async () => {
     const bodyText = 'p'.repeat(PUBLIC_POST_TEXT_MAX_BYTES);
     const payload = await createPublicPostPayload(bodyText);
     const headerCell = Cell.fromBoc(Buffer.from(payload.headerBoc, 'base64'))[0];
@@ -496,47 +461,32 @@ describe('PWA contract transaction builders', () => {
       size_class: VAULT_SIZE_CLASS.STANDARD,
       crypto_suite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
       header_0_hash: payload.headerHash,
+      header_hash: payload.headerHash,
       body_hash: payload.bodyHash,
       header_0_cell: payload.header_cell,
+      header_cell: payload.header_cell,
       body_cell: payload.body_cell,
     };
-    const signature = signVaultSessionHash(publishHash, secretKey);
-    const hashesRef = beginCell()
-      .storeUint(BigInt(publish.body_hash), 256)
-      .storeUint(BigInt(publish.header_0_hash), 256)
-      .storeUint(0n, 256)
-      .endCell();
-    const signatureRef = beginCell().storeBuffer(Buffer.from(signature)).endCell();
-    const payloadRef = beginCell().storeRef(headerCell).storeRef(bodyCell).endCell();
-    const expected = beginCell()
-      .storeUint(VAULT_EXTERNAL_MAGIC, 32)
-      .storeUint(VAULT_EXTERNAL_VERSION, 8)
-      .storeUint(VAULT_EXTERNAL_OPS.PublishPublicBySessionExternal, 32)
-      .storeAddress(Address.parseRaw(OWNER))
-      .storeUint(0x9999n, 256)
-      .storeUint(4n, 64)
-      .storeUint(1_800_000_000n, 32)
-      .storeUint(VAULT_PUBLISH_KIND.PUBLIC, 8)
-      .storeUint(VAULT_SIZE_CLASS.STANDARD, 8)
-      .storeUint(VAULT_CRYPTO_SUITE.PUBLIC_NONE, 8)
-      .storeUint(57_000_000n, 128)
-      .storeRef(hashesRef)
-      .storeRef(signatureRef)
-      .storeRef(payloadRef)
-      .endCell()
-      .toBoc({ idx: false, crc32: false })
-      .toString('base64');
 
-    expect(buildVaultExternalPublishBoc({
+    expect(createVaultWalletMessage('PublishPublicFromWallet', {
+      client_nonce: 4n,
+      max_charge: 57_000_000n,
       publish,
-      owner: OWNER,
-      sessionId: 0x9999n,
-      sessionNonce: 4n,
-      validUntil: 1_800_000_000n,
-      maxCharge: 57_000_000n,
-      sessionPublishHash: publishHash,
-      sessionSecretKey: secretKey,
-    })).toBe(expected);
+    }, {
+      vaultAddress: VAULT,
+    })).toMatchObject({
+      address: VAULT,
+      amount: '57000000',
+      payload: generatedBody(storePublishPublicFromWallet({
+        $$type: 'PublishPublicFromWallet',
+        client_nonce: 4n,
+        max_charge: 57_000_000n,
+        header_hash: BigInt(payload.headerHash),
+        body_hash: BigInt(payload.bodyHash),
+        header: headerCell,
+        body: bodyCell,
+      })),
+    });
   });
 
   it('PWA-TX-09B: public comments use compact binary parent references', async () => {

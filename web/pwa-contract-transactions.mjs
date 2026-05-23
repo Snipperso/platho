@@ -1,18 +1,16 @@
 import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs';
-import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const VAULT_OPS = Object.freeze({
   DepositTon: 716160408,
   WithdrawTon: 1212947826,
   WithdrawAth: 4188293172,
-  TopUpMessageBudget: 2258722706,
-  SetSession: 4282367168,
-  RevokeSession: 3676097982,
   RegisterMessagingKeys: 1383096026,
   ReplaceMessagingKeys: 2312521915,
   CreateReceiveIntent: 4152424723,
   ClaimReceiveIntent: 2582433020,
   CancelReceiveIntent: 841519988,
+  PublishPrivateFromWallet: 1751553222,
+  PublishPublicFromWallet: 2416888070,
 });
 
 export const ATH_WALLET_OPS = Object.freeze({
@@ -26,14 +24,6 @@ export const ATH_WALLET_OPS = Object.freeze({
 export const USERNAME_REGISTRY_OPS = Object.freeze({
   FlushAthRefundDue: 1804766023,
 });
-
-export const VAULT_EXTERNAL_OPS = Object.freeze({
-  PublishPrivateBySessionExternal: 0x686694C6n,
-  PublishPublicBySessionExternal: 0x900EC906n,
-});
-
-export const VAULT_EXTERNAL_MAGIC = 0x504c5352n;
-export const VAULT_EXTERNAL_VERSION = 1n;
 
 export const VAULT_PUBLISH_KIND = Object.freeze({
   PRIVATE: 1n,
@@ -79,7 +69,6 @@ export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 30_000_000n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({
   userStateStorage: 10_000_000n,
-  sessionStateStorage: 5_000_000n,
   keyRecordStandardStorage: 5_000_000n,
   keyRecordLongTermStorage: 30_000_000n,
   receiveIntentStorage: 5_000_000n,
@@ -111,10 +100,6 @@ export const RECEIVE_ASSETS = Object.freeze({
 });
 
 const BOC_MAGIC = [0xb5, 0xee, 0x9c, 0x72];
-const ED25519_SECRET_KEY_BYTES = 32;
-const ED25519_PUBLIC_KEY_BYTES = 32;
-const ED25519_SIGNATURE_BYTES = 64;
-
 function assertObject(value, name) {
   if (!value || typeof value !== 'object') throw new TypeError(`${name} must be an object`);
   return value;
@@ -534,7 +519,6 @@ function keyRecordStorageEndowment(cryptoSuiteMask) {
 export function estimateVaultAttachedValueNanotons(type, params = {}, context = {}) {
   assertString(type, 'type');
   const userExists = context.userExists === true;
-  const sessionExists = context.sessionExists === true;
   const recipientUserExists = context.recipientUserExists === true;
 
   if (type === 'DepositTon') {
@@ -544,11 +528,8 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
   }
   if (type === 'WithdrawTon') return VAULT_RESERVES_NANOTONS.withdrawTonExec;
   if (type === 'WithdrawAth') return VAULT_RESERVES_NANOTONS.withdrawAthMinValue;
-  if (type === 'SetSession') {
-    let value = 0n;
-    if (!userExists) value += VAULT_RESERVES_NANOTONS.userStateStorage;
-    if (!sessionExists) value += VAULT_RESERVES_NANOTONS.sessionStateStorage;
-    return value > 0n ? value + VAULT_RESERVES_NANOTONS.stateGrowthExec : 0n;
+  if (type === 'PublishPrivateFromWallet' || type === 'PublishPublicFromWallet') {
+    return assertUint(params.max_charge ?? params.maxCharge, 128, 'max_charge');
   }
   if (type === 'RegisterMessagingKeys') {
     return keyRecordStorageEndowment(params.crypto_suite_mask)
@@ -567,7 +548,7 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
     return recipientUserExists ? 0n : VAULT_RESERVES_NANOTONS.userStateStorage
       + VAULT_RESERVES_NANOTONS.stateGrowthExec;
   }
-  if (type === 'RevokeSession' || type === 'TopUpMessageBudget' || type === 'CancelReceiveIntent') {
+  if (type === 'CancelReceiveIntent') {
     return 0n;
   }
   throw new Error(`Unsupported Vault message type ${type}`);
@@ -625,17 +606,32 @@ export function buildVaultMessageBody(type, params = {}) {
         .uint(params.amount, 128, 'amount')
         .address(params.recipient, 'recipient')
         .toBocBase64();
-    case 'TopUpMessageBudget':
-      return beginVaultBody(VAULT_OPS.TopUpMessageBudget)
-        .uint(params.amount, 128, 'amount')
+    case 'PublishPrivateFromWallet': {
+      const publish = assertObject(params.publish ?? params, 'publish');
+      return beginVaultBody(VAULT_OPS.PublishPrivateFromWallet)
+        .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+        .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+        .uint(publish.size_class, 8, 'size_class')
+        .uint(publish.crypto_suite, 8, 'crypto_suite')
+        .uint(publishHashValue(publish.header_0_hash, 'publish.header_0_hash'), 256, 'header_0_hash')
+        .uint(publishHashValue(publish.header_1_hash, 'publish.header_1_hash'), 256, 'header_1_hash')
+        .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
+        .ref(publishCellFromPayload(publish.header_0_cell, 'publish.header_0_cell'), 'header_0')
+        .ref(publishCellFromPayload(publish.header_1_cell, 'publish.header_1_cell'), 'header_1')
+        .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
         .toBocBase64();
-    case 'SetSession':
-      return beginVaultBody(VAULT_OPS.SetSession)
-        .uint(params.session_pubkey, 256, 'session_pubkey')
-        .uint(params.expires_at, 32, 'expires_at')
+    }
+    case 'PublishPublicFromWallet': {
+      const publish = assertObject(params.publish ?? params, 'publish');
+      return beginVaultBody(VAULT_OPS.PublishPublicFromWallet)
+        .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+        .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+        .uint(publishHashValue(publish.header_hash ?? publish.header_0_hash, 'publish.header_hash'), 256, 'header_hash')
+        .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
+        .ref(publishCellFromPayload(publish.header_cell ?? publish.header_0_cell, 'publish.header_cell'), 'header')
+        .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
         .toBocBase64();
-    case 'RevokeSession':
-      return beginVaultBody(VAULT_OPS.RevokeSession).toBocBase64();
+    }
     case 'RegisterMessagingKeys':
       return beginVaultBody(VAULT_OPS.RegisterMessagingKeys)
         .uint(params.enc_pubkey, 256, 'enc_pubkey')
@@ -791,24 +787,6 @@ export function createWalletTransaction(messages, options = {}) {
     validUntil,
     messages: Array.isArray(messages) ? messages : [messages],
   };
-}
-
-export function createVaultSessionKey(options = {}) {
-  const secretKey = options.secretKey
-    ? assertBytes(options.secretKey, ED25519_SECRET_KEY_BYTES, 'session secret key')
-    : randomBytes(ED25519_SECRET_KEY_BYTES);
-  const publicKey = assertBytes(ed25519.getPublicKey(secretKey), ED25519_PUBLIC_KEY_BYTES, 'session public key');
-  return {
-    secretKey,
-    publicKey,
-    session_pubkey: bytesToBigInt(publicKey),
-  };
-}
-
-export function signVaultSessionHash(sessionPublishHash, sessionSecretKey) {
-  const hashBytes = bigintToBytes(sessionPublishHash, 32, 'sessionPublishHash');
-  const secretKey = assertBytes(sessionSecretKey, ED25519_SECRET_KEY_BYTES, 'session secret key');
-  return assertBytes(ed25519.sign(hashBytes, secretKey), ED25519_SIGNATURE_BYTES, 'session signature');
 }
 
 function publishHashValue(value, name) {
@@ -1282,67 +1260,4 @@ export function readPublicPostPayload(payload, options = {}) {
   const headerBytes = readSnakeCellBytes(headerPayload, { maxBytes: PUBLIC_COMMENT_HEADER_BYTES, name: 'public header snake cell' });
   const bodyBytes = readSnakeCellBytes(bodyPayload, { maxBytes, name: 'public body snake cell' });
   return readPublicBodyBytes(headerBytes, bodyBytes);
-}
-
-export function buildVaultExternalPublishBoc(params = {}) {
-  assertObject(params, 'params');
-  const publish = assertObject(params.publish, 'publish');
-  const owner = assertString(params.owner, 'owner');
-  const op = assertUint(
-    params.op ?? (BigInt(publish.publish_kind) === VAULT_PUBLISH_KIND.PUBLIC
-      ? VAULT_EXTERNAL_OPS.PublishPublicBySessionExternal
-      : VAULT_EXTERNAL_OPS.PublishPrivateBySessionExternal),
-    32,
-    'op',
-  );
-  const publishKind = assertUint(publish.publish_kind, 8, 'publish.publish_kind');
-  const sizeClass = assertUint(publish.size_class, 8, 'publish.size_class');
-  const cryptoSuite = assertUint(publish.crypto_suite, 8, 'publish.crypto_suite');
-  const bodyHash = publishHashValue(publish.body_hash, 'publish.body_hash');
-  const header0Hash = publishHashValue(publish.header_0_hash ?? 0n, 'publish.header_0_hash');
-  const header1Hash = publishHashValue(publish.header_1_hash ?? 0n, 'publish.header_1_hash');
-
-  const hashesRef = beginCell()
-    .uint(bodyHash, 256, 'body_hash')
-    .uint(header0Hash, 256, 'header_0_hash')
-    .uint(header1Hash, 256, 'header_1_hash')
-    .endCell();
-  const signatureRef = beginCell()
-    .bytesValue(signVaultSessionHash(params.sessionPublishHash, params.sessionSecretKey), ED25519_SIGNATURE_BYTES, 'session signature')
-    .endCell();
-
-  let payloadRef;
-  if (publishKind === VAULT_PUBLISH_KIND.PRIVATE) {
-    payloadRef = beginCell()
-      .ref(publishCellFromPayload(publish.header_0_cell, 'publish.header_0_cell'), 'header_0_cell')
-      .ref(publishCellFromPayload(publish.header_1_cell, 'publish.header_1_cell'), 'header_1_cell')
-      .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body_cell')
-      .endCell();
-  } else if (publishKind === VAULT_PUBLISH_KIND.PUBLIC) {
-    payloadRef = beginCell()
-      .ref(publishCellFromPayload(publish.header_0_cell, 'publish.header_0_cell'), 'header_0_cell')
-      .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body_cell')
-      .endCell();
-  } else {
-    throw new RangeError('Unsupported publish kind');
-  }
-
-  const root = beginCell()
-    .uint(VAULT_EXTERNAL_MAGIC, 32, 'magic')
-    .uint(VAULT_EXTERNAL_VERSION, 8, 'version')
-    .uint(op, 32, 'op')
-    .address(owner, 'owner')
-    .uint(params.sessionId, 256, 'sessionId')
-    .uint(params.sessionNonce, 64, 'sessionNonce')
-    .uint(params.validUntil, 32, 'validUntil')
-    .uint(publishKind, 8, 'publishKind')
-    .uint(sizeClass, 8, 'sizeClass')
-    .uint(cryptoSuite, 8, 'cryptoSuite')
-    .uint(params.maxCharge, 128, 'maxCharge')
-    .ref(hashesRef, 'hashesRef')
-    .ref(signatureRef, 'signatureRef')
-    .ref(payloadRef, 'payloadRef')
-    .endCell();
-
-  return bytesToBase64(serializeBoc(root));
 }

@@ -9,7 +9,6 @@ import {
   SealGenesis,
   DepositTon,
   WithdrawTon,
-  SetSession,
   RegisterMessagingKeys,
   CreateReceiveIntent,
   ClaimReceiveIntent,
@@ -27,7 +26,6 @@ const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
 const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
 const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
-const SESSION_STATE_STORAGE_ENDOWMENT = 5_000_000n;
 const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 5_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
 const VAULT_ATH_WITHDRAW_MIN_VALUE = 30_000_000n;
@@ -269,26 +267,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
   });
 
-  it('VAULT-BND-02: SetSession and RegisterMessagingKeys honor exact storage boundaries', async () => {
-    const lowSession = await setupPlain();
-    const sessionRequired = USER_STATE_STORAGE_ENDOWMENT + SESSION_STATE_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
-    await lowSession.vault.send(lowSession.user.getSender(), { value: sessionRequired - 1n }, {
-      $$type: 'SetSession',
-      session_pubkey: 0x1234n,
-      expires_at: BigInt((lowSession.blockchain.now ?? 0) + 1000),
-    } as SetSession);
-    expect((await lowSession.vault.getGetUser(lowSession.user.address)).exists).toBe(false);
-    expect((await lowSession.vault.getGetSession(lowSession.user.address)).exists).toBe(false);
-
-    const exactSession = await setupPlain();
-    await exactSession.vault.send(exactSession.user.getSender(), { value: sessionRequired }, {
-      $$type: 'SetSession',
-      session_pubkey: 0x1234n,
-      expires_at: BigInt((exactSession.blockchain.now ?? 0) + 1000),
-    } as SetSession);
-    expect((await exactSession.vault.getGetUser(exactSession.user.address)).exists).toBe(true);
-    expect((await exactSession.vault.getGetSession(exactSession.user.address)).exists).toBe(true);
-
+  it('VAULT-BND-02: RegisterMessagingKeys honors exact storage boundaries', async () => {
     const lowKeys = await setupPlain();
     const keyRequired = USER_STATE_STORAGE_ENDOWMENT + KEY_RECORD_STANDARD_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
     await lowKeys.vault.send(lowKeys.user.getSender(), { value: keyRequired - 1n }, {

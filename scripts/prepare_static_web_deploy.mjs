@@ -23,7 +23,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'styles.css',
   'app.js',
   'platho-config.mjs',
-  'message-budget-policy.mjs',
+  'capsule-part-policy.mjs',
   'message-pricing-policy.mjs',
   'public-channel-subscriptions.mjs',
   'recipient-identities.mjs',

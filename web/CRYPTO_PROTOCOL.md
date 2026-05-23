@@ -63,15 +63,15 @@ external wallet connection mode in final v1.
 
 Private capsule on-chain cells use the final `platho.byte-layout.v1` binary layout. The PWA may wrap capsules in JSON for export/share UI, but the cells stored by `CapsuleHub` are binary bytes, not JSON and not an off-chain pointer.
 
-Without an allocated Vault Message Budget, the PWA is in wallet-confirmed single-capsule mode: it must allow only one
-1024-byte useful segment and must not expose attachments. The publish still goes through Vault so ATH discounts apply.
-Multi-segment text and image sends require a pre-funded Message Budget so one user action does not turn into a
-wallet-confirmation loop.
+Every publish goes through Vault as a wallet-funded message. The embedded Platho wallet pays the canonical Vault publish
+charge directly, so there is no separate prepaid publish layer. Multi-segment text and image sends are just
+multiple wallet-funded capsule publishes in one wallet transaction when the wallet has enough TON. If the wallet is not
+available, the PWA stays in preview-only single-capsule mode and must not expose attachments.
 
 PWA message pricing is per capsule. `classical-v1` has a base price of `0.010 TON`; `hybrid-v1` has a base price of
 `0.020 TON`. Both include `0.005 TON` of estimated network cost. If the PWA's conservative fee estimate is higher, it
 adds `ceil((estimate - 0.005 TON) / 0.001 TON) * 0.001 TON` as a surcharge. Contract calls still start from their
-canonical required values: Vault publishes sign `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct
+canonical required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct
 user publish ABI in final v1; every publish is Vault -> CapsuleHub so ATH discounts apply.
 
 Public posts and comments are a separate open profile, not private capsules without encryption. They store a compact

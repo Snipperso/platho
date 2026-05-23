@@ -80,32 +80,6 @@ export function splitBytesToParts(value, partBytes = SINGLE_CAPSULE_USEFUL_BYTES
   return parts;
 }
 
-function integerLikeToBigInt(value) {
-  if (typeof value === 'bigint') return value;
-  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value));
-  if (typeof value === 'string' && /^[0-9]+$/.test(value)) return BigInt(value);
-  if (value && typeof value.toString === 'function') {
-    const text = value.toString();
-    if (/^[0-9]+$/.test(text)) return BigInt(text);
-  }
-  return 0n;
-}
-
-export function hasMessageBudgetAllocation(source) {
-  if (!source) return false;
-  if (typeof source === 'bigint' || typeof source === 'number' || typeof source === 'string') {
-    return integerLikeToBigInt(source) > 0n;
-  }
-  if (typeof source !== 'object') return false;
-  const amount = source.message_budget_ton
-    ?? source.messageBudgetTon
-    ?? source.available_budget_ton
-    ?? source.availableBudgetTon
-    ?? source.availableNanotons
-    ?? source.available;
-  return integerLikeToBigInt(amount) > 0n;
-}
-
-export function singleCapsuleMessageFits(text, hasBudget = false) {
-  return hasBudget || utf8ByteLength(text) <= SINGLE_CAPSULE_USEFUL_BYTES;
+export function singleCapsuleMessageFits(text, walletFunded = false) {
+  return walletFunded || utf8ByteLength(text) <= SINGLE_CAPSULE_USEFUL_BYTES;
 }

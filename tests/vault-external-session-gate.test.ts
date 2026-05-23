@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
-import { keyPairFromSeed, sign } from '@ton/crypto';
+import { beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
-  DepositTon,
-  SetSession,
-  TopUpMessageBudget,
+  RegisterMessagingKeys,
+  PublishPrivateFromWallet,
 } from '../build/Vault/Vault_Vault';
 import {
   finalPrivateBodyCell,
@@ -15,522 +13,91 @@ import {
 } from './helpers/capsule-cells';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
-const MAGIC = 0x504c5352n;
-const VERSION = 1n;
-const OP_PRIVATE = 0x686694C6n;
-const OP_PUBLIC = 0x900EC906n;
 const KIND_PRIVATE = 1n;
-const KIND_PUBLIC = 2n;
 const SIZE_STANDARD = 1n;
-const SUITE_PUBLIC = 0n;
 const SUITE_CLASSICAL = 1n;
-const INVALID_SESSION_REQUEST_CHARGE_TON = 6_000_000n;
-
-function payloadCell(label: string): Cell {
-  return beginCell().storeBuffer(Buffer.from(`PLATHO.V1.VAULT.EXT.PAYLOAD.${label}`, 'utf8')).endCell();
-}
-
-function cellHash(cell: Cell): bigint {
-  return BigInt('0x' + cell.hash().toString('hex'));
-}
-
 const BODY_CELL = finalPrivateBodyCell();
 const HEADER0_CELL = finalPrivateHeader0Cell();
 const HEADER1_CELL = finalPrivateHeader1Cell();
-const BODY_HASH = cellHash(BODY_CELL);
-const HEADER0 = cellHash(HEADER0_CELL);
-const HEADER1 = cellHash(HEADER1_CELL);
-
-function bufToBigInt(buf: Buffer): bigint {
-  return BigInt('0x' + buf.toString('hex'));
-}
-
-function bigintToBuffer(v: bigint, bytes = 32): Buffer {
-  return Buffer.from(v.toString(16).padStart(bytes * 2, '0'), 'hex');
-}
+const BODY_HASH = BigInt('0x' + BODY_CELL.hash().toString('hex'));
+const HEADER0 = BigInt('0x' + HEADER0_CELL.hash().toString('hex'));
+const HEADER1 = BigInt('0x' + HEADER1_CELL.hash().toString('hex'));
 
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
-
-  const user = await blockchain.treasury('vault-ext-user');
-  const athWallet = await blockchain.treasury('vault-ath-wallet');
-  const capsuleHub = await blockchain.treasury('capsule-hub');
-
+  const user = await blockchain.treasury('wallet-publish-user');
+  const capsuleHub = await blockchain.treasury('wallet-publish-capsulehub');
+  const athWallet = await blockchain.treasury('wallet-publish-ath-wallet');
   const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
   const address = contractAddress(0, init);
-
-  await blockchain.setShardAccount(
+  await blockchain.setShardAccount(address, createShardAccount({
     address,
-    createShardAccount({
-      address,
-      code: init.code,
-      data: init.data,
-      balance: toNano('1'),
-      workchain: address.workChain,
-    }),
-  );
-
+    code: init.code,
+    data: init.data,
+    balance: toNano('2'),
+    workchain: address.workChain,
+  }));
   const vault = blockchain.openContract(new Vault(address, init));
-  return { blockchain, vault, user, capsuleHub };
+  return { vault, user };
 }
 
-async function fundSession(vault: any, user: any, sessionPubkey: bigint, expiresAt: number, budget = toNano('0.2')) {
-  await vault.send(user.getSender(), { value: toNano('1.1') }, {
-    $$type: 'DepositTon',
-    amount: toNano('1'),
-  } as DepositTon);
-
-  await vault.send(user.getSender(), { value: toNano('0.1') }, {
-    $$type: 'SetSession',
-    session_pubkey: sessionPubkey,
-    expires_at: BigInt(expiresAt),
-  } as SetSession);
-
-  await vault.send(user.getSender(), { value: toNano('0.1') }, {
-    $$type: 'TopUpMessageBudget',
-    amount: budget,
-  } as TopUpMessageBudget);
+async function registerKeys(vault: any, user: any) {
+  await vault.send(user.getSender(), { value: toNano('0.03') }, {
+    $$type: 'RegisterMessagingKeys',
+    enc_pubkey: 1n,
+    sign_pubkey: 2n,
+    pq_kem_pubkey_hash: 0n,
+    pq_kem_pubkey_len: 0n,
+    pq_kem_pubkey: beginCell().endCell(),
+    crypto_suite_mask: 1n,
+  } as RegisterMessagingKeys);
 }
 
-async function fundSessionWithoutBudget(vault: any, user: any, sessionPubkey: bigint, expiresAt: number) {
-  await vault.send(user.getSender(), { value: toNano('1.1') }, {
-    $$type: 'DepositTon',
-    amount: toNano('1'),
-  } as DepositTon);
-
-  await vault.send(user.getSender(), { value: toNano('0.1') }, {
-    $$type: 'SetSession',
-    session_pubkey: sessionPubkey,
-    expires_at: BigInt(expiresAt),
-  } as SetSession);
+function publishMessage(maxCharge: bigint, overrides: Partial<PublishPrivateFromWallet> = {}): PublishPrivateFromWallet {
+  return {
+    $$type: 'PublishPrivateFromWallet',
+    client_nonce: 0n,
+    max_charge: maxCharge,
+    size_class: SIZE_STANDARD,
+    crypto_suite: SUITE_CLASSICAL,
+    header_0_hash: HEADER0,
+    header_1_hash: HEADER1,
+    body_hash: BODY_HASH,
+    header_0: HEADER0_CELL,
+    header_1: HEADER1_CELL,
+    body: BODY_CELL,
+    ...overrides,
+  };
 }
 
-async function buildExternalRequest(params: {
-  vault: any;
-  op: bigint;
-  owner: Address;
-  sessionId: bigint;
-  nonce: bigint;
-  validUntil: bigint;
-  publishKind: bigint;
-  sizeClass: bigint;
-  cryptoSuite: bigint;
-  maxCharge: bigint;
-  bodyHash?: bigint;
-  header0?: bigint;
-  header1?: bigint;
-  bodyCell?: Cell;
-  header0Cell?: Cell;
-  header1Cell?: Cell;
-  secretKey: Buffer;
-  mutateSignature?: boolean;
-  signatureTrailingData?: 'bits' | 'ref';
-}) {
-  const bodyCell = params.bodyCell ?? BODY_CELL;
-  const header0Cell = params.header0Cell ?? HEADER0_CELL;
-  const header1Cell = params.header1Cell ?? HEADER1_CELL;
-  const bodyHash = params.bodyHash ?? cellHash(bodyCell);
-  const header0 = params.header0 ?? cellHash(header0Cell);
-  const header1 = params.header1 ?? cellHash(header1Cell);
+describe('Vault wallet-funded publish gate', () => {
+  it('VAULT-WALLET-PUBLISH-01: publish requires activated wallet keys', async () => {
+    const { vault, user } = await setup();
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
 
-  const sigHash = await params.vault.getGetSessionPublishHash(
-    params.op,
-    params.owner,
-    params.sessionId,
-    params.nonce,
-    params.validUntil,
-    params.publishKind,
-    params.sizeClass,
-    params.cryptoSuite,
-    params.maxCharge,
-    bodyHash,
-    header0,
-    header1,
-  );
+    await vault.send(user.getSender(), { value: maxCharge }, publishMessage(maxCharge));
 
-  const signature = sign(bigintToBuffer(sigHash), params.secretKey);
-  if (params.mutateSignature) {
-    signature[0] ^= 0xff;
-  }
-
-  const hashesRef = beginCell()
-    .storeUint(bodyHash, 256)
-    .storeUint(header0, 256)
-    .storeUint(header1, 256)
-    .endCell();
-
-  const signatureBuilder = beginCell().storeBuffer(signature);
-  if (params.signatureTrailingData === 'bits') {
-    signatureBuilder.storeUint(1n, 1);
-  } else if (params.signatureTrailingData === 'ref') {
-    signatureBuilder.storeRef(beginCell().storeUint(1n, 1).endCell());
-  }
-  const signatureRef = signatureBuilder.endCell();
-
-  const builder = beginCell()
-    .storeUint(MAGIC, 32)
-    .storeUint(VERSION, 8)
-    .storeUint(params.op, 32)
-    .storeAddress(params.owner)
-    .storeUint(params.sessionId, 256)
-    .storeUint(params.nonce, 64)
-    .storeUint(params.validUntil, 32)
-    .storeUint(params.publishKind, 8)
-    .storeUint(params.sizeClass, 8)
-    .storeUint(params.cryptoSuite, 8)
-    .storeUint(params.maxCharge, 128)
-    .storeRef(hashesRef)
-    .storeRef(signatureRef);
-
-  if (params.publishKind === KIND_PRIVATE) {
-    const payloadRef = beginCell().storeRef(header0Cell).storeRef(header1Cell).storeRef(bodyCell).endCell();
-    builder.storeRef(payloadRef);
-  } else if (params.publishKind === KIND_PUBLIC) {
-    const payloadRef = beginCell().storeRef(bodyCell).endCell();
-    builder.storeRef(payloadRef);
-  }
-
-  return builder.endCell().beginParse();
-}
-
-async function tryExternal(vault: any, external: any) {
-  try {
-    await vault.sendExternal(external);
-  } catch (_e) {
-    // Sandbox throws when an external message is not accepted before acceptMessage().
-  }
-}
-
-describe('Vault milestone 6: external session pre-accept gate and pending publish', () => {
-  it('VAULT-M6-EXT-01: valid signed request consumes nonce, debits max_charge, and creates pending publish when no ACK exists yet', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 7));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
-
-    await fundSession(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    const before = await vault.getGetUser(user.address);
-
-    const external = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-    });
-
-    await vault.sendExternal(external);
-
-    const afterUser = await vault.getGetUser(user.address);
-    const afterSession = await vault.getGetSession(user.address);
-    const afterGlobal = await vault.getGetGlobal();
-    expect(afterSession.nonce).toBe(1n);
-    expect(before.message_budget_ton - afterUser.message_budget_ton).toBe(maxCharge);
-    expect(afterGlobal.pending_publish_count).toBe(1n);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 
-  it('VAULT-EXT-01: invalid signature is rejected before nonce/budget mutation', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 8));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
+  it('VAULT-WALLET-PUBLISH-02: too-low max_charge rejects before pending publish creation', async () => {
+    const { vault, user } = await setup();
+    await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
 
-    await fundSession(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    const before = await vault.getGetUser(user.address);
+    await vault.send(user.getSender(), { value: maxCharge }, publishMessage(maxCharge - 1n, { max_charge: maxCharge - 1n }));
 
-    const external = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-      mutateSignature: true,
-    });
-
-    await tryExternal(vault, external);
-
-    const afterUser = await vault.getGetUser(user.address);
-    const afterSession = await vault.getGetSession(user.address);
-    expect(afterSession.nonce).toBe(0n);
-    expect(afterUser.message_budget_ton).toBe(before.message_budget_ton);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 
-  it('VAULT-EXT-CANONICAL-SIG-01: signatureRef with trailing bits or refs is rejected before mutation', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 28));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
+  it('VAULT-WALLET-PUBLISH-03: cell hash mismatch rejects before pending publish creation', async () => {
+    const { vault, user } = await setup();
+    await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
 
-    await fundSession(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    const before = await vault.getGetUser(user.address);
+    await vault.send(user.getSender(), { value: maxCharge }, publishMessage(maxCharge, { body_hash: BODY_HASH + 1n }));
 
-    for (const signatureTrailingData of ['bits', 'ref'] as const) {
-      const external = await buildExternalRequest({
-        vault,
-        op: OP_PRIVATE,
-        owner: user.address,
-        sessionId: session.session_id,
-        nonce: 0n,
-        validUntil: BigInt(now + 100),
-        publishKind: KIND_PRIVATE,
-        sizeClass: SIZE_STANDARD,
-        cryptoSuite: SUITE_CLASSICAL,
-        maxCharge,
-        secretKey: kp.secretKey,
-        signatureTrailingData,
-      });
-
-      await tryExternal(vault, external);
-      expect((await vault.getGetSession(user.address)).nonce).toBe(0n);
-      expect((await vault.getGetUser(user.address)).message_budget_ton).toBe(before.message_budget_ton);
-    }
-  });
-
-  it('VAULT-EXT-07: duplicate external request cannot be accepted twice', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 9));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
-
-    await fundSession(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-
-    const external1 = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-    });
-    const external2 = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-    });
-
-    await vault.sendExternal(external1);
-    const afterFirst = await vault.getGetUser(user.address);
-    await tryExternal(vault, external2);
-    const afterSecond = await vault.getGetUser(user.address);
-    const sessionAfter = await vault.getGetSession(user.address);
-
-    expect(sessionAfter.nonce).toBe(1n);
-    expect(afterSecond.message_budget_ton).toBe(afterFirst.message_budget_ton);
-  });
-
-  it('VAULT-EXT-07A/07B/07B1/07B2: invalid op/profile/max_charge consumes replay nonce and charges invalid-request budget', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 10));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
-
-    await fundSession(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    const before = await vault.getGetUser(user.address);
-
-    const bad = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge: maxCharge - 1n,
-      secretKey: kp.secretKey,
-    });
-
-    await tryExternal(vault, bad);
-
-    const after = await vault.getGetUser(user.address);
-    const afterSession = await vault.getGetSession(user.address);
-    const afterGlobal = await vault.getGetGlobal();
-    expect(afterSession.nonce).toBe(1n);
-    expect(before.message_budget_ton - after.message_budget_ton).toBe(INVALID_SESSION_REQUEST_CHARGE_TON);
-    expect(afterGlobal.pending_publish_count).toBe(0n);
-  });
-
-  it('VAULT-EXT-03: expired session rejected before mutation', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 11));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
-
-    await fundSession(vault, user, pub, now + 10);
-    blockchain.now = now + 20;
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    const before = await vault.getGetUser(user.address);
-
-    const external = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-    });
-
-    await tryExternal(vault, external);
-
-    expect((await vault.getGetSession(user.address)).nonce).toBe(0n);
-    expect((await vault.getGetUser(user.address)).message_budget_ton).toBe(before.message_budget_ton);
-  });
-
-  it('VAULT-EXT-REPLAY-LOW-BUDGET-01: low-budget signed external is rejected before acceptMessage', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 21));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
-
-    await fundSessionWithoutBudget(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const maxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    const beforeUser = await vault.getGetUser(user.address);
-    const beforeBalance = (await blockchain.getContract(vault.address)).balance;
-
-    const external1 = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-    });
-    const external2 = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge,
-      secretKey: kp.secretKey,
-    });
-
-    await tryExternal(vault, external1);
-    const afterFirstUser = await vault.getGetUser(user.address);
-    const afterFirstSession = await vault.getGetSession(user.address);
-    const afterFirstBalance = (await blockchain.getContract(vault.address)).balance;
-
-    await tryExternal(vault, external2);
-    const afterSecondUser = await vault.getGetUser(user.address);
-    const afterSecondSession = await vault.getGetSession(user.address);
-    const afterSecondBalance = (await blockchain.getContract(vault.address)).balance;
-
-    expect(beforeUser.message_budget_ton).toBe(0n);
-    expect(afterFirstSession.nonce).toBe(0n);
-    expect(afterSecondSession.nonce).toBe(0n);
-    expect(afterFirstUser.message_budget_ton).toBe(0n);
-    expect(afterSecondUser.message_budget_ton).toBe(0n);
-    expect(afterFirstBalance).toBe(beforeBalance);
-    expect(afterSecondBalance).toBe(beforeBalance);
-  });
-
-  it('VAULT-EXT-REPLAY-MAXCHARGE-01: signed external with too-low maxCharge is rejected before acceptMessage', async () => {
-    const { vault, user, blockchain } = await setup();
-    const kp = keyPairFromSeed(Buffer.alloc(32, 22));
-    const pub = bufToBigInt(kp.publicKey);
-    const now = blockchain.now ?? 0;
-
-    await fundSession(vault, user, pub, now + 1000);
-    const session = await vault.getGetSession(user.address);
-    const beforeUser = await vault.getGetUser(user.address);
-    const beforeBalance = (await blockchain.getContract(vault.address)).balance;
-    const lowMaxCharge = toNano('0.001');
-
-    const external1 = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge: lowMaxCharge,
-      secretKey: kp.secretKey,
-    });
-    const external2 = await buildExternalRequest({
-      vault,
-      op: OP_PRIVATE,
-      owner: user.address,
-      sessionId: session.session_id,
-      nonce: 0n,
-      validUntil: BigInt(now + 100),
-      publishKind: KIND_PRIVATE,
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_CLASSICAL,
-      maxCharge: lowMaxCharge,
-      secretKey: kp.secretKey,
-    });
-
-    await tryExternal(vault, external1);
-    const afterFirstUser = await vault.getGetUser(user.address);
-    const afterFirstSession = await vault.getGetSession(user.address);
-    const afterFirstBalance = (await blockchain.getContract(vault.address)).balance;
-
-    await tryExternal(vault, external2);
-    const afterSecondUser = await vault.getGetUser(user.address);
-    const afterSecondSession = await vault.getGetSession(user.address);
-    const afterSecondBalance = (await blockchain.getContract(vault.address)).balance;
-
-    expect(afterFirstSession.nonce).toBe(0n);
-    expect(afterSecondSession.nonce).toBe(0n);
-    expect(afterFirstUser.message_budget_ton).toBe(beforeUser.message_budget_ton);
-    expect(afterSecondUser.message_budget_ton).toBe(beforeUser.message_budget_ton);
-    expect(afterFirstBalance).toBe(beforeBalance);
-    expect(afterSecondBalance).toBe(beforeBalance);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 });

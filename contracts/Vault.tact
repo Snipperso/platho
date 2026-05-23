@@ -1,13 +1,12 @@
 // Platho v1 Vault milestone 1 implementation.
-// Scope: UserState, TON deposit/withdraw, session lifecycle, Message Budget, KeyRecord/key_generation lifecycle.
-// Includes external session publish to CapsuleHub with PendingPublish ACK/bounce recovery.
+// Scope: UserState, TON deposit/withdraw, wallet-funded publish, KeyRecord/key_generation lifecycle.
+// Includes wallet publish to CapsuleHub with PendingPublish ACK/bounce recovery.
 // Includes pre-seal official ATH wallet binding to avoid self-address StateInit circularity.
 // No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 
 import "./ATHWallet.tact";
 
 const VAULT_USER_STATE_STORAGE_ENDOWMENT: Int = 10000000;
-const VAULT_SESSION_STATE_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT: Int = 30000000;
 const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT: Int = 5000000;
@@ -33,19 +32,14 @@ const MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES: Int = 41;
 const MLKEM768_PUBKEY_SNAKE_CELLS: Int = 10;
 const MLKEM768_PUBKEY_SNAKE_BITS: Int = 9472;
 const MLKEM768_PUBKEY_SNAKE_REFS: Int = 9;
-const MAX_SESSION_TTL: Int = 2592000; // 30 days
 const UINT64_MAX: Int = 18446744073709551615;
 const UINT64_MOD: Int = 18446744073709551616;
 const UINT32_MAX: Int = 4294967295;
 const ATH_DEPOSIT_ID_DOMAIN: Int = 0x41445049; // "ADPI"
 const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
-const SESSION_ID_DOMAIN: Int = 0x53534944; // "SSID"
 const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
-const COMPACT_MAGIC: Int = 0x504c5352; // "PLSR"
-const COMPACT_VERSION: Int = 1;
-const SIGN_DOMAIN_SESSION_PUBLISH: Int = 0x56505542; // "VPUB"
-const OP_PUBLISH_PRIVATE_BY_SESSION_EXTERNAL: Int = 0x686694C6;
-const OP_PUBLISH_PUBLIC_BY_SESSION_EXTERNAL: Int = 0x900EC906;
+const OP_PUBLISH_PRIVATE_BY_WALLET: Int = 0x686694C6;
+const OP_PUBLISH_PUBLIC_BY_WALLET: Int = 0x900EC906;
 const PUBLISH_KIND_PRIVATE: Int = 1;
 const PUBLISH_KIND_PUBLIC: Int = 2;
 const SIZE_CLASS_STANDARD: Int = 1;
@@ -58,9 +52,8 @@ const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f
 const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 30000000000000000;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
-const VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE: Int = 6000000;
+const VAULT_PUBLISH_LOCAL_EXEC_RESERVE: Int = 6000000;
 const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 2000000;
-const INVALID_SESSION_REQUEST_CHARGE_TON: Int = VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE;
 const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE: Int = 3000000;
 const CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE: Int = 4000000;
 const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 3000000;
@@ -104,17 +97,6 @@ message(0xF9A44834) WithdrawAth {
     recipient: Address;
 }
 
-message(0x86A15F92) TopUpMessageBudget {
-    amount: Int as uint128;
-}
-
-message(0xFF3FBCC0) SetSession {
-    session_pubkey: Int as uint256;
-    expires_at: Int as uint32;
-}
-
-message(0xDB1CCDBE) RevokeSession {}
-
 message(0x52705EDA) RegisterMessagingKeys {
     enc_pubkey: Int as uint256;
     sign_pubkey: Int as uint256;
@@ -148,6 +130,28 @@ message(0x99ECCCFC) ClaimReceiveIntent {
 
 message(0x32289374) CancelReceiveIntent {
     intent_id: Int as uint256;
+}
+
+message(0x686694C6) PublishPrivateFromWallet {
+    client_nonce: Int as uint64;
+    max_charge: Int as uint128;
+    size_class: Int as uint8;
+    crypto_suite: Int as uint8;
+    header_0_hash: Int as uint256;
+    header_1_hash: Int as uint256;
+    body_hash: Int as uint256;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
+}
+
+message(0x900EC906) PublishPublicFromWallet {
+    client_nonce: Int as uint64;
+    max_charge: Int as uint128;
+    header_hash: Int as uint256;
+    body_hash: Int as uint256;
+    header: Cell;
+    body: Cell;
 }
 
 message(0xA4F862C0) PublishPrivateFromVault {
@@ -200,14 +204,11 @@ struct PendingAthWithdrawal {
 
 struct PendingPublish {
     owner_wallet: Address;
-    session_id: Int as uint256;
-    budget_epoch: Int as uint64;
+    tombstone: Bool;
     nonce: Int as uint64;
     publish_kind: Int as uint8;
     body_hash: Int as uint256;
-    protocol_fee_paid: Int as uint128;
-    capsulehub_call_value: Int as uint128;
-    refundable_budget_amount: Int as uint128;
+    refundable_amount: Int as uint128;
     created_at: Int as uint32;
 }
 
@@ -240,18 +241,7 @@ struct KeyRecord {
 struct UserState {
     ton_balance: Int as uint128;
     ath_balance: Int as uint128;
-    message_budget_ton: Int as uint128;
-    budget_epoch: Int as uint64;
     current_key_id: Int as uint256;
-}
-
-struct SessionState {
-    session_pubkey: Int as uint256;
-    session_id: Int as uint256;
-    nonce: Int as uint64;
-    expires_at: Int as uint32;
-    message_budget_ton: Int as uint128;
-    active: Bool;
 }
 
 
@@ -287,18 +277,7 @@ struct VaultUserView {
     exists: Bool;
     ton_balance: Int;
     ath_balance: Int;
-    message_budget_ton: Int;
-    budget_epoch: Int;
     current_key_id: Int;
-}
-
-struct VaultSessionView {
-    exists: Bool;
-    session_pubkey: Int;
-    session_id: Int;
-    nonce: Int;
-    expires_at: Int;
-    active: Bool;
 }
 
 struct VaultPendingAthWithdrawalView {
@@ -318,7 +297,6 @@ struct VaultGlobalView {
     vault_ath_wallet_address: Address;
     ath_master_address: Address;
     user_count: Int;
-    session_count: Int;
     key_record_count: Int;
     receive_intent_count: Int;
     pending_ath_withdrawal_count: Int;
@@ -342,14 +320,12 @@ contract Vault {
     // The canonical sealed signing/deployment domain is deployment_manifest_hash.
     genesis_config_hash: Int as uint256;
     users: map<Address, UserState>;
-    sessions: map<Address, SessionState>;
     key_records: map<Int, KeyRecord>;
     receive_intents: map<Int, ReceiveIntent>;
     processed_ath_deposits: map<Int, Int>;
     pending_ath_withdrawals: map<Int, PendingAthWithdrawal>;
     pending_publishes: map<Int, PendingPublish>;
     user_count: Int as uint64;
-    session_count: Int as uint64;
     key_record_count: Int as uint64;
     receive_intent_count: Int as uint64;
     processed_ath_deposit_count: Int as uint64;
@@ -371,14 +347,12 @@ contract Vault {
             self.genesis_config_hash = VAULT_ACTIVITY_AIRDROP_TOTAL_ATH;
         }
         self.users = emptyMap();
-        self.sessions = emptyMap();
         self.key_records = emptyMap();
         self.receive_intents = emptyMap();
         self.processed_ath_deposits = emptyMap();
         self.pending_ath_withdrawals = emptyMap();
         self.pending_publishes = emptyMap();
         self.user_count = 0;
-        self.session_count = 0;
         self.key_record_count = 0;
         self.receive_intent_count = 0;
         self.processed_ath_deposit_count = 0;
@@ -403,8 +377,6 @@ contract Vault {
         return UserState {
             ton_balance: 0,
             ath_balance: 0,
-            message_budget_ton: 0,
-            budget_epoch: 0,
             current_key_id: 0
         };
     }
@@ -415,16 +387,6 @@ contract Vault {
             return self.emptyUser();
         }
         return value!!;
-    }
-
-    fun computeSessionId(owner: Address, sessionPubkey: Int): Int {
-        return beginCell()
-            .storeUint(SESSION_ID_DOMAIN, 32)
-            .storeAddress(owner)
-            .storeUint(sessionPubkey, 256)
-            .storeUint(curLt(), 64)
-            .endCell()
-            .hash();
     }
 
     fun deriveAthWalletAddress(owner: Address): Address {
@@ -467,7 +429,7 @@ contract Vault {
     }
 
     fun isPublishProfileValid(op: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, header0: Int, header1: Int): Bool {
-        if (op == OP_PUBLISH_PRIVATE_BY_SESSION_EXTERNAL) {
+        if (op == OP_PUBLISH_PRIVATE_BY_WALLET) {
             if (publishKind != PUBLISH_KIND_PRIVATE) { return false; }
             if (header0 == 0) { return false; }
             if (header1 == 0) { return false; }
@@ -479,7 +441,7 @@ contract Vault {
             }
             return false;
         }
-        if (op == OP_PUBLISH_PUBLIC_BY_SESSION_EXTERNAL) {
+        if (op == OP_PUBLISH_PUBLIC_BY_WALLET) {
             if (publishKind != PUBLISH_KIND_PUBLIC) { return false; }
             if (sizeClass != SIZE_CLASS_STANDARD) { return false; }
             if (cryptoSuite != CRYPTO_SUITE_PUBLIC_NONE) { return false; }
@@ -490,11 +452,11 @@ contract Vault {
         return false;
     }
 
-    fun canonicalSessionMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+    fun canonicalPublishMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
         if (publishKind == PUBLISH_KIND_PUBLIC) {
             throwUnless(16320, sizeClass == SIZE_CLASS_STANDARD);
             throwUnless(16321, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
-            return VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+            return VAULT_PUBLISH_LOCAL_EXEC_RESERVE
                 + self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON)
                 + CAPSULEHUB_PUBLIC_EXEC_RESERVE
                 + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
@@ -504,7 +466,7 @@ contract Vault {
         throwUnless(16322, publishKind == PUBLISH_KIND_PRIVATE);
         if (sizeClass == SIZE_CLASS_STANDARD) {
             throwUnless(16323, cryptoSuite == CRYPTO_SUITE_CLASSICAL);
-            return VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+            return VAULT_PUBLISH_LOCAL_EXEC_RESERVE
                 + self.discountedFee(owner, PLATO_PRIVATE_STANDARD_FEE_TON)
                 + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
                 + CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE
@@ -513,37 +475,12 @@ contract Vault {
         }
         throwUnless(16324, sizeClass == SIZE_CLASS_LONG_TERM);
         throwUnless(16325, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        return VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+        return VAULT_PUBLISH_LOCAL_EXEC_RESERVE
             + self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON)
             + CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE
             + CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE
             + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
             + CAPSULEHUB_ACK_FORWARD_RESERVE;
-    }
-
-    fun computeSessionPublishHash(op: Int, owner: Address, sessionId: Int, sessionNonce: Int, validUntil: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, maxCharge: Int, hashesRef: Cell): Int {
-        let fields: Cell = beginCell()
-            .storeUint(COMPACT_MAGIC, 32)
-            .storeUint(COMPACT_VERSION, 8)
-            .storeUint(op, 32)
-            .storeAddress(owner)
-            .storeUint(sessionId, 256)
-            .storeUint(sessionNonce, 64)
-            .storeUint(validUntil, 32)
-            .storeUint(publishKind, 8)
-            .storeUint(sizeClass, 8)
-            .storeUint(cryptoSuite, 8)
-            .storeUint(maxCharge, 128)
-            .storeRef(hashesRef)
-            .endCell();
-        return beginCell()
-            .storeUint(SIGN_DOMAIN_SESSION_PUBLISH, 32)
-            .storeUint(self.deployment_manifest_hash, 256)
-            .storeAddress(myAddress())
-            .storeAddress(self.capsule_hub_address)
-            .storeRef(fields)
-            .endCell()
-            .hash();
     }
 
     fun computePublishId(owner: Address, nonce: Int, bodyHash: Int, publishKind: Int): Int {
@@ -558,8 +495,8 @@ contract Vault {
     }
 
     fun capsulehubCallValue(maxCharge: Int): Int {
-        throwUnless(16340, maxCharge >= VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE);
-        return maxCharge - VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE;
+        throwUnless(16340, maxCharge >= VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        return maxCharge - VAULT_PUBLISH_LOCAL_EXEC_RESERVE;
     }
 
     fun computePublishBounceId(publishId: Int): Int {
@@ -582,36 +519,28 @@ contract Vault {
         return self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON);
     }
 
-    fun refundPublishValue(owner: Address, budgetEpoch: Int, refundableBudgetAmount: Int, amount: Int) {
+    fun refundPublishValue(owner: Address, refundableAmount: Int, amount: Int) {
         let refundAmount: Int = 0;
         if (amount > VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE) {
             refundAmount = amount - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE;
         }
-        if (refundAmount > refundableBudgetAmount) {
-            refundAmount = refundableBudgetAmount;
+        if (refundAmount > refundableAmount) {
+            refundAmount = refundableAmount;
         }
         if (refundAmount <= 0) {
             return;
         }
-        let user: UserState = self.getUserOrEmpty(owner);
-        let sessionOpt: SessionState? = self.sessions.get(owner);
-        if (sessionOpt != null) {
-            let session: SessionState = sessionOpt!!;
-            if (session.active && user.budget_epoch == budgetEpoch) {
-                user.message_budget_ton += refundAmount;
-            } else {
-                user.ton_balance += refundAmount;
-            }
-            session.message_budget_ton = user.message_budget_ton;
-            self.sessions.set(owner, session);
-        } else {
-            user.ton_balance += refundAmount;
-        }
-        self.users.set(owner, user);
+        message(MessageParameters {
+            to: owner,
+            value: refundAmount,
+            bounce: false,
+            mode: SendPayFwdFeesSeparately,
+            body: null
+        });
     }
 
     fun refundPendingPublish(pending: PendingPublish, amount: Int) {
-        self.refundPublishValue(pending.owner_wallet, pending.budget_epoch, pending.refundable_budget_amount, amount);
+        self.refundPublishValue(pending.owner_wallet, pending.refundable_amount, amount);
     }
 
     fun refundPendingAthWithdrawalTon(pending: PendingAthWithdrawal, amount: Int) {
@@ -755,14 +684,6 @@ contract Vault {
             .storeUint(secret32, 256)
             .endCell()
             .hash();
-    }
-
-    fun requireUsableSession(owner: Address) {
-        let sessionOpt: SessionState? = self.sessions.get(owner);
-        throwUnless(16000, sessionOpt != null);
-        let session: SessionState = sessionOpt!!;
-        throwUnless(16001, session.active);
-        throwUnless(16002, now() <= session.expires_at);
     }
 
     receive(msg: BindDeploymentManifest) {
@@ -972,83 +893,6 @@ contract Vault {
         self.pending_ath_withdrawal_count -= 1;
     }
 
-    receive(msg: SetSession) {
-        self.requireSealed();
-        throwUnless(16030, msg.session_pubkey != 0);
-        throwUnless(16031, msg.expires_at > now());
-        throwUnless(16032, msg.expires_at <= now() + MAX_SESSION_TTL);
-
-        let userExists: Bool = self.users.exists(sender());
-        let sessionExists: Bool = self.sessions.exists(sender());
-        let required: Int = 0;
-        if (!userExists) {
-            required += VAULT_USER_STATE_STORAGE_ENDOWMENT;
-        }
-        if (!sessionExists) {
-            required += VAULT_SESSION_STATE_STORAGE_ENDOWMENT;
-        }
-        if (required > 0) {
-            required += VAULT_STATE_GROWTH_EXEC_RESERVE;
-        }
-        throwUnless(16033, context().value >= required);
-
-        if (!userExists) {
-            let user: UserState = self.emptyUser();
-            self.users.set(sender(), user);
-            self.user_count += 1;
-        }
-        if (!sessionExists) {
-            self.session_count += 1;
-        }
-
-        let user: UserState = self.getUserOrEmpty(sender());
-        let sessionId: Int = self.computeSessionId(sender(), msg.session_pubkey);
-        self.sessions.set(sender(), SessionState {
-            session_pubkey: msg.session_pubkey,
-            session_id: sessionId,
-            nonce: 0,
-            expires_at: msg.expires_at,
-            message_budget_ton: user.message_budget_ton,
-            active: true
-        });
-    }
-
-    receive(msg: RevokeSession) {
-        self.requireSealed();
-        let sessionOpt: SessionState? = self.sessions.get(sender());
-        throwUnless(16040, sessionOpt != null);
-        let session: SessionState = sessionOpt!!;
-        throwUnless(16041, session.active);
-
-        let user: UserState = self.getUserOrEmpty(sender());
-        session.active = false;
-        user.ton_balance += user.message_budget_ton;
-        user.message_budget_ton = 0;
-        session.message_budget_ton = 0;
-        throwUnless(16042, user.budget_epoch < UINT64_MAX);
-        user.budget_epoch += 1;
-
-        self.sessions.set(sender(), session);
-        self.users.set(sender(), user);
-    }
-
-    receive(msg: TopUpMessageBudget) {
-        self.requireSealed();
-        throwUnless(16050, msg.amount > 0);
-        self.requireUsableSession(sender());
-        let userOpt: UserState? = self.users.get(sender());
-        throwUnless(16051, userOpt != null);
-        let user: UserState = userOpt!!;
-        throwUnless(16052, user.ton_balance >= msg.amount);
-
-        user.ton_balance -= msg.amount;
-        user.message_budget_ton += msg.amount;
-        let session: SessionState = self.sessions.get(sender())!!;
-        session.message_budget_ton = user.message_budget_ton;
-        self.sessions.set(sender(), session);
-        self.users.set(sender(), user);
-    }
-
     receive(msg: TopUpStorageReserve) {
         // Accept TON for Vault storage reserve only. No user balance, authority, or config state changes.
     }
@@ -1228,244 +1072,111 @@ contract Vault {
     }
 
 
-    external(msg: Slice) {
+    receive(msg: PublishPrivateFromWallet) {
         self.requireSealed();
-        throwUnless(16400, msg.bits() >= 843);
-        let magic: Int = msg.loadUint(32);
-        throwUnless(16401, magic == COMPACT_MAGIC);
-        let version: Int = msg.loadUint(8);
-        throwUnless(16402, version == COMPACT_VERSION);
-        let op: Int = msg.loadUint(32);
-        let owner: Address = msg.loadAddress();
-        let sessionId: Int = msg.loadUint(256);
-        let sessionNonce: Int = msg.loadUint(64);
-        let validUntil: Int = msg.loadUint(32);
-        let publishKind: Int = msg.loadUint(8);
-        let sizeClass: Int = msg.loadUint(8);
-        let cryptoSuite: Int = msg.loadUint(8);
-        let maxCharge: Int = msg.loadUint(128);
-        let hashesRef: Cell = msg.loadRef();
-        let signatureRef: Cell = msg.loadRef();
-        let header0Cell: Cell = emptyCell();
-        let header1Cell: Cell = emptyCell();
-        let bodyCell: Cell = emptyCell();
-        let payloadRefCount: Int = msg.refs();
-        throwUnless(16403, msg.bits() == 0);
-
-        let sessionOpt: SessionState? = self.sessions.get(owner);
-        throwUnless(16410, sessionOpt != null);
-        let session: SessionState = sessionOpt!!;
-        throwUnless(16411, session.active);
-        throwUnless(16412, session.session_id == sessionId);
-        throwUnless(16413, session.nonce == sessionNonce);
-        throwUnless(16414, now() <= session.expires_at);
-        throwUnless(16415, now() <= validUntil);
-        throwUnless(16416, session.nonce < UINT64_MAX);
-        throwUnless(16419, session.message_budget_ton >= INVALID_SESSION_REQUEST_CHARGE_TON);
-        throwUnless(16420, maxCharge >= INVALID_SESSION_REQUEST_CHARGE_TON);
-
-        let sigHash: Int = self.computeSessionPublishHash(op, owner, sessionId, sessionNonce, validUntil, publishKind, sizeClass, cryptoSuite, maxCharge, hashesRef);
-        let sigSlice: Slice = signatureRef.beginParse();
-        let sigBits: Slice = sigSlice.loadBits(512);
-        throwUnless(16421, sigSlice.empty());
-        if (!checkSignature(sigHash, sigBits, session.session_pubkey)) {
-            throw(16422);
-        }
-
-        acceptMessage();
-
-        let userOpt: UserState? = self.users.get(owner);
-        if (userOpt == null) {
-            session.nonce += 1;
-            session.message_budget_ton = 0;
-            self.sessions.set(owner, session);
-            return;
-        }
+        throwUnless(16410, self.isBasechainAddress(sender()));
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16411, userOpt != null);
         let user: UserState = userOpt!!;
+        throwUnless(16412, user.current_key_id != 0);
+        throwUnless(16413, self.isPublishProfileValid(OP_PUBLISH_PRIVATE_BY_WALLET, PUBLISH_KIND_PRIVATE, msg.size_class, msg.crypto_suite, msg.header_0_hash, msg.header_1_hash));
+        throwUnless(16414, msg.header_0.hash() == msg.header_0_hash);
+        throwUnless(16415, msg.header_1.hash() == msg.header_1_hash);
+        throwUnless(16416, msg.body.hash() == msg.body_hash);
 
-        session.nonce += 1;
+        let expectedMax: Int = self.canonicalPublishMaxCharge(sender(), PUBLISH_KIND_PRIVATE, msg.size_class, msg.crypto_suite);
+        throwUnless(16417, msg.max_charge >= expectedMax);
+        throwUnless(16418, context().value >= msg.max_charge);
 
-        let hashes: Slice = hashesRef.beginParse();
-        let bodyHash: Int = 0;
-        let header0: Int = 0;
-        let header1: Int = 0;
-
-        let postAcceptInvalid: Bool = false;
-        if (hashes.bits() != 768) {
-            postAcceptInvalid = true;
-        }
-        if (hashes.refs() != 0) {
-            postAcceptInvalid = true;
-        }
-        if (!postAcceptInvalid) {
-            bodyHash = hashes.loadUint(256);
-            header0 = hashes.loadUint(256);
-            header1 = hashes.loadUint(256);
-        }
-        if (bodyHash == 0) {
-            postAcceptInvalid = true;
-        }
-        if (!self.isPublishProfileValid(op, publishKind, sizeClass, cryptoSuite, header0, header1)) {
-            postAcceptInvalid = true;
-        }
-        if (!postAcceptInvalid) {
-            if (publishKind == PUBLISH_KIND_PRIVATE) {
-                if (payloadRefCount != 1) {
-                    postAcceptInvalid = true;
-                } else {
-                    let payloadRef: Cell = msg.loadRef();
-                    let payloadSlice: Slice = payloadRef.beginParse();
-                    if (payloadSlice.bits() != 0) {
-                        postAcceptInvalid = true;
-                    }
-                    if (payloadSlice.refs() != 3) {
-                        postAcceptInvalid = true;
-                    }
-                    if (!postAcceptInvalid) {
-                        header0Cell = payloadSlice.loadRef();
-                        header1Cell = payloadSlice.loadRef();
-                        bodyCell = payloadSlice.loadRef();
-                    }
-                }
-            } else {
-                if (payloadRefCount != 1) {
-                    postAcceptInvalid = true;
-                } else {
-                    let payloadRef: Cell = msg.loadRef();
-                    let payloadSlice: Slice = payloadRef.beginParse();
-                    if (payloadSlice.bits() != 0) {
-                        postAcceptInvalid = true;
-                    }
-                    if (payloadSlice.refs() != 2) {
-                        postAcceptInvalid = true;
-                    }
-                    if (!postAcceptInvalid) {
-                        header0Cell = payloadSlice.loadRef();
-                        bodyCell = payloadSlice.loadRef();
-                    }
-                }
-            }
-        }
-        if (!postAcceptInvalid) {
-            if (publishKind == PUBLISH_KIND_PRIVATE) {
-                if (header0Cell.hash() != header0) {
-                    postAcceptInvalid = true;
-                }
-                if (header1Cell.hash() != header1) {
-                    postAcceptInvalid = true;
-                }
-                if (bodyCell.hash() != bodyHash) {
-                    postAcceptInvalid = true;
-                }
-            } else {
-                if (header0Cell.hash() != header0) {
-                    postAcceptInvalid = true;
-                }
-                if (bodyCell.hash() != bodyHash) {
-                    postAcceptInvalid = true;
-                }
-            }
-        }
-
-        let expectedMax: Int = 0;
-        let protocolFee: Int = 0;
-        let callValue: Int = 0;
-        let publishId: Int = 0;
-        let bounceId: Int = 0;
-
-        if (!postAcceptInvalid) {
-            expectedMax = self.canonicalSessionMaxCharge(owner, publishKind, sizeClass, cryptoSuite);
-            if (maxCharge < expectedMax) {
-                postAcceptInvalid = true;
-            }
-            if (user.message_budget_ton < maxCharge) {
-                postAcceptInvalid = true;
-            }
-        }
-
-        if (!postAcceptInvalid) {
-            protocolFee = self.protocolFeePaid(owner, publishKind, sizeClass, cryptoSuite);
-            callValue = self.capsulehubCallValue(maxCharge);
-            publishId = self.computePublishId(owner, sessionNonce, bodyHash, publishKind);
-            bounceId = self.computePublishBounceId(publishId);
-            if (publishId == 0) {
-                postAcceptInvalid = true;
-            }
-            if (self.pending_publishes.exists(bounceId)) {
-                postAcceptInvalid = true;
-            }
-        }
-
-        if (postAcceptInvalid) {
-            let invalidCharge: Int = INVALID_SESSION_REQUEST_CHARGE_TON;
-            if (user.message_budget_ton < invalidCharge) {
-                invalidCharge = user.message_budget_ton;
-            }
-            user.message_budget_ton -= invalidCharge;
-            session.message_budget_ton = user.message_budget_ton;
-            self.sessions.set(owner, session);
-            self.users.set(owner, user);
-            return;
-        }
-
-        user.message_budget_ton -= maxCharge;
-        session.message_budget_ton = user.message_budget_ton;
-        self.sessions.set(owner, session);
-        self.users.set(owner, user);
+        let protocolFee: Int = self.protocolFeePaid(sender(), PUBLISH_KIND_PRIVATE, msg.size_class, msg.crypto_suite);
+        let callValue: Int = self.capsulehubCallValue(msg.max_charge);
+        let publishId: Int = self.computePublishId(sender(), msg.client_nonce, msg.body_hash, PUBLISH_KIND_PRIVATE);
+        throwUnless(16419, publishId != 0);
+        let bounceId: Int = self.computePublishBounceId(publishId);
+        throwUnless(16420, !self.pending_publishes.exists(bounceId));
 
         self.pending_publishes.set(bounceId, PendingPublish {
-            owner_wallet: owner,
-            session_id: sessionId,
-            budget_epoch: user.budget_epoch,
-            nonce: sessionNonce,
-            publish_kind: publishKind,
-            body_hash: bodyHash,
-            protocol_fee_paid: protocolFee,
-            capsulehub_call_value: callValue,
-            refundable_budget_amount: callValue,
+            owner_wallet: sender(),
+            tombstone: false,
+            nonce: msg.client_nonce,
+            publish_kind: PUBLISH_KIND_PRIVATE,
+            body_hash: msg.body_hash,
+            refundable_amount: callValue,
             created_at: now()
         });
         self.pending_publish_count += 1;
 
-        if (publishKind == PUBLISH_KIND_PRIVATE) {
-            message(MessageParameters {
-                to: self.capsule_hub_address,
-                value: callValue,
-                bounce: true,
-                mode: SendPayGasSeparately,
-                body: PublishPrivateFromVault {
-                    bounce_id: bounceId,
-                    publish_id: publishId,
-                    size_class: sizeClass,
-                    crypto_suite: cryptoSuite,
-                    header_0_hash: header0,
-                    header_1_hash: header1,
-                    body_hash: bodyHash,
-                    header_0: header0Cell,
-                    header_1: header1Cell,
-                    body: bodyCell,
-                    protocol_fee_paid: protocolFee
-                }.toCell()
-            });
-        } else {
-            message(MessageParameters {
-                to: self.capsule_hub_address,
-                value: callValue,
-                bounce: true,
-                mode: SendPayGasSeparately,
-                body: PublishPublicFromVault {
-                    bounce_id: bounceId,
-                    publish_id: publishId,
-                    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
-                    author_wallet: owner,
-                    header_hash: header0,
-                    body_hash: bodyHash,
-                    header: header0Cell,
-                    body: bodyCell,
-                    protocol_fee_paid: protocolFee
-                }.toCell()
-            });
-        }
+        message(MessageParameters {
+            to: self.capsule_hub_address,
+            value: callValue,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: PublishPrivateFromVault {
+                bounce_id: bounceId,
+                publish_id: publishId,
+                size_class: msg.size_class,
+                crypto_suite: msg.crypto_suite,
+                header_0_hash: msg.header_0_hash,
+                header_1_hash: msg.header_1_hash,
+                body_hash: msg.body_hash,
+                header_0: msg.header_0,
+                header_1: msg.header_1,
+                body: msg.body,
+                protocol_fee_paid: protocolFee
+            }.toCell()
+        });
+    }
+
+    receive(msg: PublishPublicFromWallet) {
+        self.requireSealed();
+        throwUnless(16430, self.isBasechainAddress(sender()));
+        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16431, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16432, user.current_key_id != 0);
+        throwUnless(16433, self.isPublishProfileValid(OP_PUBLISH_PUBLIC_BY_WALLET, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE, msg.header_hash, 0));
+        throwUnless(16434, msg.header.hash() == msg.header_hash);
+        throwUnless(16435, msg.body.hash() == msg.body_hash);
+
+        let expectedMax: Int = self.canonicalPublishMaxCharge(sender(), PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
+        throwUnless(16436, msg.max_charge >= expectedMax);
+        throwUnless(16437, context().value >= msg.max_charge);
+
+        let protocolFee: Int = self.protocolFeePaid(sender(), PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
+        let callValue: Int = self.capsulehubCallValue(msg.max_charge);
+        let publishId: Int = self.computePublishId(sender(), msg.client_nonce, msg.body_hash, PUBLISH_KIND_PUBLIC);
+        throwUnless(16438, publishId != 0);
+        let bounceId: Int = self.computePublishBounceId(publishId);
+        throwUnless(16439, !self.pending_publishes.exists(bounceId));
+
+        self.pending_publishes.set(bounceId, PendingPublish {
+            owner_wallet: sender(),
+            tombstone: false,
+            nonce: msg.client_nonce,
+            publish_kind: PUBLISH_KIND_PUBLIC,
+            body_hash: msg.body_hash,
+            refundable_amount: callValue,
+            created_at: now()
+        });
+        self.pending_publish_count += 1;
+
+        message(MessageParameters {
+            to: self.capsule_hub_address,
+            value: callValue,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: PublishPublicFromVault {
+                bounce_id: bounceId,
+                publish_id: publishId,
+                marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
+                author_wallet: sender(),
+                header_hash: msg.header_hash,
+                body_hash: msg.body_hash,
+                header: msg.header,
+                body: msg.body,
+                protocol_fee_paid: protocolFee
+            }.toCell()
+        });
     }
 
     receive(msg: CapsuleHubPublishAck) {
@@ -1477,7 +1188,7 @@ contract Vault {
         let pending: PendingPublish = pendingOpt!!;
         let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
         throwUnless(16502, expectedPublishId == msg.publish_id);
-        if (pending.session_id == 0) {
+        if (pending.tombstone) {
             throwUnless(16503, now() <= pending.created_at);
             self.refundPendingPublish(pending, context().value);
             self.creditActivityAirdrop(pending.owner_wallet);
@@ -1496,7 +1207,7 @@ contract Vault {
         let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
         throwUnless(16511, pendingOpt != null);
         let pending: PendingPublish = pendingOpt!!;
-        if (pending.session_id == 0) {
+        if (pending.tombstone) {
             throwUnless(16512, now() <= pending.created_at);
             throwUnless(16513, pending.publish_kind == PUBLISH_KIND_PRIVATE);
             self.refundPendingPublish(pending, context().value);
@@ -1514,7 +1225,7 @@ contract Vault {
         let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
         throwUnless(16521, pendingOpt != null);
         let pending: PendingPublish = pendingOpt!!;
-        if (pending.session_id == 0) {
+        if (pending.tombstone) {
             throwUnless(16522, now() <= pending.created_at);
             throwUnless(16523, pending.publish_kind == PUBLISH_KIND_PUBLIC);
             self.refundPendingPublish(pending, context().value);
@@ -1535,7 +1246,7 @@ contract Vault {
         let pending: PendingPublish = pendingOpt!!;
         let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
         throwUnless(16531, expectedPublishId == msg.publish_id);
-        if (pending.session_id == 0) {
+        if (pending.tombstone) {
             throwUnless(16534, now() >= pending.created_at);
             self.pending_publishes.del(bounceId);
             return;
@@ -1547,14 +1258,11 @@ contract Vault {
         }
         self.pending_publishes.set(bounceId, PendingPublish {
             owner_wallet: pending.owner_wallet,
-            session_id: 0,
-            budget_epoch: pending.budget_epoch,
+            tombstone: true,
             nonce: pending.nonce,
             publish_kind: pending.publish_kind,
             body_hash: pending.body_hash,
-            protocol_fee_paid: 0,
-            capsulehub_call_value: 0,
-            refundable_budget_amount: pending.refundable_budget_amount,
+            refundable_amount: pending.refundable_amount,
             created_at: tombstoneExpiresAt
         });
         self.pending_publish_count -= 1;
@@ -1567,8 +1275,6 @@ contract Vault {
                 exists: false,
                 ton_balance: 0,
                 ath_balance: 0,
-                message_budget_ton: 0,
-                budget_epoch: 0,
                 current_key_id: 0
             };
         }
@@ -1577,32 +1283,7 @@ contract Vault {
             exists: true,
             ton_balance: user.ton_balance,
             ath_balance: user.ath_balance,
-            message_budget_ton: user.message_budget_ton,
-            budget_epoch: user.budget_epoch,
             current_key_id: user.current_key_id
-        };
-    }
-
-    get fun get_session(owner: Address): VaultSessionView {
-        let sessionOpt: SessionState? = self.sessions.get(owner);
-        if (sessionOpt == null) {
-            return VaultSessionView {
-                exists: false,
-                session_pubkey: 0,
-                session_id: 0,
-                nonce: 0,
-                expires_at: 0,
-                active: false
-            };
-        }
-        let session: SessionState = sessionOpt!!;
-        return VaultSessionView {
-            exists: true,
-            session_pubkey: session.session_pubkey,
-            session_id: session.session_id,
-            nonce: session.nonce,
-            expires_at: session.expires_at,
-            active: session.active
         };
     }
 
@@ -1716,17 +1397,8 @@ contract Vault {
         return self.get_pending_ath_withdrawal(withdrawalId);
     }
 
-    get fun get_canonical_session_max_charge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
-        return self.canonicalSessionMaxCharge(owner, publishKind, sizeClass, cryptoSuite);
-    }
-
-    get fun get_session_publish_hash(op: Int, owner: Address, sessionId: Int, sessionNonce: Int, validUntil: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, maxCharge: Int, bodyHash: Int, header0: Int, header1: Int): Int {
-        let hashesRef: Cell = beginCell()
-            .storeUint(bodyHash, 256)
-            .storeUint(header0, 256)
-            .storeUint(header1, 256)
-            .endCell();
-        return self.computeSessionPublishHash(op, owner, sessionId, sessionNonce, validUntil, publishKind, sizeClass, cryptoSuite, maxCharge, hashesRef);
+    get fun get_canonical_publish_charge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+        return self.canonicalPublishMaxCharge(owner, publishKind, sizeClass, cryptoSuite);
     }
 
 
@@ -1743,7 +1415,6 @@ contract Vault {
             vault_ath_wallet_address: self.vault_ath_wallet_address,
             ath_master_address: self.ath_master_address,
             user_count: self.user_count,
-            session_count: self.session_count,
             key_record_count: self.key_record_count,
             receive_intent_count: self.receive_intent_count,
             pending_ath_withdrawal_count: self.pending_ath_withdrawal_count,
