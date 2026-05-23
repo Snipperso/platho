@@ -6,6 +6,9 @@ message(0xA4F862C0) PublishPrivateFromVault {
     header_0_hash: Int as uint256;
     header_1_hash: Int as uint256;
     body_hash: Int as uint256;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
     protocol_fee_paid: Int as uint128;
 }
 
@@ -14,7 +17,10 @@ message(0x8C2A76B7) PublishPublicFromVault {
     publish_id: Int as uint256;
     marketing_note: Int as uint152;
     author_wallet: Address;
+    header_hash: Int as uint256;
     body_hash: Int as uint256;
+    header: Cell;
+    body: Cell;
     protocol_fee_paid: Int as uint128;
 }
 
@@ -33,6 +39,9 @@ message(0xFA001001) ForwardVaultPrivate {
     header_0_hash: Int as uint256;
     header_1_hash: Int as uint256;
     body_hash: Int as uint256;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
     protocol_fee_paid: Int as uint128;
     value_to_capsule: Int as uint128;
 }
@@ -43,7 +52,10 @@ message(0xFA001002) ForwardVaultPublic {
     publish_id: Int as uint256;
     marketing_note: Int as uint152;
     author_wallet: Address;
+    header_hash: Int as uint256;
     body_hash: Int as uint256;
+    header: Cell;
+    body: Cell;
     protocol_fee_paid: Int as uint128;
     value_to_capsule: Int as uint128;
 }
@@ -82,6 +94,9 @@ contract MockVaultAckSink {
                 header_0_hash: msg.header_0_hash,
                 header_1_hash: msg.header_1_hash,
                 body_hash: msg.body_hash,
+                header_0: msg.header_0,
+                header_1: msg.header_1,
+                body: msg.body,
                 protocol_fee_paid: msg.protocol_fee_paid
             }.toCell()
         });
@@ -98,7 +113,10 @@ contract MockVaultAckSink {
                 publish_id: msg.publish_id,
                 marketing_note: msg.marketing_note,
                 author_wallet: msg.author_wallet,
+                header_hash: msg.header_hash,
                 body_hash: msg.body_hash,
+                header: msg.header,
+                body: msg.body,
                 protocol_fee_paid: msg.protocol_fee_paid
             }.toCell()
         });

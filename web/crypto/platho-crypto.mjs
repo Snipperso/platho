@@ -28,6 +28,27 @@ export const ED25519_PUBLIC_KEY_BYTES = 32;
 export const ED25519_SECRET_KEY_BYTES = 32;
 export const ED25519_SIGNATURE_BYTES = 64;
 export const AES_GCM_NONCE_BYTES = 12;
+export const PLATHO_COMPACT_BODY_LAYOUT = 'platho.byte-layout.v1';
+export const PLATHO_COMPACT_TEXT_BLOCK_BYTES = 1024;
+export const PLATHO_COMPACT_MAX_CHUNKS = 1;
+export const PLATHO_ONCHAIN_CELL_LAYOUT = 'ton-snake-byte-cell.v1';
+export const PLATHO_ONCHAIN_CELL_DATA_BYTES = 127;
+export const PLATHO_ONCHAIN_HEADER_MAX_BYTES = 4096;
+export const PLATHO_ONCHAIN_BODY_MAX_BYTES = 16384;
+export const PLATHO_BINARY_HEADER0_BYTES = 140;
+export const PLATHO_BINARY_HEADER1_BYTES = 30;
+export const PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES = 32;
+export const PLATHO_COMPACT_CONTENT_TYPES = Object.freeze({
+  TEXT: 1,
+  IMAGE: 2,
+  PAYMENT: 3,
+});
+export const PLATHO_COMPACT_IMAGE_FORMATS = Object.freeze({
+  WEBP: 1,
+  AVIF: 2,
+  JPEG: 3,
+  PNG: 4,
+});
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -37,10 +58,7 @@ const KEY_ID_HYBRID_DOMAIN = 'PLATHO.KEYID.HYBRID.V1';
 const MESSAGE_KEY_DOMAIN = 'PLATHO.MESSAGE.KEY.V1';
 const MESSAGE_SALT_DOMAIN = 'PLATHO.MESSAGE.SALT.V1';
 const SIGNED_BUNDLE_DOMAIN = 'PLATHO.MESSAGING.KEY_BUNDLE.SIGNATURE.V1';
-const WALLET_OWNERSHIP_DOMAIN = 'PLATHO.WALLET.KEY_BUNDLE.OWNERSHIP.V1';
 const WALLET_BUNDLE_HASH_DOMAIN = 'PLATHO.WALLET.KEY_BUNDLE.HASH.V1';
-const TON_PROOF_PREFIX = 'ton-proof-item-v2/';
-const TON_CONNECT_SIGNATURE_DOMAIN = 'ton-connect';
 const PRIVATE_CAPSULE_HEADER0_DOMAIN = 'PLATHO.PRIVATE_CAPSULE.HEADER0.V1';
 const PRIVATE_CAPSULE_HEADER1_DOMAIN = 'PLATHO.PRIVATE_CAPSULE.HEADER1.V1';
 const PRIVATE_CAPSULE_BODY_DOMAIN = 'PLATHO.PRIVATE_CAPSULE.BODY.V1';
@@ -49,7 +67,20 @@ const PRIVATE_CAPSULE_SIGNATURE_DOMAIN = 'PLATHO.PRIVATE_CAPSULE.SIGNATURE.V1';
 const DEFAULT_CAPSULE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CAPSULE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_CLOCK_SKEW_MS = 5 * 60 * 1000;
-const DEFAULT_TON_PROOF_MAX_AGE_SEC = 15 * 60;
+const COMPACT_BODY_MAGIC = new Uint8Array([0x50, 0x4c, 0x42, 0x31]); // "PLB1"
+const COMPACT_CHUNK_MAGIC = new Uint8Array([0x50, 0x4c, 0x43, 0x31]); // "PLC1"
+const COMPACT_PAYLOAD_MAGIC = new Uint8Array([0x50, 0x43, 0x50, 0x31]); // "PCP1"
+const PRIVATE_CAPSULE_HEADER0_MAGIC = new Uint8Array([0x50, 0x48, 0x30, 0x42]); // "PH0B"
+const PRIVATE_CAPSULE_HEADER1_MAGIC = new Uint8Array([0x50, 0x48, 0x31, 0x42]); // "PH1B"
+const COMPACT_BODY_AAD_DOMAIN = 'PLATHO.COMPACT_BODY.AAD.V1';
+const COMPACT_STANDARD_CHUNK_WIRE_BYTES = 2048;
+const COMPACT_HYBRID_CHUNK_WIRE_BYTES = 4096;
+const COMPACT_CHUNK_HEADER_BYTES = 24;
+const COMPACT_BODY_BASE_PREFIX_BYTES = 68;
+const COMPACT_BODY_TAG_BYTES = 16;
+const COMPACT_IMAGE_CONTENT_HEADER_BYTES = 0;
+const COMPACT_PAYMENT_CONTENT_BYTES = 82;
+const ZERO_32_BYTES = new Uint8Array(32);
 
 const SUITE_CONFIG = Object.freeze({
   [CRYPTO_SUITES.CLASSICAL_V1]: Object.freeze({
@@ -98,6 +129,15 @@ function toUint8Array(value) {
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
   if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   throw new TypeError('Expected byte array');
+}
+
+function bytesEqual(left, right) {
+  const a = toUint8Array(left);
+  const b = toUint8Array(right);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
 function concatBytes(...parts) {
@@ -189,6 +229,222 @@ function base64Decode(value) {
   return out;
 }
 
+function minimalUintByteLength(value) {
+  const current = BigInt(value);
+  if (current < 0n) throw new Error('Cannot encode a negative integer');
+  let bytes = 1;
+  while (current >= (1n << BigInt(bytes * 8))) bytes += 1;
+  return bytes;
+}
+
+function createByteCell(data, refs = []) {
+  const bytes = toUint8Array(data);
+  if (bytes.length > PLATHO_ONCHAIN_CELL_DATA_BYTES) {
+    throw new Error(`TON cell data exceeds ${PLATHO_ONCHAIN_CELL_DATA_BYTES} bytes`);
+  }
+  if (!Array.isArray(refs) || refs.length > 4) {
+    throw new Error('TON cell can have at most 4 refs');
+  }
+  return { data: bytes, refs };
+}
+
+function splitSnakeCellChunks(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length === 0) return [new Uint8Array()];
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += PLATHO_ONCHAIN_CELL_DATA_BYTES) {
+    chunks.push(bytes.subarray(offset, offset + PLATHO_ONCHAIN_CELL_DATA_BYTES));
+  }
+  return chunks;
+}
+
+function buildSnakeCell(bytesLike) {
+  const chunks = splitSnakeCellChunks(bytesLike);
+  let root = null;
+  for (let i = chunks.length - 1; i >= 0; i -= 1) {
+    root = createByteCell(chunks[i], root ? [root] : []);
+  }
+  return { root, chunks };
+}
+
+function flattenCellTree(root) {
+  const cells = [];
+  const indexes = new WeakMap();
+  const visit = (cell) => {
+    if (indexes.has(cell)) return;
+    indexes.set(cell, cells.length);
+    cells.push(cell);
+    for (const ref of cell.refs) visit(ref);
+  };
+  visit(root);
+  return { cells, indexes };
+}
+
+function cellDescriptorBytes(cell) {
+  if (cell.refs.length > 4) throw new Error('TON cell can have at most 4 refs');
+  if (cell.data.length > PLATHO_ONCHAIN_CELL_DATA_BYTES) {
+    throw new Error(`TON cell data exceeds ${PLATHO_ONCHAIN_CELL_DATA_BYTES} bytes`);
+  }
+  return new Uint8Array([cell.refs.length, cell.data.length * 2]);
+}
+
+function serializeCellForBoc(cell, indexes, sizeBytes) {
+  const refIndexes = cell.refs.map((ref) => writeBigUintBytes(indexes.get(ref), sizeBytes, 'cell ref index'));
+  return concatBytes(cellDescriptorBytes(cell), cell.data, ...refIndexes);
+}
+
+function serializeBoc(root) {
+  const { cells, indexes } = flattenCellTree(root);
+  const sizeBytes = minimalUintByteLength(cells.length);
+  const cellPayloads = cells.map((cell) => serializeCellForBoc(cell, indexes, sizeBytes));
+  const totalCellsSize = cellPayloads.reduce((sum, payload) => sum + payload.length, 0);
+  const offsetBytes = minimalUintByteLength(totalCellsSize);
+  return concatBytes(
+    new Uint8Array([0xb5, 0xee, 0x9c, 0x72]),
+    new Uint8Array([sizeBytes, offsetBytes]),
+    writeBigUintBytes(cells.length, sizeBytes, 'BOC cells count'),
+    writeBigUintBytes(1, sizeBytes, 'BOC roots count'),
+    writeBigUintBytes(0, sizeBytes, 'BOC absent count'),
+    writeBigUintBytes(totalCellsSize, offsetBytes, 'BOC total cells size'),
+    writeBigUintBytes(0, sizeBytes, 'BOC root index'),
+    ...cellPayloads,
+  );
+}
+
+function readBocUint(bytes, cursor, byteLength, name) {
+  if (cursor.offset + byteLength > bytes.length) throw new Error(`${name} is truncated`);
+  const value = readBigUintBytes(bytes, cursor.offset, byteLength, name);
+  cursor.offset += byteLength;
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${name} is too large`);
+  return Number(value);
+}
+
+function parseOrdinaryByteCellBoc(bocLike, name = 'TON cell BOC') {
+  const bytes = typeof bocLike === 'string' ? base64Decode(bocLike) : toUint8Array(bocLike);
+  if (bytes.length < 8) throw new Error(`${name} is truncated`);
+  if (bytes[0] !== 0xb5 || bytes[1] !== 0xee || bytes[2] !== 0x9c || bytes[3] !== 0x72) {
+    throw new Error(`${name} has invalid magic`);
+  }
+  const cursor = { offset: 4 };
+  const flagsByte = bytes[cursor.offset];
+  cursor.offset += 1;
+  const hasIndex = (flagsByte & 0x80) !== 0;
+  const hasCrc32c = (flagsByte & 0x40) !== 0;
+  const hasCacheBits = (flagsByte & 0x20) !== 0;
+  const sizeBytes = flagsByte & 0x07;
+  if (hasIndex || hasCrc32c || hasCacheBits || sizeBytes <= 0) {
+    throw new Error(`${name} uses unsupported BOC flags`);
+  }
+  const offsetBytes = bytes[cursor.offset];
+  cursor.offset += 1;
+  if (offsetBytes <= 0) throw new Error(`${name} has invalid offset size`);
+  const cellsCount = readBocUint(bytes, cursor, sizeBytes, `${name} cells count`);
+  const rootsCount = readBocUint(bytes, cursor, sizeBytes, `${name} roots count`);
+  const absentCount = readBocUint(bytes, cursor, sizeBytes, `${name} absent count`);
+  const totalCellsSize = readBocUint(bytes, cursor, offsetBytes, `${name} cells size`);
+  if (cellsCount <= 0 || rootsCount !== 1 || absentCount !== 0) {
+    throw new Error(`${name} must contain one ordinary root`);
+  }
+  const rootIndex = readBocUint(bytes, cursor, sizeBytes, `${name} root index`);
+  if (rootIndex < 0 || rootIndex >= cellsCount) throw new Error(`${name} root index is out of range`);
+  const cellsEnd = cursor.offset + totalCellsSize;
+  if (cellsEnd > bytes.length) throw new Error(`${name} cell payload is truncated`);
+
+  const parsed = [];
+  for (let i = 0; i < cellsCount; i += 1) {
+    if (cursor.offset + 2 > cellsEnd) throw new Error(`${name} cell descriptor is truncated`);
+    const d1 = bytes[cursor.offset];
+    const d2 = bytes[cursor.offset + 1];
+    cursor.offset += 2;
+    const refsCount = d1 & 0x07;
+    const exotic = (d1 & 0x08) !== 0;
+    const levelMask = d1 & 0xe0;
+    if (exotic || levelMask !== 0 || refsCount > 4) throw new Error(`${name} contains unsupported cell type`);
+    if (d2 % 2 !== 0) throw new Error(`${name} contains non-byte-aligned cell data`);
+    const dataBytes = d2 / 2;
+    if (cursor.offset + dataBytes + (refsCount * sizeBytes) > cellsEnd) {
+      throw new Error(`${name} cell payload is truncated`);
+    }
+    const data = bytes.slice(cursor.offset, cursor.offset + dataBytes);
+    cursor.offset += dataBytes;
+    const refIndexes = [];
+    for (let ref = 0; ref < refsCount; ref += 1) {
+      refIndexes.push(readBocUint(bytes, cursor, sizeBytes, `${name} cell ref`));
+    }
+    parsed.push({ data, refIndexes });
+  }
+  if (cursor.offset !== cellsEnd) throw new Error(`${name} has trailing cell bytes`);
+  if (hasCrc32c && bytes.length !== cellsEnd + 4) throw new Error(`${name} has invalid crc length`);
+  if (!hasCrc32c && bytes.length !== cellsEnd) throw new Error(`${name} has trailing bytes`);
+
+  const built = parsed.map((cell) => ({ data: cell.data, refs: [] }));
+  for (let i = 0; i < parsed.length; i += 1) {
+    built[i].refs = parsed[i].refIndexes.map((refIndex) => {
+      if (refIndex <= i || refIndex >= built.length) {
+        throw new Error(`${name} has invalid cell ref order`);
+      }
+      return built[refIndex];
+    });
+  }
+  return built[rootIndex];
+}
+
+function snakeBytesFromBoc(bocLike, name) {
+  let cell = parseOrdinaryByteCellBoc(bocLike, name);
+  const chunks = [];
+  let guard = 0;
+  while (cell) {
+    if (cell.data.length > PLATHO_ONCHAIN_CELL_DATA_BYTES) {
+      throw new Error(`${name} cell exceeds Platho byte-cell limit`);
+    }
+    if (!Array.isArray(cell.refs) || cell.refs.length > 1) {
+      throw new Error(`${name} is not a Platho snake byte cell`);
+    }
+    chunks.push(cell.data);
+    cell = cell.refs[0] ?? null;
+    guard += 1;
+    if (guard > 1024) throw new Error(`${name} snake cell is too deep`);
+  }
+  return concatBytes(...chunks);
+}
+
+async function computeTonCellHashAndDepth(cell, cache = new WeakMap()) {
+  const cached = cache.get(cell);
+  if (cached) return cached;
+  const refs = [];
+  for (const ref of cell.refs) refs.push(await computeTonCellHashAndDepth(ref, cache));
+  const depth = refs.length === 0 ? 0 : Math.max(...refs.map((ref) => ref.depth)) + 1;
+  const repr = concatBytes(
+    cellDescriptorBytes(cell),
+    cell.data,
+    ...refs.map((ref) => uint16Bytes(ref.depth, 'cell depth')),
+    ...refs.map((ref) => ref.hash),
+  );
+  const result = { hash: await sha256(repr), depth };
+  cache.set(cell, result);
+  return result;
+}
+
+async function createSnakeCellPayload(name, bytesLike, maxBytes) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length > maxBytes) {
+    throw new Error(`${name} exceeds on-chain payload cap: ${bytes.length} > ${maxBytes}`);
+  }
+  const { root, chunks } = buildSnakeCell(bytes);
+  const { cells } = flattenCellTree(root);
+  const { hash } = await computeTonCellHashAndDepth(root);
+  return {
+    layout: PLATHO_ONCHAIN_CELL_LAYOUT,
+    bytes: bytes.length,
+    bits: bytes.length * 8,
+    cells: cells.length,
+    refs: Math.max(0, cells.length - 1),
+    hash: bigintHex256(bytesToBigInt(hash)),
+    boc: base64Encode(serializeBoc(root)),
+    chunks: chunks.map((chunk) => base64urlEncode(chunk)),
+  };
+}
+
 function bytesToHex(bytes) {
   return [...toUint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -204,6 +460,72 @@ function hexToBytes(value, length, name) {
     out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
   return out;
+}
+
+function uint16Bytes(value, name = 'uint16') {
+  if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
+    throw new Error(`${name} must be a uint16`);
+  }
+  return new Uint8Array([(value >> 8) & 0xff, value & 0xff]);
+}
+
+function uint8Byte(value, name = 'uint8') {
+  if (!Number.isInteger(value) || value < 0 || value > 0xff) {
+    throw new Error(`${name} must be a uint8`);
+  }
+  return value;
+}
+
+function readUint16(bytes, offset, name = 'uint16') {
+  if (offset + 2 > bytes.length) throw new Error(`${name} is truncated`);
+  return (bytes[offset] << 8) | bytes[offset + 1];
+}
+
+function uint32Bytes(value, name = 'uint32') {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) {
+    throw new Error(`${name} must be an unsigned 32-bit integer`);
+  }
+  const out = new Uint8Array(4);
+  new DataView(out.buffer).setUint32(0, value, false);
+  return out;
+}
+
+function readUint32(bytes, offset, name = 'uint32') {
+  if (offset + 4 > bytes.length) throw new Error(`${name} is truncated`);
+  return new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, false);
+}
+
+function uint64Bytes(value, name = 'uint64') {
+  const integer = typeof value === 'bigint' ? value : BigInt(value);
+  if (integer < 0n || integer > 0xffffffffffffffffn) {
+    throw new Error(`${name} must be an unsigned 64-bit integer`);
+  }
+  return writeBigUintBytes(integer, 8, name);
+}
+
+function writeBigUintBytes(value, byteLength, name) {
+  let current;
+  try {
+    current = BigInt(value);
+  } catch {
+    throw new Error(`${name} must be an unsigned integer`);
+  }
+  if (current < 0n) throw new Error(`${name} must be an unsigned integer`);
+  const limit = 1n << BigInt(byteLength * 8);
+  if (current >= limit) throw new Error(`${name} does not fit into ${byteLength} bytes`);
+  const out = new Uint8Array(byteLength);
+  for (let i = byteLength - 1; i >= 0; i -= 1) {
+    out[i] = Number(current & 0xffn);
+    current >>= 8n;
+  }
+  return out;
+}
+
+function readBigUintBytes(bytes, offset, byteLength, name) {
+  if (offset + byteLength > bytes.length) throw new Error(`${name} is truncated`);
+  let value = 0n;
+  for (let i = 0; i < byteLength; i += 1) value = (value << 8n) | BigInt(bytes[offset + i]);
+  return value;
 }
 
 function normalizePublicKeyBytes(value, name) {
@@ -346,6 +668,42 @@ function recordField(record, snakeName, camelName = snakeName) {
   throw new Error(`Vault key record missing ${snakeName}`);
 }
 
+function optionalRecordField(record, ...names) {
+  for (const name of names) {
+    if (record && Object.hasOwn(record, name)) return record[name];
+  }
+  return undefined;
+}
+
+function recordPqKemPubkeyBytes(record, expectedLen) {
+  const value = optionalRecordField(
+    record,
+    'pq_kem_pubkey',
+    'pqKemPubkey',
+    'pq_kem_pubkey_bytes',
+    'pqKemPubkeyBytes',
+  );
+  if (expectedLen === 0) {
+    if (value === undefined || value === null) return new Uint8Array();
+    if (value instanceof Uint8Array || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+      const bytes = toUint8Array(value, 'pq_kem_pubkey');
+      if (bytes.length === 0) return bytes;
+    }
+    if (typeof value === 'string' && value.length === 0) return new Uint8Array();
+    throw new Error('Vault key record pq_kem_pubkey must be empty for classical-v1');
+  }
+  if (value === undefined || value === null) {
+    throw new Error('Vault key record missing pq_kem_pubkey');
+  }
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+    return assertBytes('Vault key record pq_kem_pubkey', value, expectedLen);
+  }
+  if (typeof value === 'string') {
+    return assertBytes('Vault key record pq_kem_pubkey', base64urlDecode(value), expectedLen);
+  }
+  throw new Error('Vault key record pq_kem_pubkey must be bytes');
+}
+
 function compareAddressLike(left, right) {
   const leftText = String(left).trim();
   const rightText = String(right).trim();
@@ -385,6 +743,67 @@ function assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite) {
   if (!standard && !longTerm) {
     throw new Error('Private capsule size class and crypto suite do not match CapsuleHub rules');
   }
+}
+
+function suiteByteForSuite(suite) {
+  if (suite === CRYPTO_SUITES.CLASSICAL_V1) return CONTRACT_CRYPTO_SUITE.CLASSICAL;
+  if (suite === CRYPTO_SUITES.HYBRID_V1) return CONTRACT_CRYPTO_SUITE.HYBRID;
+  throw new Error(`Unsupported Platho compact suite: ${suite}`);
+}
+
+function suiteForByte(byte) {
+  if (byte === CONTRACT_CRYPTO_SUITE.CLASSICAL) return CRYPTO_SUITES.CLASSICAL_V1;
+  if (byte === CONTRACT_CRYPTO_SUITE.HYBRID) return CRYPTO_SUITES.HYBRID_V1;
+  throw new Error('Unsupported Platho compact suite byte');
+}
+
+function compactMaxChunkWireBytesForSuite(suite) {
+  if (suite === CRYPTO_SUITES.CLASSICAL_V1) return COMPACT_STANDARD_CHUNK_WIRE_BYTES;
+  if (suite === CRYPTO_SUITES.HYBRID_V1) return COMPACT_HYBRID_CHUNK_WIRE_BYTES;
+  throw new Error(`Unsupported Platho compact suite: ${suite}`);
+}
+
+function compactBodyPrefixBytesForSuite(suite) {
+  return COMPACT_BODY_BASE_PREFIX_BYTES + (suite === CRYPTO_SUITES.HYBRID_V1 ? MLKEM768_CIPHERTEXT_BYTES : 0);
+}
+
+function compactBodyBytesForPayloadBlocks(suite, blocks) {
+  return compactBodyPrefixBytesForSuite(suite)
+    + PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES
+    + (blocks * PLATHO_COMPACT_TEXT_BLOCK_BYTES)
+    + COMPACT_BODY_TAG_BYTES;
+}
+
+export function getCompactCapsuleCapacity(suite, options = {}) {
+  const maxChunks = options.maxChunks ?? PLATHO_COMPACT_MAX_CHUNKS;
+  if (!Number.isInteger(maxChunks) || maxChunks <= 0 || maxChunks > PLATHO_COMPACT_MAX_CHUNKS) {
+    throw new Error('maxChunks must be between 1 and PLATHO_COMPACT_MAX_CHUNKS');
+  }
+  const maxChunkWireBytes = compactMaxChunkWireBytesForSuite(suite);
+  const onChainBodyCapBytes = options.maxOnChainBodyBytes ?? PLATHO_ONCHAIN_BODY_MAX_BYTES;
+  const maxUsefulPayloadBytes = maxChunks * PLATHO_COMPACT_TEXT_BLOCK_BYTES;
+  const maxEncryptedPayloadBytes = PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + maxUsefulPayloadBytes;
+  const maxBodyBytes = compactBodyBytesForPayloadBlocks(suite, maxChunks);
+  if (maxBodyBytes > onChainBodyCapBytes) {
+    throw new Error('Compact capsule capacity exceeds on-chain body cap');
+  }
+  return {
+    suite,
+    maxChunks,
+    maxChunkWireBytes,
+    chunkHeaderBytes: COMPACT_CHUNK_HEADER_BYTES,
+    onChainBodyCapBytes,
+    payloadBlockBytes: PLATHO_COMPACT_TEXT_BLOCK_BYTES,
+    payloadPrefixBytes: PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES,
+    oneChunkPlaintextBytes: PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + PLATHO_COMPACT_TEXT_BLOCK_BYTES,
+    oneChunkBodyBytes: compactBodyBytesForPayloadBlocks(suite, 1),
+    maxBodyBytes,
+    maxEncryptedPayloadBytes,
+    maxUsefulPayloadBytes,
+    maxTextBytes: maxUsefulPayloadBytes,
+    maxImageBytes: maxUsefulPayloadBytes - COMPACT_IMAGE_CONTENT_HEADER_BYTES,
+    maxPaymentBytes: COMPACT_PAYMENT_CONTENT_BYTES,
+  };
 }
 
 function assertCapsuleTimestampPolicy(header1, options = {}) {
@@ -438,6 +857,10 @@ function assertEnvelopeMatchesRecipient(envelope, recipientKeyPair) {
 async function deriveAesGcmKey(sharedParts, protectedHeader) {
   const transcript = utf8(stableStringify(protectedHeader));
   const transcriptHash = await sha256(transcript);
+  return deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+}
+
+async function deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash) {
   const ikm = concatBytes(...sharedParts);
   const salt = await sha256(utf8(MESSAGE_SALT_DOMAIN), transcriptHash);
   const info = concatBytes(utf8(MESSAGE_KEY_DOMAIN), transcriptHash);
@@ -494,6 +917,342 @@ async function decryptBytes(envelope, sharedParts) {
   return new Uint8Array(plaintext);
 }
 
+function assertCompactMagic(bytes, offset, magic, name) {
+  if (offset + magic.length > bytes.length || !bytesEqual(bytes.subarray(offset, offset + magic.length), magic)) {
+    throw new Error(`Invalid Platho compact ${name} magic`);
+  }
+}
+
+function compactHashBytes(hashHex, name) {
+  return hexToBytes(assertHashHex(name, hashHex), 32, name);
+}
+
+function compactPayloadBlockCount(contentLength) {
+  if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
+    throw new Error('Compact payload content length is invalid');
+  }
+  if (contentLength > PLATHO_COMPACT_TEXT_BLOCK_BYTES) {
+    throw new Error(`Compact payload exceeds on-chain payload cap: ${contentLength} > ${PLATHO_COMPACT_MAX_CHUNKS * PLATHO_COMPACT_TEXT_BLOCK_BYTES}`);
+  }
+  return 1;
+}
+
+function encodeFixedCompactPayload(type, flags, content, options = {}) {
+  const contentBytes = toUint8Array(content);
+  const blocks = compactPayloadBlockCount(contentBytes.length);
+  const out = new Uint8Array(PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + (blocks * PLATHO_COMPACT_TEXT_BLOCK_BYTES));
+  const streamId = options.streamId
+    ? assertBytes('compact payload stream id', options.streamId, 16)
+    : randomBytes(16);
+  out.set(COMPACT_PAYLOAD_MAGIC, 0);
+  out[4] = PROTOCOL_VERSION;
+  out[5] = uint8Byte(type, 'compact payload type');
+  out[6] = uint8Byte(flags, 'compact payload flags');
+  out[7] = uint8Byte(options.mediaFormat ?? 0, 'compact payload media format');
+  out.set(streamId, 8);
+  out.set(uint16Bytes(options.partIndex ?? 0, 'compact payload part index'), 24);
+  out.set(uint16Bytes(options.partCount ?? 1, 'compact payload part count'), 26);
+  out.set(uint16Bytes(contentBytes.length, 'compact payload content length'), 28);
+  out.set(contentBytes, PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES);
+  return out;
+}
+
+function compactPayloadContent(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length !== PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + PLATHO_COMPACT_TEXT_BLOCK_BYTES) {
+    throw new Error('Compact payload must be exactly one 1024-byte useful slot');
+  }
+  assertCompactMagic(bytes, 0, COMPACT_PAYLOAD_MAGIC, 'payload');
+  if (bytes[4] !== PROTOCOL_VERSION) throw new Error('Unsupported compact payload version');
+  const type = bytes[5];
+  const flags = bytes[6];
+  const mediaFormat = bytes[7];
+  const streamId = bytes.subarray(8, 24);
+  const partIndex = readUint16(bytes, 24, 'compact payload part index');
+  const partCount = readUint16(bytes, 26, 'compact payload part count');
+  const contentLength = readUint16(bytes, 28, 'compact payload content length');
+  if (partCount <= 0 || partIndex >= partCount) throw new Error('Compact payload part index mismatch');
+  if (bytes[30] !== 0 || bytes[31] !== 0) throw new Error('Compact payload reserved bytes must be zero');
+  const blocks = 1;
+  const contentStart = PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES;
+  const contentEnd = contentStart + contentLength;
+  if (contentEnd > bytes.length) throw new Error('Compact payload content is truncated');
+  for (let i = contentEnd; i < bytes.length; i += 1) {
+    if (bytes[i] !== 0) throw new Error('Compact payload padding must be zero');
+  }
+  return {
+    type,
+    flags,
+    mediaFormat,
+    streamId,
+    partIndex,
+    partCount,
+    content: bytes.subarray(contentStart, contentEnd),
+    blocks,
+  };
+}
+
+function assertCompactPayloadBytes(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  compactPayloadContent(bytes);
+  return bytes;
+}
+
+export function encodeCompactPayload(input) {
+  const payload = typeof input === 'string' ? { type: 'text', text: input } : (input ?? {});
+  if (payload.type === 'text' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.TEXT) {
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.TEXT, 0, utf8(payload.text ?? ''), payload);
+  }
+  if (payload.type === 'image' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.IMAGE) {
+    const bytes = toUint8Array(payload.bytes ?? payload.imageBytes ?? new Uint8Array());
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.IMAGE, 0, bytes, {
+      ...payload,
+      mediaFormat: payload.format ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
+    });
+  }
+  if (payload.type === 'payment' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.PAYMENT) {
+    const content = concatBytes(
+      new Uint8Array([uint8Byte(payload.asset ?? 0, 'payment asset'), 0]),
+      writeBigUintBytes(payload.amount ?? 0n, 16, 'payment amount'),
+      assertBytes('payment intent id', payload.intentId ?? payload.intent_id, 32),
+      assertBytes('payment secret', payload.secret ?? payload.secret32, 32),
+    );
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, 0, content, payload);
+  }
+  throw new Error('Unsupported Platho compact payload type');
+}
+
+export function decodeCompactPayload(bytesLike) {
+  const {
+    type,
+    content,
+    mediaFormat,
+    streamId,
+    partIndex,
+    partCount,
+  } = compactPayloadContent(bytesLike);
+  const part = {
+    streamId,
+    stream_id: `0x${bytesToHex(streamId)}`,
+    partIndex,
+    part_index: partIndex,
+    partCount,
+    part_count: partCount,
+  };
+  if (type === PLATHO_COMPACT_CONTENT_TYPES.TEXT) {
+    return { type: 'text', text: fromUtf8(content), ...part };
+  }
+  if (type === PLATHO_COMPACT_CONTENT_TYPES.IMAGE) {
+    return {
+      type: 'image',
+      format: mediaFormat,
+      bytes: content,
+      ...part,
+    };
+  }
+  if (type === PLATHO_COMPACT_CONTENT_TYPES.PAYMENT) {
+    if (content.length !== COMPACT_PAYMENT_CONTENT_BYTES) throw new Error('Compact payment payload has invalid length');
+    return {
+      type: 'payment',
+      asset: content[0],
+      amount: readBigUintBytes(content, 2, 16, 'payment amount'),
+      intentId: content.subarray(18, 50),
+      secret32: content.subarray(50, 82),
+      ...part,
+    };
+  }
+  throw new Error('Unsupported Platho compact payload type');
+}
+
+function compactBodyAad(bodyPrefix, hashes) {
+  return concatBytes(
+    utf8(COMPACT_BODY_AAD_DOMAIN),
+    bodyPrefix,
+    compactHashBytes(hashes.header0Hash, 'header0Hash'),
+    compactHashBytes(hashes.header1Hash, 'header1Hash'),
+  );
+}
+
+async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, options) {
+  const recipient = await normalizeRecipientBundle(recipientPublicBundle);
+  const suite = recipient.suite;
+  const suiteByte = suiteByteForSuite(suite);
+  const nonce = randomBytes(AES_GCM_NONCE_BYTES);
+  const messageId = options.messageId ? assertBytes('compact message id', options.messageId, 16) : randomBytes(16);
+  const ephemeralSecretKey = randomBytes(X25519_SECRET_KEY_BYTES);
+  const ephemeralPublicKey = x25519.getPublicKey(ephemeralSecretKey);
+  const x25519SharedSecret = deriveX25519SharedSecret(ephemeralSecretKey, recipient.x25519PublicKey);
+  const sharedParts = [x25519SharedSecret];
+  const kemParts = [];
+  if (suite === CRYPTO_SUITES.HYBRID_V1) {
+    const encapsulated = ml_kem768.encapsulate(recipient.mlKem768PublicKey);
+    kemParts.push(assertBytes('mlKem768Ciphertext', encapsulated.cipherText, MLKEM768_CIPHERTEXT_BYTES));
+    sharedParts.push(assertBytes('mlKem768SharedSecret', encapsulated.sharedSecret, 32));
+  }
+  const bodyPrefix = concatBytes(
+    COMPACT_BODY_MAGIC,
+    new Uint8Array([PROTOCOL_VERSION, suiteByte, 0, 0]),
+    messageId,
+    nonce,
+    assertBytes('x25519EphemeralPublicKey', ephemeralPublicKey, X25519_PUBLIC_KEY_BYTES),
+    ...kemParts,
+  );
+  const aad = compactBodyAad(bodyPrefix, options.hashes);
+  const transcriptHash = await sha256(aad);
+  const key = await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+  const ciphertext = await getCrypto().subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce, additionalData: aad, tagLength: 128 },
+    key,
+    toUint8Array(payloadBytes),
+  );
+  return concatBytes(bodyPrefix, new Uint8Array(ciphertext));
+}
+
+function inspectCompactBodyBytes(bodyBytesLike) {
+  const bodyBytes = toUint8Array(bodyBytesLike);
+  if (bodyBytes.length < COMPACT_BODY_BASE_PREFIX_BYTES + COMPACT_BODY_TAG_BYTES) {
+    throw new Error('Compact body is truncated');
+  }
+  assertCompactMagic(bodyBytes, 0, COMPACT_BODY_MAGIC, 'body');
+  if (bodyBytes[4] !== PROTOCOL_VERSION) throw new Error('Unsupported Platho compact body version');
+  const suite = suiteForByte(bodyBytes[5]);
+  const prefixBytes = compactBodyPrefixBytesForSuite(suite);
+  if (bodyBytes.length < prefixBytes + COMPACT_BODY_TAG_BYTES) throw new Error('Compact body is truncated');
+  return {
+    suite,
+    suiteByte: bodyBytes[5],
+    flags: bodyBytes[6],
+    messageId: bodyBytes.subarray(8, 24),
+    nonce: bodyBytes.subarray(24, 36),
+    ephemeralPublicKey: bodyBytes.subarray(36, 68),
+    mlKem768Ciphertext: suite === CRYPTO_SUITES.HYBRID_V1 ? bodyBytes.subarray(68, 68 + MLKEM768_CIPHERTEXT_BYTES) : null,
+    prefix: bodyBytes.subarray(0, prefixBytes),
+    ciphertext: bodyBytes.subarray(prefixBytes),
+  };
+}
+
+async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes) {
+  const bodyBytes = toUint8Array(bodyBytesLike);
+  const info = inspectCompactBodyBytes(bodyBytes);
+  if (recipientKeyPair?.suite !== info.suite) throw new Error('Compact body recipient suite mismatch');
+  if (recipientKeyPair?.keyId && hashes.recipientKeyId && recipientKeyPair.keyId !== hashes.recipientKeyId) {
+    throw new Error('Compact body recipient key mismatch');
+  }
+  const sharedParts = [deriveX25519SharedSecret(recipientKeyPair.x25519SecretKey, info.ephemeralPublicKey)];
+  if (info.suite === CRYPTO_SUITES.HYBRID_V1) {
+    sharedParts.push(ml_kem768.decapsulate(
+      assertBytes('mlKem768Ciphertext', info.mlKem768Ciphertext, MLKEM768_CIPHERTEXT_BYTES),
+      assertBytes('recipient.mlKem768SecretKey', recipientKeyPair.mlKem768SecretKey, 2400),
+    ));
+  }
+  const aad = compactBodyAad(info.prefix, hashes);
+  const transcriptHash = await sha256(aad);
+  const key = await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+  const plaintext = await getCrypto().subtle.decrypt(
+    { name: 'AES-GCM', iv: info.nonce, additionalData: aad, tagLength: 128 },
+    key,
+    info.ciphertext,
+  );
+  return decodeCompactPayload(new Uint8Array(plaintext));
+}
+
+function compactChunkDataBytesForSuite(suite) {
+  return compactMaxChunkWireBytesForSuite(suite) - COMPACT_CHUNK_HEADER_BYTES;
+}
+
+export function splitCompactBodyBytes(bodyBytesLike) {
+  const bodyBytes = toUint8Array(bodyBytesLike);
+  const info = inspectCompactBodyBytes(bodyBytes);
+  const chunkDataBytes = compactChunkDataBytesForSuite(info.suite);
+  const total = Math.ceil(bodyBytes.length / chunkDataBytes);
+  if (total <= 0 || total > PLATHO_COMPACT_MAX_CHUNKS) {
+    throw new Error(`Compact body needs ${total} chunks, max is ${PLATHO_COMPACT_MAX_CHUNKS}`);
+  }
+  const chunks = [];
+  for (let i = 0; i < total; i += 1) {
+    const start = i * chunkDataBytes;
+    const end = Math.min(start + chunkDataBytes, bodyBytes.length);
+    chunks.push(concatBytes(
+      COMPACT_CHUNK_MAGIC,
+      new Uint8Array([PROTOCOL_VERSION, info.suiteByte, i, total]),
+      info.messageId,
+      bodyBytes.subarray(start, end),
+    ));
+  }
+  return chunks;
+}
+
+export function assembleCompactBodyChunks(chunksLike) {
+  if (!Array.isArray(chunksLike) || chunksLike.length === 0) throw new Error('Compact chunks must be a non-empty array');
+  if (chunksLike.length > PLATHO_COMPACT_MAX_CHUNKS) throw new Error('Too many Platho compact chunks');
+  const parsed = chunksLike.map((chunkLike) => {
+    const chunk = toUint8Array(chunkLike);
+    if (chunk.length < COMPACT_CHUNK_HEADER_BYTES) throw new Error('Compact chunk is truncated');
+    assertCompactMagic(chunk, 0, COMPACT_CHUNK_MAGIC, 'chunk');
+    if (chunk[4] !== PROTOCOL_VERSION) throw new Error('Unsupported compact chunk version');
+    const suite = suiteForByte(chunk[5]);
+    const maxWireBytes = compactMaxChunkWireBytesForSuite(suite);
+    if (chunk.length > maxWireBytes) throw new Error('Compact chunk exceeds suite wire limit');
+    return {
+      suite,
+      suiteByte: chunk[5],
+      index: chunk[6],
+      total: chunk[7],
+      messageId: chunk.subarray(8, 24),
+      data: chunk.subarray(COMPACT_CHUNK_HEADER_BYTES),
+    };
+  });
+  const first = parsed[0];
+  if (first.total !== chunksLike.length || first.total === 0 || first.total > PLATHO_COMPACT_MAX_CHUNKS) {
+    throw new Error('Compact chunk total mismatch');
+  }
+  const seen = new Set();
+  for (const item of parsed) {
+    if (item.suite !== first.suite || item.suiteByte !== first.suiteByte) throw new Error('Compact chunk suite mismatch');
+    if (item.total !== first.total) throw new Error('Compact chunk total mismatch');
+    if (!bytesEqual(item.messageId, first.messageId)) throw new Error('Compact chunk message id mismatch');
+    if (item.index >= first.total || seen.has(item.index)) throw new Error('Compact chunk index mismatch');
+    seen.add(item.index);
+  }
+  const ordered = [...parsed].sort((a, b) => a.index - b.index);
+  const bodyBytes = concatBytes(...ordered.map((item) => item.data));
+  const info = inspectCompactBodyBytes(bodyBytes);
+  if (info.suite !== first.suite || !bytesEqual(info.messageId, first.messageId)) {
+    throw new Error('Compact chunk body identity mismatch');
+  }
+  return bodyBytes;
+}
+
+function compactBodyBytesFromCapsuleBody(body) {
+  if (!body || body.version !== PROTOCOL_VERSION || body.kind !== 'private' || body.layout !== PLATHO_COMPACT_BODY_LAYOUT) {
+    throw new Error('Invalid Platho compact private capsule body');
+  }
+  const chunks = (body.chunks ?? []).map((chunk) => base64urlDecode(chunk));
+  if (body.chunkCount !== chunks.length) throw new Error('Compact body chunk count mismatch');
+  const bodyBytes = assembleCompactBodyChunks(chunks);
+  const info = inspectCompactBodyBytes(bodyBytes);
+  if (body.suite !== info.suite) throw new Error('Compact body suite mismatch');
+  if (body.messageId !== base64urlEncode(info.messageId)) throw new Error('Compact body message id mismatch');
+  if (body.byteLength !== bodyBytes.length) throw new Error('Compact body byte length mismatch');
+  return bodyBytes;
+}
+
+function compactBodyObjectFromBytes(bodyBytes) {
+  const info = inspectCompactBodyBytes(bodyBytes);
+  const chunks = splitCompactBodyBytes(bodyBytes);
+  return {
+    version: PROTOCOL_VERSION,
+    kind: 'private',
+    layout: PLATHO_COMPACT_BODY_LAYOUT,
+    suite: info.suite,
+    messageId: base64urlEncode(info.messageId),
+    byteLength: bodyBytes.length,
+    chunkCount: chunks.length,
+    maxChunkWireBytes: compactMaxChunkWireBytesForSuite(info.suite),
+    chunks: chunks.map((chunk) => base64urlEncode(chunk)),
+  };
+}
+
 export async function computeClassicalKeyId(x25519PublicKey) {
   const digest = await sha256(utf8(KEY_ID_CLASSICAL_DOMAIN), assertBytes('x25519PublicKey', x25519PublicKey, 32));
   return base64urlEncode(digest);
@@ -544,9 +1303,11 @@ export async function createHybridKeyPair() {
 }
 
 export async function createMessagingIdentity(options = {}) {
-  const encryptionKeyPair = options.suite === CRYPTO_SUITES.CLASSICAL_V1
-    ? await createClassicalKeyPair()
-    : await createHybridKeyPair();
+  const encryptionKeyPair = options.encryptionKeyPair
+    ? options.encryptionKeyPair
+    : options.suite === CRYPTO_SUITES.CLASSICAL_V1
+      ? await createClassicalKeyPair()
+      : await createHybridKeyPair();
   const signingSecretKey = options.signingSecretKey
     ? assertBytes('signingSecretKey', options.signingSecretKey, ED25519_SECRET_KEY_BYTES)
     : randomBytes(ED25519_SECRET_KEY_BYTES);
@@ -696,6 +1457,71 @@ export async function verifySignedPublicKeyBundle(signedBundle, options = {}) {
   };
 }
 
+export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {}) {
+  if (!keyRecord || keyRecord.exists !== true) throw new Error('Vault key record does not exist');
+  if (options.ownerWallet !== undefined && options.ownerWallet !== null) {
+    const recordOwner = recordField(keyRecord, 'owner_wallet', 'ownerWallet');
+    if (!compareAddressLike(recordOwner, options.ownerWallet)) {
+      throw new Error('Vault key record owner does not match wallet owner');
+    }
+  }
+  if (uintLikeToBigInt(recordField(keyRecord, 'revoked_lt', 'revokedLt'), 'revoked_lt') !== 0n) {
+    throw new Error('Vault key record is revoked');
+  }
+
+  const encPublicKey = writeBigUintBytes(
+    uintLikeToBigInt(recordField(keyRecord, 'enc_pubkey', 'encPubkey'), 'enc_pubkey'),
+    X25519_PUBLIC_KEY_BYTES,
+    'enc_pubkey',
+  );
+  const cryptoSuiteMask = uintLikeToBigInt(
+    recordField(keyRecord, 'crypto_suite_mask', 'cryptoSuiteMask'),
+    'crypto_suite_mask',
+  );
+  const pqLen = Number(uintLikeToBigInt(
+    recordField(keyRecord, 'pq_kem_pubkey_len', 'pqKemPubkeyLen'),
+    'pq_kem_pubkey_len',
+  ));
+  const pqHash = uintLikeToBigInt(
+    recordField(keyRecord, 'pq_kem_pubkey_hash', 'pqKemPubkeyHash'),
+    'pq_kem_pubkey_hash',
+  );
+
+  if (cryptoSuiteMask === BigInt(CONTRACT_CRYPTO_SUITE.CLASSICAL)) {
+    if (pqLen !== 0 || pqHash !== 0n) throw new Error('classical-v1 Vault key record must not carry ML-KEM fields');
+    const emptyPq = recordPqKemPubkeyBytes(keyRecord, 0);
+    if (emptyPq.length !== 0) throw new Error('classical-v1 Vault key record pq_kem_pubkey must be empty');
+    return {
+      version: PROTOCOL_VERSION,
+      suite: CRYPTO_SUITES.CLASSICAL_V1,
+      contractSuite: CONTRACT_CRYPTO_SUITE.CLASSICAL,
+      keyId: await computeClassicalKeyId(encPublicKey),
+      x25519PublicKey: base64urlEncode(encPublicKey),
+    };
+  }
+
+  if (cryptoSuiteMask === BigInt(CONTRACT_CRYPTO_SUITE.HYBRID)) {
+    if (pqLen !== MLKEM768_PUBLIC_KEY_BYTES) throw new Error('hybrid-v1 Vault key record has invalid ML-KEM length');
+    const pqPubkey = recordPqKemPubkeyBytes(keyRecord, MLKEM768_PUBLIC_KEY_BYTES);
+    const computedHash = await sha256(pqPubkey);
+    if (bytesToBigInt(computedHash) !== pqHash) {
+      throw new Error('Vault key record pq_kem_pubkey hash does not match key material');
+    }
+    return {
+      version: PROTOCOL_VERSION,
+      suite: CRYPTO_SUITES.HYBRID_V1,
+      contractSuite: CONTRACT_CRYPTO_SUITE.HYBRID,
+      keyId: await computeHybridKeyId(encPublicKey, pqPubkey),
+      x25519PublicKey: base64urlEncode(encPublicKey),
+      mlKem768PublicKey: base64urlEncode(pqPubkey),
+      mlKem768PublicKeyHash: base64urlEncode(computedHash),
+      mlKem768PublicKeyLen: MLKEM768_PUBLIC_KEY_BYTES,
+    };
+  }
+
+  throw new Error('Vault key record has unsupported crypto suite');
+}
+
 async function signedBundleHash(signedBundle) {
   return stableJsonHashHex({ domain: WALLET_BUNDLE_HASH_DOMAIN, signedBundle });
 }
@@ -764,268 +1590,6 @@ export function parseTonAddress(address) {
   }
 }
 
-function normalizeTonConnectProof(input) {
-  const proof = input?.proof
-    ?? input?.connectItems?.tonProof?.proof
-    ?? input?.tonProof?.proof
-    ?? input?.ton_proof?.proof
-    ?? null;
-  const account = input?.account ?? {
-    address: input?.address,
-    publicKey: input?.publicKey ?? input?.public_key,
-    walletStateInit: input?.walletStateInit ?? input?.wallet_state_init,
-    chain: input?.chain ?? input?.network,
-  };
-  if (!account?.address || !proof) throw new Error('TON Connect proof requires account and proof objects');
-  const timestamp = safeInteger(proof.timestamp, 'tonProof.timestamp');
-  const domainValue = proof.domain?.value;
-  const domainLengthBytes = safeInteger(proof.domain?.lengthBytes, 'tonProof.domain.lengthBytes');
-  if (typeof domainValue !== 'string' || domainValue.length === 0) {
-    throw new Error('TON proof domain is required');
-  }
-  const domainBytes = utf8(domainValue);
-  if (domainBytes.length !== domainLengthBytes) {
-    throw new Error('TON proof domain length does not match UTF-8 byte length');
-  }
-  if (typeof proof.payload !== 'string' || proof.payload.length === 0) {
-    throw new Error('TON proof payload is required');
-  }
-  return {
-    account: {
-      ...account,
-      address: parseTonAddress(account.address).raw,
-    },
-    proof: {
-      timestamp,
-      domain: {
-        lengthBytes: domainLengthBytes,
-        value: domainValue,
-      },
-      signature: proof.signature,
-      payload: proof.payload,
-    },
-  };
-}
-
-async function tonConnectProofSigningHash(accountAddress, proof) {
-  const address = parseTonAddress(accountAddress);
-  const domainBytes = utf8(proof.domain.value);
-  const message = concatBytes(
-    utf8(TON_PROOF_PREFIX),
-    int32Be(address.workchain, 'tonAddress.workchain'),
-    address.hash,
-    uint32Le(proof.domain.lengthBytes, 'tonProof.domain.lengthBytes'),
-    domainBytes,
-    uint64Le(proof.timestamp, 'tonProof.timestamp'),
-    utf8(proof.payload),
-  );
-  const messageHash = await sha256(message);
-  return sha256(new Uint8Array([0xff, 0xff]), utf8(TON_CONNECT_SIGNATURE_DOMAIN), messageHash);
-}
-
-async function resolveTonWalletPublicKey(account, options = {}) {
-  const advertised = account.publicKey ?? account.public_key
-    ? normalizePublicKeyBytes(account.publicKey ?? account.public_key, 'tonConnect.account.publicKey')
-    : null;
-  let verified = null;
-  let source = null;
-  if (options.verifiedWalletPublicKey) {
-    verified = normalizePublicKeyBytes(options.verifiedWalletPublicKey, 'verifiedWalletPublicKey');
-    source = 'verified-option';
-  } else if (typeof options.getWalletPublicKey === 'function') {
-    const resolved = await options.getWalletPublicKey(account);
-    if (resolved) {
-      verified = normalizePublicKeyBytes(resolved, 'resolvedWalletPublicKey');
-      source = 'chain-or-state-init';
-    }
-  }
-  if (verified) {
-    if (advertised && !constantTimeEqual(advertised, verified)) {
-      throw new Error('TON Connect account public key does not match verified wallet public key');
-    }
-    return { publicKey: verified, source };
-  }
-  if (options.trustTonConnectAccountPublicKey === true && advertised) {
-    return { publicKey: advertised, source: 'tonconnect-account-unverified' };
-  }
-  throw new Error('TON wallet public key must be verified from walletStateInit or chain lookup');
-}
-
-export async function createTonConnectOwnershipPayload(signedBundle, options = {}) {
-  const verified = await verifySignedPublicKeyBundle(signedBundle, { now: options.now });
-  const bundleHash = options.bundleHash ?? await signedBundleHash(signedBundle);
-  const issuedAt = options.issuedAt ?? Date.now();
-  const expiresAt = options.expiresAt ?? issuedAt + DEFAULT_TON_PROOF_MAX_AGE_SEC * 1000;
-  if (!Number.isSafeInteger(issuedAt) || !Number.isSafeInteger(expiresAt) || expiresAt <= issuedAt) {
-    throw new Error('TON Connect ownership payload timestamps are invalid');
-  }
-  return stableStringify({
-    domain: WALLET_OWNERSHIP_DOMAIN,
-    version: PROTOCOL_VERSION,
-    issuedAt,
-    expiresAt,
-    vaultAddress: options.vaultAddress ?? signedBundle.vaultAddress ?? null,
-    keyId: verified.keyId,
-    bundleHash,
-    nonce: options.nonce ?? base64urlEncode(randomBytes(16)),
-  });
-}
-
-async function parseTonConnectOwnershipPayload(signedBundle, payloadString, options = {}) {
-  let payload;
-  try {
-    payload = JSON.parse(payloadString);
-  } catch {
-    throw new Error('TON Connect ownership payload is not valid JSON');
-  }
-  if (!payload || payload.domain !== WALLET_OWNERSHIP_DOMAIN || payload.version !== PROTOCOL_VERSION) {
-    throw new Error('Invalid Platho TON Connect ownership payload');
-  }
-  const now = options.now ?? Date.now();
-  const clockSkewMs = options.clockSkewMs ?? DEFAULT_CLOCK_SKEW_MS;
-  if (!Number.isSafeInteger(payload.issuedAt) || !Number.isSafeInteger(payload.expiresAt)) {
-    throw new Error('TON Connect ownership payload timestamps must be safe integer milliseconds');
-  }
-  if (payload.expiresAt - payload.issuedAt > (options.maxPayloadAgeMs ?? DEFAULT_TON_PROOF_MAX_AGE_SEC * 1000)) {
-    throw new Error('TON Connect ownership payload lifetime exceeds policy');
-  }
-  if (payload.issuedAt > now + clockSkewMs) {
-    throw new Error('TON Connect ownership payload was issued too far in the future');
-  }
-  if (payload.expiresAt <= now) {
-    throw new Error('TON Connect ownership payload is expired');
-  }
-  if (typeof payload.nonce !== 'string' || payload.nonce.length < 16) {
-    throw new Error('TON Connect ownership payload nonce is too short');
-  }
-  const verified = await verifySignedPublicKeyBundle(signedBundle, { now: options.now });
-  const bundleHash = await signedBundleHash(signedBundle);
-  if (payload.keyId !== verified.keyId) {
-    throw new Error('TON Connect ownership payload key id does not match signed bundle');
-  }
-  if (payload.bundleHash !== bundleHash) {
-    throw new Error('TON Connect ownership payload bundle hash does not match signed bundle');
-  }
-  if (payload.vaultAddress !== null && typeof payload.vaultAddress !== 'string') {
-    throw new Error('TON Connect ownership payload vault address is invalid');
-  }
-  const canonicalPayload = {
-    domain: payload.domain,
-    version: payload.version,
-    issuedAt: payload.issuedAt,
-    expiresAt: payload.expiresAt,
-    vaultAddress: payload.vaultAddress,
-    keyId: payload.keyId,
-    bundleHash: payload.bundleHash,
-    nonce: payload.nonce,
-  };
-  if (stableStringify(payload) !== stableStringify(canonicalPayload)) {
-    throw new Error('TON Connect ownership payload has unexpected fields');
-  }
-  if (options.expectedVaultAddress && !compareAddressLike(payload.vaultAddress, options.expectedVaultAddress)) {
-    throw new Error('TON Connect ownership payload Vault address mismatch');
-  }
-  return { payload, verifiedBundle: verified, bundleHash };
-}
-
-export async function verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, options = {}) {
-  const { account, proof } = normalizeTonConnectProof(tonConnectProof);
-  const now = options.now ?? Date.now();
-  const nowSec = options.nowSec ?? Math.floor(now / 1000);
-  const clockSkewSec = options.clockSkewSec ?? Math.ceil(DEFAULT_CLOCK_SKEW_MS / 1000);
-  const maxAgeSec = options.maxAgeSec ?? DEFAULT_TON_PROOF_MAX_AGE_SEC;
-  if (proof.timestamp > nowSec + clockSkewSec) {
-    throw new Error('TON proof timestamp is too far in the future');
-  }
-  if (proof.timestamp < nowSec - maxAgeSec) {
-    throw new Error('TON proof timestamp is too old');
-  }
-  if (options.expectedDomain && proof.domain.value !== options.expectedDomain) {
-    throw new Error('TON proof domain is not allowed');
-  }
-  if (options.expectedChain !== undefined && options.expectedChain !== null) {
-    if (account.chain === undefined || account.chain === null || String(account.chain) !== String(options.expectedChain)) {
-      throw new Error('TON Connect account chain mismatch');
-    }
-  }
-  const { payload, verifiedBundle, bundleHash } = await parseTonConnectOwnershipPayload(
-    signedBundle,
-    proof.payload,
-    options,
-  );
-  const resolved = await resolveTonWalletPublicKey(account, options);
-  const signature = assertBytes(
-    'tonProof.signature',
-    base64urlMaybeDecode(proof.signature),
-    ED25519_SIGNATURE_BYTES,
-  );
-  const signingHash = await tonConnectProofSigningHash(account.address, proof);
-  const verified = ed25519.verify(signature, signingHash, resolved.publicKey, { zip215: false });
-  if (!verified) throw new Error('TON proof signature is invalid');
-
-  if (options.walletAddress && !compareAddressLike(account.address, options.walletAddress)) {
-    throw new Error('TON proof wallet address mismatch');
-  }
-  if (
-    signedBundle.ownerWallet !== null &&
-    signedBundle.ownerWallet !== undefined &&
-    !compareAddressLike(signedBundle.ownerWallet, account.address)
-  ) {
-    throw new Error('Platho signed bundle owner wallet does not match TON proof');
-  }
-  return {
-    walletAddress: account.address,
-    walletPublicKey: resolved.publicKey,
-    walletPublicKeySource: resolved.source,
-    walletChain: account.chain ?? null,
-    domain: proof.domain.value,
-    timestamp: proof.timestamp,
-    vaultAddress: payload.vaultAddress,
-    keyId: verifiedBundle.keyId,
-    bundleHash,
-    issuedAt: payload.issuedAt,
-    expiresAt: payload.expiresAt,
-    payload,
-  };
-}
-
-async function createTonConnectProofForSelfTest(options) {
-  const walletPublicKey = normalizePublicKeyBytes(options.walletPublicKey, 'walletPublicKey');
-  const proof = {
-    timestamp: safeInteger(options.timestamp, 'tonProof.timestamp'),
-    domain: {
-      lengthBytes: utf8(options.domain).length,
-      value: options.domain,
-    },
-    payload: options.payload,
-  };
-  const signingHash = await tonConnectProofSigningHash(options.address, proof);
-  const signature = ed25519.sign(
-    signingHash,
-    assertBytes('walletSecretKey', options.walletSecretKey, ED25519_SECRET_KEY_BYTES),
-  );
-  return {
-    account: {
-      address: options.accountAddress ?? parseTonAddress(options.address).raw,
-      publicKey: bytesToHex(walletPublicKey),
-      chain: options.chain,
-    },
-    proof: {
-      ...proof,
-      signature: base64Encode(signature),
-    },
-  };
-}
-
-function tonFriendlyAddressForSelfTest(rawAddress, options = {}) {
-  const parsed = parseTonRawAddress(rawAddress);
-  const tag = (options.bounceable === false ? 0x51 : 0x11) + (options.testOnly ? 0x80 : 0);
-  const workchainByte = parsed.workchain === -1 ? 0xff : parsed.workchain & 0xff;
-  const body = concatBytes(new Uint8Array([tag, workchainByte]), parsed.hash);
-  const checksum = crc16Ccitt(body);
-  return base64urlEncode(concatBytes(body, new Uint8Array([checksum >> 8, checksum & 0xff])));
-}
-
 export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKey) {
   const bundle = await normalizeRecipientBundle(publicBundle);
   const signPublicKey = assertBytes('signingPublicKey', signingPublicKey, ED25519_PUBLIC_KEY_BYTES);
@@ -1033,12 +1597,16 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
   const pqHash = bundle.suite === CRYPTO_SUITES.HYBRID_V1
     ? assertBytes('mlKem768PublicKeyHash', base64urlDecode(bundle.mlKem768PublicKeyHash), 32)
     : new Uint8Array(32);
+  const pqPubkey = bundle.suite === CRYPTO_SUITES.HYBRID_V1
+    ? assertBytes('mlKem768PublicKey', bundle.mlKem768PublicKey, MLKEM768_PUBLIC_KEY_BYTES)
+    : new Uint8Array();
   const draft = {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: bytesToBigInt(encPublicKey),
     sign_pubkey: bytesToBigInt(signPublicKey),
     pq_kem_pubkey_hash: bytesToBigInt(pqHash),
     pq_kem_pubkey_len: bundle.suite === CRYPTO_SUITES.HYBRID_V1 ? BigInt(MLKEM768_PUBLIC_KEY_BYTES) : 0n,
+    pq_kem_pubkey: pqPubkey,
     crypto_suite_mask: BigInt(bundle.contractSuite),
   };
   return {
@@ -1049,6 +1617,7 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
       sign_pubkey: bigintHex256(draft.sign_pubkey),
       pq_kem_pubkey_hash: bigintHex256(draft.pq_kem_pubkey_hash),
       pq_kem_pubkey_len: Number(draft.pq_kem_pubkey_len),
+      pq_kem_pubkey_b64u: base64urlEncode(pqPubkey),
       crypto_suite_mask: Number(draft.crypto_suite_mask),
     },
   };
@@ -1056,23 +1625,14 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
 
 export async function verifyVaultKeyRecordBinding(signedBundle, keyRecord, options = {}) {
   const verifiedBundle = await verifySignedPublicKeyBundle(signedBundle, { now: options.now });
-  if (options.walletProof) {
-    throw new Error('Legacy local wallet proof is not supported; use TON Connect proof');
-  }
-  const wallet = options.tonConnectProof
-    ? await verifyTonConnectWalletOwnershipProof(signedBundle, options.tonConnectProof, {
-      ...options,
-      walletAddress: options.ownerWallet,
-    })
-    : null;
   if (!keyRecord || keyRecord.exists !== true) throw new Error('Vault key record does not exist');
   const draft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey);
 
-  const expectedOwner = options.ownerWallet ?? wallet?.walletAddress ?? signedBundle.ownerWallet;
+  const expectedOwner = options.ownerWallet ?? signedBundle.ownerWallet;
   if (expectedOwner !== null && expectedOwner !== undefined) {
     const recordOwner = recordField(keyRecord, 'owner_wallet', 'ownerWallet');
     if (!compareAddressLike(recordOwner, expectedOwner)) {
-      throw new Error('Vault key record owner does not match wallet proof');
+      throw new Error('Vault key record owner does not match wallet owner');
     }
   }
   if (options.currentKeyId !== undefined && options.recordKeyId !== undefined) {
@@ -1092,13 +1652,24 @@ export async function verifyVaultKeyRecordBinding(signedBundle, keyRecord, optio
     const actual = uintLikeToBigInt(recordField(keyRecord, snakeName, camelName), snakeName);
     if (actual !== expected) throw new Error(`Vault key record ${snakeName} does not match signed bundle`);
   }
+  const pqLen = Number(draft.message.pq_kem_pubkey_len);
+  const recordPqPubkey = recordPqKemPubkeyBytes(keyRecord, pqLen);
+  if (pqLen === MLKEM768_PUBLIC_KEY_BYTES) {
+    if (!bytesEqual(recordPqPubkey, draft.message.pq_kem_pubkey)) {
+      throw new Error('Vault key record pq_kem_pubkey does not match signed bundle');
+    }
+    const recordPqHash = await sha256(recordPqPubkey);
+    if (bytesToBigInt(recordPqHash) !== draft.message.pq_kem_pubkey_hash) {
+      throw new Error('Vault key record pq_kem_pubkey hash does not match key material');
+    }
+  }
   if (uintLikeToBigInt(recordField(keyRecord, 'revoked_lt', 'revokedLt'), 'revoked_lt') !== 0n) {
     throw new Error('Vault key record is revoked');
   }
 
   return {
     signedBundle: verifiedBundle,
-    wallet,
+    wallet: expectedOwner ? { walletAddress: parseTonAddress(expectedOwner).raw } : null,
     draft,
     active: true,
     recordKeyId: options.recordKeyId ?? null,
@@ -1106,12 +1677,181 @@ export async function verifyVaultKeyRecordBinding(signedBundle, keyRecord, optio
   };
 }
 
-async function computePrivateCapsuleHashes(header0, header1, body) {
+function base64urlFixedBytes(value, length, name) {
+  return assertBytes(name, base64urlDecode(value), length);
+}
+
+function uint256Bytes(value, name = 'uint256') {
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+    return assertBytes(name, value, 32);
+  }
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (/^(0x)?[0-9a-fA-F]{64}$/.test(text)) {
+      return hexToBytes(text, 32, name);
+    }
+    return assertBytes(name, base64urlMaybeDecode(text), 32);
+  }
+  return writeBigUintBytes(uintLikeToBigInt(value ?? 0n, name), 32, name);
+}
+
+function privateProfilePointer(profile = {}) {
+  const version = safeInteger(profile.version ?? profile.profileVersion ?? profile.profile_version ?? 0, 'profile_version');
   return {
-    header0Hash: await stableJsonHashHex({ domain: PRIVATE_CAPSULE_HEADER0_DOMAIN, header0 }),
-    header1Hash: await stableJsonHashHex({ domain: PRIVATE_CAPSULE_HEADER1_DOMAIN, header1 }),
-    bodyHash: await stableJsonHashHex({ domain: PRIVATE_CAPSULE_BODY_DOMAIN, body }),
+    version,
+    avatarHashBytes: uint256Bytes(profile.avatarHash ?? profile.avatar_hash ?? 0n, 'avatar_hash'),
   };
+}
+
+function capsuleTimestampSecond(value, name) {
+  if (!Number.isSafeInteger(value) || value < 0 || value % 1000 !== 0) {
+    throw new Error(`${name} must be second-aligned milliseconds`);
+  }
+  const seconds = value / 1000;
+  if (!Number.isSafeInteger(seconds) || seconds > 0xffffffff) {
+    throw new Error(`${name} must fit uint32 seconds`);
+  }
+  return seconds;
+}
+
+function alignCapsuleTimestampMs(value, mode, name) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${name} must be safe integer milliseconds`);
+  }
+  const seconds = mode === 'ceil' ? Math.ceil(value / 1000) : Math.floor(value / 1000);
+  if (!Number.isSafeInteger(seconds) || seconds > 0xffffffff) {
+    throw new Error(`${name} must fit uint32 seconds`);
+  }
+  return seconds * 1000;
+}
+
+function privateCapsuleHeader0Bytes(header0) {
+  if (header0?.version !== PROTOCOL_VERSION || header0.kind !== 'private') {
+    throw new Error('Invalid Platho private capsule header0');
+  }
+  assertAllowedPrivateCapsulePair(header0.sizeClass, header0.cryptoSuite);
+  const suiteByte = suiteByteForSuite(header0.suite);
+  if (header0.cryptoSuite !== suiteByte) throw new Error('Private capsule header0 suite byte mismatch');
+  const bytes = concatBytes(
+    PRIVATE_CAPSULE_HEADER0_MAGIC,
+    new Uint8Array([
+      PROTOCOL_VERSION,
+      uint8Byte(header0.publishKind, 'header0.publishKind'),
+      uint8Byte(header0.sizeClass, 'header0.sizeClass'),
+      uint8Byte(header0.cryptoSuite, 'header0.cryptoSuite'),
+    ]),
+    base64urlFixedBytes(header0.senderKeyId, 32, 'header0.senderKeyId'),
+    base64urlFixedBytes(header0.recipientKeyId, 32, 'header0.recipientKeyId'),
+    base64urlFixedBytes(header0.senderSigningPublicKey, ED25519_PUBLIC_KEY_BYTES, 'header0.senderSigningPublicKey'),
+    uint32Bytes(header0.profileVersion ?? 0, 'header0.profileVersion'),
+    uint256Bytes(header0.avatarHash ?? 0n, 'header0.avatarHash'),
+  );
+  if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES) throw new Error('Private capsule header0 binary size drift');
+  return bytes;
+}
+
+function privateCapsuleHeader1Bytes(header1) {
+  if (header1?.version !== PROTOCOL_VERSION) throw new Error('Invalid Platho private capsule header1');
+  const flags = uint8Byte(header1.flags ?? 0, 'header1.flags');
+  if (flags !== 0) throw new Error('Private capsule header1 flags must be zero in v1');
+  const bytes = concatBytes(
+    PRIVATE_CAPSULE_HEADER1_MAGIC,
+    new Uint8Array([
+      PROTOCOL_VERSION,
+      flags,
+    ]),
+    uint32Bytes(capsuleTimestampSecond(header1.createdAt, 'header1.createdAt'), 'header1.createdAtSec'),
+    uint32Bytes(capsuleTimestampSecond(header1.expiresAt, 'header1.expiresAt'), 'header1.expiresAtSec'),
+    base64urlFixedBytes(header1.clientNonce, 16, 'header1.clientNonce'),
+  );
+  if (bytes.length !== PLATHO_BINARY_HEADER1_BYTES) throw new Error('Private capsule header1 binary size drift');
+  return bytes;
+}
+
+function privateCapsuleHeader0ObjectFromBytes(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length !== PLATHO_BINARY_HEADER0_BYTES) throw new Error('Private capsule header0 binary size drift');
+  if (!bytesEqual(bytes.subarray(0, 4), PRIVATE_CAPSULE_HEADER0_MAGIC)) {
+    throw new Error('Private capsule header0 magic mismatch');
+  }
+  const version = bytes[4];
+  if (version !== PROTOCOL_VERSION) throw new Error('Unsupported private capsule header0 version');
+  const publishKind = bytes[5];
+  const sizeClass = bytes[6];
+  const cryptoSuite = bytes[7];
+  assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
+  const suite = suiteForByte(cryptoSuite);
+  if (sizeClassForSuite(suite) !== sizeClass) throw new Error('Private capsule header0 suite mismatch');
+  return {
+    version,
+    kind: 'private',
+    publishKind,
+    sizeClass,
+    cryptoSuite,
+    suite,
+    senderKeyId: base64urlEncode(bytes.subarray(8, 40)),
+    recipientKeyId: base64urlEncode(bytes.subarray(40, 72)),
+    senderSigningPublicKey: base64urlEncode(bytes.subarray(72, 104)),
+    profileVersion: readUint32(bytes, 104, 'header0.profileVersion'),
+    profile_version: readUint32(bytes, 104, 'header0.profileVersion'),
+    avatarHash: bigintHex256(bytesToBigInt(bytes.subarray(108, 140))),
+    avatar_hash: bigintHex256(bytesToBigInt(bytes.subarray(108, 140))),
+  };
+}
+
+function privateCapsuleHeader1ObjectFromBytes(bytesLike) {
+  const bytes = toUint8Array(bytesLike);
+  if (bytes.length !== PLATHO_BINARY_HEADER1_BYTES) throw new Error('Private capsule header1 binary size drift');
+  if (!bytesEqual(bytes.subarray(0, 4), PRIVATE_CAPSULE_HEADER1_MAGIC)) {
+    throw new Error('Private capsule header1 magic mismatch');
+  }
+  const version = bytes[4];
+  if (version !== PROTOCOL_VERSION) throw new Error('Unsupported private capsule header1 version');
+  const flags = bytes[5];
+  if (flags !== 0) throw new Error('Private capsule header1 flags must be zero in v1');
+  return {
+    version,
+    flags,
+    createdAt: readUint32(bytes, 6, 'header1.createdAtSec') * 1000,
+    expiresAt: readUint32(bytes, 10, 'header1.expiresAtSec') * 1000,
+    clientNonce: base64urlEncode(bytes.subarray(14, 30)),
+  };
+}
+
+function privateCapsuleBodyBytes(body) {
+  if (body?.layout !== PLATHO_COMPACT_BODY_LAYOUT) {
+    throw new Error('Private capsule body must use platho.byte-layout.v1');
+  }
+  return compactBodyBytesFromCapsuleBody(body);
+}
+
+async function computePrivateCapsuleChainCells(header0, header1, body) {
+  return {
+    header0: await createSnakeCellPayload('private capsule header0', privateCapsuleHeader0Bytes(header0), PLATHO_ONCHAIN_HEADER_MAX_BYTES),
+    header1: await createSnakeCellPayload('private capsule header1', privateCapsuleHeader1Bytes(header1), PLATHO_ONCHAIN_HEADER_MAX_BYTES),
+    body: await createSnakeCellPayload('private capsule body', privateCapsuleBodyBytes(body), PLATHO_ONCHAIN_BODY_MAX_BYTES),
+  };
+}
+
+async function computePrivateCapsuleHeaderHashes(header0, header1) {
+  const header0Cell = await createSnakeCellPayload('private capsule header0', privateCapsuleHeader0Bytes(header0), PLATHO_ONCHAIN_HEADER_MAX_BYTES);
+  const header1Cell = await createSnakeCellPayload('private capsule header1', privateCapsuleHeader1Bytes(header1), PLATHO_ONCHAIN_HEADER_MAX_BYTES);
+  return {
+    header0Hash: assertHashHex('chainCells.header0.hash', header0Cell.hash),
+    header1Hash: assertHashHex('chainCells.header1.hash', header1Cell.hash),
+  };
+}
+
+function privateCapsuleHashesFromChainCells(chainCells) {
+  return {
+    header0Hash: assertHashHex('chainCells.header0.hash', chainCells.header0.hash),
+    header1Hash: assertHashHex('chainCells.header1.hash', chainCells.header1.hash),
+    bodyHash: assertHashHex('chainCells.body.hash', chainCells.body.hash),
+  };
+}
+
+async function computePrivateCapsuleHashes(header0, header1, body) {
+  return privateCapsuleHashesFromChainCells(await computePrivateCapsuleChainCells(header0, header1, body));
 }
 
 async function computePrivateCapsuleId(hashes) {
@@ -1120,6 +1860,11 @@ async function computePrivateCapsuleId(hashes) {
     header1Hash: assertHashHex('header1Hash', hashes.header1Hash),
     bodyHash: assertHashHex('bodyHash', hashes.bodyHash),
   });
+}
+
+function entryHashHex(entry, fieldName) {
+  if (entry?.[fieldName] === null || entry?.[fieldName] === undefined) return null;
+  return bigintHex256(entry[fieldName]);
 }
 
 function privateCapsuleSignaturePayload(capsule) {
@@ -1132,12 +1877,27 @@ function privateCapsuleSignaturePayload(capsule) {
     bodyHash: capsule.hashes.bodyHash,
     senderKeyId: capsule.header0.senderKeyId,
     recipientKeyId: capsule.header0.recipientKeyId,
+    profileVersion: capsule.header0.profileVersion ?? 0,
+    avatarHash: capsule.header0.avatarHash ?? bigintHex256(0n),
     createdAt: capsule.header1.createdAt,
     expiresAt: capsule.header1.expiresAt,
   };
 }
 
+function assertChainCellPayloadMatches(name, actual, expected) {
+  if (actual === undefined || actual === null) return;
+  const fields = ['layout', 'bytes', 'bits', 'cells', 'refs', 'hash', 'boc'];
+  for (const field of fields) {
+    if (actual[field] !== expected[field]) {
+      throw new Error(`${name}.${field} does not match deterministic on-chain cell`);
+    }
+  }
+}
+
 function privateCapsulePublishDraft(capsule) {
+  if (!capsule.chainCells?.header0 || !capsule.chainCells?.header1 || !capsule.chainCells?.body) {
+    throw new Error('Private capsule is missing on-chain payload cells');
+  }
   return {
     kind: 'private',
     publish_kind: CAPSULE_PUBLISH_KIND.PRIVATE,
@@ -1146,7 +1906,11 @@ function privateCapsulePublishDraft(capsule) {
     header_0_hash: capsule.hashes.header0Hash,
     header_1_hash: capsule.hashes.header1Hash,
     body_hash: capsule.hashes.bodyHash,
+    header_0_cell: capsule.chainCells.header0,
+    header_1_cell: capsule.chainCells.header1,
+    body_cell: capsule.chainCells.body,
     hashes_ref_order: ['body_hash', 'header_0_hash', 'header_1_hash'],
+    payload_bundle_ref_order: ['header_0_cell', 'header_1_cell', 'body_cell'],
     valid_until: Math.floor(capsule.header1.expiresAt / 1000),
   };
 }
@@ -1157,14 +1921,39 @@ export async function createEncryptedPrivateCapsule(plaintext, recipientSignedBu
   }
   const now = options.now ?? Date.now();
   const recipient = await verifySignedPublicKeyBundle(recipientSignedBundle, { now });
+  return createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, recipient, senderIdentity, { ...options, now });
+}
+
+export async function createEncryptedPrivateCapsuleFromPublicBundle(plaintext, recipientPublicBundle, senderIdentity, options = {}) {
+  if (!senderIdentity?.encryptionKeyPair || !senderIdentity?.signingSecretKey || !senderIdentity?.signingPublicKey) {
+    throw new Error('Invalid Platho sender identity');
+  }
+  const normalizedRecipient = await normalizeRecipientBundle(recipientPublicBundle);
+  const recipient = {
+    bundle: recipientPublicBundle,
+    keyId: normalizedRecipient.keyId,
+    suite: normalizedRecipient.suite,
+    contractSuite: normalizedRecipient.contractSuite,
+  };
+  return createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, recipient, senderIdentity, options);
+}
+
+async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, recipient, senderIdentity, options = {}) {
+  const now = options.now ?? Date.now();
   const suite = recipient.suite;
   const sizeClass = sizeClassForSuite(suite);
   const cryptoSuite = recipient.contractSuite;
   assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
 
-  const createdAt = options.createdAt ?? now;
-  const expiresAt = options.expiresAt ?? createdAt + (options.ttlMs ?? DEFAULT_CAPSULE_TTL_MS);
+  const requestedCreatedAt = options.createdAt ?? now;
+  const requestedExpiresAt = options.expiresAt ?? requestedCreatedAt + (options.ttlMs ?? DEFAULT_CAPSULE_TTL_MS);
+  const createdAt = alignCapsuleTimestampMs(requestedCreatedAt, 'floor', 'header1.createdAt');
+  const expiresAt = alignCapsuleTimestampMs(requestedExpiresAt, 'ceil', 'header1.expiresAt');
   const clientNonce = options.clientNonce ?? base64urlEncode(randomBytes(16));
+  const pointer = privateProfilePointer(options.profile ?? {
+    profileVersion: options.senderProfileVersion ?? options.profileVersion,
+    avatarHash: options.senderAvatarHash ?? options.avatarHash,
+  });
   const header0 = {
     version: PROTOCOL_VERSION,
     kind: 'private',
@@ -1175,39 +1964,35 @@ export async function createEncryptedPrivateCapsule(plaintext, recipientSignedBu
     senderKeyId: senderIdentity.encryptionKeyPair.keyId,
     recipientKeyId: recipient.keyId,
     senderSigningPublicKey: base64urlEncode(senderIdentity.signingPublicKey),
-    recipientSigningPublicKey: recipientSignedBundle.signingPublicKey,
+    profileVersion: pointer.version,
+    profile_version: pointer.version,
+    avatarHash: bigintHex256(bytesToBigInt(pointer.avatarHashBytes)),
+    avatar_hash: bigintHex256(bytesToBigInt(pointer.avatarHashBytes)),
   };
   const header1 = {
     version: PROTOCOL_VERSION,
+    flags: 0,
     createdAt,
     expiresAt,
     clientNonce,
-    threadId: options.threadId ?? null,
-    purpose: options.purpose ?? 'message',
   };
   assertCapsuleTimestampPolicy(header1, { ...options, now });
 
-  const partialHashes = await computePrivateCapsuleHashes(header0, header1, { pending: true });
-  const envelope = await encryptText(plaintext, recipient.bundle, {
-    senderKeyId: senderIdentity.encryptionKeyPair.keyId,
-    createdAt,
-    context: {
-      capsule: {
-        version: PROTOCOL_VERSION,
-        kind: 'private',
-        header0Hash: partialHashes.header0Hash,
-        header1Hash: partialHashes.header1Hash,
-        clientNonce,
-        threadId: header1.threadId,
-      },
-    },
+  const partialHashes = await computePrivateCapsuleHeaderHashes(header0, header1);
+  const payloadBytes = options.payloadBytes
+    ? assertCompactPayloadBytes(options.payloadBytes)
+    : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext });
+  const bodyBytes = await encryptCompactPayloadBytes(payloadBytes, recipient.bundle, {
+    hashes: partialHashes,
+    messageId: options.messageId,
   });
   const body = {
     version: PROTOCOL_VERSION,
     kind: 'private',
-    envelope,
+    ...compactBodyObjectFromBytes(bodyBytes),
   };
-  const hashes = await computePrivateCapsuleHashes(header0, header1, body);
+  const chainCells = await computePrivateCapsuleChainCells(header0, header1, body);
+  const hashes = privateCapsuleHashesFromChainCells(chainCells);
   const id = await computePrivateCapsuleId(hashes);
   const unsignedCapsule = {
     version: PROTOCOL_VERSION,
@@ -1217,6 +2002,7 @@ export async function createEncryptedPrivateCapsule(plaintext, recipientSignedBu
     header1,
     body,
     hashes,
+    chainCells,
   };
   const signature = ed25519.sign(utf8(stableStringify(privateCapsuleSignaturePayload(unsignedCapsule))), senderIdentity.signingSecretKey);
   const capsule = {
@@ -1247,7 +2033,11 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
   }
   assertCapsuleTimestampPolicy(capsule.header1, options);
 
-  const hashes = await computePrivateCapsuleHashes(capsule.header0, capsule.header1, capsule.body);
+  const chainCells = await computePrivateCapsuleChainCells(capsule.header0, capsule.header1, capsule.body);
+  assertChainCellPayloadMatches('capsule.chainCells.header0', capsule.chainCells?.header0, chainCells.header0);
+  assertChainCellPayloadMatches('capsule.chainCells.header1', capsule.chainCells?.header1, chainCells.header1);
+  assertChainCellPayloadMatches('capsule.chainCells.body', capsule.chainCells?.body, chainCells.body);
+  const hashes = privateCapsuleHashesFromChainCells(chainCells);
   if (hashes.header0Hash !== assertHashHex('capsule.hashes.header0Hash', capsule.hashes?.header0Hash)) {
     throw new Error('Private capsule header0 hash mismatch');
   }
@@ -1260,27 +2050,10 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
   const expectedId = await computePrivateCapsuleId(hashes);
   if (capsule.id !== expectedId) throw new Error('Private capsule id mismatch');
 
-  const envelope = capsule.body?.envelope;
-  if (capsule.body?.version !== PROTOCOL_VERSION || capsule.body?.kind !== 'private' || !envelope) {
-    throw new Error('Invalid Platho private capsule body');
-  }
-  if (envelope?.context?.capsule?.header0Hash !== hashes.header0Hash) {
-    throw new Error('Private capsule envelope header0 binding mismatch');
-  }
-  if (envelope?.context?.capsule?.header1Hash !== hashes.header1Hash) {
-    throw new Error('Private capsule envelope header1 binding mismatch');
-  }
-  if (envelope?.context?.capsule?.clientNonce !== capsule.header1.clientNonce) {
-    throw new Error('Private capsule envelope nonce binding mismatch');
-  }
-  if (envelope.suite !== capsule.header0.suite || envelope.contractSuite !== capsule.header0.cryptoSuite) {
-    throw new Error('Private capsule envelope suite mismatch');
-  }
-  if (envelope.recipientKeyId !== capsule.header0.recipientKeyId) {
-    throw new Error('Private capsule envelope recipient mismatch');
-  }
-  if (envelope.senderKeyId !== capsule.header0.senderKeyId) {
-    throw new Error('Private capsule envelope sender mismatch');
+  const bodyBytes = compactBodyBytesFromCapsuleBody(capsule.body);
+  const bodyInfo = inspectCompactBodyBytes(bodyBytes);
+  if (bodyInfo.suite !== capsule.header0.suite || suiteByteForSuite(bodyInfo.suite) !== capsule.header0.cryptoSuite) {
+    throw new Error('Private capsule compact body suite mismatch');
   }
 
   const senderSigningPublicKey = assertBytes(
@@ -1298,10 +2071,12 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
     throw new Error('Private capsule sender signature is invalid');
   }
 
+  const normalizedCapsule = { ...capsule, hashes, chainCells };
   return {
-    capsule,
-    publish: privateCapsulePublishDraft(capsule),
+    capsule: normalizedCapsule,
+    publish: privateCapsulePublishDraft(normalizedCapsule),
     senderSigningPublicKey,
+    bodyBytes,
   };
 }
 
@@ -1311,10 +2086,103 @@ export async function openEncryptedPrivateCapsule(capsule, recipientKeyPair, opt
   if (replayCache && await replayCache.has(verified.capsule.id)) {
     throw new Error('Private capsule replay detected');
   }
-  const plaintext = await decryptText(verified.capsule.body.envelope, recipientKeyPair);
+  const payload = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
+    header0Hash: verified.capsule.hashes.header0Hash,
+    header1Hash: verified.capsule.hashes.header1Hash,
+    recipientKeyId: verified.capsule.header0.recipientKeyId,
+  });
   if (replayCache) await replayCache.add(verified.capsule.id, verified.capsule.header1.expiresAt);
   return {
-    plaintext,
+    plaintext: payload.type === 'text' ? payload.text : '',
+    payload,
+    capsule: verified.capsule,
+    publish: verified.publish,
+    senderSigningPublicKey: verified.senderSigningPublicKey,
+  };
+}
+
+export async function privateCapsuleFromChainEntry(entry, options = {}) {
+  if (!entry || entry.exists !== true) throw new Error('CapsuleHub private entry does not exist');
+  const header0Bytes = snakeBytesFromBoc(entry.header_0_boc, 'CapsuleHub private header0');
+  const header1Bytes = snakeBytesFromBoc(entry.header_1_boc, 'CapsuleHub private header1');
+  const bodyBytes = snakeBytesFromBoc(entry.body_boc, 'CapsuleHub private body');
+  const header0 = privateCapsuleHeader0ObjectFromBytes(header0Bytes);
+  const header1 = privateCapsuleHeader1ObjectFromBytes(header1Bytes);
+  const body = {
+    version: PROTOCOL_VERSION,
+    kind: 'private',
+    ...compactBodyObjectFromBytes(bodyBytes),
+  };
+  if (entry.size_class !== undefined && BigInt(entry.size_class) !== BigInt(header0.sizeClass)) {
+    throw new Error('CapsuleHub private entry size class mismatch');
+  }
+  if (entry.crypto_suite !== undefined && BigInt(entry.crypto_suite) !== BigInt(header0.cryptoSuite)) {
+    throw new Error('CapsuleHub private entry crypto suite mismatch');
+  }
+  assertCapsuleTimestampPolicy(header1, {
+    ...options,
+    enforceExpiry: options.enforceExpiry ?? false,
+  });
+  const bodyInfo = inspectCompactBodyBytes(bodyBytes);
+  if (bodyInfo.suite !== header0.suite || suiteByteForSuite(bodyInfo.suite) !== header0.cryptoSuite) {
+    throw new Error('CapsuleHub private body suite mismatch');
+  }
+  const chainCells = await computePrivateCapsuleChainCells(header0, header1, body);
+  const hashes = privateCapsuleHashesFromChainCells(chainCells);
+  const expectedHeader0Hash = entryHashHex(entry, 'header_0_hash');
+  const expectedHeader1Hash = entryHashHex(entry, 'header_1_hash');
+  const expectedBodyHash = entryHashHex(entry, 'body_hash');
+  if (expectedHeader0Hash && hashes.header0Hash !== expectedHeader0Hash) {
+    throw new Error('CapsuleHub private entry header0 hash mismatch');
+  }
+  if (expectedHeader1Hash && hashes.header1Hash !== expectedHeader1Hash) {
+    throw new Error('CapsuleHub private entry header1 hash mismatch');
+  }
+  if (expectedBodyHash && hashes.bodyHash !== expectedBodyHash) {
+    throw new Error('CapsuleHub private entry body hash mismatch');
+  }
+  const id = await computePrivateCapsuleId(hashes);
+  const capsule = {
+    version: PROTOCOL_VERSION,
+    kind: 'private',
+    id,
+    header0,
+    header1,
+    body,
+    hashes,
+    chainCells,
+    chainSource: {
+      capsuleHub: 'CapsuleHub',
+      entryId: entry.entry_id === undefined ? null : String(entry.entry_id),
+      entryUid: entry.entry_uid === undefined ? null : String(entry.entry_uid),
+      publishId: entry.publish_id === undefined ? null : String(entry.publish_id),
+      authorWallet: entry.author_wallet ?? null,
+      createdAt: entry.created_at === undefined ? null : String(entry.created_at),
+    },
+  };
+  return {
+    capsule,
+    publish: privateCapsulePublishDraft(capsule),
+    senderSigningPublicKey: base64urlDecode(header0.senderSigningPublicKey),
+    bodyBytes,
+  };
+}
+
+export async function openPrivateCapsuleChainEntry(entry, recipientKeyPair, options = {}) {
+  const verified = await privateCapsuleFromChainEntry(entry, options);
+  const replayCache = options.replayCache;
+  if (replayCache && await replayCache.has(verified.capsule.id)) {
+    throw new Error('Private capsule replay detected');
+  }
+  const payload = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
+    header0Hash: verified.capsule.hashes.header0Hash,
+    header1Hash: verified.capsule.hashes.header1Hash,
+    recipientKeyId: verified.capsule.header0.recipientKeyId,
+  });
+  if (replayCache) await replayCache.add(verified.capsule.id, verified.capsule.header1.expiresAt);
+  return {
+    plaintext: payload.type === 'text' ? payload.text : '',
+    payload,
     capsule: verified.capsule,
     publish: verified.publish,
     senderSigningPublicKey: verified.senderSigningPublicKey,
@@ -1423,15 +2291,7 @@ export async function runPlathoCryptoSelfTest() {
   }
 
   const identity = await createMessagingIdentity({ suite: CRYPTO_SUITES.HYBRID_V1 });
-  const walletSecretKey = randomBytes(ED25519_SECRET_KEY_BYTES);
-  const walletPublicKey = assertBytes(
-    'walletPublicKey',
-    ed25519.getPublicKey(walletSecretKey),
-    ED25519_PUBLIC_KEY_BYTES,
-  );
   const walletAddress = `0:${bytesToHex(await sha256(utf8('self-test-ton-wallet-address')))}`;
-  const tonProofDomain = 'platho.local';
-  const tonProofChain = '-3';
   const signedBundle = await exportSignedPublicKeyBundle(identity, {
     issuedAt: 1_700_000_000_000,
     expiresAt: 1_700_003_600_000,
@@ -1446,57 +2306,15 @@ export async function runPlathoCryptoSelfTest() {
   if (vaultDraft.message.pq_kem_pubkey_len !== BigInt(MLKEM768_PUBLIC_KEY_BYTES)) {
     throw new Error('hybrid-v1 Vault key draft ML-KEM length failed');
   }
-  const tonProofPayload = await createTonConnectOwnershipPayload(signedBundle, {
-    issuedAt: 1_700_000_000_000,
-    expiresAt: 1_700_000_600_000,
-    vaultAddress: 'testnet:vault-placeholder',
-    nonce: 'self-test-ton-proof-nonce',
-  });
-  const tonConnectProof = await createTonConnectProofForSelfTest({
-    address: walletAddress,
-    walletPublicKey,
-    walletSecretKey,
-    domain: tonProofDomain,
-    chain: tonProofChain,
-    timestamp: 1_700_000_001,
-    payload: tonProofPayload,
-  });
-  const verifiedWalletProof = await verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: tonProofDomain,
-    expectedChain: tonProofChain,
-    verifiedWalletPublicKey: walletPublicKey,
-  });
-  const friendlyWalletAddress = tonFriendlyAddressForSelfTest(walletAddress, { testOnly: true });
-  const friendlyTonConnectProof = await createTonConnectProofForSelfTest({
-    address: walletAddress,
-    accountAddress: friendlyWalletAddress,
-    walletPublicKey,
-    walletSecretKey,
-    domain: tonProofDomain,
-    chain: tonProofChain,
-    timestamp: 1_700_000_001,
-    payload: tonProofPayload,
-  });
-  const verifiedFriendlyWalletProof = await verifyTonConnectWalletOwnershipProof(signedBundle, friendlyTonConnectProof, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: tonProofDomain,
-    expectedChain: tonProofChain,
-    verifiedWalletPublicKey: walletPublicKey,
-  });
-  if (!compareAddressLike(verifiedFriendlyWalletProof.walletAddress, walletAddress)) {
-    throw new Error('TON user-friendly wallet address normalization failed');
-  }
   const activeVaultKeyRecord = {
     exists: true,
-    owner_wallet: verifiedWalletProof.walletAddress,
+    owner_wallet: walletAddress,
     key_generation: 0n,
     enc_pubkey: vaultDraft.message.enc_pubkey,
     sign_pubkey: vaultDraft.message.sign_pubkey,
     pq_kem_pubkey_hash: vaultDraft.message.pq_kem_pubkey_hash,
     pq_kem_pubkey_len: vaultDraft.message.pq_kem_pubkey_len,
+    pq_kem_pubkey: vaultDraft.message.pq_kem_pubkey,
     crypto_suite_mask: vaultDraft.message.crypto_suite_mask,
     created_at: 1_700_000_000n,
     created_lt: 1n,
@@ -1505,12 +2323,7 @@ export async function runPlathoCryptoSelfTest() {
   };
   const vaultRecordBinding = await verifyVaultKeyRecordBinding(signedBundle, activeVaultKeyRecord, {
     now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
     ownerWallet: walletAddress,
-    tonConnectProof,
-    expectedDomain: tonProofDomain,
-    expectedChain: tonProofChain,
-    verifiedWalletPublicKey: walletPublicKey,
     currentKeyId: '0x0100000000000000000000000000000000000000000000000000000000000001',
     recordKeyId: '0x0100000000000000000000000000000000000000000000000000000000000001',
   });
@@ -1522,7 +2335,7 @@ export async function runPlathoCryptoSelfTest() {
     now: 1_700_000_002_000,
     createdAt: 1_700_000_002_000,
     expiresAt: 1_700_000_062_000,
-    clientNonce: 'self-test-capsule-nonce',
+    clientNonce: base64urlEncode(new Uint8Array(16).fill(1)),
     threadId: 'self-test',
   });
   const openedCapsule = await openEncryptedPrivateCapsule(capsule, identity.encryptionKeyPair, {
@@ -1586,98 +2399,22 @@ export async function runPlathoCryptoSelfTest() {
     now: 1_700_003_600_001,
   }));
 
-  await expectReject('TON proof without verified public key source', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: tonProofDomain,
-  }));
-
-  const tonProofSignatureTampered = structuredClone(tonConnectProof);
-  const walletSignatureBytes = base64Decode(tonProofSignatureTampered.proof.signature);
-  walletSignatureBytes[0] ^= 1;
-  tonProofSignatureTampered.proof.signature = base64Encode(walletSignatureBytes);
-  await expectReject('TON proof signature tamper', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonProofSignatureTampered, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
-  }));
-
-  const tonProofBundlePayloadTampered = JSON.parse(tonProofPayload);
-  tonProofBundlePayloadTampered.bundleHash = vaultDraft.json.enc_pubkey;
-  const tonProofBundleTampered = await createTonConnectProofForSelfTest({
-    address: walletAddress,
-    walletPublicKey,
-    walletSecretKey,
-    domain: tonProofDomain,
-    timestamp: 1_700_000_001,
-    payload: stableStringify(tonProofBundlePayloadTampered),
-  });
-  await expectReject('TON proof bundle hash tamper', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonProofBundleTampered, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
-  }));
-
-  await expectReject('TON proof payload expiry', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
-    now: 1_700_000_600_001,
-    nowSec: 1_700_000_600,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
-  }));
-
-  await expectReject('TON proof timestamp stale', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
-    now: 1_700_000_003_000,
-    nowSec: 1_700_000_003,
-    maxAgeSec: 1,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
-  }));
-
-  await expectReject('TON proof domain mismatch', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: 'evil.example',
-    verifiedWalletPublicKey: walletPublicKey,
-  }));
-
-  await expectReject('TON proof chain mismatch', () => verifyTonConnectWalletOwnershipProof(signedBundle, tonConnectProof, {
-    now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
-    expectedDomain: tonProofDomain,
-    expectedChain: '-239',
-    verifiedWalletPublicKey: walletPublicKey,
-  }));
-
   const ownerMismatchRecord = { ...activeVaultKeyRecord, owner_wallet: 'testnet:attacker-wallet-placeholder' };
   await expectReject('Vault key record owner mismatch', () => verifyVaultKeyRecordBinding(signedBundle, ownerMismatchRecord, {
     now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
     ownerWallet: walletAddress,
-    tonConnectProof,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
   }));
 
   const revokedRecord = { ...activeVaultKeyRecord, revoked_lt: 2n };
   await expectReject('Vault key record revoked', () => verifyVaultKeyRecordBinding(signedBundle, revokedRecord, {
     now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
     ownerWallet: walletAddress,
-    tonConnectProof,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
   }));
 
   const encMismatchRecord = { ...activeVaultKeyRecord, enc_pubkey: activeVaultKeyRecord.enc_pubkey ^ 1n };
   await expectReject('Vault key record enc_pubkey mismatch', () => verifyVaultKeyRecordBinding(signedBundle, encMismatchRecord, {
     now: 1_700_000_001_000,
-    nowSec: 1_700_000_001,
     ownerWallet: walletAddress,
-    tonConnectProof,
-    expectedDomain: tonProofDomain,
-    verifiedWalletPublicKey: walletPublicKey,
   }));
 
   await expectReject('private capsule replay', () => openEncryptedPrivateCapsule(capsule, identity.encryptionKeyPair, {
@@ -1691,13 +2428,15 @@ export async function runPlathoCryptoSelfTest() {
   }));
 
   const capsuleHeaderTampered = structuredClone(capsule);
-  capsuleHeaderTampered.header1.threadId = 'tampered-thread';
+  capsuleHeaderTampered.header1.clientNonce = base64urlEncode(randomBytes(16));
   await expectReject('private capsule header tamper', () => verifyEncryptedPrivateCapsule(capsuleHeaderTampered, {
     now: 1_700_000_004_000,
   }));
 
   const capsuleBodyTampered = structuredClone(capsule);
-  capsuleBodyTampered.body.envelope.senderKeyId = alice.keyId;
+  const capsuleBodyTamperedChunk = base64urlDecode(capsuleBodyTampered.body.chunks[0]);
+  capsuleBodyTamperedChunk[capsuleBodyTamperedChunk.length - 1] ^= 1;
+  capsuleBodyTampered.body.chunks[0] = base64urlEncode(capsuleBodyTamperedChunk);
   await expectReject('private capsule body tamper', () => verifyEncryptedPrivateCapsule(capsuleBodyTampered, {
     now: 1_700_000_004_000,
   }));
@@ -1711,8 +2450,13 @@ export async function runPlathoCryptoSelfTest() {
   }));
 
   const capsuleContextTampered = structuredClone(capsule);
-  capsuleContextTampered.body.envelope.context.capsule.header0Hash = capsule.hashes.header1Hash;
+  capsuleContextTampered.header0.senderKeyId = base64urlEncode(randomBytes(32));
   capsuleContextTampered.hashes = await computePrivateCapsuleHashes(
+    capsuleContextTampered.header0,
+    capsuleContextTampered.header1,
+    capsuleContextTampered.body,
+  );
+  capsuleContextTampered.chainCells = await computePrivateCapsuleChainCells(
     capsuleContextTampered.header0,
     capsuleContextTampered.header1,
     capsuleContextTampered.body,
@@ -1723,7 +2467,7 @@ export async function runPlathoCryptoSelfTest() {
     utf8(stableStringify(privateCapsuleSignaturePayload(capsuleContextTampered))),
     identity.signingSecretKey,
   ));
-  await expectReject('private capsule envelope context mismatch', () => verifyEncryptedPrivateCapsule(capsuleContextTampered, {
+  await expectReject('private capsule compact AAD mismatch', () => openEncryptedPrivateCapsule(capsuleContextTampered, identity.encryptionKeyPair, {
     now: 1_700_000_004_000,
   }));
 
@@ -1774,12 +2518,7 @@ export async function runPlathoCryptoSelfTest() {
       signingPublicKeyBytes: verifiedBundle.signingPublicKey.length,
       vaultDraftSuiteMask: Number(vaultDraft.message.crypto_suite_mask),
       vaultDraftPqKeyBytes: Number(vaultDraft.message.pq_kem_pubkey_len),
-      tonProofVerified: true,
-      tonProofDomain: verifiedWalletProof.domain,
-      walletProofVerified: true,
-      walletPublicKeyBytes: verifiedWalletProof.walletPublicKey.length,
-      walletPublicKeySource: verifiedWalletProof.walletPublicKeySource,
-      userFriendlyAddressAccepted: true,
+      walletBindingVerified: true,
       vaultRecordBound: vaultRecordBinding.active,
     },
     capsule: {
@@ -1791,6 +2530,8 @@ export async function runPlathoCryptoSelfTest() {
       header0Hash: openedCapsule.publish.header_0_hash,
       header1Hash: openedCapsule.publish.header_1_hash,
       bodyHash: openedCapsule.publish.body_hash,
+      bodyCellBytes: openedCapsule.publish.body_cell.bytes,
+      bodyCellBocBytes: base64Decode(openedCapsule.publish.body_cell.boc).length,
     },
   };
 }

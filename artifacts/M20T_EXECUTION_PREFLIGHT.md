@@ -1,11 +1,11 @@
 # M20T Execution Preflight
 
-Status: READY_FOR_FULL_SIZE_M20T
+Status: BALANCE_NOT_CHECKED
 
 ## Wallet
 
 ```text
-address=0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+address=0QCDGghF7J5InXzzOmJPjZp6i8kxPdji2mwV5TDnc5VXE9i6
 walletVersion=v4r2
 secretMaterialPrinted=false
 mnemonicPresent=true
@@ -15,9 +15,9 @@ rpcApiKeyPresent=false
 ## Funding
 
 ```text
-observedBalanceNanotons=57999999813
+observedBalanceNanotons=NOT_CHECKED
 fullSizeM20TMinimumNanotons=55000000000
-remainingForFullSizeM20TNanotons=0
+remainingForFullSizeM20TNanotons=NOT_CHECKED
 ```
 
 ## Checks
@@ -39,8 +39,8 @@ remainingForFullSizeM20TNanotons=0
 - manifestTemplateReady: true
 - evidenceTemplateReady: true
 - evidenceFinalStatementPinned: true
-- observedBalanceProvided: true
-- fullSizeBalanceReady: true
+- observedBalanceProvided: false
+- fullSizeBalanceReady: false
 
 ## Blockers
 
@@ -48,6 +48,7 @@ None
 
 ## Warnings
 
+- M20T_BALANCE_NOT_CHECKED
 - M20T_RPC_API_KEY_NOT_SET_OR_NOT_DETECTED
 
 ## Final Statement

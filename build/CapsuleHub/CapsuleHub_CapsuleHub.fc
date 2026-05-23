@@ -14,6 +14,12 @@
 ;; __tact_context_get_sender
 slice __tact_context_get_sender() inline;
 
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_int_cell
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
+
 ;; $CapsuleHubPublishAck$_store
 builder $CapsuleHubPublishAck$_store(builder build_0, (int, int, int) v) inline;
 
@@ -29,74 +35,143 @@ cell $DepositProtocolFee$_store_cell((int) v, builder b) inline;
 ;; $DepositProtocolFee$_load_bounced
 (slice, ((int))) $DepositProtocolFee$_load_bounced(slice sc_0) inline;
 
+;; $PrivateCapsuleEntry$_store
+builder $PrivateCapsuleEntry$_store(builder build_0, (int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) v) inline_ref;
+
+;; $PrivateCapsuleEntry$_store_cell
+cell $PrivateCapsuleEntry$_store_cell((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) v, builder b) inline;
+
+;; $PrivateCapsuleEntry$_load
+(slice, ((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int))) $PrivateCapsuleEntry$_load(slice sc_0) inline_ref;
+
+;; $PrivateCapsuleEntry$_as_optional
+tuple $PrivateCapsuleEntry$_as_optional((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) v) inline;
+
+;; $PrivateCapsuleEntry$_load_opt
+tuple $PrivateCapsuleEntry$_load_opt(cell cl) inline;
+
+;; $PublicCapsuleEntry$_store
+builder $PublicCapsuleEntry$_store(builder build_0, (int, int, int, slice, int, int, cell, cell, int) v) inline;
+
+;; $PublicCapsuleEntry$_store_cell
+cell $PublicCapsuleEntry$_store_cell((int, int, int, slice, int, int, cell, cell, int) v, builder b) inline;
+
+;; $PublicCapsuleEntry$_load
+(slice, ((int, int, int, slice, int, int, cell, cell, int))) $PublicCapsuleEntry$_load(slice sc_0) inline;
+
+;; $PublicCapsuleEntry$_as_optional
+tuple $PublicCapsuleEntry$_as_optional((int, int, int, slice, int, int, cell, cell, int) v) inline;
+
+;; $PublicCapsuleEntry$_load_opt
+tuple $PublicCapsuleEntry$_load_opt(cell cl) inline;
+
 ;; $CapsuleHub$_store
-builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) v) inline;
+builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice, int, int, int, cell, cell) v) inline;
 
 ;; $CapsuleHub$_load
-(slice, ((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int))) $CapsuleHub$_load(slice sc_0) inline;
+(slice, ((slice, slice, int, int, int, slice, int, int, int, cell, cell))) $CapsuleHub$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $CapsuleHubStateView$_to_external
-(int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int) $CapsuleHubStateView$_to_external(((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int)) v) inline;
+(int, int, int, int, int, int, slice, slice, slice) $CapsuleHubStateView$_to_external(((int, int, int, int, int, int, slice, slice, slice)) v) inline;
+
+;; $PrivateCapsuleEntry$_not_null
+((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $PrivateCapsuleEntry$_not_null(tuple v) inline;
+
+;; $PublicCapsuleEntry$_not_null
+((int, int, int, slice, int, int, cell, cell, int)) $PublicCapsuleEntry$_not_null(tuple v) inline;
+
+;; $PrivateCapsuleEntryView$_to_external
+(int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) $PrivateCapsuleEntryView$_to_external(((int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) v) inline;
+
+;; $PublicCapsuleEntryView$_to_external
+(int, int, int, int, slice, int, int, cell, cell, int) $PublicCapsuleEntryView$_to_external(((int, int, int, int, slice, int, int, cell, cell, int)) v) inline;
 
 ;; $CapsuleHub$init$_load
 (slice, ((slice, slice, int, int, int, slice))) $CapsuleHub$init$_load(slice sc_0) inline;
 
 ;; $CapsuleHub$_contract_init
-(slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $CapsuleHub$_contract_init(slice $fee_accumulator_address, slice $vault_address, int $vault_bound, int $sealed, int $deployment_manifest_hash, slice $genesis_controller_address) impure inline;
+(slice, slice, int, int, int, slice, int, int, int, cell, cell) $CapsuleHub$_contract_init(slice $fee_accumulator_address, slice $vault_address, int $vault_bound, int $sealed, int $deployment_manifest_hash, slice $genesis_controller_address) impure inline;
 
 ;; $CapsuleHub$_contract_load
-(slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $CapsuleHub$_contract_load() impure inline;
+(slice, slice, int, int, int, slice, int, int, int, cell, cell) $CapsuleHub$_contract_load() impure inline;
 
 ;; $CapsuleHub$_contract_store
-() $CapsuleHub$_contract_store((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) v) impure inline;
+() $CapsuleHub$_contract_store((slice, slice, int, int, int, slice, int, int, int, cell, cell) v) impure inline;
 
 ;; $CapsuleHub$_fun_requireSealed
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), ()) $CapsuleHub$_fun_requireSealed((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireSealed((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref;
 
 ;; $CapsuleHub$_fun_requireUnsealed
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), ()) $CapsuleHub$_fun_requireUnsealed((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireUnsealed((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref;
 
 ;; $CapsuleHub$_fun_requireGenesisController
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), ()) $CapsuleHub$_fun_requireGenesisController((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireGenesisController((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref;
 
 ;; $CapsuleHub$_fun_privateFullFee
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_privateFullFee((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $sizeClass) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateFullFee((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref;
 
 ;; $CapsuleHub$_fun_privateExecReserve
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_privateExecReserve((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $sizeClass) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateExecReserve((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref;
 
 ;; $CapsuleHub$_fun_isAllowedPrivatePair
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_isAllowedPrivatePair((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $sizeClass, int $cryptoSuite) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_isAllowedPrivatePair((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass, int $cryptoSuite) impure inline_ref;
 
-;; $CapsuleHub$_fun_needsNewPage
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_needsNewPage((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId) impure inline_ref;
+;; $CapsuleHub$_fun_requireExactPayloadCell
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireExactPayloadCell((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, cell $cell, int $expectedHash, int $expectedCells, int $expectedBits, int $expectedRefs, int $hashExit, int $sizeExit) impure inline_ref;
 
-;; $CapsuleHub$_fun_computePrivateEntryUid
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computePrivateEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, int $header0, int $header1, int $bodyHash) impure inline_ref;
+;; $CapsuleHub$_fun_requirePublicPayloadCell
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requirePublicPayloadCell((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, cell $cell, int $expectedHash, int $hashExit, int $sizeExit) impure inline_ref;
 
-;; $CapsuleHub$_fun_computePublicEntryUid
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computePublicEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, slice $author, int $bodyHash) impure inline_ref;
+;; $CapsuleHub$_fun_requirePublicHeaderCell
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requirePublicHeaderCell((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, cell $cell, int $expectedHash, int $hashExit, int $sizeExit) impure inline_ref;
+
+;; $CapsuleHub$_fun_privateBodyBits
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateBodyBits((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref;
+
+;; $CapsuleHub$_fun_privateBodyCells
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateBodyCells((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref;
+
+;; $CapsuleHub$_fun_privateBodyRefs
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateBodyRefs((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref;
 
 ;; $CapsuleHub$_fun_computeVaultPrivateEntryUid
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computeVaultPrivateEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, int $publishId, int $header0, int $header1, int $bodyHash) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_computeVaultPrivateEntryUid((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId, int $publishId, int $header0, int $header1, int $bodyHash) impure inline_ref;
 
 ;; $CapsuleHub$_fun_computeVaultPublicEntryUid
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computeVaultPublicEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, int $publishId, slice $author, int $bodyHash) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_computeVaultPublicEntryUid((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId, int $publishId, slice $author, int $headerHash, int $bodyHash) impure inline_ref;
 
-;; $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_page_count_public_page_count_private_entry_count_public_entry_count_last_private_entry_id_last_public_entry_id_last_private_entry_uid_last_public_entry_uid
-((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int)) $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_page_count_public_page_count_private_entry_count_public_entry_count_last_private_entry_id_last_public_entry_id_last_private_entry_uid_last_public_entry_uid(int $sealed, int $vault_bound, int $deployment_manifest_hash, int $private_latest_id, int $public_latest_id, int $accrued_plato_fee_ton, slice $fee_accumulator_address, slice $vault_address, slice $genesis_controller_address, int $private_page_count, int $public_page_count, int $private_entry_count, int $public_entry_count, int $last_private_entry_id, int $last_public_entry_id, int $last_private_entry_uid, int $last_public_entry_uid) inline;
+;; $PrivateCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at
+((int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $PrivateCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at(int $exists, int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, cell $header_0, cell $header_1, cell $body, int $created_at) inline;
+
+;; $CapsuleHub$_fun_get_private_entry
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), (int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $CapsuleHub$_fun_get_private_entry((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId) impure inline_ref;
+
+;; $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at
+((int, int, int, int, slice, int, int, cell, cell, int)) $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at(int $exists, int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $header_hash, int $body_hash, cell $header, cell $body, int $created_at) inline;
+
+;; $CapsuleHub$_fun_get_public_entry
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), (int, int, int, int, slice, int, int, cell, cell, int)) $CapsuleHub$_fun_get_public_entry((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId) impure inline_ref;
+
+;; $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address
+((int, int, int, int, int, int, slice, slice, slice)) $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address(int $sealed, int $vault_bound, int $deployment_manifest_hash, int $private_latest_id, int $public_latest_id, int $accrued_plato_fee_ton, slice $fee_accumulator_address, slice $vault_address, slice $genesis_controller_address) inline;
 
 ;; $CapsuleHub$_fun_get_state
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), (int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int)) $CapsuleHub$_fun_get_state((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), (int, int, int, int, int, int, slice, slice, slice)) $CapsuleHub$_fun_get_state((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref;
+
+;; $PrivateCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at
+((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $PrivateCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at(int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, cell $header_0, cell $header_1, cell $body, int $created_at) inline;
 
 ;; $MessageParameters$_constructor_to_value_bounce_mode_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
 
 ;; $CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid
 ((int, int, int)) $CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid(int $publish_id, int $entry_id, int $entry_uid) inline;
+
+;; $PublicCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at
+((int, int, int, slice, int, int, cell, cell, int)) $PublicCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at(int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $header_hash, int $body_hash, cell $header, cell $body, int $created_at) inline;
 
 ;; $DepositProtocolFee$_constructor_amount
 ((int)) $DepositProtocolFee$_constructor_amount(int $amount) inline;
@@ -116,8 +191,50 @@ slice __tact_context_get_sender() inline {
     return __tact_context_sender;
 }
 
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8 -> tuple __tact_tuple_create_9((X0, X1, X2, X3, X4, X5, X6, X7, X8) v) asm """
+    9 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8 -> (X0, X1, X2, X3, X4, X5, X6, X7, X8) __tact_tuple_destroy_9(tuple v) asm """
+    9 UNTUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12 -> tuple __tact_tuple_create_13((X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12) v) asm """
+    13 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12 -> (X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12) __tact_tuple_destroy_13(tuple v) asm """
+    13 UNTUPLE
+""";
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_ref(d, kl, k, v), ());
+    }
+}
+
 builder $global_beginCell() impure asm """
     NEWC
+""";
+
+cell $global_emptyCell() impure asm """
+    <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+""";
+
+slice $global_myAddress() impure asm """
+    MYADDR
 """;
 
 () $global_message((int, cell, int, slice, int) $params) impure asm """
@@ -154,6 +271,10 @@ cell $Builder$_fun_endCell(builder $self) impure asm """
 
 builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
     STSLICER
+""";
+
+(int, int, int) $Cell$_fun_computeDataSize(cell $self, int $maxCells) impure asm """
+    CDATASIZE
 """;
 
 int $Cell$_fun_hash(cell $self) impure asm """
@@ -231,25 +352,183 @@ cell $DepositProtocolFee$_store_cell((int) v, builder b) inline {
 
 ;;
 ;; Type: CapsuleHubStateView
-;; TLB: _ sealed:bool vault_bound:bool deployment_manifest_hash:int257 private_latest_id:int257 public_latest_id:int257 accrued_plato_fee_ton:int257 fee_accumulator_address:address vault_address:address genesis_controller_address:address private_page_count:int257 public_page_count:int257 private_entry_count:int257 public_entry_count:int257 last_private_entry_id:int257 last_public_entry_id:int257 last_private_entry_uid:int257 last_public_entry_uid:int257 = CapsuleHubStateView
+;; TLB: _ sealed:bool vault_bound:bool deployment_manifest_hash:int257 private_latest_id:int257 public_latest_id:int257 accrued_plato_fee_ton:int257 fee_accumulator_address:address vault_address:address genesis_controller_address:address = CapsuleHubStateView
 ;;
 
-(int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int) $CapsuleHubStateView$_to_external(((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int)) v) inline {
-    var (v'sealed, v'vault_bound, v'deployment_manifest_hash, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'fee_accumulator_address, v'vault_address, v'genesis_controller_address, v'private_page_count, v'public_page_count, v'private_entry_count, v'public_entry_count, v'last_private_entry_id, v'last_public_entry_id, v'last_private_entry_uid, v'last_public_entry_uid) = v; 
-    return (v'sealed, v'vault_bound, v'deployment_manifest_hash, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'fee_accumulator_address, v'vault_address, v'genesis_controller_address, v'private_page_count, v'public_page_count, v'private_entry_count, v'public_entry_count, v'last_private_entry_id, v'last_public_entry_id, v'last_private_entry_uid, v'last_public_entry_uid);
+(int, int, int, int, int, int, slice, slice, slice) $CapsuleHubStateView$_to_external(((int, int, int, int, int, int, slice, slice, slice)) v) inline {
+    var (v'sealed, v'vault_bound, v'deployment_manifest_hash, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'fee_accumulator_address, v'vault_address, v'genesis_controller_address) = v; 
+    return (v'sealed, v'vault_bound, v'deployment_manifest_hash, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'fee_accumulator_address, v'vault_address, v'genesis_controller_address);
 }
 
-((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int)) $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_page_count_public_page_count_private_entry_count_public_entry_count_last_private_entry_id_last_public_entry_id_last_private_entry_uid_last_public_entry_uid(int $sealed, int $vault_bound, int $deployment_manifest_hash, int $private_latest_id, int $public_latest_id, int $accrued_plato_fee_ton, slice $fee_accumulator_address, slice $vault_address, slice $genesis_controller_address, int $private_page_count, int $public_page_count, int $private_entry_count, int $public_entry_count, int $last_private_entry_id, int $last_public_entry_id, int $last_private_entry_uid, int $last_public_entry_uid) inline {
-    return ($sealed, $vault_bound, $deployment_manifest_hash, $private_latest_id, $public_latest_id, $accrued_plato_fee_ton, $fee_accumulator_address, $vault_address, $genesis_controller_address, $private_page_count, $public_page_count, $private_entry_count, $public_entry_count, $last_private_entry_id, $last_public_entry_id, $last_private_entry_uid, $last_public_entry_uid);
+((int, int, int, int, int, int, slice, slice, slice)) $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address(int $sealed, int $vault_bound, int $deployment_manifest_hash, int $private_latest_id, int $public_latest_id, int $accrued_plato_fee_ton, slice $fee_accumulator_address, slice $vault_address, slice $genesis_controller_address) inline {
+    return ($sealed, $vault_bound, $deployment_manifest_hash, $private_latest_id, $public_latest_id, $accrued_plato_fee_ton, $fee_accumulator_address, $vault_address, $genesis_controller_address);
+}
+
+;;
+;; Type: PrivateCapsuleEntry
+;; TLB: _ entry_id:uint64 entry_uid:uint256 publish_id:uint256 author_wallet:address size_class:uint8 crypto_suite:uint8 header_0_hash:uint256 header_1_hash:uint256 body_hash:uint256 header_0:^cell header_1:^cell body:^cell created_at:uint32 = PrivateCapsuleEntry
+;;
+
+builder $PrivateCapsuleEntry$_store(builder build_0, (int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) v) inline_ref {
+    var (v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'header_0, v'header_1, v'body, v'created_at) = v;
+    build_0 = build_0.store_uint(v'entry_id, 64);
+    build_0 = build_0.store_uint(v'entry_uid, 256);
+    build_0 = build_0.store_uint(v'publish_id, 256);
+    build_0 = build_0.store_slice(v'author_wallet);
+    build_0 = build_0.store_uint(v'size_class, 8);
+    build_0 = build_0.store_uint(v'crypto_suite, 8);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'header_0_hash, 256);
+    build_1 = build_1.store_uint(v'header_1_hash, 256);
+    build_1 = build_1.store_uint(v'body_hash, 256);
+    build_1 = build_1.store_ref(v'header_0);
+    build_1 = build_1.store_ref(v'header_1);
+    build_1 = build_1.store_ref(v'body);
+    build_1 = build_1.store_uint(v'created_at, 32);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $PrivateCapsuleEntry$_store_cell((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) v, builder b) inline {
+    return $PrivateCapsuleEntry$_store(b, v).end_cell();
+}
+
+(slice, ((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int))) $PrivateCapsuleEntry$_load(slice sc_0) inline_ref {
+    var v'entry_id = sc_0~load_uint(64);
+    var v'entry_uid = sc_0~load_uint(256);
+    var v'publish_id = sc_0~load_uint(256);
+    var v'author_wallet = sc_0~load_msg_addr();
+    var v'size_class = sc_0~load_uint(8);
+    var v'crypto_suite = sc_0~load_uint(8);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'header_0_hash = sc_1~load_uint(256);
+    var v'header_1_hash = sc_1~load_uint(256);
+    var v'body_hash = sc_1~load_uint(256);
+    var v'header_0 = sc_1~load_ref();
+    var v'header_1 = sc_1~load_ref();
+    var v'body = sc_1~load_ref();
+    var v'created_at = sc_1~load_uint(32);
+    return (sc_0, (v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'header_0, v'header_1, v'body, v'created_at));
+}
+
+tuple $PrivateCapsuleEntry$_as_optional((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) v) inline {
+    var (v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'header_0, v'header_1, v'body, v'created_at) = v;
+    return __tact_tuple_create_13(v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'header_0, v'header_1, v'body, v'created_at);
+}
+
+tuple $PrivateCapsuleEntry$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $PrivateCapsuleEntry$_as_optional(sc~$PrivateCapsuleEntry$_load());
+}
+
+((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $PrivateCapsuleEntry$_not_null(tuple v) inline {
+    var (int vvv'entry_id, int vvv'entry_uid, int vvv'publish_id, slice vvv'author_wallet, int vvv'size_class, int vvv'crypto_suite, int vvv'header_0_hash, int vvv'header_1_hash, int vvv'body_hash, cell vvv'header_0, cell vvv'header_1, cell vvv'body, int vvv'created_at) = __tact_tuple_destroy_13(v);
+    return (vvv'entry_id, vvv'entry_uid, vvv'publish_id, vvv'author_wallet, vvv'size_class, vvv'crypto_suite, vvv'header_0_hash, vvv'header_1_hash, vvv'body_hash, vvv'header_0, vvv'header_1, vvv'body, vvv'created_at);
+}
+
+((int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $PrivateCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at(int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, cell $header_0, cell $header_1, cell $body, int $created_at) inline {
+    return ($entry_id, $entry_uid, $publish_id, $author_wallet, $size_class, $crypto_suite, $header_0_hash, $header_1_hash, $body_hash, $header_0, $header_1, $body, $created_at);
+}
+
+;;
+;; Type: PublicCapsuleEntry
+;; TLB: _ entry_id:uint64 entry_uid:uint256 publish_id:uint256 author_wallet:address header_hash:uint256 body_hash:uint256 header:^cell body:^cell created_at:uint32 = PublicCapsuleEntry
+;;
+
+builder $PublicCapsuleEntry$_store(builder build_0, (int, int, int, slice, int, int, cell, cell, int) v) inline {
+    var (v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'header_hash, v'body_hash, v'header, v'body, v'created_at) = v;
+    build_0 = build_0.store_uint(v'entry_id, 64);
+    build_0 = build_0.store_uint(v'entry_uid, 256);
+    build_0 = build_0.store_uint(v'publish_id, 256);
+    build_0 = build_0.store_slice(v'author_wallet);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'header_hash, 256);
+    build_1 = build_1.store_uint(v'body_hash, 256);
+    build_1 = build_1.store_ref(v'header);
+    build_1 = build_1.store_ref(v'body);
+    build_1 = build_1.store_uint(v'created_at, 32);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $PublicCapsuleEntry$_store_cell((int, int, int, slice, int, int, cell, cell, int) v, builder b) inline {
+    return $PublicCapsuleEntry$_store(b, v).end_cell();
+}
+
+(slice, ((int, int, int, slice, int, int, cell, cell, int))) $PublicCapsuleEntry$_load(slice sc_0) inline {
+    var v'entry_id = sc_0~load_uint(64);
+    var v'entry_uid = sc_0~load_uint(256);
+    var v'publish_id = sc_0~load_uint(256);
+    var v'author_wallet = sc_0~load_msg_addr();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'header_hash = sc_1~load_uint(256);
+    var v'body_hash = sc_1~load_uint(256);
+    var v'header = sc_1~load_ref();
+    var v'body = sc_1~load_ref();
+    var v'created_at = sc_1~load_uint(32);
+    return (sc_0, (v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'header_hash, v'body_hash, v'header, v'body, v'created_at));
+}
+
+tuple $PublicCapsuleEntry$_as_optional((int, int, int, slice, int, int, cell, cell, int) v) inline {
+    var (v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'header_hash, v'body_hash, v'header, v'body, v'created_at) = v;
+    return __tact_tuple_create_9(v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'header_hash, v'body_hash, v'header, v'body, v'created_at);
+}
+
+tuple $PublicCapsuleEntry$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $PublicCapsuleEntry$_as_optional(sc~$PublicCapsuleEntry$_load());
+}
+
+((int, int, int, slice, int, int, cell, cell, int)) $PublicCapsuleEntry$_not_null(tuple v) inline {
+    var (int vvv'entry_id, int vvv'entry_uid, int vvv'publish_id, slice vvv'author_wallet, int vvv'header_hash, int vvv'body_hash, cell vvv'header, cell vvv'body, int vvv'created_at) = __tact_tuple_destroy_9(v);
+    return (vvv'entry_id, vvv'entry_uid, vvv'publish_id, vvv'author_wallet, vvv'header_hash, vvv'body_hash, vvv'header, vvv'body, vvv'created_at);
+}
+
+((int, int, int, slice, int, int, cell, cell, int)) $PublicCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at(int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $header_hash, int $body_hash, cell $header, cell $body, int $created_at) inline {
+    return ($entry_id, $entry_uid, $publish_id, $author_wallet, $header_hash, $body_hash, $header, $body, $created_at);
+}
+
+;;
+;; Type: PrivateCapsuleEntryView
+;; TLB: _ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 author_wallet:address size_class:int257 crypto_suite:int257 header_0_hash:int257 header_1_hash:int257 body_hash:int257 header_0:^cell header_1:^cell body:^cell created_at:int257 = PrivateCapsuleEntryView
+;;
+
+(int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int) $PrivateCapsuleEntryView$_to_external(((int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) v) inline {
+    var (v'exists, v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'header_0, v'header_1, v'body, v'created_at) = v; 
+    return (v'exists, v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'size_class, v'crypto_suite, v'header_0_hash, v'header_1_hash, v'body_hash, v'header_0, v'header_1, v'body, v'created_at);
+}
+
+((int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $PrivateCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at(int $exists, int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $size_class, int $crypto_suite, int $header_0_hash, int $header_1_hash, int $body_hash, cell $header_0, cell $header_1, cell $body, int $created_at) inline {
+    return ($exists, $entry_id, $entry_uid, $publish_id, $author_wallet, $size_class, $crypto_suite, $header_0_hash, $header_1_hash, $body_hash, $header_0, $header_1, $body, $created_at);
+}
+
+;;
+;; Type: PublicCapsuleEntryView
+;; TLB: _ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 author_wallet:address header_hash:int257 body_hash:int257 header:^cell body:^cell created_at:int257 = PublicCapsuleEntryView
+;;
+
+(int, int, int, int, slice, int, int, cell, cell, int) $PublicCapsuleEntryView$_to_external(((int, int, int, int, slice, int, int, cell, cell, int)) v) inline {
+    var (v'exists, v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'header_hash, v'body_hash, v'header, v'body, v'created_at) = v; 
+    return (v'exists, v'entry_id, v'entry_uid, v'publish_id, v'author_wallet, v'header_hash, v'body_hash, v'header, v'body, v'created_at);
+}
+
+((int, int, int, int, slice, int, int, cell, cell, int)) $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at(int $exists, int $entry_id, int $entry_uid, int $publish_id, slice $author_wallet, int $header_hash, int $body_hash, cell $header, cell $body, int $created_at) inline {
+    return ($exists, $entry_id, $entry_uid, $publish_id, $author_wallet, $header_hash, $body_hash, $header, $body, $created_at);
 }
 
 ;;
 ;; Type: CapsuleHub
-;; TLB: _ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 accrued_plato_fee_ton:uint128 private_page_count:uint64 public_page_count:uint64 private_entry_count:uint64 public_entry_count:uint64 last_private_entry_id:uint64 last_public_entry_id:uint64 last_private_entry_uid:uint256 last_public_entry_uid:uint256 = CapsuleHub
+;; TLB: _ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<int, ^PrivateCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,header_0:^cell,header_1:^cell,body:^cell,created_at:uint32}> public_entries:dict<int, ^PublicCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,header_hash:uint256,body_hash:uint256,header:^cell,body:^cell,created_at:uint32}> = CapsuleHub
 ;;
 
-builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) v) inline {
-    var (v'fee_accumulator_address, v'vault_address, v'vault_bound, v'sealed, v'deployment_manifest_hash, v'genesis_controller_address, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'private_page_count, v'public_page_count, v'private_entry_count, v'public_entry_count, v'last_private_entry_id, v'last_public_entry_id, v'last_private_entry_uid, v'last_public_entry_uid) = v;
+builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice, int, int, int, cell, cell) v) inline {
+    var (v'fee_accumulator_address, v'vault_address, v'vault_bound, v'sealed, v'deployment_manifest_hash, v'genesis_controller_address, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'private_entries, v'public_entries) = v;
     build_0 = build_0.store_slice(v'fee_accumulator_address);
     build_0 = build_0.store_slice(v'vault_address);
     build_0 = build_0.store_int(v'vault_bound, 1);
@@ -260,21 +539,13 @@ builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice,
     build_1 = build_1.store_uint(v'private_latest_id, 64);
     build_1 = build_1.store_uint(v'public_latest_id, 64);
     build_1 = build_1.store_uint(v'accrued_plato_fee_ton, 128);
-    build_1 = build_1.store_uint(v'private_page_count, 64);
-    build_1 = build_1.store_uint(v'public_page_count, 64);
-    build_1 = build_1.store_uint(v'private_entry_count, 64);
-    build_1 = build_1.store_uint(v'public_entry_count, 64);
-    build_1 = build_1.store_uint(v'last_private_entry_id, 64);
-    build_1 = build_1.store_uint(v'last_public_entry_id, 64);
-    var build_2 = begin_cell();
-    build_2 = build_2.store_uint(v'last_private_entry_uid, 256);
-    build_2 = build_2.store_uint(v'last_public_entry_uid, 256);
-    build_1 = store_builder_ref(build_1, build_2);
+    build_1 = build_1.store_dict(v'private_entries);
+    build_1 = build_1.store_dict(v'public_entries);
     build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
-(slice, ((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int))) $CapsuleHub$_load(slice sc_0) inline {
+(slice, ((slice, slice, int, int, int, slice, int, int, int, cell, cell))) $CapsuleHub$_load(slice sc_0) inline {
     var v'fee_accumulator_address = sc_0~load_msg_addr();
     var v'vault_address = sc_0~load_msg_addr();
     var v'vault_bound = sc_0~load_int(1);
@@ -285,16 +556,9 @@ builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice,
     var v'private_latest_id = sc_1~load_uint(64);
     var v'public_latest_id = sc_1~load_uint(64);
     var v'accrued_plato_fee_ton = sc_1~load_uint(128);
-    var v'private_page_count = sc_1~load_uint(64);
-    var v'public_page_count = sc_1~load_uint(64);
-    var v'private_entry_count = sc_1~load_uint(64);
-    var v'public_entry_count = sc_1~load_uint(64);
-    var v'last_private_entry_id = sc_1~load_uint(64);
-    var v'last_public_entry_id = sc_1~load_uint(64);
-    slice sc_2 = sc_1~load_ref().begin_parse();
-    var v'last_private_entry_uid = sc_2~load_uint(256);
-    var v'last_public_entry_uid = sc_2~load_uint(256);
-    return (sc_0, (v'fee_accumulator_address, v'vault_address, v'vault_bound, v'sealed, v'deployment_manifest_hash, v'genesis_controller_address, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'private_page_count, v'public_page_count, v'private_entry_count, v'public_entry_count, v'last_private_entry_id, v'last_public_entry_id, v'last_private_entry_uid, v'last_public_entry_uid));
+    var v'private_entries = sc_1~load_dict();
+    var v'public_entries = sc_1~load_dict();
+    return (sc_0, (v'fee_accumulator_address, v'vault_address, v'vault_bound, v'sealed, v'deployment_manifest_hash, v'genesis_controller_address, v'private_latest_id, v'public_latest_id, v'accrued_plato_fee_ton, v'private_entries, v'public_entries));
 }
 
 (slice, ((slice, slice, int, int, int, slice))) $CapsuleHub$init$_load(slice sc_0) inline {
@@ -308,7 +572,7 @@ builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice,
     return (sc_0, (v'fee_accumulator_address, v'vault_address, v'vault_bound, v'sealed, v'deployment_manifest_hash, v'genesis_controller_address));
 }
 
-(slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $CapsuleHub$_contract_load() impure inline {
+(slice, slice, int, int, int, slice, int, int, int, cell, cell) $CapsuleHub$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
@@ -321,7 +585,7 @@ builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice,
     }
 }
 
-() $CapsuleHub$_contract_store((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) v) impure inline {
+() $CapsuleHub$_contract_store((slice, slice, int, int, int, slice, int, int, int, cell, cell) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $CapsuleHub$_store(b, v);
@@ -332,8 +596,8 @@ builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice,
 ;; Contract CapsuleHub functions
 ;;
 
-(slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $CapsuleHub$_contract_init(slice $fee_accumulator_address, slice $vault_address, int $vault_bound, int $sealed, int $deployment_manifest_hash, slice $genesis_controller_address) impure inline {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+(slice, slice, int, int, int, slice, int, int, int, cell, cell) $CapsuleHub$_contract_init(slice $fee_accumulator_address, slice $vault_address, int $vault_bound, int $sealed, int $deployment_manifest_hash, slice $genesis_controller_address) impure inline {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
     $self'fee_accumulator_address = $fee_accumulator_address;
     $self'vault_address = $vault_address;
     $self'vault_bound = $vault_bound;
@@ -343,115 +607,203 @@ builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice,
     $self'private_latest_id = 0;
     $self'public_latest_id = 0;
     $self'accrued_plato_fee_ton = 0;
-    $self'private_page_count = 0;
-    $self'public_page_count = 0;
-    $self'private_entry_count = 0;
-    $self'public_entry_count = 0;
-    $self'last_private_entry_id = 0;
-    $self'last_public_entry_id = 0;
-    $self'last_private_entry_uid = 0;
-    $self'last_public_entry_uid = 0;
-    return ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid);
+    $self'private_entries = null();
+    $self'public_entries = null();
+    return ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), ()) $CapsuleHub$_fun_requireSealed((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireSealed((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     throw_unless(12900, $self'sealed);
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), ());
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), ());
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), ()) $CapsuleHub$_fun_requireUnsealed((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireUnsealed((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     throw_unless(12901, (~ $self'sealed));
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), ());
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), ());
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), ()) $CapsuleHub$_fun_requireGenesisController((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireGenesisController((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     throw_unless(12930, ( equal_slices_bits(__tact_context_get_sender(), $self'genesis_controller_address) ));
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), ());
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), ());
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_privateFullFee((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $sizeClass) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateFullFee((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     if (($sizeClass == 1)) {
         var $fresh$ret_0 = 5000000;
-        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_0);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_0);
     }
     if (($sizeClass == 2)) {
         var $fresh$ret_1 = 10000000;
-        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_1);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_1);
     }
     var $fresh$ret_2 = 0;
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_2);
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_2);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_privateExecReserve((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $sizeClass) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateExecReserve((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     if (($sizeClass == 2)) {
         var $fresh$ret_3 = 4000000;
-        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_3);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_3);
     }
     var $fresh$ret_4 = 3000000;
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_4);
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_4);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_isAllowedPrivatePair((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $sizeClass, int $cryptoSuite) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_isAllowedPrivatePair((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass, int $cryptoSuite) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     if (( (($sizeClass == 1)) ? (($cryptoSuite == 1)) : (false) )) {
         var $fresh$ret_5 = true;
-        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_5);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_5);
     }
     if (( (($sizeClass == 2)) ? (($cryptoSuite == 2)) : (false) )) {
         var $fresh$ret_6 = true;
-        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_6);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_6);
     }
     var $fresh$ret_7 = false;
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_7);
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_7);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_needsNewPage((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
-    var $fresh$ret_8 = (($entryId % 256) == 0);
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_8);
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requireExactPayloadCell((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, cell $cell, int $expectedHash, int $expectedCells, int $expectedBits, int $expectedRefs, int $hashExit, int $sizeExit) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    throw_unless($hashExit, ($Cell$_fun_hash($cell) == $expectedHash));
+    try {
+        var ($size'cells, $size'bits, $size'refs) = $Cell$_fun_computeDataSize($cell, $expectedCells);
+        throw_unless($sizeExit, ($size'cells == $expectedCells));
+        throw_unless($sizeExit, ($size'bits == $expectedBits));
+        throw_unless($sizeExit, ($size'refs == $expectedRefs));
+    } catch (_, $exitCode) {
+        throw($sizeExit);
+    }
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), ());
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computePrivateEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, int $header0, int $header1, int $bodyHash) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requirePublicPayloadCell((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, cell $cell, int $expectedHash, int $hashExit, int $sizeExit) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    throw_unless($hashExit, ($Cell$_fun_hash($cell) == $expectedHash));
+    try {
+        var ($size'cells, $size'bits, $size'refs) = $Cell$_fun_computeDataSize($cell, 9);
+        throw_unless($sizeExit, ($size'cells <= 9));
+        throw_unless($sizeExit, ($size'bits > 0));
+        throw_unless($sizeExit, ($size'bits <= 8192));
+        throw_unless($sizeExit, ($size'refs <= 8));
+    } catch (_, $exitCode) {
+        throw($sizeExit);
+    }
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), ());
+}
+
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), ()) $CapsuleHub$_fun_requirePublicHeaderCell((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, cell $cell, int $expectedHash, int $hashExit, int $sizeExit) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    throw_unless($hashExit, ($Cell$_fun_hash($cell) == $expectedHash));
+    try {
+        var ($size'cells, $size'bits, $size'refs) = $Cell$_fun_computeDataSize($cell, 1);
+        throw_unless($sizeExit, ($size'cells <= 1));
+        throw_unless($sizeExit, ($size'bits > 0));
+        throw_unless($sizeExit, ($size'bits <= 576));
+        throw_unless($sizeExit, (($size'bits % 8) == 0));
+        throw_unless($sizeExit, ($size'refs <= 0));
+    } catch (_, $exitCode) {
+        throw($sizeExit);
+    }
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), ());
+}
+
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateBodyBits((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    if (($sizeClass == 2)) {
+        var $fresh$ret_8 = 17824;
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_8);
+    }
+    var $fresh$ret_9 = 9120;
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_9);
+}
+
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateBodyCells((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    if (($sizeClass == 2)) {
+        var $fresh$ret_10 = 18;
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_10);
+    }
+    var $fresh$ret_11 = 9;
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_11);
+}
+
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_privateBodyRefs((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $sizeClass) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    if (($sizeClass == 2)) {
+        var $fresh$ret_12 = 17;
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_12);
+    }
+    var $fresh$ret_13 = 8;
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_13);
+}
+
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_computeVaultPrivateEntryUid((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId, int $publishId, int $header0, int $header1, int $bodyHash) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
     cell $hashFields = $Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $header0, 256), $header1, 256), $bodyHash, 256));
-    var $fresh$ret_9 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($hashFields, store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 3508076801, 32), __tact_context_get_sender()), $entryId, 64), $global_now(), 32))));
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_9);
+    var $fresh$ret_14 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($hashFields, store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 3508077057, 32), $self'vault_address), $publishId, 256), $entryId, 64))));
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_14);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computePublicEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, slice $author, int $bodyHash) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
-    var $fresh$ret_10 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint($Builder$_fun_storeAddress(store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 3508076802, 32), __tact_context_get_sender()), $entryId, 64), $global_now(), 32), $author), $bodyHash, 256)));
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_10);
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), int) $CapsuleHub$_fun_computeVaultPublicEntryUid((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId, int $publishId, slice $author, int $headerHash, int $bodyHash) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    cell $payloadFields = $Builder$_fun_endCell(store_uint(store_uint($Builder$_fun_storeAddress($global_beginCell(), $author), $headerHash, 256), $bodyHash, 256));
+    var $fresh$ret_15 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($payloadFields, store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 3508077058, 32), $self'vault_address), $publishId, 256), $entryId, 64))));
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_15);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computeVaultPrivateEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, int $publishId, int $header0, int $header1, int $bodyHash) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
-    cell $hashFields = $Builder$_fun_endCell(store_uint(store_uint(store_uint($global_beginCell(), $header0, 256), $header1, 256), $bodyHash, 256));
-    var $fresh$ret_11 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($hashFields, store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 3508077057, 32), $self'vault_address), $publishId, 256), $entryId, 64))));
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_11);
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), (int, int, int, int, slice, int, int, int, int, int, cell, cell, cell, int)) $CapsuleHub$_fun_get_private_entry((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    tuple $entryOpt = $PrivateCapsuleEntry$_load_opt(__tact_dict_get_int_cell($self'private_entries, 257, $entryId));
+    if (null?($entryOpt)) {
+        var $fresh$ret_16 = $PrivateCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at(false, $entryId, 0, 0, $global_myAddress(), 0, 0, 0, 0, 0, $global_emptyCell(), $global_emptyCell(), $global_emptyCell(), 0);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_16);
+    }
+    var ($entry'entry_id, $entry'entry_uid, $entry'publish_id, $entry'author_wallet, $entry'size_class, $entry'crypto_suite, $entry'header_0_hash, $entry'header_1_hash, $entry'body_hash, $entry'header_0, $entry'header_1, $entry'body, $entry'created_at) = $PrivateCapsuleEntry$_not_null($entryOpt);
+    var $fresh$ret_17 = $PrivateCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at(true, $entry'entry_id, $entry'entry_uid, $entry'publish_id, $entry'author_wallet, $entry'size_class, $entry'crypto_suite, $entry'header_0_hash, $entry'header_1_hash, $entry'body_hash, $entry'header_0, $entry'header_1, $entry'body, $entry'created_at);
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_17);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), int) $CapsuleHub$_fun_computeVaultPublicEntryUid((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self, int $entryId, int $publishId, slice $author, int $bodyHash) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
-    cell $payloadFields = $Builder$_fun_endCell(store_uint($Builder$_fun_storeAddress($global_beginCell(), $author), $bodyHash, 256));
-    var $fresh$ret_12 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeRef($payloadFields, store_uint(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 3508077058, 32), $self'vault_address), $publishId, 256), $entryId, 64))));
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_12);
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), (int, int, int, int, slice, int, int, cell, cell, int)) $CapsuleHub$_fun_get_public_entry((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self, int $entryId) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    tuple $entryOpt = $PublicCapsuleEntry$_load_opt(__tact_dict_get_int_cell($self'public_entries, 257, $entryId));
+    if (null?($entryOpt)) {
+        var $fresh$ret_18 = $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at(false, $entryId, 0, 0, $global_myAddress(), 0, 0, $global_emptyCell(), $global_emptyCell(), 0);
+        return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_18);
+    }
+    var ($entry'entry_id, $entry'entry_uid, $entry'publish_id, $entry'author_wallet, $entry'header_hash, $entry'body_hash, $entry'header, $entry'body, $entry'created_at) = $PublicCapsuleEntry$_not_null($entryOpt);
+    var $fresh$ret_19 = $PublicCapsuleEntryView$_constructor_exists_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at(true, $entry'entry_id, $entry'entry_uid, $entry'publish_id, $entry'author_wallet, $entry'header_hash, $entry'body_hash, $entry'header, $entry'body, $entry'created_at);
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_19);
 }
 
-((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int), (int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int, int, int)) $CapsuleHub$_fun_get_state((slice, slice, int, int, int, slice, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
-    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)) = $self;
-    var $fresh$ret_13 = $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_page_count_public_page_count_private_entry_count_public_entry_count_last_private_entry_id_last_public_entry_id_last_private_entry_uid_last_public_entry_uid($self'sealed, $self'vault_bound, $self'deployment_manifest_hash, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'fee_accumulator_address, $self'vault_address, $self'genesis_controller_address, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid);
-    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid), $fresh$ret_13);
+((slice, slice, int, int, int, slice, int, int, int, cell, cell), (int, int, int, int, int, int, slice, slice, slice)) $CapsuleHub$_fun_get_state((slice, slice, int, int, int, slice, int, int, int, cell, cell) $self) impure inline_ref {
+    var (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)) = $self;
+    var $fresh$ret_20 = $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address($self'sealed, $self'vault_bound, $self'deployment_manifest_hash, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'fee_accumulator_address, $self'vault_address, $self'genesis_controller_address);
+    return (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries), $fresh$ret_20);
 }
 
 ;;
 ;; Get methods of a Contract CapsuleHub
 ;;
+
+_ %get_private_entry(int $entryId) method_id(101473) {
+    int $entryId = $entryId;
+    var self = $CapsuleHub$_contract_load();
+    var res = self~$CapsuleHub$_fun_get_private_entry($entryId);
+    return $PrivateCapsuleEntryView$_to_external(res);
+}
+
+_ %get_public_entry(int $entryId) method_id(65680) {
+    int $entryId = $entryId;
+    var self = $CapsuleHub$_contract_load();
+    var res = self~$CapsuleHub$_fun_get_public_entry($entryId);
+    return $PublicCapsuleEntryView$_to_external(res);
+}
 
 _ %get_state() method_id(86957) {
     var self = $CapsuleHub$_contract_load();
@@ -479,7 +831,7 @@ _ %get_state() method_id(86957) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid) = $CapsuleHub$_contract_load();
+    var ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries) = $CapsuleHub$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -492,11 +844,11 @@ _ %get_state() method_id(86957) {
         ;; Bounced handler for DepositProtocolFee message
         if (op == 0xff775609) {
             var ($msg'amount) = in_msg~$DepositProtocolFee$_load_bounced();
-            ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
+            ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireSealed();
             throw_unless(13203, ( equal_slices_bits(__tact_context_get_sender(), $self'fee_accumulator_address) ));
             throw_unless(13204, ($msg'amount > 0));
             $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton + $msg'amount;
-            $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+            $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
             return ();
         }
         
@@ -511,97 +863,28 @@ _ %get_state() method_id(86957) {
     if (op == 0x90e2e0cb) {
         var $msg'deployment_manifest_hash = in_msg~load_uint(256);
         var $msg'counterpart_address = in_msg~load_msg_addr();
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireUnsealed();
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireGenesisController();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireUnsealed();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireGenesisController();
         throw_unless(12910, (~ $self'vault_bound));
         throw_unless(12911, ($msg'deployment_manifest_hash != 0));
         throw_unless(12912, ( (($self'deployment_manifest_hash == 0)) ? (true) : (($self'deployment_manifest_hash == $msg'deployment_manifest_hash)) ));
         $self'deployment_manifest_hash = $msg'deployment_manifest_hash;
         $self'vault_address = $msg'counterpart_address;
         $self'vault_bound = true;
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     
     ;; Receive SealGenesis message
     if (op == 0x3a12d1ad) {
         var $msg'deployment_manifest_hash = in_msg~load_uint(256);
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireUnsealed();
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireGenesisController();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireUnsealed();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireGenesisController();
         throw_unless(12920, ($msg'deployment_manifest_hash != 0));
         throw_unless(12921, ($self'deployment_manifest_hash == $msg'deployment_manifest_hash));
         throw_unless(12922, $self'vault_bound);
         $self'sealed = true;
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
-        return ();
-    }
-    
-    ;; Receive PublishPrivateDirect message
-    if (op == 0x7a0ebfef) {
-        var $msg'size_class = in_msg~load_uint(8);
-        var $msg'crypto_suite = in_msg~load_uint(8);
-        var $msg'header_0_hash = in_msg~load_uint(256);
-        var $msg'header_1_hash = in_msg~load_uint(256);
-        var $msg'body_hash = in_msg~load_uint(256);
-        var $msg'protocol_fee_paid = in_msg~load_uint(128);
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
-        throw_unless(13000, ($self'private_latest_id < 18446744073709551615));
-        throw_unless(13001, ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_isAllowedPrivatePair($msg'size_class, $msg'crypto_suite));
-        throw_unless(13002, ($msg'header_0_hash != 0));
-        throw_unless(13003, ($msg'header_1_hash != 0));
-        throw_unless(13004, ($msg'body_hash != 0));
-        int $fee = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_privateFullFee($msg'size_class);
-        throw_unless(13005, ($fee > 0));
-        throw_unless(13006, ($msg'protocol_fee_paid == $fee));
-        int $entryId = $self'private_latest_id;
-        int $pageCharge = 0;
-        if (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_needsNewPage($entryId)) {
-            $pageCharge = 10000000;
-        }
-        int $required = (((($fee + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_privateExecReserve($msg'size_class)) + 1000000) + 4000000) + $pageCharge);
-        throw_unless(13007, ($Context$_get_value(__tact_context_get()) == $required));
-        int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_computePrivateEntryUid($entryId, $msg'header_0_hash, $msg'header_1_hash, $msg'body_hash);
-        $self'last_private_entry_id = $entryId;
-        $self'last_private_entry_uid = $uid;
-        $self'private_entry_count = $self'private_entry_count + 1;
-        if (($pageCharge > 0)) {
-            $self'private_page_count = $self'private_page_count + 1;
-        }
-        $self'private_latest_id = $self'private_latest_id + 1;
-        $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton + $msg'protocol_fee_paid;
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
-        return ();
-    }
-    
-    ;; Receive PublishPublicDirect message
-    if (op == 0xdd65eef9) {
-        var $msg'marketing_note = in_msg~load_uint(152);
-        var $msg'author_wallet = in_msg~load_msg_addr();
-        var $msg'body_hash = in_msg~load_uint(256);
-        var $msg'protocol_fee_paid = in_msg~load_uint(128);
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
-        throw_unless(13100, ($self'public_latest_id < 18446744073709551615));
-        throw_unless(13101, ( equal_slices_bits(__tact_context_get_sender(), $msg'author_wallet) ));
-        throw_unless(13105, ($msg'marketing_note == 2573421624129493433291659589718684717235138672));
-        throw_unless(13102, ($msg'body_hash != 0));
-        throw_unless(13103, ($msg'protocol_fee_paid == 5000000));
-        int $entryId = $self'public_latest_id;
-        int $pageCharge = 0;
-        if (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_needsNewPage($entryId)) {
-            $pageCharge = 10000000;
-        }
-        int $required = (12000000 + $pageCharge);
-        throw_unless(13104, ($Context$_get_value(__tact_context_get()) == $required));
-        int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_computePublicEntryUid($entryId, $msg'author_wallet, $msg'body_hash);
-        $self'last_public_entry_id = $entryId;
-        $self'last_public_entry_uid = $uid;
-        $self'public_entry_count = $self'public_entry_count + 1;
-        if (($pageCharge > 0)) {
-            $self'public_page_count = $self'public_page_count + 1;
-        }
-        $self'public_latest_id = $self'public_latest_id + 1;
-        $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton + $msg'protocol_fee_paid;
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     
@@ -615,37 +898,34 @@ _ %get_state() method_id(86957) {
         var $msg'header_1_hash = in_msg~load_uint(256);
         slice sc_1 = in_msg~load_ref().begin_parse();
         var $msg'body_hash = sc_1~load_uint(256);
+        var $msg'header_0 = sc_1~load_ref();
+        var $msg'header_1 = sc_1~load_ref();
+        var $msg'body = sc_1~load_ref();
         var $msg'protocol_fee_paid = sc_1~load_uint(128);
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireSealed();
         throw_unless(13300, ( equal_slices_bits(__tact_context_get_sender(), $self'vault_address) ));
         throw_unless(13301, ($self'private_latest_id < 18446744073709551615));
         throw_unless(13302, ($msg'publish_id != 0));
-        throw_unless(13303, ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_isAllowedPrivatePair($msg'size_class, $msg'crypto_suite));
+        throw_unless(13303, ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_isAllowedPrivatePair($msg'size_class, $msg'crypto_suite));
         throw_unless(13304, ($msg'header_0_hash != 0));
         throw_unless(13305, ($msg'header_1_hash != 0));
         throw_unless(13306, ($msg'body_hash != 0));
-        int $fullFee = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_privateFullFee($msg'size_class);
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireExactPayloadCell($msg'header_0, $msg'header_0_hash, 2, 1120, 1, 13311, 13312);
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireExactPayloadCell($msg'header_1, $msg'header_1_hash, 1, 240, 0, 13313, 13314);
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireExactPayloadCell($msg'body, $msg'body_hash, ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_privateBodyCells($msg'size_class), ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_privateBodyBits($msg'size_class), ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_privateBodyRefs($msg'size_class), 13315, 13316);
+        int $fullFee = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_privateFullFee($msg'size_class);
         throw_unless(13307, ($fullFee > 0));
         throw_unless(13308, ($msg'protocol_fee_paid >= 0));
         throw_unless(13309, ($msg'protocol_fee_paid <= $fullFee));
         int $entryId = $self'private_latest_id;
-        int $pageCharge = 0;
-        if (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_needsNewPage($entryId)) {
-            $pageCharge = 10000000;
-        }
-        int $required = ((((($msg'protocol_fee_paid + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_privateExecReserve($msg'size_class)) + 1000000) + 4000000) + $pageCharge) + 30000000);
+        int $required = (((($msg'protocol_fee_paid + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_privateExecReserve($msg'size_class)) + 1000000) + 4000000) + 30000000);
         throw_unless(13310, ($Context$_get_value(__tact_context_get()) >= $required));
-        int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_computeVaultPrivateEntryUid($entryId, $msg'publish_id, $msg'header_0_hash, $msg'header_1_hash, $msg'body_hash);
-        $self'last_private_entry_id = $entryId;
-        $self'last_private_entry_uid = $uid;
-        $self'private_entry_count = $self'private_entry_count + 1;
-        if (($pageCharge > 0)) {
-            $self'private_page_count = $self'private_page_count + 1;
-        }
+        int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_computeVaultPrivateEntryUid($entryId, $msg'publish_id, $msg'header_0_hash, $msg'header_1_hash, $msg'body_hash);
+        $self'private_entries~__tact_dict_set_int_cell(257, $entryId, $PrivateCapsuleEntry$_store_cell($PrivateCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_created_at($entryId, $uid, $msg'publish_id, $self'vault_address, $msg'size_class, $msg'crypto_suite, $msg'header_0_hash, $msg'header_1_hash, $msg'body_hash, $msg'header_0, $msg'header_1, $msg'body, $global_now()), begin_cell()));
         $self'private_latest_id = $self'private_latest_id + 1;
         $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton + $msg'protocol_fee_paid;
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'vault_address, ($Context$_get_value(__tact_context_get()) - ($required - 30000000)), false, 0, $CapsuleHubPublishAck$_store_cell($CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid($msg'publish_id, $entryId, $uid), begin_cell())));
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'vault_address, 30000000, false, 1, $CapsuleHubPublishAck$_store_cell($CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid($msg'publish_id, $entryId, $uid), begin_cell())));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     
@@ -656,62 +936,59 @@ _ %get_state() method_id(86957) {
         var $msg'marketing_note = in_msg~load_uint(152);
         var $msg'author_wallet = in_msg~load_msg_addr();
         slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'header_hash = sc_1~load_uint(256);
         var $msg'body_hash = sc_1~load_uint(256);
+        var $msg'header = sc_1~load_ref();
+        var $msg'body = sc_1~load_ref();
         var $msg'protocol_fee_paid = sc_1~load_uint(128);
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireSealed();
         throw_unless(13400, ( equal_slices_bits(__tact_context_get_sender(), $self'vault_address) ));
         throw_unless(13401, ($self'public_latest_id < 18446744073709551615));
         throw_unless(13402, ($msg'publish_id != 0));
         throw_unless(13407, ($msg'marketing_note == 2573421624129493433291659589718684717235138672));
+        throw_unless(13410, ($msg'header_hash != 0));
         throw_unless(13403, ($msg'body_hash != 0));
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requirePublicHeaderCell($msg'header, $msg'header_hash, 13411, 13412);
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requirePublicPayloadCell($msg'body, $msg'body_hash, 13408, 13409);
         throw_unless(13404, ($msg'protocol_fee_paid >= 0));
         throw_unless(13405, ($msg'protocol_fee_paid <= 5000000));
         int $entryId = $self'public_latest_id;
-        int $pageCharge = 0;
-        if (($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_needsNewPage($entryId)) {
-            $pageCharge = 10000000;
-        }
-        int $required = ((((($msg'protocol_fee_paid + 3000000) + 1000000) + 3000000) + $pageCharge) + 30000000);
+        int $required = (((($msg'protocol_fee_paid + 3000000) + 1000000) + 1000000) + 30000000);
         throw_unless(13406, ($Context$_get_value(__tact_context_get()) >= $required));
-        int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_computeVaultPublicEntryUid($entryId, $msg'publish_id, $msg'author_wallet, $msg'body_hash);
-        $self'last_public_entry_id = $entryId;
-        $self'last_public_entry_uid = $uid;
-        $self'public_entry_count = $self'public_entry_count + 1;
-        if (($pageCharge > 0)) {
-            $self'public_page_count = $self'public_page_count + 1;
-        }
+        int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_computeVaultPublicEntryUid($entryId, $msg'publish_id, $msg'author_wallet, $msg'header_hash, $msg'body_hash);
+        $self'public_entries~__tact_dict_set_int_cell(257, $entryId, $PublicCapsuleEntry$_store_cell($PublicCapsuleEntry$_constructor_entry_id_entry_uid_publish_id_author_wallet_header_hash_body_hash_header_body_created_at($entryId, $uid, $msg'publish_id, $msg'author_wallet, $msg'header_hash, $msg'body_hash, $msg'header, $msg'body, $global_now()), begin_cell()));
         $self'public_latest_id = $self'public_latest_id + 1;
         $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton + $msg'protocol_fee_paid;
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'vault_address, ($Context$_get_value(__tact_context_get()) - ($required - 30000000)), false, 0, $CapsuleHubPublishAck$_store_cell($CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid($msg'publish_id, $entryId, $uid), begin_cell())));
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'vault_address, 30000000, false, 1, $CapsuleHubPublishAck$_store_cell($CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid($msg'publish_id, $entryId, $uid), begin_cell())));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     
     ;; Receive FlushFees message
     if (op == 0x7a861031) {
         var $msg'amount = in_msg~load_uint(128);
-        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid)~$CapsuleHub$_fun_requireSealed();
+        ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries)~$CapsuleHub$_fun_requireSealed();
         throw_unless(13200, ($msg'amount > 0));
         throw_unless(13201, ($msg'amount <= $self'accrued_plato_fee_ton));
         throw_unless(13205, ( (($msg'amount >= 5000000)) ? (true) : (($msg'amount == $self'accrued_plato_fee_ton)) ));
         throw_unless(13202, ($Context$_get_value(__tact_context_get()) >= 4000000));
         $self'accrued_plato_fee_ton = $self'accrued_plato_fee_ton - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'fee_accumulator_address, ($msg'amount + 2000000), true, 1, $DepositProtocolFee$_store_cell($DepositProtocolFee$_constructor_amount($msg'amount), begin_cell())));
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     
     ;; Receive TopUpStorageReserve message
     if (op == 0x5331b880) {
         var $msg = empty_tuple();
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(13999);
-        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_page_count, $self'public_page_count, $self'private_entry_count, $self'public_entry_count, $self'last_private_entry_id, $self'last_public_entry_id, $self'last_private_entry_uid, $self'last_public_entry_uid));
+        $CapsuleHub$_contract_store(($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries));
         return ();
     }
     ;; Throw if not handled

@@ -6,6 +6,7 @@ import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { BuybackBurn } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+import { ProfileRegistry } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { Vault } from '../build/Vault/Vault_Vault';
@@ -39,6 +40,7 @@ export type ImplementedSubsetInits = {
   capsuleHub: Awaited<ReturnType<typeof CapsuleHub.init>>;
   feeAccumulator: Awaited<ReturnType<typeof FeeAccumulator.init>>;
   usernameRegistry: Awaited<ReturnType<typeof UsernameRegistry.init>>;
+  profileRegistry: Awaited<ReturnType<typeof ProfileRegistry.init>>;
 };
 
 export type ImplementedSubsetBuild = {
@@ -52,9 +54,11 @@ export type ImplementedSubsetBuild = {
     capsuleHubAddress: Address;
     feeAccumulatorAddress: Address;
     usernameRegistryAddress: Address;
+    profileRegistryAddress: Address;
     buybackBurnOfficialAthWalletAddress: Address;
     vaultOfficialAthWalletAddress: Address;
     usernameRegistryOfficialAthWalletAddress: Address;
+    profileRegistryOfficialAthWalletAddress: Address;
   };
 };
 
@@ -163,10 +167,12 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   const athTreasuryOwner = fixtureAddress('ATH_TREASURY_OWNER');
   const tonTreasuryReceiver = fixtureAddress('TON_TREASURY_RECEIVER');
   const treasuryAthReceiver = fixtureAddress('TREASURY_ATH_RECEIVER');
+  const profileTreasuryAthReceiver = fixtureAddress('PROFILE_TREASURY_ATH_RECEIVER');
 
   const vaultCapsulePlaceholder = fixtureAddress('VAULT_CAPSULEHUB_PLACEHOLDER');
   const capsuleVaultPlaceholder = fixtureAddress('CAPSULEHUB_VAULT_PLACEHOLDER');
   const usernameAthPlaceholder = fixtureAddress('USERNAME_REGISTRY_ATH_WALLET_PLACEHOLDER');
+  const profileAthPlaceholder = fixtureAddress('PROFILE_REGISTRY_ATH_WALLET_PLACEHOLDER');
   const genesisController = fixtureAddress('GENESIS_CONTROLLER_ONE_SHOT');
 
   const athMaster = await ATHMaster.init(athTreasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
@@ -187,11 +193,17 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   const usernameRegistry = await UsernameRegistry.init(usernameAthPlaceholder, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, genesisController);
   const usernameRegistryAddress = contractAddress(0, usernameRegistry);
 
+  const profileRegistry = await ProfileRegistry.init(profileAthPlaceholder, athMasterAddress, profileTreasuryAthReceiver, false, 0n, 0n, genesisController);
+  const profileRegistryAddress = contractAddress(0, profileRegistry);
+
   const vaultOfficialAthWallet = await ATHWallet.init(0n, vaultAddress, athMasterAddress);
   const vaultOfficialAthWalletAddress = contractAddress(vaultAddress.workChain, vaultOfficialAthWallet);
 
   const usernameRegistryOfficialAthWallet = await ATHWallet.init(0n, usernameRegistryAddress, athMasterAddress);
   const usernameRegistryOfficialAthWalletAddress = contractAddress(usernameRegistryAddress.workChain, usernameRegistryOfficialAthWallet);
+
+  const profileRegistryOfficialAthWallet = await ATHWallet.init(0n, profileRegistryAddress, athMasterAddress);
+  const profileRegistryOfficialAthWalletAddress = contractAddress(profileRegistryAddress.workChain, profileRegistryOfficialAthWallet);
 
   const buybackBurnOfficialAthWallet = await ATHWallet.init(0n, buybackBurnAddress, athMasterAddress);
   const buybackBurnOfficialAthWalletAddress = contractAddress(buybackBurnAddress.workChain, buybackBurnOfficialAthWallet);
@@ -207,6 +219,10 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     fee_accumulator: feeAccumulatorAddress.toString(),
     fee_accumulator_buyback_burn: buybackBurnAddress.toString(),
     fee_accumulator_ton_treasury_receiver: tonTreasuryReceiver.toString(),
+    profile_registry: profileRegistryAddress.toString(),
+    profile_registry_initial_ath_wallet_placeholder: profileAthPlaceholder.toString(),
+    profile_registry_official_ath_wallet: profileRegistryOfficialAthWalletAddress.toString(),
+    profile_registry_treasury_ath_receiver: profileTreasuryAthReceiver.toString(),
     treasury_ath_receiver: treasuryAthReceiver.toString(),
     username_registry: usernameRegistryAddress.toString(),
     username_registry_initial_ath_wallet_placeholder: usernameAthPlaceholder.toString(),
@@ -226,6 +242,7 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     buyback_burn: codeHash('build/BuybackBurn/BuybackBurn_BuybackBurn.code.boc'),
     capsulehub: codeHash('build/CapsuleHub/CapsuleHub_CapsuleHub.code.boc'),
     fee_accumulator: codeHash('build/FeeAccumulator/FeeAccumulator_FeeAccumulator.code.boc'),
+    profile_registry: codeHash('build/ProfileRegistry/ProfileRegistry_ProfileRegistry.code.boc'),
     username_nft_item: codeHash('build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem.code.boc'),
     username_registry: codeHash('build/UsernameRegistry/UsernameRegistry_UsernameRegistry.code.boc'),
     vault: codeHash('build/Vault/Vault_Vault.code.boc'),
@@ -237,6 +254,8 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     buyback_burn_official_ath_wallet: stateInitHash(buybackBurnOfficialAthWallet),
     capsulehub_initial: stateInitHash(capsuleHub),
     fee_accumulator: stateInitHash(feeAccumulator),
+    profile_registry_initial: stateInitHash(profileRegistry),
+    profile_registry_official_ath_wallet: stateInitHash(profileRegistryOfficialAthWallet),
     username_registry_initial: stateInitHash(usernameRegistry),
     username_registry_official_ath_wallet: stateInitHash(usernameRegistryOfficialAthWallet),
     vault_initial: stateInitHash(vault),
@@ -247,6 +266,8 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     ath_total_supply_atomic: '100000000000000000',
     buyback_offer_amount_nanotons: '50000000000',
     buyback_funding_envelope_nanotons: '51050000000',
+    profile_avatar_price_ath_atomic: '100000000000',
+    profile_avatar_max_parts: '16',
     username_pending_mint_stale_ttl_seconds: '86400',
     username_item_ack_forward_reserve_nanotons: '3000000',
     vault_pending_publish_stale_ttl_seconds: '86400',
@@ -282,7 +303,7 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   return {
     manifest,
     manifestCell,
-    inits: { athMaster, buybackBurn, vault, capsuleHub, feeAccumulator, usernameRegistry },
+    inits: { athMaster, buybackBurn, vault, capsuleHub, feeAccumulator, usernameRegistry, profileRegistry },
     parsed: {
       athMasterAddress,
       buybackBurnAddress,
@@ -290,9 +311,11 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
       capsuleHubAddress,
       feeAccumulatorAddress,
       usernameRegistryAddress,
+      profileRegistryAddress,
       buybackBurnOfficialAthWalletAddress,
       vaultOfficialAthWalletAddress,
       usernameRegistryOfficialAthWalletAddress,
+      profileRegistryOfficialAthWalletAddress,
     },
   };
 }

@@ -9,12 +9,12 @@ const checks = [
     id: 'PWA_LOCAL_WALLET_PROOF',
     file: 'web/app.js',
     pattern: /createLocalWalletProofKeyPair|testnet:local-wallet-preview|local-preview/,
-    message: 'PWA still uses local wallet-proof preview data instead of TON Connect proof.',
+    message: 'PWA still uses removed preview wallet data.',
   },
   {
     id: 'CRYPTO_PROD_REMAINING_WORK',
     file: 'web/CRYPTO_PROTOCOL.md',
-    pattern: /Before production private messaging|TON Connect integration|external cryptographic review/,
+    pattern: /Before production private messaging|external cryptographic review/,
     message: 'Crypto protocol still documents production blockers.',
   },
   {

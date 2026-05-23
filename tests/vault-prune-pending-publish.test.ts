@@ -11,6 +11,11 @@ import {
   PrunePendingPublish,
   CapsuleHubPublishAck,
 } from '../build/Vault/Vault_Vault';
+import {
+  finalPrivateBodyCell,
+  finalPrivateHeader0Cell,
+  finalPrivateHeader1Cell,
+} from './helpers/capsule-cells';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MAGIC = 0x504c5352n;
@@ -19,10 +24,14 @@ const OP_PRIVATE = 0x686694C6n;
 const KIND_PRIVATE = 1n;
 const SIZE_STANDARD = 1n;
 const SUITE_CLASSICAL = 1n;
-const BODY_HASH = 0x1111000000000000000000000000000000000000000000000000000000000001n;
-const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
-const HEADER1 = 0x3333000000000000000000000000000000000000000000000000000000000003n;
+const BODY_CELL = finalPrivateBodyCell();
+const HEADER0_CELL = finalPrivateHeader0Cell();
+const HEADER1_CELL = finalPrivateHeader1Cell();
+const BODY_HASH = cellHashToBigInt(BODY_CELL);
+const HEADER0 = cellHashToBigInt(HEADER0_CELL);
+const HEADER1 = cellHashToBigInt(HEADER1_CELL);
 const VAULT_PENDING_PUBLISH_STALE_TTL = 86_400;
+const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH = 10_000_000_000n;
 const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -115,6 +124,7 @@ async function buildExternalRequest(params: {
   const signature = sign(bigintToBuffer(sigHash), params.secretKey);
   const hashesRef = beginCell().storeUint(BODY_HASH, 256).storeUint(HEADER0, 256).storeUint(HEADER1, 256).endCell();
   const signatureRef = beginCell().storeBuffer(signature).endCell();
+  const payloadRef = beginCell().storeRef(HEADER0_CELL).storeRef(HEADER1_CELL).storeRef(BODY_CELL).endCell();
   return beginCell()
     .storeUint(MAGIC, 32)
     .storeUint(VERSION, 8)
@@ -129,6 +139,7 @@ async function buildExternalRequest(params: {
     .storeUint(params.maxCharge, 128)
     .storeRef(hashesRef)
     .storeRef(signatureRef)
+    .storeRef(payloadRef)
     .endCell()
     .beginParse();
 }
@@ -156,7 +167,7 @@ async function createPendingPublish(seedByte: number) {
 }
 
 describe('Vault milestone 14: stale PendingPublish prune', () => {
-  it('VAULT-M14-01: stale PendingPublish can be pruned without refunding debited Message Budget; late ACK is rejected', async () => {
+  it('VAULT-M14-01: stale PendingPublish prune keeps tombstone so late ACK refunds capped value', async () => {
     const ctx = await createPendingPublish(81);
     const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
     const beforePruneGlobal = await ctx.vault.getGetGlobal();
@@ -194,10 +205,11 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
     const afterLateAckUser = await ctx.vault.getGetUser(ctx.user.address);
     const afterLateAckGlobal = await ctx.vault.getGetGlobal();
     expect(afterLateAckGlobal.pending_publish_count).toBe(0n);
-    expect(afterLateAckUser.message_budget_ton).toBe(afterPendingUser.message_budget_ton);
-    expect(afterLateAckUser.ath_balance).toBe(afterPendingUser.ath_balance);
-    expect(afterLateAckGlobal.airdrop_remaining_ath).toBe(beforePruneGlobal.airdrop_remaining_ath);
-    expect(afterLateAckGlobal.airdrop_distributed_ath).toBe(beforePruneGlobal.airdrop_distributed_ath);
+    expect(afterLateAckUser.message_budget_ton).toBeGreaterThan(afterPendingUser.message_budget_ton);
+    expect(afterLateAckUser.message_budget_ton).toBeLessThanOrEqual(afterPendingUser.message_budget_ton + toNano('0.01'));
+    expect(afterLateAckUser.ath_balance).toBe(afterPendingUser.ath_balance + VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH);
+    expect(afterLateAckGlobal.airdrop_remaining_ath).toBe(beforePruneGlobal.airdrop_remaining_ath - VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH);
+    expect(afterLateAckGlobal.airdrop_distributed_ath).toBe(beforePruneGlobal.airdrop_distributed_ath + VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH);
   });
 
   it('VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending', async () => {

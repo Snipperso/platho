@@ -33,9 +33,7 @@
   "license": "UNLICENSED",
   "description": "No-backend encrypted messenger PWA and TON smart-contract suite",
   "dependencies": {
-    "@noble/post-quantum": "^0.6.1",
-    "@tonconnect/ui": "^2.4.4",
-    "qrcode-generator": "^1.4.4"
+    "@noble/post-quantum": "^0.6.1"
   },
   "devDependencies": {
     "@ston-fi/api": "0.32.0",

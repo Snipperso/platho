@@ -4,14 +4,13 @@ This file is the production freeze checklist. If any hard blocker below is still
 
 ## Hard blockers
 
-- Keep unsupported or non-standard TON wallet contracts fail-closed unless an on-chain `get_public_key` fallback is added.
-- Replace preview wallet labels with real wallet and Vault-derived data.
+- Replace preview wallet labels with real embedded Platho wallet and Vault-derived data.
 - Configure `web/vault-ton-rpc-provider.mjs` with the production Vault address and TON RPC endpoint/API policy before trusting a messaging bundle.
 - Switch `web/platho-config.mjs` to `mode: 'production'`, `network.chain: 'mainnet'`, and a static Vault provider module before creating the public production bundle.
 - Keep testnet and mainnet configuration separated. Production deploys must not read `.env.testnet.local`.
 - After deploying ATHMaster, execute the one-shot `DeployTreasurySupply` message from the final treasury owner and verify the official treasury ATH wallet balance equals the fixed total supply.
 - Before sealing or publishing a production Vault genesis package, derive the official Vault ATH wallet from the final Vault StateInit and archive proof that it is funded with the full activity-airdrop allocation.
-- Keep visible network labels, TonConnect manifest policy, and preview fixtures controlled through `web/platho-config.mjs`.
+- Keep visible network labels, embedded wallet policy, and preview fixtures controlled through `web/platho-config.mjs`.
 - Preserve the full-size M20T testnet harness evidence before changing any BuybackBurn readiness flag; M20T evidence alone is not a production unlock.
 - Derive final mainnet BuybackBurn and official ATH wallet addresses from the production `BuybackBurn` StateInit. The M20T harness must never be selected as production BuybackBurn.
 - Complete M20F mainnet STON.fi route freeze evidence before enabling production BuybackBurn. M20F must use STON.fi mainnet API simulation and official SDK/API transaction parameters, not hardcoded testnet route data.
@@ -40,10 +39,9 @@ npm.cmd run web:deploy:prepare:prod
 
 ## Current intentional non-prod markers
 
-- `web/app.js` wires TonConnect UI, requests the generated proof payload, verifies standard wallet `walletStateInit`, and has a fail-closed Vault chain binding bridge. `web/vault-ton-rpc-provider.mjs` provides the static TON RPC provider skeleton; production still needs real Vault address, RPC endpoint/API policy, and mainnet config.
-- The PWA now has no-backend public-key and encrypted-capsule package exchange. Production still needs final peer/key UX and operator review, but this path does not require a Platho server.
-- QR/share UX is implemented for transport packages. Production should still decide the final peer verification ceremony and how users compare key fingerprints before first trust.
-- Local message history is encrypted at rest with a device-local WebCrypto key. Production still needs backup/recovery UX so users understand that clearing browser storage destroys local history.
+- `web/app.js` uses an embedded Platho wallet seed as the single user secret, derives wallet and messaging keys from that seed, and has a fail-closed Vault chain binding bridge. `web/vault-ton-rpc-provider.mjs` provides the static TON RPC provider skeleton; production still needs real Vault address, RPC endpoint/API policy, and mainnet config.
+- The PWA now anchors public messaging keys in Vault records and publishes private messages through CapsuleHub payload cells. Manual public-bundle / capsule package exchange is removed from the production UI.
+- Local message history is encrypted at rest with a device-local WebCrypto key. The profile UI exports/imports only the Platho wallet seed; messaging keys are deterministically derived from that seed and are not backed up separately.
 - `web/platho-config.mjs` is currently in `preview` mode and points the UI at testnet preview data.
 - `.env.testnet.local` exists for faucet/testnet work.
 - Full-size M20T testnet harness probe is complete: see `artifacts/m20t_testnet_evidence.json` and `artifacts/M20T_TESTNET_EVIDENCE.md`.

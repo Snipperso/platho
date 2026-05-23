@@ -246,8 +246,6 @@ describe('Vault ATH accounting invariants', () => {
   it('VAULT-INV-ATH-02: ATH receive intent claim and cancel preserve total internal ATH and official backing', async () => {
     const { blockchain, vault, users, userAthWallets, officialVaultAthWallet } = await setup(2);
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
-    const now = blockchain.now ?? 0;
-
     await depositAth({ vault, user: users[0], userAthWallet: userAthWallets[0], amount: 1_200n, queryId: 501n });
     await depositAth({ vault, user: users[1], userAthWallet: userAthWallets[1], amount: 300n, queryId: 502n });
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_500n);
@@ -261,7 +259,6 @@ describe('Vault ATH accounting invariants', () => {
       amount: 500n,
       recipient_wallet: users[1].address,
       commitment: claimCommitment,
-      expires_at: BigInt(now + 1000),
       client_nonce: 1n,
     } as CreateReceiveIntent);
     expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
@@ -285,7 +282,6 @@ describe('Vault ATH accounting invariants', () => {
       amount: 250n,
       recipient_wallet: users[1].address,
       commitment: cancelCommitment,
-      expires_at: BigInt(now + 1000),
       client_nonce: 2n,
     } as CreateReceiveIntent);
     expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(450n);

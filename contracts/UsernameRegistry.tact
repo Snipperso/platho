@@ -529,7 +529,12 @@ contract UsernameRegistry {
         throwUnless(19141, pendingOpt != null);
 
         let cleared: PendingUsernameMint = self.clearPendingMint(nameFromItem!!);
+        let retainedValue: Int = USERNAME_STATE_GROWTH_EXEC_RESERVE;
+        if (!self.ath_refunds_due.exists(cleared.owner_wallet)) {
+            retainedValue += USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT;
+        }
         self.addRefundDue(cleared.owner_wallet, cleared.price_paid);
+        self.refundRejectedMintExcess(cleared.owner_wallet, retainedValue);
     }
 
     receive(msg: FlushTreasuryAthDue) {

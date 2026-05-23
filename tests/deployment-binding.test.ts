@@ -4,7 +4,7 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { Vault, BindDeploymentManifest as VaultBind, BindOfficialAthWallet as VaultBindAth, SealGenesis as VaultSeal, DepositTon } from '../build/Vault/Vault_Vault';
-import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal, PublishPublicDirect } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 

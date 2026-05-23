@@ -18,15 +18,23 @@
       "username_registry": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
       "username_registry_official_ath_wallet": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
       "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS",
+      "profile_registry": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
+      "profile_registry_official_ath_wallet": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "profile_registry_treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS",
       "stonfi_pool_address_ton_ath": "REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS"
     },
     "code_hashes": {
       "ath_master": "required: current ATHMaster code hash",
+      "ath_wallet": "required: current ATHWallet code hash",
       "vault": "required: current Vault code hash",
       "capsulehub": "required: current CapsuleHub code hash",
       "username_registry": "required: current UsernameRegistry code hash",
+      "profile_registry": "required: current ProfileRegistry code hash",
       "buyback_burn": "required: current BuybackBurn code hash",
       "fee_accumulator": "required: current FeeAccumulator code hash"
+    },
+    "constants": {
+      "vault_activity_airdrop_total_atomic": "required: decimal atomic ATH amount"
     },
     "blockers_before_final_genesis": []
   },
@@ -46,6 +54,13 @@
       "vault_ath_wallet_address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS"
     },
+    "vault_official_ath_wallet": {
+      "address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "required: decimal ATH balance from get_wallet_data"
+    },
     "capsulehub": {
       "address": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
       "code_hash": "required: current contract code hash",
@@ -62,6 +77,15 @@
       "official_ath_wallet_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS"
+    },
+    "profile_registry": {
+      "address": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
+      "code_hash": "required: current contract code hash",
+      "sealed": true,
+      "deployment_manifest_hash": "required: final manifest hash",
+      "official_ath_wallet_address": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS"
     },
     "buyback_burn": {
       "address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",

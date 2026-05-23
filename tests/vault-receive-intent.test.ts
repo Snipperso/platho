@@ -51,7 +51,7 @@ async function computeIntent(vault: any, sender: any, recipient: any, amount: bi
   return { intentId, commitment, clientNonce, secret };
 }
 
-async function createTonIntent(vault: any, sender: any, recipient: any, amount: bigint, expiresAt: number, clientNonce = 1n, secret = 0x1234n) {
+async function createTonIntent(vault: any, sender: any, recipient: any, amount: bigint, clientNonce = 1n, secret = 0x1234n) {
   const { intentId, commitment } = await computeIntent(vault, sender, recipient, amount, clientNonce, secret);
   await vault.send(sender.getSender(), { value: toNano('0.1') }, {
     $$type: 'CreateReceiveIntent',
@@ -59,7 +59,6 @@ async function createTonIntent(vault: any, sender: any, recipient: any, amount: 
     amount,
     recipient_wallet: recipient.address,
     commitment,
-    expires_at: BigInt(expiresAt),
     client_nonce: clientNonce,
   } as CreateReceiveIntent);
   return { intentId, commitment, secret };
@@ -71,7 +70,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     await deposit(vault, sender, toNano('2'));
 
     const amount = toNano('0.7');
-    const { intentId, secret } = await createTonIntent(vault, sender, recipient, amount, (blockchain.now ?? 0) + 1000);
+    const { intentId, secret } = await createTonIntent(vault, sender, recipient, amount);
 
     let senderState = await vault.getGetUser(sender.address);
     let recipientState = await vault.getGetUser(recipient.address);
@@ -103,7 +102,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     await deposit(vault, sender, toNano('1'));
 
     const amount = toNano('0.4');
-    const { intentId } = await createTonIntent(vault, sender, recipient, amount, (blockchain.now ?? 0) + 1000);
+    const { intentId } = await createTonIntent(vault, sender, recipient, amount);
     expect((await vault.getGetUser(sender.address)).ton_balance).toBe(toNano('0.6'));
 
     await vault.send(sender.getSender(), { value: toNano('0.05') }, {
@@ -121,7 +120,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     await deposit(vault, sender, toNano('1'));
 
     const amount = toNano('0.3');
-    const { intentId } = await createTonIntent(vault, sender, recipient, amount, (blockchain.now ?? 0) + 1000, 2n, 0x9999n);
+    const { intentId } = await createTonIntent(vault, sender, recipient, amount, 2n, 0x9999n);
 
     await vault.send(attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'ClaimReceiveIntent',
@@ -145,7 +144,6 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     await deposit(vault, sender, toNano('1'));
 
     const amount = toNano('0.2');
-    const expires = (blockchain.now ?? 0) + 1000;
     const { intentId, commitment } = await computeIntent(vault, sender, recipient, amount, 7n, 0x7777n);
 
     await vault.send(sender.getSender(), { value: toNano('0.1') }, {
@@ -154,7 +152,6 @@ describe('Vault milestone 3: ReceiveIntent', () => {
       amount,
       recipient_wallet: recipient.address,
       commitment,
-      expires_at: BigInt(expires),
       client_nonce: 7n,
     } as CreateReceiveIntent);
 
@@ -164,7 +161,6 @@ describe('Vault milestone 3: ReceiveIntent', () => {
       amount,
       recipient_wallet: recipient.address,
       commitment,
-      expires_at: BigInt(expires),
       client_nonce: 7n,
     } as CreateReceiveIntent);
 
@@ -180,7 +176,6 @@ describe('Vault milestone 3: ReceiveIntent', () => {
       amount: tooMuch,
       recipient_wallet: recipient.address,
       commitment: bad.commitment,
-      expires_at: BigInt(expires),
       client_nonce: 8n,
     } as CreateReceiveIntent);
 
@@ -188,29 +183,22 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     expect((await vault.getGetUser(sender.address)).ton_balance).toBe(toNano('0.8'));
   });
 
-  it('VAULT-REJECT: expired intent cannot be claimed but sender can cancel after expiry', async () => {
+  it('VAULT-HAPPY: payment check has no expiry and can be claimed later', async () => {
     const { vault, sender, recipient, blockchain } = await setup();
     const now = blockchain.now ?? 0;
     await deposit(vault, sender, toNano('1'));
 
     const amount = toNano('0.3');
-    const { intentId, secret } = await createTonIntent(vault, sender, recipient, amount, now + 100, 9n, 0x9999n);
-    blockchain.now = now + 200;
+    const { intentId, secret } = await createTonIntent(vault, sender, recipient, amount, 9n, 0x9999n);
+    blockchain.now = now + 31 * 24 * 60 * 60;
 
     await vault.send(recipient.getSender(), { value: toNano('0.1') }, {
       $$type: 'ClaimReceiveIntent',
       intent_id: intentId,
       secret32: secret,
     } as ClaimReceiveIntent);
-    expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
-    expect((await vault.getGetUser(recipient.address)).exists).toBe(false);
-
-    await vault.send(sender.getSender(), { value: toNano('0.1') }, {
-      $$type: 'CancelReceiveIntent',
-      intent_id: intentId,
-    } as CancelReceiveIntent);
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
-    expect((await vault.getGetUser(sender.address)).ton_balance).toBe(toNano('1'));
+    expect((await vault.getGetUser(recipient.address)).ton_balance).toBe(amount);
   });
 
   it('VAULT-REJECT: session-like/non-sender caller cannot create or cancel with someone else balance', async () => {
@@ -218,7 +206,6 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     await deposit(vault, sender, toNano('1'));
 
     const amount = toNano('0.2');
-    const expires = (blockchain.now ?? 0) + 1000;
     const attackerIntent = await computeIntent(vault, attacker, recipient, amount, 10n, 0x10n);
     await vault.send(attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'CreateReceiveIntent',
@@ -226,12 +213,11 @@ describe('Vault milestone 3: ReceiveIntent', () => {
       amount,
       recipient_wallet: recipient.address,
       commitment: attackerIntent.commitment,
-      expires_at: BigInt(expires),
       client_nonce: 10n,
     } as CreateReceiveIntent);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
 
-    const { intentId } = await createTonIntent(vault, sender, recipient, amount, expires, 11n, 0x11n);
+    const { intentId } = await createTonIntent(vault, sender, recipient, amount, 11n, 0x11n);
     await vault.send(attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'CancelReceiveIntent',
       intent_id: intentId,

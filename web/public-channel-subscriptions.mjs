@@ -30,13 +30,15 @@ function normalizeRegistryChannel(channel) {
   if (!isObject(channel)) return null;
   const id = nonEmptyString(channel.id);
   const sourceUrl = nonEmptyString(channel.sourceUrl);
-  if (!id || !sourceUrl) return null;
+  const authorWallet = nonEmptyString(channel.authorWallet ?? channel.author_wallet);
+  if (!id || (!sourceUrl && !authorWallet)) return null;
   return {
     id,
     name: nonEmptyString(channel.name) ?? id,
     avatar: (nonEmptyString(channel.avatar) ?? id.slice(0, 1) ?? 'P').slice(0, 2).toUpperCase(),
     subtitle: nonEmptyString(channel.subtitle) ?? 'read-only public channel',
     sourceUrl,
+    authorWallet,
   };
 }
 
@@ -151,16 +153,57 @@ export function writePublicChannelFeedCache(storage, cache) {
 function normalizeFeedPost(post) {
   if (!isObject(post)) return null;
   const id = nonEmptyString(post.id);
-  const text = nonEmptyString(post.text);
-  if (!id || !text) return null;
+  const text = nonEmptyString(post.text) ?? '';
+  const imageUrl = nonEmptyString(post.imageUrl);
+  if (!id || (!text && !imageUrl)) return null;
   return {
     id,
+    entryId: nonEmptyString(post.entryId),
+    readEntryId: nonEmptyString(post.readEntryId),
     title: nonEmptyString(post.title),
     text,
+    imageUrl,
     createdAt: nonEmptyString(post.createdAt),
     author: nonEmptyString(post.author),
+    authorWallet: nonEmptyString(post.authorWallet ?? post.author_wallet),
+    profileVersion: Number.isSafeInteger(Number(post.profileVersion ?? post.profile_version))
+      ? Number(post.profileVersion ?? post.profile_version)
+      : 0,
+    avatarHash: nonEmptyString(post.avatarHash ?? post.avatar_hash),
+    avatarImageUrl: nonEmptyString(post.avatarImageUrl ?? post.avatar_image_url),
     bodyHash: nonEmptyString(post.bodyHash),
     entryUid: nonEmptyString(post.entryUid),
+    commentsAllowed: post.commentsAllowed !== false,
+    comments: (Array.isArray(post.comments) ? post.comments : [])
+      .map(normalizeFeedComment)
+      .filter(Boolean),
+  };
+}
+
+function normalizeFeedComment(comment) {
+  if (!isObject(comment)) return null;
+  const id = nonEmptyString(comment.id);
+  const text = nonEmptyString(comment.text) ?? '';
+  const imageUrl = nonEmptyString(comment.imageUrl);
+  if (!id || (!text && !imageUrl)) return null;
+  return {
+    id,
+    entryId: nonEmptyString(comment.entryId),
+    readEntryId: nonEmptyString(comment.readEntryId),
+    parentEntryId: nonEmptyString(comment.parentEntryId),
+    parentHash: nonEmptyString(comment.parentHash),
+    text,
+    imageUrl,
+    createdAt: nonEmptyString(comment.createdAt),
+    author: nonEmptyString(comment.author),
+    authorWallet: nonEmptyString(comment.authorWallet ?? comment.author_wallet),
+    profileVersion: Number.isSafeInteger(Number(comment.profileVersion ?? comment.profile_version))
+      ? Number(comment.profileVersion ?? comment.profile_version)
+      : 0,
+    avatarHash: nonEmptyString(comment.avatarHash ?? comment.avatar_hash),
+    avatarImageUrl: nonEmptyString(comment.avatarImageUrl ?? comment.avatar_image_url),
+    bodyHash: nonEmptyString(comment.bodyHash),
+    entryUid: nonEmptyString(comment.entryUid),
   };
 }
 
@@ -201,13 +244,15 @@ export function publicChannelFeedToThread(channel, feed) {
   return {
     id: publicChannelThreadId(normalizedChannel.id),
     publicChannelId: normalizedChannel.id,
+    publicChannelAuthorWallet: normalizedChannel.authorWallet,
     readOnly: true,
     name: normalizedChannel.name,
     avatar: normalizedChannel.avatar,
+    avatarImageUrl: latest?.avatarImageUrl,
     subtitle: normalizedChannel.subtitle,
     time: shortTime(latest?.createdAt) ?? 'public',
     state: posts.length > 0 ? 'channel' : 'syncing',
-    preview: latest?.title ?? latest?.text ?? 'Waiting for public feed',
+    preview: latest?.title ?? latest?.text ?? (latest?.imageUrl ? 'Image' : 'Waiting for public feed'),
     messages: posts.map((post) => ({
       type: 'in',
       text: post.title ? `${post.title}\n${post.text}` : post.text,
@@ -215,7 +260,20 @@ export function publicChannelFeedToThread(channel, feed) {
         .filter(Boolean)
         .join(' · '),
       publicPostId: post.id,
+      publicPostTitle: post.title,
+      publicPostText: post.text,
+      publicPostImageUrl: post.imageUrl,
+      publicAuthorWallet: post.authorWallet,
+      publicProfileVersion: post.profileVersion,
+      publicAvatarHash: post.avatarHash,
+      publicAvatarImageUrl: post.avatarImageUrl,
       publicChannelId: normalizedChannel.id,
+      publicEntryId: post.entryId,
+      publicReadEntryId: post.readEntryId,
+      publicBodyHash: post.bodyHash,
+      publicCommentsAllowed: post.commentsAllowed !== false,
+      publicComments: post.comments,
+      attachment: post.imageUrl ? { type: 'image', url: post.imageUrl } : null,
     })),
   };
 }
@@ -234,15 +292,46 @@ export function publicChannelSubscriptionsToThreads(subscriptions, registry = DE
 }
 
 export function publicChannelThreadsToFeedItems(threads) {
-  return (threads ?? []).map((thread) => {
-    const latest = thread.messages?.[thread.messages.length - 1] ?? null;
-    return {
-      meta: [thread.name, thread.state, thread.time].filter(Boolean),
-      title: thread.name,
-      text: latest?.text ?? thread.preview,
-      compact: !latest,
-    };
-  });
+  const items = [];
+  for (const thread of threads ?? []) {
+    const messages = thread.messages ?? [];
+    if (messages.length === 0) {
+      items.push({
+        id: thread.id,
+        channelId: thread.publicChannelId,
+        meta: [thread.name, thread.state, thread.time].filter(Boolean),
+        title: thread.name,
+        text: thread.preview,
+        comments: [],
+        compact: true,
+      });
+      continue;
+    }
+    for (const message of messages) {
+      items.push({
+        id: message.publicPostId,
+        channelId: thread.publicChannelId,
+        entryId: message.publicEntryId,
+        readEntryId: message.publicReadEntryId,
+        bodyHash: message.publicBodyHash,
+        authorWallet: message.publicAuthorWallet,
+        profileVersion: message.publicProfileVersion,
+        avatarHash: message.publicAvatarHash,
+        avatarImageUrl: message.publicAvatarImageUrl,
+        commentsAllowed: message.publicCommentsAllowed !== false,
+        meta: [
+          thread.name,
+          message.meta,
+        ].filter(Boolean),
+        title: message.publicPostTitle ?? thread.name,
+        text: message.publicPostText ?? message.text ?? thread.preview,
+        imageUrl: message.publicPostImageUrl ?? message.attachment?.url,
+        comments: message.publicComments ?? [],
+        compact: false,
+      });
+    }
+  }
+  return items.reverse();
 }
 
 export function clonePublicChannelSubscriptions(value) {

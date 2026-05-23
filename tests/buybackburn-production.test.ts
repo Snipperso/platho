@@ -42,6 +42,7 @@ const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
+const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
 const OP_PTON_TON_TRANSFER = 0x01f3835d;
 const UINT64_MAX = 18446744073709551615n;
@@ -607,6 +608,97 @@ describe('Production BuybackBurn candidate', () => {
     const afterReuseAttempt = await env.buyback.getGetBuybackBurnState();
     expect(afterReuseAttempt.phase).toBe(PHASE_IDLE);
     expect(afterReuseAttempt.reserve_due_ton).toBe(ENVELOPE);
+  });
+
+  it('BUYBACK-05C: authenticated ATH route notification surplus is accounted as route refund', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+    await executeBuyback(env, 1n);
+
+    const stonfiSourceWallet = await deployAthWallet(
+      env.blockchain,
+      env.stonfiPoolOwner.address,
+      env.athMasterAddress,
+      200_000n,
+    );
+
+    const highNotifyValue = toNano('0.1');
+    await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 1n,
+      amount: 100_000n,
+      recipient: env.buyback.address,
+      response_destination: env.stonfiPoolOwner.address,
+      notify_destination: env.buyback.address,
+      notify_value: highNotifyValue,
+    } as ATHTransferRequestWithNotify);
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    const totals = await env.buyback.getGetBuybackBurnTotals();
+    const jetton = await env.athMaster.getGetJettonData();
+    const officialWallet = env.blockchain.openContract(new ATHWallet(env.officialAthWallet));
+
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.route_refund_due_ton).toBe(highNotifyValue - BUYBACK_ROUTE_NOTIFY_MIN_VALUE);
+    expect(totals.executed_buyback_count).toBe(1n);
+    expect(totals.burned_ath_total_atomic).toBe(100_000n);
+    expect(jetton.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - 100_000n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
+  });
+
+  it('BUYBACK-05B: authenticated low-value ATH route notification becomes retry-due instead of a stuck swap', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+    await executeBuyback(env, 1n);
+
+    const stonfiSourceWallet = await deployAthWallet(
+      env.blockchain,
+      env.stonfiPoolOwner.address,
+      env.athMasterAddress,
+      200_000n,
+    );
+
+    await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 1n,
+      amount: 100_000n,
+      recipient: env.buyback.address,
+      response_destination: env.stonfiPoolOwner.address,
+      notify_destination: env.buyback.address,
+      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+    } as ATHTransferRequestWithNotify);
+
+    const officialWallet = env.blockchain.openContract(new ATHWallet(env.officialAthWallet));
+    let state = await env.buyback.getGetBuybackBurnState();
+    let totals = await env.buyback.getGetBuybackBurnTotals();
+
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(1n);
+    expect(state.ath_burn_retry_due_atomic).toBe(100_000n);
+    expect(totals.executed_buyback_count).toBe(0n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(100_000n);
+
+    await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'RetryAthBurnDue',
+      query_id: 2n,
+      amount: 100_000n,
+    } as RetryAthBurnDue);
+
+    state = await env.buyback.getGetBuybackBurnState();
+    totals = await env.buyback.getGetBuybackBurnTotals();
+    const jetton = await env.athMaster.getGetJettonData();
+
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.ath_burn_retry_due_atomic).toBe(0n);
+    expect(totals.executed_buyback_count).toBe(1n);
+    expect(totals.burned_ath_total_atomic).toBe(100_000n);
+    expect(jetton.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - 100_000n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
   });
 
   it('BUYBACK-06: authenticated burn failure becomes retry-due and can be finalized later', async () => {

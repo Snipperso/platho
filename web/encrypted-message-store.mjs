@@ -92,7 +92,7 @@ function normalizeMessageRecordInput(input) {
     threadId: assertString(input.threadId, 'message history input.threadId'),
     createdAt: input.createdAt ?? Date.now(),
     type: assertString(message.type, 'message.type'),
-    capsuleId: message.capsule?.id ?? message.transportPackage?.capsuleId ?? null,
+    capsuleId: message.capsule?.id ?? null,
     message: safeClone(message),
   };
 }

@@ -1,6 +1,6 @@
 # Platho Static Web Deploy
 
-Platho PWA is deployed as static files. No backend process is required for login, messaging UI, crypto self-checks, or TonConnect bootstrap.
+Platho PWA is deployed as static files. No backend process is required for wallet creation/import, messaging UI, or crypto self-checks.
 
 ## Local package
 

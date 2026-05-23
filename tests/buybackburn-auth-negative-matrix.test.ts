@@ -485,6 +485,8 @@ describe('BuybackBurn auth and negative matrix', () => {
       [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 1n }],
       [toNano('0.1'), { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_001n }],
       [ATH_BURN_REQUEST_VALUE - 1n, { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_000n }],
+      [ATH_BURN_REQUEST_VALUE, { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_000n }],
+      [ATH_BURN_REQUEST_VALUE + ROUTE_REFUND_EXEC_RESERVE - 1n, { $$type: 'RetryAthBurnDue', query_id: 2n, amount: 100_000n }],
     ] as const) {
       await env.buyback.send(env.attacker.getSender(), { value }, msg as RetryAthBurnDue);
       state = await env.buyback.getGetBuybackBurnState();
@@ -510,7 +512,7 @@ describe('BuybackBurn auth and negative matrix', () => {
       workchain: env.athMasterAddress.workChain,
     }));
 
-    await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
+    await env.buyback.send(env.operator.getSender(), { value: ATH_BURN_REQUEST_VALUE + ROUTE_REFUND_EXEC_RESERVE }, {
       $$type: 'RetryAthBurnDue',
       query_id: 2n,
       amount: 100_000n,

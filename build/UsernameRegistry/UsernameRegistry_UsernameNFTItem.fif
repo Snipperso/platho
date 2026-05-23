@@ -164,7 +164,7 @@ PROGRAM{
       THROWANYIFNOT
       3000000 PUSHINT
       TRUE
-      0 PUSHINT
+      1 PUSHINT
       s5 s3 PUSH2
       $UsernameItemDeployedAck$_constructor_name_hash_owner_wallet INLINECALLDICT
       NEWC

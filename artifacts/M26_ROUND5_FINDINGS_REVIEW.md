@@ -16,7 +16,7 @@ Status: **PATCHED / TESTED** for confirmed code issues. Production remains **NO-
 
 ## Source-Of-Truth Decisions
 
-- F-030: resolved as a v1 interface decision. CapsuleHub is counter-only / anchor-only in v1: it records counters, page counts, latest entry ids/uids, and fee accounting, but does not expose retrievable on-chain `private_pages` / `public_pages` maps. The current spec text has been aligned with that interface.
+- F-030: superseded. CapsuleHub v1 must store retrievable encrypted payload cells on-chain. Counter-only / anchor-only is no longer an acceptable v1 interface decision.
 - F-031: resolved as a v1 ABI decision. Explicit no-authority `TopUpStorageReserve` handlers exist for Vault, CapsuleHub, FeeAccumulator, BuybackBurn, UsernameRegistry, and UsernameNFTItem using the opcodes pinned in the current spec table. ATHMaster/ATHWallet are not extended by this decision because the current top-up opcode table does not define ATH jetton top-up operations.
 
 ## Regression Evidence

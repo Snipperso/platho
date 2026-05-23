@@ -1,26 +1,26 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-21T13:38:40.952Z",
-  "mode": "production",
+  "generatedAt": "2026-05-23T11:06:05.125Z",
+  "mode": "preview",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "BLOCKED_BY_PREPROD",
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
+  "status": "PREVIEW_STATIC_PACKAGE_READY",
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 104,
-    "totalBytes": 1931279,
-    "bundleSha256": "79f419bfc2e47d81cdfd5547020e4f2efda4133e4dff574ba131d350f055d237",
+    "totalBytes": 1671126,
+    "bundleSha256": "dbf7b4c068643f254e00d09a2029e174159e490590c9341dcfb58a1662ff3eb6",
     "files": [
       {
         "path": "app.js",
-        "bytes": 43657,
-        "sha256": "aaf0d748f7ab2d1a45e54eed1fbddb93f275368e6a8ae0d73345963813a67e6c"
+        "bytes": 129055,
+        "sha256": "2c78659563fdec596853ef6258bc339f0a8718576e9cc40f12a075cbcb0d4d40"
       },
       {
-        "path": "assets/icons/attach.svg",
-        "bytes": 313,
-        "sha256": "471c5657a2c13b70b4a0b03880280f84c3fdddcd3358bc3c97044beca78eb38a"
+        "path": "assets/icons/back.svg",
+        "bytes": 158,
+        "sha256": "232cedcaacd7699a099ec78977b418f2d295fc6253268049b7eb42cf4e6771a2"
       },
       {
         "path": "assets/icons/bolt.svg",
@@ -33,29 +33,24 @@
         "sha256": "0b3cae7dd7189d68b2fa0c310d68808732747a168d2d0b48471f1f7f9380e092"
       },
       {
-        "path": "assets/icons/call.svg",
-        "bytes": 376,
-        "sha256": "bfa933b57624df33c216d89dad3104f113ed96d0b0d11f539f256ba4728523db"
-      },
-      {
         "path": "assets/icons/chat.svg",
         "bytes": 248,
         "sha256": "6460c12c558a1f7347a864d1e573e23c6ffb937b15aa14ea7a0be87a8ff09865"
       },
       {
+        "path": "assets/icons/chevron-down.svg",
+        "bytes": 136,
+        "sha256": "b608f2f4616858c1a48dc75283d09dbbbf2453b0bc194be5e122f9bb45ed8276"
+      },
+      {
         "path": "assets/icons/down.svg",
-        "bytes": 159,
-        "sha256": "9fc33e039235c691d16b236ab611161d3336171e0b3725b5dace77d6acda5d77"
+        "bytes": 154,
+        "sha256": "fbf091250538376e7982e938ed005454031ec099e823a618926375565148aea4"
       },
       {
         "path": "assets/icons/gear.svg",
         "bytes": 461,
         "sha256": "e24a041c2f714b34bba311bdd2470d7324cf305c1f6177c77713a4cb2fe8482b"
-      },
-      {
-        "path": "assets/icons/more.svg",
-        "bytes": 191,
-        "sha256": "cb7316286ab5754c167f42e8ca4582e9ec52855a20dd9d96e8de8cc0f7d5e650"
       },
       {
         "path": "assets/icons/plus.svg",
@@ -73,14 +68,9 @@
         "sha256": "ed6a2bb9d9bc98392ffd80113080cb752762079d1c5cd73b46de16faf1752259"
       },
       {
-        "path": "assets/icons/send.svg",
-        "bytes": 121,
-        "sha256": "1f97393d8878559a4ecd18144f30269a629ab99e2f4d01f1ec9f21957b88afc0"
-      },
-      {
         "path": "assets/icons/up.svg",
-        "bytes": 157,
-        "sha256": "ba98de683017cc6d1dc135a1433fa8e30d0dbd913b2bd3c193837d13269aee53"
+        "bytes": 153,
+        "sha256": "d2f0ddc1dc80d882d2679168bd0bdce23a7db2a52dd0338e35b4626e249a5a10"
       },
       {
         "path": "assets/icons/user.svg",
@@ -103,29 +93,34 @@
         "sha256": "19b3be4429420b0bc5ebbaf033bd8700bacfbcaf9bf7cd497a4800b8dbeb9ee7"
       },
       {
+        "path": "ath-ton-rpc-provider.mjs",
+        "bytes": 5971,
+        "sha256": "c1b688fc17f05329aab0711339cfabb9be8bfd0737f1c22b0294f0a0c4041899"
+      },
+      {
+        "path": "capsulehub-ton-rpc-provider.mjs",
+        "bytes": 6844,
+        "sha256": "3b80501c2b7016a1f537f733300bcc7836aafd0f93cc585d05bade38b4ce5dc6"
+      },
+      {
         "path": "channels/platho.app/feed.json",
-        "bytes": 455,
-        "sha256": "f9c2a6fbe811e658043ceb3e4232ef34e12c17987560e65481eb0904f2b42721"
+        "bytes": 369,
+        "sha256": "34c422aa558769ea1c29141eb6a169fbb01434019f9d09be5a646ab0768e3128"
       },
       {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 70946,
-        "sha256": "3eb0e23a24f7de33708fb6a3d28350a64ac12f036581825e19ba8c9ede7e9d01"
-      },
-      {
-        "path": "crypto/ton-wallet-stateinit.mjs",
-        "bytes": 17160,
-        "sha256": "3dd87e86cdfc1a800055707d64e8a61b6609202d3baac07d7942718eeb420550"
+        "bytes": 101936,
+        "sha256": "85bbee51230271ea9e85900df523cf14777d2720ee18b200116bac796e99f329"
       },
       {
         "path": "encrypted-message-store.mjs",
-        "bytes": 10578,
-        "sha256": "bce04356e561ed060b9174c01d09eae3a7abefca59c468f1cd5fc3cebe37df1f"
+        "bytes": 10539,
+        "sha256": "d80609a13215025c4edd06f278651b4088c026833a51be73cc155ba817f87332"
       },
       {
         "path": "index.html",
-        "bytes": 10657,
-        "sha256": "982ca8782c2529e7b5853e0a285b2525c2865479b9aee1eeb295789ec0a574aa"
+        "bytes": 14445,
+        "sha256": "ed074d85ab7f57fa7f517fa268d5610ebc3f76ddbb4f82fb9933095a81dc96a9"
       },
       {
         "path": "manifest.webmanifest",
@@ -133,19 +128,39 @@
         "sha256": "eee17433e3981b1dc8157f80e4d183a94bf824394c0fa91743afa4727e4d0e3d"
       },
       {
-        "path": "no-backend-transport.mjs",
-        "bytes": 6759,
-        "sha256": "9ef144c17e478cca2361582b7880ef2dbb344fd1882d13d46c7c60f082ac0a6d"
+        "path": "message-budget-policy.mjs",
+        "bytes": 1773,
+        "sha256": "ed893e82875a874a19f9a72bfead3fd79b1a87206847e18fb34678f7905934c6"
+      },
+      {
+        "path": "message-pricing-policy.mjs",
+        "bytes": 3423,
+        "sha256": "23ee4c944cb7f6336cda0654c780a0571e5e27a7186573115ad42f1b03ca5e85"
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 6939,
-        "sha256": "903444de719a7df5b8d8ca918734f87f821b5a54e42b3772dda96a22eef0462a"
+        "bytes": 5065,
+        "sha256": "6722b08bb747d348ab90bde68b7afd40cba107c5a38f1bba2bda8e23d1f844e9"
+      },
+      {
+        "path": "platho-wallet.mjs",
+        "bytes": 11798,
+        "sha256": "6dc8d92158f4580b98f2363099a1c6c8b6032aa2c6e76521480c9ba21271eb23"
       },
       {
         "path": "public-channel-subscriptions.mjs",
-        "bytes": 8477,
-        "sha256": "da2eddd2c86b62db36ba18b82b3c256e071274155c0e81685b932c7e3af597b7"
+        "bytes": 10255,
+        "sha256": "5efd0555973c3b98bba7c9fb1611c3b8e4fd8ff6aaf63477e2d2c06c2bc57b87"
+      },
+      {
+        "path": "pwa-contract-transactions.mjs",
+        "bytes": 43494,
+        "sha256": "1811fbc590137e78f3ecb98ae4d1e3fe023c9a2dd957839aaa8e7d5640c7273c"
+      },
+      {
+        "path": "recipient-identities.mjs",
+        "bytes": 8267,
+        "sha256": "73e33a45876104f4e5fcb27d9abd51e9948eea96e6ff21b06b85173f29e27c60"
       },
       {
         "path": "replay-store.mjs",
@@ -154,33 +169,33 @@
       },
       {
         "path": "styles.css",
-        "bytes": 16337,
-        "sha256": "181d9cbcda0c4984c92264bf75997e2c1127733e9f9aee48e14575e978e975f8"
+        "bytes": 22988,
+        "sha256": "c4130b60d20c52364af9eee6cb2dc0b167507a1d9101b4d4548dc7fcde85f785"
       },
       {
         "path": "sw.js",
-        "bytes": 2128,
-        "sha256": "65d044906e1bc7373925cb05fbfe26c88a44ca352c4c8c9bcc37df8eb56eefa6"
+        "bytes": 2132,
+        "sha256": "9b1306ebe3bdbe780d2636c55ad69b60198d1eb107723d240fcf2e2d4129f63c"
       },
       {
-        "path": "tonconnect-manifest.json",
-        "bytes": 112,
-        "sha256": "20e0f1e497cd0db34efedb4c6bca3350c9e8c0e28b7829b0dcfeb39d1e364754"
+        "path": "ton-dns-provider.mjs",
+        "bytes": 11438,
+        "sha256": "66cbe71e1fb8766b8f54e4c88a32edeccab8aa8f26f5c11da5c9789d3921bf6f"
       },
       {
-        "path": "transport-share.mjs",
-        "bytes": 2046,
-        "sha256": "c912681964a2467ffd83f4e0d7edd23bbb94d8c393a77858d71234a09c9d739a"
+        "path": "username-ton-rpc-provider.mjs",
+        "bytes": 15002,
+        "sha256": "2bd53fd5802f60d551c4221bf486194e4a18432c0e0634f1dd1637dbade64e01"
       },
       {
         "path": "vault-chain-provider.mjs",
-        "bytes": 6284,
-        "sha256": "160f8e0d065e8ef47b96795eaac41d7da80faa4e0196510276f750643d82ad18"
+        "bytes": 6378,
+        "sha256": "ec9f430549f06ac687427179c3c11802ffb28b8b6137cc539655764375fc9d6c"
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 13479,
-        "sha256": "9769b9c7ffb8f775243306f139278aacd82727381497c06913cdf7e62ea1902e"
+        "bytes": 25313,
+        "sha256": "ca72a5be585f6ccf19270b787f189ebfeae6aaf4bc39cbe2bee614924e418b3b"
       },
       {
         "path": "vendor/@noble/ciphers/LICENSE",
@@ -516,21 +531,6 @@
         "path": "vendor/@noble/post-quantum/utils.js",
         "bytes": 15333,
         "sha256": "b3d97248f0a16ea60119de0585def637a8aa3f27c4124d8825e1709588de53f8"
-      },
-      {
-        "path": "vendor/@tonconnect/ui/tonconnect-ui.min.js",
-        "bytes": 422763,
-        "sha256": "ab1d010e9b9d9af37e98bdfa6248068eccdbeb7bbbee99d86364abd1d9a7611a"
-      },
-      {
-        "path": "vendor/qrcode-generator/package.json",
-        "bytes": 632,
-        "sha256": "c5f5225b0eff05b3073b8ed89f5b45ec48e6619b62490d89da75383f2063afbd"
-      },
-      {
-        "path": "vendor/qrcode-generator/qrcode.js",
-        "bytes": 56513,
-        "sha256": "b8c4e98c89451099ebab4759c4b399cbcf488e8edf593fdfa976ef80cee693f5"
       }
     ],
     "excludedWebFiles": [
@@ -783,22 +783,21 @@
   },
   "checks": {
     "serviceWorkerIncluded": true,
-    "tonConnectManifestDomainMatches": true,
-    "tonConnectIconDomainMatches": true,
     "pwaStartUrlIsStatic": true,
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
     "productionMarkersCleared": false
   },
-  "blockers": [
+  "blockers": [],
+  "warnings": [
+    "STATIC_PACKAGE_IS_NON_PRODUCTION",
     "PWA_MODE_NOT_PRODUCTION",
     "PWA_NETWORK_NOT_MAINNET",
     "CRYPTO_PROD_REMAINING_WORK",
     "PROD_CHECKLIST_OPEN_BLOCKERS",
     "TESTNET_ENV_PRESENT"
   ],
-  "warnings": [],
   "productionFindings": [
     {
       "id": "PWA_MODE_NOT_PRODUCTION",

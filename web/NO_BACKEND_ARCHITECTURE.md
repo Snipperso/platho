@@ -27,21 +27,19 @@ This prototype is designed around a hard constraint: the app must keep working w
 - Any public or auditable state should be reconstructable from contracts and signed events.
 - If a feature cannot be implemented without a centralized backend, it should be marked as blocked instead of quietly adding one.
 
-## Portable transport
+## On-chain message delivery
 
-The PWA can exchange data through signed JSON packages instead of a backend:
+The PWA does not use manual signed JSON packages as the v1 delivery layer. Accepted messages are reconstructed from retrievable encrypted binary payload cells stored by `CapsuleHub`.
 
-- `platho.public-bundle.v1` carries a signed public messaging bundle. Import verifies the key id, suite, bundle signature, and expiry before trusting it for encryption.
-- `platho.private-capsule.v1` carries a private encrypted capsule. Import verifies capsule hashes, sender signature, expiry, and replay policy before local decryption.
+Public recipient keys are registered in `Vault` key records. Private key material is derived from the embedded Platho wallet seed; exporting/importing that seed is the only supported account recovery path.
 
-These packages can move through files, QR, local messenger attachment, IPFS, TON Storage, or any other replaceable carrier. Persistent local transport state stores only public bundles, encrypted capsules, and routing metadata. Plaintext is shown in memory after decryption and is not written into the transport store.
+Private capsule on-chain cells use the final binary layout in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`: `PH0B` header0 is 140 bytes, `PH1B` header1 is 30 bytes, and each `platho.byte-layout.v1` body carries exactly one encrypted 1024-byte user payload slot for both standard and postquantum capsules.
 
-The UI supports several backend-free carriers:
+The UI must not expose manual public-key bundle exchange, QR package sharing, raw package JSON paste, or encrypted-capsule file import/export as production flows.
 
-- QR for packages small enough to fit QR capacity, primarily public key bundles.
-- Clipboard/Web Share for public bundles and encrypted capsules.
-- File import/export for larger capsules and devices without Web Share support.
-- Text paste import for raw package JSON.
+## Wallet avatars
+
+Avatars are also backend-free. The image bytes are compressed to WebP and published as public `CapsuleHub` avatar capsules. `ProfileRegistry` stores the paid wallet-level pointer and ATH accounting state. The PWA may cache reconstructed data URLs locally, but display must remain reconstructable from `ProfileRegistry` getters plus `CapsuleHub` public entries. No CDN or profile API is part of v1 delivery.
 
 ## Local encrypted history
 
@@ -58,6 +56,17 @@ Production key trust must be anchored to Vault contract state, not to a local UI
 - Returned stack values are decoded into the same `VaultUserView` and `VaultKeyRecordView` shapes used by the client verifier.
 
 The provider can use a configured `globalThis.plathoTonRpcTransport` or a TON Center v3 compatible endpoint. If the transport, Vault address, getter response, or record binding is missing or malformed, the PWA stays fail-closed.
+
+## TON DNS recipient lookup
+
+`.ton` recipient routes are resolved in the static PWA before Vault key lookup. The runtime includes `ton-dns-provider.mjs`, which calls TON DNS `dnsresolve` through the same replaceable TON `runGetMethod` transport model:
+
+- domain names are normalized to lowercase `.ton` and encoded in TON DNS internal order;
+- the wallet category is `sha256("wallet")`;
+- `dns_smc_address#9fd3` records resolve to the recipient wallet address;
+- `dns_next_resolver#ba93` records are followed with a bounded recursion limit.
+
+If the TON DNS root address, transport, resolver response, or wallet record is missing or malformed, the PWA stays fail-closed and does not send a message.
 
 ## Distribution model
 
@@ -76,4 +85,4 @@ Use `npm.cmd run web:deploy:prepare` to build a preview static bundle from the r
 
 Use `npm.cmd run web:deploy:prepare:prod` only after `npm.cmd run preprod:check` passes. The production package intentionally blocks while testnet labels, testnet env files, or missing Vault provider configuration remain in the workspace.
 
-Runtime mode, network labels, TonConnect manifest policy, Vault provider lookup, and preview fixtures live in `web/platho-config.mjs`. A production bundle must replace that file with `mode: 'production'`, `network.chain: 'mainnet'`, and a static Vault chain provider module before the release gate can pass.
+Runtime mode, network labels, embedded Platho wallet policy, Vault provider lookup, TON DNS lookup, and preview fixtures live in `web/platho-config.mjs`. A production bundle must replace that file with `mode: 'production'`, `network.chain: 'mainnet'`, static provider modules or root addresses, and final contract addresses before the release gate can pass.

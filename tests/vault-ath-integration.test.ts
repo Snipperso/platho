@@ -4,6 +4,7 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   Vault,
+  AthTransferNotification,
   BindOfficialAthWallet,
   SealGenesis,
   WithdrawAth,
@@ -217,6 +218,43 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect((await vault.getGetPendingAthWithdrawal(32n)).exists).toBe(false);
     expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(2_000n);
+  });
+
+  it('VAULT-ATH-03C: non-basechain withdrawal recipient is rejected before debit or pending state', async () => {
+    const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setup();
+    const masterchainRecipient = fixtureAddress('VAULT_ATH_MASTERCHAIN_RECIPIENT', -1);
+
+    await depositAth({ vault, user, userAthWallet, amount: 2_000n, queryId: 33n });
+    await vault.send(user.getSender(), { value: toNano('0.25') }, {
+      $$type: 'WithdrawAth',
+      query_id: 34n,
+      amount: 750n,
+      recipient: masterchainRecipient,
+    } as WithdrawAth);
+
+    const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+
+    expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
+    expect((await vault.getGetPendingAthWithdrawal(34n)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(2_000n);
+  });
+
+  it('VAULT-ATH-03D: non-basechain deposit notification sender is rejected before ledger credit', async () => {
+    const { blockchain, vault, officialVaultAthWallet } = await setup();
+    const masterchainSource = fixtureAddress('VAULT_ATH_MASTERCHAIN_SOURCE', -1);
+
+    await vault.send(blockchain.sender(officialVaultAthWallet), { value: toNano('0.1') }, {
+      $$type: 'AthTransferNotification',
+      query_id: 35n,
+      amount: 1_000n,
+      sender_key: 0n,
+      sender_wallet: masterchainSource,
+    } as AthTransferNotification);
+
+    expect((await vault.getGetUser(masterchainSource)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).user_count).toBe(0n);
+    expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(0n);
   });
 
   it('VAULT-ATH-04: repeated deposit query_id is rejected before creating uncredited official-wallet balance', async () => {

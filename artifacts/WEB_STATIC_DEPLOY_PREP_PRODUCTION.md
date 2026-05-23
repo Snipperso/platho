@@ -8,17 +8,15 @@ Output: C:\platho\artifacts\platho-web-static-production
 ## Runtime
 
 ```text
-fileCount=104
-totalBytes=1931279
-bundleSha256=79f419bfc2e47d81cdfd5547020e4f2efda4133e4dff574ba131d350f055d237
+fileCount=101
+totalBytes=1588820
+bundleSha256=7ce64d9aed913120f3602484f9b669f538975a9b48ba1754a8514fcd95211a39
 noBackendRuntime=true
 ```
 
 ## Checks
 
 - serviceWorkerIncluded: true
-- tonConnectManifestDomainMatches: true
-- tonConnectIconDomainMatches: true
 - pwaStartUrlIsStatic: true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false

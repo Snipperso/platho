@@ -22,10 +22,10 @@ platho.app {
   @html path / /index.html
   header @html Cache-Control "no-cache"
 
-  @manifest path /manifest.webmanifest /tonconnect-manifest.json
+  @manifest path /manifest.webmanifest
   header @manifest Cache-Control "no-cache"
 
-  @runtime path /app.js /styles.css /replay-store.mjs /vault-chain-provider.mjs /crypto/*
+  @runtime path /app.js /styles.css /platho-config.mjs /platho-wallet.mjs /pwa-contract-transactions.mjs /replay-store.mjs /vault-chain-provider.mjs /crypto/*
   header @runtime Cache-Control "public, max-age=3600"
 
   @static path /assets/* /vendor/*

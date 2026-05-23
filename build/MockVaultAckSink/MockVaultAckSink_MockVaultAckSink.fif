@@ -13,58 +13,74 @@ PROGRAM{
   DECLPROC $MockVaultStateView$_constructor_ack_count_last_publish_id_last_entry_id_last_entry_uid
   DECLPROC $MockVaultAckSink$_fun_get_state
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
-  DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid
-  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid
+  DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid
+  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid
   86957 DECLMETHOD %get_state
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
   DECLGLOBVAR __tact_context_sender
   DECLGLOBVAR __tact_child_contract_codes
   DECLGLOBVAR __tact_randomized
-  $PublishPrivateFromVault$_store PROCINLINE:<{
+  $PublishPrivateFromVault$_store PROCREF:<{
     2767741632 PUSHINT
-    s0 s9 XCHG2
+    s0 s12 XCHG2
     32 STU
-    s1 s7 XCHG
+    s1 s10 XCHG
     64 STU
-    s1 s5 XCHG
+    s1 s8 XCHG
     256 STU
-    s1 s3 XCHG
+    s1 s6 XCHG
     8 STU
+    s1 s4 XCHG
     8 STU
+    s1 s2 XCHG
     256 STU
     256 STU
     SWAP
     NEWC
     256 STU
+    s1 s2 XCHG
+    STREF
+    s1 s2 XCHG
+    STREF
+    s1 s2 XCHG
+    STREF
     s1 s2 XCHG
     128 STU
     STBREFR
   }>
   $PublishPrivateFromVault$_store_cell PROCINLINE:<{
-    8 -ROLL
+    11 -ROLL
     $PublishPrivateFromVault$_store INLINECALLDICT
     ENDC
   }>
   $PublishPublicFromVault$_store PROCINLINE:<{
     2351593143 PUSHINT
-    s0 s7 XCHG2
+    s0 s10 XCHG2
     32 STU
-    s1 s5 XCHG
+    s1 s8 XCHG
     64 STU
-    s1 s3 XCHG
+    s1 s6 XCHG
     256 STU
+    s1 s4 XCHG
     152 STU
+    s1 s2 XCHG
     STSLICE
     SWAP
     NEWC
     256 STU
     s1 s2 XCHG
+    256 STU
+    s1 s2 XCHG
+    STREF
+    s1 s2 XCHG
+    STREF
+    s1 s2 XCHG
     128 STU
     STBREFR
   }>
   $PublishPublicFromVault$_store_cell PROCINLINE:<{
-    6 -ROLL
+    9 -ROLL
     $PublishPublicFromVault$_store INLINECALLDICT
     ENDC
   }>
@@ -121,9 +137,9 @@ PROGRAM{
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
-  $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid PROCINLINE:<{
+  $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid PROCINLINE:<{
   }>
-  $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid PROCINLINE:<{
+  $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid PROCINLINE:<{
   }>
   %get_state PROC:<{
     $MockVaultAckSink$_contract_load INLINECALLDICT
@@ -179,18 +195,24 @@ PROGRAM{
       CTOS
       256 LDU
       256 LDU
+      LDREF
+      LDREF
+      LDREF
       128 LDU
       128 LDU
       DROP
-      s5 s8 XCHG
-      s4 s7 XCHG
-      s3 s6 XCHG
-      s8 s7 s0 XCHG3
+      s8 s11 XCHG
+      s7 s10 XCHG
+      s6 s9 XCHG
+      s5 s11 XCHG
+      s4 s10 XCHG
+      s3 s9 XCHG
+      s11 s10 s0 XCHG3
       TRUE
-      s7 s9 XCHG2
+      s10 s12 XCHG2
       0 PUSHINT
-      s0 s9 XCHG
-      $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_protocol_fee_paid INLINECALLDICT
+      s0 s12 XCHG
+      $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPrivateFromVault$_store_cell INLINECALLDICT
       s3 s3 s0 XCHG3
@@ -230,16 +252,25 @@ PROGRAM{
       CTOS
       LDMSGADDR
       256 LDU
+      256 LDU
+      LDREF
+      LDREF
       128 LDU
+      LDREF
+      DROP
+      CTOS
       128 LDU
       DROP
-      s3 s6 XCHG
-      s5 s4 s0 XCHG3
+      s6 s9 XCHG
+      s5 s8 XCHG
+      s4 s7 XCHG
+      s3 s9 XCHG
+      s8 s7 s0 XCHG3
       TRUE
-      s7 s6 XCHG2
+      s10 s9 XCHG2
       0 PUSHINT
-      s0 s6 XCHG
-      $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_body_hash_protocol_fee_paid INLINECALLDICT
+      s0 s9 XCHG
+      $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPublicFromVault$_store_cell INLINECALLDICT
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT

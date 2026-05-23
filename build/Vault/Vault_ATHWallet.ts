@@ -1217,6 +1217,101 @@ export function dictValueParserAthTransferNotificationMintUsername(): Dictionary
     }
 }
 
+export type AthTransferNotificationProfileAvatar = {
+    $$type: 'AthTransferNotificationProfileAvatar';
+    query_id: bigint;
+    amount: bigint;
+    sender_key: bigint;
+    owner_wallet: Address;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeAthTransferNotificationProfileAvatar(src: AthTransferNotificationProfileAvatar) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2702864385, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeUint(src.sender_key, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.avatar_hash, 256);
+        b_0.storeUint(src.avatar_entry_id, 64);
+        b_0.storeUint(src.avatar_stream_id, 128);
+        b_0.storeUint(src.avatar_part_count, 16);
+        b_0.storeUint(src.media_format, 8);
+    };
+}
+
+export function loadAthTransferNotificationProfileAvatar(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2702864385) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _sender_key = sc_0.loadUintBig(32);
+    const _owner_wallet = sc_0.loadAddress();
+    const _avatar_hash = sc_0.loadUintBig(256);
+    const _avatar_entry_id = sc_0.loadUintBig(64);
+    const _avatar_stream_id = sc_0.loadUintBig(128);
+    const _avatar_part_count = sc_0.loadUintBig(16);
+    const _media_format = sc_0.loadUintBig(8);
+    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleAthTransferNotificationProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleAthTransferNotificationProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleAthTransferNotificationProfileAvatar(source: AthTransferNotificationProfileAvatar) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeNumber(source.sender_key);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserAthTransferNotificationProfileAvatar(): DictionaryValue<AthTransferNotificationProfileAvatar> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAthTransferNotificationProfileAvatar(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAthTransferNotificationProfileAvatar(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHTransferRequest = {
     $$type: 'ATHTransferRequest';
     query_id: bigint;
@@ -1445,6 +1540,110 @@ export function dictValueParserATHTransferRequestMintUsername(): DictionaryValue
     }
 }
 
+export type ATHTransferRequestProfileAvatar = {
+    $$type: 'ATHTransferRequestProfileAvatar';
+    query_id: bigint;
+    amount: bigint;
+    recipient: Address;
+    response_destination: Address;
+    notify_value: bigint;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeATHTransferRequestProfileAvatar(src: ATHTransferRequestProfileAvatar) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042520, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.recipient);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.notify_value, 128);
+        const b_1 = new Builder();
+        b_1.storeUint(src.avatar_hash, 256);
+        b_1.storeUint(src.avatar_entry_id, 64);
+        b_1.storeUint(src.avatar_stream_id, 128);
+        b_1.storeUint(src.avatar_part_count, 16);
+        b_1.storeUint(src.media_format, 8);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadATHTransferRequestProfileAvatar(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042520) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _recipient = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _notify_value = sc_0.loadUintBig(128);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _avatar_hash = sc_1.loadUintBig(256);
+    const _avatar_entry_id = sc_1.loadUintBig(64);
+    const _avatar_stream_id = sc_1.loadUintBig(128);
+    const _avatar_part_count = sc_1.loadUintBig(16);
+    const _media_format = sc_1.loadUintBig(8);
+    return { $$type: 'ATHTransferRequestProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleATHTransferRequestProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _recipient = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHTransferRequestProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleATHTransferRequestProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _recipient = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHTransferRequestProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleATHTransferRequestProfileAvatar(source: ATHTransferRequestProfileAvatar) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.recipient);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.notify_value);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserATHTransferRequestProfileAvatar(): DictionaryValue<ATHTransferRequestProfileAvatar> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHTransferRequestProfileAvatar(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHTransferRequestProfileAvatar(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHInternalTransfer = {
     $$type: 'ATHInternalTransfer';
     query_id: bigint;
@@ -1669,6 +1868,110 @@ export function dictValueParserATHInternalTransferMintUsername(): DictionaryValu
         },
         parse: (src) => {
             return loadATHInternalTransferMintUsername(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHInternalTransferProfileAvatar = {
+    $$type: 'ATHInternalTransferProfileAvatar';
+    query_id: bigint;
+    amount: bigint;
+    sender_owner: Address;
+    response_destination: Address;
+    notify_value: bigint;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeATHInternalTransferProfileAvatar(src: ATHInternalTransferProfileAvatar) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042521, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.sender_owner);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.notify_value, 128);
+        const b_1 = new Builder();
+        b_1.storeUint(src.avatar_hash, 256);
+        b_1.storeUint(src.avatar_entry_id, 64);
+        b_1.storeUint(src.avatar_stream_id, 128);
+        b_1.storeUint(src.avatar_part_count, 16);
+        b_1.storeUint(src.media_format, 8);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadATHInternalTransferProfileAvatar(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042521) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _sender_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _notify_value = sc_0.loadUintBig(128);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _avatar_hash = sc_1.loadUintBig(256);
+    const _avatar_entry_id = sc_1.loadUintBig(64);
+    const _avatar_stream_id = sc_1.loadUintBig(128);
+    const _avatar_part_count = sc_1.loadUintBig(16);
+    const _media_format = sc_1.loadUintBig(8);
+    return { $$type: 'ATHInternalTransferProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleATHInternalTransferProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHInternalTransferProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleATHInternalTransferProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHInternalTransferProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleATHInternalTransferProfileAvatar(source: ATHInternalTransferProfileAvatar) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.sender_owner);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.notify_value);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserATHInternalTransferProfileAvatar(): DictionaryValue<ATHInternalTransferProfileAvatar> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHInternalTransferProfileAvatar(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHInternalTransferProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
@@ -1963,6 +2266,7 @@ export type ATHWallet$Data = {
     ath_master_address: Address;
     pending_notifications: Dictionary<bigint, PendingAthTransferNotification>;
     processed_notifications: Dictionary<bigint, bigint>;
+    pruned_notification_acks: Dictionary<bigint, bigint>;
 }
 
 export function storeATHWallet$Data(src: ATHWallet$Data) {
@@ -1973,6 +2277,7 @@ export function storeATHWallet$Data(src: ATHWallet$Data) {
         b_0.storeAddress(src.ath_master_address);
         b_0.storeDict(src.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification());
         b_0.storeDict(src.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
+        b_0.storeDict(src.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
     };
 }
 
@@ -1983,7 +2288,8 @@ export function loadATHWallet$Data(slice: Slice) {
     const _ath_master_address = sc_0.loadAddress();
     const _pending_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), sc_0);
     const _processed_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications };
+    const _pruned_notification_acks = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks };
 }
 
 export function loadTupleATHWallet$Data(source: TupleReader) {
@@ -1992,7 +2298,8 @@ export function loadTupleATHWallet$Data(source: TupleReader) {
     const _ath_master_address = source.readAddress();
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
     const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications };
+    const _pruned_notification_acks = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks };
 }
 
 export function loadGetterTupleATHWallet$Data(source: TupleReader) {
@@ -2001,7 +2308,8 @@ export function loadGetterTupleATHWallet$Data(source: TupleReader) {
     const _ath_master_address = source.readAddress();
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
     const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications };
+    const _pruned_notification_acks = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks };
 }
 
 export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
@@ -2011,6 +2319,7 @@ export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
     builder.writeAddress(source.ath_master_address);
     builder.writeCell(source.pending_notifications.size > 0 ? beginCell().storeDictDirect(source.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification()).endCell() : null);
     builder.writeCell(source.processed_notifications.size > 0 ? beginCell().storeDictDirect(source.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
+    builder.writeCell(source.pruned_notification_acks.size > 0 ? beginCell().storeDictDirect(source.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
     return builder.build();
 }
 
@@ -2484,6 +2793,7 @@ export type RegisterMessagingKeys = {
     sign_pubkey: bigint;
     pq_kem_pubkey_hash: bigint;
     pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
     crypto_suite_mask: bigint;
 }
 
@@ -2495,6 +2805,7 @@ export function storeRegisterMessagingKeys(src: RegisterMessagingKeys) {
         b_0.storeUint(src.sign_pubkey, 256);
         b_0.storeUint(src.pq_kem_pubkey_hash, 256);
         b_0.storeUint(src.pq_kem_pubkey_len, 16);
+        b_0.storeRef(src.pq_kem_pubkey);
         b_0.storeUint(src.crypto_suite_mask, 16);
     };
 }
@@ -2506,8 +2817,9 @@ export function loadRegisterMessagingKeys(slice: Slice) {
     const _sign_pubkey = sc_0.loadUintBig(256);
     const _pq_kem_pubkey_hash = sc_0.loadUintBig(256);
     const _pq_kem_pubkey_len = sc_0.loadUintBig(16);
+    const _pq_kem_pubkey = sc_0.loadRef();
     const _crypto_suite_mask = sc_0.loadUintBig(16);
-    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function loadTupleRegisterMessagingKeys(source: TupleReader) {
@@ -2515,8 +2827,9 @@ export function loadTupleRegisterMessagingKeys(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function loadGetterTupleRegisterMessagingKeys(source: TupleReader) {
@@ -2524,8 +2837,9 @@ export function loadGetterTupleRegisterMessagingKeys(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function storeTupleRegisterMessagingKeys(source: RegisterMessagingKeys) {
@@ -2534,6 +2848,7 @@ export function storeTupleRegisterMessagingKeys(source: RegisterMessagingKeys) {
     builder.writeNumber(source.sign_pubkey);
     builder.writeNumber(source.pq_kem_pubkey_hash);
     builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
     builder.writeNumber(source.crypto_suite_mask);
     return builder.build();
 }
@@ -2555,6 +2870,7 @@ export type ReplaceMessagingKeys = {
     sign_pubkey: bigint;
     pq_kem_pubkey_hash: bigint;
     pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
     crypto_suite_mask: bigint;
 }
 
@@ -2566,6 +2882,7 @@ export function storeReplaceMessagingKeys(src: ReplaceMessagingKeys) {
         b_0.storeUint(src.sign_pubkey, 256);
         b_0.storeUint(src.pq_kem_pubkey_hash, 256);
         b_0.storeUint(src.pq_kem_pubkey_len, 16);
+        b_0.storeRef(src.pq_kem_pubkey);
         b_0.storeUint(src.crypto_suite_mask, 16);
     };
 }
@@ -2577,8 +2894,9 @@ export function loadReplaceMessagingKeys(slice: Slice) {
     const _sign_pubkey = sc_0.loadUintBig(256);
     const _pq_kem_pubkey_hash = sc_0.loadUintBig(256);
     const _pq_kem_pubkey_len = sc_0.loadUintBig(16);
+    const _pq_kem_pubkey = sc_0.loadRef();
     const _crypto_suite_mask = sc_0.loadUintBig(16);
-    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function loadTupleReplaceMessagingKeys(source: TupleReader) {
@@ -2586,8 +2904,9 @@ export function loadTupleReplaceMessagingKeys(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function loadGetterTupleReplaceMessagingKeys(source: TupleReader) {
@@ -2595,8 +2914,9 @@ export function loadGetterTupleReplaceMessagingKeys(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function storeTupleReplaceMessagingKeys(source: ReplaceMessagingKeys) {
@@ -2605,6 +2925,7 @@ export function storeTupleReplaceMessagingKeys(source: ReplaceMessagingKeys) {
     builder.writeNumber(source.sign_pubkey);
     builder.writeNumber(source.pq_kem_pubkey_hash);
     builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
     builder.writeNumber(source.crypto_suite_mask);
     return builder.build();
 }
@@ -2626,7 +2947,6 @@ export type CreateReceiveIntent = {
     amount: bigint;
     recipient_wallet: Address;
     commitment: bigint;
-    expires_at: bigint;
     client_nonce: bigint;
 }
 
@@ -2638,7 +2958,6 @@ export function storeCreateReceiveIntent(src: CreateReceiveIntent) {
         b_0.storeUint(src.amount, 128);
         b_0.storeAddress(src.recipient_wallet);
         b_0.storeUint(src.commitment, 256);
-        b_0.storeUint(src.expires_at, 32);
         b_0.storeUint(src.client_nonce, 64);
     };
 }
@@ -2650,9 +2969,8 @@ export function loadCreateReceiveIntent(slice: Slice) {
     const _amount = sc_0.loadUintBig(128);
     const _recipient_wallet = sc_0.loadAddress();
     const _commitment = sc_0.loadUintBig(256);
-    const _expires_at = sc_0.loadUintBig(32);
     const _client_nonce = sc_0.loadUintBig(64);
-    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce };
+    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, client_nonce: _client_nonce };
 }
 
 export function loadTupleCreateReceiveIntent(source: TupleReader) {
@@ -2660,9 +2978,8 @@ export function loadTupleCreateReceiveIntent(source: TupleReader) {
     const _amount = source.readBigNumber();
     const _recipient_wallet = source.readAddress();
     const _commitment = source.readBigNumber();
-    const _expires_at = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
-    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce };
+    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, client_nonce: _client_nonce };
 }
 
 export function loadGetterTupleCreateReceiveIntent(source: TupleReader) {
@@ -2670,9 +2987,8 @@ export function loadGetterTupleCreateReceiveIntent(source: TupleReader) {
     const _amount = source.readBigNumber();
     const _recipient_wallet = source.readAddress();
     const _commitment = source.readBigNumber();
-    const _expires_at = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
-    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce };
+    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, client_nonce: _client_nonce };
 }
 
 export function storeTupleCreateReceiveIntent(source: CreateReceiveIntent) {
@@ -2681,7 +2997,6 @@ export function storeTupleCreateReceiveIntent(source: CreateReceiveIntent) {
     builder.writeNumber(source.amount);
     builder.writeAddress(source.recipient_wallet);
     builder.writeNumber(source.commitment);
-    builder.writeNumber(source.expires_at);
     builder.writeNumber(source.client_nonce);
     return builder.build();
 }
@@ -2806,6 +3121,9 @@ export type PublishPrivateFromVault = {
     header_0_hash: bigint;
     header_1_hash: bigint;
     body_hash: bigint;
+    header_0: Cell;
+    header_1: Cell;
+    body: Cell;
     protocol_fee_paid: bigint;
 }
 
@@ -2821,6 +3139,9 @@ export function storePublishPrivateFromVault(src: PublishPrivateFromVault) {
         b_0.storeUint(src.header_1_hash, 256);
         const b_1 = new Builder();
         b_1.storeUint(src.body_hash, 256);
+        b_1.storeRef(src.header_0);
+        b_1.storeRef(src.header_1);
+        b_1.storeRef(src.body);
         b_1.storeUint(src.protocol_fee_paid, 128);
         b_0.storeRef(b_1.endCell());
     };
@@ -2837,8 +3158,11 @@ export function loadPublishPrivateFromVault(slice: Slice) {
     const _header_1_hash = sc_0.loadUintBig(256);
     const sc_1 = sc_0.loadRef().beginParse();
     const _body_hash = sc_1.loadUintBig(256);
+    const _header_0 = sc_1.loadRef();
+    const _header_1 = sc_1.loadRef();
+    const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPrivateFromVault(source: TupleReader) {
@@ -2849,8 +3173,11 @@ export function loadTuplePublishPrivateFromVault(source: TupleReader) {
     const _header_0_hash = source.readBigNumber();
     const _header_1_hash = source.readBigNumber();
     const _body_hash = source.readBigNumber();
+    const _header_0 = source.readCell();
+    const _header_1 = source.readCell();
+    const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
@@ -2861,8 +3188,11 @@ export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
     const _header_0_hash = source.readBigNumber();
     const _header_1_hash = source.readBigNumber();
     const _body_hash = source.readBigNumber();
+    const _header_0 = source.readCell();
+    const _header_1 = source.readCell();
+    const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPrivateFromVault(source: PublishPrivateFromVault) {
@@ -2874,6 +3204,9 @@ export function storeTuplePublishPrivateFromVault(source: PublishPrivateFromVaul
     builder.writeNumber(source.header_0_hash);
     builder.writeNumber(source.header_1_hash);
     builder.writeNumber(source.body_hash);
+    builder.writeCell(source.header_0);
+    builder.writeCell(source.header_1);
+    builder.writeCell(source.body);
     builder.writeNumber(source.protocol_fee_paid);
     return builder.build();
 }
@@ -2895,7 +3228,10 @@ export type PublishPublicFromVault = {
     publish_id: bigint;
     marketing_note: bigint;
     author_wallet: Address;
+    header_hash: bigint;
     body_hash: bigint;
+    header: Cell;
+    body: Cell;
     protocol_fee_paid: bigint;
 }
 
@@ -2908,7 +3244,10 @@ export function storePublishPublicFromVault(src: PublishPublicFromVault) {
         b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
         const b_1 = new Builder();
+        b_1.storeUint(src.header_hash, 256);
         b_1.storeUint(src.body_hash, 256);
+        b_1.storeRef(src.header);
+        b_1.storeRef(src.body);
         b_1.storeUint(src.protocol_fee_paid, 128);
         b_0.storeRef(b_1.endCell());
     };
@@ -2922,9 +3261,12 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
     const sc_1 = sc_0.loadRef().beginParse();
+    const _header_hash = sc_1.loadUintBig(256);
     const _body_hash = sc_1.loadUintBig(256);
+    const _header = sc_1.loadRef();
+    const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicFromVault(source: TupleReader) {
@@ -2932,9 +3274,12 @@ export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _publish_id = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
+    const _header_hash = source.readBigNumber();
     const _body_hash = source.readBigNumber();
+    const _header = source.readCell();
+    const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
@@ -2942,9 +3287,12 @@ export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _publish_id = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
+    const _header_hash = source.readBigNumber();
     const _body_hash = source.readBigNumber();
+    const _header = source.readCell();
+    const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, body_hash: _body_hash, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
@@ -2953,7 +3301,10 @@ export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault)
     builder.writeNumber(source.publish_id);
     builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
+    builder.writeNumber(source.header_hash);
     builder.writeNumber(source.body_hash);
+    builder.writeCell(source.header);
+    builder.writeCell(source.body);
     builder.writeNumber(source.protocol_fee_paid);
     return builder.build();
 }
@@ -3303,7 +3654,6 @@ export type ReceiveIntent = {
     asset: bigint;
     amount: bigint;
     commitment: bigint;
-    expires_at: bigint;
     client_nonce: bigint;
     created_at: bigint;
     claimed: boolean;
@@ -3317,10 +3667,9 @@ export function storeReceiveIntent(src: ReceiveIntent) {
         b_0.storeUint(src.asset, 8);
         b_0.storeUint(src.amount, 128);
         b_0.storeUint(src.commitment, 256);
-        b_0.storeUint(src.expires_at, 32);
         b_0.storeUint(src.client_nonce, 64);
+        b_0.storeUint(src.created_at, 32);
         const b_1 = new Builder();
-        b_1.storeUint(src.created_at, 32);
         b_1.storeBit(src.claimed);
         b_0.storeRef(b_1.endCell());
     };
@@ -3333,12 +3682,11 @@ export function loadReceiveIntent(slice: Slice) {
     const _asset = sc_0.loadUintBig(8);
     const _amount = sc_0.loadUintBig(128);
     const _commitment = sc_0.loadUintBig(256);
-    const _expires_at = sc_0.loadUintBig(32);
     const _client_nonce = sc_0.loadUintBig(64);
+    const _created_at = sc_0.loadUintBig(32);
     const sc_1 = sc_0.loadRef().beginParse();
-    const _created_at = sc_1.loadUintBig(32);
     const _claimed = sc_1.loadBit();
-    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadTupleReceiveIntent(source: TupleReader) {
@@ -3347,11 +3695,10 @@ export function loadTupleReceiveIntent(source: TupleReader) {
     const _asset = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
-    const _expires_at = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadGetterTupleReceiveIntent(source: TupleReader) {
@@ -3360,11 +3707,10 @@ export function loadGetterTupleReceiveIntent(source: TupleReader) {
     const _asset = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
-    const _expires_at = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
 }
 
 export function storeTupleReceiveIntent(source: ReceiveIntent) {
@@ -3374,7 +3720,6 @@ export function storeTupleReceiveIntent(source: ReceiveIntent) {
     builder.writeNumber(source.asset);
     builder.writeNumber(source.amount);
     builder.writeNumber(source.commitment);
-    builder.writeNumber(source.expires_at);
     builder.writeNumber(source.client_nonce);
     builder.writeNumber(source.created_at);
     builder.writeBoolean(source.claimed);
@@ -3400,6 +3745,7 @@ export type KeyRecord = {
     sign_pubkey: bigint;
     pq_kem_pubkey_hash: bigint;
     pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
     crypto_suite_mask: bigint;
     created_at: bigint;
     created_lt: bigint;
@@ -3417,6 +3763,7 @@ export function storeKeyRecord(src: KeyRecord) {
         const b_1 = new Builder();
         b_1.storeUint(src.pq_kem_pubkey_hash, 256);
         b_1.storeUint(src.pq_kem_pubkey_len, 16);
+        b_1.storeRef(src.pq_kem_pubkey);
         b_1.storeUint(src.crypto_suite_mask, 16);
         b_1.storeUint(src.created_at, 32);
         b_1.storeUint(src.created_lt, 64);
@@ -3435,12 +3782,13 @@ export function loadKeyRecord(slice: Slice) {
     const sc_1 = sc_0.loadRef().beginParse();
     const _pq_kem_pubkey_hash = sc_1.loadUintBig(256);
     const _pq_kem_pubkey_len = sc_1.loadUintBig(16);
+    const _pq_kem_pubkey = sc_1.loadRef();
     const _crypto_suite_mask = sc_1.loadUintBig(16);
     const _created_at = sc_1.loadUintBig(32);
     const _created_lt = sc_1.loadUintBig(64);
     const _revoked_at = sc_1.loadUintBig(32);
     const _revoked_lt = sc_1.loadUintBig(64);
-    return { $$type: 'KeyRecord' as const, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
+    return { $$type: 'KeyRecord' as const, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
 }
 
 export function loadTupleKeyRecord(source: TupleReader) {
@@ -3450,12 +3798,13 @@ export function loadTupleKeyRecord(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _created_lt = source.readBigNumber();
     const _revoked_at = source.readBigNumber();
     const _revoked_lt = source.readBigNumber();
-    return { $$type: 'KeyRecord' as const, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
+    return { $$type: 'KeyRecord' as const, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
 }
 
 export function loadGetterTupleKeyRecord(source: TupleReader) {
@@ -3465,12 +3814,13 @@ export function loadGetterTupleKeyRecord(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _created_lt = source.readBigNumber();
     const _revoked_at = source.readBigNumber();
     const _revoked_lt = source.readBigNumber();
-    return { $$type: 'KeyRecord' as const, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
+    return { $$type: 'KeyRecord' as const, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
 }
 
 export function storeTupleKeyRecord(source: KeyRecord) {
@@ -3481,6 +3831,7 @@ export function storeTupleKeyRecord(source: KeyRecord) {
     builder.writeNumber(source.sign_pubkey);
     builder.writeNumber(source.pq_kem_pubkey_hash);
     builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
     builder.writeNumber(source.crypto_suite_mask);
     builder.writeNumber(source.created_at);
     builder.writeNumber(source.created_lt);
@@ -3652,7 +4003,6 @@ export type VaultReceiveIntentView = {
     asset: bigint;
     amount: bigint;
     commitment: bigint;
-    expires_at: bigint;
     client_nonce: bigint;
     created_at: bigint;
     claimed: boolean;
@@ -3668,9 +4018,8 @@ export function storeVaultReceiveIntentView(src: VaultReceiveIntentView) {
         const b_1 = new Builder();
         b_1.storeInt(src.amount, 257);
         b_1.storeInt(src.commitment, 257);
-        b_1.storeInt(src.expires_at, 257);
+        b_1.storeInt(src.client_nonce, 257);
         const b_2 = new Builder();
-        b_2.storeInt(src.client_nonce, 257);
         b_2.storeInt(src.created_at, 257);
         b_2.storeBit(src.claimed);
         b_1.storeRef(b_2.endCell());
@@ -3687,12 +4036,11 @@ export function loadVaultReceiveIntentView(slice: Slice) {
     const sc_1 = sc_0.loadRef().beginParse();
     const _amount = sc_1.loadIntBig(257);
     const _commitment = sc_1.loadIntBig(257);
-    const _expires_at = sc_1.loadIntBig(257);
+    const _client_nonce = sc_1.loadIntBig(257);
     const sc_2 = sc_1.loadRef().beginParse();
-    const _client_nonce = sc_2.loadIntBig(257);
     const _created_at = sc_2.loadIntBig(257);
     const _claimed = sc_2.loadBit();
-    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadTupleVaultReceiveIntentView(source: TupleReader) {
@@ -3702,11 +4050,10 @@ export function loadTupleVaultReceiveIntentView(source: TupleReader) {
     const _asset = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
-    const _expires_at = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadGetterTupleVaultReceiveIntentView(source: TupleReader) {
@@ -3716,11 +4063,10 @@ export function loadGetterTupleVaultReceiveIntentView(source: TupleReader) {
     const _asset = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
-    const _expires_at = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, expires_at: _expires_at, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
 }
 
 export function storeTupleVaultReceiveIntentView(source: VaultReceiveIntentView) {
@@ -3731,7 +4077,6 @@ export function storeTupleVaultReceiveIntentView(source: VaultReceiveIntentView)
     builder.writeNumber(source.asset);
     builder.writeNumber(source.amount);
     builder.writeNumber(source.commitment);
-    builder.writeNumber(source.expires_at);
     builder.writeNumber(source.client_nonce);
     builder.writeNumber(source.created_at);
     builder.writeBoolean(source.claimed);
@@ -3758,6 +4103,7 @@ export type VaultKeyRecordView = {
     sign_pubkey: bigint;
     pq_kem_pubkey_hash: bigint;
     pq_kem_pubkey_len: bigint;
+    pq_kem_pubkey: Cell;
     crypto_suite_mask: bigint;
     created_at: bigint;
     created_lt: bigint;
@@ -3776,6 +4122,7 @@ export function storeVaultKeyRecordView(src: VaultKeyRecordView) {
         b_1.storeInt(src.sign_pubkey, 257);
         b_1.storeInt(src.pq_kem_pubkey_hash, 257);
         b_1.storeInt(src.pq_kem_pubkey_len, 257);
+        b_1.storeRef(src.pq_kem_pubkey);
         const b_2 = new Builder();
         b_2.storeInt(src.crypto_suite_mask, 257);
         b_2.storeInt(src.created_at, 257);
@@ -3799,6 +4146,7 @@ export function loadVaultKeyRecordView(slice: Slice) {
     const _sign_pubkey = sc_1.loadIntBig(257);
     const _pq_kem_pubkey_hash = sc_1.loadIntBig(257);
     const _pq_kem_pubkey_len = sc_1.loadIntBig(257);
+    const _pq_kem_pubkey = sc_1.loadRef();
     const sc_2 = sc_1.loadRef().beginParse();
     const _crypto_suite_mask = sc_2.loadIntBig(257);
     const _created_at = sc_2.loadIntBig(257);
@@ -3806,7 +4154,7 @@ export function loadVaultKeyRecordView(slice: Slice) {
     const sc_3 = sc_2.loadRef().beginParse();
     const _revoked_at = sc_3.loadIntBig(257);
     const _revoked_lt = sc_3.loadIntBig(257);
-    return { $$type: 'VaultKeyRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
+    return { $$type: 'VaultKeyRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
 }
 
 export function loadTupleVaultKeyRecordView(source: TupleReader) {
@@ -3817,12 +4165,13 @@ export function loadTupleVaultKeyRecordView(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _created_lt = source.readBigNumber();
     const _revoked_at = source.readBigNumber();
     const _revoked_lt = source.readBigNumber();
-    return { $$type: 'VaultKeyRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
+    return { $$type: 'VaultKeyRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
 }
 
 export function loadGetterTupleVaultKeyRecordView(source: TupleReader) {
@@ -3833,12 +4182,13 @@ export function loadGetterTupleVaultKeyRecordView(source: TupleReader) {
     const _sign_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
+    const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _created_lt = source.readBigNumber();
     const _revoked_at = source.readBigNumber();
     const _revoked_lt = source.readBigNumber();
-    return { $$type: 'VaultKeyRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
+    return { $$type: 'VaultKeyRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, key_generation: _key_generation, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask, created_at: _created_at, created_lt: _created_lt, revoked_at: _revoked_at, revoked_lt: _revoked_lt };
 }
 
 export function storeTupleVaultKeyRecordView(source: VaultKeyRecordView) {
@@ -3850,6 +4200,7 @@ export function storeTupleVaultKeyRecordView(source: VaultKeyRecordView) {
     builder.writeNumber(source.sign_pubkey);
     builder.writeNumber(source.pq_kem_pubkey_hash);
     builder.writeNumber(source.pq_kem_pubkey_len);
+    builder.writeCell(source.pq_kem_pubkey);
     builder.writeNumber(source.crypto_suite_mask);
     builder.writeNumber(source.created_at);
     builder.writeNumber(source.created_lt);
@@ -4455,7 +4806,7 @@ function initATHWallet_init_args(src: ATHWallet_init_args) {
 }
 
 async function ATHWallet_init(balance: bigint, owner_address: Address, ath_master_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241022f01000df3000114ff00f4a413f4bcf2c80b01020162022904dad001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019ed37ffa40fa40f404f40455406c158e10810101d700fa40fa40552003d1586d6de206e3027025d74920c21f953105d31f06de21821041544801bae30221821041544805bae30221821041544810ba030c0e0f046e048020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae30220821041544817ba0405060700d230d33fd37f59328136b3f84224c705f2f48136b422c200f2f45141a0708040067f04c8598210415448045003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5400be30d33fd37f593281378c22c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5400be30d33fd37f59328137f022c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5402ee8e5f30d33fd37f59328138b822c200f2f45141a0708040067f04c8598210415448135003cb1fcb3fcb7fc92543144700441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed54e0208210472d9d7dbae302821089129d5fbae3025f060809015030d33fd37fd31f55203310571046103512db3cc87f01ca0055405045cb7f12cecef400f400c9ed540a014ed33fd37fd31f55203310571046103512db3cc87f01ca0055405045cb7f12cecef400f400c9ed540a04e88137fa21c200f2f48137fb5381bef2f41047103645765357db3c228101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e28137fc216eb3f2f46f23308137fd511abaf2f4103645468137fe5167db3c500bba16f2f45127a15034810101f45a3055035177db3c7053942c281f0b01bedb3c707f541ab880400ec855308210415448125005cb1f13cb3fcb7fcecec910361059104a103b103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0044432001fe5b04d33fd37ffa40308136b0f84226c705f2f48136b122c200f2f48136b25362bef2f48136b55315c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15162a1715414367f04c855308210415448025005cb1f13cb3fcb7fcecec92404075520441359c8cf8580ca00cf8440ce01fa020d0042806acf40f400c901fb004034c87f01ca0055405045cb7f12cecef400f400c9ed5401ec5b04d33fd37ffa4030813840f84225c705f2f481384122c200f2f481384226c000f2f4813843f8416f24135f0382082dc6c0bef2f45151a082080f42407004705147c855208210415448065004cb1f12cb3fcb7fcec910474730441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00403419043ce30221821041544814bae30221821041544816bae30221821041544812ba1012141803fc5b04d33fd37ffa40fa4030813778f84227c705f2f48137795316c705f2f481377a23c200f2f481377b5373bef2f482083d090081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a15173a1041036458925db3c70541074db3c7f541c96710dc855308210415448125005cb1f13cb3fcb7fcecec9106710591f201100a61048103a41b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb004134c87f01ca0055405045cb7f12cecef400f400c9ed5404fc5b04d33fd37ffa40fa40d430d0fa40d37f308137dcf84229c705f2f48137dd5338c705f2f48137de5324c705f2f48137df25c200f2f48137e021c200f2f48137e15395bef2f48137e2218209c9c380bef2f410481037469a2adb3c208208989680a08137e3f8416f24135f0322bef2f4516aa1553129db3c705410b4db3c151f201302f4509c7f7127544d30011111011112c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a105a104c103d48b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0301a113164440db3c171904fc5b04d33fd37ffa40fa40d37fd3078138a4f8422ac705f2f48138a55349c705f2f48138a626c200f2f48138a723c200f2f48138a853a6bef2f48138a9238209c9c380bef2f41049103847ab27db3c208208989680a08138aaf8416f24135f0322bef2f45167a155312bdb3c705410d4db3c4a907f7127513f4f1301111201151f2016002482080f4240a082086acfc0a082081e8480a002d61113c855608210415448175008cb1f16cb3f14cb7f12cececb7fcb07cec9106b104d103947c0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f035005a1415013db3c1719004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003f48f765b04d33fd37ffa40fa403081378223c200f2f4813783f84210581047103649a6db3c16c70519f2f4813784f8416f24135f0382081e8480bef2f45124a0708040077f07c8598210415448115003cb1fcb3fcb7fc91048473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00443012e0211f191a002ac87f01ca0055405045cb7f12cecef400f400c9ed54044a821041544815bae30221821041544817bae302218210472d9d7ebae302218210504e5052ba1b1e232604fe5b04d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842104a103948bc25db3c1dc7051bf2f48137e85382c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082086acfc0a082081e8480a0bef2f44014503a541909db3c55405365db3c8137eb238101012359f40c6fa131b3f2f41f282c1c02fc8137ec298209c9c380bef2f4554053b7db3c8137ed81010154431359f40c6fa131b3f2f4514ca0810101f823546df0c855205023cecb7fcb1fc94170206e953059f45a30944133f415e2717f54488052ee12c855308210472d9d7d5005cb1f13cb3fcb7fcb1fcec9104910384b60441359c8cf8580ca00cf8440ce01fa02241d00b6806acf40f400c901fb0082080f42407004700ac8598210415448115003cb1fcb3fcb7fc91047473019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00441359c87f01ca0055405045cb7f12cecef400f400c9ed5404fc5b04d33fd37ffa40fa40d37fd3078138ae26c200f2f48138aff842104b103a49cd26db3c1ec7051cf2f48138b02ac200f2f48138b1f8416f24135f032b82080f4240a082086acfc0a082081e8480a0bef2f44014503b541a0bdb3c55405375db3c8138b2238101012359f40c6fa131b3f2f48138b32c8209c9c380bef2f41f282c21016820fa4430705825db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0200026f82ac87001ca0055215023810101cf00cecec902fe554053d8db3c8138b481010154431359f40c6fa131b3f2f45147a0810101f823546fa0c855205023cecb7fcb1fc94170206e953059f45a30944133f415e2717f2951491049030211100250dc1034c85550821089129d5f5007cb1f15cb3f13cb7fcb1fcecb07cec9544114103a48cc441359c8cf8580ca00cf8440ce01fa02242200b2806acf40f400c901fb0082080f424070047004c8598210415448115003cb1fcb3fcb7fc910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004133c87f01ca0055405045cb7f12cecef400f400c9ed5404f25b04d33fd37fd31f30813804f84226c705f2f481380522c200f2f41045103545675357db3c228101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2813806216eb3f2f46f2330813807511abaf2f4103645468138085167db3c500bba16f2f44614034858db3c810101512214182c2824250024c8821041544e4901cb1f58cf16cb3fc9f9000062216e955b59f45a3098c801cf004133f442e25054810101f45a304403c87f01ca0055405045cb7f12cecef400f400c9ed54015ce30236c00005c12115b08e1c8132c8f2f04034c87f01ca0055405045cb7f12cecef400f400c9ed54e05f05f2c0822702fc5b04d33fd31f3010451034436626db3c228101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e281380e216eb3f2f46f233110471036457681380f08db3c5009ba17f2f4813810f8230682015180a016be15f2f45024810101f45a305004c87f01ca0055405045cb7f12cecef400f400c9ed542c280026c8821041544e4901cb1f01cf16c9f900a9381f0201482a2d0161bb1c5ed44d0d200019ed37ffa40fa40f404f40455406c158e10810101d700fa40fa40552003d1586d6de25514db3c6c5482b0166db3c810101230259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206e96307070545500e06f237f55202c000a01aa1f01a0015dbbb02ed44d0d200019ed37ffa40fa40f404f40455406c158e10810101d700fa40fa40552003d1586d6de2db3c6c5382e00065474325690c8a0');
+    const __code = Cell.fromHex('b5ee9c7241023e0100132f000114ff00f4a413f4bcf2c80b01020162023804f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de207e3027026d74920c21f953106d31f07de21821041544801bae30221821041544805bae30221821041544810ba030d0f10046e058020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae30220821041544817ba0405060700e230d33fd37f59328136b3f84225c705f2f48136b422c200f2f45151a0708040077f04c8598210415448045003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f593281378c22c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f59328137f022c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5403fe8e6730d33fd37f59328138b822c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544819bae302208210472d9d7dbae3022008090a00ce30d33fd37f593281392622c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016430d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540b02f2821089129d5fba8eb230d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e08210a11a7001ba8eb1d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f070b0b03f68137fa21c200f2f48137fff8416f24135f038208895440bef2f48137fb5391bef2f455525387db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e28137fc216eb3f2f46f23308137fd511abaf2f41047103645768137fe5167db3c500bba16f2f45137a15063810101f45a303b350c02d840155033045177db3c705395db3c707f541db980400ec855308210415448125005cb1f13cb3fcb7fcecec91036105c104a103b103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb005522122c2d01fe5b05d33fd37ffa40308136b0f84227c705f2f48136b122c200f2f48136b25372bef2f48136b55316c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15172a1715414377f04c855308210415448025005cb1f13cb3fcb7fcecec92504085520441359c8cf8580ca00cf8440ce01fa020e0052806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5401f05b05d33fd37ffa4030813840f84226c705f2f481384122c200f2f481384227c000f2f4813843f8416f24135f0382082dc6c0bef2f45161a082080f42407004705148c855208210415448065004cb1f12cb3fcb7fcec910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035551230043ce30221821041544814bae30221821041544816bae30221821041544818ba1113161904da5b05d33fd37ffa40fa4030813778f84228c705f2f48137795317c705f2f410575e3346895389db3c81377a27c200f2f481377b5367bef2f482083d090081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a15167a1554029db3c705410b5db3c7f541ba7710fc81b2c2d1200e455308210415448125005cb1f13cb3fcb7fcecec9106b10581049103c41a0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00505503c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fe5b05d33fd37ffa40fa40d430d0fa40d37f308137dcf8422ac705f2f48137dd5339c705f2f48137de5324c705f2f410591048103746ab5376db3c8137df29c200f2f48137e02cc200f2f48137e15369bef2f48137e22c8209c9c380bef2f42bdb3c208208989680a08137e3f8416f24135f0322bef2f4517aa1554129db3c701b1d2c1402fc5410b5db3c50dc7f7128544d30011112011113c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a1057104d103e4cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0358a110371615132d15013e4440db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542104ea5b05d33fd37ffa40fa40d37fd3078138a4f8422bc705f2f48138a5534ac705f2f4105a1049103847bc5398db3c8138a62bc200f2f48138a728c200f2f48138a8536bbef2f48138a9288209c9c380bef2f427db3c208208989680a08138aaf8416f24135f0322bef2f4517ca155412bdb3c705410d51b1d2c1702fcdb3c4ae07f7128513f4f13011113011114c855608210415448175008cb1f16cb3f14cb7f12cececb7fcb07cec9106b105b104e10394cd0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0301a110471046415014132d18013adb3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5421043ce30221821041544812bae30221821041544815bae30221821041544817ba1a22232704fc5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd30730813912f8422ec705f2f4813913537dc705f2f4105d104c103b4aef5376db3c81391429c200f2f48139152ec200f2f48139165369bef2f48139172e8209c9c380bef2f42ddb3c208208989680a0813918f8416f24135f0322bef2f4517aa1554129db3c701b1d2c1e035410478139082705104710394078db3c17f2f4550481390908db3c18f2f4550581390a07db3c17f2f455041c1c1c000afa4430c000002482080f4240a082086acfc0a082081e8480a003fe5410b5db3c105d104c7f7128516d0605111505041114040311130302111202011116011117c85590821041544819500bcb1f19cb3f17cb7f15ce13cecb7f01c8cbff12cb3f12cb7f12cb0f12cb07cdc91035104a10394cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c9012d1f20001a58cf8680cf8480f400f400cf810162fb00f8416f24135f035004a11057104615103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5421004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002f05b05d33fd37ffa40fa403081378223c200f2f4813783f84210691058104710394ab9db3c19c7051af2f4813784f8416f24135f0382081e8480bef2f45134a0708040077f07c8598210415448115003cb1fcb3fcb7fc91049473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004055032c3004f45b05d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842105b104a103948cd2bdb3c1ec7051cf2f48137e85383c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082086acfc0a082081e8480a0bef2f410354014503b541a09db3c555053b6db3c8137eb24810101232c353b2402fc59f40c6fa131b3f2f48137ec298209c9c380bef2f48137ed238101012359f40c6fa131b3f2f4516da0810101f82352d0561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f544d9052fe12c855308210472d9d7d5005cb1f13cb3fcb7fcb1fcec9104910384b70441359c8cf8580ca0089252600011000cacf16ce01fa02806acf40f400c901fb0082080f42407009700bc8598210415448115003cb1fcb3fcb7fc9104749301a441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54043ce30221821041544819bae302218210472d9d7ebae302218210504e5052ba282b313404fe5b05d33fd37ffa40fa40d37fd3078138ae26c200f2f48138aff842105c104b103a49de26db3c1fc7051df2f48138b02ac200f2f48138b1f8416f24135f032b82080f4240a082086acfc0a082081e8480a0bef2f410354014503c541b0cdb3c55505376db3c8138b2248101012359f40c6fa131b3f2f48138b32c8209c9c3802c353b2901fcbef2f48138b4238101012359f40c6fa131b3f2f4516da0810101f823561001561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f29514f104a030211110250dc1034c85550821089129d5f5007cb1f15cb3f13cb7fcb1fcecb07cec923103a48dd441359c8cf8580ca00cf8440ce01fa022a00c8806acf40f400c901fb0082080f42407004700ac8598210415448115003cb1fcb3fcb7fc91048483019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00103510341023c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fa5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd3073081391c29c200f2f481391df842105f104e103d102c01111001111129db3c01111201c70501111001f2f481391e26c200f2f481391ff8416f24135f032782080f4240a082086acfc0a082081e8480a0bef2f410354014503f541e07db3c555053a6db3c2c353b2e016820fa4430705826db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d02d0026f82ac87001ca0055215023810101cf00cecec901ea813920248101012359f40c6fa131b3f2f481392156118209c9c380bef2f4813922238101012359f40c6fa131b3f2f4516aa0810101f823546bd0c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f2c517c107a06105c041114040311120302111102011110010f1067c82f01fe55808210a11a7001500acb1f18cb3f16cb7f14cb1f12cecbffcb3fcb7fcb0fcb07c92804103c4baa441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f424070047004c8598210415448115003cb1fcb3fcb7fc910474730441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035144330300036c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fc5b05d33fd37fd31f30813804f84227c705f2f481380522c200f2f4478727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206ee3026f2330813807511bbaf2f4555181380807db3c5009ba16f2f481010120103654471350aa216e955b59f45a3098c801cf004133f442e250463b323533008a3037810101530150994133f40c6fa19401d70030925b6de2813806216eb3f2f481380908ba17f2f45513c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54004c810101f45a301510344013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fe8ffd5b05d33fd31f30105610451034437727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e281380e216eb3f2f46f23105910481037469881380f07db3c500bba16f2f4813810f8230882015180a018be17f2f4810101541400546690216e955b59f45a3098c801cf004133f442e23b3536370026c8821041544e4901cb1f01cf16c9f900a9381f008a8101012010395446135099216e955b59f45a3098c801cf004133f442e25034810101f45a304015504403c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54006ae037c00006c12116b08e248132c8f2f010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f06f2c082020148393c017dbb1c5ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de25515db3c6c6483a0166db3c810101240259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206e96307070545600e06f237f55203b000a01aa1f01a00179bbb02ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de2db3c6c6383d000654754376b9c80b');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initATHWallet_init_args({ $$type: 'ATHWallet_init_args', balance, owner_address, ath_master_address })(builder);
@@ -4562,18 +4913,21 @@ const ATHWallet_types: ABIType[] = [
     {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PruneStaleNotification","header":1347309650,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"AthTransferNotificationMintUsername","header":2299698527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"AthTransferNotificationProfileAvatar","header":2702864385,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHTransferRequestWithNotify","header":1096042516,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferRequestMintUsername","header":1096042518,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"ATHTransferRequestProfileAvatar","header":1096042520,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHInternalTransfer","header":1096042514,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHInternalTransferWithNotify","header":1096042517,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHInternalTransferMintUsername","header":1096042519,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"ATHInternalTransferProfileAvatar","header":1096042521,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferFailed","header":1096042515,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}}]},
+    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pruned_notification_acks","type":{"kind":"dict","key":"int","value":"int"}}]},
     {"name":"BindDeploymentManifest","header":2430787787,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"counterpart_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"BindOfficialAthWallet","header":417017035,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
@@ -4583,24 +4937,24 @@ const ATHWallet_types: ABIType[] = [
     {"name":"TopUpMessageBudget","header":2258722706,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"SetSession","header":4282367168,"fields":[{"name":"session_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"RevokeSession","header":3676097982,"fields":[]},
-    {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
-    {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
-    {"name":"CreateReceiveIntent","header":4152424723,"fields":[{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"CreateReceiveIntent","header":4152424723,"fields":[{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ClaimReceiveIntent","header":2582433020,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"secret32","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"CancelReceiveIntent","header":841519988,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
-    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PrunePendingPublish","header":1913380205,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"TopUpStorageReserve","header":840283645,"fields":[]},
     {"name":"PendingAthWithdrawal","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"refundable_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingPublish","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"session_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"budget_epoch","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"capsulehub_call_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"refundable_budget_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
-    {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"message_budget_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"budget_epoch","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"SessionState","header":null,"fields":[{"name":"session_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"session_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"expires_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"message_budget_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"active","type":{"kind":"simple","type":"bool","optional":false}}]},
-    {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"expires_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
-    {"name":"VaultKeyRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"VaultKeyRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultUserView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"ton_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"message_budget_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"budget_epoch","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultSessionView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"session_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"session_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"expires_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"active","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultPendingAthWithdrawalView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
@@ -4619,12 +4973,15 @@ const ATHWallet_opcodes = {
     "AthTransferNotificationAck": 1194171774,
     "PruneStaleNotification": 1347309650,
     "AthTransferNotificationMintUsername": 2299698527,
+    "AthTransferNotificationProfileAvatar": 2702864385,
     "ATHTransferRequest": 1096042512,
     "ATHTransferRequestWithNotify": 1096042516,
     "ATHTransferRequestMintUsername": 1096042518,
+    "ATHTransferRequestProfileAvatar": 1096042520,
     "ATHInternalTransfer": 1096042514,
     "ATHInternalTransferWithNotify": 1096042517,
     "ATHInternalTransferMintUsername": 1096042519,
+    "ATHInternalTransferProfileAvatar": 1096042521,
     "ATHTransferAck": 1096042513,
     "ATHTransferFailed": 1096042515,
     "BindDeploymentManifest": 2430787787,
@@ -4664,9 +5021,11 @@ const ATHWallet_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequest"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestWithNotify"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestMintUsername"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestProfileAvatar"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferWithNotify"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferMintUsername"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferProfileAvatar"}},
     {"receiver":"internal","message":{"kind":"typed","type":"AthTransferNotificationAck"}},
     {"receiver":"internal","message":{"kind":"typed","type":"PruneStaleNotification"}},
     {"receiver":"internal","message":{"kind":"empty"}},
@@ -4693,6 +5052,7 @@ export const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT = 30000000n;
 export const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT = 5000000n;
 export const VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT = 3000000n;
 export const VAULT_PENDING_PUBLISH_STALE_TTL = 86400n;
+export const VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL = 86400n;
 export const VAULT_DEPOSIT_TON_EXEC_RESERVE = 2000000n;
 export const VAULT_STATE_GROWTH_EXEC_RESERVE = 2000000n;
 export const VAULT_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
@@ -4704,10 +5064,14 @@ export const ASSET_TON = 1n;
 export const ASSET_ATH = 2n;
 export const RECEIVE_INTENT_ID_DOMAIN = 1380141380n;
 export const RECEIVE_INTENT_COMMITMENT_DOMAIN = 1380139853n;
-export const MAX_RECEIVE_INTENT_TTL = 2592000n;
 export const CRYPTO_SUITE_CLASSICAL = 1n;
 export const CRYPTO_SUITE_HYBRID = 2n;
 export const MLKEM768_PUBKEY_LEN = 1184n;
+export const MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES = 127n;
+export const MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES = 41n;
+export const MLKEM768_PUBKEY_SNAKE_CELLS = 10n;
+export const MLKEM768_PUBKEY_SNAKE_BITS = 9472n;
+export const MLKEM768_PUBKEY_SNAKE_REFS = 9n;
 export const MAX_SESSION_TTL = 2592000n;
 export const UINT64_MAX = 18446744073709551615n;
 export const UINT64_MOD = 18446744073709551616n;
@@ -4743,8 +5107,7 @@ export const CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE = 1000000n;
 export const CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE = 1000000n;
 export const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE = 1000000n;
 export const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 4000000n;
-export const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 3000000n;
-export const CAPSULEHUB_PAGE_STORAGE_ENDOWMENT = 10000000n;
+export const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 1000000n;
 export const CAPSULEHUB_ACK_FORWARD_RESERVE = 30000000n;
 export const OP_BIND_DEPLOYMENT_MANIFEST = 2430787787n;
 export const OP_BIND_OFFICIAL_ATH_WALLET = 417017035n;
@@ -4784,7 +5147,7 @@ export class ATHWallet implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHBurn | ATHGenesisSupplyCredit | ATHTransferRequest | ATHTransferRequestWithNotify | ATHTransferRequestMintUsername | ATHInternalTransfer | ATHInternalTransferWithNotify | ATHInternalTransferMintUsername | AthTransferNotificationAck | PruneStaleNotification | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHBurn | ATHGenesisSupplyCredit | ATHTransferRequest | ATHTransferRequestWithNotify | ATHTransferRequestMintUsername | ATHTransferRequestProfileAvatar | ATHInternalTransfer | ATHInternalTransferWithNotify | ATHInternalTransferMintUsername | ATHInternalTransferProfileAvatar | AthTransferNotificationAck | PruneStaleNotification | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHBurn') {
@@ -4802,6 +5165,9 @@ export class ATHWallet implements Contract {
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestMintUsername') {
             body = beginCell().store(storeATHTransferRequestMintUsername(message)).endCell();
         }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestProfileAvatar') {
+            body = beginCell().store(storeATHTransferRequestProfileAvatar(message)).endCell();
+        }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransfer') {
             body = beginCell().store(storeATHInternalTransfer(message)).endCell();
         }
@@ -4810,6 +5176,9 @@ export class ATHWallet implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferMintUsername') {
             body = beginCell().store(storeATHInternalTransferMintUsername(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferProfileAvatar') {
+            body = beginCell().store(storeATHInternalTransferProfileAvatar(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'AthTransferNotificationAck') {
             body = beginCell().store(storeAthTransferNotificationAck(message)).endCell();

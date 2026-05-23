@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: CapsuleHub
-BoC Size: 3353 bytes
+BoC Size: 2872 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 22
+Total structures: 24
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -53,21 +53,13 @@ Signature: `BindDeploymentManifest{deployment_manifest_hash:uint256,counterpart_
 TL-B: `seal_genesis#3a12d1ad deployment_manifest_hash:uint256 = SealGenesis`
 Signature: `SealGenesis{deployment_manifest_hash:uint256}`
 
-### PublishPrivateDirect
-TL-B: `publish_private_direct#7a0ebfef size_class:uint8 crypto_suite:uint8 header_0_hash:uint256 header_1_hash:uint256 body_hash:uint256 protocol_fee_paid:uint128 = PublishPrivateDirect`
-Signature: `PublishPrivateDirect{size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,protocol_fee_paid:uint128}`
-
-### PublishPublicDirect
-TL-B: `publish_public_direct#dd65eef9 marketing_note:uint152 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicDirect`
-Signature: `PublishPublicDirect{marketing_note:uint152,author_wallet:address,body_hash:uint256,protocol_fee_paid:uint128}`
-
 ### PublishPrivateFromVault
-TL-B: `publish_private_from_vault#a4f862c0 bounce_id:uint64 publish_id:uint256 size_class:uint8 crypto_suite:uint8 header_0_hash:uint256 header_1_hash:uint256 body_hash:uint256 protocol_fee_paid:uint128 = PublishPrivateFromVault`
-Signature: `PublishPrivateFromVault{bounce_id:uint64,publish_id:uint256,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,protocol_fee_paid:uint128}`
+TL-B: `publish_private_from_vault#a4f862c0 bounce_id:uint64 publish_id:uint256 size_class:uint8 crypto_suite:uint8 header_0_hash:uint256 header_1_hash:uint256 body_hash:uint256 header_0:^cell header_1:^cell body:^cell protocol_fee_paid:uint128 = PublishPrivateFromVault`
+Signature: `PublishPrivateFromVault{bounce_id:uint64,publish_id:uint256,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,header_0:^cell,header_1:^cell,body:^cell,protocol_fee_paid:uint128}`
 
 ### PublishPublicFromVault
-TL-B: `publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 marketing_note:uint152 author_wallet:address body_hash:uint256 protocol_fee_paid:uint128 = PublishPublicFromVault`
-Signature: `PublishPublicFromVault{bounce_id:uint64,publish_id:uint256,marketing_note:uint152,author_wallet:address,body_hash:uint256,protocol_fee_paid:uint128}`
+TL-B: `publish_public_from_vault#8c2a76b7 bounce_id:uint64 publish_id:uint256 marketing_note:uint152 author_wallet:address header_hash:uint256 body_hash:uint256 header:^cell body:^cell protocol_fee_paid:uint128 = PublishPublicFromVault`
+Signature: `PublishPublicFromVault{bounce_id:uint64,publish_id:uint256,marketing_note:uint152,author_wallet:address,header_hash:uint256,body_hash:uint256,header:^cell,body:^cell,protocol_fee_paid:uint128}`
 
 ### CapsuleHubPublishAck
 TL-B: `capsule_hub_publish_ack#874e576a publish_id:uint256 entry_id:uint64 entry_uid:uint256 = CapsuleHubPublishAck`
@@ -86,15 +78,37 @@ TL-B: `deposit_protocol_fee#ff775609 amount:uint128 = DepositProtocolFee`
 Signature: `DepositProtocolFee{amount:uint128}`
 
 ### CapsuleHubStateView
-TL-B: `_ sealed:bool vault_bound:bool deployment_manifest_hash:int257 private_latest_id:int257 public_latest_id:int257 accrued_plato_fee_ton:int257 fee_accumulator_address:address vault_address:address genesis_controller_address:address private_page_count:int257 public_page_count:int257 private_entry_count:int257 public_entry_count:int257 last_private_entry_id:int257 last_public_entry_id:int257 last_private_entry_uid:int257 last_public_entry_uid:int257 = CapsuleHubStateView`
-Signature: `CapsuleHubStateView{sealed:bool,vault_bound:bool,deployment_manifest_hash:int257,private_latest_id:int257,public_latest_id:int257,accrued_plato_fee_ton:int257,fee_accumulator_address:address,vault_address:address,genesis_controller_address:address,private_page_count:int257,public_page_count:int257,private_entry_count:int257,public_entry_count:int257,last_private_entry_id:int257,last_public_entry_id:int257,last_private_entry_uid:int257,last_public_entry_uid:int257}`
+TL-B: `_ sealed:bool vault_bound:bool deployment_manifest_hash:int257 private_latest_id:int257 public_latest_id:int257 accrued_plato_fee_ton:int257 fee_accumulator_address:address vault_address:address genesis_controller_address:address = CapsuleHubStateView`
+Signature: `CapsuleHubStateView{sealed:bool,vault_bound:bool,deployment_manifest_hash:int257,private_latest_id:int257,public_latest_id:int257,accrued_plato_fee_ton:int257,fee_accumulator_address:address,vault_address:address,genesis_controller_address:address}`
+
+### PrivateCapsuleEntry
+TL-B: `_ entry_id:uint64 entry_uid:uint256 publish_id:uint256 author_wallet:address size_class:uint8 crypto_suite:uint8 header_0_hash:uint256 header_1_hash:uint256 body_hash:uint256 header_0:^cell header_1:^cell body:^cell created_at:uint32 = PrivateCapsuleEntry`
+Signature: `PrivateCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,header_0:^cell,header_1:^cell,body:^cell,created_at:uint32}`
+
+### PublicCapsuleEntry
+TL-B: `_ entry_id:uint64 entry_uid:uint256 publish_id:uint256 author_wallet:address header_hash:uint256 body_hash:uint256 header:^cell body:^cell created_at:uint32 = PublicCapsuleEntry`
+Signature: `PublicCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,header_hash:uint256,body_hash:uint256,header:^cell,body:^cell,created_at:uint32}`
+
+### PrivateCapsuleEntryView
+TL-B: `_ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 author_wallet:address size_class:int257 crypto_suite:int257 header_0_hash:int257 header_1_hash:int257 body_hash:int257 header_0:^cell header_1:^cell body:^cell created_at:int257 = PrivateCapsuleEntryView`
+Signature: `PrivateCapsuleEntryView{exists:bool,entry_id:int257,entry_uid:int257,publish_id:int257,author_wallet:address,size_class:int257,crypto_suite:int257,header_0_hash:int257,header_1_hash:int257,body_hash:int257,header_0:^cell,header_1:^cell,body:^cell,created_at:int257}`
+
+### PublicCapsuleEntryView
+TL-B: `_ exists:bool entry_id:int257 entry_uid:int257 publish_id:int257 author_wallet:address header_hash:int257 body_hash:int257 header:^cell body:^cell created_at:int257 = PublicCapsuleEntryView`
+Signature: `PublicCapsuleEntryView{exists:bool,entry_id:int257,entry_uid:int257,publish_id:int257,author_wallet:address,header_hash:int257,body_hash:int257,header:^cell,body:^cell,created_at:int257}`
 
 ### CapsuleHub$Data
-TL-B: `_ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 accrued_plato_fee_ton:uint128 private_page_count:uint64 public_page_count:uint64 private_entry_count:uint64 public_entry_count:uint64 last_private_entry_id:uint64 last_public_entry_id:uint64 last_private_entry_uid:uint256 last_public_entry_uid:uint256 = CapsuleHub`
-Signature: `CapsuleHub{fee_accumulator_address:address,vault_address:address,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_controller_address:address,private_latest_id:uint64,public_latest_id:uint64,accrued_plato_fee_ton:uint128,private_page_count:uint64,public_page_count:uint64,private_entry_count:uint64,public_entry_count:uint64,last_private_entry_id:uint64,last_public_entry_id:uint64,last_private_entry_uid:uint256,last_public_entry_uid:uint256}`
+TL-B: `_ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<int, ^PrivateCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,header_0:^cell,header_1:^cell,body:^cell,created_at:uint32}> public_entries:dict<int, ^PublicCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,header_hash:uint256,body_hash:uint256,header:^cell,body:^cell,created_at:uint32}> = CapsuleHub`
+Signature: `CapsuleHub{fee_accumulator_address:address,vault_address:address,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_controller_address:address,private_latest_id:uint64,public_latest_id:uint64,accrued_plato_fee_ton:uint128,private_entries:dict<int, ^PrivateCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,size_class:uint8,crypto_suite:uint8,header_0_hash:uint256,header_1_hash:uint256,body_hash:uint256,header_0:^cell,header_1:^cell,body:^cell,created_at:uint32}>,public_entries:dict<int, ^PublicCapsuleEntry{entry_id:uint64,entry_uid:uint256,publish_id:uint256,author_wallet:address,header_hash:uint256,body_hash:uint256,header:^cell,body:^cell,created_at:uint32}>}`
 
 ## Get methods
-Total get methods: 1
+Total get methods: 3
+
+## get_private_entry
+Argument: entryId
+
+## get_public_entry
+Argument: entryId
 
 ## get_state
 No arguments

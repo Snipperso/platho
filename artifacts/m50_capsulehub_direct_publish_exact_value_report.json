@@ -2,6 +2,7 @@
   "profile": "PLATHO.V1.M50.CAPSULEHUB_DIRECT_PUBLISH_EXACT_VALUE",
   "date": "2026-05-21",
   "status": "PASS",
+  "supersededNote": "2026-05-22 final v1 removed the separate page-storage reserve. Page counters are metadata-only. Later final v1 dynamic PWA pricing re-opened context.value >= required for direct publishes so the official client can attach a rounded network-fee surcharge above the base value. Current pricing source of truth: artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md.",
   "finding": "CAPHUB-01",
   "contract": "CapsuleHub",
   "codeChange": {
@@ -16,15 +17,15 @@
       "coverage": [
         "private direct publish rejects required minus one",
         "private direct publish rejects required plus one",
-        "public direct same-page overpay using first-page reserve is rejected",
-        "public direct same-page exact no-page value succeeds"
+        "public direct overpay is rejected",
+        "public direct exact value succeeds"
       ]
     },
     {
       "file": "tests/capsulehub.test.ts",
       "coverage": [
         "direct publish happy paths use exact required values",
-        "same-page public direct publish uses the no-page exact value",
+        "public direct publish uses the final fixed exact value",
         "fee accrual and flush setup no longer depends on broad direct overpayment"
       ]
     },

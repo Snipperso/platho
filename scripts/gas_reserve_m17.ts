@@ -1,4 +1,4 @@
-import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { keyPairFromSeed, sign } from '@ton/crypto';
 import { createHash } from 'crypto';
@@ -7,7 +7,7 @@ import * as path from 'path';
 
 import { ATHWallet, ATHTransferRequest, ATHBurn } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
-import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal, PublishPrivateDirect, PublishPublicDirect } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal, PublishPrivateFromVault, PublishPublicFromVault } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator, DepositProtocolFee, SplitAccumulated, FlushTreasuryDue, FlushBuybackDue } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
   UsernameRegistry,
@@ -45,9 +45,31 @@ const OP_PRIVATE = 0x686694C6n;
 const KIND_PRIVATE = 1n;
 const SIZE_STANDARD = 1n;
 const SUITE_CLASSICAL = 1n;
-const BODY_HASH = 0x1111000000000000000000000000000000000000000000000000000000000001n;
-const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
-const HEADER1 = 0x3333000000000000000000000000000000000000000000000000000000000003n;
+
+function snakeCell(byteLength: number, fill = 0x61): Cell {
+  const bytes = Buffer.alloc(byteLength, fill);
+  let tail: Cell | null = null;
+  for (let offset = bytes.length; offset > 0;) {
+    const start = Math.max(0, offset - 127);
+    const builder = beginCell().storeBuffer(bytes.subarray(start, offset));
+    if (tail) builder.storeRef(tail);
+    tail = builder.endCell();
+    offset = start;
+  }
+  return tail ?? beginCell().endCell();
+}
+
+const BODY_CELL = snakeCell(1140, 0x62);
+const HEADER0_CELL = snakeCell(104, 0x30);
+const HEADER1_CELL = snakeCell(30, 0x31);
+const CAPSULE_PRIVATE_BODY_CELL = snakeCell(1140, 0x64);
+const CAPSULE_PRIVATE_HEADER0_CELL = snakeCell(140, 0x32);
+const CAPSULE_PRIVATE_HEADER1_CELL = snakeCell(30, 0x33);
+const CAPSULE_PUBLIC_HEADER_CELL = snakeCell(68, 0x50);
+const CAPSULE_PUBLIC_BODY_CELL = snakeCell(1024, 0x70);
+const BODY_HASH = BigInt(`0x${BODY_CELL.hash().toString('hex')}`);
+const HEADER0 = BigInt(`0x${HEADER0_CELL.hash().toString('hex')}`);
+const HEADER1 = BigInt(`0x${HEADER1_CELL.hash().toString('hex')}`);
 
 export type M17TxMetric = {
   total_fees_nanotons: string;
@@ -263,37 +285,47 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({ address, code: init.code, data: init.data, balance: toNano('2'), workchain: address.workChain }));
   const capsule = blockchain.openContract(new CapsuleHub(address, init));
-  const privateValue = 23_000_000n;
-  const publicValue = 22_000_000n;
+  const privateValue = 43_000_000n;
+  const publicValue = 40_000_000n;
   const flushValue = toNano('0.05');
-  const privateRes = await capsule.send(author.getSender(), { value: privateValue }, {
-    $$type: 'PublishPrivateDirect',
+  const privateRes = await capsule.send(blockchain.sender(vaultAddress), { value: privateValue }, {
+    $$type: 'PublishPrivateFromVault',
+    bounce_id: 17_101n,
+    publish_id: GENESIS_HASH,
     size_class: 1n,
     crypto_suite: 1n,
-    header_0_hash: 1n,
-    header_1_hash: 2n,
-    body_hash: 3n,
+    header_0_hash: BigInt(`0x${CAPSULE_PRIVATE_HEADER0_CELL.hash().toString('hex')}`),
+    header_1_hash: BigInt(`0x${CAPSULE_PRIVATE_HEADER1_CELL.hash().toString('hex')}`),
+    body_hash: BigInt(`0x${CAPSULE_PRIVATE_BODY_CELL.hash().toString('hex')}`),
+    header_0: CAPSULE_PRIVATE_HEADER0_CELL,
+    header_1: CAPSULE_PRIVATE_HEADER1_CELL,
+    body: CAPSULE_PRIVATE_BODY_CELL,
     protocol_fee_paid: 5_000_000n,
-  } as PublishPrivateDirect);
-  const publicRes = await capsule.send(author.getSender(), { value: publicValue }, {
-    $$type: 'PublishPublicDirect',
+  } as PublishPrivateFromVault);
+  const publicRes = await capsule.send(blockchain.sender(vaultAddress), { value: publicValue }, {
+    $$type: 'PublishPublicFromVault',
+    bounce_id: 17_102n,
+    publish_id: GENESIS_HASH + 1n,
     author_wallet: author.address,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
-    body_hash: 4n,
+    header_hash: BigInt(`0x${CAPSULE_PUBLIC_HEADER_CELL.hash().toString('hex')}`),
+    body_hash: BigInt(`0x${CAPSULE_PUBLIC_BODY_CELL.hash().toString('hex')}`),
+    header: CAPSULE_PUBLIC_HEADER_CELL,
+    body: CAPSULE_PUBLIC_BODY_CELL,
     protocol_fee_paid: 5_000_000n,
-  } as PublishPublicDirect);
+  } as PublishPublicFromVault);
   const state = await capsule.getGetState();
-  if (state.private_entry_count !== 1n || state.public_entry_count !== 1n) {
-    throw new Error('CapsuleHub direct publish scenario did not create both entries');
+  if (state.private_latest_id !== 1n || state.public_latest_id !== 1n) {
+    throw new Error('CapsuleHub Vault publish scenario did not create both entries');
   }
   // No FeeAccumulator contract is deployed here; this measures CapsuleHub send path and bounce recovery.
   const flushRes = await capsule.send(deployer.getSender(), { value: flushValue }, {
     $$type: 'FlushFees',
     amount: 5_000_000n,
   } as any);
-  return scenario('CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE', [
-    opMetric('private_direct_publish', privateValue, privateRes),
-    opMetric('public_direct_publish', publicValue, publicRes),
+  return scenario('CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE', [
+    opMetric('private_vault_publish', privateValue, privateRes),
+    opMetric('public_vault_publish', publicValue, publicRes),
     opMetric('flush_fee_to_missing_accumulator_bounce', flushValue, flushRes),
   ]);
 }
@@ -479,6 +511,7 @@ async function buildExternalRequest(params: { vault: any; owner: Address; sessio
   const signature = sign(bigintToBuffer(sigHash), params.secretKey);
   const hashesRef = beginCell().storeUint(BODY_HASH, 256).storeUint(HEADER0, 256).storeUint(HEADER1, 256).endCell();
   const signatureRef = beginCell().storeBuffer(signature).endCell();
+  const payloadRef = beginCell().storeRef(HEADER0_CELL).storeRef(HEADER1_CELL).storeRef(BODY_CELL).endCell();
   return beginCell()
     .storeUint(MAGIC, 32)
     .storeUint(VERSION, 8)
@@ -493,6 +526,7 @@ async function buildExternalRequest(params: { vault: any; owner: Address; sessio
     .storeUint(params.maxCharge, 128)
     .storeRef(hashesRef)
     .storeRef(signatureRef)
+    .storeRef(payloadRef)
     .endCell()
     .beginParse();
 }
