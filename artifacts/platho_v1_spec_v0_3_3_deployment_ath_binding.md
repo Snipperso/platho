@@ -7,6 +7,8 @@
 
 **BuybackBurn ABI note, 2026-05-20:** this v0.3.3 table is superseded for active BuybackBurn ABI by `artifacts/M29_BUYBACKBURN_ABI_AND_EVIDENCE_REVIEW.md`. The production source of truth is the BY* table implemented in `contracts/BuybackBurn.tact` and exported by `build/BuybackBurn/BuybackBurn_BuybackBurn.ts`; older `ExecuteBuyback` / `BuybackBounceRecovery` / `PruneStuckBuyback` names below are historical milestone context only.
 
+**CapsuleHub final note, 2026-05-22:** this document is superseded for CapsuleHub message storage, binary capsule layout, and publish pricing by `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores retrievable payload cells and removed the separate page-storage reserve; page counters are metadata-only.
+
 ---
 
 ## 0. Core Philosophy
@@ -318,9 +320,23 @@ If none can be implemented, the flush operation is not part of v1.
 
 ### 5.1 Purpose
 
-CapsuleHub v1 anchors accepted private encrypted message entries and public post entries with sequential counters, page counters, latest entry metadata, deterministic entry UIDs, and protocol-fee accounting.
+CapsuleHub v1 stores accepted private encrypted message entries and public post entries with sequential counters, page counters, latest entry metadata, deterministic entry UIDs, retrievable payload records, and protocol-fee accounting.
 
-CapsuleHub v1 is intentionally counter-only / anchor-only. It does not store full retrievable on-chain page maps or full entry payload records. Encrypted capsule packages are carried by replaceable no-backend transports; the contract records acceptance metadata and fee accounting only.
+CapsuleHub v1 stores encrypted payload cells on-chain. Replaceable PWA transports may cache or share encrypted packages, but they are not the source of truth for delivered messages. The contract must expose retrievable entry records keyed by entry id so the PWA can reconstruct messages from chain state.
+
+This is a hard v1 invariant, not an optimization target: a private message or public post is not considered published unless the encrypted body payload cell itself is persisted in CapsuleHub state and can be fetched later from chain state. A hash-only record, counter-only record, off-chain package pointer, local PWA cache entry, static config entry, IPFS/Ton Storage pointer, or other carrier artifact is not a message record for v1.
+
+Payload-size limits, useful-text limits, image limits, and chunk limits are defined only against bytes that are actually serialized into these on-chain payload cells. It is invalid to advertise a useful payload capacity that cannot be reconstructed from CapsuleHub without a backend or local cache.
+
+The final private capsule cell format is binary, not JSON:
+
+```text
+header_0_cell = PH0B binary header, exactly 140 bytes
+header_1_cell = PH1B binary header, exactly 30 bytes
+body_cell     = platho.byte-layout.v1 encrypted body
+```
+
+The encrypted body plaintext uses the final `PCP1` slot defined in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`: encrypted metadata plus exactly one 1024-byte user payload slot. Standard and postquantum capsules expose the same useful capacity per capsule. Smaller messages are padded inside the encrypted plaintext. Long text/images use multiple capsules with encrypted `stream_id`, `part_index`, and `part_count`; a single capsule must not contain multiple 1024-byte slots. Exact body sizes are: standard = 1,140 bytes; postquantum = 2,228 bytes.
 
 It does not parse private payload semantics, recipient identity, private conversation state, wallet balances, ATH discount ownership, or receive-intent secrets.
 
@@ -343,6 +359,8 @@ last_private_entry_id: uint64
 last_public_entry_id: uint64
 last_private_entry_uid: uint256
 last_public_entry_uid: uint256
+private_entries: map<uint64, PrivateCapsuleEntry>
+public_entries: map<uint64, PublicCapsuleEntry>
 
 accrued_plato_fee_ton: coins
 ```

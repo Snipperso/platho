@@ -4,9 +4,13 @@ Date: 2026-05-21
 
 Status: local hardening pass after CapsuleHub session 6 audit finding `CAPHUB-01`. This is not a mainnet production approval.
 
+Superseded note 2026-05-22: final v1 removed the separate page-storage reserve entirely. Page counters are metadata-only, and direct publish exactness now applies to a fixed same-profile value rather than a first-page/no-page split.
+
+Superseded note 2026-05-22: final v1 dynamic PWA pricing re-opened `context.value >= required` for direct publishes so the official client can attach a rounded network-fee surcharge above the base value. Manual broad overpayment is no longer a contract-level concern; the current pricing source of truth is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+
 ## Finding
 
-Direct CapsuleHub publish paths accepted any value greater than or equal to the computed required amount. If the sender overpaid, for example by attaching a first-page reserve after another entry had already created the page, the publish succeeded and the excess TON remained as unaccounted CapsuleHub balance.
+Direct CapsuleHub publish paths accepted any value greater than or equal to the computed required amount. Before final v1 removed the page-storage charge, this could happen by attaching a boundary-page value after another entry had already created the page. The publish succeeded and the excess TON remained as unaccounted CapsuleHub balance.
 
 Vault-mediated publish was not changed in this pass. That path intentionally accepts a caller envelope and returns ACK/excess value to Vault.
 
@@ -27,8 +31,8 @@ The change is intentionally narrow: direct users no longer silently donate overp
 
 - private direct publish rejects `required - 1`;
 - private direct publish rejects `required + 1`;
-- public direct same-page overpay using the first-page reserve is rejected;
-- exact same-page public direct value still succeeds.
+- public direct overpay is rejected;
+- exact public direct value still succeeds.
 
 `tests/capsulehub.test.ts` uses exact direct publish values instead of broad `0.1 TON` overpayment in the happy paths.
 

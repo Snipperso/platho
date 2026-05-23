@@ -7,6 +7,8 @@
 
 This profile fixes serialization, economic constants, reserve defaults, storage endowments, route placeholders, and test-vector obligations for implementation handoff.
 
+**CapsuleHub final-price note, 2026-05-22:** final v1 removed the separate page-storage reserve. `CAPSULEHUB_PAGE_SIZE` remains indexing metadata only; page boundaries do not change publish price. The canonical capsule byte layout and storage economics source of truth is `PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+
 Values marked **FINAL AFTER GAS TESTS** are conservative implementation-start values. They must be validated by unit/gas tests before code freeze. Do not silently lower them in code.
 
 ---
@@ -271,7 +273,6 @@ CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE = 0.001 TON = 1_000_000 nanotons
 
 CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 0.004 TON = 4_000_000 nanotons
 CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 0.003 TON = 3_000_000 nanotons
-CAPSULEHUB_PAGE_STORAGE_ENDOWMENT = 0.010 TON = 10_000_000 nanotons
 CAPSULEHUB_ACK_FORWARD_RESERVE = 0.030 TON = 30_000_000 nanotons
 ```
 
@@ -323,7 +324,7 @@ page_id = entry_id / 256
 index_in_page = entry_id % 256
 ```
 
-Superseded by the M27 interface decision: CapsuleHub v1 uses separate private and public counters/page counts, not retrievable on-chain page maps.
+Superseded by the M27 interface decision: CapsuleHub v1 uses separate private and public counters/page counts, not retrievable on-chain page maps. Page counters are metadata-only and do not add a per-page publish charge.
 
 ---
 
@@ -336,7 +337,6 @@ MAX_CHARGE_PRIVATE_STANDARD(owner) =
   + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
   + CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE
   + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
-  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
   + CAPSULEHUB_ACK_FORWARD_RESERVE
 
 MAX_CHARGE_PRIVATE_LONG_TERM(owner) =
@@ -345,7 +345,6 @@ MAX_CHARGE_PRIVATE_LONG_TERM(owner) =
   + CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE
   + CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE
   + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
-  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
   + CAPSULEHUB_ACK_FORWARD_RESERVE
 
 MAX_CHARGE_PUBLIC(owner) =
@@ -354,14 +353,10 @@ MAX_CHARGE_PUBLIC(owner) =
   + CAPSULEHUB_PUBLIC_EXEC_RESERVE
   + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
   + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
-  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT
   + CAPSULEHUB_ACK_FORWARD_RESERVE
 ```
 
-Unused page storage reserve returns through ACK excess. CapsuleHub MUST retain the
-protocol-fee backing, execution/storage reserves, and keepalive value for accepted
-Vault publishes; the ACK carries only `CAPSULEHUB_ACK_FORWARD_RESERVE` plus true
-excess value.
+CapsuleHub MUST retain the protocol-fee backing, execution/storage reserves, and keepalive value for accepted Vault publishes; the ACK carries only `CAPSULEHUB_ACK_FORWARD_RESERVE` plus true excess value.
 
 ---
 

@@ -211,6 +211,66 @@ describe('ATH wallet derivation profile', () => {
     expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
   });
 
+  it('ATH Master refunds bounced treasury genesis credit envelope when treasury wallet rejects', async () => {
+    const blockchain = await Blockchain.create();
+    const treasuryOwner = await blockchain.treasury('ath-genesis-bounce-refund-owner');
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterAddress = contractAddress(0, masterInit);
+    await blockchain.setShardAccount(
+      masterAddress,
+      createShardAccount({
+        address: masterAddress,
+        code: masterInit.code,
+        data: masterInit.data,
+        balance: toNano('1'),
+        workchain: masterAddress.workChain,
+      }),
+    );
+
+    const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+    const treasuryWalletAddress = await master.getGetWalletAddress(treasuryOwner.address);
+    const treasuryWalletInit = await ATHWallet.init(0n, treasuryOwner.address, masterAddress);
+    const rejectingWalletDataInit = await ATHWallet.init(1n, treasuryOwner.address, masterAddress);
+    await blockchain.setShardAccount(
+      treasuryWalletAddress,
+      createShardAccount({
+        address: treasuryWalletAddress,
+        code: treasuryWalletInit.code,
+        data: rejectingWalletDataInit.data,
+        balance: toNano('1'),
+        workchain: treasuryWalletAddress.workChain,
+      }),
+    );
+
+    const result = await master.send(treasuryOwner.getSender(), { value: ATH_GENESIS_SUPPLY_REQUIRED_VALUE }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 35n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect(findTransaction(result.transactions, {
+      from: master.address,
+      to: treasuryWalletAddress,
+      success: false,
+    })).toBeDefined();
+    expect(findTransaction(result.transactions, {
+      from: master.address,
+      to: treasuryOwner.address,
+      success: true,
+    })).toBeDefined();
+
+    const retryResult = await master.send(treasuryOwner.getSender(), { value: ATH_GENESIS_SUPPLY_REQUIRED_VALUE }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 36n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect(findTransaction(retryResult.transactions, {
+      from: master.address,
+      to: treasuryWalletAddress,
+    })).toBeDefined();
+  });
+
   it('ATH treasury wallet rejects direct genesis supply credit from a non-master sender', async () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-direct-owner');

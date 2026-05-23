@@ -10,6 +10,7 @@ const productionContracts = [
   'BuybackBurn.tact',
   'CapsuleHub.tact',
   'FeeAccumulator.tact',
+  'ProfileRegistry.tact',
   'UsernameNFTItem.tact',
   'UsernameRegistry.tact',
   'Vault.tact',
@@ -19,6 +20,7 @@ const storageTopUpReceivers: Array<[string, string]> = [
   ['BuybackBurn.tact', 'TopUpStorageReserve'],
   ['CapsuleHub.tact', 'TopUpStorageReserve'],
   ['FeeAccumulator.tact', 'TopUpStorageReserve'],
+  ['ProfileRegistry.tact', 'ProfileRegistryTopUpStorageReserve'],
   ['UsernameNFTItem.tact', 'TopUpStorageReserve'],
   ['UsernameRegistry.tact', 'UsernameRegistryTopUpStorageReserve'],
   ['Vault.tact', 'TopUpStorageReserve'],
@@ -90,6 +92,7 @@ describe('M16 production conformance static checks', () => {
       ['BuybackBurn', 'BuybackBurn_BuybackBurn', 'BUYBACKBURN_CODE_HASH.txt'],
       ['CapsuleHub', 'CapsuleHub_CapsuleHub', 'CAPSULEHUB_CODE_HASH.txt'],
       ['FeeAccumulator', 'FeeAccumulator_FeeAccumulator', 'FEEACCUMULATOR_CODE_HASH.txt'],
+      ['ProfileRegistry', 'ProfileRegistry_ProfileRegistry', 'PROFILE_REGISTRY_CODE_HASH.txt'],
       ['UsernameNFTItem', 'UsernameNFTItem_UsernameNFTItem', 'USERNAME_NFT_ITEM_CODE_HASH.txt'],
       ['UsernameRegistry', 'UsernameRegistry_UsernameRegistry', 'USERNAME_REGISTRY_CODE_HASH.txt'],
       ['Vault', 'Vault_Vault', 'VAULT_CODE_HASH.txt'],
@@ -119,6 +122,8 @@ describe('M16 production conformance static checks', () => {
     expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('30000000000000000');
     expect(manifest.constants.vault_activity_airdrop_reward_per_message_atomic).toBe('10000000000');
     expect(manifest.constants.vault_activity_airdrop_per_wallet_cap_atomic).toBe('0');
+    expect(manifest.constants.profile_avatar_price_ath_atomic).toBe('100000000000');
+    expect(manifest.constants.profile_avatar_max_parts).toBe('16');
     expect(manifest.constants.username_pending_mint_stale_ttl_seconds).toBe('86400');
     expect(manifest.constants.username_item_ack_forward_reserve_nanotons).toBe('3000000');
   });
@@ -138,6 +143,7 @@ describe('M16 production conformance static checks', () => {
       'MockUsernameRegistryAckSink.tact',
       'MockVaultAckSink.tact',
       'MockVaultAthWallet.tact',
+      'ProfileRegistry.tact',
       'UsernameNFTItem.tact',
       'UsernameRegistry.tact',
       'Vault.tact',

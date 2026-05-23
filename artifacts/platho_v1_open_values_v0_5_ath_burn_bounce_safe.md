@@ -5,6 +5,8 @@
 **Companion spec:** `platho_v1_spec_v0_3_1_smoke_clean.md`  
 **Rule:** if a value is not pinned here or in the main v1 spec, it is not part of Platho v1.
 
+**Historical note, 2026-05-22:** this older profile is superseded for CapsuleHub payload storage and publish pricing by `PLATHO_CAPSULE_V1_FINAL_SPEC.md` and `platho_v1_open_values_v0_6.md`. Final v1 removed `CAPSULEHUB_PAGE_STORAGE_ENDOWMENT`; page boundaries are metadata-only.
+
 This profile fixes serialization, economic constants, reserve defaults, storage endowments, route placeholders, and test-vector obligations for implementation handoff.
 
 Values marked **FINAL AFTER GAS TESTS** are conservative implementation-start values. They must be validated by unit/gas tests before code freeze. Do not silently lower them in code.

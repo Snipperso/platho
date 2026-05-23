@@ -1,9 +1,51 @@
 {
   "profile": "PLATHO.V1.AUDIT_FINDINGS_MATRIX",
-  "date": "2026-05-21",
+  "date": "2026-05-22",
   "status": "LIVE_COORDINATION_MATRIX",
   "productionApproval": false,
   "purpose": "Track acknowledged audit findings across rounds so already-triaged issues are not rediscovered as new blockers without new evidence.",
+  "auditSessions": [
+    {
+      "id": "SESSION-VAULT-01",
+      "area": "contracts/Vault.tact local money/liveness audit",
+      "status": "COMPLETED_NO_NEW_VAULT_ONLY_FINDING_CONFIRMED",
+      "summary": "Vault-focused audit did not confirm a new standalone Vault money/stuck bug requiring a contract patch. Pending records, ACK/bounce/fail restoration, stale publish tombstones, and bounded invalid signed external request charging are present in the current implementation.",
+      "focusedRegression": [
+        "tests/vault-session-lifecycle.test.ts",
+        "tests/vault-boundary-negative.test.ts",
+        "tests/vault-external-session-gate.test.ts",
+        "tests/vault-m6-publish.test.ts",
+        "tests/vault-prune-pending-publish.test.ts",
+        "tests/vault-ath-integration.test.ts",
+        "tests/vault-receive-intent.test.ts",
+        "tests/vault-auth-negative-matrix.test.ts",
+        "tests/vault-ath-invariants.test.ts",
+        "tests/vault-ton-state-invariants.test.ts"
+      ],
+      "testResult": "10 test files passed; 49 tests passed",
+      "currentDecision": "No Vault contract patch proposed from this session.",
+      "notFindings": [
+        "External session maxCharge greater than canonical expected max charge is not treated as a Vault bug under the current PWA-controlled surcharge/pricing policy.",
+        "Raw manual overpay in direct user messages is not treated as a contract finding when it does not break protocol accounting.",
+        "Duplicate created_at in the source-level receive intent view is cosmetic only for this audit scope."
+      ],
+      "carriedVerificationItems": [
+        {
+          "id": "SEAM-VATH-AIRDROP-BACKING",
+          "area": "Vault <-> ATHWallet / genesis deployment",
+          "classification": "NOT_A_CONFIRMED_FINDING",
+          "summary": "creditActivityAirdrop credits internal user ATH and decrements the remaining airdrop counter; final genesis/deployment evidence must prove the official Vault ATH wallet is funded for the full airdrop allocation."
+        },
+        {
+          "id": "SEAM-VCAP-ACK-AMOUNT",
+          "area": "Vault <-> CapsuleHub",
+          "classification": "NOT_A_CONFIRMED_FINDING",
+          "summary": "Vault can only refund the TON value it actually receives from CapsuleHub ACK/bounce, capped by the pending/tombstone refundable amount. CapsuleHub ACK/excess value accounting must be verified in the seam audit."
+        }
+      ],
+      "verificationPolicy": "These items are not confirmed Vault bugs. Promote them to findings only if a dedicated seam/deployment pass proves a real under-backed or under-refunded path in an official PWA or release flow."
+    }
+  ],
   "findings": [
     {
       "id": "UNFT-01",
@@ -32,19 +74,145 @@
       "id": "VCAP-01",
       "area": "Vault <-> CapsuleHub late ACK after stale prune",
       "severity": "P2_MONEY_LIVENESS",
-      "status": "ACKNOWLEDGED_OPEN",
-      "summary": "If PrunePendingPublish removes a stale PendingPublish and the real CapsuleHub ACK arrives later, Vault rejects it because routing state is gone. The ACK value is bounce:false, so returned TON becomes raw Vault balance and is not credited to the user.",
+      "status": "FIXED_REGRESSED",
+      "summary": "If PrunePendingPublish removed a stale PendingPublish and the real CapsuleHub ACK arrived later, Vault rejected it because routing state was gone. The ACK value is bounce:false, so returned TON became raw Vault balance and was not credited to the user.",
       "notP0P1Rationale": [
         "Normal Vault -> CapsuleHub publish flow remains passing.",
         "The issue requires delayed ACK/bounce beyond the stale pending TTL.",
         "Forged ACK and forged Vault publish paths remain rejected."
       ],
-      "currentDecision": "Do not close by making ACK bounceable alone; without symmetric CapsuleHub recovery that only moves the stuck-value problem to the other side of the seam.",
-      "preferredFix": "On prune, move minimal routing/refund data into a compact tombstone. Late authenticated ACK/bounce can then credit capped returned TON to active message_budget_ton when the epoch is active, otherwise to ton_balance, until tombstone expiry.",
+      "fix": [
+        "PrunePendingPublish now converts the active PendingPublish record into a compact tombstone in the existing pending_publishes map instead of deleting all routing data.",
+        "The tombstone uses session_id == 0 and keeps owner, budget_epoch, nonce, publish_kind, body_hash, refundable cap, and expiry.",
+        "Late authenticated CapsuleHub ACK refunds capped returned TON to active message_budget_ton when the epoch is active, otherwise to ton_balance, and credits the activity airdrop.",
+        "Late authenticated CapsuleHub bounce refunds capped returned TON without airdrop.",
+        "A second PrunePendingPublish after tombstone expiry deletes the tombstone."
+      ],
+      "currentDecision": "Closed in Vault with a compact tombstone. ACK remains non-bounceable; no new persistent map was added, so external publish pre-accept gas stays within the existing signature-check envelope.",
+      "regressionCoverage": [
+        "tests/vault-prune-pending-publish.test.ts::VAULT-M14-01",
+        "tests/vault-m6-publish.test.ts",
+        "tests/capsulehub.test.ts"
+      ],
       "relatedArtifacts": [
         "artifacts/m38_vault_capsulehub_discounted_fee_dust_seam_report.json",
         "artifacts/MILESTONE_SUMMARY_M38_VAULT_CAPSULEHUB_DISCOUNTED_FEE_DUST_SEAM.md"
       ]
+    },
+    {
+      "id": "CAPHUB-02",
+      "area": "CapsuleHub on-chain payload storage economics",
+      "severity": "P1_PRODUCTION_EVIDENCE_BLOCKER",
+      "status": "FIXED_REGRESSED",
+      "summary": "CapsuleHub now stores retrievable payload cells. Private cells are exact-size. Public entries store compact PPH1 header bytes plus raw public text body bytes, 1..1024 bytes for both posts and comments. Page boundaries have no stored counters and no first-page price lottery, and sandbox economics show retained non-fee balance remains above configured storage reserve for Vault-only publish paths.",
+      "notManualMisuseRationale": [
+        "The official PWA can send normal max-size text or image payload cells.",
+        "The contract accepts max-size payload cells under the current v1 caps.",
+        "Publish fees and storage endowments are not currently size-scaled.",
+        "Protocol fee accrued in CapsuleHub remains a liability owed to FeeAccumulator while storage rent is paid from the same physical balance."
+      ],
+      "currentDecision": "Closed for canonical PWA v1 payloads by exact-size private CapsuleHub gates, bounded public payload gates, and dedicated storage-economics evidence. Hash-only delivery remains forbidden.",
+      "fix": [
+        "Public publish validation now stores compact PPH1 header bytes separately from raw body text, so both posts and comments expose a full 1..1024 body bytes instead of padding to private capsule size.",
+        "Private publish bodies and headers remain exact-size: header0 104 bytes, header1 30 bytes, standard body 1140 bytes, hybrid body 2228 bytes.",
+        "Per-page storage charging was removed from publish pricing; clients can derive page windows from sequential entry ids.",
+        "Direct user publish ABI was removed; public and private publishes now enter CapsuleHub only through Vault so ATH discounts apply consistently.",
+        "A dedicated storage-economics harness verifies retained non-fee balance remains above configured storage reserve after transaction fees and ACK sends."
+      ],
+      "regressionCoverage": [
+        "tests/capsulehub-boundary-negative.test.ts::CAPSULE-PAYLOAD-02",
+        "tests/capsulehub-boundary-negative.test.ts::CAPSULE-PAYLOAD-03",
+        "tests/capsulehub-storage-economics.test.ts::CAPHUB-ECON-01",
+        "tests/spec-onchain-message-source.test.ts::SPEC-MSG-SOURCE-01"
+      ],
+      "relatedArtifacts": [
+        "artifacts/capsulehub_storage_economics_report.json",
+        "artifacts/capsulehub_storage_economics_summary.md",
+        "artifacts/m17_gas_reserve_sanity_report.json",
+        "artifacts/m17_gas_reserve_sanity_summary.md"
+      ]
+    },
+    {
+      "id": "VATH-01",
+      "area": "Vault <-> ATHWallet non-basechain ATH paths",
+      "severity": "P1_MONEY_LIVENESS",
+      "status": "FIXED_REGRESSED",
+      "summary": "Non-basechain ATH deposit and withdrawal paths could become stuck or lossy because wallet derivation allowed other workchains while value envelopes were basechain-sized.",
+      "fix": [
+        "Vault rejects non-basechain AthTransferNotification sender_wallet before ledger credit.",
+        "Vault rejects non-basechain WithdrawAth sender and recipient before user ATH debit or pending state.",
+        "ATHWallet owner-facing transfer, notify-transfer, and mint-notify transfer reject non-basechain source, recipient, or response paths before token debit."
+      ],
+      "regressionCoverage": [
+        "tests/vault-ath-integration.test.ts::VAULT-ATH-03C",
+        "tests/vault-ath-integration.test.ts::VAULT-ATH-03D",
+        "tests/ath-wallet-boundary-negative.test.ts::ATH-BND-09"
+      ],
+      "currentDecision": "ATH user paths are basechain-only for this release. This is not full cross-workchain support."
+    },
+    {
+      "id": "VATH-02",
+      "area": "Vault <-> ATHWallet stale notification prune and duplicate query reuse",
+      "severity": "P1_CONDITIONAL_MONEY_LIVENESS",
+      "status": "FIXED_REGRESSED",
+      "summary": "If Vault processed an ATH deposit notification but the ACK reached the official ATH wallet after pending prune, a later real transfer with the same source/query could become unclaimable backing because Vault treated it as a duplicate without crediting it.",
+      "fix": [
+        "PruneStaleNotification records the notification id as processed before deleting pending state.",
+        "PruneStaleNotification records a pruned ACK tombstone keyed by query and sender key.",
+        "AthTransferNotificationAck is idempotent for a pruned tombstone with matching amount."
+      ],
+      "regressionCoverage": [
+        "tests/ath-wallet-transfer.test.ts::ATH-XFER-05"
+      ],
+      "currentDecision": "Closed at ATHWallet notification state-machine layer. Vault-only handling is insufficient once the official ATH wallet forgets a processed notification id."
+    },
+    {
+      "id": "BATH-01",
+      "area": "BuybackBurn <-> ATHWallet low route notification value",
+      "severity": "P1_CONDITIONAL_LIVENESS",
+      "status": "FIXED_REGRESSED",
+      "summary": "A valid STON.fi ATH output with notify value accepted by ATHWallet but below BuybackBurn immediate-burn minimum could leave BuybackBurn stuck in PENDING_STONFI_SWAP.",
+      "fix": [
+        "BuybackBurn accepts authenticated low-value ATH output after sender, query, source, and amount checks pass.",
+        "BuybackBurn sends AthTransferNotificationAck to the official ATH wallet so the received ATH remains held by the official wallet.",
+        "BuybackBurn records the amount in ath_burn_retry_due_atomic and terminalizes the swap cycle so RetryAthBurnDue can burn it with caller-funded TON."
+      ],
+      "regressionCoverage": [
+        "tests/buybackburn-production.test.ts::BUYBACK-05B"
+      ],
+      "currentDecision": "On-chain recovery is required because this can occur in the honest STON.fi route output flow, not only in manual misuse."
+    },
+    {
+      "id": "BATH-02",
+      "area": "BuybackBurn <-> ATHWallet <-> ATHMaster unsupported ATHMaster workchain",
+      "severity": "P1_CONDITIONAL_DEPLOYMENT_LIVENESS",
+      "status": "CLOSED_BY_RELEASE_GATE_REGRESSED",
+      "summary": "A masterchain or unsupported ATHMaster in production genesis could leave BuybackBurn stuck in PENDING_ATH_BURN because official ATH wallet burn forwarding can fail before ATHBurnFailed reaches BuybackBurn.",
+      "fix": [
+        "BuybackBurn init remains unchanged by policy; unsupported deployment topology is not a PWA user flow.",
+        "Mainnet genesis verifier rejects non-basechain ATHMaster evidence for the current release.",
+        "Final genesis evidence must show buyback_burn.ath_master_address is workchain 0."
+      ],
+      "regressionCoverage": [
+        "tests/mainnet-genesis-verify.test.ts::rejects unsupported masterchain ATHMaster in final mainnet genesis evidence"
+      ],
+      "currentDecision": "Closed at release-verification layer instead of adding unsupported-workchain policy to BuybackBurn init."
+    },
+    {
+      "id": "UNSEAM5-01",
+      "area": "UsernameRegistry <-> ATHWallet <-> ATHMaster unsupported ATHMaster workchain",
+      "severity": "P1_CONDITIONAL_DEPLOYMENT_LIVENESS",
+      "status": "CLOSED_BY_RELEASE_GATE_REGRESSED",
+      "summary": "A masterchain or unsupported ATHMaster in production genesis could leave FlushBurnAthDue pending forever because official Registry ATH wallet burn forwarding can fail before ATHBurnFinalized or ATHBurnFailed reaches UsernameRegistry.",
+      "fix": [
+        "UsernameRegistry init remains unchanged by policy; unsupported deployment topology is not a PWA user flow.",
+        "Mainnet genesis verifier rejects non-basechain ATHMaster evidence for UsernameRegistry in the current release.",
+        "Final genesis evidence must show username_registry.ath_master_address is workchain 0."
+      ],
+      "regressionCoverage": [
+        "tests/mainnet-genesis-verify.test.ts::rejects unsupported masterchain ATHMaster in final mainnet genesis evidence"
+      ],
+      "currentDecision": "Closed at release-verification layer instead of adding unsupported-workchain policy to UsernameRegistry init."
     }
   ]
 }

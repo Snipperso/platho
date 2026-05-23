@@ -298,6 +298,13 @@ contract BuybackBurn {
         self.route_refund_due_ton += value - BUYBACK_ROUTE_REFUND_EXEC_RESERVE;
     }
 
+    fun creditRouteNotifySurplus(value: Int, reservedValue: Int) {
+        if (value <= reservedValue) {
+            return;
+        }
+        self.route_refund_due_ton += value - reservedValue;
+    }
+
     fun sendAthBurn(queryId: Int, amount: Int) {
         message(MessageParameters {
             to: self.official_ath_wallet_address,
@@ -412,10 +419,33 @@ contract BuybackBurn {
         throwUnless(22302, msg.query_id == self.pending_query_id);
         throwUnless(22303, msg.amount >= self.pending_dex_min_out_atomic_ath);
         throwUnless(22304, msg.sender_wallet == self.stonfi_pool_address_ton_ath);
-        throwUnless(22305, context().value >= BUYBACK_ROUTE_NOTIFY_MIN_VALUE);
+        throwUnless(22305, context().value >= BUYBACK_ATH_NOTIFY_ACK_VALUE);
+
+        if (context().value < BUYBACK_ROUTE_NOTIFY_MIN_VALUE) {
+            message(MessageParameters {
+                to: sender(),
+                value: BUYBACK_ATH_NOTIFY_ACK_VALUE,
+                bounce: false,
+                mode: SendDefaultMode,
+                body: AthTransferNotificationAck {
+                    query_id: msg.query_id,
+                    sender_key: msg.sender_key,
+                    amount: msg.amount
+                }.toCell()
+            });
+
+            self.creditRouteNotifySurplus(
+                context().value,
+                BUYBACK_ATH_NOTIFY_ACK_VALUE + BUYBACK_ROUTE_REFUND_EXEC_RESERVE
+            );
+            self.ath_burn_retry_due_atomic += msg.amount;
+            self.finishPendingCycle();
+            return;
+        }
 
         self.phase = BUYBACK_PHASE_PENDING_ATH_BURN;
         self.pending_received_ath_atomic = msg.amount;
+        self.creditRouteNotifySurplus(context().value, BUYBACK_ROUTE_NOTIFY_MIN_VALUE);
 
         message(MessageParameters {
             to: sender(),
@@ -463,7 +493,7 @@ contract BuybackBurn {
         self.requireNextQueryId(msg.query_id);
         throwUnless(22342, msg.amount > 0);
         throwUnless(22343, msg.amount == self.ath_burn_retry_due_atomic);
-        throwUnless(22344, context().value >= BUYBACK_ATH_BURN_REQUEST_VALUE);
+        throwUnless(22344, context().value >= BUYBACK_ATH_BURN_REQUEST_VALUE + BUYBACK_ROUTE_REFUND_EXEC_RESERVE);
 
         self.ath_burn_retry_due_atomic -= msg.amount;
         self.phase = BUYBACK_PHASE_PENDING_ATH_BURN;

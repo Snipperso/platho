@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { Address } from '@ton/core';
+import { createHash } from 'crypto';
 import {
   BUYBACK_FLUSH_CALLER_RESERVE_NANOTONS,
   BUYBACK_FLUSH_ENVELOPE_NANOTONS,
@@ -6,8 +8,12 @@ import {
   createBuybackFlushPreflight,
 } from '../scripts/buyback_flush_preflight';
 
-const FEE_ACCUMULATOR = 'EQFeeAccumulatorM40';
-const BUYBACK_BURN = 'EQBuybackBurnM40';
+function fixtureAddress(label: string, workchain = 0): string {
+  return new Address(workchain, createHash('sha256').update(`PLATHO.V1.BUYBACK.PREFLIGHT.${label}`).digest()).toString();
+}
+
+const FEE_ACCUMULATOR = fixtureAddress('FEE_ACCUMULATOR');
+const BUYBACK_BURN = fixtureAddress('BUYBACK_BURN');
 
 function completeInput(overrides: Partial<BuybackFlushPreflightInput> = {}): BuybackFlushPreflightInput {
   const base: BuybackFlushPreflightInput = {
@@ -83,13 +89,13 @@ describe('BuybackBurn flush preflight guard', () => {
     const report = createBuybackFlushPreflight(completeInput({
       feeAccumulatorState: {
         buyback_due_ton: BUYBACK_FLUSH_ENVELOPE_NANOTONS.toString(),
-        buyback_burn_address: 'EQWrongBuybackBurnM40',
+        buyback_burn_address: fixtureAddress('WRONG_BUYBACK_BURN'),
       },
       buybackBurnConfig: {
         sealed: true,
         route_frozen: true,
         fee_bound: true,
-        fee_accumulator_address: 'EQWrongFeeAccumulatorM40',
+        fee_accumulator_address: fixtureAddress('WRONG_FEE_ACCUMULATOR'),
       },
     }));
 
@@ -121,5 +127,30 @@ describe('BuybackBurn flush preflight guard', () => {
 
     expect(report.ok).toBe(false);
     expect(report.blockers).toContain('INSUFFICIENT_BUYBACK_DUE');
+  });
+
+  it('M40-07: blocks cross-workchain FeeAccumulator and BuybackBurn flush endpoints', () => {
+    const masterchainFeeAccumulator = fixtureAddress('MASTERCHAIN_FEE_ACCUMULATOR', -1);
+    const masterchainBuybackBurn = fixtureAddress('MASTERCHAIN_BUYBACK_BURN', -1);
+    const report = createBuybackFlushPreflight(completeInput({
+      feeAccumulatorAddress: masterchainFeeAccumulator,
+      buybackBurnAddress: masterchainBuybackBurn,
+      feeAccumulatorState: {
+        buyback_due_ton: BUYBACK_FLUSH_ENVELOPE_NANOTONS.toString(),
+        buyback_burn_address: masterchainBuybackBurn,
+      },
+      buybackBurnConfig: {
+        sealed: true,
+        route_frozen: true,
+        fee_bound: true,
+        fee_accumulator_address: masterchainFeeAccumulator,
+      },
+    }));
+
+    expect(report.ok).toBe(false);
+    expect(report.blockers).toContain('FEEACCUMULATORADDRESS_NOT_BASECHAIN');
+    expect(report.blockers).toContain('BUYBACKBURNADDRESS_NOT_BASECHAIN');
+    expect(report.blockers).toContain('FEEACCUMULATORSTATE_BUYBACK_BURN_ADDRESS_NOT_BASECHAIN');
+    expect(report.blockers).toContain('BUYBACKBURNCONFIG_FEE_ACCUMULATOR_ADDRESS_NOT_BASECHAIN');
   });
 });

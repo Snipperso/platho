@@ -343,4 +343,42 @@ describe('ATH wallet/master value boundary negative matrix', () => {
     expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
   });
+
+  it('ATH-BND-09: owner-facing transfers reject non-basechain source or recipient before debit', async () => {
+    const blockchain = await Blockchain.create();
+    const master = fixtureAddress('OWNER_WORKCHAIN_GUARD_MASTER');
+    const masterchainOwner = fixtureAddress('OWNER_WORKCHAIN_GUARD_SOURCE', -1);
+    const baseRecipient = await blockchain.treasury('ath-bnd-workchain-base-recipient');
+    const { wallet: masterchainSourceWallet } = await deployWallet(blockchain, masterchainOwner, master, 1_000n);
+
+    await masterchainSourceWallet.send(blockchain.sender(masterchainOwner), { value: ATH_OWNER_NOTIFY_MIN_VALUE }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 90n,
+      amount: 100n,
+      recipient: baseRecipient.address,
+      response_destination: masterchainOwner,
+      notify_destination: baseRecipient.address,
+      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+    } as ATHTransferRequestWithNotify);
+
+    expect((await masterchainSourceWallet.getGetWalletData()).balance).toBe(1_000n);
+
+    const baseSourceOwner = await blockchain.treasury('ath-bnd-workchain-base-source');
+    const masterchainRecipient = fixtureAddress('OWNER_WORKCHAIN_GUARD_RECIPIENT', -1);
+    const { wallet: baseSourceWallet } = await deployWallet(blockchain, baseSourceOwner.address, master, 1_000n);
+    const { wallet: recipientWallet } = await deployWallet(blockchain, masterchainRecipient, master, 0n);
+
+    await baseSourceWallet.send(baseSourceOwner.getSender(), { value: ATH_OWNER_NOTIFY_MIN_VALUE }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 91n,
+      amount: 100n,
+      recipient: masterchainRecipient,
+      response_destination: baseSourceOwner.address,
+      notify_destination: masterchainRecipient,
+      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
+    } as ATHTransferRequestWithNotify);
+
+    expect((await baseSourceWallet.getGetWalletData()).balance).toBe(1_000n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(0n);
+  });
 });

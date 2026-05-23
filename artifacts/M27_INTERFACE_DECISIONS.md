@@ -2,31 +2,47 @@
 
 Date: 2026-05-20
 
-Status: source-of-truth alignment for audit follow-up. This is not a mainnet production approval.
+Status: superseded by on-chain payload storage fix. This is not a mainnet production approval.
 
 ## CapsuleHub v1
 
-Decision: CapsuleHub v1 is **counter-only / anchor-only**.
+Superseded decision: CapsuleHub v1 is **not** counter-only / anchor-only. Accepted private and public entries must store retrievable on-chain payload cells in CapsuleHub state.
 
-The contract records accepted publish metadata and accounting:
+The contract records accepted publish metadata, accounting, and payload records:
 
 - private/public latest ids;
 - private/public entry counters;
-- private/public page counters;
 - last private/public entry ids and UIDs;
+- private/public entry maps keyed by entry id;
+- private header/body payload cell hashes and payload cells;
+- public body payload cell hashes and payload cells;
 - protocol fee accrual and flush accounting.
 
-It does **not** store full retrievable on-chain `private_pages` or `public_pages` maps in v1. Encrypted capsule packages remain carrier-agnostic and move through replaceable no-backend transports such as files, QR, Web Share, static mirrors, IPFS, TON Storage, or other user-selected carriers.
+It does not need page-map retrieval as the primary API, but it must expose retrievable entry records. Replaceable PWA transports may cache/share encrypted packages, but they are not the source of truth for delivered messages.
 
 Reasoning:
 
-- full page maps would materially increase storage rent and gas requirements;
-- full on-chain retrieval indexes would create stronger metadata permanence than the v1 no-backend privacy model needs;
-- current tests, getters, and PWA assumptions use CapsuleHub as an acceptance/accounting anchor, not as a message database.
+- message bodies must survive without any backend, local config file, IPFS object, or static mirror;
+- storing encrypted cells keeps plaintext private while making delivery state self-contained on-chain;
+- PWA and contract tests now use CapsuleHub as the message database for encrypted payload cells.
 
-Audit implication: absence of page maps is not a code bug for v1. Any future on-chain retrieval interface must reopen CapsuleHub storage economics, getters, wrappers, tests, code hashes, and release evidence.
+Audit implication: missing retrievable payload cells is a v1 blocker. Entry payload storage, getters, wrappers, tests, code hashes, and release evidence must remain aligned.
 
-Public publish marketing marker: CapsuleHub v1 public publish messages carry a fixed byte-aligned `uint152` marker equal to ASCII `sent via Platho.App` in the transaction message body. This is an on-chain annotation only; it is not persisted as retrievable page content and the official messenger UI must not render it as part of the public post text. Private publish messages do not carry the marker.
+Capacity implication: useful message capacity is measured only by bytes that are serialized into the payload cells persisted by CapsuleHub. Hash-only capacity claims, local-cache-only bodies, or off-chain carrier-only bodies are invalid for v1.
+
+Binary layout decision: v1 on-chain private capsule cells are fixed binary bytes, not JSON. `header_0_cell` is exactly 140 bytes (`PH0B`, including the sender wallet avatar pointer), `header_1_cell` is exactly 30 bytes (`PH1B`), and `body_cell` stores `platho.byte-layout.v1`. The canonical byte-for-byte source is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+
+Useful capacity is identical for standard and postquantum capsules: exactly one encrypted 1024-byte user payload slot per capsule. Small messages are zero-padded inside that slot. Long text and images are split into multiple independent capsules whose encrypted metadata carries `stream_id`, `part_index`, and `part_count`. Body sizes are exact: standard body = 1,140 bytes; postquantum body = 2,228 bytes. A single capsule must not contain multiple 1024-byte slots.
+
+Public publish marketing marker: CapsuleHub v1 public publish messages carry a fixed byte-aligned `uint152` marker equal to ASCII `sent via Platho.App` in the transaction message body. Public publish entries store a compact public header cell separately from a raw text body cell, `1..1024` bytes in a snake cell, not padded private capsules. This is an on-chain annotation only; the official messenger UI must not render it as part of the public post text. Private publish messages do not carry the marker.
+
+CapsuleHub does not store page counters. Clients can derive page windows from sequential entry ids. The first entry of a page must not pay a separate page-storage reserve; every capsule of the same publish profile has the same required value.
+
+PWA pricing decision: official public post price is `0.010 TON`; official per-capsule private prices are `0.010 TON` for `classical-v1` and `0.020 TON` for `hybrid-v1`.
+Both include `0.005 TON` of estimated network cost. If the current PWA estimate exceeds `0.005 TON`, the PWA adds the
+overage rounded upward to `0.001 TON` steps. Final v1 publishes are Vault-only; Vault accepts
+`maxCharge >= canonical_max_charge` so the PWA can keep v1 above cost without a contract oracle while applying ATH
+discounts to public and private messages consistently.
 
 ## Storage Top-Up ABI
 

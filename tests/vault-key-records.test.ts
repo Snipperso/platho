@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contractAddress, toNano } from '@ton/core';
+import { Cell, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
@@ -41,6 +41,21 @@ const ENC_1 = 0x3000000000000000000000000000000000000000000000000000000000000003
 const SIG_1 = 0x4000000000000000000000000000000000000000000000000000000000000004n;
 const PQ_HASH = 0x5000000000000000000000000000000000000000000000000000000000000005n;
 
+function snakeCell(byteLength: number, fill = 0x5a): Cell {
+  let tail: Cell | null = null;
+  for (let offset = byteLength; offset > 0;) {
+    const start = Math.max(0, offset - 127);
+    const builder = beginCell().storeBuffer(Buffer.alloc(offset - start, fill));
+    if (tail) builder.storeRef(tail);
+    tail = builder.endCell();
+    offset = start;
+  }
+  return tail ?? beginCell().endCell();
+}
+
+const EMPTY_PQ_CELL = beginCell().endCell();
+const PQ_CELL = snakeCell(1184);
+
 async function registerClassical(vault: any, user: any, value = toNano('0.1')) {
   await vault.send(user.getSender(), { value }, {
     $$type: 'RegisterMessagingKeys',
@@ -48,6 +63,7 @@ async function registerClassical(vault: any, user: any, value = toNano('0.1')) {
     sign_pubkey: SIG_0,
     pq_kem_pubkey_hash: 0n,
     pq_kem_pubkey_len: 0n,
+    pq_kem_pubkey: EMPTY_PQ_CELL,
     crypto_suite_mask: 1n,
   } as RegisterMessagingKeys);
 }
@@ -59,6 +75,7 @@ async function replaceHybrid(vault: any, user: any, value = toNano('0.1')) {
     sign_pubkey: SIG_1,
     pq_kem_pubkey_hash: PQ_HASH,
     pq_kem_pubkey_len: 1184n,
+    pq_kem_pubkey: PQ_CELL,
     crypto_suite_mask: 2n,
   } as ReplaceMessagingKeys);
 }
@@ -84,6 +101,8 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect(record.crypto_suite_mask).toBe(1n);
     expect(record.pq_kem_pubkey_hash).toBe(0n);
     expect(record.pq_kem_pubkey_len).toBe(0n);
+    expect(record.pq_kem_pubkey.bits.length).toBe(0);
+    expect(record.pq_kem_pubkey.refs).toHaveLength(0);
     expect(record.revoked_lt).toBe(0n);
   });
 
@@ -116,6 +135,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect(newRecord.crypto_suite_mask).toBe(2n);
     expect(newRecord.pq_kem_pubkey_hash).toBe(PQ_HASH);
     expect(newRecord.pq_kem_pubkey_len).toBe(1184n);
+    expect(newRecord.pq_kem_pubkey.hash().toString('hex')).toBe(PQ_CELL.hash().toString('hex'));
     expect(newRecord.revoked_lt).toBe(0n);
     expect((await vault.getGetGlobal()).key_record_count).toBe(2n);
   });
@@ -142,6 +162,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
       sign_pubkey: SIG_0,
       pq_kem_pubkey_hash: PQ_HASH,
       pq_kem_pubkey_len: 1184n,
+      pq_kem_pubkey: PQ_CELL,
       crypto_suite_mask: 1n,
     } as RegisterMessagingKeys);
     expect((await vault.getGetUser(user.address)).exists).toBe(false);
@@ -155,6 +176,20 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
       sign_pubkey: SIG_1,
       pq_kem_pubkey_hash: 0n,
       pq_kem_pubkey_len: 0n,
+      pq_kem_pubkey: EMPTY_PQ_CELL,
+      crypto_suite_mask: 2n,
+    } as ReplaceMessagingKeys);
+
+    expect((await vault.getGetUser(user.address)).current_key_id).toBe(keyId);
+    expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
+
+    await vault.send(user.getSender(), { value: toNano('0.1') }, {
+      $$type: 'ReplaceMessagingKeys',
+      enc_pubkey: ENC_1,
+      sign_pubkey: SIG_1,
+      pq_kem_pubkey_hash: PQ_HASH,
+      pq_kem_pubkey_len: 1184n,
+      pq_kem_pubkey: beginCell().storeBuffer(Buffer.alloc(32, 0x99)).endCell(),
       crypto_suite_mask: 2n,
     } as ReplaceMessagingKeys);
 

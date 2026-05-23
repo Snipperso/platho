@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   UsernameNFTItem,
@@ -21,6 +22,12 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 function nameHash(name: string): bigint {
   return BigInt(`0x${createHash('sha256').update(`PLATHO.V1.USERNAME.${name}`).digest('hex')}`);
+}
+
+function inboundValue(tx: any): bigint {
+  const info = tx?.inMessage?.info;
+  if (info?.type !== 'internal') throw new Error('missing inbound internal value');
+  return info.value.coins;
 }
 
 async function deployItem() {
@@ -68,7 +75,7 @@ describe('UsernameNFTItem v1 milestone', () => {
   it('USERNAME-NFT-02: ResendDeployedAck is permissionless and sends immutable owner/name identity to registry', async () => {
     const { caller, registry, item, ownerWallet, usernameHash } = await deployItem();
 
-    await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_RESERVE }, {
+    const result = await item.send(caller.getSender(), { value: ITEM_ACK_RESEND_RESERVE }, {
       $$type: 'ResendDeployedAck',
     } as ResendDeployedAck);
 
@@ -76,6 +83,11 @@ describe('UsernameNFTItem v1 milestone', () => {
     expect(state.ack_count).toBe(1n);
     expect(state.last_name_hash).toBe(usernameHash);
     expect(state.last_owner_wallet.equals(ownerWallet)).toBe(true);
+    const ackTx = findTransaction(result.transactions, {
+      from: item.address,
+      to: registry.address,
+    });
+    expect(inboundValue(ackTx)).toBe(ITEM_ACK_FORWARD_RESERVE);
   });
 
   it('USERNAME-NFT-04: underfunded ResendDeployedAck is rejected to prevent storage-reserve drain', async () => {

@@ -250,7 +250,7 @@ _ %get_state() method_id(86957) {
         var $msg = empty_tuple();
         throw_unless(18002, ($Context$_get_value(__tact_context_get()) >= 4000000));
         throw_unless(18003, ($Context$_get_value(__tact_context_get()) <= 20000000));
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'username_registry_address, 3000000, true, 0, $UsernameItemDeployedAck$_store_cell($UsernameItemDeployedAck$_constructor_name_hash_owner_wallet($self'name_hash, $self'owner_wallet), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'username_registry_address, 3000000, true, 1, $UsernameItemDeployedAck$_store_cell($UsernameItemDeployedAck$_constructor_name_hash_owner_wallet($self'name_hash, $self'owner_wallet), begin_cell())));
         $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
         return ();
     }

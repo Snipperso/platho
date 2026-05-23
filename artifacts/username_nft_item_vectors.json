@@ -1,6 +1,6 @@
 {
   "profile": "PLATHO.V1.USERNAME_NFT_ITEM_V1",
-  "username_nft_item_code_hash": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
+  "username_nft_item_code_hash": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
   "derivation_formula": "addr_std(owner_workchain, cell_hash(StateInit{code=USERNAME_NFT_ITEM_CODE_CELL,data=UsernameNFTItemDataV1(owner_wallet,username_registry_address,name_hash)}))",
   "items": [
     {
@@ -9,8 +9,8 @@
       "username_registry_address": "EQC2D5I2jhg3Puip6OfkDTCp6-TV5pxm_cs9uhV0UTblmSLn",
       "name_hash": "0x6e4bc608c66b0c4c5ff6dc247619526b193faac5d937b88c2608420796fa8bb3",
       "data_cell_hash": "8283685566be6a6341f57a82d1352df3a0ede462734b2ac8d6328d5cde715a50",
-      "state_init_hash": "4f1e179275673a2ed6b83761f9b4170576c3e000c5374ee4847395bdee60e687",
-      "derived_item_address": "EQBPHheSdWc6Lta4N2H5tBcFdsPgAMU3TuSEc5W97mDmh0f2"
+      "state_init_hash": "9d0cfced48a2887f4e8ac8376d0c17ad33dd571847970df60728b14f8a17263a",
+      "derived_item_address": "EQCdDPztSKKIf06KyDdtDBetM91XGEeXDfYHKLFPihcmOmEM"
     },
     {
       "name": "larisa",
@@ -18,8 +18,8 @@
       "username_registry_address": "EQC2D5I2jhg3Puip6OfkDTCp6-TV5pxm_cs9uhV0UTblmSLn",
       "name_hash": "0x432558c4322c9af1cb3cf1b5b3f1fc4472ad3622ce08591f6c7f8785c1dc073b",
       "data_cell_hash": "4bca91d34eb390c670bc6ac4e3ddde2a5cba5f2859a714a9f977bbdbc3d48e15",
-      "state_init_hash": "ad46b0d1b8c4c85868208603e71d17a8b854933707477030864be4d7b6fcf7ee",
-      "derived_item_address": "EQCtRrDRuMTIWGgghgPnHReouFSTNwdHcDCGS-TXtvz37s9r"
+      "state_init_hash": "dd73d92f988f1c34872c17e3eb7929e82c94da50e3e038ff7762b0323b0d1f47",
+      "derived_item_address": "EQDdc9kvmI8cNIcsF-PreSnoLJTaUOPgOP93YrAyOw0fRzlP"
     },
     {
       "name": "testname",
@@ -27,8 +27,8 @@
       "username_registry_address": "Ef_7HxOMngim2TZVNBcHtPlwvgSWQC2R0sy6dK0lESpdT6m5",
       "name_hash": "0xc677904cab36d96d9f97826a1939b176dfa0c8d36be652522a32814d973debeb",
       "data_cell_hash": "e26719fb0c8475ac8b68a44f16cadaba46c5233d24ea1944b8019a275be3473e",
-      "state_init_hash": "4650f4cf3bc26b1709f613fa00a0612de4a20cd4c27a38f9b3e75e8ec89aabcf",
-      "derived_item_address": "Ef9GUPTPO8JrFwn2E_oAoGEt5KIM1MJ6OPmz516OyJqrz-gv"
+      "state_init_hash": "cb09ebd14b2c28a2ecf1bc55dcf0701314001cb0e90df40703af7b0e8c9add89",
+      "derived_item_address": "Ef_LCevRSywoouzxvFXc8HATFAAcsOkN9AcDr3sOjJrdiQpj"
     }
   ]
 }

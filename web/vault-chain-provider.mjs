@@ -64,6 +64,7 @@ function normalizeVaultKeyRecordView(record) {
     sign_pubkey: uintLikeToBigInt(field(record, 'sign_pubkey', 'signPubkey'), 'Vault key record sign_pubkey'),
     pq_kem_pubkey_hash: uintLikeToBigInt(field(record, 'pq_kem_pubkey_hash', 'pqKemPubkeyHash'), 'Vault key record pq_kem_pubkey_hash'),
     pq_kem_pubkey_len: uintLikeToBigInt(field(record, 'pq_kem_pubkey_len', 'pqKemPubkeyLen'), 'Vault key record pq_kem_pubkey_len'),
+    pq_kem_pubkey: field(record, 'pq_kem_pubkey', 'pqKemPubkey'),
     crypto_suite_mask: uintLikeToBigInt(field(record, 'crypto_suite_mask', 'cryptoSuiteMask'), 'Vault key record crypto_suite_mask'),
     created_at: uintLikeToBigInt(field(record, 'created_at', 'createdAt'), 'Vault key record created_at'),
     created_lt: uintLikeToBigInt(field(record, 'created_lt', 'createdLt'), 'Vault key record created_lt'),
@@ -88,21 +89,21 @@ export function getConfiguredVaultChainProvider() {
   return globalThis.plathoVaultChainProvider ?? createUnavailableVaultChainProvider();
 }
 
-export async function bindVaultRecordFromChain(signedBundle, walletProof, options = {}) {
-  if (!walletProof?.walletAddress) {
-    throw new Error('Verified TON wallet proof is required before Vault binding');
+export async function bindVaultRecordFromChain(signedBundle, owner, options = {}) {
+  if (!owner?.walletAddress && !owner?.ownerWallet) {
+    throw new Error('Platho wallet owner is required before Vault binding');
   }
   const provider = options.provider ?? getConfiguredVaultChainProvider();
   if (typeof provider?.getUser !== 'function' || typeof provider?.getKeyRecord !== 'function') {
     throw new VaultChainProviderUnavailableError();
   }
-  const ownerWallet = normalizeAddressLike(walletProof.walletAddress, 'walletProof.walletAddress');
+  const ownerWallet = normalizeAddressLike(owner.walletAddress ?? owner.ownerWallet, 'owner.walletAddress');
   const user = normalizeVaultUserView(await provider.getUser(ownerWallet, {
-    vaultAddress: options.vaultAddress ?? walletProof.vaultAddress ?? null,
+    vaultAddress: options.vaultAddress ?? owner.vaultAddress ?? null,
   }));
   const keyRecord = normalizeVaultKeyRecordView(await provider.getKeyRecord(user.current_key_id, {
     ownerWallet,
-    vaultAddress: options.vaultAddress ?? walletProof.vaultAddress ?? null,
+    vaultAddress: options.vaultAddress ?? owner.vaultAddress ?? null,
   }));
   const binding = await verifyVaultKeyRecordBinding(signedBundle, keyRecord, {
     now: options.now,
@@ -120,13 +121,14 @@ export async function bindVaultRecordFromChain(signedBundle, walletProof, option
   };
 }
 
-export async function runVaultChainBindingSelfTest({ signedBundle, walletProof, keyRecord }) {
+export async function runVaultChainBindingSelfTest({ signedBundle, ownerWallet, keyRecord }) {
   const keyId = 7n;
+  const owner = { walletAddress: ownerWallet };
   const provider = {
     kind: 'self-test',
-    async getUser(ownerWallet) {
+    async getUser(walletAddress) {
       return {
-        exists: ownerWallet === walletProof.walletAddress,
+        exists: walletAddress === ownerWallet,
         current_key_id: keyId,
       };
     },
@@ -135,10 +137,10 @@ export async function runVaultChainBindingSelfTest({ signedBundle, walletProof, 
       return keyRecord;
     },
   };
-  const binding = await bindVaultRecordFromChain(signedBundle, walletProof, { provider });
+  const binding = await bindVaultRecordFromChain(signedBundle, owner, { provider });
   let missingProviderRejected = false;
   try {
-    await bindVaultRecordFromChain(signedBundle, walletProof, {
+    await bindVaultRecordFromChain(signedBundle, owner, {
       provider: createUnavailableVaultChainProvider('self-test unavailable'),
     });
   } catch (error) {

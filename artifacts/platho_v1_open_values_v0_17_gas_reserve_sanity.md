@@ -13,7 +13,7 @@ It adds a repeatable sandbox measurement pass for the implemented subset:
 ```text
 ATH transfer
 ATH burn
-CapsuleHub direct publish + fee flush bounce
+CapsuleHub Vault publish + fee flush bounce
 FeeAccumulator split/flush
 UsernameRegistry mint/refund/treasury/burn/prune flows
 Vault external publish ACK/bounce flows
@@ -51,9 +51,9 @@ M17 gas/reserve sanity: PASS
 Observed maxes from the current implemented subset:
 
 ```text
-max_operation_fee_nanotons = 18_263_750   // UsernameRegistry multi-flow scenario total across 7 operations
-max_single_operation_fee_nanotons = 5_572_714 // Vault external publish ACK flow
-max_gas_used_per_transaction = 42_003         // Vault external publish path
+max_operation_fee_nanotons = 23_968_636   // UsernameRegistry multi-flow scenario total across 7 operations
+max_single_operation_fee_nanotons = 8_289_244 // Vault external publish ACK flow
+max_gas_used_per_transaction = 50_001         // Vault external publish path
 ```
 
 All values are below the broad M17 sanity thresholds.

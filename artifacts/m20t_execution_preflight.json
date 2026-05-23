@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.V1.M20T_EXECUTION_PREFLIGHT",
-  "status": "READY_FOR_FULL_SIZE_M20T",
-  "generatedAt": "2026-05-18T20:49:49.642Z",
+  "status": "BALANCE_NOT_CHECKED",
+  "generatedAt": "2026-05-22T11:32:15.352Z",
   "network": "testnet",
   "deployer": {
-    "address": "0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "address": "0QCDGghF7J5InXzzOmJPjZp6i8kxPdji2mwV5TDnc5VXE9i6",
     "walletVersion": "v4r2",
     "secretMaterialPrinted": false,
     "mnemonicPresent": true,
     "rpcApiKeyPresent": false
   },
   "funding": {
-    "observedBalanceNanotons": "57999999813",
+    "observedBalanceNanotons": "NOT_CHECKED",
     "scaledHarnessMinimumNanotons": "1000000000",
     "fullSizeM20TMinimumNanotons": "55000000000",
-    "remainingForScaledHarnessNanotons": "0",
-    "remainingForFullSizeM20TNanotons": "0"
+    "remainingForScaledHarnessNanotons": "NOT_CHECKED",
+    "remainingForFullSizeM20TNanotons": "NOT_CHECKED"
   },
   "checks": {
     "envExampleExists": true,
@@ -35,14 +35,15 @@
     "manifestTemplateReady": true,
     "evidenceTemplateReady": true,
     "evidenceFinalStatementPinned": true,
-    "observedBalanceProvided": true,
-    "fullSizeBalanceReady": true
+    "observedBalanceProvided": false,
+    "fullSizeBalanceReady": false
   },
   "blockers": [],
   "warnings": [
+    "M20T_BALANCE_NOT_CHECKED",
     "M20T_RPC_API_KEY_NOT_SET_OR_NOT_DETECTED"
   ],
-  "allowedToExecuteFullSizeM20T": true,
+  "allowedToExecuteFullSizeM20T": false,
   "productionUnlock": false,
   "requiredFinalStatement": "M20T testnet evidence is NOT mainnet route freeze evidence and does not unlock production BuybackBurn."
 }

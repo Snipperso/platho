@@ -15,7 +15,7 @@ Frozen scope:
 - CapsuleHub ACK emission to Vault
 - protocol-fee accrual and fee flush bounce recovery
 - entry/page counters and value boundary checks
-- counter-only / anchor-only v1 semantics; no on-chain page-map retrieval interface is exposed
+- superseded: counter-only / anchor-only v1 semantics are not sufficient; encrypted payload cells must be retrievable on-chain
 - shared Vault/CapsuleHub ACK forward reserve value used by Vault max-charge accounting
 
 This is a local engineering freeze. It is not an independent third-party audit, formal proof, or final genesis release approval.

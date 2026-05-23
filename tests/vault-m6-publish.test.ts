@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { keyPairFromSeed, sign } from '@ton/crypto';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
@@ -21,6 +21,11 @@ import {
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import {
+  finalPrivateBodyCell,
+  finalPrivateHeader0Cell,
+  finalPrivateHeader1Cell,
+} from './helpers/capsule-cells';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -30,14 +35,26 @@ const OP_PRIVATE = 0x686694C6n;
 const KIND_PRIVATE = 1n;
 const SIZE_STANDARD = 1n;
 const SUITE_CLASSICAL = 1n;
-const BODY_HASH = 0x1111000000000000000000000000000000000000000000000000000000000001n;
-const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
-const HEADER1 = 0x3333000000000000000000000000000000000000000000000000000000000003n;
 const PLATO_PRIVATE_STANDARD_FEE_TON = 5_000_000n;
 const ATH_FULL_DISCOUNT_AMOUNT = 10_000_000_000_000n;
 const AIRDROP_TOTAL = 30_000_000_000_000_000n;
 const AIRDROP_REWARD_PER_MESSAGE = 10_000_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = 4_000_000n;
+
+function payloadCell(label: string): Cell {
+  return beginCell().storeBuffer(Buffer.from(`PLATHO.V1.VAULT.M6.PAYLOAD.${label}`, 'utf8')).endCell();
+}
+
+function cellHash(cell: Cell): bigint {
+  return BigInt('0x' + cell.hash().toString('hex'));
+}
+
+const BODY_CELL = finalPrivateBodyCell();
+const HEADER0_CELL = finalPrivateHeader0Cell();
+const HEADER1_CELL = finalPrivateHeader1Cell();
+const BODY_HASH = cellHash(BODY_CELL);
+const HEADER0 = cellHash(HEADER0_CELL);
+const HEADER1 = cellHash(HEADER1_CELL);
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -92,6 +109,7 @@ async function buildExternalRequest(params: {
   const signature = sign(bigintToBuffer(sigHash), params.secretKey);
   const hashesRef = beginCell().storeUint(BODY_HASH, 256).storeUint(HEADER0, 256).storeUint(HEADER1, 256).endCell();
   const signatureRef = beginCell().storeBuffer(signature).endCell();
+  const payloadRef = beginCell().storeRef(HEADER0_CELL).storeRef(HEADER1_CELL).storeRef(BODY_CELL).endCell();
 
   return beginCell()
     .storeUint(MAGIC, 32)
@@ -107,6 +125,7 @@ async function buildExternalRequest(params: {
     .storeUint(params.maxCharge, 128)
     .storeRef(hashesRef)
     .storeRef(signatureRef)
+    .storeRef(payloadRef)
     .endCell()
     .beginParse();
 }
@@ -257,9 +276,12 @@ describe('Vault milestone 6: external publish orchestration', () => {
 
     expect(afterSession.nonce).toBe(1n);
     expect(vg.pending_publish_count).toBe(0n);
-    expect(cs.private_entry_count).toBe(1n);
     expect(cs.private_latest_id).toBe(1n);
     expect(cs.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE_TON);
+    const stored = await capsule.getGetPrivateEntry(0n);
+    expect(stored.exists).toBe(true);
+    expect(stored.body_hash).toBe(BODY_HASH);
+    expect(stored.body.hash().toString('hex')).toBe(BODY_CELL.hash().toString('hex'));
     expect(budgetSpent > 0n).toBe(true);
     expect(budgetSpent <= maxCharge).toBe(true);
     expect(beforeUser.ton_balance + beforeUser.message_budget_ton - afterUser.ton_balance - afterUser.message_budget_ton)
@@ -271,6 +293,48 @@ describe('Vault milestone 6: external publish orchestration', () => {
     expect(vg.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
     expect(vg.airdrop_reward_per_message_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
     expect(vg.airdrop_total_allocation_ath).toBe(AIRDROP_TOTAL);
+  });
+
+  it('VAULT-M6-01B: signed external publish may include a PWA fee surcharge above canonical maxCharge', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
+    const kp = keyPairFromSeed(Buffer.alloc(32, 70));
+    const now = blockchain.now ?? 0;
+
+    await fundSession(vault, user, bufToBigInt(kp.publicKey), now + 1000);
+    const session = await vault.getGetSession(user.address);
+    const canonicalMaxCharge = await vault.getGetCanonicalSessionMaxCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    const surcharge = 2_000_000n;
+    const maxCharge = canonicalMaxCharge + surcharge;
+    const beforeUser = await vault.getGetUser(user.address);
+
+    const external = await buildExternalRequest({
+      vault,
+      op: OP_PRIVATE,
+      owner: user.address,
+      sessionId: session.session_id,
+      nonce: 0n,
+      validUntil: BigInt(now + 100),
+      publishKind: KIND_PRIVATE,
+      sizeClass: SIZE_STANDARD,
+      cryptoSuite: SUITE_CLASSICAL,
+      maxCharge,
+      secretKey: kp.secretKey,
+    });
+
+    await vault.sendExternal(external);
+
+    const afterUser = await vault.getGetUser(user.address);
+    const afterSession = await vault.getGetSession(user.address);
+    const vg = await vault.getGetGlobal();
+    const cs = await capsule.getGetState();
+    const budgetSpent = beforeUser.message_budget_ton - afterUser.message_budget_ton;
+
+    expect(afterSession.nonce).toBe(1n);
+    expect(vg.pending_publish_count).toBe(0n);
+    expect(cs.private_latest_id).toBe(1n);
+    expect(cs.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE_TON);
+    expect(budgetSpent >= surcharge).toBe(true);
+    expect(budgetSpent <= maxCharge).toBe(true);
   });
 
   it('VAULT-CAPSULE-DUST-01: discounted Vault fee dust flushes from CapsuleHub into real FeeAccumulator', async () => {

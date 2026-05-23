@@ -11,7 +11,7 @@ Scope implemented:
 - internal `entry_uid` metadata hash
 - no caller-supplied `entry_id` or `entry_uid`
 - no entry-id gaps on failed/underfunded publish
-- first-page storage reserve accounting
+- page counters as metadata only; no per-page storage reserve is charged in final v1
 - per-entry storage reserve accounting
 - PLATO fee accrual
 - `OP_FLUSH_FEES(amount)`
@@ -30,7 +30,7 @@ Explicitly not implemented:
 - Vault ACK / excess return
 - discounted Vault fees
 - private recipient/client sync
-- full on-chain CapsuleHub page maps are intentionally out of scope for v1; v1 is counter-only / anchor-only
+- superseded: counter-only / anchor-only is not sufficient for v1; CapsuleHub must store retrievable encrypted payload cells
 - deployment/seal checks
 - UsernameRegistry
 - BuybackBurn STON.fi execution

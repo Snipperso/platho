@@ -1,4 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs';
 
 export class VaultTonRpcProviderError extends Error {
   constructor(message) {
@@ -224,6 +225,16 @@ function readStackAddress(stack, index, name) {
   throw new Error(`${name} must be a TON address stack item`);
 }
 
+function readStackCellBoc(stack, index, name) {
+  if (index >= stack.length) throw new Error(`Missing ${name} stack item`);
+  const item = stack[index];
+  const value = stackItemValue(item);
+  const type = stackItemType(item);
+  if (typeof value === 'string' && (type.includes('cell') || type.includes('slice'))) return value;
+  if (typeof value === 'string' && value.startsWith('te6')) return value;
+  throw new Error(`${name} must be a TON cell stack item`);
+}
+
 function extractStack(result) {
   const stack = result?.stack ?? result?.result?.stack;
   if (!Array.isArray(stack)) throw new Error('TON get-method response did not include a stack');
@@ -244,6 +255,7 @@ export function decodeVaultUserViewStack(result) {
 
 export function decodeVaultKeyRecordViewStack(result) {
   const stack = extractStack(result);
+  const pqKemPubkeyBoc = readStackCellBoc(stack, 7, 'Vault key record pq_kem_pubkey');
   return {
     exists: readStackBool(stack, 0, 'Vault key record exists'),
     owner_wallet: readStackAddress(stack, 1, 'Vault key record owner_wallet'),
@@ -252,16 +264,88 @@ export function decodeVaultKeyRecordViewStack(result) {
     sign_pubkey: readStackInt(stack, 4, 'Vault key record sign_pubkey'),
     pq_kem_pubkey_hash: readStackInt(stack, 5, 'Vault key record pq_kem_pubkey_hash'),
     pq_kem_pubkey_len: readStackInt(stack, 6, 'Vault key record pq_kem_pubkey_len'),
-    crypto_suite_mask: readStackInt(stack, 7, 'Vault key record crypto_suite_mask'),
-    created_at: readStackInt(stack, 8, 'Vault key record created_at'),
-    created_lt: readStackInt(stack, 9, 'Vault key record created_lt'),
-    revoked_at: readStackInt(stack, 10, 'Vault key record revoked_at'),
-    revoked_lt: readStackInt(stack, 11, 'Vault key record revoked_lt'),
+    pq_kem_pubkey: readSnakeCellBytes(pqKemPubkeyBoc, {
+      maxBytes: MLKEM768_PUBLIC_KEY_BYTES,
+      name: 'Vault key record pq_kem_pubkey',
+    }),
+    pq_kem_pubkey_boc: pqKemPubkeyBoc,
+    crypto_suite_mask: readStackInt(stack, 8, 'Vault key record crypto_suite_mask'),
+    created_at: readStackInt(stack, 9, 'Vault key record created_at'),
+    created_lt: readStackInt(stack, 10, 'Vault key record created_lt'),
+    revoked_at: readStackInt(stack, 11, 'Vault key record revoked_at'),
+    revoked_lt: readStackInt(stack, 12, 'Vault key record revoked_lt'),
+  };
+}
+
+export function decodeVaultSessionViewStack(result) {
+  const stack = extractStack(result);
+  return {
+    exists: readStackBool(stack, 0, 'Vault session exists'),
+    session_pubkey: readStackInt(stack, 1, 'Vault session session_pubkey'),
+    session_id: readStackInt(stack, 2, 'Vault session session_id'),
+    nonce: readStackInt(stack, 3, 'Vault session nonce'),
+    expires_at: readStackInt(stack, 4, 'Vault session expires_at'),
+    active: readStackBool(stack, 5, 'Vault session active'),
+  };
+}
+
+export function decodeVaultReceiveIntentViewStack(result) {
+  const stack = extractStack(result);
+  return {
+    exists: readStackBool(stack, 0, 'Vault receive intent exists'),
+    sender_wallet: readStackAddress(stack, 1, 'Vault receive intent sender_wallet'),
+    recipient_wallet: readStackAddress(stack, 2, 'Vault receive intent recipient_wallet'),
+    asset: readStackInt(stack, 3, 'Vault receive intent asset'),
+    amount: readStackInt(stack, 4, 'Vault receive intent amount'),
+    commitment: readStackInt(stack, 5, 'Vault receive intent commitment'),
+    client_nonce: readStackInt(stack, 6, 'Vault receive intent client_nonce'),
+    created_at: readStackInt(stack, 7, 'Vault receive intent created_at'),
+    claimed: readStackBool(stack, 8, 'Vault receive intent claimed'),
+  };
+}
+
+export function decodeVaultPendingAthWithdrawalViewStack(result) {
+  const stack = extractStack(result);
+  return {
+    exists: readStackBool(stack, 0, 'Vault pending ATH withdrawal exists'),
+    owner_wallet: readStackAddress(stack, 1, 'Vault pending ATH withdrawal owner_wallet'),
+    recipient: readStackAddress(stack, 2, 'Vault pending ATH withdrawal recipient'),
+    recipient_ath_wallet: readStackAddress(stack, 3, 'Vault pending ATH withdrawal recipient_ath_wallet'),
+    amount: readStackInt(stack, 4, 'Vault pending ATH withdrawal amount'),
+    created_at: readStackInt(stack, 5, 'Vault pending ATH withdrawal created_at'),
+  };
+}
+
+export function decodeVaultGlobalViewStack(result) {
+  const stack = extractStack(result);
+  return {
+    sealed: readStackBool(stack, 0, 'Vault global sealed'),
+    capsule_hub_bound: readStackBool(stack, 1, 'Vault global capsule_hub_bound'),
+    deployment_manifest_hash: readStackInt(stack, 2, 'Vault global deployment_manifest_hash'),
+    capsule_hub_address: readStackAddress(stack, 3, 'Vault global capsule_hub_address'),
+    vault_ath_wallet_address: readStackAddress(stack, 4, 'Vault global vault_ath_wallet_address'),
+    ath_master_address: readStackAddress(stack, 5, 'Vault global ath_master_address'),
+    user_count: readStackInt(stack, 6, 'Vault global user_count'),
+    session_count: readStackInt(stack, 7, 'Vault global session_count'),
+    key_record_count: readStackInt(stack, 8, 'Vault global key_record_count'),
+    receive_intent_count: readStackInt(stack, 9, 'Vault global receive_intent_count'),
+    pending_ath_withdrawal_count: readStackInt(stack, 10, 'Vault global pending_ath_withdrawal_count'),
+    pending_publish_count: readStackInt(stack, 11, 'Vault global pending_publish_count'),
+    processed_ath_deposit_count: readStackInt(stack, 12, 'Vault global processed_ath_deposit_count'),
+    pending_publish_stale_ttl: readStackInt(stack, 13, 'Vault global pending_publish_stale_ttl'),
+    airdrop_remaining_ath: readStackInt(stack, 14, 'Vault global airdrop_remaining_ath'),
+    airdrop_distributed_ath: readStackInt(stack, 15, 'Vault global airdrop_distributed_ath'),
+    airdrop_reward_per_message_ath: readStackInt(stack, 16, 'Vault global airdrop_reward_per_message_ath'),
+    airdrop_total_allocation_ath: readStackInt(stack, 17, 'Vault global airdrop_total_allocation_ath'),
   };
 }
 
 export function createTonCenterV3VaultTransport(options = {}) {
   const endpoint = assertString(options.endpoint, 'TON RPC endpoint');
+  const sendBocEndpoint = options.sendBocEndpoint
+    ?? globalThis.plathoTonSendBocEndpoint
+    ?? globalThis.PLATHO_TON_SEND_BOC_ENDPOINT
+    ?? null;
   const fetchImpl = options.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new VaultTonRpcProviderError('fetch is unavailable');
   return {
@@ -282,6 +366,26 @@ export function createTonCenterV3VaultTransport(options = {}) {
       if (Number(exitCode) !== 0) {
         throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`);
       }
+      return json;
+    },
+    async sendBoc({ boc }) {
+      const endpointForSend = sendBocEndpoint;
+      if (!endpointForSend) {
+        throw new VaultTonRpcProviderError('TON sendBoc endpoint is not configured');
+      }
+      const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
+      if (options.apiKey) headers['X-API-Key'] = options.apiKey;
+      const response = await fetchImpl(endpointForSend, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ boc }),
+      });
+      if (!response.ok) {
+        throw new VaultTonRpcProviderError(`TON RPC sendBoc HTTP ${response.status}`);
+      }
+      const json = await response.json();
+      const ok = json.ok ?? json.result?.ok ?? true;
+      if (ok === false) throw new VaultTonRpcProviderError('TON RPC sendBoc rejected message');
       return json;
     },
   };
@@ -309,6 +413,14 @@ function resolveVaultAddress(configured, callOptions) {
   return parseTonAddress(address).raw;
 }
 
+function stackAddress(address) {
+  return { type: 'slice', value: encodeTonAddressSliceBoc(parseTonAddress(address).raw) };
+}
+
+function stackNumber(value) {
+  return { type: 'num', value: toStackNumber(value) };
+}
+
 export function createVaultTonRpcProvider(options = {}) {
   return {
     kind: options.kind ?? options.transport?.kind ?? 'ton-rpc',
@@ -316,11 +428,20 @@ export function createVaultTonRpcProvider(options = {}) {
       const transport = resolveTransport(options);
       if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
       const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      const owner = parseTonAddress(ownerWallet).raw;
       return decodeVaultUserViewStack(await transport.runGetMethod({
         address: vaultAddress,
         method: 'get_user',
-        stack: [{ type: 'slice', value: encodeTonAddressSliceBoc(owner) }],
+        stack: [stackAddress(ownerWallet)],
+      }));
+    },
+    async getSession(ownerWallet, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      return decodeVaultSessionViewStack(await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_session',
+        stack: [stackAddress(ownerWallet)],
       }));
     },
     async getKeyRecord(keyId, callOptions = {}) {
@@ -330,8 +451,126 @@ export function createVaultTonRpcProvider(options = {}) {
       return decodeVaultKeyRecordViewStack(await transport.runGetMethod({
         address: vaultAddress,
         method: 'get_key_record',
-        stack: [{ type: 'num', value: toStackNumber(keyId) }],
+        stack: [stackNumber(keyId)],
       }));
+    },
+    async getReceiveIntent(intentId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      return decodeVaultReceiveIntentViewStack(await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_receive_intent',
+        stack: [stackNumber(intentId)],
+      }));
+    },
+    async getReceiveIntentId(senderWallet, recipientWallet, asset, amount, clientNonce, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      const result = await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_receive_intent_id',
+        stack: [
+          stackAddress(senderWallet),
+          stackAddress(recipientWallet),
+          stackNumber(asset),
+          stackNumber(amount),
+          stackNumber(clientNonce),
+        ],
+      });
+      return readStackInt(extractStack(result), 0, 'Vault receive intent id');
+    },
+    async getReceiveIntentCommitment(intentId, recipientWallet, secret32, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      const result = await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_receive_intent_commitment',
+        stack: [
+          stackNumber(intentId),
+          stackAddress(recipientWallet),
+          stackNumber(secret32),
+        ],
+      });
+      return readStackInt(extractStack(result), 0, 'Vault receive intent commitment');
+    },
+    async getAthWithdrawalId(ownerWallet, queryId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      const result = await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_ath_withdrawal_id',
+        stack: [stackAddress(ownerWallet), stackNumber(queryId)],
+      });
+      return readStackInt(extractStack(result), 0, 'Vault ATH withdrawal id');
+    },
+    async getPendingAthWithdrawalFor(ownerWallet, queryId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      return decodeVaultPendingAthWithdrawalViewStack(await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_pending_ath_withdrawal_for',
+        stack: [stackAddress(ownerWallet), stackNumber(queryId)],
+      }));
+    },
+    async getCanonicalSessionMaxCharge(ownerWallet, publishKind, sizeClass, cryptoSuite, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      const result = await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_canonical_session_max_charge',
+        stack: [
+          stackAddress(ownerWallet),
+          stackNumber(publishKind),
+          stackNumber(sizeClass),
+          stackNumber(cryptoSuite),
+        ],
+      });
+      return readStackInt(extractStack(result), 0, 'Vault canonical session max charge');
+    },
+    async getSessionPublishHash(args, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      const result = await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_session_publish_hash',
+        stack: [
+          stackNumber(args.op),
+          stackAddress(args.owner),
+          stackNumber(args.sessionId),
+          stackNumber(args.sessionNonce),
+          stackNumber(args.validUntil),
+          stackNumber(args.publishKind),
+          stackNumber(args.sizeClass),
+          stackNumber(args.cryptoSuite),
+          stackNumber(args.maxCharge),
+          stackNumber(args.bodyHash),
+          stackNumber(args.header0),
+          stackNumber(args.header1),
+        ],
+      });
+      return readStackInt(extractStack(result), 0, 'Vault session publish hash');
+    },
+    async getGlobal(callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      return decodeVaultGlobalViewStack(await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_global',
+        stack: [],
+      }));
+    },
+    async sendExternalMessage(boc, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.sendBoc) throw new VaultTonRpcProviderError('TON RPC sendBoc transport is not configured');
+      return transport.sendBoc({ boc, vaultAddress: resolveVaultAddress(options.vaultAddress, callOptions) });
     },
   };
 }

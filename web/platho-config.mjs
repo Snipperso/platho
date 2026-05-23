@@ -21,12 +21,6 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     chain: 'testnet',
     label: 'testnet',
   },
-  tonConnect: {
-    manifestUrl: './tonconnect-manifest.json',
-    insecureOriginManifestUrl: 'https://platho.app/tonconnect-manifest.json',
-    expectedDomain: 'platho.app',
-    expectedChain: '-3',
-  },
   vault: {
     address: null,
     provider: {
@@ -37,8 +31,38 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       requiredInProduction: true,
     },
   },
+  tonDns: {
+    rootAddress: null,
+    provider: {
+      globalName: 'plathoTonDnsProvider',
+      moduleUrl: null,
+      exportName: 'default',
+      unavailableStatus: 'TON DNS provider required',
+      requiredInProduction: true,
+    },
+  },
+  capsuleHub: {
+    address: null,
+    publicReadLimit: 50,
+  },
+  ath: {
+    masterAddress: null,
+  },
+  usernameRegistry: {
+    address: null,
+  },
+  profileRegistry: {
+    address: null,
+  },
   crypto: {
     signedBundlePurpose: 'pwa-preview',
+  },
+  messaging: {
+    pricing: {
+      estimatedNetworkFeeNanotons: '5000000',
+      includedNetworkFeeNanotons: '5000000',
+      roundingStepNanotons: '1000000',
+    },
   },
   publicChannels: [
     {
@@ -51,90 +75,33 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   ],
   ui: {
     brandNetworkLabel: 'testnet',
-    chatCountLabel: 'threads',
-    publicSubtitle: 'latest capsules',
-    vaultSubtitle: 'testnet account',
-    profileHandle: '@platho',
-    identityName: 'platho.ton',
-    identitySubtitle: 'username NFT pending',
+    chatCountLabel: 'Private chats',
+    publicSubtitle: 'Public channels',
+    vaultSubtitle: 'Vault',
+    profileHandle: 'Profile',
+    identityName: 'No wallet',
+    identitySubtitle: 'Create or import a wallet',
+    identityVariants: [
+      { type: 'platho_nft', value: 'platho.ath', label: 'platho.ath' },
+      { type: 'ton_dns', value: 'platho.ton', label: 'platho.ton' },
+    ],
     walletLabel: 'v4r2 testnet',
     networkLabel: 'testnet',
     localStateLabel: 'device only',
     vaultCards: [
-      { label: 'TON', value: '5.9999', caption: 'available' },
-      { label: 'ATH', value: '0', caption: 'official wallet' },
-      { label: 'M20T', value: '49.0', caption: 'TON left', tone: 'warn' },
+      { label: 'TON', value: '-', caption: 'wallet required' },
+      { label: 'ATH', value: '-', caption: 'wallet required' },
     ],
     vaultActions: [
-      { label: 'Deposit', icon: 'down' },
-      { label: 'Withdraw', icon: 'up' },
-      { label: 'Top up', icon: 'bolt' },
+      { id: 'vault-deposit-ton', label: 'Deposit TON', icon: 'down' },
+      { id: 'vault-withdraw-ton', label: 'Withdraw TON', icon: 'up' },
+      { id: 'vault-deposit-ath', label: 'Deposit ATH', icon: 'down' },
+      { id: 'vault-withdraw-ath', label: 'Withdraw ATH', icon: 'up' },
     ],
-    ledgerRows: [
-      { tone: 'green', title: 'Faucet received', detail: '2 TON from testgiver', value: '+2.000' },
-      { tone: 'cyan', title: 'Readiness artifact', detail: 'scaled harness ready', value: 'ready' },
-      { tone: 'amber', title: 'Full-size M20T', detail: 'needs 55 TON minimum', value: 'locked' },
-    ],
+    ledgerRows: [],
   },
   preview: {
-    threads: [
-      {
-        id: 'ari',
-        name: 'Ari',
-        avatar: 'A',
-        subtitle: 'sealed 2 min ago',
-        time: '00:41',
-        state: 'sealed',
-        preview: 'M20T scaled harness is ready.',
-        messages: [
-          { type: 'system', text: 'session key rotated', meta: 'local' },
-          { type: 'in', text: 'Faucet landed. We can run the scaled probe now.', meta: '00:37' },
-          { type: 'out', text: 'Keep full-size locked until the 55 TON threshold.', meta: 'sealed' },
-          { type: 'in', text: 'Agreed. No route freeze shortcuts.', meta: '00:41' },
-        ],
-      },
-      {
-        id: 'vault',
-        name: 'Vault Ops',
-        avatar: 'V',
-        subtitle: 'testnet wallet',
-        time: '00:35',
-        state: 'ready',
-        preview: 'Balance 5.999999996 TON.',
-        messages: [
-          { type: 'system', text: 'wallet v4r2 linked', meta: 'testnet' },
-          { type: 'in', text: 'Scaled harness minimum is covered.', meta: '00:33' },
-          { type: 'out', text: 'Full-size M20T still needs 49.000000004 TON.', meta: 'sent' },
-        ],
-      },
-      {
-        id: 'audit',
-        name: 'Audit Trail',
-        avatar: 'T',
-        subtitle: '50 files passed',
-        time: '00:42',
-        state: 'green',
-        preview: 'Full suite: 192 tests.',
-        messages: [
-          { type: 'in', text: 'ATH reserve hardening frozen.', meta: 'green' },
-          { type: 'in', text: 'BuybackBurn remains blocked pending M20T and M20F.', meta: 'locked' },
-          { type: 'out', text: 'Keep the readiness flags false.', meta: 'sealed' },
-        ],
-      },
-      {
-        id: 'route',
-        name: 'STON.fi Route',
-        avatar: 'S',
-        subtitle: 'mainnet evidence missing',
-        time: 'yday',
-        state: 'locked',
-        preview: 'Need on-chain route proof and refund checks.',
-        messages: [
-          { type: 'system', text: 'mainnet route freeze is not ready', meta: 'M20F' },
-          { type: 'in', text: 'No production BuybackBurn until route evidence passes.', meta: 'policy' },
-        ],
-      },
-    ],
+    threads: [],
   },
 });
 
@@ -158,17 +125,10 @@ function collectMatchingStrings(value, pattern, path = 'config', out = []) {
   return out;
 }
 
-function expectedTonConnectChain(networkChain) {
-  if (networkChain === 'mainnet') return '-239';
-  if (networkChain === 'testnet') return '-3';
-  return null;
-}
-
 export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
   const findings = [];
   const mode = config?.mode;
   const provider = config?.vault?.provider ?? {};
-  const expectedChain = expectedTonConnectChain(config?.network?.chain);
 
   if (!VALID_MODES.has(mode)) {
     addFinding(findings, 'PWA_MODE_INVALID', `PWA mode must be one of ${[...VALID_MODES].join(', ')}.`);
@@ -178,13 +138,6 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
   }
   if (config?.network?.chain !== 'mainnet') {
     addFinding(findings, 'PWA_NETWORK_NOT_MAINNET', 'PWA config does not target mainnet.');
-  }
-  if (expectedChain && String(config?.tonConnect?.expectedChain) !== expectedChain) {
-    addFinding(
-      findings,
-      'PWA_TONCONNECT_CHAIN_MISMATCH',
-      `TON Connect expectedChain must be ${expectedChain} for ${config?.network?.chain}.`,
-    );
   }
   if (mode === PRODUCTION_MODE) {
     const markerPaths = collectMatchingStrings(config, /\b(testnet|preview)\b/i);
@@ -200,6 +153,25 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         findings,
         'PWA_VAULT_CHAIN_PROVIDER_REQUIRED',
         'Production PWA config must name a static Vault chain provider module.',
+      );
+    }
+    const tonDnsProvider = config?.tonDns?.provider ?? {};
+    if (
+      tonDnsProvider.requiredInProduction !== false
+      && !tonDnsProvider.moduleUrl
+      && !config?.tonDns?.rootAddress
+    ) {
+      addFinding(
+        findings,
+        'PWA_TON_DNS_PROVIDER_REQUIRED',
+        'Production PWA config must set TON DNS rootAddress or name a static TON DNS provider module.',
+      );
+    }
+    if (!config?.profileRegistry?.address) {
+      addFinding(
+        findings,
+        'PWA_PROFILE_REGISTRY_ADDRESS_REQUIRED',
+        'Production PWA config must set ProfileRegistry address for paid wallet avatar updates.',
       );
     }
   }

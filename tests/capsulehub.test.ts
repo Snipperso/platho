@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Address, contractAddress, toNano } from '@ton/core';
+import { Address, Cell, contractAddress, toNano } from '@ton/core';
 import { findTransaction } from '@ton/test-utils';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   CapsuleHub,
-  PublishPrivateDirect,
-  PublishPublicDirect,
   FlushFees,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
@@ -15,38 +13,30 @@ import {
   ForwardVaultPrivate,
   ForwardVaultPublic,
 } from '../build/MockVaultAckSink/MockVaultAckSink_MockVaultAckSink';
+import {
+  finalPrivateBodyCell,
+  finalPrivateHeader0Cell,
+  finalPrivateHeader1Cell,
+  finalPublicBodyCell,
+  finalPublicHeaderCell,
+} from './helpers/capsule-cells';
 
 const PLATO_PRIVATE_STANDARD_FEE = 5_000_000n;
-const PLATO_PRIVATE_LONG_TERM_FEE = 10_000_000n;
 const PLATO_PUBLIC_FEE = 5_000_000n;
-const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE = 3_000_000n;
-const CAPSULEHUB_PUBLIC_EXEC_RESERVE = 3_000_000n;
-const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE = 1_000_000n;
-const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 4_000_000n;
-const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 3_000_000n;
-const CAPSULEHUB_PAGE_STORAGE_ENDOWMENT = 10_000_000n;
-const CAPSULEHUB_PRIVATE_STANDARD_DIRECT_REQUIRED = PLATO_PRIVATE_STANDARD_FEE
-  + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
-  + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE
-  + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
-  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT;
-const CAPSULEHUB_PUBLIC_DIRECT_REQUIRED = PLATO_PUBLIC_FEE
-  + CAPSULEHUB_PUBLIC_EXEC_RESERVE
-  + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE
-  + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
-  + CAPSULEHUB_PAGE_STORAGE_ENDOWMENT;
-const CAPSULEHUB_PUBLIC_DIRECT_NO_PAGE_REQUIRED = PLATO_PUBLIC_FEE
-  + CAPSULEHUB_PUBLIC_EXEC_RESERVE
-  + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE
-  + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
 const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
+const CAPSULEHUB_ACK_FORWARD_RESERVE = 30_000_000n;
 const OP_DEPOSIT_PROTOCOL_FEE = 0xff775609;
+const OP_CAPSULEHUB_PUBLISH_ACK = 0x874e576a;
 const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(label).digest('hex'));
+}
+
+function cellHash(cell: Cell): bigint {
+  return BigInt('0x' + cell.hash().toString('hex'));
 }
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -125,41 +115,24 @@ function inboundValue(tx: any): bigint {
   return info.value.coins;
 }
 
-function privateMsg(overrides?: Partial<PublishPrivateDirect>): PublishPrivateDirect {
-  return {
-    $$type: 'PublishPrivateDirect',
-    size_class: 1n,
-    crypto_suite: 1n,
-    header_0_hash: hash256('h0'),
-    header_1_hash: hash256('h1'),
-    body_hash: hash256('body'),
-    protocol_fee_paid: PLATO_PRIVATE_STANDARD_FEE,
-    ...overrides,
-  } as PublishPrivateDirect;
-}
-
-function publicMsg(author: Address, overrides?: Partial<PublishPublicDirect>): PublishPublicDirect {
-  return {
-    $$type: 'PublishPublicDirect',
-    author_wallet: author,
-    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
-    body_hash: hash256('public-body'),
-    protocol_fee_paid: PLATO_PUBLIC_FEE,
-    ...overrides,
-  } as PublishPublicDirect;
-}
-
 function forwardVaultPrivate(capsuleAddress: Address, overrides?: Partial<ForwardVaultPrivate>): ForwardVaultPrivate {
+  const sizeClass = overrides?.size_class ?? 1n;
+  const header_0 = overrides?.header_0 ?? finalPrivateHeader0Cell(0x76);
+  const header_1 = overrides?.header_1 ?? finalPrivateHeader1Cell(0x77);
+  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x78);
   return {
     $$type: 'ForwardVaultPrivate',
     capsule_hub_address: capsuleAddress,
     bounce_id: 1001n,
     publish_id: hash256('vault-private-publish-id'),
-    size_class: 1n,
+    size_class: sizeClass,
     crypto_suite: 1n,
-    header_0_hash: hash256('vault-h0'),
-    header_1_hash: hash256('vault-h1'),
-    body_hash: hash256('vault-body'),
+    header_0_hash: cellHash(header_0),
+    header_1_hash: cellHash(header_1),
+    body_hash: cellHash(body),
+    header_0,
+    header_1,
+    body,
     protocol_fee_paid: PLATO_PRIVATE_STANDARD_FEE,
     value_to_capsule: 100_000_000n,
     ...overrides,
@@ -167,6 +140,8 @@ function forwardVaultPrivate(capsuleAddress: Address, overrides?: Partial<Forwar
 }
 
 function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?: Partial<ForwardVaultPublic>): ForwardVaultPublic {
+  const header = overrides?.header ?? finalPublicHeaderCell(0x50);
+  const body = overrides?.body ?? finalPublicBodyCell(0x79);
   return {
     $$type: 'ForwardVaultPublic',
     capsule_hub_address: capsuleAddress,
@@ -174,7 +149,10 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
     publish_id: hash256('vault-public-publish-id'),
     author_wallet: author,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
-    body_hash: hash256('vault-public-body'),
+    header_hash: cellHash(header),
+    body_hash: cellHash(body),
+    header,
+    body,
     protocol_fee_paid: PLATO_PUBLIC_FEE,
     value_to_capsule: 100_000_000n,
     ...overrides,
@@ -182,99 +160,10 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
 }
 
 describe('CapsuleHub v1 milestone 1', () => {
-  it('CAPSULE-02/CAPSULE-ID-01/03: public direct publish assigns sequential entry_id and accrues fee', async () => {
-    const { capsule, author } = await setup();
-
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
-    let state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(1n);
-    expect(state.last_public_entry_id).toBe(0n);
-    expect(state.public_entry_count).toBe(1n);
-    expect(state.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
-    expect(state.public_page_count).toBe(1n);
-
-    const firstUid = state.last_public_entry_uid;
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_NO_PAGE_REQUIRED }, publicMsg(author.address));
-    state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(2n);
-    expect(state.last_public_entry_id).toBe(1n);
-    expect(state.public_entry_count).toBe(2n);
-    expect(state.last_public_entry_uid).not.toBe(firstUid);
-    expect(state.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE * 2n);
-  });
-
-  it('CAPSULE-03: public direct publish rejects author spoofing', async () => {
-    const { capsule, author, attacker } = await setup();
-
-    await capsule.send(attacker.getSender(), { value: toNano('0.1') }, publicMsg(author.address));
-
-    const state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(0n);
-    expect(state.public_entry_count).toBe(0n);
-    expect(state.accrued_plato_fee_ton).toBe(0n);
-  });
-
-  it('CAPSULE-01: private direct publish validates allowed header/body/suite pair and accrues fee', async () => {
-    const { capsule, author } = await setup();
-
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PRIVATE_STANDARD_DIRECT_REQUIRED }, privateMsg());
-    const state = await capsule.getGetState();
-    expect(state.private_latest_id).toBe(1n);
-    expect(state.last_private_entry_id).toBe(0n);
-    expect(state.private_entry_count).toBe(1n);
-    expect(state.private_page_count).toBe(1n);
-    expect(state.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE);
-  });
-
-  it('CAP-REJECT-07A: private direct publish rejects mismatched size_class/crypto_suite and zero headers', async () => {
-    const { capsule, author } = await setup();
-
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, privateMsg({ crypto_suite: 2n }));
-    await capsule.send(author.getSender(), { value: toNano('0.1') }, privateMsg({ header_0_hash: 0n }));
-
-    const state = await capsule.getGetState();
-    expect(state.private_latest_id).toBe(0n);
-    expect(state.private_entry_count).toBe(0n);
-    expect(state.accrued_plato_fee_ton).toBe(0n);
-  });
-
-  it('CAPSULE-ID-06B: failed/underfunded publish does not create entry_id gaps', async () => {
-    const { capsule, author } = await setup();
-
-    await capsule.send(author.getSender(), { value: 1n }, publicMsg(author.address));
-    let state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(0n);
-    expect(state.public_entry_count).toBe(0n);
-
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
-    state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(1n);
-    expect(state.last_public_entry_id).toBe(0n);
-  });
-
-  it('CAPSULE-ID-07/09: first entry in a page charges page storage reserve; later same page does not require it', async () => {
-    const { capsule, author } = await setup();
-
-    // Missing first-page reserve, should fail and not increment.
-    const withoutPageReserve = PLATO_PUBLIC_FEE + 3_000_000n + 1_000_000n + 3_000_000n;
-    await capsule.send(author.getSender(), { value: withoutPageReserve }, publicMsg(author.address));
-    expect((await capsule.getGetState()).public_latest_id).toBe(0n);
-
-    // First page with page reserve succeeds.
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
-    expect((await capsule.getGetState()).public_page_count).toBe(1n);
-
-    // Second entry on same page succeeds without page reserve.
-    await capsule.send(author.getSender(), { value: withoutPageReserve }, publicMsg(author.address));
-    const state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(2n);
-    expect(state.public_page_count).toBe(1n);
-  });
-
   it('CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce', async () => {
-    const { capsule, author, operator } = await setup({ feeAccumulatorDeployed: false });
+    const { capsule, author, operator, mockVault } = await setup({ feeAccumulatorDeployed: false });
 
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
 
     await capsule.send(operator.getSender(), { value: toNano('0.1') }, {
@@ -287,9 +176,9 @@ describe('CapsuleHub v1 milestone 1', () => {
   });
 
   it('CAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver', async () => {
-    const { blockchain, capsule, author, operator, feeAccumulator } = await setup({ feeAccumulatorDeployed: true });
+    const { blockchain, capsule, author, operator, feeAccumulator, mockVault } = await setup({ feeAccumulatorDeployed: true });
 
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
 
     const flush = await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
       $$type: 'FlushFees',
@@ -316,9 +205,9 @@ describe('CapsuleHub v1 milestone 1', () => {
   });
 
   it('CAPSULE-FEE-06: dust or locally underfunded FlushFees cannot drain CapsuleHub reserve', async () => {
-    const { capsule, author, operator } = await setup({ feeAccumulatorDeployed: true });
+    const { capsule, author, operator, mockVault } = await setup({ feeAccumulatorDeployed: true });
 
-    await capsule.send(author.getSender(), { value: CAPSULEHUB_PUBLIC_DIRECT_REQUIRED }, publicMsg(author.address));
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
 
     await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE - 1n }, {
       $$type: 'FlushFees',
@@ -366,19 +255,30 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs', async () => {
     const { capsule, mockVault, operator } = await setup();
 
-    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPrivate(capsule.address));
+    const forwarded = forwardVaultPrivate(capsule.address);
+    const result = await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwarded);
 
     const hubState = await capsule.getGetState();
     expect(hubState.private_latest_id).toBe(1n);
-    expect(hubState.last_private_entry_id).toBe(0n);
-    expect(hubState.private_entry_count).toBe(1n);
     expect(hubState.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE);
 
     const vaultState = await mockVault.getGetState();
     expect(vaultState.ack_count).toBe(1n);
     expect(vaultState.last_publish_id).toBe(hash256('vault-private-publish-id'));
     expect(vaultState.last_entry_id).toBe(0n);
-    expect(vaultState.last_entry_uid).toBe(hubState.last_private_entry_uid);
+    const stored = await capsule.getGetPrivateEntry(0n);
+    expect(stored.exists).toBe(true);
+    expect(vaultState.last_entry_uid).toBe(stored.entry_uid);
+    expect(stored.publish_id).toBe(forwarded.publish_id);
+    expect(stored.body.hash().toString('hex')).toBe(forwarded.body.hash().toString('hex'));
+
+    const ackTx = findTransaction(result.transactions, {
+      from: capsule.address,
+      to: mockVault.address,
+      op: OP_CAPSULEHUB_PUBLISH_ACK,
+      success: true,
+    });
+    expect(inboundValue(ackTx)).toBe(CAPSULEHUB_ACK_FORWARD_RESERVE);
   });
 
   it('CAPSULE-VAULT-BACKING-01: Vault publish retains protocol fee backing instead of returning it as ACK excess', async () => {
@@ -389,7 +289,7 @@ describe('CapsuleHub v1 milestone 1', () => {
     }));
 
     const state = await capsule.getGetState();
-    expect(state.private_entry_count).toBe(1n);
+    expect(state.private_latest_id).toBe(1n);
     expect(state.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE);
     expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThanOrEqual(PLATO_PRIVATE_STANDARD_FEE);
   });
@@ -397,18 +297,29 @@ describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs', async () => {
     const { capsule, mockVault, operator, author } = await setup();
 
-    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
+    const forwarded = forwardVaultPublic(capsule.address, author.address);
+    const result = await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwarded);
 
     const hubState = await capsule.getGetState();
     expect(hubState.public_latest_id).toBe(1n);
-    expect(hubState.last_public_entry_id).toBe(0n);
-    expect(hubState.public_entry_count).toBe(1n);
     expect(hubState.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
 
     const vaultState = await mockVault.getGetState();
     expect(vaultState.ack_count).toBe(1n);
     expect(vaultState.last_publish_id).toBe(hash256('vault-public-publish-id'));
-    expect(vaultState.last_entry_uid).toBe(hubState.last_public_entry_uid);
+    const stored = await capsule.getGetPublicEntry(0n);
+    expect(stored.exists).toBe(true);
+    expect(vaultState.last_entry_uid).toBe(stored.entry_uid);
+    expect(stored.author_wallet.toString()).toBe(author.address.toString());
+    expect(stored.body.hash().toString('hex')).toBe(forwarded.body.hash().toString('hex'));
+
+    const ackTx = findTransaction(result.transactions, {
+      from: capsule.address,
+      to: mockVault.address,
+      op: OP_CAPSULEHUB_PUBLISH_ACK,
+      success: true,
+    });
+    expect(inboundValue(ackTx)).toBe(CAPSULEHUB_ACK_FORWARD_RESERVE);
   });
 
   it('CAP-REJECT-07: Vault-only publish from non-Vault sender rejected', async () => {
@@ -420,13 +331,15 @@ describe('CapsuleHub v1 milestone 1', () => {
       publish_id: hash256('evil'),
       author_wallet: author.address,
       marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
-      body_hash: hash256('evil-body'),
+      header_hash: forwardVaultPublic(capsule.address, author.address).header_hash,
+      body_hash: forwardVaultPublic(capsule.address, author.address).body_hash,
+      header: forwardVaultPublic(capsule.address, author.address).header,
+      body: forwardVaultPublic(capsule.address, author.address).body,
       protocol_fee_paid: PLATO_PUBLIC_FEE,
     });
 
     const state = await capsule.getGetState();
     expect(state.public_latest_id).toBe(0n);
-    expect(state.public_entry_count).toBe(0n);
     expect(state.accrued_plato_fee_ton).toBe(0n);
   });
 

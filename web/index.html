@@ -8,7 +8,7 @@
     <title>Platho</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" href="./assets/platho-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=45">
     <script type="importmap">
       {
         "imports": {
@@ -35,9 +35,9 @@
         </div>
 
         <nav class="rail" aria-label="Primary">
-          <button class="rail-item is-active" type="button" data-tab="chats" aria-label="Chats" title="Chats">
+          <button class="rail-item is-active" type="button" data-tab="chats" aria-label="Private" title="Private">
             <span class="icon icon-chat"></span>
-            <span>Chats</span>
+            <span>Private</span>
           </button>
           <button class="rail-item" type="button" data-tab="public" aria-label="Public" title="Public">
             <span class="icon icon-broadcast"></span>
@@ -55,25 +55,25 @@
       </aside>
 
       <main class="workspace">
-        <section class="list-pane view-panel is-active" data-panel="chats" aria-label="Chats">
+        <section class="list-pane view-panel is-active" data-panel="chats" aria-label="Private">
           <header class="pane-header">
             <div>
-              <h1>Chats</h1>
-              <p id="chatCountLabel">threads</p>
+              <h1>Platho.app</h1>
+              <p id="chatCountLabel">Private chats</p>
             </div>
             <div class="header-actions">
               <button class="icon-button" type="button" aria-label="Search" title="Search">
                 <span class="icon icon-search"></span>
               </button>
-              <button class="icon-button accent" type="button" aria-label="New chat" title="New chat">
-                <span class="icon icon-plus"></span>
-              </button>
             </div>
           </header>
 
-          <div class="search-row">
+          <div class="search-row action-search-row">
             <span class="icon icon-search"></span>
-            <input id="threadSearch" type="search" placeholder="Search threads" autocomplete="off">
+            <input id="threadSearch" type="search" placeholder="Search private" autocomplete="off">
+            <button class="icon-button accent" id="newChatButton" type="button" aria-label="New private chat" title="New private chat">
+              <span class="icon icon-plus"></span>
+            </button>
           </div>
 
           <div class="thread-list" id="threadList"></div>
@@ -81,17 +81,17 @@
 
         <section class="content-pane chat-pane view-panel is-active" data-panel="chats" aria-label="Conversation">
           <header class="conversation-header">
+            <button class="icon-button chat-back-button" id="backToChatsButton" type="button" aria-label="Back to private" title="Back to private">
+              <span class="icon icon-back"></span>
+            </button>
             <div class="avatar" id="activeAvatar" aria-hidden="true">A</div>
             <div class="conversation-title">
               <h2 id="activeTitle">Ari</h2>
               <p id="activeSubtitle">sealed 2 min ago</p>
             </div>
             <div class="header-actions">
-              <button class="icon-button" type="button" aria-label="Call" title="Call">
-                <span class="icon icon-call"></span>
-              </button>
-              <button class="icon-button" type="button" aria-label="More" title="More">
-                <span class="icon icon-more"></span>
+              <button class="icon-button" id="identityMenuButton" type="button" aria-label="Choose display name" title="Choose display name" aria-haspopup="menu" aria-expanded="false">
+                <span class="icon icon-chevron-down"></span>
               </button>
             </div>
           </header>
@@ -99,37 +99,98 @@
           <div class="message-strip" id="messageStrip" aria-live="polite"></div>
 
           <form class="composer" id="composer">
-            <button class="icon-button" type="button" aria-label="Attach" title="Attach">
-              <span class="icon icon-attach"></span>
+            <button class="icon-button payment-check-button" id="paymentCheckButton" type="button" aria-label="Payment check" title="Payment check">
+              <span class="icon icon-vault"></span>
             </button>
+            <button class="icon-button attachment-button" id="privateImageButton" type="button" aria-label="Attach image" title="Attach image">
+              <span class="icon icon-plus"></span>
+            </button>
+            <input id="privateImageInput" type="file" accept="image/*" hidden>
             <label class="sr-only" for="messageInput">Message</label>
-            <input id="messageInput" type="text" placeholder="Message" autocomplete="off">
+            <textarea id="messageInput" placeholder="Message (1024 bytes max)" maxlength="1024" rows="1" autocomplete="off"></textarea>
             <button class="send-button" type="submit" aria-label="Send" title="Send">
-              <span class="icon icon-send"></span>
+              <span class="icon icon-bolt"></span>
             </button>
+                        <div class="composer-attachment" id="privateAttachmentPanel" hidden>
+              <span id="privateAttachmentLabel">No image</span>
+              <select id="privateImageModeSelect" aria-label="Image compression">
+                <option value="standard">Standard 8 KiB</option>
+                <option value="improved">Improved 16 KiB</option>
+              </select>
+              <button id="privateClearImageButton" type="button">Remove</button>
+            </div>
+            <div class="composer-cost-status" id="privateComposerCostStatus">Price checking
+Wallet required - Message budget required</div>
           </form>
         </section>
 
         <section class="content-pane public-pane view-panel" data-panel="public" aria-label="Public feed">
           <header class="pane-header inline">
             <div>
-              <h1>Public</h1>
-              <p id="publicSubtitle">capsules</p>
+              <h1>Platho.app</h1>
+              <p id="publicSubtitle">Public channels</p>
             </div>
-            <button class="icon-button accent" type="button" aria-label="Publish" title="Publish">
+            <div class="public-header-actions">
+              <div class="segmented-control" aria-label="Public display mode">
+                <button id="publicFeedModeButton" type="button" data-public-mode="feed" aria-pressed="true">Feed</button>
+                <button id="publicChannelsModeButton" type="button" data-public-mode="channels" aria-pressed="false">Channels</button>
+              </div>
+            </div>
+          </header>
+          <div class="search-row action-search-row public-channel-search-row" id="publicChannelSearchRow">
+            <span class="icon icon-search"></span>
+            <input id="publicChannelSearch" type="search" placeholder="Search public" autocomplete="off">
+            <button class="icon-button accent" id="addPublicChannelButton" type="button" aria-label="Add public channel" title="Add public channel">
               <span class="icon icon-plus"></span>
             </button>
-          </header>
+          </div>
           <div class="public-feed" id="publicFeed"></div>
+          <button class="public-jump-down-button" id="publicJumpDownButton" type="button" aria-label="Jump to newest public posts" title="Jump to newest public posts" hidden>
+            <span class="icon icon-down"></span>
+            <span>Down</span>
+          </button>
+          <form class="composer public-composer" id="publicComposer">
+            <div class="composer-stack">
+              <label class="sr-only" for="publicMessageInput">Public message</label>
+              <textarea id="publicMessageInput" placeholder="Post to public" maxlength="1024" rows="1" autocomplete="off"></textarea>
+              <div class="composer-attachment-controls">
+                <button class="icon-button attachment-button" id="publicImageButton" type="button" aria-label="Attach image" title="Attach image">
+                  <span class="icon icon-plus"></span>
+                </button>
+                <input id="publicImageInput" type="file" accept="image/*" hidden>
+                <select id="publicImageModeSelect" aria-label="Image compression">
+                  <option value="standard">Standard 8 KiB</option>
+                  <option value="improved">Improved 16 KiB</option>
+                </select>
+              </div>
+              <div class="composer-attachment" id="publicAttachmentPanel" hidden>
+                <span id="publicAttachmentLabel">No image</span>
+                <button id="publicClearImageButton" type="button">Remove</button>
+              </div>
+              <label class="composer-post-option" id="publicPostCommentsToggle">
+                <input id="publicComposerCommentsCheckbox" type="checkbox" checked>
+                <span>Allow comments</span>
+              </label>
+              <div class="composer-context" id="publicCommentContext" hidden>
+                <span id="publicCommentContextText">Commenting</span>
+                <button type="button" id="publicCancelCommentButton">Cancel</button>
+              </div>
+            </div>
+            <button class="send-button" type="submit" aria-label="Publish" title="Publish">
+              <span class="icon icon-bolt"></span>
+            </button>
+            <div class="composer-cost-status" id="publicComposerCostStatus">Price checking
+Wallet required - Message budget required</div>
+          </form>
         </section>
 
         <section class="content-pane vault-pane view-panel" data-panel="vault" aria-label="Vault">
           <header class="pane-header inline">
             <div>
-              <h1>Vault</h1>
-              <p id="vaultSubtitle">account</p>
+              <h1>Platho.app</h1>
+              <p id="vaultSubtitle">Vault</p>
             </div>
-            <button class="icon-button" type="button" aria-label="Refresh" title="Refresh">
+            <button class="icon-button" id="refreshVaultButton" type="button" aria-label="Refresh" title="Refresh">
               <span class="icon icon-refresh"></span>
             </button>
           </header>
@@ -144,78 +205,126 @@
         <section class="content-pane profile-pane view-panel" data-panel="profile" aria-label="Profile">
           <header class="pane-header inline">
             <div>
-              <h1>Profile</h1>
-              <p id="profileHandle">@platho</p>
-            </div>
-            <div class="header-actions">
-              <div class="ton-connect-anchor" id="tonConnectButton"></div>
-              <button class="icon-button" type="button" aria-label="Settings" title="Settings">
-                <span class="icon icon-gear"></span>
-              </button>
+              <h1>Platho.app</h1>
+              <p id="profileHandle">Profile</p>
             </div>
           </header>
 
           <div class="identity-block">
-            <div class="avatar large" aria-hidden="true">P</div>
+            <div class="avatar large" id="profileAvatar" aria-hidden="true">P</div>
             <div>
-              <h2 id="identityName">platho.ton</h2>
-              <p id="identitySubtitle">username NFT pending</p>
+              <h2 id="identityName">No wallet</h2>
+              <p id="identitySubtitle">Create or import a wallet</p>
             </div>
           </div>
 
-          <div class="settings-list">
-            <button type="button"><span>Wallet</span><strong id="walletRuntimeLabel">wallet</strong></button>
-            <button type="button"><span>Encryption</span><strong id="encryptionStatus">checking</strong></button>
-            <button type="button"><span>Key suite</span><strong id="keySuiteStatus">hybrid-v1</strong></button>
-            <button type="button"><span>Key auth</span><strong id="keyAuthStatus">checking</strong></button>
-            <button type="button"><span>Vault draft</span><strong id="vaultDraftStatus">checking</strong></button>
-            <button type="button"><span>Capsule policy</span><strong id="capsulePolicyStatus">checking</strong></button>
-            <button type="button"><span>TON Connect</span><strong id="tonConnectStatus">not connected</strong></button>
-            <button type="button"><span>Wallet proof</span><strong id="walletProofStatus">checking</strong></button>
-            <button type="button"><span>Wallet key</span><strong id="walletKeyStatus">lookup required</strong></button>
-            <button type="button"><span>Vault record</span><strong id="vaultRecordStatus">checking</strong></button>
-            <button type="button"><span>Replay store</span><strong id="replayStoreStatus">checking</strong></button>
-            <button type="button"><span>Local state</span><strong id="localStateLabel">device</strong></button>
-            <button type="button"><span>Network</span><strong id="networkRuntimeLabel">network</strong></button>
-          </div>
+          <div class="profile-sections">
+            <section class="profile-section" aria-label="Wallet">
+              <h2>Wallet</h2>
+              <div class="settings-list">
+                <button id="createWalletButton" type="button"><span>Create wallet</span><strong>recommended</strong></button>
+                <button id="importWalletButton" type="button"><span>Import wallet</span><strong>seed</strong></button>
+                <button id="exportWalletSeedButton" type="button"><span>Export wallet seed</span><strong id="walletAddressStatus">not created</strong></button>
+                <button id="registerVaultKeysButton" type="button"><span>Activate wallet</span><strong id="vaultDraftStatus">required</strong></button>
+              </div>
+            </section>
 
-          <section class="transport-panel" aria-label="Transport">
-            <header class="transport-header">
-              <div>
-                <h2>Transport</h2>
-                <p id="transportStatus">checking</p>
+            <section class="profile-section" aria-label="Messages">
+              <h2>Messages</h2>
+              <div class="settings-list">
+                <label class="settings-select-row" for="keySuiteSelect">
+                  <span>Encryption mode</span>
+                  <select id="keySuiteSelect" aria-label="Encryption type">
+                    <option value="hybrid-v1">Postquantum · 1 KiB/capsule</option>
+                    <option value="classical-v1">Standard · 1 KiB/capsule</option>
+                  </select>
+                  <strong id="keySuiteStatus">checking</strong>
+                </label>
+                <button id="syncMessagesButton" type="button"><span>Sync messages</span><strong id="messageSyncStatus">chain</strong></button>
+                <button id="replaceVaultKeysButton" type="button"><span>Rotate keys</span><strong id="vaultRotateStatus">suite</strong></button>
+                <button id="revokeVaultSessionButton" type="button"><span>Revoke session</span><strong id="vaultSessionStatus">session</strong></button>
+                <button id="setAvatarButton" type="button"><span>Set avatar</span><strong>100 ATH</strong></button>
+                <input id="profileAvatarInput" type="file" accept="image/*" hidden>
               </div>
-            </header>
-            <div class="transport-actions">
-              <button id="showKeyQrButton" type="button"><span class="icon icon-broadcast"></span>QR key</button>
-              <button id="copyKeyBundleButton" type="button"><span class="icon icon-attach"></span>Copy key</button>
-              <button id="exportKeyBundleButton" type="button"><span class="icon icon-up"></span>Save key</button>
-              <button id="shareCapsuleButton" type="button"><span class="icon icon-send"></span>Share capsule</button>
-              <button id="exportCapsuleButton" type="button"><span class="icon icon-down"></span>Save capsule</button>
-              <button id="importTransportButton" type="button"><span class="icon icon-attach"></span>Open file</button>
-            </div>
-            <div class="transport-stats">
-              <div><span>Peer</span><strong id="transportPeerStatus">none</strong></div>
-              <div><span>Outbox</span><strong id="transportOutboxStatus">0</strong></div>
-              <div><span>Inbox</span><strong id="transportInboxStatus">0</strong></div>
-              <div><span>Last</span><strong id="transportLastStatus">none</strong></div>
-            </div>
-            <div class="transport-share-panel">
-              <div class="transport-qr-output" id="transportQrOutput" aria-label="Transport QR"></div>
-              <textarea id="transportPackageText" rows="6" spellcheck="false" placeholder="Paste package JSON"></textarea>
-              <div class="transport-inline-actions">
-                <button id="copyTransportTextButton" type="button">Copy</button>
-                <button id="importTransportTextButton" type="button">Import text</button>
-                <button id="shareTransportTextButton" type="button">Share</button>
+            </section>
+
+            <section class="profile-section" aria-label="Public channels">
+              <h2>Public channels</h2>
+              <div class="settings-list">
+                <label class="settings-select-row" for="publicSyncWindowSelect">
+                  <span>Visible history</span>
+                  <select id="publicSyncWindowSelect" aria-label="Public sync window">
+                    <option value="7">7 days</option>
+                    <option value="30">30 days</option>
+                    <option value="90">90 days</option>
+                    <option value="all">All time · slow sync</option>
+                  </select>
+                  <strong id="publicSyncWindowStatus">7 days</strong>
+                </label>
+                <label class="settings-select-row" for="publicCommentsDefaultSelect">
+                  <span>Comments by default</span>
+                  <select id="publicCommentsDefaultSelect" aria-label="Default public comment setting">
+                    <option value="enabled">Allowed</option>
+                    <option value="disabled">Closed</option>
+                  </select>
+                  <strong id="publicCommentsDefaultStatus">enabled</strong>
+                </label>
               </div>
-            </div>
-            <input class="sr-only" id="transportFileInput" type="file" accept="application/json,.json,.platho">
-          </section>
+            </section>
+
+            <section class="profile-section" aria-label="Names and ATH">
+              <h2>Names and ATH</h2>
+              <div class="settings-list">
+                <button id="mintUsernameButton" type="button"><span>Mint .ath name</span><strong>Username</strong></button>
+                <button id="flushUsernameRefundButton" type="button"><span>Claim failed mint refund</span><strong>ATH</strong></button>
+                <button id="transferAthButton" type="button"><span>Transfer ATH</span><strong>wallet</strong></button>
+                <button id="burnAthButton" type="button"><span>Burn ATH</span><strong>wallet</strong></button>
+              </div>
+            </section>
+          </div>
         </section>
       </main>
-    </div>
 
-    <script src="./vendor/@tonconnect/ui/tonconnect-ui.min.js"></script>
-    <script src="./app.js" type="module"></script>
+      <div class="modal-backdrop" id="newChatDialog" hidden>
+        <form class="recipient-dialog" id="newChatForm">
+          <header>
+            <div>
+              <h2>New Chat</h2>
+              <p id="recipientHint">Use a wallet address, xxxx.ton, or xxxx.ath. Local label is only shown on this device.</p>
+            </div>
+            <button class="icon-button" id="closeNewChatButton" type="button" aria-label="Close" title="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </header>
+          <div class="action-field">
+            <label for="recipientInput">Recipient</label>
+            <input id="recipientInput" type="text" spellcheck="false" autocomplete="off" placeholder="EQ..., xxxx.ton, or xxxx.ath">
+          </div>
+          <div class="action-field">
+            <label for="recipientLocalLabel">Local label</label>
+            <input id="recipientLocalLabel" type="text" spellcheck="false" autocomplete="off" placeholder="Optional, e.g. Anonymous">
+          </div>
+          <button class="recipient-submit" type="submit">Start</button>
+        </form>
+      </div>
+
+      <div class="modal-backdrop" id="actionDialog" hidden>
+        <form class="action-dialog" id="actionForm">
+          <header>
+            <div>
+              <h2 id="actionTitle">Action</h2>
+              <p id="actionHint">Review details before signing.</p>
+            </div>
+            <button class="icon-button" id="actionCancelButton" type="button" aria-label="Close" title="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </header>
+          <div class="action-fields" id="actionFields"></div>
+          <div class="action-summary" id="actionSummary"></div>
+          <button class="recipient-submit" id="actionSubmitButton" type="submit">Continue</button>
+        </form>
+      </div>
+    </div>
+    <script src="./app.js?v=65" type="module"></script>
   </body>
 </html>

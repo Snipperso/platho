@@ -16,9 +16,9 @@
           "label": "owner_to_recipient_wallet",
           "inbound_value_nanotons": "200000000",
           "tx_count": 4,
-          "total_fees_nanotons": "2378103",
-          "max_single_tx_fee_nanotons": "1426856",
-          "max_gas_used": "9847",
+          "total_fees_nanotons": "2812499",
+          "max_single_tx_fee_nanotons": "1806785",
+          "max_gas_used": "11621",
           "aborted_count": 0,
           "failed_compute_count": 0,
           "transactions": [
@@ -34,20 +34,20 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "1426856",
-              "gas_used": "9847",
-              "gas_fees_nanotons": "656468",
-              "action_fees_nanotons": "770388",
-              "fwd_fees_nanotons": "2311201",
+              "total_fees_nanotons": "1806785",
+              "gas_used": "11621",
+              "gas_fees_nanotons": "774734",
+              "action_fees_nanotons": "1032051",
+              "fwd_fees_nanotons": "3096201",
               "out_messages": 1,
               "aborted": false,
               "success": true,
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "594223",
-              "gas_used": "8472",
-              "gas_fees_nanotons": "564801",
+              "total_fees_nanotons": "648690",
+              "gas_used": "9289",
+              "gas_fees_nanotons": "619268",
               "action_fees_nanotons": "29422",
               "fwd_fees_nanotons": "88268",
               "out_messages": 1,
@@ -69,9 +69,9 @@
           ]
         }
       ],
-      "total_fees_nanotons": "2378103",
-      "max_operation_fee_nanotons": "2378103",
-      "max_gas_used": "9847"
+      "total_fees_nanotons": "2812499",
+      "max_operation_fee_nanotons": "2812499",
+      "max_gas_used": "11621"
     },
     {
       "id": "ATH_BURN_SUCCESS",
@@ -81,9 +81,9 @@
           "label": "wallet_to_master_burn_finalized",
           "inbound_value_nanotons": "200000000",
           "tx_count": 4,
-          "total_fees_nanotons": "1321536",
-          "max_single_tx_fee_nanotons": "564156",
-          "max_gas_used": "7932",
+          "total_fees_nanotons": "1366069",
+          "max_single_tx_fee_nanotons": "565356",
+          "max_gas_used": "7950",
           "aborted_count": 0,
           "failed_compute_count": 0,
           "transactions": [
@@ -99,9 +99,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "430756",
-              "gas_used": "5842",
-              "gas_fees_nanotons": "389468",
+              "total_fees_nanotons": "474089",
+              "gas_used": "6492",
+              "gas_fees_nanotons": "432801",
               "action_fees_nanotons": "41288",
               "fwd_fees_nanotons": "123868",
               "out_messages": 1,
@@ -110,9 +110,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "564156",
-              "gas_used": "7932",
-              "gas_fees_nanotons": "528801",
+              "total_fees_nanotons": "565356",
+              "gas_used": "7950",
+              "gas_fees_nanotons": "530001",
               "action_fees_nanotons": "35355",
               "fwd_fees_nanotons": "106068",
               "out_messages": 1,
@@ -134,79 +134,79 @@
           ]
         }
       ],
-      "total_fees_nanotons": "1321536",
-      "max_operation_fee_nanotons": "1321536",
-      "max_gas_used": "7932"
+      "total_fees_nanotons": "1366069",
+      "max_operation_fee_nanotons": "1366069",
+      "max_gas_used": "7950"
     },
     {
-      "id": "CAPSULEHUB_DIRECT_PUBLISH_AND_FLUSH_BOUNCE",
+      "id": "CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE",
       "status": "ok",
       "operations": [
         {
-          "label": "private_direct_publish",
-          "inbound_value_nanotons": "23000000",
+          "label": "private_vault_publish",
+          "inbound_value_nanotons": "43000000",
           "tx_count": 2,
-          "total_fees_nanotons": "1258690",
-          "max_single_tx_fee_nanotons": "905734",
-          "max_gas_used": "13586",
-          "aborted_count": 0,
+          "total_fees_nanotons": "1565089",
+          "max_single_tx_fee_nanotons": "1565089",
+          "max_gas_used": "22907",
+          "aborted_count": 1,
           "failed_compute_count": 0,
           "transactions": [
             {
-              "total_fees_nanotons": "352956",
-              "gas_used": "1937",
-              "gas_fees_nanotons": "129134",
-              "action_fees_nanotons": "45421",
-              "fwd_fees_nanotons": "136268",
+              "total_fees_nanotons": "1565089",
+              "gas_used": "22907",
+              "gas_fees_nanotons": "1527134",
+              "action_fees_nanotons": "37955",
+              "fwd_fees_nanotons": "113868",
               "out_messages": 1,
               "aborted": false,
               "success": true,
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "905734",
-              "gas_used": "13586",
-              "gas_fees_nanotons": "905734",
+              "total_fees_nanotons": "0",
+              "gas_used": "0",
+              "gas_fees_nanotons": "0",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
-              "aborted": false,
+              "aborted": true,
               "success": true,
-              "exit_code": 0
+              "exit_code": null
             }
           ]
         },
         {
-          "label": "public_direct_publish",
-          "inbound_value_nanotons": "22000000",
+          "label": "public_vault_publish",
+          "inbound_value_nanotons": "40000000",
           "tx_count": 2,
-          "total_fees_nanotons": "1096468",
-          "max_single_tx_fee_nanotons": "753201",
-          "max_gas_used": "11298",
-          "aborted_count": 0,
+          "total_fees_nanotons": "1222356",
+          "max_single_tx_fee_nanotons": "1222356",
+          "max_gas_used": "17766",
+          "aborted_count": 1,
           "failed_compute_count": 0,
           "transactions": [
             {
-              "total_fees_nanotons": "343267",
-              "gas_used": "1937",
-              "gas_fees_nanotons": "129134",
-              "action_fees_nanotons": "42999",
-              "fwd_fees_nanotons": "129001",
+              "total_fees_nanotons": "1222356",
+              "gas_used": "17766",
+              "gas_fees_nanotons": "1184401",
+              "action_fees_nanotons": "37955",
+              "fwd_fees_nanotons": "113868",
               "out_messages": 1,
               "aborted": false,
               "success": true,
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "753201",
-              "gas_used": "11298",
-              "gas_fees_nanotons": "753201",
+              "total_fees_nanotons": "0",
+              "gas_used": "0",
+              "gas_fees_nanotons": "0",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
-              "aborted": false,
+              "aborted": true,
               "success": true,
-              "exit_code": 0
+              "exit_code": null
             }
           ]
         },
@@ -214,9 +214,9 @@
           "label": "flush_fee_to_missing_accumulator_bounce",
           "inbound_value_nanotons": "50000000",
           "tx_count": 3,
-          "total_fees_nanotons": "1011091",
-          "max_single_tx_fee_nanotons": "719667",
-          "max_gas_used": "10375",
+          "total_fees_nanotons": "845757",
+          "max_single_tx_fee_nanotons": "554333",
+          "max_gas_used": "7895",
           "aborted_count": 0,
           "failed_compute_count": 0,
           "transactions": [
@@ -232,9 +232,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "719667",
-              "gas_used": "10375",
-              "gas_fees_nanotons": "691668",
+              "total_fees_nanotons": "554333",
+              "gas_used": "7895",
+              "gas_fees_nanotons": "526334",
               "action_fees_nanotons": "27999",
               "fwd_fees_nanotons": "84001",
               "out_messages": 1,
@@ -256,9 +256,9 @@
           ]
         }
       ],
-      "total_fees_nanotons": "3366249",
-      "max_operation_fee_nanotons": "1258690",
-      "max_gas_used": "13586"
+      "total_fees_nanotons": "3633202",
+      "max_operation_fee_nanotons": "1565089",
+      "max_gas_used": "22907"
     },
     {
       "id": "FEEACCUMULATOR_SPLIT_FLUSH",
@@ -435,7 +435,7 @@
           "label": "valid_username_mint_with_item_ack",
           "inbound_value_nanotons": "150000000",
           "tx_count": 5,
-          "total_fees_nanotons": "4366089",
+          "total_fees_nanotons": "4404422",
           "max_single_tx_fee_nanotons": "2727509",
           "max_gas_used": "38299",
           "aborted_count": 2,
@@ -464,9 +464,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "258601",
-              "gas_used": "3879",
-              "gas_fees_nanotons": "258601",
+              "total_fees_nanotons": "296934",
+              "gas_used": "4454",
+              "gas_fees_nanotons": "296934",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
@@ -502,7 +502,7 @@
           "label": "invalid_username_refund_due",
           "inbound_value_nanotons": "100000000",
           "tx_count": 3,
-          "total_fees_nanotons": "2022156",
+          "total_fees_nanotons": "2060489",
           "max_single_tx_fee_nanotons": "1763555",
           "max_gas_used": "25668",
           "aborted_count": 2,
@@ -520,9 +520,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "258601",
-              "gas_used": "3879",
-              "gas_fees_nanotons": "258601",
+              "total_fees_nanotons": "296934",
+              "gas_used": "4454",
+              "gas_fees_nanotons": "296934",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
@@ -547,8 +547,8 @@
           "label": "flush_ath_refund_due",
           "inbound_value_nanotons": "200000000",
           "tx_count": 5,
-          "total_fees_nanotons": "4636681",
-          "max_single_tx_fee_nanotons": "1548089",
+          "total_fees_nanotons": "5071077",
+          "max_single_tx_fee_nanotons": "1806785",
           "max_gas_used": "22602",
           "aborted_count": 0,
           "failed_compute_count": 0,
@@ -576,20 +576,20 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "1426856",
-              "gas_used": "9847",
-              "gas_fees_nanotons": "656468",
-              "action_fees_nanotons": "770388",
-              "fwd_fees_nanotons": "2311201",
+              "total_fees_nanotons": "1806785",
+              "gas_used": "11621",
+              "gas_fees_nanotons": "774734",
+              "action_fees_nanotons": "1032051",
+              "fwd_fees_nanotons": "3096201",
               "out_messages": 1,
               "aborted": false,
               "success": true,
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "594223",
-              "gas_used": "8472",
-              "gas_fees_nanotons": "564801",
+              "total_fees_nanotons": "648690",
+              "gas_used": "9289",
+              "gas_fees_nanotons": "619268",
               "action_fees_nanotons": "29422",
               "fwd_fees_nanotons": "88268",
               "out_messages": 1,
@@ -614,8 +614,8 @@
           "label": "flush_treasury_due_ath",
           "inbound_value_nanotons": "200000000",
           "tx_count": 5,
-          "total_fees_nanotons": "4330124",
-          "max_single_tx_fee_nanotons": "1423789",
+          "total_fees_nanotons": "4781721",
+          "max_single_tx_fee_nanotons": "1820919",
           "max_gas_used": "18134",
           "aborted_count": 0,
           "failed_compute_count": 0,
@@ -643,20 +643,20 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "1423789",
-              "gas_used": "9801",
-              "gas_fees_nanotons": "653401",
-              "action_fees_nanotons": "770388",
-              "fwd_fees_nanotons": "2311201",
+              "total_fees_nanotons": "1820919",
+              "gas_used": "11833",
+              "gas_fees_nanotons": "788868",
+              "action_fees_nanotons": "1032051",
+              "fwd_fees_nanotons": "3096201",
               "out_messages": 1,
               "aborted": false,
               "success": true,
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "594223",
-              "gas_used": "8472",
-              "gas_fees_nanotons": "564801",
+              "total_fees_nanotons": "648690",
+              "gas_used": "9289",
+              "gas_fees_nanotons": "619268",
               "action_fees_nanotons": "29422",
               "fwd_fees_nanotons": "88268",
               "out_messages": 1,
@@ -681,7 +681,7 @@
           "label": "flush_burn_due_ath",
           "inbound_value_nanotons": "200000000",
           "tx_count": 5,
-          "total_fees_nanotons": "3151758",
+          "total_fees_nanotons": "3213491",
           "max_single_tx_fee_nanotons": "1030689",
           "max_gas_used": "14930",
           "aborted_count": 0,
@@ -710,9 +710,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "427689",
-              "gas_used": "5796",
-              "gas_fees_nanotons": "386401",
+              "total_fees_nanotons": "488222",
+              "gas_used": "6704",
+              "gas_fees_nanotons": "446934",
               "action_fees_nanotons": "41288",
               "fwd_fees_nanotons": "123868",
               "out_messages": 1,
@@ -721,9 +721,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "564156",
-              "gas_used": "7932",
-              "gas_fees_nanotons": "528801",
+              "total_fees_nanotons": "565356",
+              "gas_used": "7950",
+              "gas_fees_nanotons": "530001",
               "action_fees_nanotons": "35355",
               "fwd_fees_nanotons": "106068",
               "out_messages": 1,
@@ -748,7 +748,7 @@
           "label": "stuck_pending_mint_creation_no_ack",
           "inbound_value_nanotons": "150000000",
           "tx_count": 4,
-          "total_fees_nanotons": "3127644",
+          "total_fees_nanotons": "3165977",
           "max_single_tx_fee_nanotons": "2727509",
           "max_gas_used": "38299",
           "aborted_count": 2,
@@ -777,9 +777,9 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "258601",
-              "gas_used": "3879",
-              "gas_fees_nanotons": "258601",
+              "total_fees_nanotons": "296934",
+              "gas_used": "4454",
+              "gas_fees_nanotons": "296934",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
@@ -804,8 +804,8 @@
           "label": "prune_stale_pending_mint",
           "inbound_value_nanotons": "50000000",
           "tx_count": 2,
-          "total_fees_nanotons": "1626486",
-          "max_single_tx_fee_nanotons": "1342092",
+          "total_fees_nanotons": "1650774",
+          "max_single_tx_fee_nanotons": "1366380",
           "max_gas_used": "15788",
           "aborted_count": 0,
           "failed_compute_count": 0,
@@ -822,7 +822,7 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "1342092",
+              "total_fees_nanotons": "1366380",
               "gas_used": "15788",
               "gas_fees_nanotons": "1052534",
               "action_fees_nanotons": "0",
@@ -835,8 +835,8 @@
           ]
         }
       ],
-      "total_fees_nanotons": "23260938",
-      "max_operation_fee_nanotons": "4636681",
+      "total_fees_nanotons": "24347951",
+      "max_operation_fee_nanotons": "5071077",
       "max_gas_used": "38299"
     },
     {
@@ -847,38 +847,38 @@
           "label": "external_private_publish_to_capsulehub_ack",
           "inbound_value_nanotons": "0",
           "tx_count": 3,
-          "total_fees_nanotons": "6717781",
-          "max_single_tx_fee_nanotons": "3401824",
-          "max_gas_used": "46783",
-          "aborted_count": 0,
-          "failed_compute_count": 0,
+          "total_fees_nanotons": "6365443",
+          "max_single_tx_fee_nanotons": "4620620",
+          "max_gas_used": "49909",
+          "aborted_count": 1,
+          "failed_compute_count": 1,
           "transactions": [
             {
-              "total_fees_nanotons": "3401824",
-              "gas_used": "46783",
-              "gas_fees_nanotons": "3118868",
-              "action_fees_nanotons": "54755",
-              "fwd_fees_nanotons": "164268",
+              "total_fees_nanotons": "4620620",
+              "gas_used": "49909",
+              "gas_fees_nanotons": "3327268",
+              "action_fees_nanotons": "305684",
+              "fwd_fees_nanotons": "917068",
               "out_messages": 1,
               "aborted": false,
               "success": true,
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "1213889",
-              "gas_used": "17639",
-              "gas_fees_nanotons": "1175934",
-              "action_fees_nanotons": "37955",
-              "fwd_fees_nanotons": "113868",
+              "total_fees_nanotons": "466822",
+              "gas_used": "6669",
+              "gas_fees_nanotons": "444601",
+              "action_fees_nanotons": "0",
+              "fwd_fees_nanotons": "0",
               "out_messages": 1,
-              "aborted": false,
-              "success": true,
-              "exit_code": 0
+              "aborted": true,
+              "success": false,
+              "exit_code": 13312
             },
             {
-              "total_fees_nanotons": "2102068",
-              "gas_used": "31531",
-              "gas_fees_nanotons": "2102068",
+              "total_fees_nanotons": "1278001",
+              "gas_used": "19170",
+              "gas_fees_nanotons": "1278001",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
@@ -892,18 +892,18 @@
           "label": "external_private_publish_to_missing_capsulehub_bounce",
           "inbound_value_nanotons": "0",
           "tx_count": 3,
-          "total_fees_nanotons": "4676846",
-          "max_single_tx_fee_nanotons": "3401824",
-          "max_gas_used": "46783",
+          "total_fees_nanotons": "5920842",
+          "max_single_tx_fee_nanotons": "4620620",
+          "max_gas_used": "49909",
           "aborted_count": 1,
           "failed_compute_count": 0,
           "transactions": [
             {
-              "total_fees_nanotons": "3401824",
-              "gas_used": "46783",
-              "gas_fees_nanotons": "3118868",
-              "action_fees_nanotons": "54755",
-              "fwd_fees_nanotons": "164268",
+              "total_fees_nanotons": "4620620",
+              "gas_used": "49909",
+              "gas_fees_nanotons": "3327268",
+              "action_fees_nanotons": "305684",
+              "fwd_fees_nanotons": "917068",
               "out_messages": 1,
               "aborted": false,
               "success": true,
@@ -921,9 +921,9 @@
               "exit_code": null
             },
             {
-              "total_fees_nanotons": "1252801",
-              "gas_used": "18792",
-              "gas_fees_nanotons": "1252801",
+              "total_fees_nanotons": "1278001",
+              "gas_used": "19170",
+              "gas_fees_nanotons": "1278001",
               "action_fees_nanotons": "0",
               "fwd_fees_nanotons": "0",
               "out_messages": 0,
@@ -934,9 +934,9 @@
           ]
         }
       ],
-      "total_fees_nanotons": "11394627",
-      "max_operation_fee_nanotons": "6717781",
-      "max_gas_used": "46783"
+      "total_fees_nanotons": "12286285",
+      "max_operation_fee_nanotons": "6365443",
+      "max_gas_used": "49909"
     }
   ]
 }

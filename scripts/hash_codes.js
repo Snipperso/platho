@@ -9,6 +9,7 @@ FEEACCUMULATOR_CODE_HASH:'build/FeeAccumulator/FeeAccumulator_FeeAccumulator.cod
 VAULT_CODE_HASH:'build/Vault/Vault_Vault.code.boc',
 USERNAME_NFT_ITEM_CODE_HASH:'build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem.code.boc',
 USERNAME_REGISTRY_CODE_HASH:'build/UsernameRegistry/UsernameRegistry_UsernameRegistry.code.boc',
+PROFILE_REGISTRY_CODE_HASH:'build/ProfileRegistry/ProfileRegistry_ProfileRegistry.code.boc',
 MOCK_VAULT_ATH_WALLET_CODE_HASH:'build/MockVaultAthWallet/MockVaultAthWallet_MockVaultAthWallet.code.boc',
 MOCK_USERNAME_NFT_ITEM_NO_ACK_CODE_HASH:'build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck.code.boc',
 };

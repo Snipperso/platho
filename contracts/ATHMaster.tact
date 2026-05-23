@@ -104,6 +104,16 @@ contract ATHMaster {
         throwUnless(14130, sender() == self.derive_wallet_address(self.treasury_owner));
         throwUnless(14131, msg.amount == self.total_supply);
         self.treasury_supply_deployed = false;
+
+        if (context().value >= ATH_MASTER_EXCESS_REFUND_MIN_VALUE) {
+            message(MessageParameters {
+                to: self.treasury_owner,
+                value: 0,
+                bounce: false,
+                mode: SendRemainingValue,
+                body: null
+            });
+        }
     }
 
     get fun get_jetton_data(): ATHJettonDataView {

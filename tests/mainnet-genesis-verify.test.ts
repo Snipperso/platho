@@ -6,8 +6,8 @@ import {
   verifyMainnetGenesisSnapshot,
 } from '../scripts/mainnet_genesis_verify';
 
-function addr(label: string): string {
-  return new Address(0, createHash('sha256').update(`PLATHO.MAINNET.GENESIS.${label}`).digest()).toString();
+function addr(label: string, workchain = 0): string {
+  return new Address(workchain, createHash('sha256').update(`PLATHO.MAINNET.GENESIS.${label}`).digest()).toString();
 }
 
 function hash(label: string): string {
@@ -28,13 +28,18 @@ function finalInput(): MainnetGenesisVerifyInput {
     username_registry: addr('username_registry'),
     username_registry_official_ath_wallet: addr('username_registry_official_ath_wallet'),
     treasury_ath_receiver: addr('treasury_ath_receiver'),
+    profile_registry: addr('profile_registry'),
+    profile_registry_official_ath_wallet: addr('profile_registry_official_ath_wallet'),
+    profile_registry_treasury_ath_receiver: addr('profile_registry_treasury_ath_receiver'),
     stonfi_pool_address_ton_ath: addr('stonfi_pool_address_ton_ath'),
   };
   const code_hashes = {
     ath_master: hash('ath_master'),
+    ath_wallet: hash('ath_wallet'),
     vault: hash('vault'),
     capsulehub: hash('capsulehub'),
     username_registry: hash('username_registry'),
+    profile_registry: hash('profile_registry'),
     buyback_burn: hash('buyback_burn'),
     fee_accumulator: hash('fee_accumulator'),
   };
@@ -49,6 +54,9 @@ function finalInput(): MainnetGenesisVerifyInput {
       manifest_hash_hex: manifestHash,
       addresses,
       code_hashes,
+      constants: {
+        vault_activity_airdrop_total_atomic: '30000000000000000',
+      },
       blockers_before_final_genesis: [],
     },
     snapshot: {
@@ -67,6 +75,13 @@ function finalInput(): MainnetGenesisVerifyInput {
         vault_ath_wallet_address: addresses.vault_official_ath_wallet,
         ath_master_address: addresses.ath_master,
       },
+      vault_official_ath_wallet: {
+        address: addresses.vault_official_ath_wallet,
+        code_hash: code_hashes.ath_wallet,
+        owner_address: addresses.vault,
+        ath_master_address: addresses.ath_master,
+        balance_atomic: '30000000000000000',
+      },
       capsulehub: {
         address: addresses.capsulehub,
         code_hash: code_hashes.capsulehub,
@@ -83,6 +98,15 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.username_registry_official_ath_wallet,
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.treasury_ath_receiver,
+      },
+      profile_registry: {
+        address: addresses.profile_registry,
+        code_hash: code_hashes.profile_registry,
+        sealed: true,
+        deployment_manifest_hash: manifestHash,
+        official_ath_wallet_address: addresses.profile_registry_official_ath_wallet,
+        ath_master_address: addresses.ath_master,
+        treasury_ath_receiver: addresses.profile_registry_treasury_ath_receiver,
       },
       buyback_burn: {
         address: addresses.buyback_burn,
@@ -147,5 +171,66 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('MANIFEST_NOT_FINAL_GENESIS');
     expect(report.issue_codes).toContain('FINAL_GENESIS_BLOCKERS_NOT_EMPTY');
+  });
+
+  it('rejects unsupported masterchain ATHMaster in final mainnet genesis evidence', () => {
+    const input = finalInput();
+    const masterchainAthMaster = addr('ath_master_masterchain', -1);
+    input.manifest.addresses.ath_master = masterchainAthMaster;
+    input.snapshot.ath_master.address = masterchainAthMaster;
+    input.snapshot.vault.ath_master_address = masterchainAthMaster;
+    input.snapshot.username_registry.ath_master_address = masterchainAthMaster;
+    input.snapshot.profile_registry.ath_master_address = masterchainAthMaster;
+    input.snapshot.buyback_burn.ath_master_address = masterchainAthMaster;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('ATH_MASTER_NOT_BASECHAIN');
+    expect(report.issue_codes).toContain('USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN');
+    expect(report.issue_codes).toContain('PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN');
+    expect(report.issue_codes).toContain('BUYBACK_ATH_MASTER_NOT_BASECHAIN');
+  });
+
+  it('rejects sealing a correct manifest hash with the wrong ProfileRegistry official ATH wallet', () => {
+    const input = finalInput();
+    input.snapshot.profile_registry.official_ath_wallet_address = addr('wrong_profile_registry_official_ath_wallet');
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH');
+  });
+
+  it('rejects final genesis when official Vault ATH wallet does not fund the full activity airdrop allocation', () => {
+    const input = finalInput();
+    input.snapshot.vault_official_ath_wallet.balance_atomic = '29999999999999999';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('VAULT_ACTIVITY_AIRDROP_BACKING_UNDERFUNDED');
+  });
+
+  it('rejects final genesis when official Vault ATH wallet getter snapshot is missing', () => {
+    const input = finalInput() as any;
+    delete input.snapshot.vault_official_ath_wallet;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('MISSING_VAULT_OFFICIAL_ATH_WALLET_SNAPSHOT');
+  });
+
+  it('rejects final genesis when official Vault ATH wallet identity does not match Vault and ATHMaster', () => {
+    const input = finalInput();
+    input.snapshot.vault_official_ath_wallet.owner_address = addr('wrong_vault_owner');
+    input.snapshot.vault_official_ath_wallet.ath_master_address = addr('wrong_ath_master');
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_OWNER_MISMATCH');
+    expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH');
   });
 });

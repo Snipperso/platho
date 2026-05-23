@@ -10,6 +10,7 @@ import {
   AthTransferNotificationMintUsername,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
+import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -197,6 +198,38 @@ describe('UsernameRegistry paid mint milestone', () => {
     const global = await registry.getGetGlobal();
     expect(global.pending_mint_count).toBe(0n);
     expect(global.refund_due_count).toBe(0n);
+  });
+
+  it('USERNAME-REG-M10-11: bounced item deploy records ATH refund due and returns deploy reserve excess', async () => {
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
+    const owner = await blockchain.treasury('username-registry-bounced-item-owner');
+    const hash = nameHash('bounce');
+    const itemAddress = await registry.getGetUsernameItemAddress(owner.address, hash);
+    const rejectInit = await MockAthWalletNoAck.init();
+    await blockchain.setShardAccount(itemAddress, createShardAccount({
+      address: itemAddress,
+      code: rejectInit.code,
+      data: rejectInit.data,
+      balance: toNano('0.05'),
+      workchain: itemAddress.workChain,
+    }));
+
+    const result = await sendMint(
+      registry,
+      officialAthWallet,
+      owner.address,
+      'bounce',
+      PRICE_6_PLUS,
+      SUCCESSFUL_MINT_REQUIRED_VALUE,
+    );
+
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect(await registry.getGetRefundDue(owner.address)).toBe(PRICE_6_PLUS);
+    expect(findTransaction(result.transactions, {
+      from: registry.address,
+      to: owner.address,
+    })).toBeDefined();
   });
 
   it('USERNAME-REG-M10-02: invalid uppercase username from official ATH wallet creates refund due and no pending/name record', async () => {

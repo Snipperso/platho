@@ -14,7 +14,7 @@
   "per_contract": [
     {
       "contract": "ATHMaster.tact",
-      "non_comment_lines": 106,
+      "non_comment_lines": 115,
       "receive_handlers": 3,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -23,16 +23,16 @@
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 560,
-      "receive_handlers": 11,
-      "bounced_handlers": 6,
+      "non_comment_lines": 716,
+      "receive_handlers": 13,
+      "bounced_handlers": 8,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
       "storage_top_up_receive": false
     },
     {
       "contract": "BuybackBurn.tact",
-      "non_comment_lines": 511,
+      "non_comment_lines": 538,
       "receive_handlers": 14,
       "bounced_handlers": 2,
       "forbidden_hits": [],
@@ -41,8 +41,8 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 411,
-      "receive_handlers": 9,
+      "non_comment_lines": 496,
+      "receive_handlers": 7,
       "bounced_handlers": 1,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -58,6 +58,15 @@
       "storage_top_up_receive": true
     },
     {
+      "contract": "ProfileRegistry.tact",
+      "non_comment_lines": 432,
+      "receive_handlers": 11,
+      "bounced_handlers": 2,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true,
+      "storage_top_up_receive": true
+    },
+    {
       "contract": "UsernameNFTItem.tact",
       "non_comment_lines": 51,
       "receive_handlers": 3,
@@ -68,7 +77,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 777,
+      "non_comment_lines": 782,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -77,7 +86,7 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 1426,
+      "non_comment_lines": 1588,
       "receive_handlers": 21,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -87,23 +96,23 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "4d88d83ed5d795eb25f947e8c9f1d19ad7cbedeae93562e27d73b65b54f5a62f",
-      "pinned": "4d88d83ed5d795eb25f947e8c9f1d19ad7cbedeae93562e27d73b65b54f5a62f",
+      "built": "4523b07bc1612865a8aedc08670ed0c88df78cab5d320e5ee26721ed258754fe",
+      "pinned": "4523b07bc1612865a8aedc08670ed0c88df78cab5d320e5ee26721ed258754fe",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
-      "pinned": "5c0cf65ee7b44b239a87d181b9167a406b935ac0d0879e8727e96c2e4d68064a",
+      "built": "ee68b51fa434cb1477885d1844cfc4ed5677ff3d170a82e91122927f400fea9e",
+      "pinned": "ee68b51fa434cb1477885d1844cfc4ed5677ff3d170a82e91122927f400fea9e",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "272c14fb673dbb5ff51c9945b16325902d22925d48ea458c53612d8aed032acd",
-      "pinned": "272c14fb673dbb5ff51c9945b16325902d22925d48ea458c53612d8aed032acd",
+      "built": "67ab28999e3155d9b3569ab852dfc18fd28f56122ebdb7bcca745dff32810ba9",
+      "pinned": "67ab28999e3155d9b3569ab852dfc18fd28f56122ebdb7bcca745dff32810ba9",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "d085e00659e51525f54cfdb023379646ee55f81001598cc541d22a91b9b0aa34",
-      "pinned": "d085e00659e51525f54cfdb023379646ee55f81001598cc541d22a91b9b0aa34",
+      "built": "28828c66c0a991ca497b4782ff17fbc717eda1a72c1b612f7300ced26daa2254",
+      "pinned": "28828c66c0a991ca497b4782ff17fbc717eda1a72c1b612f7300ced26daa2254",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -111,19 +120,24 @@
       "pinned": "471f1fdb5b84dfb6b07e263d3eddd6c1880b7d6bc366c1443c244e08e85a2f5f",
       "match": true
     },
+    "PROFILE_REGISTRY_CODE_HASH": {
+      "built": "9cf0e3c72632df76200752ca3720fe64e9bee574e00ac5e365d8b54d74bb31f6",
+      "pinned": "9cf0e3c72632df76200752ca3720fe64e9bee574e00ac5e365d8b54d74bb31f6",
+      "match": true
+    },
     "USERNAME_NFT_ITEM_CODE_HASH": {
-      "built": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
-      "pinned": "bf2735f371ba1eaa77fd37c8eaab847fac40e2357d2e7850c9e444dc3b00df1e",
+      "built": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
+      "pinned": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1",
-      "pinned": "637959f5a8467210a21e9ebb49977c5008bb7bf8f756cf2cce41c11e0f2e1ed1",
+      "built": "ff8129c4cf80fd16f397d1a019a599b72e008c576f92fe2026fb24dc273e423c",
+      "pinned": "ff8129c4cf80fd16f397d1a019a599b72e008c576f92fe2026fb24dc273e423c",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "2c3d46775d2509ff5c3c7b8f839589bc26a6e69e9a453d0e6248ca6cf3f723b3",
-      "pinned": "2c3d46775d2509ff5c3c7b8f839589bc26a6e69e9a453d0e6248ca6cf3f723b3",
+      "built": "0e3318cbc644b824ec71115690816bfb9fd7bbd26cf42643ef9b5d4f8832d6e4",
+      "pinned": "0e3318cbc644b824ec71115690816bfb9fd7bbd26cf42643ef9b5d4f8832d6e4",
       "match": true
     }
   },
@@ -131,7 +145,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "8ac43f43f884f48ae640efc78303b7bbbd9367aa447fb8e763887d4fbde3b730",
+    "manifest_hash_hex": "a5905fc94dac120f2dd93f4bda2e636e8c8a3aee6408934461bbd7a9ecbb7df0",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_ROUTE_SEAL_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
@@ -143,6 +157,8 @@
       "ath_total_supply_atomic": "100000000000000000",
       "buyback_offer_amount_nanotons": "50000000000",
       "buyback_funding_envelope_nanotons": "51050000000",
+      "profile_avatar_price_ath_atomic": "100000000000",
+      "profile_avatar_max_parts": "16",
       "username_pending_mint_stale_ttl_seconds": "86400",
       "username_item_ack_forward_reserve_nanotons": "3000000",
       "vault_pending_publish_stale_ttl_seconds": "86400",
@@ -164,6 +180,7 @@
     "MockUsernameRegistryAckSink.tact",
     "MockVaultAckSink.tact",
     "MockVaultAthWallet.tact",
+    "ProfileRegistry.tact",
     "UsernameNFTItem.tact",
     "UsernameRegistry.tact",
     "Vault.tact"

@@ -42,7 +42,7 @@ contract UsernameNFTItem {
             to: self.username_registry_address,
             value: USERNAME_ITEM_ACK_FORWARD_RESERVE,
             bounce: true,
-            mode: SendDefaultMode,
+            mode: SendPayFwdFeesSeparately,
             body: UsernameItemDeployedAck {
                 name_hash: self.name_hash,
                 owner_wallet: self.owner_wallet

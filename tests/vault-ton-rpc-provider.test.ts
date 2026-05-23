@@ -12,6 +12,7 @@ import {
   decodeTonAddressSliceBoc,
   encodeTonAddressSliceBoc,
 } from '../web/vault-ton-rpc-provider.mjs';
+import { tonCell } from '../web/pwa-contract-transactions.mjs';
 
 const NOW = Date.UTC(2026, 0, 3, 10, 0, 0);
 const OWNER = `0:${'11'.repeat(32)}`;
@@ -23,6 +24,10 @@ function num(value: bigint | number | string) {
     type: 'num',
     value: bigint < 0n ? `-0x${(-bigint).toString(16)}` : `0x${bigint.toString(16)}`,
   };
+}
+
+function snakeBoc(bytes: Uint8Array) {
+  return tonCell.bytesToBase64(tonCell.serializeBoc(tonCell.snakeCellFromBytes(bytes)));
 }
 
 async function keyFixture() {
@@ -76,6 +81,7 @@ describe('Vault TON RPC provider', () => {
               num(draft.message.sign_pubkey),
               num(draft.message.pq_kem_pubkey_hash),
               num(draft.message.pq_kem_pubkey_len),
+              { type: 'cell', value: snakeBoc(draft.message.pq_kem_pubkey) },
               num(draft.message.crypto_suite_mask),
               num(1_700_000_000n),
               num(10n),
@@ -146,5 +152,159 @@ describe('Vault TON RPC provider', () => {
       method: 'get_key_record',
       stack: [{ type: 'num', value: '0x7' }],
     });
+  });
+
+  it('VAULT-RPC-04B: wraps configured sendBoc endpoint for external session publish', async () => {
+    const requests: any[] = [];
+    const transport = createTonCenterV3VaultTransport({
+      endpoint: 'https://toncenter.example/api/v3/runGetMethod',
+      sendBocEndpoint: 'https://toncenter.example/api/v3/sendBoc',
+      apiKey: 'test-api-key',
+      fetch: async (url: string, init: any) => {
+        requests.push({ url, init });
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { ok: true, result: { hash: 'abc' } };
+          },
+        };
+      },
+    });
+    const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
+
+    await expect(provider.sendExternalMessage('te6ccgEBAQEAAgAAAA==')).resolves.toMatchObject({ ok: true });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toBe('https://toncenter.example/api/v3/sendBoc');
+    expect(requests[0].init.headers['X-API-Key']).toBe('test-api-key');
+    expect(JSON.parse(requests[0].init.body)).toEqual({ boc: 'te6ccgEBAQEAAgAAAA==' });
+  });
+
+  it('VAULT-RPC-05: exposes typed Vault getters needed by the PWA', async () => {
+    const calls: Array<{ method: string; address: string; stack: any[] }> = [];
+    const transport = {
+      async runGetMethod(call: { method: string; address: string; stack: any[] }) {
+        calls.push(call);
+        if (call.method === 'get_session') {
+          return { stack: [num(-1n), num(0x1234n), num(0x5555n), num(2n), num(1_800_000_000n), num(-1n)] };
+        }
+        if (call.method === 'get_receive_intent') {
+          return {
+            stack: [
+              num(-1n),
+              { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'44'.repeat(32)}`) },
+              num(1n),
+              num(100n),
+              num(0xabcdn),
+              num(77n),
+              num(1_700_000_000n),
+              num(0n),
+            ],
+          };
+        }
+        if (call.method === 'get_receive_intent_id') return { stack: [num(0x1010n)] };
+        if (call.method === 'get_receive_intent_commitment') return { stack: [num(0x2020n)] };
+        if (call.method === 'get_ath_withdrawal_id') return { stack: [num(0x3030n)] };
+        if (call.method === 'get_pending_ath_withdrawal_for') {
+          return {
+            stack: [
+              num(-1n),
+              { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'44'.repeat(32)}`) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'55'.repeat(32)}`) },
+              num(500n),
+              num(1_700_000_001n),
+            ],
+          };
+        }
+        if (call.method === 'get_canonical_session_max_charge') return { stack: [num(58_000_000n)] };
+        if (call.method === 'get_session_publish_hash') return { stack: [num(0x4040n)] };
+        if (call.method === 'get_global') {
+          return {
+            stack: [
+              num(-1n),
+              num(-1n),
+              num(0x9999n),
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'66'.repeat(32)}`) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'77'.repeat(32)}`) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'88'.repeat(32)}`) },
+              num(1n),
+              num(2n),
+              num(3n),
+              num(4n),
+              num(5n),
+              num(6n),
+              num(7n),
+              num(86_400n),
+              num(8n),
+              num(9n),
+              num(10n),
+              num(11n),
+            ],
+          };
+        }
+        throw new Error(`unexpected method ${call.method}`);
+      },
+    };
+    const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
+
+    await expect(provider.getSession(OWNER)).resolves.toMatchObject({
+      exists: true,
+      session_pubkey: 0x1234n,
+      session_id: 0x5555n,
+      nonce: 2n,
+      active: true,
+    });
+    await expect(provider.getReceiveIntent(0x999n)).resolves.toMatchObject({
+      exists: true,
+      sender_wallet: OWNER,
+      asset: 1n,
+      amount: 100n,
+      claimed: false,
+    });
+    await expect(provider.getReceiveIntentId(OWNER, `0:${'44'.repeat(32)}`, 1n, 100n, 77n)).resolves.toBe(0x1010n);
+    await expect(provider.getReceiveIntentCommitment(0x1010n, `0:${'44'.repeat(32)}`, 0x7777n)).resolves.toBe(0x2020n);
+    await expect(provider.getAthWithdrawalId(OWNER, 12n)).resolves.toBe(0x3030n);
+    await expect(provider.getPendingAthWithdrawalFor(OWNER, 12n)).resolves.toMatchObject({
+      exists: true,
+      owner_wallet: OWNER,
+      amount: 500n,
+    });
+    await expect(provider.getCanonicalSessionMaxCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(58_000_000n);
+    await expect(provider.getSessionPublishHash({
+      op: 1n,
+      owner: OWNER,
+      sessionId: 2n,
+      sessionNonce: 3n,
+      validUntil: 4n,
+      publishKind: 1n,
+      sizeClass: 1n,
+      cryptoSuite: 2n,
+      maxCharge: 58_000_000n,
+      bodyHash: 5n,
+      header0: 6n,
+      header1: 7n,
+    })).resolves.toBe(0x4040n);
+    await expect(provider.getGlobal()).resolves.toMatchObject({
+      sealed: true,
+      capsule_hub_bound: true,
+      user_count: 1n,
+      airdrop_total_allocation_ath: 11n,
+    });
+
+    expect(calls.map((call) => call.method)).toEqual([
+      'get_session',
+      'get_receive_intent',
+      'get_receive_intent_id',
+      'get_receive_intent_commitment',
+      'get_ath_withdrawal_id',
+      'get_pending_ath_withdrawal_for',
+      'get_canonical_session_max_charge',
+      'get_session_publish_hash',
+      'get_global',
+    ]);
+    expect(decodeTonAddressSliceBoc(calls[0].stack[0].value)).toBe(OWNER);
   });
 });

@@ -243,7 +243,6 @@ describe('Vault TON/session state-machine invariants', () => {
           amount,
           recipient_wallet: users[recipient].address,
           commitment,
-          expires_at: now + 1_000n,
           client_nonce: clientNonce,
         } as CreateReceiveIntent);
         const key = intentId.toString();

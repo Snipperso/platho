@@ -297,6 +297,7 @@ describe('Vault value/storage boundary negative matrix', () => {
       sign_pubkey: SIG,
       pq_kem_pubkey_hash: 0n,
       pq_kem_pubkey_len: 0n,
+      pq_kem_pubkey: beginCell().endCell(),
       crypto_suite_mask: 1n,
     } as RegisterMessagingKeys);
     expect((await lowKeys.vault.getGetGlobal()).key_record_count).toBe(0n);
@@ -309,6 +310,7 @@ describe('Vault value/storage boundary negative matrix', () => {
       sign_pubkey: SIG,
       pq_kem_pubkey_hash: 0n,
       pq_kem_pubkey_len: 0n,
+      pq_kem_pubkey: beginCell().endCell(),
       crypto_suite_mask: 1n,
     } as RegisterMessagingKeys);
     expect((await exactKeys.vault.getGetGlobal()).key_record_count).toBe(1n);
@@ -316,9 +318,8 @@ describe('Vault value/storage boundary negative matrix', () => {
   });
 
   it('VAULT-BND-03: ReceiveIntent create and new-recipient claim reject min-1 and accept exact storage values', async () => {
-    const { vault, user, recipient, blockchain } = await setupPlain();
+    const { vault, user, recipient } = await setupPlain();
     const amount = toNano('0.2');
-    const now = blockchain.now ?? 0;
     await depositTon(vault, user, toNano('1'));
 
     const intentId = await vault.getGetReceiveIntentId(user.address, recipient.address, ASSET_TON, amount, 7n);
@@ -332,7 +333,6 @@ describe('Vault value/storage boundary negative matrix', () => {
       amount,
       recipient_wallet: recipient.address,
       commitment,
-      expires_at: BigInt(now + 1000),
       client_nonce: 7n,
     } as CreateReceiveIntent);
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
@@ -344,7 +344,6 @@ describe('Vault value/storage boundary negative matrix', () => {
       amount,
       recipient_wallet: recipient.address,
       commitment,
-      expires_at: BigInt(now + 1000),
       client_nonce: 7n,
     } as CreateReceiveIntent);
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);

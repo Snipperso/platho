@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { Address } from '@ton/core';
 
 export const BUYBACK_FLUSH_ENVELOPE_NANOTONS = 51_050_000_000n;
 export const BUYBACK_FLUSH_CALLER_RESERVE_NANOTONS = 7_000_000n;
@@ -63,6 +64,32 @@ function addFailure(failures: BuybackFlushPreflightFailure[], id: string, messag
   failures.push({ id, message });
 }
 
+function addressWorkchain(value: string | null | undefined): number | null {
+  const normalized = normalizeAddress(value);
+  if (!normalized) return null;
+  try {
+    return Address.parse(normalized).workChain;
+  } catch {
+    return null;
+  }
+}
+
+function requireBasechainAddress(
+  failures: BuybackFlushPreflightFailure[],
+  field: string,
+  value: string | null | undefined,
+) {
+  const workchain = addressWorkchain(value);
+  if (workchain !== 0) {
+    const idPrefix = field.replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
+    addFailure(
+      failures,
+      `${idPrefix}_NOT_BASECHAIN`,
+      `${field} must be a basechain workchain 0 address for the current buyback flush envelope.`,
+    );
+  }
+}
+
 export function createBuybackFlushPreflight(input: BuybackFlushPreflightInput): BuybackFlushPreflightResult {
   const failures: BuybackFlushPreflightFailure[] = [];
   let amount = -1n;
@@ -123,6 +150,11 @@ export function createBuybackFlushPreflight(input: BuybackFlushPreflightInput): 
       'BuybackBurn.fee_accumulator_address must equal the source FeeAccumulator address.',
     );
   }
+
+  requireBasechainAddress(failures, 'feeAccumulatorAddress', input.feeAccumulatorAddress);
+  requireBasechainAddress(failures, 'buybackBurnAddress', input.buybackBurnAddress);
+  requireBasechainAddress(failures, 'feeAccumulatorState.buyback_burn_address', input.feeAccumulatorState.buyback_burn_address);
+  requireBasechainAddress(failures, 'buybackBurnConfig.fee_accumulator_address', input.buybackBurnConfig.fee_accumulator_address);
 
   const blockers = failures.map((failure) => failure.id);
   return {

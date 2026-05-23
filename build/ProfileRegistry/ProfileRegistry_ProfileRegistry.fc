@@ -1,0 +1,1271 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; ProfileRegistry_ProfileRegistry.headers.fc
+;;
+;; Header files for ProfileRegistry
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_get_slice_int
+int __tact_dict_get_slice_int(cell d, int kl, slice k, int vl) inline;
+
+;; __tact_dict_set_slice_int
+(cell, ()) __tact_dict_set_slice_int(cell d, int kl, slice k, int v, int vl) inline;
+
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_int_cell
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
+
+;; __tact_dict_exists_int
+int __tact_dict_exists_int(cell d, int kl, int k) inline;
+
+;; $ATHBurn$_store
+builder $ATHBurn$_store(builder build_0, (int, int, slice) v) inline;
+
+;; $ATHBurn$_store_cell
+cell $ATHBurn$_store_cell((int, int, slice) v, builder b) inline;
+
+;; $ATHBurn$_load_bounced
+(slice, ((int, int))) $ATHBurn$_load_bounced(slice sc_0) inline;
+
+;; $AthTransferNotificationAck$_store
+builder $AthTransferNotificationAck$_store(builder build_0, (int, int, int) v) inline;
+
+;; $AthTransferNotificationAck$_store_cell
+cell $AthTransferNotificationAck$_store_cell((int, int, int) v, builder b) inline;
+
+;; $ATHTransferRequest$_store
+builder $ATHTransferRequest$_store(builder build_0, (int, int, slice, slice) v) inline;
+
+;; $ATHTransferRequest$_store_cell
+cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inline;
+
+;; $ATHTransferRequest$_load_bounced
+(slice, ((int, int))) $ATHTransferRequest$_load_bounced(slice sc_0) inline;
+
+;; $ProfileAvatarRecord$_store
+builder $ProfileAvatarRecord$_store(builder build_0, (slice, int, int, int, int, int, int, int) v) inline;
+
+;; $ProfileAvatarRecord$_store_cell
+cell $ProfileAvatarRecord$_store_cell((slice, int, int, int, int, int, int, int) v, builder b) inline;
+
+;; $ProfileAvatarRecord$_load
+(slice, ((slice, int, int, int, int, int, int, int))) $ProfileAvatarRecord$_load(slice sc_0) inline;
+
+;; $ProfileAvatarRecord$_as_optional
+tuple $ProfileAvatarRecord$_as_optional((slice, int, int, int, int, int, int, int) v) inline;
+
+;; $ProfileAvatarRecord$_load_opt
+tuple $ProfileAvatarRecord$_load_opt(cell cl) inline;
+
+;; $PendingProfileTreasuryFlush$_store
+builder $PendingProfileTreasuryFlush$_store(builder build_0, (int, slice, int) v) inline;
+
+;; $PendingProfileTreasuryFlush$_store_cell
+cell $PendingProfileTreasuryFlush$_store_cell((int, slice, int) v, builder b) inline;
+
+;; $PendingProfileTreasuryFlush$_load
+(slice, ((int, slice, int))) $PendingProfileTreasuryFlush$_load(slice sc_0) inline;
+
+;; $PendingProfileTreasuryFlush$_as_optional
+tuple $PendingProfileTreasuryFlush$_as_optional((int, slice, int) v) inline;
+
+;; $PendingProfileTreasuryFlush$_load_opt
+tuple $PendingProfileTreasuryFlush$_load_opt(cell cl) inline;
+
+;; $PendingProfileBurnFlush$_store
+builder $PendingProfileBurnFlush$_store(builder build_0, (int, int) v) inline;
+
+;; $PendingProfileBurnFlush$_store_cell
+cell $PendingProfileBurnFlush$_store_cell((int, int) v, builder b) inline;
+
+;; $PendingProfileBurnFlush$_load
+(slice, ((int, int))) $PendingProfileBurnFlush$_load(slice sc_0) inline;
+
+;; $PendingProfileBurnFlush$_as_optional
+tuple $PendingProfileBurnFlush$_as_optional((int, int) v) inline;
+
+;; $PendingProfileBurnFlush$_load_opt
+tuple $PendingProfileBurnFlush$_load_opt(cell cl) inline;
+
+;; $ProfileRegistry$_store
+builder $ProfileRegistry$_store(builder build_0, (slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) v) inline;
+
+;; $ProfileRegistry$_load
+(slice, ((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int))) $ProfileRegistry$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $ProfileAvatarRecord$_not_null
+((slice, int, int, int, int, int, int, int)) $ProfileAvatarRecord$_not_null(tuple v) inline;
+
+;; $ProfileAvatarView$_to_external
+(int, slice, int, int, int, int, int, int, int) $ProfileAvatarView$_to_external(((int, slice, int, int, int, int, int, int, int)) v) inline;
+
+;; $PendingProfileTreasuryFlush$_not_null
+((int, slice, int)) $PendingProfileTreasuryFlush$_not_null(tuple v) inline;
+
+;; $PendingProfileBurnFlush$_not_null
+((int, int)) $PendingProfileBurnFlush$_not_null(tuple v) inline;
+
+;; $ProfileRegistryGlobalView$_to_external
+(int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int) $ProfileRegistryGlobalView$_to_external(((int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int)) v) inline;
+
+;; $ATHWallet$init$_store
+builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline;
+
+;; $ProfileRegistry$init$_load
+(slice, ((slice, slice, slice, int, int, int, slice))) $ProfileRegistry$init$_load(slice sc_0) inline;
+
+;; $ProfileRegistry$_contract_init
+(slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $ProfileRegistry$_contract_init(slice $official_ath_wallet_address, slice $ath_master_address, slice $treasury_ath_receiver_address, int $sealed, int $deployment_manifest_hash, int $genesis_config_hash, slice $genesis_controller_address) impure inline;
+
+;; $ProfileRegistry$_contract_load
+(slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $ProfileRegistry$_contract_load() impure inline;
+
+;; $ProfileRegistry$_contract_store
+() $ProfileRegistry$_contract_store((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $ATHWallet$_init_child
+(cell, cell) $ATHWallet$_init_child(int $balance, slice $owner_address, slice $ath_master_address) inline_ref;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $ProfileRegistry$_fun_requireUnsealed
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireUnsealed((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref;
+
+;; $ProfileRegistry$_fun_requireSealed
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireSealed((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref;
+
+;; $ProfileRegistry$_fun_requireGenesisController
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireGenesisController((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref;
+
+;; $ProfileRegistry$_fun_isBasechainAddress
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), int) $ProfileRegistry$_fun_isBasechainAddress((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $address) impure inline_ref;
+
+;; $ProfileRegistry$_fun_deriveAthWalletAddress
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), slice) $ProfileRegistry$_fun_deriveAthWalletAddress((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet) impure inline_ref;
+
+;; $ProfileRegistry$_fun_computeAvatarRecordId
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), int) $ProfileRegistry$_fun_computeAvatarRecordId((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet, int $version) impure inline_ref;
+
+;; $ProfileRegistry$_fun_requireValidAvatarPointer
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireValidAvatarPointer((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, (int, int, int, slice, int, int, int, int, int) $msg) impure inline_ref;
+
+;; $AthTransferNotificationAck$_constructor_query_id_sender_key_amount
+((int, int, int)) $AthTransferNotificationAck$_constructor_query_id_sender_key_amount(int $query_id, int $sender_key, int $amount) inline;
+
+;; $ProfileRegistry$_fun_sendAthNotificationAck
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_sendAthNotificationAck((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id, int $sender_key, int $amount) impure inline_ref;
+
+;; $ProfileRegistry$_fun_refundAvatarExcess
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_refundAvatarExcess((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet, int $retained_value) impure inline_ref;
+
+;; $ProfileRegistry$_fun_requireNoDueFlushQuery
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireNoDueFlushQuery((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id) impure inline_ref;
+
+;; $ProfileRegistry$_fun_restoreTreasuryDue
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_restoreTreasuryDue((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $amount) impure inline_ref;
+
+;; $ProfileRegistry$_fun_restoreBurnDue
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_restoreBurnDue((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $amount) impure inline_ref;
+
+;; $ProfileRegistry$_fun_clearPendingTreasuryFlush
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, slice, int)) $ProfileRegistry$_fun_clearPendingTreasuryFlush((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id) impure inline_ref;
+
+;; $ProfileRegistry$_fun_clearPendingBurnFlush
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, int)) $ProfileRegistry$_fun_clearPendingBurnFlush((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id) impure inline_ref;
+
+;; $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count
+((int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int)) $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count(int $sealed, int $official_ath_wallet_bound, int $deployment_manifest_hash, int $genesis_config_hash, slice $official_ath_wallet_address, slice $ath_master_address, slice $treasury_ath_receiver_address, slice $genesis_controller_address, int $profile_count, int $avatar_record_count, int $treasury_due_ath, int $burn_due_ath, int $pending_treasury_flush_count, int $pending_burn_flush_count) inline;
+
+;; $ProfileRegistry$_fun_get_global
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int)) $ProfileRegistry$_fun_get_global((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref;
+
+;; $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at
+((int, slice, int, int, int, int, int, int, int)) $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(int $exists, slice $owner_wallet, int $version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format, int $updated_at) inline;
+
+;; $ProfileRegistry$_fun_get_avatar_version
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, slice, int, int, int, int, int, int, int)) $ProfileRegistry$_fun_get_avatar_version((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet, int $version) impure inline_ref;
+
+;; $ProfileRegistry$_fun_get_avatar
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, slice, int, int, int, int, int, int, int)) $ProfileRegistry$_fun_get_avatar((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet) impure inline_ref;
+
+;; $ProfileRegistry$_fun_get_ath_wallet_address
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), slice) $ProfileRegistry$_fun_get_ath_wallet_address((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet) impure inline_ref;
+
+;; $ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at
+((slice, int, int, int, int, int, int, int)) $ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(slice $owner_wallet, int $version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format, int $updated_at) inline;
+
+;; $PendingProfileTreasuryFlush$_constructor_amount_recipient_ath_wallet_created_at
+((int, slice, int)) $PendingProfileTreasuryFlush$_constructor_amount_recipient_ath_wallet_created_at(int $amount, slice $recipient_ath_wallet, int $created_at) inline;
+
+;; $MessageParameters$_constructor_to_value_mode_bounce_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline;
+
+;; $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination
+((int, int, slice, slice)) $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination(int $query_id, int $amount, slice $recipient, slice $response_destination) inline;
+
+;; $PendingProfileBurnFlush$_constructor_amount_created_at
+((int, int)) $PendingProfileBurnFlush$_constructor_amount_created_at(int $amount, int $created_at) inline;
+
+;; $ATHBurn$_constructor_query_id_amount_response_destination
+((int, int, slice)) $ATHBurn$_constructor_query_id_amount_response_destination(int $query_id, int $amount, slice $response_destination) inline;
+
+
+;; ProfileRegistry_ProfileRegistry.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(cell, int) __tact_dict_delete(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTDEL
+""";
+
+(cell, int) __tact_dict_delete_int(cell dict, int key_len, int index) asm(index dict key_len) """
+    DICTIDEL
+""";
+
+(slice, int) __tact_dict_get(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTGET NULLSWAPIFNOT
+""";
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+forall X0, X1 -> tuple __tact_tuple_create_2((X0, X1) v) asm """
+    2 TUPLE
+""";
+
+forall X0, X1 -> (X0, X1) __tact_tuple_destroy_2(tuple v) asm """
+    2 UNTUPLE
+""";
+
+forall X0, X1, X2 -> tuple __tact_tuple_create_3((X0, X1, X2) v) asm """
+    3 TUPLE
+""";
+
+forall X0, X1, X2 -> (X0, X1, X2) __tact_tuple_destroy_3(tuple v) asm """
+    3 UNTUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7 -> tuple __tact_tuple_create_8((X0, X1, X2, X3, X4, X5, X6, X7) v) asm """
+    8 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7 -> (X0, X1, X2, X3, X4, X5, X6, X7) __tact_tuple_destroy_8(tuple v) asm """
+    8 UNTUPLE
+""";
+
+int __tact_dict_get_slice_int(cell d, int kl, slice k, int vl) inline {
+    var (r, ok) = __tact_dict_get(d, kl, k);
+    if (ok) {
+        return r~load_int(vl);
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_slice_int(cell d, int kl, slice k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = __tact_dict_delete(d, kl, k);
+        return (r, ());
+    } else {
+        return (dict_set_builder(d, kl, k, begin_cell().store_int(v, vl)), ());
+    }
+}
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_ref(d, kl, k, v), ());
+    }
+}
+
+int __tact_dict_exists_int(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get?(d, kl, k);
+    return ok;
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+(int, int) $global_parseStdAddress(slice $slice) impure asm """
+    REWRITESTDADDR
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; ProfileRegistry_ProfileRegistry.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: ATHBurn
+;; Header: 0x41544801
+;; TLB: ath_burn#41544801 query_id:uint64 amount:uint128 response_destination:address = ATHBurn
+;;
+
+builder $ATHBurn$_store(builder build_0, (int, int, slice) v) inline {
+    var (v'query_id, v'amount, v'response_destination) = v;
+    build_0 = store_uint(build_0, 1096042497, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'response_destination);
+    return build_0;
+}
+
+cell $ATHBurn$_store_cell((int, int, slice) v, builder b) inline {
+    return $ATHBurn$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $ATHBurn$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'query_id, v'amount));
+}
+
+((int, int, slice)) $ATHBurn$_constructor_query_id_amount_response_destination(int $query_id, int $amount, slice $response_destination) inline {
+    return ($query_id, $amount, $response_destination);
+}
+
+;;
+;; Type: AthTransferNotificationAck
+;; Header: 0x472d9d7e
+;; TLB: ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck
+;;
+
+builder $AthTransferNotificationAck$_store(builder build_0, (int, int, int) v) inline {
+    var (v'query_id, v'amount, v'sender_key) = v;
+    build_0 = store_uint(build_0, 1194171774, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_uint(v'sender_key, 32);
+    return build_0;
+}
+
+cell $AthTransferNotificationAck$_store_cell((int, int, int) v, builder b) inline {
+    return $AthTransferNotificationAck$_store(b, v).end_cell();
+}
+
+((int, int, int)) $AthTransferNotificationAck$_constructor_query_id_sender_key_amount(int $query_id, int $sender_key, int $amount) inline {
+    return ($query_id, $amount, $sender_key);
+}
+
+;;
+;; Type: AthTransferNotificationProfileAvatar
+;; Header: 0xa11a7001
+;; TLB: ath_transfer_notification_profile_avatar#a11a7001 query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationProfileAvatar
+;;
+
+((int, int, int, slice, int, int, int, int, int)) $AthTransferNotificationProfileAvatar$_tensor_cast((int, int, int, slice, int, int, int, int, int) v) asm "NOP";
+
+;;
+;; Type: ATHTransferRequest
+;; Header: 0x41544810
+;; TLB: ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest
+;;
+
+builder $ATHTransferRequest$_store(builder build_0, (int, int, slice, slice) v) inline {
+    var (v'query_id, v'amount, v'recipient, v'response_destination) = v;
+    build_0 = store_uint(build_0, 1096042512, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'recipient);
+    build_0 = build_0.store_slice(v'response_destination);
+    return build_0;
+}
+
+cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inline {
+    return $ATHTransferRequest$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $ATHTransferRequest$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'query_id, v'amount));
+}
+
+((int, int, slice, slice)) $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination(int $query_id, int $amount, slice $recipient, slice $response_destination) inline {
+    return ($query_id, $amount, $recipient, $response_destination);
+}
+
+;;
+;; Type: ProfileAvatarRecord
+;; TLB: _ owner_wallet:address version:uint32 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 updated_at:uint32 = ProfileAvatarRecord
+;;
+
+builder $ProfileAvatarRecord$_store(builder build_0, (slice, int, int, int, int, int, int, int) v) inline {
+    var (v'owner_wallet, v'version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format, v'updated_at) = v;
+    build_0 = build_0.store_slice(v'owner_wallet);
+    build_0 = build_0.store_uint(v'version, 32);
+    build_0 = build_0.store_uint(v'avatar_hash, 256);
+    build_0 = build_0.store_uint(v'avatar_entry_id, 64);
+    build_0 = build_0.store_uint(v'avatar_stream_id, 128);
+    build_0 = build_0.store_uint(v'avatar_part_count, 16);
+    build_0 = build_0.store_uint(v'media_format, 8);
+    build_0 = build_0.store_uint(v'updated_at, 32);
+    return build_0;
+}
+
+cell $ProfileAvatarRecord$_store_cell((slice, int, int, int, int, int, int, int) v, builder b) inline {
+    return $ProfileAvatarRecord$_store(b, v).end_cell();
+}
+
+(slice, ((slice, int, int, int, int, int, int, int))) $ProfileAvatarRecord$_load(slice sc_0) inline {
+    var v'owner_wallet = sc_0~load_msg_addr();
+    var v'version = sc_0~load_uint(32);
+    var v'avatar_hash = sc_0~load_uint(256);
+    var v'avatar_entry_id = sc_0~load_uint(64);
+    var v'avatar_stream_id = sc_0~load_uint(128);
+    var v'avatar_part_count = sc_0~load_uint(16);
+    var v'media_format = sc_0~load_uint(8);
+    var v'updated_at = sc_0~load_uint(32);
+    return (sc_0, (v'owner_wallet, v'version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format, v'updated_at));
+}
+
+tuple $ProfileAvatarRecord$_as_optional((slice, int, int, int, int, int, int, int) v) inline {
+    var (v'owner_wallet, v'version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format, v'updated_at) = v;
+    return __tact_tuple_create_8(v'owner_wallet, v'version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format, v'updated_at);
+}
+
+tuple $ProfileAvatarRecord$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $ProfileAvatarRecord$_as_optional(sc~$ProfileAvatarRecord$_load());
+}
+
+((slice, int, int, int, int, int, int, int)) $ProfileAvatarRecord$_not_null(tuple v) inline {
+    var (slice vvv'owner_wallet, int vvv'version, int vvv'avatar_hash, int vvv'avatar_entry_id, int vvv'avatar_stream_id, int vvv'avatar_part_count, int vvv'media_format, int vvv'updated_at) = __tact_tuple_destroy_8(v);
+    return (vvv'owner_wallet, vvv'version, vvv'avatar_hash, vvv'avatar_entry_id, vvv'avatar_stream_id, vvv'avatar_part_count, vvv'media_format, vvv'updated_at);
+}
+
+((slice, int, int, int, int, int, int, int)) $ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(slice $owner_wallet, int $version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format, int $updated_at) inline {
+    return ($owner_wallet, $version, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format, $updated_at);
+}
+
+;;
+;; Type: ProfileAvatarView
+;; TLB: _ exists:bool owner_wallet:address version:int257 avatar_hash:int257 avatar_entry_id:int257 avatar_stream_id:int257 avatar_part_count:int257 media_format:int257 updated_at:int257 = ProfileAvatarView
+;;
+
+(int, slice, int, int, int, int, int, int, int) $ProfileAvatarView$_to_external(((int, slice, int, int, int, int, int, int, int)) v) inline {
+    var (v'exists, v'owner_wallet, v'version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format, v'updated_at) = v; 
+    return (v'exists, v'owner_wallet, v'version, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format, v'updated_at);
+}
+
+((int, slice, int, int, int, int, int, int, int)) $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(int $exists, slice $owner_wallet, int $version, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format, int $updated_at) inline {
+    return ($exists, $owner_wallet, $version, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format, $updated_at);
+}
+
+;;
+;; Type: PendingProfileTreasuryFlush
+;; TLB: _ amount:uint128 recipient_ath_wallet:address created_at:uint32 = PendingProfileTreasuryFlush
+;;
+
+builder $PendingProfileTreasuryFlush$_store(builder build_0, (int, slice, int) v) inline {
+    var (v'amount, v'recipient_ath_wallet, v'created_at) = v;
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'recipient_ath_wallet);
+    build_0 = build_0.store_uint(v'created_at, 32);
+    return build_0;
+}
+
+cell $PendingProfileTreasuryFlush$_store_cell((int, slice, int) v, builder b) inline {
+    return $PendingProfileTreasuryFlush$_store(b, v).end_cell();
+}
+
+(slice, ((int, slice, int))) $PendingProfileTreasuryFlush$_load(slice sc_0) inline {
+    var v'amount = sc_0~load_uint(128);
+    var v'recipient_ath_wallet = sc_0~load_msg_addr();
+    var v'created_at = sc_0~load_uint(32);
+    return (sc_0, (v'amount, v'recipient_ath_wallet, v'created_at));
+}
+
+tuple $PendingProfileTreasuryFlush$_as_optional((int, slice, int) v) inline {
+    var (v'amount, v'recipient_ath_wallet, v'created_at) = v;
+    return __tact_tuple_create_3(v'amount, v'recipient_ath_wallet, v'created_at);
+}
+
+tuple $PendingProfileTreasuryFlush$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $PendingProfileTreasuryFlush$_as_optional(sc~$PendingProfileTreasuryFlush$_load());
+}
+
+((int, slice, int)) $PendingProfileTreasuryFlush$_not_null(tuple v) inline {
+    var (int vvv'amount, slice vvv'recipient_ath_wallet, int vvv'created_at) = __tact_tuple_destroy_3(v);
+    return (vvv'amount, vvv'recipient_ath_wallet, vvv'created_at);
+}
+
+((int, slice, int)) $PendingProfileTreasuryFlush$_constructor_amount_recipient_ath_wallet_created_at(int $amount, slice $recipient_ath_wallet, int $created_at) inline {
+    return ($amount, $recipient_ath_wallet, $created_at);
+}
+
+;;
+;; Type: PendingProfileBurnFlush
+;; TLB: _ amount:uint128 created_at:uint32 = PendingProfileBurnFlush
+;;
+
+builder $PendingProfileBurnFlush$_store(builder build_0, (int, int) v) inline {
+    var (v'amount, v'created_at) = v;
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_uint(v'created_at, 32);
+    return build_0;
+}
+
+cell $PendingProfileBurnFlush$_store_cell((int, int) v, builder b) inline {
+    return $PendingProfileBurnFlush$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $PendingProfileBurnFlush$_load(slice sc_0) inline {
+    var v'amount = sc_0~load_uint(128);
+    var v'created_at = sc_0~load_uint(32);
+    return (sc_0, (v'amount, v'created_at));
+}
+
+tuple $PendingProfileBurnFlush$_as_optional((int, int) v) inline {
+    var (v'amount, v'created_at) = v;
+    return __tact_tuple_create_2(v'amount, v'created_at);
+}
+
+tuple $PendingProfileBurnFlush$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $PendingProfileBurnFlush$_as_optional(sc~$PendingProfileBurnFlush$_load());
+}
+
+((int, int)) $PendingProfileBurnFlush$_not_null(tuple v) inline {
+    var (int vvv'amount, int vvv'created_at) = __tact_tuple_destroy_2(v);
+    return (vvv'amount, vvv'created_at);
+}
+
+((int, int)) $PendingProfileBurnFlush$_constructor_amount_created_at(int $amount, int $created_at) inline {
+    return ($amount, $created_at);
+}
+
+;;
+;; Type: ProfileRegistryGlobalView
+;; TLB: _ sealed:bool official_ath_wallet_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address genesis_controller_address:address profile_count:int257 avatar_record_count:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 = ProfileRegistryGlobalView
+;;
+
+(int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int) $ProfileRegistryGlobalView$_to_external(((int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int)) v) inline {
+    var (v'sealed, v'official_ath_wallet_bound, v'deployment_manifest_hash, v'genesis_config_hash, v'official_ath_wallet_address, v'ath_master_address, v'treasury_ath_receiver_address, v'genesis_controller_address, v'profile_count, v'avatar_record_count, v'treasury_due_ath, v'burn_due_ath, v'pending_treasury_flush_count, v'pending_burn_flush_count) = v; 
+    return (v'sealed, v'official_ath_wallet_bound, v'deployment_manifest_hash, v'genesis_config_hash, v'official_ath_wallet_address, v'ath_master_address, v'treasury_ath_receiver_address, v'genesis_controller_address, v'profile_count, v'avatar_record_count, v'treasury_due_ath, v'burn_due_ath, v'pending_treasury_flush_count, v'pending_burn_flush_count);
+}
+
+((int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int)) $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count(int $sealed, int $official_ath_wallet_bound, int $deployment_manifest_hash, int $genesis_config_hash, slice $official_ath_wallet_address, slice $ath_master_address, slice $treasury_ath_receiver_address, slice $genesis_controller_address, int $profile_count, int $avatar_record_count, int $treasury_due_ath, int $burn_due_ath, int $pending_treasury_flush_count, int $pending_burn_flush_count) inline {
+    return ($sealed, $official_ath_wallet_bound, $deployment_manifest_hash, $genesis_config_hash, $official_ath_wallet_address, $ath_master_address, $treasury_ath_receiver_address, $genesis_controller_address, $profile_count, $avatar_record_count, $treasury_due_ath, $burn_due_ath, $pending_treasury_flush_count, $pending_burn_flush_count);
+}
+
+;;
+;; Type: ATHWallet
+;; TLB: _ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pruned_notification_acks:dict<int, int> = ATHWallet
+;;
+
+builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
+    var (v'balance, v'owner_address, v'ath_master_address) = v;
+    build_0 = build_0.store_int(v'balance, 257);
+    build_0 = build_0.store_slice(v'owner_address);
+    build_0 = build_0.store_slice(v'ath_master_address);
+    return build_0;
+}
+
+cell $ATHWallet$_child_get_code() impure asm """
+    B{b5ee9c7201023e0100132f000114ff00f4a413f4bcf2c80b01020162020304f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de207e3027026d74920c21f953106d31f07de21821041544801bae30221821041544805bae30221821041544810ba040506070201481213046e058020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae30220821041544817ba08090a0b01fe5b05d33fd37ffa40308136b0f84227c705f2f48136b122c200f2f48136b25372bef2f48136b55316c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15172a1715414377f04c855308210415448025005cb1f13cb3fcb7fcecec92504085520441359c8cf8580ca00cf8440ce01fa021101f05b05d33fd37ffa4030813840f84226c705f2f481384122c200f2f481384227c000f2f4813843f8416f24135f0382082dc6c0bef2f45161a082080f42407004705148c855208210415448065004cb1f12cb3fcb7fcec910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035551237043ce30221821041544814bae30221821041544816bae30221821041544818ba1617181900e230d33fd37f59328136b3f84225c705f2f48136b422c200f2f45151a0708040077f04c8598210415448045003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f593281378c22c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f59328137f022c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5403fe8e6730d33fd37f59328138b822c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544819bae302208210472d9d7dbae302200c0d0e00ce30d33fd37f593281392622c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016430d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540f02f2821089129d5fba8eb230d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e08210a11a7001ba8eb1d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f070f0f03f68137fa21c200f2f48137fff8416f24135f038208895440bef2f48137fb5391bef2f455525387db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e28137fc216eb3f2f46f23308137fd511abaf2f41047103645768137fe5167db3c500bba16f2f45137a15063810101f45a303a3b1002d840155033045177db3c705395db3c707f541db980400ec855308210415448125005cb1f13cb3fcb7fcecec91036105c104a103b103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0055221233350052806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54017dbb1c5ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de25515db3c6c648140179bbb02ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de2db3c6c638150166db3c810101240259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206e96307070545600e06f237f55203a000654754304da5b05d33fd37ffa40fa4030813778f84228c705f2f48137795317c705f2f410575e3346895389db3c81377a27c200f2f481377b5367bef2f482083d090081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a15167a1554029db3c705410b5db3c7f541ba7710fc82333351a04fe5b05d33fd37ffa40fa40d430d0fa40d37f308137dcf8422ac705f2f48137dd5339c705f2f48137de5324c705f2f410591048103746ab5376db3c8137df29c200f2f48137e02cc200f2f48137e15369bef2f48137e22c8209c9c380bef2f42bdb3c208208989680a08137e3f8416f24135f0322bef2f4517aa1554129db3c702324331b04ea5b05d33fd37ffa40fa40d37fd3078138a4f8422bc705f2f48138a5534ac705f2f4105a1049103847bc5398db3c8138a62bc200f2f48138a728c200f2f48138a8536bbef2f48138a9288209c9c380bef2f427db3c208208989680a08138aaf8416f24135f0322bef2f4517ca155412bdb3c705410d52324331d043ce30221821041544812bae30221821041544815bae30221821041544817ba1f20212200e455308210415448125005cb1f13cb3fcb7fcecec9106b10581049103c41a0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00505503c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5402fc5410b5db3c50dc7f7128544d30011112011113c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a1057104d103e4cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0358a11037161513351c013e4440db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542902fcdb3c4ae07f7128513f4f13011113011114c855608210415448175008cb1f16cb3f14cb7f12cececb7fcb07cec9106b105b104e10394cd0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0301a11047104641501413351e013adb3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542904fc5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd30730813912f8422ec705f2f4813913537dc705f2f4105d104c103b4aef5376db3c81391429c200f2f48139152ec200f2f48139165369bef2f48139172e8209c9c380bef2f42ddb3c208208989680a0813918f8416f24135f0322bef2f4517aa1554129db3c702324332502f05b05d33fd37ffa40fa403081378223c200f2f4813783f84210691058104710394ab9db3c19c7051af2f4813784f8416f24135f0382081e8480bef2f45134a0708040077f07c8598210415448115003cb1fcb3fcb7fc91049473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00405503333704f45b05d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842105b104a103948cd2bdb3c1ec7051cf2f48137e85383c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082086acfc0a082081e8480a0bef2f410354014503b541a09db3c555053b6db3c8137eb2481010123333b3a2a043ce30221821041544819bae302218210472d9d7ebae302218210504e5052ba2d2e2f30035410478139082705104710394078db3c17f2f4550481390908db3c18f2f4550581390a07db3c17f2f45504262626002482080f4240a082086acfc0a082081e8480a003fe5410b5db3c105d104c7f7128516d0605111505041114040311130302111202011116011117c85590821041544819500bcb1f19cb3f17cb7f15ce13cecb7f01c8cbff12cb3f12cb7f12cb0f12cb07cdc91035104a10394cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901352728000afa4430c000001a58cf8680cf8480f400f400cf810162fb00f8416f24135f035004a11057104615103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5429004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002fc59f40c6fa131b3f2f48137ec298209c9c380bef2f48137ed238101012359f40c6fa131b3f2f4516da0810101f82352d0561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f544d9052fe12c855308210472d9d7d5005cb1f13cb3fcb7fcb1fcec9104910384b70441359c8cf8580ca00892b2c00011000cacf16ce01fa02806acf40f400c901fb0082080f42407009700bc8598210415448115003cb1fcb3fcb7fc9104749301a441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fe5b05d33fd37ffa40fa40d37fd3078138ae26c200f2f48138aff842105c104b103a49de26db3c1fc7051df2f48138b02ac200f2f48138b1f8416f24135f032b82080f4240a082086acfc0a082081e8480a0bef2f410354014503c541b0cdb3c55505376db3c8138b2248101012359f40c6fa131b3f2f48138b32c8209c9c380333b3a3104fa5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd3073081391c29c200f2f481391df842105f104e103d102c01111001111129db3c01111201c70501111001f2f481391e26c200f2f481391ff8416f24135f032782080f4240a082086acfc0a082081e8480a0bef2f410354014503f541e07db3c555053a6db3c333b3a3404fc5b05d33fd37fd31f30813804f84227c705f2f481380522c200f2f4478727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206ee3026f2330813807511bbaf2f4555181380807db3c5009ba16f2f481010120103654471350aa216e955b59f45a3098c801cf004133f442e250463a383b3904fe8ffd5b05d33fd31f30105610451034437727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e281380e216eb3f2f46f23105910481037469881380f07db3c500bba16f2f4813810f8230882015180a018be17f2f4810101541400546690216e955b59f45a3098c801cf004133f442e23a3b3c3d01fcbef2f48138b4238101012359f40c6fa131b3f2f4516da0810101f823561001561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f29514f104a030211110250dc1034c85550821089129d5f5007cb1f15cb3f13cb7fcb1fcecb07cec923103a48dd441359c8cf8580ca00cf8440ce01fa023200c8806acf40f400c901fb0082080f42407004700ac8598210415448115003cb1fcb3fcb7fc91048483019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00103510341023c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016820fa4430705826db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d03501ea813920248101012359f40c6fa131b3f2f481392156118209c9c380bef2f4813922238101012359f40c6fa131b3f2f4516aa0810101f823546bd0c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f2c517c107a06105c041114040311120302111102011110010f1067c8360026f82ac87001ca0055215023810101cf00cecec901fe55808210a11a7001500acb1f18cb3f16cb7f14cb1f12cecbffcb3fcb7fcb0fcb07c92804103c4baa441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f424070047004c8598210415448115003cb1fcb3fcb7fc910474730441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035144330370036c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54008a3037810101530150994133f40c6fa19401d70030925b6de2813806216eb3f2f481380908ba17f2f45513c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54004c810101f45a301510344013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54000a01aa1f01a00026c8821041544e4901cb1f01cf16c9f900a9381f008a8101012010395446135099216e955b59f45a3098c801cf004133f442e25034810101f45a304015504403c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54006ae037c00006c12116b08e248132c8f2f010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f06f2c082} B>boc PUSHREF
+""";
+
+(cell, cell) $ATHWallet$_init_child(int $balance, slice $owner_address, slice $ath_master_address) inline_ref {
+    ;; Build init code cell
+
+    ;; Contract Code: ATHWallet
+    cell init_code = $ATHWallet$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = b.store_int(false, 1);
+    b = $ATHWallet$init$_store(b, ($balance, $owner_address, $ath_master_address));
+    return (init_code, b.end_cell());
+}
+
+;;
+;; Type: ProfileRegistry
+;; TLB: _ official_ath_wallet_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 genesis_controller_address:address profile_count:uint64 avatar_record_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 current_avatar_versions:dict<address, int> avatar_records:dict<int, ^ProfileAvatarRecord{owner_wallet:address,version:uint32,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8,updated_at:uint32}> pending_treasury_flushes:dict<int, ^PendingProfileTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint32}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingProfileBurnFlush{amount:uint128,created_at:uint32}> pending_burn_flush_count:uint64 = ProfileRegistry
+;;
+
+builder $ProfileRegistry$_store(builder build_0, (slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) v) inline {
+    var (v'official_ath_wallet_address, v'ath_master_address, v'treasury_ath_receiver_address, v'official_ath_wallet_bound, v'sealed, v'deployment_manifest_hash, v'genesis_config_hash, v'genesis_controller_address, v'profile_count, v'avatar_record_count, v'treasury_due_ath, v'burn_due_ath, v'current_avatar_versions, v'avatar_records, v'pending_treasury_flushes, v'pending_treasury_flush_count, v'pending_burn_flushes, v'pending_burn_flush_count) = v;
+    build_0 = build_0.store_slice(v'official_ath_wallet_address);
+    build_0 = build_0.store_slice(v'ath_master_address);
+    build_0 = build_0.store_slice(v'treasury_ath_receiver_address);
+    build_0 = build_0.store_int(v'official_ath_wallet_bound, 1);
+    build_0 = build_0.store_int(v'sealed, 1);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'deployment_manifest_hash, 256);
+    build_1 = build_1.store_uint(v'genesis_config_hash, 256);
+    build_1 = build_1.store_slice(v'genesis_controller_address);
+    build_1 = build_1.store_uint(v'profile_count, 64);
+    build_1 = build_1.store_uint(v'avatar_record_count, 64);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_uint(v'treasury_due_ath, 128);
+    build_2 = build_2.store_uint(v'burn_due_ath, 128);
+    build_2 = build_2.store_dict(v'current_avatar_versions);
+    build_2 = build_2.store_dict(v'avatar_records);
+    build_2 = build_2.store_dict(v'pending_treasury_flushes);
+    build_2 = build_2.store_uint(v'pending_treasury_flush_count, 64);
+    build_2 = build_2.store_dict(v'pending_burn_flushes);
+    build_2 = build_2.store_uint(v'pending_burn_flush_count, 64);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int))) $ProfileRegistry$_load(slice sc_0) inline {
+    var v'official_ath_wallet_address = sc_0~load_msg_addr();
+    var v'ath_master_address = sc_0~load_msg_addr();
+    var v'treasury_ath_receiver_address = sc_0~load_msg_addr();
+    var v'official_ath_wallet_bound = sc_0~load_int(1);
+    var v'sealed = sc_0~load_int(1);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'deployment_manifest_hash = sc_1~load_uint(256);
+    var v'genesis_config_hash = sc_1~load_uint(256);
+    var v'genesis_controller_address = sc_1~load_msg_addr();
+    var v'profile_count = sc_1~load_uint(64);
+    var v'avatar_record_count = sc_1~load_uint(64);
+    slice sc_2 = sc_1~load_ref().begin_parse();
+    var v'treasury_due_ath = sc_2~load_uint(128);
+    var v'burn_due_ath = sc_2~load_uint(128);
+    var v'current_avatar_versions = sc_2~load_dict();
+    var v'avatar_records = sc_2~load_dict();
+    var v'pending_treasury_flushes = sc_2~load_dict();
+    var v'pending_treasury_flush_count = sc_2~load_uint(64);
+    var v'pending_burn_flushes = sc_2~load_dict();
+    var v'pending_burn_flush_count = sc_2~load_uint(64);
+    return (sc_0, (v'official_ath_wallet_address, v'ath_master_address, v'treasury_ath_receiver_address, v'official_ath_wallet_bound, v'sealed, v'deployment_manifest_hash, v'genesis_config_hash, v'genesis_controller_address, v'profile_count, v'avatar_record_count, v'treasury_due_ath, v'burn_due_ath, v'current_avatar_versions, v'avatar_records, v'pending_treasury_flushes, v'pending_treasury_flush_count, v'pending_burn_flushes, v'pending_burn_flush_count));
+}
+
+(slice, ((slice, slice, slice, int, int, int, slice))) $ProfileRegistry$init$_load(slice sc_0) inline {
+    var v'official_ath_wallet_address = sc_0~load_msg_addr();
+    var v'ath_master_address = sc_0~load_msg_addr();
+    var v'treasury_ath_receiver_address = sc_0~load_msg_addr();
+    var v'sealed = sc_0~load_int(1);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'deployment_manifest_hash = sc_1~load_int(257);
+    var v'genesis_config_hash = sc_1~load_int(257);
+    var v'genesis_controller_address = sc_1~load_msg_addr();
+    return (sc_0, (v'official_ath_wallet_address, v'ath_master_address, v'treasury_ath_receiver_address, v'sealed, v'deployment_manifest_hash, v'genesis_config_hash, v'genesis_controller_address));
+}
+
+(slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $ProfileRegistry$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$ProfileRegistry$_load();
+    }
+    else {
+        (slice $official_ath_wallet_address, slice $ath_master_address, slice $treasury_ath_receiver_address, int $sealed, int $deployment_manifest_hash, int $genesis_config_hash, slice $genesis_controller_address) = $sc~$ProfileRegistry$init$_load();
+        $sc.end_parse();
+        return $ProfileRegistry$_contract_init($official_ath_wallet_address, $ath_master_address, $treasury_ath_receiver_address, $sealed, $deployment_manifest_hash, $genesis_config_hash, $genesis_controller_address);
+    }
+}
+
+() $ProfileRegistry$_contract_store((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $ProfileRegistry$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract ProfileRegistry functions
+;;
+
+(slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $ProfileRegistry$_contract_init(slice $official_ath_wallet_address, slice $ath_master_address, slice $treasury_ath_receiver_address, int $sealed, int $deployment_manifest_hash, int $genesis_config_hash, slice $genesis_controller_address) impure inline {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'official_ath_wallet_address = $official_ath_wallet_address;
+    $self'ath_master_address = $ath_master_address;
+    $self'treasury_ath_receiver_address = $treasury_ath_receiver_address;
+    $self'official_ath_wallet_bound = false;
+    $self'sealed = $sealed;
+    $self'deployment_manifest_hash = $deployment_manifest_hash;
+    $self'genesis_config_hash = $genesis_config_hash;
+    $self'genesis_controller_address = $genesis_controller_address;
+    $self'profile_count = 0;
+    $self'avatar_record_count = 0;
+    $self'treasury_due_ath = 0;
+    $self'burn_due_ath = 0;
+    $self'current_avatar_versions = null();
+    $self'avatar_records = null();
+    $self'pending_treasury_flushes = null();
+    $self'pending_treasury_flush_count = 0;
+    $self'pending_burn_flushes = null();
+    $self'pending_burn_flush_count = 0;
+    return ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireUnsealed((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    throw_unless(21000, (~ $self'sealed));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireSealed((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    throw_unless(21100, $self'sealed);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireGenesisController((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    throw_unless(21030, ( equal_slices_bits(__tact_context_get_sender(), $self'genesis_controller_address) ));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), int) $ProfileRegistry$_fun_isBasechainAddress((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $address) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    var ($std'workchain, $std'address) = $global_parseStdAddress($Address$_fun_asSlice($address));
+    var $fresh$ret_27 = ($std'workchain == 0);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_27);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), slice) $ProfileRegistry$_fun_deriveAthWalletAddress((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    var ($owner_std'workchain, $owner_std'address) = $global_parseStdAddress($Address$_fun_asSlice($owner_wallet));
+    var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $owner_wallet, $self'ath_master_address);
+    var $fresh$ret_28 = $global_contractAddressExt($owner_std'workchain, $wallet_init'code, $wallet_init'data);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_28);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), int) $ProfileRegistry$_fun_computeAvatarRecordId((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet, int $version) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    var $fresh$ret_29 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1347567958, 32), $owner_wallet), $version, 32)));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_29);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireValidAvatarPointer((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, (int, int, int, slice, int, int, int, int, int) $msg) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    var (($msg'query_id, $msg'amount, $msg'sender_key, $msg'owner_wallet, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format)) = $msg;
+    throw_unless(21120, ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_isBasechainAddress($msg'owner_wallet));
+    throw_unless(21121, ($msg'avatar_hash != 0));
+    throw_unless(21122, ($msg'avatar_stream_id != 0));
+    throw_unless(21123, ($msg'avatar_part_count > 0));
+    throw_unless(21124, ($msg'avatar_part_count <= 16));
+    throw_unless(21125, ($msg'media_format == 1));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_sendAthNotificationAck((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id, int $sender_key, int $amount) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__tact_context_get_sender(), 1000000, false, 0, $AthTransferNotificationAck$_store_cell($AthTransferNotificationAck$_constructor_query_id_sender_key_amount($query_id, $sender_key, $amount), begin_cell())));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_refundAvatarExcess((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet, int $retained_value) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    int $excess = ($Context$_get_value(__tact_context_get()) - $retained_value);
+    if (($excess < 100000)) {
+        return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+    }
+    $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($owner_wallet, $excess, false, 0, null()));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_requireNoDueFlushQuery((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    throw_unless(21200, (~ __tact_dict_exists_int($self'pending_treasury_flushes, 257, $query_id)));
+    throw_unless(21201, (~ __tact_dict_exists_int($self'pending_burn_flushes, 257, $query_id)));
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_restoreTreasuryDue((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $amount) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    throw_unless(21210, ($amount > 0));
+    $self'treasury_due_ath = $self'treasury_due_ath + $amount;
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), ()) $ProfileRegistry$_fun_restoreBurnDue((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $amount) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    throw_unless(21220, ($amount > 0));
+    $self'burn_due_ath = $self'burn_due_ath + $amount;
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), ());
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, slice, int)) $ProfileRegistry$_fun_clearPendingTreasuryFlush((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    tuple $pendingOpt = $PendingProfileTreasuryFlush$_load_opt(__tact_dict_get_int_cell($self'pending_treasury_flushes, 257, $query_id));
+    throw_unless(21230, (~ null?($pendingOpt)));
+    var ($pending'amount, $pending'recipient_ath_wallet, $pending'created_at) = $PendingProfileTreasuryFlush$_not_null($pendingOpt);
+    $self'pending_treasury_flushes~__tact_dict_delete_int(257, $query_id);
+    $self'pending_treasury_flush_count = $self'pending_treasury_flush_count - 1;
+    var $fresh$ret_30 = ($pending'amount, $pending'recipient_ath_wallet, $pending'created_at);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_30);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, int)) $ProfileRegistry$_fun_clearPendingBurnFlush((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, int $query_id) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    tuple $pendingOpt = $PendingProfileBurnFlush$_load_opt(__tact_dict_get_int_cell($self'pending_burn_flushes, 257, $query_id));
+    throw_unless(21240, (~ null?($pendingOpt)));
+    var ($pending'amount, $pending'created_at) = $PendingProfileBurnFlush$_not_null($pendingOpt);
+    $self'pending_burn_flushes~__tact_dict_delete_int(257, $query_id);
+    $self'pending_burn_flush_count = $self'pending_burn_flush_count - 1;
+    var $fresh$ret_31 = ($pending'amount, $pending'created_at);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_31);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, int, int, int, slice, slice, slice, slice, int, int, int, int, int, int)) $ProfileRegistry$_fun_get_global((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    var $fresh$ret_32 = $ProfileRegistryGlobalView$_constructor_sealed_official_ath_wallet_bound_deployment_manifest_hash_genesis_config_hash_official_ath_wallet_address_ath_master_address_treasury_ath_receiver_address_genesis_controller_address_profile_count_avatar_record_count_treasury_due_ath_burn_due_ath_pending_treasury_flush_count_pending_burn_flush_count($self'sealed, $self'official_ath_wallet_bound, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'pending_treasury_flush_count, $self'pending_burn_flush_count);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_32);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, slice, int, int, int, int, int, int, int)) $ProfileRegistry$_fun_get_avatar_version((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet, int $version) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    int $recordId = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_computeAvatarRecordId($owner_wallet, $version);
+    tuple $recordOpt = $ProfileAvatarRecord$_load_opt(__tact_dict_get_int_cell($self'avatar_records, 257, $recordId));
+    if (null?($recordOpt)) {
+        var $fresh$ret_35 = $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(false, $owner_wallet, $version, 0, 0, 0, 0, 0, 0);
+        return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_35);
+    }
+    var ($record'owner_wallet, $record'version, $record'avatar_hash, $record'avatar_entry_id, $record'avatar_stream_id, $record'avatar_part_count, $record'media_format, $record'updated_at) = $ProfileAvatarRecord$_not_null($recordOpt);
+    var $fresh$ret_36 = $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(true, $record'owner_wallet, $record'version, $record'avatar_hash, $record'avatar_entry_id, $record'avatar_stream_id, $record'avatar_part_count, $record'media_format, $record'updated_at);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_36);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), (int, slice, int, int, int, int, int, int, int)) $ProfileRegistry$_fun_get_avatar((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    int $versionOpt = __tact_dict_get_slice_int($self'current_avatar_versions, 267, $owner_wallet, 257);
+    if (null?($versionOpt)) {
+        var $fresh$ret_33 = $ProfileAvatarView$_constructor_exists_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at(false, $owner_wallet, 0, 0, 0, 0, 0, 0, 0);
+        return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_33);
+    }
+    var $fresh$ret_34 = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_get_avatar_version($owner_wallet, $versionOpt);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_34);
+}
+
+((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int), slice) $ProfileRegistry$_fun_get_ath_wallet_address((slice, slice, slice, int, int, int, int, slice, int, int, int, int, cell, cell, cell, int, cell, int) $self, slice $owner_wallet) impure inline_ref {
+    var (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)) = $self;
+    var $fresh$ret_37 = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_deriveAthWalletAddress($owner_wallet);
+    return (($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count), $fresh$ret_37);
+}
+
+;;
+;; Get methods of a Contract ProfileRegistry
+;;
+
+_ %get_global() method_id(126899) {
+    var self = $ProfileRegistry$_contract_load();
+    var res = self~$ProfileRegistry$_fun_get_global();
+    return $ProfileRegistryGlobalView$_to_external(res);
+}
+
+_ %get_avatar(slice $owner_wallet) method_id(98496) {
+    slice $owner_wallet = $owner_wallet;
+    var self = $ProfileRegistry$_contract_load();
+    var res = self~$ProfileRegistry$_fun_get_avatar($owner_wallet);
+    return $ProfileAvatarView$_to_external(res);
+}
+
+_ %get_avatar_version(slice $owner_wallet, int $version) method_id(111429) {
+    slice $owner_wallet = $owner_wallet;
+    int $version = $version;
+    var self = $ProfileRegistry$_contract_load();
+    var res = self~$ProfileRegistry$_fun_get_avatar_version($owner_wallet, $version);
+    return $ProfileAvatarView$_to_external(res);
+}
+
+_ %get_ath_wallet_address(slice $owner_wallet) method_id(108577) {
+    slice $owner_wallet = $owner_wallet;
+    var self = $ProfileRegistry$_contract_load();
+    var res = self~$ProfileRegistry$_fun_get_ath_wallet_address($owner_wallet);
+    return res;
+}
+
+;;
+;; Routing of a Contract ProfileRegistry
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count) = $ProfileRegistry$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for ATHTransferRequest message
+        if (op == 0x41544810) {
+            var ($msg'query_id, $msg'amount) = in_msg~$ATHTransferRequest$_load_bounced();
+            ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+            throw_unless(21320, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+            var ($pending'amount, $pending'recipient_ath_wallet, $pending'created_at) = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_clearPendingTreasuryFlush($msg'query_id);
+            throw_unless(21321, ($pending'amount == $msg'amount));
+            ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_restoreTreasuryDue($pending'amount);
+            $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+            return ();
+        }
+        
+        ;; Bounced handler for ATHBurn message
+        if (op == 0x41544801) {
+            var ($msg'query_id, $msg'amount) = in_msg~$ATHBurn$_load_bounced();
+            ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+            throw_unless(21350, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+            var ($pending'amount, $pending'created_at) = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_clearPendingBurnFlush($msg'query_id);
+            throw_unless(21351, ($pending'amount == $msg'amount));
+            ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_restoreBurnDue($pending'amount);
+            $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+            return ();
+        }
+        
+        return ();
+    }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive BindProfileOfficialAthWallet message
+    if (op == 0x50a61101) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        var $msg'official_ath_wallet_address = in_msg~load_msg_addr();
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireUnsealed();
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireGenesisController();
+        throw_unless(21031, ($msg'deployment_manifest_hash > 1));
+        throw_unless(21032, (~ $self'official_ath_wallet_bound));
+        throw_unless(21033, ($self'genesis_config_hash == 0));
+        throw_unless(21034, ( (($self'deployment_manifest_hash == 0)) ? (true) : (($self'deployment_manifest_hash == $msg'deployment_manifest_hash)) ));
+        throw_unless(21035, ( equal_slices_bits($msg'official_ath_wallet_address, ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_deriveAthWalletAddress($global_myAddress())) ));
+        $self'deployment_manifest_hash = $msg'deployment_manifest_hash;
+        $self'genesis_config_hash = 1;
+        $self'official_ath_wallet_address = $msg'official_ath_wallet_address;
+        $self'official_ath_wallet_bound = true;
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive SealGenesis message
+    if (op == 0x3a12d1ad) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireUnsealed();
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireGenesisController();
+        throw_unless(21040, ($msg'deployment_manifest_hash > 1));
+        throw_unless(21041, ($self'deployment_manifest_hash == $msg'deployment_manifest_hash));
+        throw_unless(21042, $self'official_ath_wallet_bound);
+        throw_unless(21043, ( equal_slices_bits($self'official_ath_wallet_address, ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_deriveAthWalletAddress($global_myAddress())) ));
+        throw_unless(21044, ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_isBasechainAddress($self'treasury_ath_receiver_address));
+        $self'genesis_config_hash = $msg'deployment_manifest_hash;
+        $self'sealed = true;
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive AthTransferNotificationProfileAvatar message
+    if (op == 0xa11a7001) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_key = in_msg~load_uint(32);
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        var $msg'avatar_hash = in_msg~load_uint(256);
+        var $msg'avatar_entry_id = in_msg~load_uint(64);
+        var $msg'avatar_stream_id = in_msg~load_uint(128);
+        var $msg'avatar_part_count = in_msg~load_uint(16);
+        var $msg'media_format = in_msg~load_uint(8);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        throw_unless(21110, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+        throw_unless(21111, ($msg'amount == 100000000000));
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireValidAvatarPointer($AthTransferNotificationProfileAvatar$_tensor_cast(($msg'query_id, $msg'amount, $msg'sender_key, $msg'owner_wallet, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format)));
+        int $currentVersionOpt = __tact_dict_get_slice_int($self'current_avatar_versions, 267, $msg'owner_wallet, 257);
+        int $retainedValue = 9000000;
+        if (null?($currentVersionOpt)) {
+            $retainedValue = $retainedValue + 3000000;
+        }
+        throw_unless(21112, ($Context$_get_value(__tact_context_get()) >= $retainedValue));
+        int $nextVersion = 1;
+        if ((~ null?($currentVersionOpt))) {
+            throw_unless(21113, ($currentVersionOpt < 4294967295));
+            $nextVersion = ($currentVersionOpt + 1);
+        } else {
+            $self'profile_count = $self'profile_count + 1;
+        }
+        int $recordId = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_computeAvatarRecordId($msg'owner_wallet, $nextVersion);
+        throw_unless(21114, (~ __tact_dict_exists_int($self'avatar_records, 257, $recordId)));
+        $self'avatar_records~__tact_dict_set_int_cell(257, $recordId, $ProfileAvatarRecord$_store_cell($ProfileAvatarRecord$_constructor_owner_wallet_version_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format_updated_at($msg'owner_wallet, $nextVersion, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format, $global_now()), begin_cell()));
+        $self'current_avatar_versions~__tact_dict_set_slice_int(267, $msg'owner_wallet, $nextVersion, 257);
+        $self'avatar_record_count = $self'avatar_record_count + 1;
+        int $treasury_amount = (($msg'amount * 5000) / 10000);
+        int $burn_amount = ($msg'amount - $treasury_amount);
+        $self'treasury_due_ath = $self'treasury_due_ath + $treasury_amount;
+        $self'burn_due_ath = $self'burn_due_ath + $burn_amount;
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_sendAthNotificationAck($msg'query_id, $msg'sender_key, $msg'amount);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_refundAvatarExcess($msg'owner_wallet, $retainedValue);
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive FlushProfileTreasuryAthDue message
+    if (op == 0x50a61110) {
+        var $msg'query_id = in_msg~load_uint(64);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        throw_unless(21250, ($msg'query_id > 0));
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireNoDueFlushQuery($msg'query_id);
+        throw_unless(21251, ($self'treasury_due_ath > 0));
+        throw_unless(21252, ($Context$_get_value(__tact_context_get()) >= 7000000));
+        throw_unless(21253, ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_isBasechainAddress($self'treasury_ath_receiver_address));
+        int $amount = $self'treasury_due_ath;
+        $self'treasury_due_ath = 0;
+        slice $recipient_ath_wallet = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_deriveAthWalletAddress($self'treasury_ath_receiver_address);
+        $self'pending_treasury_flushes~__tact_dict_set_int_cell(257, $msg'query_id, $PendingProfileTreasuryFlush$_store_cell($PendingProfileTreasuryFlush$_constructor_amount_recipient_ath_wallet_created_at($amount, $recipient_ath_wallet, $global_now()), begin_cell()));
+        $self'pending_treasury_flush_count = $self'pending_treasury_flush_count + 1;
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'official_ath_wallet_address, 5000000, 1, true, $ATHTransferRequest$_store_cell($ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination($msg'query_id, $amount, $self'treasury_ath_receiver_address, $global_myAddress()), begin_cell())));
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive FlushProfileBurnAthDue message
+    if (op == 0x50a61111) {
+        var $msg'query_id = in_msg~load_uint(64);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        throw_unless(21260, ($msg'query_id > 0));
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireNoDueFlushQuery($msg'query_id);
+        throw_unless(21261, ($self'burn_due_ath > 0));
+        throw_unless(21262, ($Context$_get_value(__tact_context_get()) >= 7000000));
+        int $amount = $self'burn_due_ath;
+        $self'burn_due_ath = 0;
+        $self'pending_burn_flushes~__tact_dict_set_int_cell(257, $msg'query_id, $PendingProfileBurnFlush$_store_cell($PendingProfileBurnFlush$_constructor_amount_created_at($amount, $global_now()), begin_cell()));
+        $self'pending_burn_flush_count = $self'pending_burn_flush_count + 1;
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'official_ath_wallet_address, 5000000, 1, true, $ATHBurn$_store_cell($ATHBurn$_constructor_query_id_amount_response_destination($msg'query_id, $amount, $global_myAddress()), begin_cell())));
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive ATHTransferAck message
+    if (op == 0x41544811) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        var ($pending'amount, $pending'recipient_ath_wallet, $pending'created_at) = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_clearPendingTreasuryFlush($msg'query_id);
+        throw_unless(21300, ($pending'amount == $msg'amount));
+        throw_unless(21301, ( equal_slices_bits(__tact_context_get_sender(), $pending'recipient_ath_wallet) ));
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive ATHTransferFailed message
+    if (op == 0x41544813) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        throw_unless(21310, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+        var ($pending'amount, $pending'recipient_ath_wallet, $pending'created_at) = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_clearPendingTreasuryFlush($msg'query_id);
+        throw_unless(21311, ($pending'amount == $msg'amount));
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_restoreTreasuryDue($pending'amount);
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive ATHBurnFinalized message
+    if (op == 0x41544803) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'owner_address = in_msg~load_msg_addr();
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        throw_unless(21330, ( equal_slices_bits(__tact_context_get_sender(), $self'ath_master_address) ));
+        var ($pending'amount, $pending'created_at) = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_clearPendingBurnFlush($msg'query_id);
+        throw_unless(21331, ($pending'amount == $msg'amount));
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive ATHBurnFailed message
+    if (op == 0x41544804) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_requireSealed();
+        throw_unless(21340, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+        var ($pending'amount, $pending'created_at) = ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_clearPendingBurnFlush($msg'query_id);
+        throw_unless(21341, ($pending'amount == $msg'amount));
+        ($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count)~$ProfileRegistry$_fun_restoreBurnDue($pending'amount);
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive ProfileRegistryTopUpStorageReserve message
+    if (op == 0x50a61120) {
+        var $msg = empty_tuple();
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(21400);
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'avatar_record_count, $self'treasury_due_ath, $self'burn_due_ath, $self'current_avatar_versions, $self'avatar_records, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

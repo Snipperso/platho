@@ -7,6 +7,8 @@
 
 **BuybackBurn ABI note, 2026-05-20:** this v0.3.2 table is superseded for active BuybackBurn ABI by `artifacts/M29_BUYBACKBURN_ABI_AND_EVIDENCE_REVIEW.md`. The production source of truth is the BY* table implemented in `contracts/BuybackBurn.tact` and exported by `build/BuybackBurn/BuybackBurn_BuybackBurn.ts`; older `ExecuteBuyback` / `BuybackBounceRecovery` / `PruneStuckBuyback` names below are historical milestone context only.
 
+**CapsuleHub final note, 2026-05-22:** this document is superseded for CapsuleHub message storage, binary capsule layout, and publish pricing by `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores retrievable payload cells and removed the separate page-storage reserve; page counters are metadata-only.
+
 ---
 
 ## 0. Core Philosophy
@@ -310,7 +312,7 @@ If none can be implemented, the flush operation is not part of v1.
 
 ### 5.1 Purpose
 
-Superseded note: this v0.3.2 text predates the M27 interface decision. CapsuleHub v1 is counter-only / anchor-only and does not expose retrievable on-chain page maps.
+Superseded note: this v0.3.2 text predates the on-chain payload storage fix. CapsuleHub v1 must store retrievable encrypted payload cells on-chain; counter-only / anchor-only is not sufficient. The final v1 cell format is binary, not JSON: `PH0B` header0 is exactly 140 bytes, `PH1B` header1 is exactly 30 bytes, and each `platho.byte-layout.v1` body plaintext carries exactly one encrypted 1024-byte user payload slot for both standard and postquantum capsules. The canonical byte layout is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
 
 CapsuleHub anchors private encrypted message entries and public post entries.
 

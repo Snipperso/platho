@@ -13,6 +13,7 @@ type ManifestLike = {
   manifest_hash_hex: string;
   addresses: Record<string, string>;
   code_hashes: Record<string, string>;
+  constants?: Record<string, string>;
   blockers_before_final_genesis?: string[];
 };
 
@@ -37,11 +38,21 @@ export interface MainnetGenesisVerifyInput {
       vault_ath_wallet_address: string;
       ath_master_address: string;
     };
+    vault_official_ath_wallet: BaseSnapshot & {
+      owner_address: string;
+      ath_master_address: string;
+      balance_atomic: string;
+    };
     capsulehub: BaseSnapshot & {
       vault_address: string;
       fee_accumulator_address: string;
     };
     username_registry: BaseSnapshot & {
+      official_ath_wallet_address: string;
+      ath_master_address: string;
+      treasury_ath_receiver: string;
+    };
+    profile_registry: BaseSnapshot & {
       official_ath_wallet_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
@@ -87,6 +98,10 @@ function isHex64(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
 }
 
+function isDecimalString(value: unknown): value is string {
+  return typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value);
+}
+
 function isPlaceholder(value: unknown): boolean {
   if (typeof value !== 'string') return true;
   const v = value.trim();
@@ -107,6 +122,11 @@ function sameAddress(a: string, b: string): boolean {
   return Address.parse(a).equals(Address.parse(b));
 }
 
+function addressWorkchain(value: unknown): number | null {
+  if (!isParseableMainnetAddress(value)) return null;
+  return Address.parse(value as string).workChain;
+}
+
 function addEq(issues: Issue[], code: string, actual: unknown, expected: unknown, label: string) {
   if (actual !== expected) {
     issues.push(issue(code, `${label} mismatch: expected ${expected}, got ${actual}`));
@@ -122,6 +142,23 @@ function addAddressEq(issues: Issue[], code: string, actual: string, expected: s
 function addTrue(issues: Issue[], code: string, actual: boolean | undefined, label: string) {
   if (actual !== true) {
     issues.push(issue(code, `${label} must be true`));
+  }
+}
+
+function addDecimalGte(issues: Issue[], code: string, actual: unknown, expected: string, label: string) {
+  if (!isDecimalString(actual)) {
+    issues.push(issue(code, `${label} must be a decimal atomic amount string; got ${actual}`));
+    return;
+  }
+  if (BigInt(actual) < BigInt(expected)) {
+    issues.push(issue(code, `${label} underfunded: expected at least ${expected}, got ${actual}`));
+  }
+}
+
+function addBasechainAddress(issues: Issue[], code: string, value: unknown, label: string) {
+  const workchain = addressWorkchain(value);
+  if (workchain !== null && workchain !== 0) {
+    issues.push(issue(code, `${label} must be a basechain workchain 0 address for the current release; got workchain ${workchain}.`));
   }
 }
 
@@ -160,15 +197,23 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       username_registry: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
       username_registry_official_ath_wallet: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
       treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
+      profile_registry: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
+      profile_registry_official_ath_wallet: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
+      profile_registry_treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
       stonfi_pool_address_ton_ath: 'REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS',
     },
     code_hashes: {
       ath_master: 'required: current ATHMaster code hash',
+      ath_wallet: 'required: current ATHWallet code hash',
       vault: 'required: current Vault code hash',
       capsulehub: 'required: current CapsuleHub code hash',
       username_registry: 'required: current UsernameRegistry code hash',
+      profile_registry: 'required: current ProfileRegistry code hash',
       buyback_burn: 'required: current BuybackBurn code hash',
       fee_accumulator: 'required: current FeeAccumulator code hash',
+    },
+    constants: {
+      vault_activity_airdrop_total_atomic: 'required: decimal atomic ATH amount',
     },
     blockers_before_final_genesis: [],
   };
@@ -198,6 +243,13 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         vault_ath_wallet_address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
       },
+      vault_official_ath_wallet: {
+        address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+        code_hash: 'required: current ATHWallet code hash',
+        owner_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        balance_atomic: 'required: decimal ATH balance from get_wallet_data',
+      },
       capsulehub: {
         ...base,
         address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
@@ -210,6 +262,13 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         official_ath_wallet_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
+      },
+      profile_registry: {
+        ...base,
+        address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
+        official_ath_wallet_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
       },
       buyback_burn: {
         ...base,
@@ -260,8 +319,13 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   for (const [key, value] of Object.entries(manifest.addresses ?? {})) {
     if (!isParseableMainnetAddress(value)) issues.push(issue(`BAD_MANIFEST_ADDRESS_${key.toUpperCase()}`, `${key} must be a parseable mainnet address.`));
   }
+  addBasechainAddress(issues, 'ATH_MASTER_NOT_BASECHAIN', manifest.addresses?.ath_master, 'manifest.addresses.ath_master');
   for (const [key, value] of Object.entries(manifest.code_hashes ?? {})) {
     if (!isHex64(value)) issues.push(issue(`BAD_MANIFEST_CODE_HASH_${key.toUpperCase()}`, `${key} code hash must be 32-byte hex.`));
+  }
+  const vaultActivityAirdropTotal = manifest.constants?.vault_activity_airdrop_total_atomic;
+  if (!isDecimalString(vaultActivityAirdropTotal)) {
+    issues.push(issue('BAD_VAULT_ACTIVITY_AIRDROP_TOTAL', 'manifest.constants.vault_activity_airdrop_total_atomic must be a decimal atomic ATH string.'));
   }
 
   const s = input.snapshot;
@@ -275,6 +339,29 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MISMATCH', s.vault.vault_ath_wallet_address, manifest.addresses.vault_official_ath_wallet, 'vault.vault_ath_wallet_address');
   addAddressEq(issues, 'VAULT_ATH_MASTER_MISMATCH', s.vault.ath_master_address, manifest.addresses.ath_master, 'vault.ath_master_address');
 
+  const vaultOfficialAthWallet = (s as any).vault_official_ath_wallet ?? {
+    address: '',
+    code_hash: '',
+    owner_address: '',
+    ath_master_address: '',
+    balance_atomic: '',
+  };
+  if (!(s as any).vault_official_ath_wallet) {
+    issues.push(issue('MISSING_VAULT_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.vault_official_ath_wallet getter data is required.'));
+  }
+  checkBase(issues, manifest, vaultOfficialAthWallet, 'vault_official_ath_wallet', 'vault_official_ath_wallet', 'ath_wallet');
+  addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', vaultOfficialAthWallet.owner_address, manifest.addresses.vault, 'vault_official_ath_wallet.owner_address');
+  addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', vaultOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'vault_official_ath_wallet.ath_master_address');
+  if (isDecimalString(vaultActivityAirdropTotal)) {
+    addDecimalGte(
+      issues,
+      'VAULT_ACTIVITY_AIRDROP_BACKING_UNDERFUNDED',
+      vaultOfficialAthWallet.balance_atomic,
+      vaultActivityAirdropTotal,
+      'vault_official_ath_wallet.balance_atomic',
+    );
+  }
+
   checkBase(issues, manifest, s.capsulehub, 'capsulehub', 'capsulehub', 'capsulehub');
   checkSealed(issues, manifest, s.capsulehub, 'capsulehub');
   addAddressEq(issues, 'CAPSULEHUB_VAULT_ADDRESS_MISMATCH', s.capsulehub.vault_address, manifest.addresses.vault, 'capsulehub.vault_address');
@@ -284,7 +371,16 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   checkSealed(issues, manifest, s.username_registry, 'username_registry');
   addAddressEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.username_registry.official_ath_wallet_address, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.official_ath_wallet_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_ATH_MASTER_MISMATCH', s.username_registry.ath_master_address, manifest.addresses.ath_master, 'username_registry.ath_master_address');
+  addBasechainAddress(issues, 'USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.username_registry.ath_master_address, 'username_registry.ath_master_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.username_registry.treasury_ath_receiver, manifest.addresses.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
+
+  checkBase(issues, manifest, s.profile_registry, 'profile_registry', 'profile_registry', 'profile_registry');
+  checkSealed(issues, manifest, s.profile_registry, 'profile_registry');
+  addAddressEq(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.profile_registry.official_ath_wallet_address, manifest.addresses.profile_registry_official_ath_wallet, 'profile_registry.official_ath_wallet_address');
+  addAddressEq(issues, 'PROFILE_REGISTRY_ATH_MASTER_MISMATCH', s.profile_registry.ath_master_address, manifest.addresses.ath_master, 'profile_registry.ath_master_address');
+  addBasechainAddress(issues, 'PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.profile_registry.ath_master_address, 'profile_registry.ath_master_address');
+  addAddressEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry_treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
+  addBasechainAddress(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_NOT_BASECHAIN', s.profile_registry.treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
 
   checkBase(issues, manifest, s.buyback_burn, 'buyback_burn', 'buyback_burn', 'buyback_burn');
   checkSealed(issues, manifest, s.buyback_burn, 'buyback_burn');
@@ -292,6 +388,7 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addAddressEq(issues, 'BUYBACK_FEE_ACCUMULATOR_MISMATCH', s.buyback_burn.fee_accumulator_address, manifest.addresses.fee_accumulator, 'buyback_burn.fee_accumulator_address');
   addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_MISMATCH', s.buyback_burn.official_ath_wallet_address, manifest.addresses.buyback_burn_official_ath_wallet, 'buyback_burn.official_ath_wallet_address');
   addAddressEq(issues, 'BUYBACK_ATH_MASTER_MISMATCH', s.buyback_burn.ath_master_address, manifest.addresses.ath_master, 'buyback_burn.ath_master_address');
+  addBasechainAddress(issues, 'BUYBACK_ATH_MASTER_NOT_BASECHAIN', s.buyback_burn.ath_master_address, 'buyback_burn.ath_master_address');
   addAddressEq(issues, 'BUYBACK_STONFI_POOL_MISMATCH', s.buyback_burn.stonfi_pool_address_ton_ath, manifest.addresses.stonfi_pool_address_ton_ath, 'buyback_burn.stonfi_pool_address_ton_ath');
 
   checkBase(issues, manifest, s.fee_accumulator, 'fee_accumulator', 'fee_accumulator', 'fee_accumulator');

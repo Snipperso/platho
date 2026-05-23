@@ -36,6 +36,11 @@
       "output": "build/CapsuleHub"
     },
     {
+      "name": "ProfileRegistry",
+      "path": "contracts/ProfileRegistry.tact",
+      "output": "build/ProfileRegistry"
+    },
+    {
       "name": "MockVaultAckSink",
       "path": "contracts/MockVaultAckSink.tact",
       "output": "build/MockVaultAckSink"

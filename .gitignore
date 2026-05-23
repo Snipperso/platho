@@ -19,10 +19,14 @@ artifacts/m20t_live_testnet_run.local.json
 artifacts/m20t_wallet_private.local.json
 artifacts/platho-web-static-*/
 artifacts/local/
+artifacts/platho_external_audit*.zip
+artifacts/platho_external_audit*.zip.sha256
+artifacts/platho_external_audit*.contents.txt
 
 # Browser smoke-test profiles and local runtime state
 .edge-smoke/
 .edge-smoke-tonconnect/
+.audit-staging*/
 platho-gitdir/
 gitdir-probe/
 

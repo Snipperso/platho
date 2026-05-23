@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { keyPairFromSeed, sign } from '@ton/crypto';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
@@ -8,6 +8,11 @@ import {
   SetSession,
   TopUpMessageBudget,
 } from '../build/Vault/Vault_Vault';
+import {
+  finalPrivateBodyCell,
+  finalPrivateHeader0Cell,
+  finalPrivateHeader1Cell,
+} from './helpers/capsule-cells';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MAGIC = 0x504c5352n;
@@ -21,9 +26,20 @@ const SUITE_PUBLIC = 0n;
 const SUITE_CLASSICAL = 1n;
 const INVALID_SESSION_REQUEST_CHARGE_TON = 6_000_000n;
 
-const BODY_HASH = 0x1111000000000000000000000000000000000000000000000000000000000001n;
-const HEADER0 = 0x2222000000000000000000000000000000000000000000000000000000000002n;
-const HEADER1 = 0x3333000000000000000000000000000000000000000000000000000000000003n;
+function payloadCell(label: string): Cell {
+  return beginCell().storeBuffer(Buffer.from(`PLATHO.V1.VAULT.EXT.PAYLOAD.${label}`, 'utf8')).endCell();
+}
+
+function cellHash(cell: Cell): bigint {
+  return BigInt('0x' + cell.hash().toString('hex'));
+}
+
+const BODY_CELL = finalPrivateBodyCell();
+const HEADER0_CELL = finalPrivateHeader0Cell();
+const HEADER1_CELL = finalPrivateHeader1Cell();
+const BODY_HASH = cellHash(BODY_CELL);
+const HEADER0 = cellHash(HEADER0_CELL);
+const HEADER1 = cellHash(HEADER1_CELL);
 
 function bufToBigInt(buf: Buffer): bigint {
   return BigInt('0x' + buf.toString('hex'));
@@ -104,13 +120,19 @@ async function buildExternalRequest(params: {
   bodyHash?: bigint;
   header0?: bigint;
   header1?: bigint;
+  bodyCell?: Cell;
+  header0Cell?: Cell;
+  header1Cell?: Cell;
   secretKey: Buffer;
   mutateSignature?: boolean;
   signatureTrailingData?: 'bits' | 'ref';
 }) {
-  const bodyHash = params.bodyHash ?? BODY_HASH;
-  const header0 = params.header0 ?? HEADER0;
-  const header1 = params.header1 ?? HEADER1;
+  const bodyCell = params.bodyCell ?? BODY_CELL;
+  const header0Cell = params.header0Cell ?? HEADER0_CELL;
+  const header1Cell = params.header1Cell ?? HEADER1_CELL;
+  const bodyHash = params.bodyHash ?? cellHash(bodyCell);
+  const header0 = params.header0 ?? cellHash(header0Cell);
+  const header1 = params.header1 ?? cellHash(header1Cell);
 
   const sigHash = await params.vault.getGetSessionPublishHash(
     params.op,
@@ -146,7 +168,7 @@ async function buildExternalRequest(params: {
   }
   const signatureRef = signatureBuilder.endCell();
 
-  return beginCell()
+  const builder = beginCell()
     .storeUint(MAGIC, 32)
     .storeUint(VERSION, 8)
     .storeUint(params.op, 32)
@@ -159,9 +181,17 @@ async function buildExternalRequest(params: {
     .storeUint(params.cryptoSuite, 8)
     .storeUint(params.maxCharge, 128)
     .storeRef(hashesRef)
-    .storeRef(signatureRef)
-    .endCell()
-    .beginParse();
+    .storeRef(signatureRef);
+
+  if (params.publishKind === KIND_PRIVATE) {
+    const payloadRef = beginCell().storeRef(header0Cell).storeRef(header1Cell).storeRef(bodyCell).endCell();
+    builder.storeRef(payloadRef);
+  } else if (params.publishKind === KIND_PUBLIC) {
+    const payloadRef = beginCell().storeRef(bodyCell).endCell();
+    builder.storeRef(payloadRef);
+  }
+
+  return builder.endCell().beginParse();
 }
 
 async function tryExternal(vault: any, external: any) {
@@ -335,17 +365,15 @@ describe('Vault milestone 6: external session pre-accept gate and pending publis
 
     const bad = await buildExternalRequest({
       vault,
-      op: OP_PUBLIC,
+      op: OP_PRIVATE,
       owner: user.address,
       sessionId: session.session_id,
       nonce: 0n,
       validUntil: BigInt(now + 100),
-      publishKind: KIND_PUBLIC,
+      publishKind: KIND_PRIVATE,
       sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_PUBLIC,
+      cryptoSuite: SUITE_CLASSICAL,
       maxCharge: maxCharge - 1n,
-      header0: 0n,
-      header1: 0n,
       secretKey: kp.secretKey,
     });
 
