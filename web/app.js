@@ -58,14 +58,13 @@ import {
 } from './recipient-identities.mjs';
 import {
   SINGLE_CAPSULE_USEFUL_BYTES,
-  hasMessageBudgetAllocation,
   messagePartCount,
   singleCapsuleMessageFits,
   splitBytesToParts,
   splitUtf8ToParts,
   truncateUtf8ToBytes,
   utf8ByteLength,
-} from './message-budget-policy.mjs?v=2';
+} from './capsule-part-policy.mjs?v=1';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -75,11 +74,9 @@ import {
   resolveNetworkFeeEstimateNanotons,
 } from './message-pricing-policy.mjs';
 import {
-  buildVaultExternalPublishBoc,
   createAthWalletMessage,
   createPublicPostPayload,
   createWalletTransaction,
-  createVaultSessionKey,
   createVaultWalletMessage,
   createUsernameRegistryWalletMessage,
   PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS,
@@ -144,7 +141,7 @@ const privateAttachmentPanel = document.querySelector('#privateAttachmentPanel')
 const privateAttachmentLabel = document.querySelector('#privateAttachmentLabel');
 const privateClearImageButton = document.querySelector('#privateClearImageButton');
 const attachmentControls = [
-  ...document.querySelectorAll('[data-requires-message-budget="true"], #attachButton, .attachment-button'),
+  ...document.querySelectorAll('[data-requires-wallet="true"], #attachButton, .attachment-button'),
 ];
 const encryptionStatus = document.querySelector('#encryptionStatus');
 const keySuiteStatus = document.querySelector('#keySuiteStatus');
@@ -159,8 +156,6 @@ const exportWalletSeedButton = document.querySelector('#exportWalletSeedButton')
 const vaultRecordStatus = document.querySelector('#vaultRecordStatus');
 const registerVaultKeysButton = document.querySelector('#registerVaultKeysButton');
 const replaceVaultKeysButton = document.querySelector('#replaceVaultKeysButton');
-const revokeVaultSessionButton = document.querySelector('#revokeVaultSessionButton');
-const vaultSessionStatus = document.querySelector('#vaultSessionStatus');
 const vaultRotateStatus = document.querySelector('#vaultRotateStatus');
 const syncMessagesButton = document.querySelector('#syncMessagesButton');
 const messageSyncStatus = document.querySelector('#messageSyncStatus');
@@ -230,7 +225,6 @@ let encryptedMessageStore = null;
 let vaultProviderLoadPromise = null;
 let tonDnsProviderLoadPromise = null;
 let identityPopover = null;
-let vaultSessionKey = null;
 let activeActionDialog = null;
 let publicDisplayMode = 'feed';
 let publicChannelSearchQuery = '';
@@ -242,7 +236,6 @@ let profileAvatarLoadPromises = new Map();
 
 const KEY_SUITE_PREF_KEY = 'platho.crypto.suite.v1';
 const PLATHO_WALLET_STORAGE_KEY = 'platho.wallet.seed.v1';
-const VAULT_SESSION_KEY_STORAGE_PREFIX = 'platho.vault.session.v1';
 const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v1';
@@ -254,11 +247,8 @@ const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 96;
 const PROFILE_AVATAR_FALLBACK_SCAN_LIMIT = 400;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 20;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 1500;
-const VAULT_SESSION_TTL_SECONDS = 29 * 24 * 60 * 60;
-const VAULT_PUBLISH_NONCE_POLL_MS = 1500;
-const VAULT_PUBLISH_NONCE_POLL_ATTEMPTS = 20;
 const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
-const VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE_NANOTONS = 6_000_000n;
+const VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS = 6_000_000n;
 const PLATO_PRIVATE_STANDARD_FEE_NANOTONS = 5_000_000n;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
 const PLATO_PUBLIC_POST_FEE_NANOTONS = 5_000_000n;
@@ -1187,7 +1177,7 @@ function setPublicCommentTarget(item = null) {
     }
     if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.checked = readPublicCommentsDefault() !== 'disabled';
   }
-  refreshComposerBudgetPolicy();
+  refreshComposerPublishPolicy();
   refreshComposerCostStatus();
 }
 
@@ -2315,7 +2305,6 @@ async function setPlathoWallet(wallet) {
   plathoWallet = wallet;
   localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
   await writeStoredPlathoWallet(wallet);
-  clearVaultSessionKey(wallet.address);
   await bootCrypto();
   await refreshVaultActivationStatus();
   await refreshOwnProfileAvatar();
@@ -2352,10 +2341,8 @@ function updateKeySuiteUi(suite) {
   refreshComposerCostStatus();
 }
 
-function currentMessageBudgetSource() {
+function currentVaultUserSource() {
   return globalThis.plathoVaultBinding?.user
-    ?? globalThis.plathoMessageBudget
-    ?? appConfig.messaging?.messageBudget
     ?? null;
 }
 
@@ -2376,22 +2363,8 @@ function nonNegativeBigInt(value, fallback = 0n) {
   return fallback;
 }
 
-function currentMessageBudgetNanotons() {
-  const source = currentMessageBudgetSource();
-  if (source === null || source === undefined) return 0n;
-  if (typeof source !== 'object') return nonNegativeBigInt(source);
-  return nonNegativeBigInt(
-    source.message_budget_ton
-      ?? source.messageBudgetTon
-      ?? source.available_budget_ton
-      ?? source.availableBudgetTon
-      ?? source.availableNanotons
-      ?? source.available,
-  );
-}
-
 function currentAthBalanceAtomic() {
-  const source = currentMessageBudgetSource();
+  const source = currentVaultUserSource();
   if (!source || typeof source !== 'object') return 0n;
   return nonNegativeBigInt(source.ath_balance ?? source.athBalance ?? source.ath);
 }
@@ -2432,7 +2405,7 @@ function privateComposerPublishProfile() {
       sizeClass: VAULT_SIZE_CLASS.STANDARD,
       cryptoSuite: VAULT_CRYPTO_SUITE.CLASSICAL,
       priceSuite: MESSAGE_PRICE_SUITES.CLASSICAL_V1,
-      fixedCharge: VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE_NANOTONS + CAPSULEHUB_PRIVATE_STANDARD_FIXED_CHARGE_NANOTONS,
+      fixedCharge: VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS + CAPSULEHUB_PRIVATE_STANDARD_FIXED_CHARGE_NANOTONS,
       protocolFee: PLATO_PRIVATE_STANDARD_FEE_NANOTONS,
     };
   }
@@ -2441,7 +2414,7 @@ function privateComposerPublishProfile() {
     sizeClass: VAULT_SIZE_CLASS.LONG_TERM,
     cryptoSuite: VAULT_CRYPTO_SUITE.HYBRID,
     priceSuite: MESSAGE_PRICE_SUITES.HYBRID_V1,
-    fixedCharge: VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE_NANOTONS + CAPSULEHUB_PRIVATE_LONG_TERM_FIXED_CHARGE_NANOTONS,
+    fixedCharge: VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS + CAPSULEHUB_PRIVATE_LONG_TERM_FIXED_CHARGE_NANOTONS,
     protocolFee: PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS,
   };
 }
@@ -2452,7 +2425,7 @@ function publicComposerPublishProfile() {
     sizeClass: VAULT_SIZE_CLASS.STANDARD,
     cryptoSuite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
     priceSuite: MESSAGE_PRICE_SUITES.PUBLIC_V1,
-    fixedCharge: VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE_NANOTONS + CAPSULEHUB_PUBLIC_FIXED_CHARGE_NANOTONS,
+    fixedCharge: VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS + CAPSULEHUB_PUBLIC_FIXED_CHARGE_NANOTONS,
     protocolFee: PLATO_PUBLIC_POST_FEE_NANOTONS,
   };
 }
@@ -2496,25 +2469,18 @@ function composerEstimatedMaxChargeNanotons(profile, parts = 1) {
 }
 
 function composerCostStatusText(profile, text, maxTextBytes, attachment = null) {
-  const budget = currentMessageBudgetNanotons();
   const parts = composerTotalPartCount(text, attachment, maxTextBytes);
   const price = composerEstimatedPriceNanotons(profile, parts);
   const hold = composerEstimatedMaxChargeNanotons(profile, parts);
-  const shortfall = hold > budget ? hold - budget : 0n;
-  const needsBudget = parts > 1 && !hasAllocatedMessageBudget();
   const statusParts = [];
   if (!plathoWallet) {
-    statusParts.push('Wallet required', 'Message budget required');
-  } else if (needsBudget) {
-    statusParts.push('Message budget required');
-  } else if (shortfall > 0n) {
-    statusParts.push(`Need +${formatTonNanotons(shortfall)} TON`);
+    statusParts.push('Wallet required');
   } else {
     statusParts.push('Ready');
   }
   return {
     text: `Price ${formatTonNanotons(price)} TON - Hold ${formatTonNanotons(hold)} TON - ATH discount ${formatDiscountPercent()}\n${statusParts.join(' - ')}`,
-    state: plathoWallet && shortfall === 0n && !needsBudget ? 'ready' : 'short',
+    state: plathoWallet ? 'ready' : 'short',
     parts,
   };
 }
@@ -2625,10 +2591,6 @@ function isFreshPublicTimestamp(value, cutoffMs = publicSyncCutoffMs()) {
   return timestamp >= cutoffMs;
 }
 
-function hasAllocatedMessageBudget() {
-  return hasMessageBudgetAllocation(currentMessageBudgetSource());
-}
-
 function autoResizeComposerTextarea(node) {
   if (!node || node.tagName !== 'TEXTAREA') return;
   node.style.height = '0px';
@@ -2656,14 +2618,6 @@ async function setImageAttachment(kind, file, modeId) {
   const input = kind === 'public' ? publicImageInput : privateImageInput;
   const button = kind === 'public' ? publicImageButton : privateImageButton;
   const mode = imageCompressionMode(modeId);
-  if (!hasAllocatedMessageBudget()) {
-    if (status) {
-      status.textContent = 'Message Budget is required for images';
-      status.dataset.state = 'short';
-    }
-    if (input) input.value = '';
-    return;
-  }
   try {
     if (status) {
       status.textContent = `Compressing image to ${Math.ceil(mode.maxBytes / 1024)} KiB`;
@@ -2677,7 +2631,7 @@ async function setImageAttachment(kind, file, modeId) {
       privateImageAttachment = attachment;
     }
     updateImageAttachmentUi(kind);
-    refreshComposerBudgetPolicy();
+    refreshComposerPublishPolicy();
   } catch (error) {
     if (kind === 'public') {
       publicImageAttachment = null;
@@ -2692,7 +2646,7 @@ async function setImageAttachment(kind, file, modeId) {
     console.error(error);
   } finally {
     if (input) input.value = '';
-    if (button) button.disabled = !hasAllocatedMessageBudget();
+    if (button) button.disabled = !plathoWallet;
   }
 }
 
@@ -2703,11 +2657,11 @@ async function recompressImageAttachment(kind) {
   await setImageAttachment(kind, attachment.sourceFile, modeSelect.value);
 }
 
-function refreshComposerBudgetPolicy() {
-  const hasBudget = hasAllocatedMessageBudget();
-  if (composer) composer.dataset.messageBudget = hasBudget ? 'allocated' : 'wallet-confirmed-single';
+function refreshComposerPublishPolicy() {
+  const canPublish = Boolean(plathoWallet);
+  if (composer) composer.dataset.publishMode = canPublish ? 'wallet-funded' : 'wallet-required';
   if (messageInput) {
-    if (hasBudget) {
+    if (canPublish) {
       messageInput.removeAttribute('maxlength');
       messageInput.placeholder = 'Message';
     } else {
@@ -2716,10 +2670,10 @@ function refreshComposerBudgetPolicy() {
     }
     autoResizeComposerTextarea(messageInput);
   }
-  if (publicComposer) publicComposer.dataset.messageBudget = hasBudget ? 'allocated' : 'wallet-confirmed-single';
+  if (publicComposer) publicComposer.dataset.publishMode = canPublish ? 'wallet-funded' : 'wallet-required';
   if (publicMessageInput) {
     const publicLimit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
-    if (hasBudget) {
+    if (canPublish) {
       publicMessageInput.removeAttribute('maxlength');
     } else {
       publicMessageInput.setAttribute('maxlength', String(publicLimit));
@@ -2727,17 +2681,17 @@ function refreshComposerBudgetPolicy() {
     autoResizeComposerTextarea(publicMessageInput);
   }
   for (const control of attachmentControls) {
-    control.disabled = !hasBudget;
-    control.hidden = !hasBudget;
-    control.setAttribute('aria-disabled', hasBudget ? 'false' : 'true');
+    control.disabled = !canPublish;
+    control.hidden = !canPublish;
+    control.setAttribute('aria-disabled', canPublish ? 'false' : 'true');
   }
   if (privateImageModeSelect) {
-    privateImageModeSelect.disabled = !hasBudget;
-    privateImageModeSelect.hidden = !hasBudget;
+    privateImageModeSelect.disabled = !canPublish;
+    privateImageModeSelect.hidden = !canPublish;
   }
   if (publicImageModeSelect) {
-    publicImageModeSelect.disabled = !hasBudget;
-    publicImageModeSelect.hidden = !hasBudget;
+    publicImageModeSelect.disabled = !canPublish;
+    publicImageModeSelect.hidden = !canPublish;
   }
   updateImageAttachmentUi('private');
   updateImageAttachmentUi('public');
@@ -2745,7 +2699,7 @@ function refreshComposerBudgetPolicy() {
 }
 
 function enforceComposerByteLimit() {
-  if (!messageInput || hasAllocatedMessageBudget()) return;
+  if (!messageInput || plathoWallet) return;
   if (singleCapsuleMessageFits(messageInput.value, false)) return;
   const truncated = truncateUtf8ToBytes(messageInput.value, SINGLE_CAPSULE_USEFUL_BYTES);
   messageInput.value = truncated;
@@ -2755,7 +2709,7 @@ function enforceComposerByteLimit() {
 }
 
 function enforcePublicComposerByteLimit() {
-  if (!publicMessageInput || hasAllocatedMessageBudget()) return;
+  if (!publicMessageInput || plathoWallet) return;
   const limit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
   if (utf8ByteLength(publicMessageInput.value) <= limit) return;
   const truncated = truncateUtf8ToBytes(publicMessageInput.value, limit);
@@ -2783,7 +2737,6 @@ function refreshMessagingControls() {
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
   if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet;
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet;
-  if (revokeVaultSessionButton) revokeVaultSessionButton.disabled = !plathoWallet;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet;
   if (refreshVaultButton) refreshVaultButton.disabled = !plathoWallet;
   if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet;
@@ -2861,15 +2814,15 @@ function renderConversation() {
   const isReadOnly = thread.readOnly === true;
 
   if (composer) composer.dataset.readOnly = isReadOnly ? 'true' : 'false';
-  refreshComposerBudgetPolicy();
+  refreshComposerPublishPolicy();
   if (messageInput) {
     messageInput.disabled = isReadOnly;
     if (isReadOnly) messageInput.placeholder = 'Read-only channel';
   }
   if (sendButton) sendButton.disabled = isReadOnly;
   if (paymentCheckButton) paymentCheckButton.disabled = isReadOnly;
-  if (privateImageButton) privateImageButton.disabled = isReadOnly || !hasAllocatedMessageBudget();
-  if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !hasAllocatedMessageBudget();
+  if (privateImageButton) privateImageButton.disabled = isReadOnly || !plathoWallet;
+  if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
 
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
@@ -3115,18 +3068,6 @@ replaceVaultKeysButton?.addEventListener('click', async () => {
   }
 });
 
-revokeVaultSessionButton?.addEventListener('click', async () => {
-  try {
-    revokeVaultSessionButton.disabled = true;
-    await submitVaultRevokeSession();
-  } catch (error) {
-    setText(vaultSessionStatus, 'revoke blocked');
-    console.error(error);
-  } finally {
-    revokeVaultSessionButton.disabled = false;
-  }
-});
-
 syncMessagesButton?.addEventListener('click', async () => {
   try {
     syncMessagesButton.disabled = true;
@@ -3291,16 +3232,16 @@ publicMessageInput?.addEventListener('keydown', (event) => {
 });
 
 privateImageButton?.addEventListener('click', () => {
-  if (!hasAllocatedMessageBudget()) {
-    refreshComposerBudgetPolicy();
+  if (!plathoWallet) {
+    refreshComposerPublishPolicy();
     return;
   }
   privateImageInput?.click();
 });
 
 publicImageButton?.addEventListener('click', () => {
-  if (!hasAllocatedMessageBudget()) {
-    refreshComposerBudgetPolicy();
+  if (!plathoWallet) {
+    refreshComposerPublishPolicy();
     return;
   }
   publicImageInput?.click();
@@ -3407,11 +3348,11 @@ publicComposer?.addEventListener('submit', async (event) => {
 
 composer?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  refreshComposerBudgetPolicy();
+  refreshComposerPublishPolicy();
   enforceComposerByteLimit();
   const text = messageInput.value.trim();
   if (!text && !privateImageAttachment) return;
-  if (!singleCapsuleMessageFits(text, hasAllocatedMessageBudget()) && !privateImageAttachment) {
+  if (!singleCapsuleMessageFits(text, Boolean(plathoWallet)) && !privateImageAttachment) {
     refreshMessagingControls();
     return;
   }
@@ -3447,11 +3388,8 @@ composer?.addEventListener('submit', async (event) => {
             ? await publishCapsulesThroughVault(capsules)
             : await publishCapsuleThroughVault(capsule);
           message.vaultPublish = publishResult;
-          if (publishResult.status === 'external-publish-sent') {
+          if (publishResult.status === 'wallet-publish-sent') {
             message.meta = 'published';
-            refreshMessagingControls();
-          } else if (publishResult.status === 'session-budget-submitted') {
-            message.meta = 'budget submitted';
             refreshMessagingControls();
           }
         } catch (error) {
@@ -4018,49 +3956,6 @@ function paymentSecret32(payment) {
   return BigInt(`0x${payment.secret32Hex}`);
 }
 
-function vaultSessionStorageKey(owner = null) {
-  const vault = appConfig.vault?.address ?? 'no-vault';
-  const wallet = owner ?? plathoWallet?.address ?? 'no-wallet';
-  return `${VAULT_SESSION_KEY_STORAGE_PREFIX}:${vault}:${wallet}`;
-}
-
-function readVaultSessionKey(owner = null) {
-  if (vaultSessionKey) return vaultSessionKey;
-  try {
-    const raw = localStorageOrNull()?.getItem(vaultSessionStorageKey(owner));
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.secretKeyHex) {
-        vaultSessionKey = createVaultSessionKey({ secretKey: hexToBytes(parsed.secretKeyHex) });
-        return vaultSessionKey;
-      }
-    }
-  } catch {
-    vaultSessionKey = null;
-  }
-  vaultSessionKey = createVaultSessionKey();
-  try {
-    localStorageOrNull()?.setItem(vaultSessionStorageKey(owner), JSON.stringify({
-      secretKeyHex: bytesToHex(vaultSessionKey.secretKey),
-      publicKeyHex: bytesToHex(vaultSessionKey.publicKey),
-      sessionPubkey: vaultSessionKey.session_pubkey.toString(),
-      createdAt: Date.now(),
-    }));
-  } catch {
-    // A non-persistent browser session can still publish while the tab stays open.
-  }
-  return vaultSessionKey;
-}
-
-function clearVaultSessionKey(owner = null) {
-  vaultSessionKey = null;
-  try {
-    localStorageOrNull()?.removeItem(vaultSessionStorageKey(owner));
-  } catch {
-    // Best-effort cleanup only.
-  }
-}
-
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -4073,19 +3968,10 @@ async function loadConnectedVaultUser() {
   });
 }
 
-async function loadConnectedVaultSession() {
-  const provider = await resolveVaultChainProvider();
-  if (!provider?.getSession) throw new Error('Vault chain provider is not configured');
-  return provider.getSession(requirePlathoWalletAddress(), {
-    vaultAddress: requireVaultAddress(),
-  });
-}
-
 async function refreshVaultDashboard() {
   if (!plathoWallet?.address) {
     renderVaultCards(appConfig.ui?.vaultCards ?? []);
     setVaultStatus('wallet required');
-    setText(vaultSessionStatus, 'wallet required');
     return null;
   }
   try {
@@ -4094,19 +3980,16 @@ async function refreshVaultDashboard() {
       { label: 'TON', value: formatTonNanotons(user.ton_balance), caption: 'Vault ledger' },
       { label: 'ATH', value: formatAthAtomic(user.ath_balance), caption: 'Vault ledger' },
     ]);
-    const budget = BigInt(user.message_budget_ton ?? 0n);
     setVaultStatus(user.exists === true ? 'synced' : 'activation required');
-    setText(vaultSessionStatus, budget > 0n ? `${formatTonNanotons(budget)} TON` : 'no budget');
     globalThis.plathoVaultBinding = {
       ...(globalThis.plathoVaultBinding ?? {}),
       user,
       walletAddress: plathoWallet.address,
     };
-    refreshComposerBudgetPolicy();
+    refreshComposerPublishPolicy();
     return user;
   } catch (error) {
     setVaultStatus('sync blocked');
-    setText(vaultSessionStatus, 'provider');
     console.error(error);
     return null;
   }
@@ -4423,10 +4306,8 @@ async function submitProfileAvatarUpdate(file, modeId = 'standard') {
 
   setText(identitySubtitle, 'avatar publishing');
   const publishResult = await publishPublicPayloadParts(payloads, `profile-avatar-${Date.now()}`);
-  if (publishResult?.status !== 'external-publish-sent') {
-    setText(identitySubtitle, publishResult?.status === 'session-budget-submitted'
-      ? 'avatar budget submitted'
-      : 'avatar budget required');
+  if (publishResult?.status !== 'wallet-publish-sent') {
+    setText(identitySubtitle, 'avatar publish blocked');
     return publishResult;
   }
 
@@ -4548,11 +4429,9 @@ async function submitCreatePaymentCheck() {
   try {
     const publishResult = await publishCapsuleThroughVault(capsule);
     message.vaultPublish = publishResult;
-    message.meta = publishResult.status === 'external-publish-sent'
+    message.meta = publishResult.status === 'wallet-publish-sent'
       ? 'check published'
-      : publishResult.status === 'session-budget-submitted'
-        ? 'budget submitted'
-        : 'budget ready';
+      : 'publish ready';
   } catch (error) {
     message.meta = 'check publish unavailable';
     refreshMessagingControls();
@@ -4622,88 +4501,16 @@ async function submitVaultReplaceMessagingKeys() {
   return result;
 }
 
-async function submitVaultRevokeSession() {
-  const session = await loadConnectedVaultSession();
-  if (session.exists !== true || session.active !== true) {
-    setText(vaultSessionStatus, 'no active session');
-    return null;
-  }
-  setText(vaultSessionStatus, 'signing');
-  const result = await submitVaultMessage('RevokeSession', {});
-  clearVaultSessionKey(requirePlathoWalletAddress());
-  setText(vaultSessionStatus, 'revoke sent');
-  refreshComposerBudgetPolicy();
-  return result;
-}
-
-async function submitVaultSessionBudget(minBudgetNanotons, options = {}) {
-  const owner = requirePlathoWalletAddress();
-  const sessionKey = readVaultSessionKey(owner);
-  const user = options.user ?? await loadConnectedVaultUser();
-  const session = options.session ?? await loadConnectedVaultSession();
-  const minBudget = BigInt(minBudgetNanotons);
-  const currentBudget = BigInt(user.message_budget_ton ?? 0n);
-  const topUpAmount = currentBudget >= minBudget ? 0n : minBudget - currentBudget;
-  const tonBalance = BigInt(user.ton_balance ?? 0n);
-  const depositAmount = topUpAmount > tonBalance ? topUpAmount - tonBalance : 0n;
-  const nowSec = Math.floor(Date.now() / 1000);
-  const expiresAt = BigInt(nowSec + VAULT_SESSION_TTL_SECONDS);
-  const needsSession = session.exists !== true
-    || session.active !== true
-    || BigInt(session.session_pubkey ?? 0n) !== sessionKey.session_pubkey
-    || BigInt(session.expires_at ?? 0n) <= BigInt(nowSec + 300);
-  const messages = [];
-  let userExistsAfterDeposit = user.exists === true;
-
-  if (depositAmount > 0n) {
-    messages.push(createVaultWalletMessage('DepositTon', { amount: depositAmount }, {
-      vaultAddress: requireVaultAddress(),
-      userExists: user.exists === true,
-    }));
-    userExistsAfterDeposit = true;
-  }
-  if (needsSession) {
-    messages.push(createVaultWalletMessage('SetSession', {
-      session_pubkey: sessionKey.session_pubkey,
-      expires_at: expiresAt,
-    }, {
-      vaultAddress: requireVaultAddress(),
-      userExists: userExistsAfterDeposit,
-      sessionExists: session.exists === true,
-    }));
-  }
-  if (topUpAmount > 0n) {
-    messages.push(createVaultWalletMessage('TopUpMessageBudget', { amount: topUpAmount }, {
-      vaultAddress: requireVaultAddress(),
-    }));
-  }
-  if (messages.length === 0) return { submitted: false, sessionKey };
-  const transaction = createWalletTransaction(messages);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  globalThis.plathoLastVaultSessionBudgetTransaction = { messages, transaction, result };
-  return { submitted: true, sessionKey, result, topUpAmount, depositAmount };
-}
-
 async function publishCapsuleThroughVault(capsule) {
   const result = await publishCapsulesThroughVault([capsule]);
-  if (result.status !== 'external-publish-sent') return result;
+  if (result.status !== 'wallet-publish-sent') return result;
   const first = result.results?.[0] ?? {};
   return {
     status: result.status,
-    boc: first.boc,
+    message: first.message,
     result: first.result,
     maxCharge: result.maxCharge,
   };
-}
-
-async function waitForVaultSessionNonceAtLeast(targetNonce) {
-  const target = BigInt(targetNonce);
-  for (let attempt = 0; attempt < VAULT_PUBLISH_NONCE_POLL_ATTEMPTS; attempt += 1) {
-    const session = await loadConnectedVaultSession();
-    if (session.exists === true && BigInt(session.nonce ?? 0n) >= target) return session;
-    await delay(VAULT_PUBLISH_NONCE_POLL_MS);
-  }
-  throw new Error('Vault session nonce did not advance after publish');
 }
 
 async function publishCapsulesThroughVault(capsules) {
@@ -4713,85 +4520,49 @@ async function publishCapsulesThroughVault(capsules) {
     throw new Error('Capsule publish payload is missing');
   }
   const provider = await resolveVaultChainProvider();
-  if (!provider?.getSession || !provider?.getCanonicalSessionMaxCharge || !provider?.getSessionPublishHash) {
-    throw new Error('Vault chain provider cannot price session publish');
-  }
-  if (!provider?.sendExternalMessage) {
-    throw new Error('Vault chain provider cannot broadcast external messages');
+  if (!provider?.getCanonicalPublishCharge) {
+    throw new Error('Vault chain provider cannot price wallet publish');
   }
   const owner = requirePlathoWalletAddress();
   const user = await loadConnectedVaultUser();
-  const session = await loadConnectedVaultSession();
-  const sessionKey = readVaultSessionKey(owner);
+  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
+    throw new Error('Activate wallet before publishing');
+  }
   const surcharge = currentNetworkFeeSurchargeNanotons();
-  const maxCharges = [];
-  for (const capsule of normalizedCapsules) {
+  const messages = [];
+  const results = [];
+  let totalMaxCharge = 0n;
+  for (let index = 0; index < normalizedCapsules.length; index += 1) {
+    const capsule = normalizedCapsules[index];
     const publish = capsule.publish;
-    const canonicalMaxCharge = await provider.getCanonicalSessionMaxCharge(
+    const canonicalMaxCharge = await provider.getCanonicalPublishCharge(
       owner,
       BigInt(publish.publish_kind),
       BigInt(publish.size_class),
       BigInt(publish.crypto_suite),
       { vaultAddress: requireVaultAddress() },
     );
-    maxCharges.push(BigInt(canonicalMaxCharge) + surcharge);
-  }
-  const totalMaxCharge = maxCharges.reduce((sum, value) => sum + value, 0n);
-  const nowSec = Math.floor(Date.now() / 1000);
-  const sessionReady = session.exists === true
-    && session.active === true
-    && BigInt(session.session_pubkey ?? 0n) === sessionKey.session_pubkey
-    && BigInt(session.expires_at ?? 0n) > BigInt(nowSec + 300)
-    && BigInt(user.message_budget_ton ?? 0n) >= totalMaxCharge;
-  if (!sessionReady) {
-    const setup = await submitVaultSessionBudget(totalMaxCharge, { user, session });
-    return { status: setup.submitted ? 'session-budget-submitted' : 'session-budget-ready', setup, maxCharge: totalMaxCharge };
-  }
-
-  let currentSession = session;
-  const results = [];
-  for (let index = 0; index < normalizedCapsules.length; index += 1) {
-    const capsule = normalizedCapsules[index];
-    const publish = capsule.publish;
-    const maxCharge = maxCharges[index];
-    const sessionNonce = BigInt(currentSession.nonce ?? 0n);
-    const partNowSec = Math.floor(Date.now() / 1000);
-    const validUntil = BigInt(Math.min(
-      Number(publish.valid_until ?? partNowSec + 300),
-      Number(currentSession.expires_at ?? partNowSec + 300),
-    ));
-    const sessionPublishHash = await provider.getSessionPublishHash({
-      op: BigInt(publish.publish_kind) === 2n ? 0x900EC906n : 0x686694C6n,
-      owner,
-      sessionId: currentSession.session_id,
-      sessionNonce,
-      validUntil,
-      publishKind: publish.publish_kind,
-      sizeClass: publish.size_class,
-      cryptoSuite: publish.crypto_suite,
-      maxCharge,
-      bodyHash: publish.body_hash,
-      header0: publish.header_0_hash ?? 0n,
-      header1: publish.header_1_hash ?? 0n,
-    }, { vaultAddress: requireVaultAddress() });
-    const boc = buildVaultExternalPublishBoc({
+    const maxCharge = BigInt(canonicalMaxCharge) + surcharge;
+    totalMaxCharge += maxCharge;
+    const messageType = BigInt(publish.publish_kind) === VAULT_PUBLISH_KIND.PUBLIC
+      ? 'PublishPublicFromWallet'
+      : 'PublishPrivateFromWallet';
+    const message = createVaultWalletMessage(messageType, {
+      client_nonce: nextQueryId(),
+      max_charge: maxCharge,
       publish,
-      owner,
-      sessionId: currentSession.session_id,
-      sessionNonce,
-      validUntil,
-      maxCharge,
-      sessionPublishHash,
-      sessionSecretKey: sessionKey.secretKey,
+    }, {
+      vaultAddress: requireVaultAddress(),
+      valueNanotons: maxCharge,
     });
-    const result = await provider.sendExternalMessage(boc, { vaultAddress: requireVaultAddress() });
-    results.push({ capsuleId: capsule.id, boc, result, maxCharge, sessionNonce });
-    if (index < normalizedCapsules.length - 1) {
-      currentSession = await waitForVaultSessionNonceAtLeast(sessionNonce + 1n);
-    }
+    messages.push(message);
+    results.push({ capsuleId: capsule.id, message, maxCharge });
   }
-  globalThis.plathoLastVaultExternalPublish = { capsules: normalizedCapsules.map((capsule) => capsule.id), results };
-  return { status: 'external-publish-sent', results, maxCharge: totalMaxCharge };
+  const transaction = createWalletTransaction(messages);
+  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
+  for (const item of results) item.result = result;
+  globalThis.plathoLastVaultWalletPublish = { capsules: normalizedCapsules.map((capsule) => capsule.id), messages, transaction, result };
+  return { status: 'wallet-publish-sent', results, maxCharge: totalMaxCharge, result };
 }
 
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null) {
@@ -4867,28 +4638,16 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null) {
 }
 
 function publicTextPartsForSend(text) {
-  const parts = splitUtf8ToParts(text, SINGLE_CAPSULE_USEFUL_BYTES);
-  if (parts.length > 1 && !hasAllocatedMessageBudget()) {
-    throw new Error('Message Budget is required for multi-part public posts');
-  }
-  return parts;
+  return splitUtf8ToParts(text, SINGLE_CAPSULE_USEFUL_BYTES);
 }
 
 function privateTextPartsForSend(text) {
-  const parts = splitUtf8ToParts(text, SINGLE_CAPSULE_USEFUL_BYTES);
-  if (parts.length > 1 && !hasAllocatedMessageBudget()) {
-    throw new Error('Message Budget is required for multi-part private messages');
-  }
-  return parts;
+  return splitUtf8ToParts(text, SINGLE_CAPSULE_USEFUL_BYTES);
 }
 
 function imagePartsForSend(attachment, label = 'image') {
   if (!attachment?.bytes?.length) return [];
-  const parts = splitBytesToParts(attachment.bytes, SINGLE_CAPSULE_USEFUL_BYTES);
-  if (parts.length > 0 && !hasAllocatedMessageBudget()) {
-    throw new Error(`Message Budget is required for ${label}`);
-  }
-  return parts;
+  return splitBytesToParts(attachment.bytes, SINGLE_CAPSULE_USEFUL_BYTES);
 }
 
 async function createPrivateComposerCapsules(text, attachment, recipientEntry, threadId) {
@@ -5006,13 +4765,11 @@ async function submitPublicPostThroughVault(draft = null) {
     commentsAllowed: resolvedDraft.commentsAllowed,
   });
   const result = await publishPublicPayloadParts(payloads, `public-${Date.now()}`);
-  if (result?.status === 'external-publish-sent') {
+  if (result?.status === 'wallet-publish-sent') {
     rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, resolvedDraft.attachment);
     setPublicStatus('public publish submitted');
   } else {
-    setPublicStatus(result?.status === 'session-budget-submitted'
-      ? 'budget submitted'
-      : 'budget ready');
+    setPublicStatus('publish ready');
   }
   globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result };
   return result;
@@ -5033,13 +4790,11 @@ async function submitPublicCommentThroughVault(parent, bodyText = null) {
     parent,
   });
   const result = await publishPublicPayloadParts(payloads, `public-comment-${Date.now()}`);
-  if (result?.status === 'external-publish-sent') {
+  if (result?.status === 'wallet-publish-sent') {
     rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachment);
     setPublicStatus('comment submitted');
   } else {
-    setPublicStatus(result?.status === 'session-budget-submitted'
-      ? 'budget submitted'
-      : 'budget ready');
+    setPublicStatus('publish ready');
   }
   globalThis.plathoLastPublicComment = { parent, text, payloads, result };
   return result;
@@ -5068,14 +4823,11 @@ globalThis.plathoVaultTransactions = {
   submitVaultCancelPaymentCheck,
   submitVaultRegisterMessagingKeys,
   submitVaultReplaceMessagingKeys,
-  submitVaultRevokeSession,
-  submitVaultSessionBudget,
   refreshVaultDashboard,
   publishCapsuleThroughVault,
   submitPublicPostThroughVault,
   submitPublicCommentThroughVault,
   syncPrivateCapsulesFromChain,
-  clearVaultSessionKey,
 };
 
 async function resolveVaultChainProvider(explicitProvider) {
@@ -5098,7 +4850,7 @@ async function resolveVaultChainProvider(explicitProvider) {
 async function refreshVaultActivationStatus(options = {}) {
   if (!plathoWallet?.address || !localVaultDraft?.message) {
     setText(vaultRecordStatus, plathoWallet ? 'keys pending' : 'wallet required');
-    refreshComposerBudgetPolicy();
+    refreshComposerPublishPolicy();
     return null;
   }
   try {
@@ -5108,7 +4860,7 @@ async function refreshVaultActivationStatus(options = {}) {
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
       delete globalThis.plathoVaultBinding;
       setText(vaultRecordStatus, 'activation required');
-      refreshComposerBudgetPolicy();
+      refreshComposerPublishPolicy();
       return null;
     }
     const record = await provider.getKeyRecord(user.current_key_id, { vaultAddress: appConfig.vault?.address ?? null });
@@ -5120,14 +4872,14 @@ async function refreshVaultActivationStatus(options = {}) {
     const active = binding.active === true;
     globalThis.plathoVaultBinding = active ? { walletAddress: plathoWallet.address, user, keyRecord: record } : null;
     setText(vaultRecordStatus, active ? 'activated' : 'record mismatch');
-    refreshComposerBudgetPolicy();
+    refreshComposerPublishPolicy();
     return globalThis.plathoVaultBinding;
   } catch (error) {
     delete globalThis.plathoVaultBinding;
     setText(vaultRecordStatus, error instanceof VaultChainProviderUnavailableError
       ? appConfig.vault?.provider?.unavailableStatus ?? 'provider unavailable'
       : 'record blocked');
-    refreshComposerBudgetPolicy();
+    refreshComposerPublishPolicy();
     console.error(error);
     return null;
   }
@@ -5153,7 +4905,7 @@ async function bootCrypto() {
       setText(walletAddressStatus, 'not created');
       localProfileAvatarPointer = null;
       updateKeySuiteUi(preferredSuite);
-      refreshComposerBudgetPolicy();
+      refreshComposerPublishPolicy();
       return null;
     }
     setText(walletAddressStatus, shortAddress(plathoWallet.address));

@@ -64,8 +64,6 @@ describe('Vault TON RPC provider', () => {
               num(-1n),
               num(0n),
               num(0n),
-              num(0n),
-              num(1n),
               num(7n),
             ],
           };
@@ -154,7 +152,7 @@ describe('Vault TON RPC provider', () => {
     });
   });
 
-  it('VAULT-RPC-04B: wraps configured sendBoc endpoint for external session publish', async () => {
+  it('VAULT-RPC-04B: wraps configured sendBoc endpoint for embedded wallet broadcasts', async () => {
     const requests: any[] = [];
     const transport = createTonCenterV3VaultTransport({
       endpoint: 'https://toncenter.example/api/v3/runGetMethod',
@@ -171,9 +169,8 @@ describe('Vault TON RPC provider', () => {
         };
       },
     });
-    const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
 
-    await expect(provider.sendExternalMessage('te6ccgEBAQEAAgAAAA==')).resolves.toMatchObject({ ok: true });
+    await expect(transport.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
 
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe('https://toncenter.example/api/v3/sendBoc');
@@ -186,9 +183,6 @@ describe('Vault TON RPC provider', () => {
     const transport = {
       async runGetMethod(call: { method: string; address: string; stack: any[] }) {
         calls.push(call);
-        if (call.method === 'get_session') {
-          return { stack: [num(-1n), num(0x1234n), num(0x5555n), num(2n), num(1_800_000_000n), num(-1n)] };
-        }
         if (call.method === 'get_receive_intent') {
           return {
             stack: [
@@ -219,8 +213,7 @@ describe('Vault TON RPC provider', () => {
             ],
           };
         }
-        if (call.method === 'get_canonical_session_max_charge') return { stack: [num(58_000_000n)] };
-        if (call.method === 'get_session_publish_hash') return { stack: [num(0x4040n)] };
+        if (call.method === 'get_canonical_publish_charge') return { stack: [num(58_000_000n)] };
         if (call.method === 'get_global') {
           return {
             stack: [
@@ -241,7 +234,6 @@ describe('Vault TON RPC provider', () => {
               num(8n),
               num(9n),
               num(10n),
-              num(11n),
             ],
           };
         }
@@ -250,13 +242,6 @@ describe('Vault TON RPC provider', () => {
     };
     const provider = createVaultTonRpcProvider({ vaultAddress: VAULT, transport });
 
-    await expect(provider.getSession(OWNER)).resolves.toMatchObject({
-      exists: true,
-      session_pubkey: 0x1234n,
-      session_id: 0x5555n,
-      nonce: 2n,
-      active: true,
-    });
     await expect(provider.getReceiveIntent(0x999n)).resolves.toMatchObject({
       exists: true,
       sender_wallet: OWNER,
@@ -272,39 +257,23 @@ describe('Vault TON RPC provider', () => {
       owner_wallet: OWNER,
       amount: 500n,
     });
-    await expect(provider.getCanonicalSessionMaxCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(58_000_000n);
-    await expect(provider.getSessionPublishHash({
-      op: 1n,
-      owner: OWNER,
-      sessionId: 2n,
-      sessionNonce: 3n,
-      validUntil: 4n,
-      publishKind: 1n,
-      sizeClass: 1n,
-      cryptoSuite: 2n,
-      maxCharge: 58_000_000n,
-      bodyHash: 5n,
-      header0: 6n,
-      header1: 7n,
-    })).resolves.toBe(0x4040n);
+    await expect(provider.getCanonicalPublishCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(58_000_000n);
     await expect(provider.getGlobal()).resolves.toMatchObject({
       sealed: true,
       capsule_hub_bound: true,
       user_count: 1n,
-      airdrop_total_allocation_ath: 11n,
+      airdrop_total_allocation_ath: 10n,
     });
 
     expect(calls.map((call) => call.method)).toEqual([
-      'get_session',
       'get_receive_intent',
       'get_receive_intent_id',
       'get_receive_intent_commitment',
       'get_ath_withdrawal_id',
       'get_pending_ath_withdrawal_for',
-      'get_canonical_session_max_charge',
-      'get_session_publish_hash',
+      'get_canonical_publish_charge',
       'get_global',
     ]);
-    expect(decodeTonAddressSliceBoc(calls[0].stack[0].value)).toBe(OWNER);
+    expect(decodeTonAddressSliceBoc(calls[5].stack[0].value)).toBe(OWNER);
   });
 });

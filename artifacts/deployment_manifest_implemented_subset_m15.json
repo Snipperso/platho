@@ -2,9 +2,9 @@
   "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
   "version": 15,
   "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-  "manifest_hash_hex": "a510eb82e98cc5e7d29260ea3f858dde66f4e485a64b6685f7b46cdbd28c7524",
-  "manifest_hash_uint256": "74661515009055645383193531572568278558426866767591839968847233224640647951652",
-  "manifest_cell_hash_hex": "a510eb82e98cc5e7d29260ea3f858dde66f4e485a64b6685f7b46cdbd28c7524",
+  "manifest_hash_hex": "1e18ef2335667590dd1e61fc9e35ddea4b8afaa8aaa9ef344d966161be9c7ce3",
+  "manifest_hash_uint256": "13613440253651389915848177835180131249974076019476218842016273673958155123939",
+  "manifest_cell_hash_hex": "1e18ef2335667590dd1e61fc9e35ddea4b8afaa8aaa9ef344d966161be9c7ce3",
   "addresses": {
     "ath_master": "EQDrIl7OeX2BZzydV1ZjzVYakTFgIHqZhsFFiLn8_PR4DTD6",
     "ath_treasury_owner": "EQA2cSC9Qk1GRw63Y1P0dnfKGZ-ewHKyjV23z1VWnSl5cNbp",
@@ -25,12 +25,12 @@
     "username_registry_initial_ath_wallet_placeholder": "EQDmbkp0-mP5zJtxg1jAc_buyKYD_GqOe-HwumL-5ugZYUpr",
     "genesis_controller_one_shot": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
     "username_registry_official_ath_wallet": "EQAVQHcK2f-EmTGzowA89BpvboXCUVqZ5uQsSweYfDLVOrBG",
-    "vault": "EQB7A7ZX0Pf2kBoq1M1FaqxU-QjjF-EnMBfO--ffTTFAl8BY",
+    "vault": "EQCtXrlUpaFjtUWJ8j-P60xg5lVv4o8tv7GB-TGm0EXTG1y0",
     "vault_ath_master": "EQDrIl7OeX2BZzydV1ZjzVYakTFgIHqZhsFFiLn8_PR4DTD6",
     "vault_initial_controller_slot": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
     "vault_initial_genesis_controller": "EQCjmCusEo1YYl7KASUrXNbmMiHMttAweIruErh6HB13P3w-",
     "vault_initial_capsulehub_placeholder": "EQCY-CYQTcmjZIXdyzhWLkXfTBRU3HdLCDM2A8-PLp9GWvjH",
-    "vault_official_ath_wallet": "EQBPzrlK7RZfZ6DKbzcMb0GKpudw-gEEz074RKo2zRQKlVkE"
+    "vault_official_ath_wallet": "EQAVd3hZG9UCGwEc05ESdvBpH0PYzsg7ejQtM96TTFtbAWAm"
   },
   "code_hashes": {
     "ath_master": "e0af1eba68f1d22b56caee365e75f97fa72014e82f5de107f81de93ef1c93761",
@@ -41,7 +41,7 @@
     "profile_registry": "8a32e95d7396582b6891a4bda773dc29e8218441de23977c11892f8da0286d51",
     "username_nft_item": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
     "username_registry": "fbcede326fe1698a166d9f7b157fd75f6216b5d453c6f8c245b6bec8a824dcbe",
-    "vault": "10dbcfd008e9cf9acbbc3394e4429ea48a2c4d6b287d8564b7d62a9935249496"
+    "vault": "cd171ab27113e42f5d00c7b0668098c4215090a3e312e7eddcbc7acb6ac93554"
   },
   "state_init_hashes": {
     "ath_master": "eb225ece797d81673c9d575663cd561a913160207a9986c14588b9fcfcf4780d",
@@ -53,8 +53,8 @@
     "profile_registry_official_ath_wallet": "e190a4d44df9c97749b4e9fdf15efda873dbafb4801530ceca2f699c58592e2f",
     "username_registry_initial": "11b185e799a512861c38d07a960fd80c756712ed61f9521cf3dab3501475d5df",
     "username_registry_official_ath_wallet": "1540770ad9ff849931b3a3003cf41a6f6e85c2515a99e6e42c4b07987c32d53a",
-    "vault_initial": "7b03b657d0f7f6901a2ad4cd456aac54f908e317e1273017cefbe7df4d314097",
-    "vault_official_ath_wallet": "4fceb94aed165f67a0ca6f370c6f418aa6e770fa0104cf4ef844aa36cd140a95"
+    "vault_initial": "ad5eb954a5a163b54589f23f8feb4c60e6556fe28f2dbfb181f931a6d045d31b",
+    "vault_official_ath_wallet": "157778591bd5021b011cd3911276f0691f43d8cec83b7a342d33de934c5b5b01"
   },
   "constants": {
     "ath_total_supply_atomic": "100000000000000000",

@@ -120,7 +120,6 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/<h2>Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
     expect(html).toMatch(/<h2>Names and ATH<\/h2>[\s\S]*id="mintUsernameButton"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
-    expect(html).toMatch(/id="revokeVaultSessionButton"/);
     expect(html).toMatch(/id="syncMessagesButton"/);
     expect(html).toMatch(/id="publicSyncWindowSelect"/);
     expect(html).toMatch(/id="publicCommentsDefaultSelect"/);
@@ -151,7 +150,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Message \(1024 bytes max\)/);
     expect(html).toMatch(/id="privateComposerCostStatus"/);
     expect(html).toMatch(/id="publicComposerCostStatus"/);
-    expect(html).toMatch(/Price checking\s+Wallet required - Message budget required/);
+    expect(html).toMatch(/Price checking\s+Wallet required/);
     expect(html).toMatch(/id="publicComposer"/);
     expect(html).toMatch(/id="publicComposerCommentsCheckbox"/);
     expect(html).toMatch(/<textarea id="publicMessageInput"[\s\S]*id="publicComposerCommentsCheckbox"/);
