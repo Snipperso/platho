@@ -201,12 +201,45 @@ Wallet required</div>
 
           <div class="balance-grid" id="balanceGrid"></div>
 
+          <form class="vault-move-card" id="vaultMoveForm">
+            <section class="vault-move-pocket" aria-label="Move from">
+              <div>
+                <span>From</span>
+                <strong id="vaultMoveFromLabel">Wallet</strong>
+                <small id="vaultMoveFromBalance">Balance -</small>
+              </div>
+              <div class="vault-move-amount">
+                <input id="vaultMoveAmountInput" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+                <select id="vaultMoveAssetSelect" aria-label="Asset">
+                  <option value="TON">TON</option>
+                  <option value="ATH">ATH</option>
+                </select>
+                <button id="vaultMoveMaxButton" type="button">MAX</button>
+              </div>
+            </section>
+
+            <button class="vault-move-switch" id="vaultMoveDirectionButton" type="button" aria-label="Switch direction" title="Switch direction">
+              <span class="icon icon-down"></span>
+              <span class="icon icon-up"></span>
+            </button>
+
+            <section class="vault-move-pocket" aria-label="Move to">
+              <div>
+                <span>To</span>
+                <strong id="vaultMoveToLabel">Vault</strong>
+                <small id="vaultMoveToBalance">Balance -</small>
+              </div>
+            </section>
+
+            <button class="vault-move-submit" id="vaultMoveSubmitButton" type="submit">Move to Vault</button>
+          </form>
+
+          <div class="action-grid" id="actionGrid"></div>
+
           <div class="vault-pocket-note">
             <strong>Wallet and Vault are separate for security.</strong>
             <span>Your wallet pays gas and holds funds outside the app. Vault holds only the funds you move there for encrypted checks, payments, and ATH discounts.</span>
           </div>
-
-          <div class="action-grid" id="actionGrid"></div>
 
           <div class="ledger" id="ledgerRows"></div>
         </section>

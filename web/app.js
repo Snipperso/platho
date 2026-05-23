@@ -197,6 +197,16 @@ const publicCancelCommentButton = document.querySelector('#publicCancelCommentBu
 const vaultSubtitle = document.querySelector('#vaultSubtitle');
 const refreshVaultButton = document.querySelector('#refreshVaultButton');
 const balanceGrid = document.querySelector('#balanceGrid');
+const vaultMoveForm = document.querySelector('#vaultMoveForm');
+const vaultMoveFromLabel = document.querySelector('#vaultMoveFromLabel');
+const vaultMoveToLabel = document.querySelector('#vaultMoveToLabel');
+const vaultMoveFromBalance = document.querySelector('#vaultMoveFromBalance');
+const vaultMoveToBalance = document.querySelector('#vaultMoveToBalance');
+const vaultMoveAmountInput = document.querySelector('#vaultMoveAmountInput');
+const vaultMoveAssetSelect = document.querySelector('#vaultMoveAssetSelect');
+const vaultMoveMaxButton = document.querySelector('#vaultMoveMaxButton');
+const vaultMoveDirectionButton = document.querySelector('#vaultMoveDirectionButton');
+const vaultMoveSubmitButton = document.querySelector('#vaultMoveSubmitButton');
 const actionGrid = document.querySelector('#actionGrid');
 const ledgerRows = document.querySelector('#ledgerRows');
 const profileHandle = document.querySelector('#profileHandle');
@@ -233,6 +243,11 @@ let privateImageAttachment = null;
 let publicImageAttachment = null;
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
+let vaultMoveDirection = 'to-vault';
+let vaultPocketState = {
+  wallet: { ton_balance: null, ath_balance: null },
+  vault: { ton_balance: null, ath_balance: null },
+};
 
 const KEY_SUITE_PREF_KEY = 'platho.crypto.suite.v1';
 const PLATHO_WALLET_STORAGE_KEY = 'platho.wallet.seed.v1';
@@ -255,6 +270,7 @@ const PLATO_PUBLIC_POST_FEE_NANOTONS = 5_000_000n;
 const CAPSULEHUB_PRIVATE_STANDARD_FIXED_CHARGE_NANOTONS = 3_000_000n + 1_000_000n + 4_000_000n + 30_000_000n;
 const CAPSULEHUB_PRIVATE_LONG_TERM_FIXED_CHARGE_NANOTONS = 4_000_000n + 1_000_000n + 4_000_000n + 30_000_000n;
 const CAPSULEHUB_PUBLIC_FIXED_CHARGE_NANOTONS = 3_000_000n + 1_000_000n + 1_000_000n + 30_000_000n;
+const VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS = 50_000_000n;
 const DEFAULT_IMAGE_COMPRESSION_MODE_ID = 'good';
 const IMAGE_COMPRESSION_MODES = Object.freeze({
   low: Object.freeze({ id: 'low', label: 'Low', maxBytes: 8 * 1024 }),
@@ -2762,6 +2778,7 @@ function refreshMessagingControls() {
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
     button.disabled = !plathoWallet;
   }
+  refreshVaultMoveWidget();
   refreshComposerCostStatus();
 }
 
@@ -2998,6 +3015,49 @@ refreshVaultButton?.addEventListener('click', async () => {
     await refreshVaultActivationStatus();
   } finally {
     refreshVaultButton.disabled = false;
+  }
+});
+
+vaultMoveAssetSelect?.addEventListener('change', () => {
+  refreshVaultMoveWidget();
+});
+
+vaultMoveDirectionButton?.addEventListener('click', () => {
+  vaultMoveDirection = vaultMoveDirection === 'to-vault' ? 'from-vault' : 'to-vault';
+  refreshVaultMoveWidget();
+});
+
+vaultMoveMaxButton?.addEventListener('click', () => {
+  const max = vaultMoveMaxAmount();
+  if (max === null) return;
+  vaultMoveAmountInput.value = formatVaultMoveAmountInput(max);
+  refreshVaultMoveWidget();
+});
+
+vaultMoveForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!plathoWallet) return;
+  const asset = vaultMoveAsset();
+  const raw = vaultMoveAmountInput?.value ?? '';
+  try {
+    vaultMoveSubmitButton.disabled = true;
+    const amount = asset === 'ATH' ? parseAthAmountAtomic(raw) : parseTonAmountNanotons(raw);
+    if (asset === 'TON' && vaultMoveDirection === 'to-vault') {
+      await submitVaultDepositTonAmount(amount);
+    } else if (asset === 'TON') {
+      await submitVaultWithdrawTonAmount(amount);
+    } else if (vaultMoveDirection === 'to-vault') {
+      await submitVaultDepositAthAmount(amount);
+    } else {
+      await submitVaultWithdrawAthAmount(amount);
+    }
+    if (vaultMoveAmountInput) vaultMoveAmountInput.value = '';
+    await refreshVaultDashboard();
+  } catch (error) {
+    setVaultStatus('move blocked');
+    console.error(error);
+  } finally {
+    refreshVaultMoveWidget();
   }
 });
 
@@ -3544,6 +3604,11 @@ function formatAthAtomic(value) {
   return formatDecimalAmount(value, 9, 4);
 }
 
+function formatVaultMoveAmountInput(units) {
+  if (units === null || units === undefined) return '';
+  return formatDecimalAmount(units, 9, 9);
+}
+
 function normalizeUsernameInput(input) {
   const raw = String(input ?? '').trim().toLowerCase();
   const username = raw.endsWith('.ath') ? raw.slice(0, -4) : raw;
@@ -3991,6 +4056,16 @@ async function loadConnectedWalletBalances() {
 }
 
 function renderVaultPocketCards(walletBalances, vaultUser) {
+  vaultPocketState = {
+    wallet: {
+      ton_balance: walletBalances?.ton_balance ?? null,
+      ath_balance: walletBalances?.ath_balance ?? null,
+    },
+    vault: {
+      ton_balance: vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ton_balance) : null,
+      ath_balance: vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ath_balance) : null,
+    },
+  };
   renderVaultCards([
     {
       label: 'Wallet TON',
@@ -4013,11 +4088,82 @@ function renderVaultPocketCards(walletBalances, vaultUser) {
       caption: 'inside Vault',
     },
   ]);
+  refreshVaultMoveWidget();
+}
+
+function vaultMoveAsset() {
+  return vaultMoveAssetSelect?.value === 'ATH' ? 'ATH' : 'TON';
+}
+
+function vaultMoveSourcePocket() {
+  return vaultMoveDirection === 'to-vault' ? 'wallet' : 'vault';
+}
+
+function vaultMoveTargetPocket() {
+  return vaultMoveDirection === 'to-vault' ? 'vault' : 'wallet';
+}
+
+function vaultMoveBalance(pocket, asset) {
+  return asset === 'ATH'
+    ? vaultPocketState[pocket]?.ath_balance
+    : vaultPocketState[pocket]?.ton_balance;
+}
+
+function vaultMoveFormattedBalance(pocket, asset) {
+  const balance = vaultMoveBalance(pocket, asset);
+  const formatted = asset === 'ATH'
+    ? optionalBalanceText(balance, formatAthAtomic)
+    : optionalBalanceText(balance, formatTonNanotons);
+  return `Balance ${formatted}`;
+}
+
+function vaultMoveMaxAmount() {
+  const asset = vaultMoveAsset();
+  const source = vaultMoveSourcePocket();
+  const balance = vaultMoveBalance(source, asset);
+  if (balance === null || balance === undefined) return null;
+  if (asset === 'TON' && source === 'wallet') {
+    return balance > VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
+      ? balance - VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
+      : 0n;
+  }
+  return balance;
+}
+
+function refreshVaultMoveWidget() {
+  const asset = vaultMoveAsset();
+  const source = vaultMoveSourcePocket();
+  const target = vaultMoveTargetPocket();
+  const sourceLabel = source === 'wallet' ? 'Wallet' : 'Vault';
+  const targetLabel = target === 'wallet' ? 'Wallet' : 'Vault';
+  setText(vaultMoveFromLabel, sourceLabel);
+  setText(vaultMoveToLabel, targetLabel);
+  setText(vaultMoveFromBalance, vaultMoveFormattedBalance(source, asset));
+  setText(vaultMoveToBalance, vaultMoveFormattedBalance(target, asset));
+  if (vaultMoveSubmitButton) {
+    vaultMoveSubmitButton.textContent = vaultMoveDirection === 'to-vault'
+      ? `Move ${asset} to Vault`
+      : `Move ${asset} to Wallet`;
+    vaultMoveSubmitButton.disabled = !plathoWallet;
+  }
+  if (vaultMoveForm) {
+    vaultMoveForm.dataset.direction = vaultMoveDirection;
+    vaultMoveForm.dataset.asset = asset;
+  }
+  if (vaultMoveAmountInput) vaultMoveAmountInput.disabled = !plathoWallet;
+  if (vaultMoveAssetSelect) vaultMoveAssetSelect.disabled = !plathoWallet;
+  if (vaultMoveMaxButton) vaultMoveMaxButton.disabled = !plathoWallet;
+  if (vaultMoveDirectionButton) vaultMoveDirectionButton.disabled = !plathoWallet;
 }
 
 async function refreshVaultDashboard() {
   if (!plathoWallet?.address) {
+    vaultPocketState = {
+      wallet: { ton_balance: null, ath_balance: null },
+      vault: { ton_balance: null, ath_balance: null },
+    };
     renderVaultCards(appConfig.ui?.vaultCards ?? []);
+    refreshVaultMoveWidget();
     setVaultStatus('wallet required');
     return null;
   }
@@ -4188,6 +4334,10 @@ async function submitUsernameRegistryMessage(type, params, options = {}) {
 async function submitVaultDepositTon() {
   const amount = await requestTonAmountNanotons('Move TON to Vault', 'Moves TON from your connected Platho wallet into the Vault pocket.');
   if (amount === null) return null;
+  return submitVaultDepositTonAmount(amount);
+}
+
+async function submitVaultDepositTonAmount(amount) {
   const user = await loadConnectedVaultUser();
   setVaultStatus('moving TON to Vault');
   const result = await submitVaultMessage('DepositTon', { amount }, {
@@ -4200,6 +4350,10 @@ async function submitVaultDepositTon() {
 async function submitVaultWithdrawTon() {
   const amount = await requestTonAmountNanotons('Move TON from Vault', 'Moves TON from the Vault pocket back to your connected Platho wallet.');
   if (amount === null) return null;
+  return submitVaultWithdrawTonAmount(amount);
+}
+
+async function submitVaultWithdrawTonAmount(amount) {
   setVaultStatus('moving TON from Vault');
   const result = await submitVaultMessage('WithdrawTon', {
     amount,
@@ -4212,6 +4366,10 @@ async function submitVaultWithdrawTon() {
 async function submitVaultDepositAth() {
   const amount = await requestAthAmountAtomic('Move ATH to Vault', 'Moves ATH from your connected Platho wallet into the Vault pocket.');
   if (amount === null) return null;
+  return submitVaultDepositAthAmount(amount);
+}
+
+async function submitVaultDepositAthAmount(amount) {
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const vault = requireBasechainAddress(requireVaultAddress(), 'Vault');
   setVaultStatus('moving ATH to Vault');
@@ -4230,6 +4388,10 @@ async function submitVaultDepositAth() {
 async function submitVaultWithdrawAth() {
   const amount = await requestAthAmountAtomic('Move ATH from Vault', 'Moves ATH from the Vault pocket back to your connected Platho wallet.');
   if (amount === null) return null;
+  return submitVaultWithdrawAthAmount(amount);
+}
+
+async function submitVaultWithdrawAthAmount(amount) {
   setVaultStatus('moving ATH from Vault');
   const result = await submitVaultMessage('WithdrawAth', {
     query_id: nextQueryId(),
