@@ -260,15 +260,18 @@ function cellBitsDescriptor(bitLength) {
 }
 
 function flattenCellTree(root) {
-  const cells = [];
-  const indexes = new WeakMap();
+  const postorder = [];
+  const seen = new WeakSet();
   const visit = (cell) => {
-    if (indexes.has(cell)) return;
-    indexes.set(cell, cells.length);
-    cells.push(cell);
-    for (const ref of cell.refs) visit(ref);
+    if (seen.has(cell)) return;
+    seen.add(cell);
+    for (let index = cell.refs.length - 1; index >= 0; index -= 1) visit(cell.refs[index]);
+    postorder.push(cell);
   };
   visit(root);
+  const cells = postorder.reverse();
+  const indexes = new WeakMap();
+  cells.forEach((cell, index) => indexes.set(cell, index));
   return { cells, indexes };
 }
 

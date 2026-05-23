@@ -14,6 +14,7 @@ import {
   verifySignedPublicKeyBundle,
 } from './crypto/platho-crypto.mjs';
 import {
+  PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
   deriveMessagingIdentityFromWallet,
   exportPlathoWalletSeed,
@@ -2272,7 +2273,7 @@ async function readStoredPlathoWallet() {
     if (!raw) return null;
     const record = JSON.parse(raw);
     if (record?.kind !== 'platho.wallet.seed.v1' || typeof record.seed !== 'string') return null;
-    return importPlathoWallet(record.seed);
+    return importPlathoWallet(record.seed, plathoWalletNetworkOptions());
   } catch (error) {
     console.error(error);
     return null;
@@ -2286,6 +2287,8 @@ async function writeStoredPlathoWallet(wallet) {
       version: 1,
       seed: exportPlathoWalletSeed(wallet),
       address: wallet.address,
+      walletKind: wallet.kind,
+      networkGlobalId: wallet.networkGlobalId,
       createdAt: Date.now(),
     }));
   } catch {
@@ -2344,6 +2347,15 @@ function updateKeySuiteUi(suite) {
 function currentVaultUserSource() {
   return globalThis.plathoVaultBinding?.user
     ?? null;
+}
+
+function plathoWalletNetworkOptions() {
+  const chain = String(appConfig.network?.chain ?? '').toLowerCase();
+  return {
+    networkGlobalId: chain === 'testnet'
+      ? PLATHO_WALLET_NETWORK_GLOBAL_IDS.TESTNET
+      : PLATHO_WALLET_NETWORK_GLOBAL_IDS.MAINNET,
+  };
 }
 
 function nonNegativeBigInt(value, fallback = 0n) {
@@ -3420,7 +3432,7 @@ composer?.addEventListener('submit', async (event) => {
 createWalletButton?.addEventListener('click', async () => {
   try {
     createWalletButton.disabled = true;
-    const wallet = await setPlathoWallet(await createPlathoWallet());
+    const wallet = await setPlathoWallet(await createPlathoWallet(plathoWalletNetworkOptions()));
     setText(walletAddressStatus, shortAddress(wallet.address));
     setText(identityName, shortAddress(wallet.address));
     setText(identitySubtitle, 'Wallet created');
@@ -3438,7 +3450,7 @@ importWalletButton?.addEventListener('click', async () => {
   if (!seed) return;
   try {
     importWalletButton.disabled = true;
-    const wallet = await setPlathoWallet(await importPlathoWallet(seed));
+    const wallet = await setPlathoWallet(await importPlathoWallet(seed, plathoWalletNetworkOptions()));
     setText(walletAddressStatus, shortAddress(wallet.address));
     setText(identityName, shortAddress(wallet.address));
     setText(identitySubtitle, 'Wallet imported');
