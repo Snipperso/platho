@@ -94,12 +94,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       { label: 'Vault TON', value: '-', caption: 'inside Vault' },
       { label: 'Vault ATH', value: '-', caption: 'inside Vault' },
     ],
-    vaultActions: [
-      { id: 'vault-deposit-ton', label: 'Move TON to Vault', icon: 'down' },
-      { id: 'vault-withdraw-ton', label: 'Move TON from Vault', icon: 'up' },
-      { id: 'vault-deposit-ath', label: 'Move ATH to Vault', icon: 'down' },
-      { id: 'vault-withdraw-ath', label: 'Move ATH from Vault', icon: 'up' },
-    ],
+    vaultActions: [],
     ledgerRows: [],
   },
   preview: {
