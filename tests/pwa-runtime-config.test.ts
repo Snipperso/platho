@@ -64,12 +64,17 @@ describe('PWA runtime config guard', () => {
       subtitle: PLATHO_APP_CONFIG.ui.vaultSubtitle,
     });
 
-    expect(PLATHO_APP_CONFIG.ui.vaultCards.map((card) => card.label)).toEqual(['TON', 'ATH']);
+    expect(PLATHO_APP_CONFIG.ui.vaultCards.map((card) => card.label)).toEqual([
+      'Wallet TON',
+      'Wallet ATH',
+      'Vault TON',
+      'Vault ATH',
+    ]);
     expect(PLATHO_APP_CONFIG.ui.vaultActions.map((action) => action.label)).toEqual([
-      'Deposit TON',
-      'Withdraw TON',
-      'Deposit ATH',
-      'Withdraw ATH',
+      'Move TON to Vault',
+      'Move TON from Vault',
+      'Move ATH to Vault',
+      'Move ATH from Vault',
     ]);
     expect(PLATHO_APP_CONFIG.ui.ledgerRows).toEqual([]);
     expect(vaultText).not.toMatch(/M20T|readiness|faucet|testgiver/i);
@@ -131,8 +136,9 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="flushUsernameRefundButton"/);
     expect(html).toMatch(/Claim failed mint refund/);
     expect(html).not.toMatch(/Claim username refund/);
-    expect(html).toMatch(/id="transferAthButton"/);
+    expect(html).not.toMatch(/id="transferAthButton"/);
     expect(html).toMatch(/id="burnAthButton"/);
+    expect(html).toMatch(/Wallet and Vault are separate for security/);
     expect(html).not.toMatch(/Wallet runtime|Key auth|Vault record|Replay store|Local state/);
     expect(app).not.toMatch(/window\.prompt|window\.alert/);
     expect(html).not.toMatch(/Messaging key backup|exportMessagingKeyBackupButton|importMessagingKeyBackupButton|messagingKeyBackupInput/);

@@ -91,7 +91,7 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
 } from './pwa-contract-transactions.mjs?v=3';
-import { createAthMasterTonRpcProvider } from './ath-ton-rpc-provider.mjs';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs';
 import { createCapsuleHubTonRpcProvider } from './capsulehub-ton-rpc-provider.mjs';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs';
 import { createTonDnsProvider } from './ton-dns-provider.mjs';
@@ -168,7 +168,6 @@ const setAvatarButton = document.querySelector('#setAvatarButton');
 const profileAvatarInput = document.querySelector('#profileAvatarInput');
 const mintUsernameButton = document.querySelector('#mintUsernameButton');
 const flushUsernameRefundButton = document.querySelector('#flushUsernameRefundButton');
-const transferAthButton = document.querySelector('#transferAthButton');
 const burnAthButton = document.querySelector('#burnAthButton');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
 const brandNetworkLabel = document.querySelector('#brandNetworkLabel');
@@ -2759,7 +2758,6 @@ function refreshMessagingControls() {
   if (publicMessageInput) publicMessageInput.disabled = !plathoWallet;
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet;
   publicComposer?.querySelector?.('.send-button')?.toggleAttribute('disabled', !plathoWallet);
-  if (transferAthButton) transferAthButton.disabled = !plathoWallet;
   if (burnAthButton) burnAthButton.disabled = !plathoWallet;
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
     button.disabled = !plathoWallet;
@@ -3044,18 +3042,6 @@ flushUsernameRefundButton?.addEventListener('click', async () => {
     console.error(error);
   } finally {
     flushUsernameRefundButton.disabled = false;
-  }
-});
-
-transferAthButton?.addEventListener('click', async () => {
-  try {
-    transferAthButton.disabled = true;
-    await submitAthWalletTransfer();
-  } catch (error) {
-    setText(identitySubtitle, 'ATH transfer blocked');
-    console.error(error);
-  } finally {
-    transferAthButton.disabled = false;
   }
 });
 
@@ -3619,54 +3605,6 @@ function requestAthAmountAtomic(title, hint) {
   });
 }
 
-async function requestTransferDetails({ title, hint, symbol, parser, defaultRecipient }) {
-  let feedback = hint;
-  let tone = 'muted';
-  let amountValue = '';
-  let recipientValue = defaultRecipient;
-  while (true) {
-    const result = await openActionDialog({
-      title,
-      hint: feedback,
-      tone,
-      submitLabel: 'Review transaction',
-      fields: [
-        {
-          id: 'amount',
-          label: `${symbol} amount`,
-          inputMode: 'decimal',
-          placeholder: '0.00',
-          autocomplete: 'off',
-          value: amountValue,
-        },
-        {
-          id: 'recipient',
-          label: 'Recipient wallet',
-          value: recipientValue,
-          autocomplete: 'off',
-        },
-      ],
-      summary: (values) => [
-        { label: 'Asset', value: symbol },
-        { label: 'Amount', value: values.amount?.trim() || 'not set' },
-        { label: 'Recipient', value: shortAddress(values.recipient) },
-      ],
-    });
-    if (!result) return null;
-    amountValue = result.amount;
-    recipientValue = result.recipient;
-    try {
-      return {
-        amount: parser(result.amount),
-        recipient: requireBasechainAddress(result.recipient, 'Recipient'),
-      };
-    } catch (error) {
-      feedback = error.message;
-      tone = 'error';
-    }
-  }
-}
-
 async function requestWalletSeedImport() {
   const result = await openActionDialog({
     title: 'Import wallet',
@@ -3983,18 +3921,116 @@ async function loadConnectedVaultUser() {
   });
 }
 
+function optionalBalanceText(value, formatter) {
+  return value === null || value === undefined ? '-' : formatter(value);
+}
+
+function extractTonWalletBalance(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'bigint') return value >= 0n ? value : null;
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return BigInt(Math.trunc(value));
+  if (typeof value === 'string' && /^[0-9]+$/.test(value.trim())) return BigInt(value.trim());
+  if (typeof value === 'object') {
+    return extractTonWalletBalance(
+      value.balance
+      ?? value.ton_balance
+      ?? value.tonBalance
+      ?? value.account?.balance
+      ?? value.result?.balance
+      ?? value.result?.account?.balance,
+    );
+  }
+  return null;
+}
+
+async function loadConnectedTonWalletBalance() {
+  const address = requirePlathoWalletAddress();
+  const candidates = [
+    globalThis.plathoWalletBalanceProvider,
+    globalThis.plathoTonWalletProvider,
+    globalThis.plathoTonRpcTransport,
+  ].filter(Boolean);
+  for (const provider of candidates) {
+    for (const method of ['getTonBalance', 'getWalletBalance', 'getAccountBalance', 'getBalance']) {
+      if (typeof provider?.[method] !== 'function') continue;
+      try {
+        const balance = extractTonWalletBalance(await provider[method](address));
+        if (balance !== null) return balance;
+      } catch {
+        // Try the next provider shape.
+      }
+    }
+    if (typeof provider?.getAccount === 'function') {
+      try {
+        const balance = extractTonWalletBalance(await provider.getAccount(address));
+        if (balance !== null) return balance;
+      } catch {
+        // Try the next provider.
+      }
+    }
+  }
+  return null;
+}
+
+async function loadConnectedAthWalletBalance() {
+  const athWalletAddress = await loadConnectedAthWalletAddress();
+  const provider = createAthWalletTonRpcProvider({ athWalletAddress });
+  const data = await provider.getWalletData({ address: athWalletAddress });
+  return nonNegativeBigInt(data.balance);
+}
+
+async function loadConnectedWalletBalances() {
+  const [tonResult, athResult] = await Promise.allSettled([
+    loadConnectedTonWalletBalance(),
+    loadConnectedAthWalletBalance(),
+  ]);
+  return {
+    ton_balance: tonResult.status === 'fulfilled' ? tonResult.value : null,
+    ath_balance: athResult.status === 'fulfilled' ? athResult.value : null,
+  };
+}
+
+function renderVaultPocketCards(walletBalances, vaultUser) {
+  renderVaultCards([
+    {
+      label: 'Wallet TON',
+      value: optionalBalanceText(walletBalances?.ton_balance, formatTonNanotons),
+      caption: 'connected wallet',
+    },
+    {
+      label: 'Wallet ATH',
+      value: optionalBalanceText(walletBalances?.ath_balance, formatAthAtomic),
+      caption: 'connected wallet',
+    },
+    {
+      label: 'Vault TON',
+      value: vaultUser?.exists === true ? formatTonNanotons(vaultUser.ton_balance) : '-',
+      caption: 'inside Vault',
+    },
+    {
+      label: 'Vault ATH',
+      value: vaultUser?.exists === true ? formatAthAtomic(vaultUser.ath_balance) : '-',
+      caption: 'inside Vault',
+    },
+  ]);
+}
+
 async function refreshVaultDashboard() {
   if (!plathoWallet?.address) {
     renderVaultCards(appConfig.ui?.vaultCards ?? []);
     setVaultStatus('wallet required');
     return null;
   }
+  let user = null;
+  let userError = null;
+  const walletBalances = await loadConnectedWalletBalances();
   try {
-    const user = await loadConnectedVaultUser();
-    renderVaultCards([
-      { label: 'TON', value: formatTonNanotons(user.ton_balance), caption: 'Vault ledger' },
-      { label: 'ATH', value: formatAthAtomic(user.ath_balance), caption: 'Vault ledger' },
-    ]);
+    user = await loadConnectedVaultUser();
+  } catch (error) {
+    userError = error;
+  }
+  renderVaultPocketCards(walletBalances, user);
+  if (user) {
     setVaultStatus(user.exists === true ? 'synced' : 'activation required');
     globalThis.plathoVaultBinding = {
       ...(globalThis.plathoVaultBinding ?? {}),
@@ -4003,11 +4039,10 @@ async function refreshVaultDashboard() {
     };
     refreshComposerPublishPolicy();
     return user;
-  } catch (error) {
-    setVaultStatus('sync blocked');
-    console.error(error);
-    return null;
   }
+  setVaultStatus('sync blocked');
+  if (userError) console.error(userError);
+  return null;
 }
 
 async function resolveAthMasterProvider() {
@@ -4151,38 +4186,35 @@ async function submitUsernameRegistryMessage(type, params, options = {}) {
 }
 
 async function submitVaultDepositTon() {
-  const amount = await requestTonAmountNanotons('Deposit TON', 'Adds TON to your Vault ledger.');
+  const amount = await requestTonAmountNanotons('Move TON to Vault', 'Moves TON from your connected Platho wallet into the Vault pocket.');
   if (amount === null) return null;
   const user = await loadConnectedVaultUser();
-  setVaultStatus('deposit signing');
+  setVaultStatus('moving TON to Vault');
   const result = await submitVaultMessage('DepositTon', { amount }, {
     userExists: user.exists === true,
   });
-  setVaultStatus('deposit submitted');
+  setVaultStatus('move submitted');
   return result;
 }
 
 async function submitVaultWithdrawTon() {
-  const details = await requestTransferDetails({
-    title: 'Withdraw TON',
-    hint: 'Sends TON from your Vault ledger to a basechain wallet.',
-    symbol: 'TON',
-    parser: parseTonAmountNanotons,
-    defaultRecipient: requirePlathoWalletAddress(),
+  const amount = await requestTonAmountNanotons('Move TON from Vault', 'Moves TON from the Vault pocket back to your connected Platho wallet.');
+  if (amount === null) return null;
+  setVaultStatus('moving TON from Vault');
+  const result = await submitVaultMessage('WithdrawTon', {
+    amount,
+    recipient: requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet'),
   });
-  if (!details) return null;
-  setVaultStatus('withdraw signing');
-  const result = await submitVaultMessage('WithdrawTon', details);
-  setVaultStatus('withdraw submitted');
+  setVaultStatus('move submitted');
   return result;
 }
 
 async function submitVaultDepositAth() {
-  const amount = await requestAthAmountAtomic('Deposit ATH', 'Moves ATH from your wallet into the Vault ledger.');
+  const amount = await requestAthAmountAtomic('Move ATH to Vault', 'Moves ATH from your connected Platho wallet into the Vault pocket.');
   if (amount === null) return null;
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const vault = requireBasechainAddress(requireVaultAddress(), 'Vault');
-  setVaultStatus('ATH deposit signing');
+  setVaultStatus('moving ATH to Vault');
   const result = await submitAthWalletMessage('ATHTransferRequestWithNotify', {
     query_id: nextQueryId(),
     amount,
@@ -4191,26 +4223,20 @@ async function submitVaultDepositAth() {
     notify_destination: vault,
     notify_value: 30_000_000n,
   });
-  setVaultStatus('ATH deposit submitted');
+  setVaultStatus('move submitted');
   return result;
 }
 
 async function submitVaultWithdrawAth() {
-  const details = await requestTransferDetails({
-    title: 'Withdraw ATH',
-    hint: 'Sends ATH from your Vault ledger to a basechain wallet.',
-    symbol: 'ATH',
-    parser: parseAthAmountAtomic,
-    defaultRecipient: requirePlathoWalletAddress(),
-  });
-  if (!details) return null;
-  setVaultStatus('ATH withdraw signing');
+  const amount = await requestAthAmountAtomic('Move ATH from Vault', 'Moves ATH from the Vault pocket back to your connected Platho wallet.');
+  if (amount === null) return null;
+  setVaultStatus('moving ATH from Vault');
   const result = await submitVaultMessage('WithdrawAth', {
     query_id: nextQueryId(),
-    amount: details.amount,
-    recipient: details.recipient,
+    amount,
+    recipient: requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet'),
   });
-  setVaultStatus('ATH withdraw submitted');
+  setVaultStatus('move submitted');
   return result;
 }
 
@@ -4252,27 +4278,6 @@ async function submitUsernameRefundFlush() {
     owner_wallet: owner,
   });
   setText(identitySubtitle, 'refund submitted');
-  return result;
-}
-
-async function submitAthWalletTransfer() {
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const details = await requestTransferDetails({
-    title: 'Transfer ATH',
-    hint: 'Sends ATH from your external ATH wallet to another basechain wallet.',
-    symbol: 'ATH',
-    parser: parseAthAmountAtomic,
-    defaultRecipient: '',
-  });
-  if (!details) return null;
-  setText(identitySubtitle, 'ATH transfer signing');
-  const result = await submitAthWalletMessage('ATHTransferRequest', {
-    query_id: nextQueryId(),
-    amount: details.amount,
-    recipient: details.recipient,
-    response_destination: owner,
-  });
-  setText(identitySubtitle, 'ATH transfer submitted');
   return result;
 }
 
@@ -4830,7 +4835,6 @@ globalThis.plathoVaultTransactions = {
   submitVaultWithdrawAth,
   submitUsernameMint,
   submitUsernameRefundFlush,
-  submitAthWalletTransfer,
   submitAthWalletBurn,
   submitProfileAvatarUpdate,
   submitCreatePaymentCheck,
