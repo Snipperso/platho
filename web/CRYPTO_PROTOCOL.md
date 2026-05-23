@@ -85,7 +85,7 @@ public image post, `kind = 4` is a public image comment, and `kind = 5` is publi
 `media_format = 1` for WebP image/avatar parts. Public post, image post, and avatar headers also carry
 `profile_version:uint32` and `avatar_hash:uint256`; zero means no avatar pointer. Long public text or image data is reconstructed from multiple 1024-byte entries
 without reducing the useful body budget. The official PWA compresses selected images to WebP targets of 8 KiB
-(`standard`) or 16 KiB (`improved`) before splitting. There is no edit/delete/reaction/moderation or counter layer in v1.
+(`low`), 16 KiB (`medium`), 32 KiB (`good`, default), or 64 KiB (`maximum`) before splitting. There is no edit/delete/reaction/moderation or counter layer in v1.
 
 Wallet avatars are paid profile updates, not off-chain assets. The avatar bytes are published as `kind = 5` public
 CapsuleHub entries, then `ProfileRegistry` records the authenticated wallet pointer:

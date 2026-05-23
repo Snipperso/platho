@@ -114,8 +114,10 @@
                         <div class="composer-attachment" id="privateAttachmentPanel" hidden>
               <span id="privateAttachmentLabel">No image</span>
               <select id="privateImageModeSelect" aria-label="Image compression">
-                <option value="standard">Standard 8 KiB</option>
-                <option value="improved">Improved 16 KiB</option>
+                <option value="low">Low 8 KiB</option>
+                <option value="medium">Medium 16 KiB</option>
+                <option value="good" selected>Good 32 KiB</option>
+                <option value="maximum">Maximum 64 KiB</option>
               </select>
               <button id="privateClearImageButton" type="button">Remove</button>
             </div>
@@ -159,8 +161,10 @@ Wallet required</div>
                 </button>
                 <input id="publicImageInput" type="file" accept="image/*" hidden>
                 <select id="publicImageModeSelect" aria-label="Image compression">
-                  <option value="standard">Standard 8 KiB</option>
-                  <option value="improved">Improved 16 KiB</option>
+                  <option value="low">Low 8 KiB</option>
+                  <option value="medium">Medium 16 KiB</option>
+                  <option value="good" selected>Good 32 KiB</option>
+                  <option value="maximum">Maximum 64 KiB</option>
                 </select>
               </div>
               <div class="composer-attachment" id="publicAttachmentPanel" hidden>

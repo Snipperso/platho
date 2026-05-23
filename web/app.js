@@ -256,9 +256,12 @@ const PLATO_PUBLIC_POST_FEE_NANOTONS = 5_000_000n;
 const CAPSULEHUB_PRIVATE_STANDARD_FIXED_CHARGE_NANOTONS = 3_000_000n + 1_000_000n + 4_000_000n + 30_000_000n;
 const CAPSULEHUB_PRIVATE_LONG_TERM_FIXED_CHARGE_NANOTONS = 4_000_000n + 1_000_000n + 4_000_000n + 30_000_000n;
 const CAPSULEHUB_PUBLIC_FIXED_CHARGE_NANOTONS = 3_000_000n + 1_000_000n + 1_000_000n + 30_000_000n;
+const DEFAULT_IMAGE_COMPRESSION_MODE_ID = 'good';
 const IMAGE_COMPRESSION_MODES = Object.freeze({
-  standard: Object.freeze({ id: 'standard', label: 'Standard', maxBytes: 8 * 1024 }),
-  improved: Object.freeze({ id: 'improved', label: 'Improved', maxBytes: 16 * 1024 }),
+  low: Object.freeze({ id: 'low', label: 'Low', maxBytes: 8 * 1024 }),
+  medium: Object.freeze({ id: 'medium', label: 'Medium', maxBytes: 16 * 1024 }),
+  good: Object.freeze({ id: 'good', label: 'Good', maxBytes: 32 * 1024 }),
+  maximum: Object.freeze({ id: 'maximum', label: 'Maximum', maxBytes: 64 * 1024 }),
 });
 
 function localStorageOrNull() {
@@ -2447,7 +2450,7 @@ function composerPartCount(text, maxTextBytes = SINGLE_CAPSULE_USEFUL_BYTES) {
 }
 
 function imageCompressionMode(modeId) {
-  return IMAGE_COMPRESSION_MODES[modeId] ?? IMAGE_COMPRESSION_MODES.standard;
+  return IMAGE_COMPRESSION_MODES[modeId] ?? IMAGE_COMPRESSION_MODES[DEFAULT_IMAGE_COMPRESSION_MODE_ID];
 }
 
 function imageAttachmentPartCount(attachment) {
@@ -3262,13 +3265,13 @@ publicImageButton?.addEventListener('click', () => {
 privateImageInput?.addEventListener('change', async () => {
   const file = privateImageInput.files?.[0];
   if (!file) return;
-  await setImageAttachment('private', file, privateImageModeSelect?.value ?? 'standard');
+  await setImageAttachment('private', file, privateImageModeSelect?.value ?? DEFAULT_IMAGE_COMPRESSION_MODE_ID);
 });
 
 publicImageInput?.addEventListener('change', async () => {
   const file = publicImageInput.files?.[0];
   if (!file) return;
-  await setImageAttachment('public', file, publicImageModeSelect?.value ?? 'standard');
+  await setImageAttachment('public', file, publicImageModeSelect?.value ?? DEFAULT_IMAGE_COMPRESSION_MODE_ID);
 });
 
 privateImageModeSelect?.addEventListener('change', () => {
@@ -3296,7 +3299,7 @@ profileAvatarInput?.addEventListener('change', async () => {
   if (!file) return;
   try {
     setAvatarButton?.toggleAttribute('disabled', true);
-    await submitProfileAvatarUpdate(file, publicImageModeSelect?.value ?? 'standard');
+    await submitProfileAvatarUpdate(file, publicImageModeSelect?.value ?? DEFAULT_IMAGE_COMPRESSION_MODE_ID);
   } catch (error) {
     setText(identitySubtitle, 'avatar blocked');
     console.error(error);
@@ -4287,7 +4290,7 @@ async function submitAthWalletBurn() {
   return result;
 }
 
-async function submitProfileAvatarUpdate(file, modeId = 'standard') {
+async function submitProfileAvatarUpdate(file, modeId = DEFAULT_IMAGE_COMPRESSION_MODE_ID) {
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
   if (!file) return null;

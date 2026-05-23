@@ -169,8 +169,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/resolvePublicChannelIdentity/);
     expect(html).toMatch(/id="privateImageButton"/);
     expect(html).toMatch(/id="publicImageButton"/);
-    expect(html).toMatch(/Standard 8 KiB/);
-    expect(html).toMatch(/Improved 16 KiB/);
+    expect(html).toMatch(/Low 8 KiB/);
+    expect(html).toMatch(/Medium 16 KiB/);
+    expect(html).toMatch(/Good 32 KiB/);
+    expect(html).toMatch(/Maximum 64 KiB/);
   });
 
   it('PWA-CONFIG-01E: public publishing uses the shared composer and explicit feed controls', () => {
