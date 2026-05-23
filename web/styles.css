@@ -1121,10 +1121,28 @@ button.feed-item:hover {
   color: var(--amber);
 }
 
+.vault-pocket-note {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.vault-pocket-note strong {
+  color: var(--text);
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 10px;
+  margin-top: 10px;
 }
 
 .action-grid button,
