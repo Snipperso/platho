@@ -85,7 +85,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       { type: 'platho_nft', value: 'platho.ath', label: 'platho.ath' },
       { type: 'ton_dns', value: 'platho.ton', label: 'platho.ton' },
     ],
-    walletLabel: 'v4r2 testnet',
+    walletLabel: 'v5r1 testnet',
     networkLabel: 'testnet',
     localStateLabel: 'device only',
     vaultCards: [

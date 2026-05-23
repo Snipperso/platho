@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { Address, Cell, toNano } from '@ton/core';
 import { Blockchain } from '@ton/sandbox';
-import { WalletContractV4 } from '@ton/ton';
+import { WalletContractV5R1 } from '@ton/ton';
 import {
+  PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
   buildPlathoWalletExternalBoc,
   createPlathoWallet,
   deriveMessagingIdentityFromWallet,
   exportPlathoWalletSeed,
   importPlathoWallet,
+  sendPlathoWalletTransaction,
 } from '../web/platho-wallet.mjs';
 import {
   CRYPTO_SUITES,
@@ -22,12 +24,12 @@ import {
 const seed = Uint8Array.from({ length: 32 }, (_, index) => index);
 
 describe('embedded Platho wallet', () => {
-  it('PLATHO-WALLET-01: derives the same v4r2 wallet address as @ton/ton', async () => {
+  it('PLATHO-WALLET-01: derives the same v5r1 wallet address as @ton/ton', async () => {
     const wallet = await createPlathoWallet({ seed });
-    const reference = WalletContractV4.create({
+    const reference = WalletContractV5R1.create({
       workchain: wallet.workchain,
       publicKey: Buffer.from(wallet.walletPublicKey),
-      walletId: wallet.walletId,
+      walletId: wallet.walletIdSpec,
     });
 
     expect(wallet.address).toBe(reference.address.toRawString());
@@ -62,7 +64,7 @@ describe('embedded Platho wallet', () => {
     expect(built.seqno).toBe(0);
   });
 
-  it('PLATHO-WALLET-04: sends a real sandbox v4r2 wallet transfer', async () => {
+  it('PLATHO-WALLET-04: sends a real sandbox v5r1 wallet transfer', async () => {
     const blockchain = await Blockchain.create();
     const wallet = await createPlathoWallet({ seed });
     const funder = await blockchain.treasury('platho-wallet-funder');
@@ -87,6 +89,70 @@ describe('embedded Platho wallet', () => {
     const after = await recipient.getBalance();
 
     expect(after - before).toBeGreaterThan(toNano('0.099'));
+  });
+
+  it('PLATHO-WALLET-04B: sends more than four internal messages in one v5r1 transfer', async () => {
+    const blockchain = await Blockchain.create();
+    const wallet = await createPlathoWallet({ seed });
+    const funder = await blockchain.treasury('platho-wallet-multi-funder');
+    const recipients = await Promise.all(
+      Array.from({ length: 9 }, (_, index) => blockchain.treasury(`platho-wallet-multi-recipient-${index}`)),
+    );
+
+    await funder.send({
+      to: Address.parseRaw(wallet.address),
+      value: toNano('2'),
+      bounce: false,
+    });
+
+    const before = await Promise.all(recipients.map((recipient) => recipient.getBalance()));
+    const built = await buildPlathoWalletExternalBoc(wallet, recipients.map((recipient) => ({
+      address: recipient.address.toRawString(),
+      amount: toNano('0.01').toString(),
+      payload: null,
+    })), {
+      seqno: 0,
+      timeout: Math.floor(Date.now() / 1000) + 300,
+    });
+    await blockchain.sendMessage(Cell.fromBoc(Buffer.from(built.boc, 'base64'))[0]);
+    const after = await Promise.all(recipients.map((recipient) => recipient.getBalance()));
+
+    expect(built.seqno).toBe(0);
+    for (let index = 0; index < recipients.length; index += 1) {
+      expect(after[index] - before[index]).toBeGreaterThan(toNano('0.009'));
+    }
+  });
+
+  it('PLATHO-WALLET-04C: splits more than 255 capsules into sequential v5r1 transfers', async () => {
+    const wallet = await createPlathoWallet({ seed });
+    let seqno = 42;
+    const sent: any[] = [];
+    const messages = Array.from({ length: PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER + 5 }, (_, index) => ({
+      address: `0:${(index + 1).toString(16).padStart(64, '0')}`,
+      amount: '1000000',
+      payload: null,
+    }));
+    const transport = {
+      async runGetMethod() {
+        return { stack: [{ type: 'num', value: `0x${seqno.toString(16)}` }] };
+      },
+      async sendBoc(input: any) {
+        sent.push(input);
+        seqno += 1;
+        return { ok: true, seqno };
+      },
+    };
+
+    const result = await sendPlathoWalletTransaction(wallet, { messages, validUntil: 1_700_000_300 }, {
+      transport,
+      seqnoPollMs: 0,
+      seqnoPollAttempts: 2,
+    });
+
+    expect(sent).toHaveLength(2);
+    expect(result.batchCount).toBe(2);
+    expect(result.batches.map((batch: any) => batch.seqno)).toEqual([42, 43]);
+    expect(result.batches.map((batch: any) => batch.messageCount)).toEqual([255, 5]);
   });
 
   it('PLATHO-WALLET-05: encrypts to a recipient Vault key record derived from their wallet seed', async () => {
