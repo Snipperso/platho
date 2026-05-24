@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, Dictionary, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
@@ -10,6 +10,7 @@ import {
   AthTransferNotification,
   RegisterMessagingKeys,
   PublishPrivateFromWallet,
+  storeVault$Data as storeVaultData,
 } from '../build/Vault/Vault_Vault';
 import {
   CapsuleHub,
@@ -33,6 +34,7 @@ const SUITE_CLASSICAL = 1n;
 const PLATO_PRIVATE_STANDARD_FEE_TON = 5_000_000n;
 const ATH_FULL_DISCOUNT_AMOUNT = 10_000_000_000_000n;
 const AIRDROP_TOTAL = 30_000_000_000_000_000n;
+const AIRDROP_DISCOUNT_UNLOCK_REMAINING = 15_000_000_000_000_000n;
 const AIRDROP_REWARD_PER_MESSAGE = 10_000_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = 4_000_000n;
 
@@ -60,7 +62,7 @@ async function deriveAthWallet(owner: Address, athMasterAddress: Address): Promi
   return contractAddress(owner.workChain, walletInit);
 }
 
-async function deployBoundPair() {
+async function deployBoundPair(options: { airdropRemaining?: bigint } = {}) {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
 
@@ -126,6 +128,39 @@ async function deployBoundPair() {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as CapsuleSeal);
+
+  if (options.airdropRemaining !== undefined) {
+    const balance = (await blockchain.getContract(vaultAddress)).balance;
+    const data = beginCell().storeBit(true).store(storeVaultData({
+      $$type: 'Vault$Data',
+      vault_ath_wallet_address: officialAthWallet,
+      ath_master_address: deployer.address,
+      capsule_hub_address: capsuleAddress,
+      capsule_hub_bound: true,
+      sealed: true,
+      deployment_manifest_hash: MANIFEST_HASH,
+      genesis_config_hash: options.airdropRemaining,
+      users: Dictionary.empty(),
+      key_records: Dictionary.empty(),
+      receive_intents: Dictionary.empty(),
+      processed_ath_deposits: Dictionary.empty(),
+      pending_ath_withdrawals: Dictionary.empty(),
+      pending_publishes: Dictionary.empty(),
+      user_count: 0n,
+      key_record_count: 0n,
+      receive_intent_count: 0n,
+      processed_ath_deposit_count: 0n,
+      pending_ath_withdrawal_count: 0n,
+      pending_publish_count: 0n,
+    })).endCell();
+    await blockchain.setShardAccount(vaultAddress, createShardAccount({
+      address: vaultAddress,
+      code: vaultInit.code,
+      data,
+      balance,
+      workchain: vaultAddress.workChain,
+    }));
+  }
 
   return { blockchain, deployer, vault, capsule, feeAccumulator, officialAthWallet, user };
 }
@@ -219,8 +254,10 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE_TON);
   });
 
-  it('VAULT-CAPSULE-DUST-01: discounted Vault fee dust flushes from CapsuleHub into real FeeAccumulator', async () => {
-    const { blockchain, deployer, vault, capsule, feeAccumulator, officialAthWallet, user } = await deployBoundPair();
+  it('VAULT-CAPSULE-DUST-01: after 15% distribution, discounted Vault fee dust flushes from CapsuleHub into real FeeAccumulator', async () => {
+    const { blockchain, deployer, vault, capsule, feeAccumulator, officialAthWallet, user } = await deployBoundPair({
+      airdropRemaining: AIRDROP_DISCOUNT_UNLOCK_REMAINING,
+    });
     await registerKeys(vault, user);
     await vault.send(blockchain.sender(officialAthWallet), { value: toNano('0.03') }, {
       $$type: 'AthTransferNotification',
@@ -260,7 +297,7 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
     expect(vg.airdrop_distributed_ath).toBe(beforeGlobal.airdrop_distributed_ath);
   });
 
-  it('VAULT-M20X-01: activity airdrop accumulates per successful finalized paid publish without a per-wallet cap gate', async () => {
+  it('VAULT-M20X-01: before 15% distribution, activity rewards do not reduce the next message fee', async () => {
     const { vault, user } = await deployBoundPair();
     await registerKeys(vault, user);
 
@@ -272,11 +309,24 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
     expect(globalAfter.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
 
     const maxCharge2 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    expect(maxCharge2).toBeLessThan(maxCharge1);
+    expect(maxCharge2).toBe(maxCharge1);
     await publishPrivate(vault, user, 1n, maxCharge2);
     userAfter = await vault.getGetUser(user.address);
     globalAfter = await vault.getGetGlobal();
     expect(userAfter.ath_balance).toBe(AIRDROP_REWARD_PER_MESSAGE * 2n);
     expect(globalAfter.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE * 2n);
+  });
+
+  it('VAULT-M20X-02: after 15% distribution, activity ATH reduces the canonical message fee', async () => {
+    const { vault, user } = await deployBoundPair({
+      airdropRemaining: AIRDROP_DISCOUNT_UNLOCK_REMAINING,
+    });
+    await registerKeys(vault, user);
+
+    const maxCharge1 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    await publishPrivate(vault, user, 0n, maxCharge1);
+
+    const maxCharge2 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    expect(maxCharge2).toBeLessThan(maxCharge1);
   });
 });

@@ -167,6 +167,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/openPrivateThreadForWallet/);
     expect(app).toMatch(/Add public channel/);
     expect(app).toMatch(/ATH discount/);
+    expect(app).toMatch(/locked until 15%/);
+    expect(app).toMatch(/messageDiscountUnlocked/);
     expect(app).toMatch(/Price/);
     expect(app).toMatch(/Hold/);
     expect(app).toMatch(/networkFeeSurchargeNanotons/);

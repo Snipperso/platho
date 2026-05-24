@@ -898,6 +898,16 @@ PROGRAM{
     64 MODPOW2#
   }>
   $Vault$_fun_discountedFee PROCREF:<{
+    16 s() PUSH
+    IFNOTJMP:<{
+      NIP
+    }>
+    s14 PUSH
+    15000000000000000 PUSHINT
+    GREATER
+    IFJMP:<{
+      NIP
+    }>
     19 s() 20 s() XCHG
     18 s() 20 s() XCHG
     17 s() 20 s() XCHG

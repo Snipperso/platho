@@ -74,10 +74,11 @@ The remaining `15,000,000 ATH` activity airdrop allocation continues after pool 
 
 Before the official ATH pool launch, users can still accumulate ATH through paid messaging and use the internal Vault ATH balance for protocol utility, including:
 
-- protocol fee discounts;
 - username purchases.
 
 This creates ATH ownership through real protocol usage before market trading begins.
+
+Message protocol-fee discounts unlock only after approximately `15,000,000 ATH` has been distributed through Vault activity rewards. Before that threshold, message publish fees use the full protocol fee so early protocol TON can bootstrap liquidity / treasury instead of being immediately discounted away.
 
 ## Vault implementation constants
 

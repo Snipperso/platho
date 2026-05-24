@@ -21,6 +21,7 @@
 - Final token distribution updated: community activity airdrop 30%, founder allocation 5%, no separate early-user / launch reserve.
 - Official ATH pool launch target added: after approximately 15,000,000 ATH has been distributed through Vault activity rewards.
 - FeeAccumulator bootstrap split added: protocol TON goes 100% to liquidity bootstrap / treasury until the post-15% pool-launch gate enables buyback split.
+- Message ATH discounts are also locked until the same 15,000,000 ATH distribution gate.
 
 - Vault now credits 10 ATH to the publish owner after authenticated `CapsuleHubPublishAck` for a valid existing `PendingPublish`.
 - Vault signature/publish-id domain now uses `deployment_manifest_hash` as the sealed canonical domain.

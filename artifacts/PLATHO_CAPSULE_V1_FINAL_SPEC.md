@@ -143,7 +143,9 @@ ask for a wallet-confirmed Vault publish transaction for the single capsule, but
 Vault -> CapsuleHub. CapsuleHub has no direct user publish ABI in final v1.
 
 `protocol_fee_paid` exists only on Vault -> CapsuleHub publish messages, because Vault is the contract that knows the
-sender's ATH discount state. This keeps public channels and private messages on the same discount path.
+sender's ATH discount state. This keeps public channels and private messages on the same discount path. The discount
+path is locked until Vault activity rewards have distributed 15,000,000 ATH; before that gate, Vault pays the full
+message protocol fee.
 
 ## Header 0
 

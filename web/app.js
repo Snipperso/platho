@@ -246,11 +246,6 @@ let publicImageAttachment = null;
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
 let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
-let vaultPocketState = {
-  wallet: { ton_balance: null, ath_balance: null },
-  vault: { ton_balance: null, ath_balance: null },
-};
-
 const KEY_SUITE_PREF_KEY = 'platho.crypto.suite.v1';
 const PLATHO_WALLET_STORAGE_KEY = 'platho.wallet.seed.v1';
 const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
@@ -265,6 +260,8 @@ const PROFILE_AVATAR_FALLBACK_SCAN_LIMIT = 400;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 20;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 1500;
 const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
+const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 30_000_000_000_000_000n;
+const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 15_000_000_000_000_000n;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS = 6_000_000n;
 const PLATO_PRIVATE_STANDARD_FEE_NANOTONS = 5_000_000n;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
@@ -280,6 +277,14 @@ const IMAGE_COMPRESSION_MODES = Object.freeze({
   good: Object.freeze({ id: 'good', label: 'Good', maxBytes: 32 * 1024 }),
   maximum: Object.freeze({ id: 'maximum', label: 'Maximum', maxBytes: 64 * 1024 }),
 });
+let vaultPocketState = {
+  wallet: { ton_balance: null, ath_balance: null },
+  vault: { ton_balance: null, ath_balance: null },
+};
+let vaultProtocolState = {
+  airdrop_remaining_ath: null,
+  airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+};
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
@@ -2405,7 +2410,14 @@ function currentNetworkFeeSurchargeNanotons() {
   return networkFeeSurchargeNanotons(currentNetworkFeeEstimateNanotons(), appConfig.messaging?.pricing ?? {});
 }
 
+function messageDiscountUnlocked() {
+  const remaining = vaultProtocolState?.airdrop_remaining_ath;
+  if (remaining === null || remaining === undefined) return false;
+  return nonNegativeBigInt(remaining) <= VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC;
+}
+
 function athDiscountBps() {
+  if (!messageDiscountUnlocked()) return 0n;
   const athBalance = currentAthBalanceAtomic();
   if (athBalance >= ATH_FULL_DISCOUNT_AMOUNT_ATOMIC) return 10_000n;
   return (athBalance * 10_000n) / ATH_FULL_DISCOUNT_AMOUNT_ATOMIC;
@@ -2423,6 +2435,7 @@ function formatDiscountPercent(bps = athDiscountBps()) {
 
 function discountedProtocolFeeNanotons(fullFee) {
   const fee = nonNegativeBigInt(fullFee);
+  if (!messageDiscountUnlocked()) return fee;
   const athBalance = currentAthBalanceAtomic();
   if (athBalance >= ATH_FULL_DISCOUNT_AMOUNT_ATOMIC) return 0n;
   const remaining = ATH_FULL_DISCOUNT_AMOUNT_ATOMIC - athBalance;
@@ -2511,7 +2524,7 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null) 
     statusParts.push('Ready');
   }
   return {
-    text: `Price ${formatTonNanotons(price)} TON - Hold ${formatTonNanotons(hold)} TON - ATH discount ${formatDiscountPercent()}\n${statusParts.join(' - ')}`,
+    text: `Price ${formatTonNanotons(price)} TON - Hold ${formatTonNanotons(hold)} TON - ATH discount ${formatDiscountPercent()}${messageDiscountUnlocked() ? '' : ' (locked until 15%)'}\n${statusParts.join(' - ')}`,
     state: plathoWallet ? 'ready' : 'short',
     parts,
   };
@@ -3989,6 +4002,14 @@ async function loadConnectedVaultUser() {
   });
 }
 
+async function loadConnectedVaultGlobal() {
+  const provider = await resolveVaultChainProvider();
+  if (!provider?.getGlobal) throw new Error('Vault chain provider is not configured');
+  return provider.getGlobal({
+    vaultAddress: requireVaultAddress(),
+  });
+}
+
 function optionalBalanceText(value, formatter) {
   return value === null || value === undefined ? '-' : formatter(value);
 }
@@ -4144,20 +4165,41 @@ async function refreshVaultDashboard() {
       wallet: { ton_balance: null, ath_balance: null },
       vault: { ton_balance: null, ath_balance: null },
     };
+    vaultProtocolState = {
+      airdrop_remaining_ath: null,
+      airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+    };
     renderVaultCards(appConfig.ui?.vaultCards ?? []);
     refreshVaultMoveWidget();
+    refreshComposerCostStatus();
     setVaultStatus('wallet required');
     return null;
   }
   let user = null;
+  let global = null;
   let userError = null;
-  const walletBalances = await loadConnectedWalletBalances();
-  try {
-    user = await loadConnectedVaultUser();
-  } catch (error) {
-    userError = error;
+  const [walletBalancesResult, userResult, globalResult] = await Promise.allSettled([
+    loadConnectedWalletBalances(),
+    loadConnectedVaultUser(),
+    loadConnectedVaultGlobal(),
+  ]);
+  const walletBalances = walletBalancesResult.status === 'fulfilled'
+    ? walletBalancesResult.value
+    : { ton_balance: null, ath_balance: null };
+  if (userResult.status === 'fulfilled') {
+    user = userResult.value;
+  } else {
+    userError = userResult.reason;
   }
+  if (globalResult.status === 'fulfilled') {
+    global = globalResult.value;
+  }
+  vaultProtocolState = {
+    airdrop_remaining_ath: global?.airdrop_remaining_ath ?? null,
+    airdrop_total_allocation_ath: global?.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+  };
   renderVaultPocketCards(walletBalances, user);
+  refreshComposerCostStatus();
   if (user) {
     setVaultStatus(user.exists === true ? 'synced' : 'activation required');
     globalThis.plathoVaultBinding = {
@@ -5019,7 +5061,16 @@ async function refreshVaultActivationStatus(options = {}) {
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
-    const user = await provider.getUser(plathoWallet.address, { vaultAddress: appConfig.vault?.address ?? null });
+    const [user, global] = await Promise.all([
+      provider.getUser(plathoWallet.address, { vaultAddress: appConfig.vault?.address ?? null }),
+      provider.getGlobal
+        ? provider.getGlobal({ vaultAddress: appConfig.vault?.address ?? null }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    vaultProtocolState = {
+      airdrop_remaining_ath: global?.airdrop_remaining_ath ?? vaultProtocolState.airdrop_remaining_ath ?? null,
+      airdrop_total_allocation_ath: global?.airdrop_total_allocation_ath ?? vaultProtocolState.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+    };
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
       delete globalThis.plathoVaultBinding;
       setText(vaultRecordStatus, 'activation required');
