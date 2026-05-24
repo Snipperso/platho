@@ -1,6 +1,6 @@
 // Platho v1 Vault milestone 1 implementation.
-// Scope: UserState, TON deposit/withdraw, wallet-funded publish, KeyRecord/key_generation lifecycle.
-// Includes wallet publish to CapsuleHub with PendingPublish ACK/bounce recovery.
+// Scope: UserState, TON deposit/withdraw, Vault-funded publish, KeyRecord/key_generation lifecycle.
+// Includes signed publish to CapsuleHub with PendingPublish ACK/bounce recovery.
 // Includes pre-seal official ATH wallet binding to avoid self-address StateInit circularity.
 // No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 
@@ -39,8 +39,6 @@ const UINT32_MAX: Int = 4294967295;
 const ATH_DEPOSIT_ID_DOMAIN: Int = 0x41445049; // "ADPI"
 const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
 const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
-const OP_PUBLISH_PRIVATE_BY_WALLET: Int = 0x686694C6;
-const OP_PUBLISH_PUBLIC_BY_WALLET: Int = 0x900EC906;
 const PUBLISH_KIND_PRIVATE: Int = 1;
 const PUBLISH_KIND_PUBLIC: Int = 2;
 const SIZE_CLASS_STANDARD: Int = 1;
@@ -134,26 +132,16 @@ message(0x32289374) CancelReceiveIntent {
     intent_id: Int as uint256;
 }
 
-message(0x686694C6) PublishPrivateFromWallet {
-    client_nonce: Int as uint64;
-    max_charge: Int as uint128;
-    size_class: Int as uint8;
-    crypto_suite: Int as uint8;
-    header_0_hash: Int as uint256;
-    header_1_hash: Int as uint256;
-    body_hash: Int as uint256;
-    header_0: Cell;
-    header_1: Cell;
-    body: Cell;
+message(0x7E1F5031) PublishPrivateFromVaultBalance {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
 }
 
-message(0x900EC906) PublishPublicFromWallet {
-    client_nonce: Int as uint64;
-    max_charge: Int as uint128;
-    header_hash: Int as uint256;
-    body_hash: Int as uint256;
-    header: Cell;
-    body: Cell;
+message(0x7E1F5032) PublishPublicFromVaultBalance {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
 }
 
 message(0xA4F862C0) PublishPrivateFromVault {
@@ -209,6 +197,7 @@ struct PendingAthWithdrawal {
 struct PendingPublish {
     owner_wallet: Address;
     tombstone: Bool;
+    refund_to_vault: Bool;
     nonce: Int as uint64;
     publish_kind: Int as uint8;
     body_hash: Int as uint256;
@@ -246,6 +235,8 @@ struct UserState {
     ton_balance: Int as uint128;
     ath_balance: Int as uint128;
     current_key_id: Int as uint256;
+    current_sign_pubkey: Int as uint256;
+    publish_nonce: Int as uint64;
 }
 
 
@@ -282,6 +273,7 @@ struct VaultUserView {
     ton_balance: Int;
     ath_balance: Int;
     current_key_id: Int;
+    publish_nonce: Int;
 }
 
 struct VaultPendingAthWithdrawalView {
@@ -381,7 +373,9 @@ contract Vault {
         return UserState {
             ton_balance: 0,
             ath_balance: 0,
-            current_key_id: 0
+            current_key_id: 0,
+            current_sign_pubkey: 0,
+            publish_nonce: 0
         };
     }
 
@@ -438,9 +432,8 @@ contract Vault {
         return ((fullFee * remaining) + ATH_FULL_DISCOUNT_AMOUNT - 1) / ATH_FULL_DISCOUNT_AMOUNT;
     }
 
-    fun isPublishProfileValid(op: Int, publishKind: Int, sizeClass: Int, cryptoSuite: Int, header0: Int, header1: Int): Bool {
-        if (op == OP_PUBLISH_PRIVATE_BY_WALLET) {
-            if (publishKind != PUBLISH_KIND_PRIVATE) { return false; }
+    fun isPublishProfileValid(publishKind: Int, sizeClass: Int, cryptoSuite: Int, header0: Int, header1: Int): Bool {
+        if (publishKind == PUBLISH_KIND_PRIVATE) {
             if (header0 == 0) { return false; }
             if (header1 == 0) { return false; }
             if (sizeClass == SIZE_CLASS_STANDARD) {
@@ -451,8 +444,7 @@ contract Vault {
             }
             return false;
         }
-        if (op == OP_PUBLISH_PUBLIC_BY_WALLET) {
-            if (publishKind != PUBLISH_KIND_PUBLIC) { return false; }
+        if (publishKind == PUBLISH_KIND_PUBLIC) {
             if (sizeClass != SIZE_CLASS_STANDARD) { return false; }
             if (cryptoSuite != CRYPTO_SUITE_PUBLIC_NONE) { return false; }
             if (header0 == 0) { return false; }
@@ -557,7 +549,23 @@ contract Vault {
     }
 
     fun refundPendingPublish(pending: PendingPublish, amount: Int) {
-        self.refundPublishValue(pending.owner_wallet, pending.refundable_amount, amount);
+        if (!pending.refund_to_vault) {
+            self.refundPublishValue(pending.owner_wallet, pending.refundable_amount, amount);
+            return;
+        }
+        let refundAmount: Int = 0;
+        if (amount > VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE) {
+            refundAmount = amount - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE;
+        }
+        if (refundAmount > pending.refundable_amount) {
+            refundAmount = pending.refundable_amount;
+        }
+        if (refundAmount <= 0) {
+            return;
+        }
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        user.ton_balance += refundAmount;
+        self.users.set(pending.owner_wallet, user);
     }
 
     fun refundPendingAthWithdrawalTon(pending: PendingAthWithdrawal, amount: Int) {
@@ -954,6 +962,7 @@ contract Vault {
         });
         self.key_record_count += 1;
         user.current_key_id = keyId;
+        user.current_sign_pubkey = msg.sign_pubkey;
         self.users.set(sender(), user);
     }
 
@@ -1000,6 +1009,7 @@ contract Vault {
         });
         self.key_record_count += 1;
         user.current_key_id = newKeyId;
+        user.current_sign_pubkey = msg.sign_pubkey;
         self.users.set(sender(), user);
     }
 
@@ -1088,37 +1098,70 @@ contract Vault {
         self.receive_intent_count -= 1;
     }
 
-
-    receive(msg: PublishPrivateFromWallet) {
+    external(msg: PublishPrivateFromVaultBalance) {
         self.requireSealed();
-        throwUnless(16410, self.isBasechainAddress(sender()));
-        let userOpt: UserState? = self.users.get(sender());
-        throwUnless(16411, userOpt != null);
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16451, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16412, user.current_key_id != 0);
-        throwUnless(16413, self.isPublishProfileValid(OP_PUBLISH_PRIVATE_BY_WALLET, PUBLISH_KIND_PRIVATE, msg.size_class, msg.crypto_suite, msg.header_0_hash, msg.header_1_hash));
-        throwUnless(16414, msg.header_0.hash() == msg.header_0_hash);
-        throwUnless(16415, msg.header_1.hash() == msg.header_1_hash);
-        throwUnless(16416, msg.body.hash() == msg.body_hash);
+        throwUnless(16454, user.current_sign_pubkey != 0);
+        throwUnless(16457, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
 
-        let expectedMax: Int = self.canonicalPublishMaxCharge(sender(), PUBLISH_KIND_PRIVATE, msg.size_class, msg.crypto_suite);
-        throwUnless(16417, msg.max_charge >= expectedMax);
-        throwUnless(16418, context().value >= msg.max_charge);
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedOwner: Address = signedPayload.loadAddress();
+        let clientNonce: Int = signedPayload.loadUint(64);
+        let maxCharge: Int = signedPayload.loadUint(128);
+        let payloadCell: Cell = signedPayload.loadRef();
+        throwUnless(16468, signedPayload.bits() == 0);
+        throwUnless(16469, signedPayload.refs() == 0);
+        throwUnless(16470, signedOwner == msg.owner_wallet);
+        throwUnless(16453, clientNonce == user.publish_nonce);
+        throwUnless(16462, maxCharge >= VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        throwUnless(16463, user.ton_balance >= maxCharge);
 
-        let protocolFee: Int = self.protocolFeePaid(sender(), PUBLISH_KIND_PRIVATE, msg.size_class, msg.crypto_suite);
-        let callValue: Int = self.capsulehubCallValue(msg.max_charge);
-        let publishId: Int = self.computePublishId(sender(), msg.client_nonce, msg.body_hash, PUBLISH_KIND_PRIVATE);
-        throwUnless(16419, publishId != 0);
+        acceptMessage();
+
+        user.ton_balance -= maxCharge;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        let payload: Slice = payloadCell.beginParse();
+        let sizeClass: Int = payload.loadUint(8);
+        let cryptoSuite: Int = payload.loadUint(8);
+        let header0Hash: Int = payload.loadUint(256);
+        let header1Hash: Int = payload.loadUint(256);
+        let bodyHash: Int = payload.loadUint(256);
+        let header0: Cell = payload.loadRef();
+        let header1: Cell = payload.loadRef();
+        let body: Cell = payload.loadRef();
+        throwUnless(16466, payload.bits() == 0);
+        throwUnless(16467, payload.refs() == 0);
+
+        throwUnless(16458, self.isPublishProfileValid(PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite, header0Hash, header1Hash));
+        throwUnless(16459, header0.hash() == header0Hash);
+        throwUnless(16460, header1.hash() == header1Hash);
+        throwUnless(16461, body.hash() == bodyHash);
+
+        let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
+        throwUnless(16462, maxCharge >= expectedMax);
+
+        let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
+        let callValue: Int = self.capsulehubCallValue(maxCharge);
+        let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PRIVATE);
+        throwUnless(16464, publishId != 0);
         let bounceId: Int = self.computePublishBounceId(publishId);
         let bounceTag: Int = self.computePublishBounceTag(publishId);
-        throwUnless(16420, !self.pending_publishes.exists(bounceId));
+        throwUnless(16465, !self.pending_publishes.exists(bounceId));
+        throwUnless(16450, self.isBasechainAddress(msg.owner_wallet));
+        throwUnless(16452, user.current_key_id != 0);
 
         self.pending_publishes.set(bounceId, PendingPublish {
-            owner_wallet: sender(),
+            owner_wallet: msg.owner_wallet,
             tombstone: false,
-            nonce: msg.client_nonce,
+            refund_to_vault: true,
+            nonce: clientNonce,
             publish_kind: PUBLISH_KIND_PRIVATE,
-            body_hash: msg.body_hash,
+            body_hash: bodyHash,
             refundable_amount: callValue,
             created_at: now()
         });
@@ -1133,48 +1176,78 @@ contract Vault {
                 bounce_id: bounceId,
                 bounce_tag: bounceTag,
                 publish_id: publishId,
-                size_class: msg.size_class,
-                crypto_suite: msg.crypto_suite,
-                header_0_hash: msg.header_0_hash,
-                header_1_hash: msg.header_1_hash,
-                body_hash: msg.body_hash,
-                header_0: msg.header_0,
-                header_1: msg.header_1,
-                body: msg.body,
+                size_class: sizeClass,
+                crypto_suite: cryptoSuite,
+                header_0_hash: header0Hash,
+                header_1_hash: header1Hash,
+                body_hash: bodyHash,
+                header_0: header0,
+                header_1: header1,
+                body: body,
                 protocol_fee_paid: protocolFee
             }.toCell()
         });
     }
 
-    receive(msg: PublishPublicFromWallet) {
+    external(msg: PublishPublicFromVaultBalance) {
         self.requireSealed();
-        throwUnless(16430, self.isBasechainAddress(sender()));
-        let userOpt: UserState? = self.users.get(sender());
-        throwUnless(16431, userOpt != null);
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16481, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16432, user.current_key_id != 0);
-        throwUnless(16433, self.isPublishProfileValid(OP_PUBLISH_PUBLIC_BY_WALLET, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE, msg.header_hash, 0));
-        throwUnless(16434, msg.header.hash() == msg.header_hash);
-        throwUnless(16435, msg.body.hash() == msg.body_hash);
+        throwUnless(16484, user.current_sign_pubkey != 0);
+        throwUnless(16487, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
 
-        let expectedMax: Int = self.canonicalPublishMaxCharge(sender(), PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
-        throwUnless(16436, msg.max_charge >= expectedMax);
-        throwUnless(16437, context().value >= msg.max_charge);
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedOwner: Address = signedPayload.loadAddress();
+        let clientNonce: Int = signedPayload.loadUint(64);
+        let maxCharge: Int = signedPayload.loadUint(128);
+        let payloadCell: Cell = signedPayload.loadRef();
+        throwUnless(16497, signedPayload.bits() == 0);
+        throwUnless(16498, signedPayload.refs() == 0);
+        throwUnless(16499, signedOwner == msg.owner_wallet);
+        throwUnless(16483, clientNonce == user.publish_nonce);
+        throwUnless(16491, maxCharge >= VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        throwUnless(16492, user.ton_balance >= maxCharge);
 
-        let protocolFee: Int = self.protocolFeePaid(sender(), PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
-        let callValue: Int = self.capsulehubCallValue(msg.max_charge);
-        let publishId: Int = self.computePublishId(sender(), msg.client_nonce, msg.body_hash, PUBLISH_KIND_PUBLIC);
-        throwUnless(16438, publishId != 0);
+        acceptMessage();
+
+        user.ton_balance -= maxCharge;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        let payload: Slice = payloadCell.beginParse();
+        let headerHash: Int = payload.loadUint(256);
+        let bodyHash: Int = payload.loadUint(256);
+        let header: Cell = payload.loadRef();
+        let body: Cell = payload.loadRef();
+        throwUnless(16495, payload.bits() == 0);
+        throwUnless(16496, payload.refs() == 0);
+
+        throwUnless(16488, self.isPublishProfileValid(PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE, headerHash, 0));
+        throwUnless(16489, header.hash() == headerHash);
+        throwUnless(16490, body.hash() == bodyHash);
+
+        let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
+        throwUnless(16491, maxCharge >= expectedMax);
+
+        let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
+        let callValue: Int = self.capsulehubCallValue(maxCharge);
+        let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PUBLIC);
+        throwUnless(16493, publishId != 0);
         let bounceId: Int = self.computePublishBounceId(publishId);
         let bounceTag: Int = self.computePublishBounceTag(publishId);
-        throwUnless(16439, !self.pending_publishes.exists(bounceId));
+        throwUnless(16494, !self.pending_publishes.exists(bounceId));
+        throwUnless(16480, self.isBasechainAddress(msg.owner_wallet));
+        throwUnless(16482, user.current_key_id != 0);
 
         self.pending_publishes.set(bounceId, PendingPublish {
-            owner_wallet: sender(),
+            owner_wallet: msg.owner_wallet,
             tombstone: false,
-            nonce: msg.client_nonce,
+            refund_to_vault: true,
+            nonce: clientNonce,
             publish_kind: PUBLISH_KIND_PUBLIC,
-            body_hash: msg.body_hash,
+            body_hash: bodyHash,
             refundable_amount: callValue,
             created_at: now()
         });
@@ -1190,11 +1263,11 @@ contract Vault {
                 bounce_tag: bounceTag,
                 publish_id: publishId,
                 marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
-                author_wallet: sender(),
-                header_hash: msg.header_hash,
-                body_hash: msg.body_hash,
-                header: msg.header,
-                body: msg.body,
+                author_wallet: msg.owner_wallet,
+                header_hash: headerHash,
+                body_hash: bodyHash,
+                header: header,
+                body: body,
                 protocol_fee_paid: protocolFee
             }.toCell()
         });
@@ -1284,6 +1357,7 @@ contract Vault {
         self.pending_publishes.set(bounceId, PendingPublish {
             owner_wallet: pending.owner_wallet,
             tombstone: true,
+            refund_to_vault: pending.refund_to_vault,
             nonce: pending.nonce,
             publish_kind: pending.publish_kind,
             body_hash: pending.body_hash,
@@ -1300,7 +1374,8 @@ contract Vault {
                 exists: false,
                 ton_balance: 0,
                 ath_balance: 0,
-                current_key_id: 0
+                current_key_id: 0,
+                publish_nonce: 0
             };
         }
         let user: UserState = userOpt!!;
@@ -1308,7 +1383,8 @@ contract Vault {
             exists: true,
             ton_balance: user.ton_balance,
             ath_balance: user.ath_balance,
-            current_key_id: user.current_key_id
+            current_key_id: user.current_key_id,
+            publish_nonce: user.publish_nonce
         };
     }
 

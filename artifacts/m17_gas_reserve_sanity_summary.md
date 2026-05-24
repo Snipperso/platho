@@ -11,7 +11,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
 | USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 24347951 | 5071077 | 38299 |
-| VAULT_WALLET_PUBLISH | 2 | 10135120 | 5291327 | 31111 |
+| VAULT_BALANCE_PUBLISH | 2 | 9832860 | 5140197 | 31931 |
 
 ## Operation details
 
@@ -59,12 +59,12 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | stuck_pending_mint_creation_no_ack | 4 | 3165977 | 2727509 | 38299 | 2 | 1 |
 | prune_stale_pending_mint | 2 | 1650774 | 1366380 | 15788 | 0 | 0 |
 
-### VAULT_WALLET_PUBLISH
+### VAULT_BALANCE_PUBLISH
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| wallet_private_publish_to_capsulehub_ack | 5 | 5291327 | 2383307 | 31111 | 1 | 1 |
-| wallet_private_publish_to_missing_capsulehub_bounce | 5 | 4843793 | 2383307 | 31111 | 1 | 0 |
+| vault_balance_private_publish_to_capsulehub_ack | 3 | 5140197 | 3414374 | 31931 | 1 | 1 |
+| vault_balance_private_publish_to_missing_capsulehub_bounce | 3 | 4692663 | 3414374 | 31931 | 1 | 0 |
 
 ## Result
 

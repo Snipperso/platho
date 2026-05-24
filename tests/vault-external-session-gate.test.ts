@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { beginCell, contractAddress, toNano } from '@ton/core';
-import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { beginCell, contractAddress, external, toNano } from '@ton/core';
+import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
+import { keyPairFromSeed, sign } from '@ton/crypto';
 import {
-  Vault,
+  DepositTon,
   RegisterMessagingKeys,
-  PublishPrivateFromWallet,
+  Vault,
 } from '../build/Vault/Vault_Vault';
 import {
   finalPrivateBodyCell,
@@ -22,13 +23,15 @@ const HEADER1_CELL = finalPrivateHeader1Cell();
 const BODY_HASH = BigInt('0x' + BODY_CELL.hash().toString('hex'));
 const HEADER0 = BigInt('0x' + HEADER0_CELL.hash().toString('hex'));
 const HEADER1 = BigInt('0x' + HEADER1_CELL.hash().toString('hex'));
+const OP_REMOVED_DIRECT_PUBLISH_PRIVATE = 0x686694C6;
+const OP_PUBLISH_PRIVATE_FROM_VAULT_BALANCE = 0x7E1F5031;
 
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
-  const user = await blockchain.treasury('wallet-publish-user');
-  const capsuleHub = await blockchain.treasury('wallet-publish-capsulehub');
-  const athWallet = await blockchain.treasury('wallet-publish-ath-wallet');
+  const user = await blockchain.treasury('vault-balance-publish-user');
+  const capsuleHub = await blockchain.treasury('vault-balance-publish-capsulehub');
+  const athWallet = await blockchain.treasury('vault-balance-publish-ath-wallet');
   const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({
@@ -39,64 +42,99 @@ async function setup() {
     workchain: address.workChain,
   }));
   const vault = blockchain.openContract(new Vault(address, init));
-  return { vault, user };
+  return { blockchain, vault, user };
 }
 
 async function registerKeys(vault: any, user: any) {
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 8));
   await vault.send(user.getSender(), { value: toNano('0.03') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: 1n,
-    sign_pubkey: 2n,
+    sign_pubkey: BigInt('0x' + keyPair.publicKey.toString('hex')),
     pq_kem_pubkey_hash: 0n,
     pq_kem_pubkey_len: 0n,
     pq_kem_pubkey: beginCell().endCell(),
     crypto_suite_mask: 1n,
   } as RegisterMessagingKeys);
+  return keyPair;
 }
 
-function publishMessage(maxCharge: bigint, overrides: Partial<PublishPrivateFromWallet> = {}): PublishPrivateFromWallet {
-  return {
-    $$type: 'PublishPrivateFromWallet',
-    client_nonce: 0n,
-    max_charge: maxCharge,
-    size_class: SIZE_STANDARD,
-    crypto_suite: SUITE_CLASSICAL,
-    header_0_hash: HEADER0,
-    header_1_hash: HEADER1,
-    body_hash: BODY_HASH,
-    header_0: HEADER0_CELL,
-    header_1: HEADER1_CELL,
-    body: BODY_CELL,
-    ...overrides,
-  };
+async function depositTon(vault: any, user: any, amount: bigint) {
+  await vault.send(user.getSender(), { value: amount + 12_000_000n }, {
+    $$type: 'DepositTon',
+    amount,
+  } as DepositTon);
 }
 
-describe('Vault wallet-funded publish gate', () => {
-  it('VAULT-WALLET-PUBLISH-01: publish requires activated wallet keys', async () => {
-    const { vault, user } = await setup();
+function signedPrivatePublishBody(owner: any, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+  const payload = beginCell()
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(HEADER0, 256)
+    .storeUint(HEADER1, 256)
+    .storeUint(BODY_HASH, 256)
+    .storeRef(HEADER0_CELL)
+    .storeRef(HEADER1_CELL)
+    .storeRef(BODY_CELL)
+    .endCell();
+  const signedPayload = beginCell()
+    .storeAddress(owner)
+    .storeUint(nonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  return beginCell()
+    .storeUint(OP_PUBLISH_PRIVATE_FROM_VAULT_BALANCE, 32)
+    .storeAddress(owner)
+    .storeBuffer(sign(signedPayload.hash(), secretKey))
+    .storeRef(signedPayload)
+    .endCell();
+}
+
+function removedDirectPublishBody(maxCharge: bigint) {
+  return beginCell()
+    .storeUint(OP_REMOVED_DIRECT_PUBLISH_PRIVATE, 32)
+    .storeUint(0n, 64)
+    .storeUint(maxCharge, 128)
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(HEADER0, 256)
+    .storeUint(HEADER1, 256)
+    .storeUint(BODY_HASH, 256)
+    .storeRef(HEADER0_CELL)
+    .storeRef(HEADER1_CELL)
+    .storeRef(BODY_CELL)
+    .endCell();
+}
+
+describe('Vault balance-funded publish gate', () => {
+  it('VAULT-BALANCE-PUBLISH-01: signed publish requires activated messaging keys', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = keyPairFromSeed(Buffer.alloc(32, 8));
     const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
 
-    await vault.send(user.getSender(), { value: maxCharge }, publishMessage(maxCharge));
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey),
+    }))).rejects.toMatchObject({ exitCode: 16454 });
 
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(before.ton_balance);
   });
 
-  it('VAULT-WALLET-PUBLISH-02: too-low max_charge rejects before pending publish creation', async () => {
-    const { vault, user } = await setup();
+  it('VAULT-BALANCE-PUBLISH-02: removed direct publish opcode is not handled', async () => {
+    const { blockchain, vault, user } = await setup();
     await registerKeys(vault, user);
     const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
 
-    await vault.send(user.getSender(), { value: maxCharge }, publishMessage(maxCharge - 1n, { max_charge: maxCharge - 1n }));
-
-    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
-  });
-
-  it('VAULT-WALLET-PUBLISH-03: cell hash mismatch rejects before pending publish creation', async () => {
-    const { vault, user } = await setup();
-    await registerKeys(vault, user);
-    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-
-    await vault.send(user.getSender(), { value: maxCharge }, publishMessage(maxCharge, { body_hash: BODY_HASH + 1n }));
+    await blockchain.sendMessage(internal({
+      from: user.address,
+      to: vault.address,
+      value: maxCharge,
+      body: removedDirectPublishBody(maxCharge),
+    }));
 
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });

@@ -78,6 +78,7 @@ import {
   createAthWalletMessage,
   createPublicPostPayload,
   createWalletTransaction,
+  buildVaultBalancePublishExternalBoc,
   createVaultWalletMessage,
   createUsernameRegistryWalletMessage,
   PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS,
@@ -3465,7 +3466,7 @@ composer?.addEventListener('submit', async (event) => {
             ? await publishCapsulesThroughVault(capsules)
             : await publishCapsuleThroughVault(capsule);
           message.vaultPublish = publishResult;
-          if (publishResult.status === 'wallet-publish-sent') {
+          if (publishResult.status === 'vault-publish-sent') {
             message.meta = 'published';
             refreshMessagingControls();
           }
@@ -4512,7 +4513,7 @@ async function submitProfileAvatarUpdate(file, modeId = DEFAULT_IMAGE_COMPRESSIO
 
   setText(identitySubtitle, 'avatar publishing');
   const publishResult = await publishPublicPayloadParts(payloads, `profile-avatar-${Date.now()}`);
-  if (publishResult?.status !== 'wallet-publish-sent') {
+  if (publishResult?.status !== 'vault-publish-sent') {
     setText(identitySubtitle, 'avatar publish blocked');
     return publishResult;
   }
@@ -4635,7 +4636,7 @@ async function submitCreatePaymentCheck() {
   try {
     const publishResult = await publishCapsuleThroughVault(capsule);
     message.vaultPublish = publishResult;
-    message.meta = publishResult.status === 'wallet-publish-sent'
+    message.meta = publishResult.status === 'vault-publish-sent'
       ? 'check published'
       : 'publish ready';
   } catch (error) {
@@ -4709,14 +4710,21 @@ async function submitVaultReplaceMessagingKeys() {
 
 async function publishCapsuleThroughVault(capsule) {
   const result = await publishCapsulesThroughVault([capsule]);
-  if (result.status !== 'wallet-publish-sent') return result;
+  if (result.status !== 'vault-publish-sent') return result;
   const first = result.results?.[0] ?? {};
   return {
     status: result.status,
-    message: first.message,
+    external: first.external,
     result: first.result,
     maxCharge: result.maxCharge,
   };
+}
+
+async function sendVaultExternalBoc(built) {
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
+  const result = await transport.sendBoc({ boc: built.boc, walletAddress: requireVaultAddress() });
+  return { ...built, result };
 }
 
 async function publishCapsulesThroughVault(capsules) {
@@ -4727,15 +4735,18 @@ async function publishCapsulesThroughVault(capsules) {
   }
   const provider = await resolveVaultChainProvider();
   if (!provider?.getCanonicalPublishCharge) {
-    throw new Error('Vault chain provider cannot price wallet publish');
+    throw new Error('Vault chain provider cannot price publish');
   }
   const owner = requirePlathoWalletAddress();
   const user = await loadConnectedVaultUser();
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate wallet before publishing');
   }
+  if (!localIdentity?.signingSecretKey) {
+    throw new Error('Local Platho signing key is not ready');
+  }
   const surcharge = currentNetworkFeeSurchargeNanotons();
-  const messages = [];
+  let publishNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
   const results = [];
   let totalMaxCharge = 0n;
   for (let index = 0; index < normalizedCapsules.length; index += 1) {
@@ -4751,24 +4762,36 @@ async function publishCapsulesThroughVault(capsules) {
     const maxCharge = BigInt(canonicalMaxCharge) + surcharge;
     totalMaxCharge += maxCharge;
     const messageType = BigInt(publish.publish_kind) === VAULT_PUBLISH_KIND.PUBLIC
-      ? 'PublishPublicFromWallet'
-      : 'PublishPrivateFromWallet';
-    const message = createVaultWalletMessage(messageType, {
-      client_nonce: nextQueryId(),
+      ? 'PublishPublicFromVaultBalance'
+      : 'PublishPrivateFromVaultBalance';
+    const external = await buildVaultBalancePublishExternalBoc(messageType, {
+      owner_wallet: owner,
+      client_nonce: publishNonce,
       max_charge: maxCharge,
       publish,
+      signingSecretKey: localIdentity.signingSecretKey,
     }, {
       vaultAddress: requireVaultAddress(),
-      valueNanotons: maxCharge,
     });
-    messages.push(message);
-    results.push({ capsuleId: capsule.id, message, maxCharge });
+    results.push({ capsuleId: capsule.id, external, maxCharge, clientNonce: publishNonce });
+    publishNonce += 1n;
   }
-  const transaction = createWalletTransaction(messages);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  for (const item of results) item.result = result;
-  globalThis.plathoLastVaultWalletPublish = { capsules: normalizedCapsules.map((capsule) => capsule.id), messages, transaction, result };
-  return { status: 'wallet-publish-sent', results, maxCharge: totalMaxCharge, result };
+  const balance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
+  if (balance < totalMaxCharge) {
+    throw new Error('Vault TON balance is too low for this publish');
+  }
+  let lastResult = null;
+  for (const item of results) {
+    lastResult = await sendVaultExternalBoc(item.external);
+    item.result = lastResult;
+  }
+  globalThis.plathoLastVaultPublish = {
+    capsules: normalizedCapsules.map((capsule) => capsule.id),
+    results,
+    maxCharge: totalMaxCharge,
+    result: lastResult,
+  };
+  return { status: 'vault-publish-sent', results, maxCharge: totalMaxCharge, result: lastResult };
 }
 
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null) {
@@ -4971,7 +4994,7 @@ async function submitPublicPostThroughVault(draft = null) {
     commentsAllowed: resolvedDraft.commentsAllowed,
   });
   const result = await publishPublicPayloadParts(payloads, `public-${Date.now()}`);
-  if (result?.status === 'wallet-publish-sent') {
+  if (result?.status === 'vault-publish-sent') {
     rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, resolvedDraft.attachment);
     setPublicStatus('public publish submitted');
   } else {
@@ -4996,7 +5019,7 @@ async function submitPublicCommentThroughVault(parent, bodyText = null) {
     parent,
   });
   const result = await publishPublicPayloadParts(payloads, `public-comment-${Date.now()}`);
-  if (result?.status === 'wallet-publish-sent') {
+  if (result?.status === 'vault-publish-sent') {
     rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachment);
     setPublicStatus('comment submitted');
   } else {

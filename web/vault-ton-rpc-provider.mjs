@@ -248,6 +248,7 @@ export function decodeVaultUserViewStack(result) {
     ton_balance: readStackInt(stack, 1, 'Vault user ton_balance'),
     ath_balance: readStackInt(stack, 2, 'Vault user ath_balance'),
     current_key_id: readStackInt(stack, 3, 'Vault user current_key_id'),
+    publish_nonce: readStackInt(stack, 4, 'Vault user publish_nonce'),
   };
 }
 

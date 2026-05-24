@@ -1,4 +1,5 @@
 import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs';
+import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const VAULT_OPS = Object.freeze({
   DepositTon: 716160408,
@@ -9,8 +10,8 @@ export const VAULT_OPS = Object.freeze({
   CreateReceiveIntent: 4152424723,
   ClaimReceiveIntent: 2582433020,
   CancelReceiveIntent: 841519988,
-  PublishPrivateFromWallet: 1751553222,
-  PublishPublicFromWallet: 2416888070,
+  PublishPrivateFromVaultBalance: 2115981361,
+  PublishPublicFromVaultBalance: 2115981362,
 });
 
 export const ATH_WALLET_OPS = Object.freeze({
@@ -531,9 +532,6 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
   }
   if (type === 'WithdrawTon') return VAULT_RESERVES_NANOTONS.withdrawTonExec;
   if (type === 'WithdrawAth') return VAULT_RESERVES_NANOTONS.withdrawAthMinValue;
-  if (type === 'PublishPrivateFromWallet' || type === 'PublishPublicFromWallet') {
-    return assertUint(params.max_charge ?? params.maxCharge, 128, 'max_charge');
-  }
   if (type === 'RegisterMessagingKeys') {
     return keyRecordStorageEndowment(params.crypto_suite_mask)
       + VAULT_RESERVES_NANOTONS.stateGrowthExec
@@ -591,6 +589,97 @@ export function estimateUsernameRegistryAttachedValueNanotons(type) {
   throw new Error(`Unsupported UsernameRegistry message type ${type}`);
 }
 
+function vaultBalancePublishOwner(params) {
+  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
+}
+
+function privateVaultBalancePublishSignedDataCell(params) {
+  const publish = assertObject(params.publish ?? params, 'publish');
+  const payload = beginCell()
+    .uint(publish.size_class, 8, 'size_class')
+    .uint(publish.crypto_suite, 8, 'crypto_suite')
+    .uint(publishHashValue(publish.header_0_hash, 'publish.header_0_hash'), 256, 'header_0_hash')
+    .uint(publishHashValue(publish.header_1_hash, 'publish.header_1_hash'), 256, 'header_1_hash')
+    .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
+    .ref(publishCellFromPayload(publish.header_0_cell, 'publish.header_0_cell'), 'header_0')
+    .ref(publishCellFromPayload(publish.header_1_cell, 'publish.header_1_cell'), 'header_1')
+    .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
+    .endCell();
+  return beginCell()
+    .address(vaultBalancePublishOwner(params), 'owner_wallet')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+    .ref(payload, 'payload')
+    .endCell();
+}
+
+function publicVaultBalancePublishSignedDataCell(params) {
+  const publish = assertObject(params.publish ?? params, 'publish');
+  const payload = beginCell()
+    .uint(publishHashValue(publish.header_hash ?? publish.header_0_hash, 'publish.header_hash'), 256, 'header_hash')
+    .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
+    .ref(publishCellFromPayload(publish.header_cell ?? publish.header_0_cell, 'publish.header_cell'), 'header')
+    .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
+    .endCell();
+  return beginCell()
+    .address(vaultBalancePublishOwner(params), 'owner_wallet')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+    .ref(payload, 'payload')
+    .endCell();
+}
+
+function vaultBalancePublishSignedDataCell(type, params = {}) {
+  assertString(type, 'type');
+  assertObject(params, 'params');
+  if (type === 'PublishPrivateFromVaultBalance') return privateVaultBalancePublishSignedDataCell(params);
+  if (type === 'PublishPublicFromVaultBalance') return publicVaultBalancePublishSignedDataCell(params);
+  throw new Error(`Unsupported Vault balance publish type ${type}`);
+}
+
+function externalInMessageCell(destinationAddress, bodyCell) {
+  return beginCell()
+    .uint(2n, 2, 'ext_in_msg_info.tag')
+    .uint(0n, 2, 'ext_in_msg_info.src_none')
+    .address(destinationAddress, 'ext_in_msg_info.dest')
+    .coins(0n, 'ext_in_msg_info.import_fee')
+    .uint(0n, 1, 'external.init_none')
+    .uint(1n, 1, 'external.body_ref')
+    .ref(bodyCell, 'external.body')
+    .endCell();
+}
+
+export async function buildVaultBalancePublishBodyCell(type, params = {}) {
+  const signedData = vaultBalancePublishSignedDataCell(type, params);
+  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedData);
+  const signature = ed25519.sign(hash, signingSecretKey);
+  const op = type === 'PublishPrivateFromVaultBalance'
+    ? VAULT_OPS.PublishPrivateFromVaultBalance
+    : VAULT_OPS.PublishPublicFromVaultBalance;
+  return {
+    bodyCell: beginVaultBody(op)
+      .address(vaultBalancePublishOwner(params), 'owner_wallet')
+      .bytesValue(signature, 64, 'signature')
+      .ref(signedData, 'signed_payload')
+      .endCell(),
+    signedData,
+    signedDataHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+  };
+}
+
+export async function buildVaultBalancePublishExternalBoc(type, params = {}, options = {}) {
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const built = await buildVaultBalancePublishBodyCell(type, params);
+  const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  return {
+    ...built,
+    boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
 export function buildVaultMessageBody(type, params = {}) {
   assertObject(params, 'params');
   switch (type) {
@@ -609,32 +698,6 @@ export function buildVaultMessageBody(type, params = {}) {
         .uint(params.amount, 128, 'amount')
         .address(params.recipient, 'recipient')
         .toBocBase64();
-    case 'PublishPrivateFromWallet': {
-      const publish = assertObject(params.publish ?? params, 'publish');
-      return beginVaultBody(VAULT_OPS.PublishPrivateFromWallet)
-        .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-        .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
-        .uint(publish.size_class, 8, 'size_class')
-        .uint(publish.crypto_suite, 8, 'crypto_suite')
-        .uint(publishHashValue(publish.header_0_hash, 'publish.header_0_hash'), 256, 'header_0_hash')
-        .uint(publishHashValue(publish.header_1_hash, 'publish.header_1_hash'), 256, 'header_1_hash')
-        .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
-        .ref(publishCellFromPayload(publish.header_0_cell, 'publish.header_0_cell'), 'header_0')
-        .ref(publishCellFromPayload(publish.header_1_cell, 'publish.header_1_cell'), 'header_1')
-        .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
-        .toBocBase64();
-    }
-    case 'PublishPublicFromWallet': {
-      const publish = assertObject(params.publish ?? params, 'publish');
-      return beginVaultBody(VAULT_OPS.PublishPublicFromWallet)
-        .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-        .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
-        .uint(publishHashValue(publish.header_hash ?? publish.header_0_hash, 'publish.header_hash'), 256, 'header_hash')
-        .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
-        .ref(publishCellFromPayload(publish.header_cell ?? publish.header_0_cell, 'publish.header_cell'), 'header')
-        .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
-        .toBocBase64();
-    }
     case 'RegisterMessagingKeys':
       return beginVaultBody(VAULT_OPS.RegisterMessagingKeys)
         .uint(params.enc_pubkey, 256, 'enc_pubkey')
