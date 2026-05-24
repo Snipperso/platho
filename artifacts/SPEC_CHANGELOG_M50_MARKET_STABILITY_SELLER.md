@@ -16,6 +16,7 @@
 ## Behavior
 
 - Accepts reserve ATH only through the official seller ATH wallet and only from the bound reserve funder domain.
+- Can seal in an inert pre-pool state and freeze pricing exactly once later while reserve/sales state is still zero.
 - Sells ATH directly to buyers at frozen tranche floor prices x2..x16.
 - Requires buyer-funded local reserve and downstream ATH transfer value.
 - Finalizes sale only after recipient ATH wallet ACK.
@@ -28,4 +29,4 @@
 - No oracle read.
 - No admin sale override.
 - No pause, rescue, upgrade, governance, or post-seal pricing mutation.
-
+- No reserve funding or sale before pricing is frozen.

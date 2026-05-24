@@ -96,9 +96,10 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.market_stability_seller_official_ath_wallet,
         ton_treasury_receiver_address: addresses.market_stability_ton_treasury_receiver,
         ath_master_address: addresses.ath_master,
-        genesis_config_hash: '0'.repeat(64),
-        pricing_frozen: true,
-        reserve_due_ath: '45000000000000000',
+        genesis_config_hash: hash('market_stability_launch_controller'),
+        pricing_frozen: false,
+        reserve_due_ath: '0',
+        reserve_funded_total_ath: '0',
         treasury_due_ton: '0',
         sold_ath_total: '0',
       },
@@ -107,7 +108,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         code_hash: code_hashes.ath_wallet,
         owner_address: addresses.market_stability_seller,
         ath_master_address: addresses.ath_master,
-        balance_atomic: '45000000000000000',
+        balance_atomic: '0',
       },
       capsulehub: {
         address: addresses.capsulehub,
@@ -265,20 +266,26 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH');
   });
 
-  it('rejects final genesis when MarketStabilitySeller pricing is not frozen and reserve is underfunded', () => {
+  it('rejects final genesis when MarketStabilitySeller is already priced or funded', () => {
     const input = finalInput();
-    input.snapshot.market_stability_seller.pricing_frozen = false;
-    input.snapshot.market_stability_seller.genesis_config_hash = hash('seller_controller_not_cleared');
-    input.snapshot.market_stability_seller.reserve_due_ath = '44999999999999999';
-    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '44999999999999999';
+    input.snapshot.market_stability_seller.pricing_frozen = true;
+    input.snapshot.market_stability_seller.genesis_config_hash = '0'.repeat(64);
+    input.snapshot.market_stability_seller.reserve_due_ath = '1';
+    input.snapshot.market_stability_seller.reserve_funded_total_ath = '1';
+    input.snapshot.market_stability_seller.treasury_due_ton = '1';
+    input.snapshot.market_stability_seller.sold_ath_total = '1';
+    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '1';
 
     const report = verifyMainnetGenesisSnapshot(input);
 
     expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_GENESIS_HASH_NOT_CLEARED');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_UNDERFUNDED');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_UNDERFUNDED');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_FROZEN_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS');
   });
 
   it('rejects final genesis when MarketStabilitySeller getter snapshots are missing', () => {

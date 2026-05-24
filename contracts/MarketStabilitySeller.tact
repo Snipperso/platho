@@ -318,10 +318,17 @@ contract MarketStabilitySeller {
     }
 
     receive(msg: FreezeMarketStabilityPricing) {
-        self.requireUnsealed();
         self.requireGenesisController();
         self.acceptManifestHash(msg.deployment_manifest_hash);
         throwUnless(23130, !self.pricing_frozen);
+        if (self.sealed) {
+            throwUnless(23131, self.phase == MARKET_STABILITY_PHASE_IDLE);
+            throwUnless(23132, self.reserve_due_ath == 0);
+            throwUnless(23133, self.treasury_due_ton == 0);
+            throwUnless(23134, self.reserve_funded_total_ath == 0);
+            throwUnless(23135, self.sold_ath_total == 0);
+            throwUnless(23139, self.completed_tranche_count == 0 && self.current_tranche_sold_ath == 0);
+        }
         throwUnless(23136, msg.base_tranche_price_nanotons > 0);
         throwUnless(23137, msg.evidence_x1_tranche_quote_nanotons >= msg.base_tranche_price_nanotons);
         throwUnless(23138, msg.pricing_evidence_hash != 0);
@@ -329,6 +336,9 @@ contract MarketStabilitySeller {
         self.evidence_x1_tranche_quote_nanotons = msg.evidence_x1_tranche_quote_nanotons;
         self.pricing_evidence_hash = msg.pricing_evidence_hash;
         self.pricing_frozen = true;
+        if (self.sealed) {
+            self.genesis_config_hash = 0;
+        }
     }
 
     receive(msg: SealMarketStabilityGenesis) {
@@ -338,8 +348,9 @@ contract MarketStabilitySeller {
         throwUnless(23140, self.reserve_funder_bound);
         throwUnless(23141, self.official_ath_wallet_bound);
         throwUnless(23142, self.treasury_bound);
-        throwUnless(23143, self.pricing_frozen);
-        self.genesis_config_hash = 0;
+        if (self.pricing_frozen) {
+            self.genesis_config_hash = 0;
+        }
         self.sealed = true;
     }
 

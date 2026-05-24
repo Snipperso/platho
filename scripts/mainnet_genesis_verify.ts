@@ -51,6 +51,7 @@ export interface MainnetGenesisVerifyInput {
       genesis_config_hash: string;
       pricing_frozen: boolean;
       reserve_due_ath: string;
+      reserve_funded_total_ath: string;
       treasury_due_ton: string;
       sold_ath_total: string;
     };
@@ -289,9 +290,10 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         official_ath_wallet_address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
         ton_treasury_receiver_address: 'REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        genesis_config_hash: '0000000000000000000000000000000000000000000000000000000000000000',
-        pricing_frozen: true,
-        reserve_due_ath: 'required: decimal ATH reserve due from get_market_stability_seller_state',
+        genesis_config_hash: 'required: 64 lowercase hex market stability launch controller hash',
+        pricing_frozen: false,
+        reserve_due_ath: '0',
+        reserve_funded_total_ath: '0',
         treasury_due_ton: '0',
         sold_ath_total: '0',
       },
@@ -431,6 +433,7 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
     genesis_config_hash: '',
     pricing_frozen: false,
     reserve_due_ath: '',
+    reserve_funded_total_ath: '',
     treasury_due_ton: '',
     sold_ath_total: '',
   };
@@ -439,18 +442,19 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   }
   checkBase(issues, manifest, marketSeller, 'market_stability_seller', 'market_stability_seller', 'market_stability_seller');
   checkSealed(issues, manifest, marketSeller, 'market_stability_seller');
-  addTrue(issues, 'MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN', marketSeller.pricing_frozen, 'market_stability_seller.pricing_frozen');
-  if (!isHex64(marketSeller.genesis_config_hash) || !/^0{64}$/i.test(marketSeller.genesis_config_hash)) {
-    issues.push(issue('MARKET_STABILITY_SELLER_GENESIS_HASH_NOT_CLEARED', 'market_stability_seller.genesis_config_hash must be zero after pricing freeze and seal.'));
+  if (marketSeller.pricing_frozen !== false) {
+    issues.push(issue('MARKET_STABILITY_SELLER_PRICING_FROZEN_AT_GENESIS', 'market_stability_seller.pricing_frozen must be false at final genesis; pricing freezes once after the 15% activity distribution / pool-launch gate.'));
+  }
+  if (!isHex64(marketSeller.genesis_config_hash) || /^0{64}$/i.test(marketSeller.genesis_config_hash)) {
+    issues.push(issue('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING', 'market_stability_seller.genesis_config_hash must retain the non-zero one-time launch controller hash until post-pool pricing freeze.'));
   }
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_RESERVE_FUNDER_MISMATCH', marketSeller.reserve_funder_address, manifest.addresses.market_stability_reserve_funder, 'market_stability_seller.reserve_funder_address');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MISMATCH', marketSeller.official_ath_wallet_address, manifest.addresses.market_stability_seller_official_ath_wallet, 'market_stability_seller.official_ath_wallet_address');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_TON_TREASURY_MISMATCH', marketSeller.ton_treasury_receiver_address, manifest.addresses.market_stability_ton_treasury_receiver, 'market_stability_seller.ton_treasury_receiver_address');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_ATH_MASTER_MISMATCH', marketSeller.ath_master_address, manifest.addresses.ath_master, 'market_stability_seller.ath_master_address');
   addBasechainAddress(issues, 'MARKET_STABILITY_SELLER_ATH_MASTER_NOT_BASECHAIN', marketSeller.ath_master_address, 'market_stability_seller.ath_master_address');
-  if (isDecimalString(marketStabilityReserveTotal)) {
-    addDecimalGte(issues, 'MARKET_STABILITY_RESERVE_DUE_UNDERFUNDED', marketSeller.reserve_due_ath, marketStabilityReserveTotal, 'market_stability_seller.reserve_due_ath');
-  }
+  addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_DUE_NOT_ZERO_AT_GENESIS', marketSeller.reserve_due_ath, '0', 'market_stability_seller.reserve_due_ath');
+  addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.reserve_funded_total_ath, '0', 'market_stability_seller.reserve_funded_total_ath');
   addDecimalEq(issues, 'MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', marketSeller.treasury_due_ton, '0', 'market_stability_seller.treasury_due_ton');
   addDecimalEq(issues, 'MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.sold_ath_total, '0', 'market_stability_seller.sold_ath_total');
 
@@ -467,15 +471,7 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   checkBase(issues, manifest, marketSellerOfficialAthWallet, 'market_stability_seller_official_ath_wallet', 'market_stability_seller_official_ath_wallet', 'ath_wallet');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', marketSellerOfficialAthWallet.owner_address, manifest.addresses.market_stability_seller, 'market_stability_seller_official_ath_wallet.owner_address');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', marketSellerOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'market_stability_seller_official_ath_wallet.ath_master_address');
-  if (isDecimalString(marketStabilityReserveTotal)) {
-    addDecimalGte(
-      issues,
-      'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_UNDERFUNDED',
-      marketSellerOfficialAthWallet.balance_atomic,
-      marketStabilityReserveTotal,
-      'market_stability_seller_official_ath_wallet.balance_atomic',
-    );
-  }
+  addDecimalEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS', marketSellerOfficialAthWallet.balance_atomic, '0', 'market_stability_seller_official_ath_wallet.balance_atomic');
 
   checkBase(issues, manifest, s.capsulehub, 'capsulehub', 'capsulehub', 'capsulehub');
   checkSealed(issues, manifest, s.capsulehub, 'capsulehub');
