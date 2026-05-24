@@ -30,6 +30,19 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
 
     expect(manifest.profile).toBe('PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15');
     expect(manifest.status).toBe('IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS');
+    expect(manifest.constants.ath_activity_airdrop_allocation_percent).toBe('30');
+    expect(manifest.constants.ath_initial_liquidity_allocation_percent).toBe('15');
+    expect(manifest.constants.ath_treasury_operations_allocation_percent).toBe('10');
+    expect(manifest.constants.ath_market_stability_reserve_allocation_percent).toBe('45');
+    expect(manifest.constants.ath_founder_allocation_percent).toBe('0');
+    expect(manifest.constants.ath_initial_liquidity_allocation_atomic).toBe('15000000000000000');
+    expect(manifest.constants.ath_treasury_operations_allocation_atomic).toBe('10000000000000000');
+    expect(manifest.constants.ath_market_stability_reserve_allocation_atomic).toBe('45000000000000000');
+    expect(manifest.constants.ath_market_stability_tranche_count).toBe('15');
+    expect(manifest.constants.ath_market_stability_tranche_percent).toBe('3');
+    expect(manifest.constants.ath_market_stability_tranche_atomic).toBe('3000000000000000');
+    expect(manifest.constants.ath_market_stability_start_multiplier).toBe('2');
+    expect(manifest.constants.ath_market_stability_end_multiplier).toBe('16');
     expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('30000000000000000');
     expect(manifest.constants.vault_activity_airdrop_reward_per_message_atomic).toBe('10000000000');
     expect(manifest.constants.vault_activity_airdrop_per_wallet_cap_atomic).toBe('0');

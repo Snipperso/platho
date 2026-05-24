@@ -43,6 +43,9 @@ const stableArtifacts = [
   'artifacts/m17_gas_reserve_sanity_report.json',
   'artifacts/platho_v1_open_values_v0_18_artifact_integrity.md',
   'artifacts/SPEC_CHANGELOG_M18_ARTIFACT_INTEGRITY.md',
+  'artifacts/platho_v1_open_values_v0_49_final_tokenomics_market_stability.md',
+  'artifacts/MILESTONE_SUMMARY_M49_FINAL_TOKENOMICS_MARKET_STABILITY.md',
+  'artifacts/SPEC_CHANGELOG_M49_FINAL_TOKENOMICS_MARKET_STABILITY.md',
 ];
 
 function sha256(data: Buffer | string): string {

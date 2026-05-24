@@ -18,7 +18,7 @@
 
 ## Changed
 
-- Final token distribution updated: community activity airdrop 30%, founder allocation 5%, no separate early-user / launch reserve.
+- Final token distribution updated and later superseded by M49 as: community activity airdrop 30%, initial liquidity 15%, treasury / operations 10%, market stability reserve 45%, founder allocation 0%.
 - Official ATH pool launch target added: after approximately 15,000,000 ATH has been distributed through Vault activity rewards.
 - FeeAccumulator bootstrap split added: protocol TON goes 100% to liquidity bootstrap / treasury until the post-15% pool-launch gate enables buyback split.
 - Message ATH discounts are also locked until the same 15,000,000 ATH distribution gate.
