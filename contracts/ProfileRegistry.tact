@@ -391,6 +391,7 @@ contract ProfileRegistry {
     receive(msg: ATHBurnFinalized) {
         self.requireSealed();
         throwUnless(21330, sender() == self.ath_master_address);
+        throwUnless(21332, msg.owner_address == myAddress());
         let pending: PendingProfileBurnFlush = self.clearPendingBurnFlush(msg.query_id);
         throwUnless(21331, pending.amount == msg.amount);
     }

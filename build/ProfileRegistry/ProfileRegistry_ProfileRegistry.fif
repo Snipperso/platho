@@ -1730,19 +1730,55 @@ PROGRAM{
       s0 17 s() XCHG
       64 LDU
       128 LDU
+      LDMSGADDR
       DROP
-      s1 18 s() XCHG
-      s0 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 18 s() XCHG
+      s15 18 s() XCHG
+      s14 18 s() XCHG
+      s13 18 s() XCHG
+      s12 18 s() XCHG
+      s11 18 s() XCHG
+      s10 18 s() XCHG
+      s9 18 s() XCHG
+      s8 18 s() XCHG
+      s7 18 s() XCHG
+      s6 18 s() XCHG
+      s5 18 s() XCHG
+      s4 18 s() XCHG
+      s3 18 s() XCHG
+      s2 18 s() XCHG
+      s1 19 s() XCHG
+      s0 20 s() XCHG
       $ProfileRegistry$_fun_requireSealed INLINECALLDICT
       21330 PUSHINT
       __tact_context_get_sender INLINECALLDICT
       18 s() PUSH
       SDEQ
       THROWANYIFNOT
-      17 s() 18 s() XCHG
-      16 s() 17 s() XCHG
-      s15 16 s() XCHG
-      15 ROLL
+      21332 PUSHINT
+          MYADDR
+      s1 22 s() XCHG
+      SDEQ
+      s1 21 s() XCHG
+      THROWANYIFNOT
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      s12 s14 XCHG
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s9 s11 XCHG
+      s8 s10 XCHG
+      s7 s9 XCHG
+      s6 s8 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s3 s5 XCHG
+      s0 s1 s4 XCHG3
+      s0 19 s() XCHG
+      s0 s3 XCHG2
       $ProfileRegistry$_fun_clearPendingBurnFlush INLINECALLDICT
       DROP
       21331 PUSHINT

@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: MockAthWalletNoAck
-BoC Size: 127 bytes
+BoC Size: 147 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 12
+Total structures: 13
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -48,6 +48,10 @@ Signature: `BasechainAddress{hash:Maybe int257}`
 ### ATHTransferRequest
 TL-B: `ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest`
 Signature: `ATHTransferRequest{query_id:uint64,amount:uint128,recipient:address,response_destination:address}`
+
+### ATHBurn
+TL-B: `ath_burn#41544801 query_id:uint64 amount:uint128 response_destination:address = ATHBurn`
+Signature: `ATHBurn{query_id:uint64,amount:uint128,response_destination:address}`
 
 ### MockAthWalletNoAck$Data
 TL-B: `_  = MockAthWalletNoAck`

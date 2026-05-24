@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: ProfileRegistry
-BoC Size: 9185 bytes
+BoC Size: 9302 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 46
