@@ -2,7 +2,7 @@
 
 Status: **PASS**
 
-Scope: implemented subset artifacts after M17. No contract functionality or code hash was changed. This pass locks generated artifacts against the current build so stale vectors do not quietly survive into later milestones. Yes, apparently files can lie by omission too.
+Scope: current implemented subset artifacts, including the M50 MarketStabilitySeller contract. This pass locks generated artifacts against the current build so stale vectors do not quietly survive into later milestones. Yes, apparently files can lie by omission too.
 
 ## Checks
 
@@ -24,8 +24,8 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 
 ## Manifest
 
-- Stored hash: b9f91de2c84c3067184323fd03940e60acfc9a15f760abd6d6240e5bc0c4c451
-- Rebuilt hash: b9f91de2c84c3067184323fd03940e60acfc9a15f760abd6d6240e5bc0c4c451
+- Stored hash: 12a7ff212aaf7ba70a5616e88b315a14a5c1d55982cd6d47b6f12a2704a95386
+- Rebuilt hash: 12a7ff212aaf7ba70a5616e88b315a14a5c1d55982cd6d47b6f12a2704a95386
 - Match: true
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
 
@@ -36,6 +36,7 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 | ATHMASTER_CODE_HASH | e0af1eba68f1d22b56caee365e75f97fa72014e82f5de107f81de93ef1c93761 | e0af1eba68f1d22b56caee365e75f97fa72014e82f5de107f81de93ef1c93761 | true |
 | ATH_WALLET_CODE_HASH | b95c2c1159aa292830f3a03a751c4f37bcd0ebf2a416301fb19eadb94ca50b2c | b95c2c1159aa292830f3a03a751c4f37bcd0ebf2a416301fb19eadb94ca50b2c | true |
 | BUYBACKBURN_CODE_HASH | 660f6816b4bc4f25db1e5166d2d238627793ccfc75d08a0fb5e5238fc9a84218 | 660f6816b4bc4f25db1e5166d2d238627793ccfc75d08a0fb5e5238fc9a84218 | true |
+| MARKET_STABILITY_SELLER_CODE_HASH | 85dd6995e116388e3e4ec2059110d6b861279049c683c3657702f02de0c645d4 | 85dd6995e116388e3e4ec2059110d6b861279049c683c3657702f02de0c645d4 | true |
 | CAPSULEHUB_CODE_HASH | 9d5f946d2db56aabe39c2c0bde53b7bf074eef516868b372d17ed3997935c3a3 | 9d5f946d2db56aabe39c2c0bde53b7bf074eef516868b372d17ed3997935c3a3 | true |
 | FEEACCUMULATOR_CODE_HASH | 593bbab3c38ab877a123459111a3a2f63464c7b74d63db0ff4c1cabddba2ee53 | 593bbab3c38ab877a123459111a3a2f63464c7b74d63db0ff4c1cabddba2ee53 | true |
 | PROFILE_REGISTRY_CODE_HASH | 2a32bc13b9b767d45ee679831b7bf8518d7a59c1e58a3f9fa50653ae11544f49 | 2a32bc13b9b767d45ee679831b7bf8518d7a59c1e58a3f9fa50653ae11544f49 | true |
@@ -50,5 +51,7 @@ Scope: implemented subset artifacts after M17. No contract functionality or code
 - ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT
 - BUYBACKBURN_POST_POOL_ROUTE_FREEZE_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE
 - STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED
+- MARKET_STABILITY_SELLER_PRICING_MUST_BE_FROZEN_FROM_FINAL_POOL_LAUNCH_EVIDENCE
+- MARKET_STABILITY_RESERVE_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_SELLER_ATH_WALLET_BEFORE_USE
 - FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES
 - VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS

@@ -43,6 +43,22 @@ export interface MainnetGenesisVerifyInput {
       ath_master_address: string;
       balance_atomic: string;
     };
+    market_stability_seller: BaseSnapshot & {
+      reserve_funder_address: string;
+      official_ath_wallet_address: string;
+      ton_treasury_receiver_address: string;
+      ath_master_address: string;
+      genesis_config_hash: string;
+      pricing_frozen: boolean;
+      reserve_due_ath: string;
+      treasury_due_ton: string;
+      sold_ath_total: string;
+    };
+    market_stability_seller_official_ath_wallet: BaseSnapshot & {
+      owner_address: string;
+      ath_master_address: string;
+      balance_atomic: string;
+    };
     capsulehub: BaseSnapshot & {
       vault_address: string;
       fee_accumulator_address: string;
@@ -156,6 +172,16 @@ function addDecimalGte(issues: Issue[], code: string, actual: unknown, expected:
   }
 }
 
+function addDecimalEq(issues: Issue[], code: string, actual: unknown, expected: string, label: string) {
+  if (!isDecimalString(actual)) {
+    issues.push(issue(code, `${label} must be a decimal atomic amount string; got ${actual}`));
+    return;
+  }
+  if (BigInt(actual) !== BigInt(expected)) {
+    issues.push(issue(code, `${label} mismatch: expected ${expected}, got ${actual}`));
+  }
+}
+
 function addBasechainAddress(issues: Issue[], code: string, value: unknown, label: string) {
   const workchain = addressWorkchain(value);
   if (workchain !== null && workchain !== 0) {
@@ -190,6 +216,10 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_treasury_owner: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
       vault: 'REQUIRED_MAINNET_VAULT_ADDRESS',
       vault_official_ath_wallet: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+      market_stability_seller: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
+      market_stability_seller_official_ath_wallet: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
+      market_stability_reserve_funder: 'REQUIRED_MAINNET_MARKET_STABILITY_RESERVE_FUNDER_ADDRESS',
+      market_stability_ton_treasury_receiver: 'REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS',
       capsulehub: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
       fee_accumulator: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
       fee_accumulator_ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
@@ -206,6 +236,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_master: 'required: current ATHMaster code hash',
       ath_wallet: 'required: current ATHWallet code hash',
       vault: 'required: current Vault code hash',
+      market_stability_seller: 'required: current MarketStabilitySeller code hash',
       capsulehub: 'required: current CapsuleHub code hash',
       username_registry: 'required: current UsernameRegistry code hash',
       profile_registry: 'required: current ProfileRegistry code hash',
@@ -214,6 +245,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
     },
     constants: {
       vault_activity_airdrop_total_atomic: 'required: decimal atomic ATH amount',
+      ath_market_stability_reserve_allocation_atomic: 'required: decimal atomic ATH amount',
     },
     blockers_before_final_genesis: [],
   };
@@ -247,6 +279,26 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
         code_hash: 'required: current ATHWallet code hash',
         owner_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        balance_atomic: 'required: decimal ATH balance from get_wallet_data',
+      },
+      market_stability_seller: {
+        ...base,
+        address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
+        reserve_funder_address: 'REQUIRED_MAINNET_MARKET_STABILITY_RESERVE_FUNDER_ADDRESS',
+        official_ath_wallet_address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
+        ton_treasury_receiver_address: 'REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        genesis_config_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+        pricing_frozen: true,
+        reserve_due_ath: 'required: decimal ATH reserve due from get_market_stability_seller_state',
+        treasury_due_ton: '0',
+        sold_ath_total: '0',
+      },
+      market_stability_seller_official_ath_wallet: {
+        address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
+        code_hash: 'required: current ATHWallet code hash',
+        owner_address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: 'required: decimal ATH balance from get_wallet_data',
       },
@@ -328,6 +380,10 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   if (!isDecimalString(vaultActivityAirdropTotal)) {
     issues.push(issue('BAD_VAULT_ACTIVITY_AIRDROP_TOTAL', 'manifest.constants.vault_activity_airdrop_total_atomic must be a decimal atomic ATH string.'));
   }
+  const marketStabilityReserveTotal = manifest.constants?.ath_market_stability_reserve_allocation_atomic;
+  if (!isDecimalString(marketStabilityReserveTotal)) {
+    issues.push(issue('BAD_MARKET_STABILITY_RESERVE_TOTAL', 'manifest.constants.ath_market_stability_reserve_allocation_atomic must be a decimal atomic ATH string.'));
+  }
 
   const s = input.snapshot;
   checkBase(issues, manifest, s.ath_master, 'ath_master', 'ath_master', 'ath_master');
@@ -360,6 +416,64 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
       vaultOfficialAthWallet.balance_atomic,
       vaultActivityAirdropTotal,
       'vault_official_ath_wallet.balance_atomic',
+    );
+  }
+
+  const marketSeller = (s as any).market_stability_seller ?? {
+    address: '',
+    code_hash: '',
+    sealed: false,
+    deployment_manifest_hash: '',
+    reserve_funder_address: '',
+    official_ath_wallet_address: '',
+    ton_treasury_receiver_address: '',
+    ath_master_address: '',
+    genesis_config_hash: '',
+    pricing_frozen: false,
+    reserve_due_ath: '',
+    treasury_due_ton: '',
+    sold_ath_total: '',
+  };
+  if (!(s as any).market_stability_seller) {
+    issues.push(issue('MISSING_MARKET_STABILITY_SELLER_SNAPSHOT', 'snapshot.market_stability_seller getter data is required.'));
+  }
+  checkBase(issues, manifest, marketSeller, 'market_stability_seller', 'market_stability_seller', 'market_stability_seller');
+  checkSealed(issues, manifest, marketSeller, 'market_stability_seller');
+  addTrue(issues, 'MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN', marketSeller.pricing_frozen, 'market_stability_seller.pricing_frozen');
+  if (!isHex64(marketSeller.genesis_config_hash) || !/^0{64}$/i.test(marketSeller.genesis_config_hash)) {
+    issues.push(issue('MARKET_STABILITY_SELLER_GENESIS_HASH_NOT_CLEARED', 'market_stability_seller.genesis_config_hash must be zero after pricing freeze and seal.'));
+  }
+  addAddressEq(issues, 'MARKET_STABILITY_SELLER_RESERVE_FUNDER_MISMATCH', marketSeller.reserve_funder_address, manifest.addresses.market_stability_reserve_funder, 'market_stability_seller.reserve_funder_address');
+  addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MISMATCH', marketSeller.official_ath_wallet_address, manifest.addresses.market_stability_seller_official_ath_wallet, 'market_stability_seller.official_ath_wallet_address');
+  addAddressEq(issues, 'MARKET_STABILITY_SELLER_TON_TREASURY_MISMATCH', marketSeller.ton_treasury_receiver_address, manifest.addresses.market_stability_ton_treasury_receiver, 'market_stability_seller.ton_treasury_receiver_address');
+  addAddressEq(issues, 'MARKET_STABILITY_SELLER_ATH_MASTER_MISMATCH', marketSeller.ath_master_address, manifest.addresses.ath_master, 'market_stability_seller.ath_master_address');
+  addBasechainAddress(issues, 'MARKET_STABILITY_SELLER_ATH_MASTER_NOT_BASECHAIN', marketSeller.ath_master_address, 'market_stability_seller.ath_master_address');
+  if (isDecimalString(marketStabilityReserveTotal)) {
+    addDecimalGte(issues, 'MARKET_STABILITY_RESERVE_DUE_UNDERFUNDED', marketSeller.reserve_due_ath, marketStabilityReserveTotal, 'market_stability_seller.reserve_due_ath');
+  }
+  addDecimalEq(issues, 'MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', marketSeller.treasury_due_ton, '0', 'market_stability_seller.treasury_due_ton');
+  addDecimalEq(issues, 'MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.sold_ath_total, '0', 'market_stability_seller.sold_ath_total');
+
+  const marketSellerOfficialAthWallet = (s as any).market_stability_seller_official_ath_wallet ?? {
+    address: '',
+    code_hash: '',
+    owner_address: '',
+    ath_master_address: '',
+    balance_atomic: '',
+  };
+  if (!(s as any).market_stability_seller_official_ath_wallet) {
+    issues.push(issue('MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.market_stability_seller_official_ath_wallet getter data is required.'));
+  }
+  checkBase(issues, manifest, marketSellerOfficialAthWallet, 'market_stability_seller_official_ath_wallet', 'market_stability_seller_official_ath_wallet', 'ath_wallet');
+  addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', marketSellerOfficialAthWallet.owner_address, manifest.addresses.market_stability_seller, 'market_stability_seller_official_ath_wallet.owner_address');
+  addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', marketSellerOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'market_stability_seller_official_ath_wallet.ath_master_address');
+  if (isDecimalString(marketStabilityReserveTotal)) {
+    addDecimalGte(
+      issues,
+      'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_UNDERFUNDED',
+      marketSellerOfficialAthWallet.balance_atomic,
+      marketStabilityReserveTotal,
+      'market_stability_seller_official_ath_wallet.balance_atomic',
     );
   }
 

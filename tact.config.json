@@ -21,6 +21,11 @@
       "output": "build/BuybackBurn"
     },
     {
+      "name": "MarketStabilitySeller",
+      "path": "contracts/MarketStabilitySeller.tact",
+      "output": "build/MarketStabilitySeller"
+    },
+    {
       "name": "M20TBuybackBurnHarness",
       "path": "contracts/M20TBuybackBurnHarness.tact",
       "output": "build/M20TBuybackBurnHarness"

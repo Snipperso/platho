@@ -1,6 +1,6 @@
 # Platho v1 Open Values v0.49 - Final ATH Tokenomics and Market Stability Reserve
 
-Status: allocation policy fixed; seller implementation remains a separate audited release item.
+Status: allocation policy fixed. M50 adds the concrete immutable seller implementation for this policy.
 
 ## Fixed supply
 
@@ -72,7 +72,6 @@ TON proceeds from executed reserve sales go to treasury / operations. Treasury u
 
 ## Implementation boundary
 
-This document fixes allocation policy. It does not claim that the market-stability seller contract exists.
+M49 fixes allocation policy. M50 implements the separate immutable market-stability seller contract for that policy.
 
-Before the reserve is used operationally, the seller must be implemented as a separate immutable contract, audited, and covered by release evidence. Until then, reserve ATH should remain inert in treasury custody and must not be treated as an active protocol mechanism.
-
+Before the reserve is used operationally, final pool-launch pricing evidence, seller code hash, official seller ATH wallet funding proof, and deployment manifest evidence must be archived. Until then, reserve ATH should remain inert in treasury custody and must not be treated as an active protocol mechanism.

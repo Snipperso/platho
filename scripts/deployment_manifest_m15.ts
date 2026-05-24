@@ -6,6 +6,7 @@ import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { BuybackBurn } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+import { MarketStabilitySeller } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 import { ProfileRegistry } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -36,6 +37,7 @@ export type ImplementedSubsetManifest = {
 export type ImplementedSubsetInits = {
   athMaster: Awaited<ReturnType<typeof ATHMaster.init>>;
   buybackBurn: Awaited<ReturnType<typeof BuybackBurn.init>>;
+  marketStabilitySeller: Awaited<ReturnType<typeof MarketStabilitySeller.init>>;
   vault: Awaited<ReturnType<typeof Vault.init>>;
   capsuleHub: Awaited<ReturnType<typeof CapsuleHub.init>>;
   feeAccumulator: Awaited<ReturnType<typeof FeeAccumulator.init>>;
@@ -50,12 +52,14 @@ export type ImplementedSubsetBuild = {
   parsed: {
     athMasterAddress: Address;
     buybackBurnAddress: Address;
+    marketStabilitySellerAddress: Address;
     vaultAddress: Address;
     capsuleHubAddress: Address;
     feeAccumulatorAddress: Address;
     usernameRegistryAddress: Address;
     profileRegistryAddress: Address;
     buybackBurnOfficialAthWalletAddress: Address;
+    marketStabilitySellerOfficialAthWalletAddress: Address;
     vaultOfficialAthWalletAddress: Address;
     usernameRegistryOfficialAthWalletAddress: Address;
     profileRegistryOfficialAthWalletAddress: Address;
@@ -181,6 +185,9 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   const buybackBurn = await BuybackBurn.init(addressHash(genesisController), athMasterAddress);
   const buybackBurnAddress = contractAddress(0, buybackBurn);
 
+  const marketStabilitySeller = await MarketStabilitySeller.init(addressHash(genesisController), athMasterAddress);
+  const marketStabilitySellerAddress = contractAddress(0, marketStabilitySeller);
+
   const feeAccumulator = await FeeAccumulator.init(tonTreasuryReceiver, buybackBurnAddress);
   const feeAccumulatorAddress = contractAddress(0, feeAccumulator);
 
@@ -208,12 +215,20 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   const buybackBurnOfficialAthWallet = await ATHWallet.init(0n, buybackBurnAddress, athMasterAddress);
   const buybackBurnOfficialAthWalletAddress = contractAddress(buybackBurnAddress.workChain, buybackBurnOfficialAthWallet);
 
+  const marketStabilitySellerOfficialAthWallet = await ATHWallet.init(0n, marketStabilitySellerAddress, athMasterAddress);
+  const marketStabilitySellerOfficialAthWalletAddress = contractAddress(marketStabilitySellerAddress.workChain, marketStabilitySellerOfficialAthWallet);
+
   const addresses: AddressMap = {
     ath_master: athMasterAddress.toString(),
     ath_treasury_owner: athTreasuryOwner.toString(),
     buyback_burn: buybackBurnAddress.toString(),
     buyback_burn_initial_genesis_controller: genesisController.toString(),
     buyback_burn_official_ath_wallet: buybackBurnOfficialAthWalletAddress.toString(),
+    market_stability_seller: marketStabilitySellerAddress.toString(),
+    market_stability_seller_initial_genesis_controller: genesisController.toString(),
+    market_stability_seller_official_ath_wallet: marketStabilitySellerOfficialAthWalletAddress.toString(),
+    market_stability_reserve_funder: athTreasuryOwner.toString(),
+    market_stability_ton_treasury_receiver: tonTreasuryReceiver.toString(),
     capsulehub: capsuleHubAddress.toString(),
     capsulehub_initial_vault_placeholder: capsuleVaultPlaceholder.toString(),
     fee_accumulator: feeAccumulatorAddress.toString(),
@@ -240,6 +255,7 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     ath_master: codeHash('build/ATHMaster/ATHMaster_ATHMaster.code.boc'),
     ath_wallet: codeHash('build/ATHWallet/ATHWallet_ATHWallet.code.boc'),
     buyback_burn: codeHash('build/BuybackBurn/BuybackBurn_BuybackBurn.code.boc'),
+    market_stability_seller: codeHash('build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller.code.boc'),
     capsulehub: codeHash('build/CapsuleHub/CapsuleHub_CapsuleHub.code.boc'),
     fee_accumulator: codeHash('build/FeeAccumulator/FeeAccumulator_FeeAccumulator.code.boc'),
     profile_registry: codeHash('build/ProfileRegistry/ProfileRegistry_ProfileRegistry.code.boc'),
@@ -252,6 +268,8 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     ath_master: stateInitHash(athMaster),
     buyback_burn_initial: stateInitHash(buybackBurn),
     buyback_burn_official_ath_wallet: stateInitHash(buybackBurnOfficialAthWallet),
+    market_stability_seller_initial: stateInitHash(marketStabilitySeller),
+    market_stability_seller_official_ath_wallet: stateInitHash(marketStabilitySellerOfficialAthWallet),
     capsulehub_initial: stateInitHash(capsuleHub),
     fee_accumulator: stateInitHash(feeAccumulator),
     profile_registry_initial: stateInitHash(profileRegistry),
@@ -293,6 +311,8 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     'ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT',
     'BUYBACKBURN_POST_POOL_ROUTE_FREEZE_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE',
     'STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED',
+    'MARKET_STABILITY_SELLER_PRICING_MUST_BE_FROZEN_FROM_FINAL_POOL_LAUNCH_EVIDENCE',
+    'MARKET_STABILITY_RESERVE_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_SELLER_ATH_WALLET_BEFORE_USE',
     'FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES',
     'VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS',
   ];
@@ -316,16 +336,18 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   return {
     manifest,
     manifestCell,
-    inits: { athMaster, buybackBurn, vault, capsuleHub, feeAccumulator, usernameRegistry, profileRegistry },
+    inits: { athMaster, buybackBurn, marketStabilitySeller, vault, capsuleHub, feeAccumulator, usernameRegistry, profileRegistry },
     parsed: {
       athMasterAddress,
       buybackBurnAddress,
+      marketStabilitySellerAddress,
       vaultAddress,
       capsuleHubAddress,
       feeAccumulatorAddress,
       usernameRegistryAddress,
       profileRegistryAddress,
       buybackBurnOfficialAthWalletAddress,
+      marketStabilitySellerOfficialAthWalletAddress,
       vaultOfficialAthWalletAddress,
       usernameRegistryOfficialAthWalletAddress,
       profileRegistryOfficialAthWalletAddress,

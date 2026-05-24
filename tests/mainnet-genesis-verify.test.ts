@@ -20,6 +20,10 @@ function finalInput(): MainnetGenesisVerifyInput {
     ath_treasury_owner: addr('ath_treasury_owner'),
     vault: addr('vault'),
     vault_official_ath_wallet: addr('vault_official_ath_wallet'),
+    market_stability_seller: addr('market_stability_seller'),
+    market_stability_seller_official_ath_wallet: addr('market_stability_seller_official_ath_wallet'),
+    market_stability_reserve_funder: addr('market_stability_reserve_funder'),
+    market_stability_ton_treasury_receiver: addr('market_stability_ton_treasury_receiver'),
     capsulehub: addr('capsulehub'),
     fee_accumulator: addr('fee_accumulator'),
     fee_accumulator_ton_treasury_receiver: addr('fee_accumulator_ton_treasury_receiver'),
@@ -36,6 +40,7 @@ function finalInput(): MainnetGenesisVerifyInput {
     ath_master: hash('ath_master'),
     ath_wallet: hash('ath_wallet'),
     vault: hash('vault'),
+    market_stability_seller: hash('market_stability_seller'),
     capsulehub: hash('capsulehub'),
     username_registry: hash('username_registry'),
     profile_registry: hash('profile_registry'),
@@ -55,6 +60,7 @@ function finalInput(): MainnetGenesisVerifyInput {
       code_hashes,
       constants: {
         vault_activity_airdrop_total_atomic: '30000000000000000',
+        ath_market_stability_reserve_allocation_atomic: '45000000000000000',
       },
       blockers_before_final_genesis: [],
     },
@@ -80,6 +86,28 @@ function finalInput(): MainnetGenesisVerifyInput {
         owner_address: addresses.vault,
         ath_master_address: addresses.ath_master,
         balance_atomic: '30000000000000000',
+      },
+      market_stability_seller: {
+        address: addresses.market_stability_seller,
+        code_hash: code_hashes.market_stability_seller,
+        sealed: true,
+        deployment_manifest_hash: manifestHash,
+        reserve_funder_address: addresses.market_stability_reserve_funder,
+        official_ath_wallet_address: addresses.market_stability_seller_official_ath_wallet,
+        ton_treasury_receiver_address: addresses.market_stability_ton_treasury_receiver,
+        ath_master_address: addresses.ath_master,
+        genesis_config_hash: '0'.repeat(64),
+        pricing_frozen: true,
+        reserve_due_ath: '45000000000000000',
+        treasury_due_ton: '0',
+        sold_ath_total: '0',
+      },
+      market_stability_seller_official_ath_wallet: {
+        address: addresses.market_stability_seller_official_ath_wallet,
+        code_hash: code_hashes.ath_wallet,
+        owner_address: addresses.market_stability_seller,
+        ath_master_address: addresses.ath_master,
+        balance_atomic: '45000000000000000',
       },
       capsulehub: {
         address: addresses.capsulehub,
@@ -179,6 +207,8 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     input.manifest.addresses.ath_master = masterchainAthMaster;
     input.snapshot.ath_master.address = masterchainAthMaster;
     input.snapshot.vault.ath_master_address = masterchainAthMaster;
+    input.snapshot.market_stability_seller.ath_master_address = masterchainAthMaster;
+    input.snapshot.market_stability_seller_official_ath_wallet.ath_master_address = masterchainAthMaster;
     input.snapshot.username_registry.ath_master_address = masterchainAthMaster;
     input.snapshot.profile_registry.ath_master_address = masterchainAthMaster;
     input.snapshot.buyback_burn.ath_master_address = masterchainAthMaster;
@@ -187,6 +217,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('ATH_MASTER_NOT_BASECHAIN');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_ATH_MASTER_NOT_BASECHAIN');
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN');
     expect(report.issue_codes).toContain('PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN');
     expect(report.issue_codes).toContain('BUYBACK_ATH_MASTER_NOT_BASECHAIN');
@@ -232,6 +263,34 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_OWNER_MISMATCH');
     expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH');
+  });
+
+  it('rejects final genesis when MarketStabilitySeller pricing is not frozen and reserve is underfunded', () => {
+    const input = finalInput();
+    input.snapshot.market_stability_seller.pricing_frozen = false;
+    input.snapshot.market_stability_seller.genesis_config_hash = hash('seller_controller_not_cleared');
+    input.snapshot.market_stability_seller.reserve_due_ath = '44999999999999999';
+    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '44999999999999999';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_GENESIS_HASH_NOT_CLEARED');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_UNDERFUNDED');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_UNDERFUNDED');
+  });
+
+  it('rejects final genesis when MarketStabilitySeller getter snapshots are missing', () => {
+    const input = finalInput() as any;
+    delete input.snapshot.market_stability_seller;
+    delete input.snapshot.market_stability_seller_official_ath_wallet;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('MISSING_MARKET_STABILITY_SELLER_SNAPSHOT');
+    expect(report.issue_codes).toContain('MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT');
   });
 
   it('rejects final genesis when FeeAccumulator buyback split is already enabled', () => {

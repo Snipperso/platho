@@ -10,6 +10,7 @@ const codeHashChecks: Array<{ key: string; buildDir: string; artifactName: strin
   { key: 'ATHMASTER_CODE_HASH', buildDir: 'ATHMaster', artifactName: 'ATHMaster_ATHMaster', artifactFile: 'ATHMASTER_CODE_HASH.txt', manifestKey: 'ath_master' },
   { key: 'ATH_WALLET_CODE_HASH', buildDir: 'ATHWallet', artifactName: 'ATHWallet_ATHWallet', artifactFile: 'ATH_WALLET_CODE_HASH.txt', manifestKey: 'ath_wallet' },
   { key: 'BUYBACKBURN_CODE_HASH', buildDir: 'BuybackBurn', artifactName: 'BuybackBurn_BuybackBurn', artifactFile: 'BUYBACKBURN_CODE_HASH.txt', manifestKey: 'buyback_burn' },
+  { key: 'MARKET_STABILITY_SELLER_CODE_HASH', buildDir: 'MarketStabilitySeller', artifactName: 'MarketStabilitySeller_MarketStabilitySeller', artifactFile: 'MARKET_STABILITY_SELLER_CODE_HASH.txt', manifestKey: 'market_stability_seller' },
   { key: 'CAPSULEHUB_CODE_HASH', buildDir: 'CapsuleHub', artifactName: 'CapsuleHub_CapsuleHub', artifactFile: 'CAPSULEHUB_CODE_HASH.txt', manifestKey: 'capsulehub' },
   { key: 'FEEACCUMULATOR_CODE_HASH', buildDir: 'FeeAccumulator', artifactName: 'FeeAccumulator_FeeAccumulator', artifactFile: 'FEEACCUMULATOR_CODE_HASH.txt', manifestKey: 'fee_accumulator' },
   { key: 'PROFILE_REGISTRY_CODE_HASH', buildDir: 'ProfileRegistry', artifactName: 'ProfileRegistry_ProfileRegistry', artifactFile: 'PROFILE_REGISTRY_CODE_HASH.txt', manifestKey: 'profile_registry' },
@@ -25,6 +26,7 @@ const stableArtifacts = [
   'artifacts/ATHMASTER_CODE_HASH.txt',
   'artifacts/ATH_WALLET_CODE_HASH.txt',
   'artifacts/BUYBACKBURN_CODE_HASH.txt',
+  'artifacts/MARKET_STABILITY_SELLER_CODE_HASH.txt',
   'artifacts/CAPSULEHUB_CODE_HASH.txt',
   'artifacts/FEEACCUMULATOR_CODE_HASH.txt',
   'artifacts/FEE_ACCUMULATOR_CODE_HASH.txt',
@@ -46,6 +48,9 @@ const stableArtifacts = [
   'artifacts/platho_v1_open_values_v0_49_final_tokenomics_market_stability.md',
   'artifacts/MILESTONE_SUMMARY_M49_FINAL_TOKENOMICS_MARKET_STABILITY.md',
   'artifacts/SPEC_CHANGELOG_M49_FINAL_TOKENOMICS_MARKET_STABILITY.md',
+  'artifacts/platho_v1_open_values_v0_50_market_stability_seller.md',
+  'artifacts/MILESTONE_SUMMARY_M50_MARKET_STABILITY_SELLER.md',
+  'artifacts/SPEC_CHANGELOG_M50_MARKET_STABILITY_SELLER.md',
 ];
 
 function sha256(data: Buffer | string): string {
@@ -113,8 +118,8 @@ function allTrue(obj: Record<string, boolean>): boolean {
 export type M18Report = {
   profile: string;
   status: 'PASS' | 'FAIL';
-  contract_code_changed: false;
-  functional_surface_added: false;
+  contract_code_changed: boolean;
+  functional_surface_added: boolean;
   checks: Record<string, boolean>;
   code_hashes: Record<string, { built: string; pinned: string; current_file: string | null; match: boolean }>;
   vector_checks: Record<string, boolean>;
@@ -218,8 +223,8 @@ export async function runM18ArtifactIntegrity(writeArtifacts = true): Promise<M1
   const report: M18Report = {
     profile: M18_PROFILE,
     status: allTrue(checks) ? 'PASS' : 'FAIL',
-    contract_code_changed: false,
-    functional_surface_added: false,
+    contract_code_changed: true,
+    functional_surface_added: true,
     checks,
     code_hashes: codeHashes,
     vector_checks: vectorChecks,
@@ -233,7 +238,7 @@ export async function runM18ArtifactIntegrity(writeArtifacts = true): Promise<M1
     stable_artifact_lock: artifactLock,
     source_lock: sourceLock,
     notes: [
-      'M18 does not add contract functionality or change contract code.',
+      'M50 adds the MarketStabilitySeller contract and refreshes the implemented-subset artifact lock accordingly.',
       'JSON artifact hashes are normalized by replacing generated_at/generated_at_utc with DETERMINISTIC_ARTIFACT and sorting object keys.',
       'This is an implemented-subset artifact integrity lock, not a final genesis manifest.',
     ],
@@ -259,7 +264,7 @@ function renderMarkdown(report: M18Report): string {
   lines.push('');
   lines.push(`Status: **${report.status}**`);
   lines.push('');
-  lines.push('Scope: implemented subset artifacts after M17. No contract functionality or code hash was changed. This pass locks generated artifacts against the current build so stale vectors do not quietly survive into later milestones. Yes, apparently files can lie by omission too.');
+  lines.push('Scope: current implemented subset artifacts, including the M50 MarketStabilitySeller contract. This pass locks generated artifacts against the current build so stale vectors do not quietly survive into later milestones. Yes, apparently files can lie by omission too.');
   lines.push('');
   lines.push('## Checks');
   lines.push('');
