@@ -264,6 +264,8 @@ const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 30_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 15_000_000_000_000_000n;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS = 6_000_000n;
+const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
+const VAULT_PUBLISH_NONCE_POLL_MS = 1_500;
 const PLATO_PRIVATE_STANDARD_FEE_NANOTONS = 5_000_000n;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
 const PLATO_PUBLIC_POST_FEE_NANOTONS = 5_000_000n;
@@ -4727,6 +4729,25 @@ async function sendVaultExternalBoc(built) {
   return { ...built, result };
 }
 
+async function readVaultPublishNonce(provider, owner) {
+  if (!provider?.getUser) return null;
+  const user = await provider.getUser(owner, { vaultAddress: requireVaultAddress() });
+  return BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+}
+
+async function waitForVaultPublishNonce(provider, owner, expectedNonce) {
+  const deadline = Date.now() + VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS;
+  let lastNonce = await readVaultPublishNonce(provider, owner);
+  while (lastNonce !== null && lastNonce < expectedNonce && Date.now() < deadline) {
+    await delay(VAULT_PUBLISH_NONCE_POLL_MS);
+    lastNonce = await readVaultPublishNonce(provider, owner);
+  }
+  if (lastNonce !== null && lastNonce < expectedNonce) {
+    throw new Error('Vault publish was not confirmed before sending the next capsule');
+  }
+  return lastNonce;
+}
+
 async function publishCapsulesThroughVault(capsules) {
   const normalizedCapsules = (capsules ?? []).filter(Boolean);
   if (normalizedCapsules.length === 0) throw new Error('Capsule publish payload is missing');
@@ -4781,9 +4802,13 @@ async function publishCapsulesThroughVault(capsules) {
     throw new Error('Vault TON balance is too low for this publish');
   }
   let lastResult = null;
-  for (const item of results) {
+  for (let index = 0; index < results.length; index += 1) {
+    const item = results[index];
     lastResult = await sendVaultExternalBoc(item.external);
     item.result = lastResult;
+    if (index + 1 < results.length) {
+      await waitForVaultPublishNonce(provider, owner, item.clientNonce + 1n);
+    }
   }
   globalThis.plathoLastVaultPublish = {
     capsules: normalizedCapsules.map((capsule) => capsule.id),

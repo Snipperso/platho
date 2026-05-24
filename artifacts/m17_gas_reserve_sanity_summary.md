@@ -11,7 +11,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
 | USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 24347951 | 5071077 | 38299 |
-| VAULT_BALANCE_PUBLISH | 2 | 9832860 | 5140197 | 31931 |
+| VAULT_BALANCE_PUBLISH | 2 | 10188594 | 5318064 | 34599 |
 
 ## Operation details
 
@@ -63,8 +63,8 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| vault_balance_private_publish_to_capsulehub_ack | 3 | 5140197 | 3414374 | 31931 | 1 | 1 |
-| vault_balance_private_publish_to_missing_capsulehub_bounce | 3 | 4692663 | 3414374 | 31931 | 1 | 0 |
+| vault_balance_private_publish_to_capsulehub_ack | 3 | 5318064 | 3592241 | 34599 | 1 | 1 |
+| vault_balance_private_publish_to_missing_capsulehub_bounce | 3 | 4870530 | 3592241 | 34599 | 1 | 0 |
 
 ## Result
 

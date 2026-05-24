@@ -15,8 +15,10 @@ import {
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const KIND_PRIVATE = 1n;
+const KIND_PUBLIC = 2n;
 const SIZE_STANDARD = 1n;
 const SUITE_CLASSICAL = 1n;
+const SUITE_PUBLIC_NONE = 0n;
 const BODY_CELL = finalPrivateBodyCell();
 const HEADER0_CELL = finalPrivateHeader0Cell();
 const HEADER1_CELL = finalPrivateHeader1Cell();
@@ -25,6 +27,8 @@ const HEADER0 = BigInt('0x' + HEADER0_CELL.hash().toString('hex'));
 const HEADER1 = BigInt('0x' + HEADER1_CELL.hash().toString('hex'));
 const OP_REMOVED_DIRECT_PUBLISH_PRIVATE = 0x686694C6;
 const OP_PUBLISH_PRIVATE_FROM_VAULT_BALANCE = 0x7E1F5031;
+const OP_PUBLISH_PUBLIC_FROM_VAULT_BALANCE = 0x7E1F5032;
+const VAULT_PUBLISH_LOCAL_EXEC_RESERVE = 6_000_000n;
 
 async function setup() {
   const blockchain = await Blockchain.create();
@@ -66,13 +70,19 @@ async function depositTon(vault: any, user: any, amount: bigint) {
   } as DepositTon);
 }
 
-function signedPrivatePublishBody(owner: any, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+function signedPrivatePublishBody(
+  owner: any,
+  nonce: bigint,
+  maxCharge: bigint,
+  secretKey: Buffer,
+  overrides: { bodyHash?: bigint } = {},
+) {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
     .storeUint(SUITE_CLASSICAL, 8)
     .storeUint(HEADER0, 256)
     .storeUint(HEADER1, 256)
-    .storeUint(BODY_HASH, 256)
+    .storeUint(overrides.bodyHash ?? BODY_HASH, 256)
     .storeRef(HEADER0_CELL)
     .storeRef(HEADER1_CELL)
     .storeRef(BODY_CELL)
@@ -85,6 +95,33 @@ function signedPrivatePublishBody(owner: any, nonce: bigint, maxCharge: bigint, 
     .endCell();
   return beginCell()
     .storeUint(OP_PUBLISH_PRIVATE_FROM_VAULT_BALANCE, 32)
+    .storeAddress(owner)
+    .storeBuffer(sign(signedPayload.hash(), secretKey))
+    .storeRef(signedPayload)
+    .endCell();
+}
+
+function signedPublicPublishBody(
+  owner: any,
+  nonce: bigint,
+  maxCharge: bigint,
+  secretKey: Buffer,
+  overrides: { bodyHash?: bigint } = {},
+) {
+  const payload = beginCell()
+    .storeUint(HEADER0, 256)
+    .storeUint(overrides.bodyHash ?? BODY_HASH, 256)
+    .storeRef(HEADER0_CELL)
+    .storeRef(BODY_CELL)
+    .endCell();
+  const signedPayload = beginCell()
+    .storeAddress(owner)
+    .storeUint(nonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  return beginCell()
+    .storeUint(OP_PUBLISH_PUBLIC_FROM_VAULT_BALANCE, 32)
     .storeAddress(owner)
     .storeBuffer(sign(signedPayload.hash(), secretKey))
     .storeRef(signedPayload)
@@ -136,6 +173,73 @@ describe('Vault balance-funded publish gate', () => {
       body: removedDirectPublishBody(maxCharge),
     }));
 
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-03: valid signature with underpriced payload only charges local exec reserve', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPrivatePublishBody(user.address, before.publish_nonce, VAULT_PUBLISH_LOCAL_EXEC_RESERVE, keyPair.secretKey),
+    }));
+
+    const after = await vault.getGetUser(user.address);
+    expect(after.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+    expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-04: valid signature with mismatched cell hash only charges local exec reserve', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+    const badBody = signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+      bodyHash: BODY_HASH + 1n,
+    });
+
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: badBody,
+    }));
+
+    const after = await vault.getGetUser(user.address);
+    expect(after.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+    expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: badBody,
+    }))).rejects.toMatchObject({ exitCode: 16453 });
+    const replayed = await vault.getGetUser(user.address);
+    expect(replayed.ton_balance).toBe(after.ton_balance);
+    expect(replayed.publish_nonce).toBe(after.publish_nonce);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-05: public signed payload mismatch also advances nonce without pending publish', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        bodyHash: BODY_HASH + 1n,
+      }),
+    }));
+
+    const after = await vault.getGetUser(user.address);
+    expect(after.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+    expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 });
