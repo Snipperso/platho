@@ -30,6 +30,10 @@ const OP_PUBLISH_PRIVATE_FROM_VAULT_BALANCE = 0x7E1F5031;
 const OP_PUBLISH_PUBLIC_FROM_VAULT_BALANCE = 0x7E1F5032;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE = 6_000_000n;
 
+function cellHash(cell: any): bigint {
+  return BigInt('0x' + cell.hash().toString('hex'));
+}
+
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -106,13 +110,15 @@ function signedPublicPublishBody(
   nonce: bigint,
   maxCharge: bigint,
   secretKey: Buffer,
-  overrides: { bodyHash?: bigint } = {},
+  overrides: { bodyHash?: bigint; headerCell?: any; bodyCell?: any } = {},
 ) {
+  const headerCell = overrides.headerCell ?? HEADER0_CELL;
+  const bodyCell = overrides.bodyCell ?? BODY_CELL;
   const payload = beginCell()
-    .storeUint(HEADER0, 256)
-    .storeUint(overrides.bodyHash ?? BODY_HASH, 256)
-    .storeRef(HEADER0_CELL)
-    .storeRef(BODY_CELL)
+    .storeUint(cellHash(headerCell), 256)
+    .storeUint(overrides.bodyHash ?? cellHash(bodyCell), 256)
+    .storeRef(headerCell)
+    .storeRef(bodyCell)
     .endCell();
   const signedPayload = beginCell()
     .storeAddress(owner)
@@ -126,6 +132,14 @@ function signedPublicPublishBody(
     .storeBuffer(sign(signedPayload.hash(), secretKey))
     .storeRef(signedPayload)
     .endCell();
+}
+
+function oversizedPublicBodyCell() {
+  let cell = beginCell().storeUint(1n, 8).endCell();
+  for (let index = 0; index < 9; index += 1) {
+    cell = beginCell().storeUint(1n, 8).storeRef(cell).endCell();
+  }
+  return cell;
 }
 
 function removedDirectPublishBody(maxCharge: bigint) {
@@ -234,6 +248,26 @@ describe('Vault balance-funded publish gate', () => {
       to: vault.address,
       body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
         bodyHash: BODY_HASH + 1n,
+      }),
+    }));
+
+    const after = await vault.getGetUser(user.address);
+    expect(after.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+    expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-06: public oversized body is rejected before outbound publish', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        bodyCell: oversizedPublicBodyCell(),
       }),
     }));
 

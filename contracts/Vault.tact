@@ -63,6 +63,24 @@ const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 4000000;
 const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 1000000;
 const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
+const CAPSULEHUB_PRIVATE_HEADER0_BITS: Int = 1120;
+const CAPSULEHUB_PRIVATE_HEADER1_BITS: Int = 240;
+const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 2;
+const CAPSULEHUB_PRIVATE_HEADER0_REFS: Int = 1;
+const CAPSULEHUB_PRIVATE_HEADER1_CELLS: Int = 1;
+const CAPSULEHUB_PRIVATE_HEADER1_REFS: Int = 0;
+const CAPSULEHUB_PRIVATE_STANDARD_BODY_BITS: Int = 9120;
+const CAPSULEHUB_PRIVATE_LONG_TERM_BODY_BITS: Int = 17824;
+const CAPSULEHUB_PRIVATE_STANDARD_BODY_CELLS: Int = 9;
+const CAPSULEHUB_PRIVATE_LONG_TERM_BODY_CELLS: Int = 18;
+const CAPSULEHUB_PRIVATE_STANDARD_BODY_REFS: Int = 8;
+const CAPSULEHUB_PRIVATE_LONG_TERM_BODY_REFS: Int = 17;
+const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576;
+const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
+const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
+const CAPSULEHUB_PUBLIC_BODY_MAX_BITS: Int = 8192;
+const CAPSULEHUB_PUBLIC_BODY_MAX_CELLS: Int = 9;
+const CAPSULEHUB_PUBLIC_BODY_MAX_REFS: Int = 8;
 const OP_BIND_DEPLOYMENT_MANIFEST: Int = 0x90E2E0CB;
 const OP_BIND_OFFICIAL_ATH_WALLET: Int = 0x18DB2CCB;
 const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
@@ -452,6 +470,67 @@ contract Vault {
             return true;
         }
         return false;
+    }
+
+    fun privateBodyBits(sizeClass: Int): Int {
+        if (sizeClass == SIZE_CLASS_LONG_TERM) {
+            return CAPSULEHUB_PRIVATE_LONG_TERM_BODY_BITS;
+        }
+        return CAPSULEHUB_PRIVATE_STANDARD_BODY_BITS;
+    }
+
+    fun privateBodyCells(sizeClass: Int): Int {
+        if (sizeClass == SIZE_CLASS_LONG_TERM) {
+            return CAPSULEHUB_PRIVATE_LONG_TERM_BODY_CELLS;
+        }
+        return CAPSULEHUB_PRIVATE_STANDARD_BODY_CELLS;
+    }
+
+    fun privateBodyRefs(sizeClass: Int): Int {
+        if (sizeClass == SIZE_CLASS_LONG_TERM) {
+            return CAPSULEHUB_PRIVATE_LONG_TERM_BODY_REFS;
+        }
+        return CAPSULEHUB_PRIVATE_STANDARD_BODY_REFS;
+    }
+
+    fun isExactCapsuleCell(cell: Cell, expectedCells: Int, expectedBits: Int, expectedRefs: Int): Bool {
+        try {
+            let size: DataSize = cell.computeDataSize(expectedCells);
+            return size.cells == expectedCells && size.bits == expectedBits && size.refs == expectedRefs;
+        } catch (exitCode) {
+            return false;
+        }
+    }
+
+    fun isPublicCapsuleCell(cell: Cell, maxCells: Int, maxBits: Int, maxRefs: Int, requireByteAligned: Bool): Bool {
+        try {
+            let size: DataSize = cell.computeDataSize(maxCells);
+            if (!(size.cells <= maxCells)) { return false; }
+            if (!(size.bits > 0)) { return false; }
+            if (!(size.bits <= maxBits)) { return false; }
+            if (!(size.refs <= maxRefs)) { return false; }
+            if (requireByteAligned && !(size.bits % 8 == 0)) { return false; }
+            return true;
+        } catch (exitCode) {
+            return false;
+        }
+    }
+
+    fun isPrivateCapsuleShapeValid(sizeClass: Int, header0: Cell, header1: Cell, body: Cell): Bool {
+        if (!self.isExactCapsuleCell(header0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS)) {
+            return false;
+        }
+        if (!self.isExactCapsuleCell(header1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS)) {
+            return false;
+        }
+        return self.isExactCapsuleCell(body, self.privateBodyCells(sizeClass), self.privateBodyBits(sizeClass), self.privateBodyRefs(sizeClass));
+    }
+
+    fun isPublicCapsuleShapeValid(header: Cell, body: Cell): Bool {
+        if (!self.isPublicCapsuleCell(header, CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS, CAPSULEHUB_PUBLIC_HEADER_MAX_BITS, CAPSULEHUB_PUBLIC_HEADER_MAX_REFS, true)) {
+            return false;
+        }
+        return self.isPublicCapsuleCell(body, CAPSULEHUB_PUBLIC_BODY_MAX_CELLS, CAPSULEHUB_PUBLIC_BODY_MAX_BITS, CAPSULEHUB_PUBLIC_BODY_MAX_REFS, false);
     }
 
     fun canonicalPublishMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
@@ -1159,6 +1238,9 @@ contract Vault {
         if (!(body.hash() == bodyHash)) {
             return;
         }
+        if (!self.isPrivateCapsuleShapeValid(sizeClass, header0, header1, body)) {
+            return;
+        }
 
         let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
         if (!(maxCharge >= expectedMax)) {
@@ -1267,6 +1349,9 @@ contract Vault {
             return;
         }
         if (!(body.hash() == bodyHash)) {
+            return;
+        }
+        if (!self.isPublicCapsuleShapeValid(header, body)) {
             return;
         }
 

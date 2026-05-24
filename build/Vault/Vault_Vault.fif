@@ -80,6 +80,13 @@ PROGRAM{
   DECLPROC $Vault$_fun_computeAthWithdrawalId
   DECLPROC $Vault$_fun_discountedFee
   DECLPROC $Vault$_fun_isPublishProfileValid
+  DECLPROC $Vault$_fun_privateBodyBits
+  DECLPROC $Vault$_fun_privateBodyCells
+  DECLPROC $Vault$_fun_privateBodyRefs
+  DECLPROC $Vault$_fun_isExactCapsuleCell
+  DECLPROC $Vault$_fun_isPublicCapsuleCell
+  DECLPROC $Vault$_fun_isPrivateCapsuleShapeValid
+  DECLPROC $Vault$_fun_isPublicCapsuleShapeValid
   DECLPROC $Vault$_fun_canonicalPublishMaxCharge
   DECLPROC $Vault$_fun_computePublishId
   DECLPROC $Vault$_fun_capsulehubCallValue
@@ -1033,6 +1040,378 @@ PROGRAM{
     }>
     4 BLKDROP
     FALSE
+  }>
+  $Vault$_fun_privateBodyBits PROCREF:<{
+    2 EQINT
+    IFJMP:<{
+      17824 PUSHINT
+    }>
+    9120 PUSHINT
+  }>
+  $Vault$_fun_privateBodyCells PROCREF:<{
+    2 EQINT
+    IFJMP:<{
+      18 PUSHINT
+    }>
+    9 PUSHINT
+  }>
+  $Vault$_fun_privateBodyRefs PROCREF:<{
+    2 EQINT
+    IFJMP:<{
+      17 PUSHINT
+    }>
+    8 PUSHINT
+  }>
+  $Vault$_fun_isExactCapsuleCell PROCREF:<{
+    CONT:<{
+      c2 SAVE
+      SAMEALTSAVE
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      22 s() PUSH
+      c1 PUSH
+      c3 PUSH
+      c4 PUSH
+      c5 PUSH
+      c7 PUSH
+      <{
+        2DROP
+        FALSE
+        RETALT
+        15 BLKDROP
+        5 BLKDROP
+      }>CONT
+      c7 SETCONT
+      c5 SETCONT
+      c4 SETCONT
+      c3 SETCONT
+      c1 SETCONT
+      19 PUSHINT
+      -1 PUSHINT
+      SETCONTVARARGS
+      <{
+        s3 s2 XCPU
+            CDATASIZE
+        s2 s4 XCHG2
+        EQUAL
+        IF:<{
+          SWAP
+          EQUAL
+        }>ELSE<{
+          2DROP
+          FALSE
+        }>
+        IF:<{
+          SWAP
+          EQUAL
+        }>ELSE<{
+          2DROP
+          FALSE
+        }>
+        RETALT
+      }>CONT
+      c1 PUSH
+      COMPOSALT
+      SWAP
+      TRY
+    }>
+    23 PUSHINT -1 PUSHINT CALLXVARARGS
+  }>
+  $Vault$_fun_isPublicCapsuleCell PROCREF:<{
+    CONT:<{
+      c2 SAVE
+      SAMEALTSAVE
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      23 s() PUSH
+      c1 PUSH
+      c3 PUSH
+      c4 PUSH
+      c5 PUSH
+      c7 PUSH
+      <{
+        2DROP
+        FALSE
+        RETALT
+        15 BLKDROP
+        5 BLKDROP
+      }>CONT
+      c7 SETCONT
+      c5 SETCONT
+      c4 SETCONT
+      c3 SETCONT
+      c1 SETCONT
+      19 PUSHINT
+      -1 PUSHINT
+      SETCONTVARARGS
+      <{
+        s4 s3 XCPU
+            CDATASIZE
+        s2 s5 XCHG2
+        LEQ
+        IFNOTJMP:<{
+          5 BLKDROP
+          FALSE
+          RETALT
+        }>
+        DUP
+        0 GTINT
+        IFNOTJMP:<{
+          5 BLKDROP
+          FALSE
+          RETALT
+        }>
+        s0 s2 PUXC
+        LEQ
+        IFNOTJMP:<{
+          4 BLKDROP
+          FALSE
+          RETALT
+        }>
+        s1 s2 XCHG
+        LEQ
+        IFNOTJMP:<{
+          2DROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+        IF:<{
+          3 MODPOW2#
+          0 EQINT
+          NOT
+        }>ELSE<{
+          DROP
+          FALSE
+        }>
+        IFJMP:<{
+          FALSE
+          RETALT
+        }>
+        TRUE
+        RETALT
+      }>CONT
+      c1 PUSH
+      COMPOSALT
+      SWAP
+      TRY
+    }>
+    24 PUSHINT -1 PUSHINT CALLXVARARGS
+  }>
+  $Vault$_fun_isPrivateCapsuleShapeValid PROCREF:<{
+    19 s() 22 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 22 s() XCHG
+    s15 21 s() XCHG
+    s14 20 s() XCHG
+    s13 22 s() XCHG
+    s12 21 s() XCHG
+    s11 20 s() XCHG
+    s10 22 s() XCHG
+    s9 21 s() XCHG
+    s8 20 s() XCHG
+    s7 22 s() XCHG
+    s6 21 s() XCHG
+    s5 20 s() XCHG
+    s4 22 s() XCHG
+    s3 21 s() XCHG
+    s2 20 s() XCHG
+    s1 22 s() XCHG
+    s0 20 s() XCHG
+    2 PUSHINT
+    1120 PUSHINT
+    1 PUSHINT
+    $Vault$_fun_isExactCapsuleCell INLINECALLDICT
+    IFNOTJMP:<{
+      19 s() POP
+      19 s() POP
+      19 s() POP
+      s15 18 s() XCHG
+      s14 17 s() XCHG
+      s13 16 s() XCHG
+      3 13 BLKSWAP
+      FALSE
+    }>
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    s0 21 s() XCHG
+    1 PUSHINT
+    240 PUSHINT
+    0 PUSHINT
+    $Vault$_fun_isExactCapsuleCell INLINECALLDICT
+    IFNOTJMP:<{
+      19 s() POP
+      19 s() POP
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      FALSE
+    }>
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() PUSH
+    18 s() 37 s() XCHG
+    17 s() 36 s() XCHG
+    16 s() 35 s() XCHG
+    s15 34 s() XCHG
+    s14 33 s() XCHG
+    s13 32 s() XCHG
+    s12 31 s() XCHG
+    s11 30 s() XCHG
+    s10 29 s() XCHG
+    s9 28 s() XCHG
+    s8 27 s() XCHG
+    s7 26 s() XCHG
+    s6 25 s() XCHG
+    s5 24 s() XCHG
+    s4 23 s() XCHG
+    s3 22 s() XCHG
+    s2 21 s() XCHG
+    s1 20 s() XCHG
+    s0 19 s() XCHG
+    38 s() PUSH
+    $Vault$_fun_privateBodyCells INLINECALLDICT
+    18 s() 19 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 19 s() XCHG
+    s15 19 s() XCHG
+    s14 19 s() XCHG
+    s13 19 s() XCHG
+    s12 19 s() XCHG
+    s11 19 s() XCHG
+    s10 19 s() XCHG
+    s9 19 s() XCHG
+    s0 19 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    39 s() PUSH
+    $Vault$_fun_privateBodyBits INLINECALLDICT
+    s0 40 s() XCHG
+    $Vault$_fun_privateBodyRefs INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    3 1 BLKDROP2
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s15 17 s() XCHG
+    s14 16 s() XCHG
+    s13 s15 XCHG
+    s12 s14 XCHG
+    s11 s13 XCHG
+    s10 s12 XCHG
+    s9 s11 XCHG
+    s8 s10 XCHG
+    s7 s9 XCHG
+    s6 s8 XCHG
+    s5 s7 XCHG
+    s4 s6 XCHG
+    s3 s5 XCHG
+    s1 s4 s0 XCHG3
+    s1 s3 XCHG
+    $Vault$_fun_isExactCapsuleCell INLINECALLDICT
+  }>
+  $Vault$_fun_isPublicCapsuleShapeValid PROCREF:<{
+    19 s() 20 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 20 s() XCHG
+    s15 20 s() XCHG
+    s14 20 s() XCHG
+    s13 20 s() XCHG
+    s12 20 s() XCHG
+    s11 20 s() XCHG
+    s10 20 s() XCHG
+    s9 20 s() XCHG
+    s8 20 s() XCHG
+    s7 20 s() XCHG
+    s6 20 s() XCHG
+    s0 20 s() XCHG
+    s0 s5 XCHG
+    s0 s4 XCHG
+    s0 s3 XCHG
+    -ROT
+    1 PUSHINT
+    576 PUSHINT
+    0 PUSHINT
+    TRUE
+    $Vault$_fun_isPublicCapsuleCell INLINECALLDICT
+    IFNOTJMP:<{
+      19 s() POP
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      FALSE
+    }>
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    9 PUSHINT
+    13 PUSHPOW2
+    8 PUSHINT
+    FALSE
+    $Vault$_fun_isPublicCapsuleCell INLINECALLDICT
   }>
   $Vault$_fun_canonicalPublishMaxCharge PROCREF:<{
     s2 PUSH
@@ -5237,6 +5616,34 @@ PROGRAM{
         13 3 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
+      19 s() PUSH
+      21 s() PUSH
+      28 s() PUSH
+      30 s() PUSH
+      $Vault$_fun_isPrivateCapsuleShapeValid INLINECALLDICT
+      IFNOTJMP:<{
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        s2 18 s() XCHG
+        s1 17 s() XCHG
+        s0 16 s() XCHG
+        13 3 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
       33 s() PUSH
       1 PUSHINT
       21 s() PUSH
@@ -5788,6 +6195,30 @@ PROGRAM{
           HASHCU
       21 s() PUSH
       EQUAL
+      IFNOTJMP:<{
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        19 s() POP
+        s6 18 s() XCHG
+        s5 17 s() XCHG
+        s4 16 s() XCHG
+        s3 s15 XCHG
+        s14 s13 s12 XCHG3
+        5 7 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      22 s() PUSH
+      24 s() PUSH
+      $Vault$_fun_isPublicCapsuleShapeValid INLINECALLDICT
       IFNOTJMP:<{
         19 s() POP
         19 s() POP
