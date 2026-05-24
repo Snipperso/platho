@@ -1151,6 +1151,11 @@ buyback_amount = 0
 `EnableBuybackSplit` is one-way, can only be sent by the immutable
 `treasury_receiver_address`, and requires caller-funded execution reserve.
 
+If `accumulated_ton > 0` when `EnableBuybackSplit` is accepted, that pre-enable
+amount is moved into `treasury_due_ton` before `buyback_split_enabled` becomes
+true. This prevents unsplit bootstrap fees from entering the post-pool buyback
+split.
+
 After `buyback_split_enabled` is true, split uses the normal buyback policy:
 
 ```text

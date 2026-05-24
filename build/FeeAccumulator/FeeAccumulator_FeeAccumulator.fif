@@ -277,6 +277,14 @@ PROGRAM{
       2000000 PUSHINT
       GEQ
       THROWANYIFNOT
+      DUP
+      0 GTINT
+      IF:<{
+        s1 s4 XCHG
+        ADD
+        s0 s3 XCHG
+        0 PUSHINT
+      }>
       2 3 BLKSWAP
       TRUE
       $FeeAccumulator$_contract_store INLINECALLDICT

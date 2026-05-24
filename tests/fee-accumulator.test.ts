@@ -125,6 +125,33 @@ describe('FeeAccumulator v1 milestone', () => {
     expect(state.treasury_due_ton + state.buyback_due_ton).toBe(amount);
   });
 
+  it('FEE-DUE-01C: enabling buyback split sweeps already accumulated bootstrap fees to treasury', async () => {
+    const { fee, capsuleHub, treasury } = await setup();
+    const preBootstrapAmount = 101n;
+    const postBootstrapAmount = 103n;
+
+    await fee.send(capsuleHub.getSender(), { value: preBootstrapAmount + toNano('0.1') }, {
+      $$type: 'DepositProtocolFee',
+      amount: preBootstrapAmount,
+    } as DepositProtocolFee);
+    expect((await fee.getGetState()).accumulated_ton).toBe(preBootstrapAmount);
+
+    await enableBuybackSplit(fee, treasury);
+
+    let state = await fee.getGetState();
+    expect(state.buyback_split_enabled).toBe(true);
+    expect(state.accumulated_ton).toBe(0n);
+    expect(state.treasury_due_ton).toBe(preBootstrapAmount);
+    expect(state.buyback_due_ton).toBe(0n);
+
+    await depositAndSplit(fee, capsuleHub, postBootstrapAmount);
+
+    state = await fee.getGetState();
+    expect(state.accumulated_ton).toBe(0n);
+    expect(state.treasury_due_ton).toBe(preBootstrapAmount + 51n);
+    expect(state.buyback_due_ton).toBe(52n);
+  });
+
   it('FEE-DUE-05: treasury flush uses immutable terminal receiver and debits treasury_due_ton only by requested amount', async () => {
     const { fee, capsuleHub, operator, treasury } = await setup();
     const amount = toNano('1');

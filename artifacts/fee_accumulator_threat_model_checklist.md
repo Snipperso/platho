@@ -10,6 +10,7 @@ Date: 2026-05-17
 - Deposit reserve boundary: underfunded principal-plus-exec reserve is rejected.
 - Split accounting: bootstrap mode sends 100% to treasury/liquidity; after one-way buyback enable it uses exact 50/50 integer split with dust to buyback.
 - Buyback split enable is one-way and restricted to the immutable treasury receiver.
+- Buyback split enable sweeps any pre-enable `accumulated_ton` into `treasury_due_ton` so unsplit bootstrap fees cannot become buyback due after the gate opens.
 - Split reserve boundary: underfunded split cannot move accumulated principal into due buckets.
 - Treasury flush reserve boundary and immutable terminal receiver routing.
 - Buyback flush exact 51.05 TON envelope enforcement.
@@ -24,6 +25,7 @@ Date: 2026-05-17
 - Deposits account only declared principal; surplus is execution/storage reserve.
 - Split preserves total accounted principal and sends no external value.
 - Before `buyback_split_enabled`, split cannot increase `buyback_due_ton`.
+- `EnableBuybackSplit` cannot convert already accumulated bootstrap fees into `buyback_due_ton`.
 - Treasury flush only debits the requested treasury due amount after reserve checks.
 - Buyback due can only be flushed as one complete M19H funding envelope.
 - Failed buyback delivery restores the exact envelope amount to `buyback_due_ton`.
