@@ -1784,6 +1784,13 @@ PROGRAM{
       $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
       s1 30 s() XCHG
       THROWANYIFNOT
+      23219 PUSHINT
+          MYADDR
+      33 s() PUSH
+      SWAP
+      SDEQ
+      NOT
+      THROWANYIFNOT
       27 s() 28 s() XCHG
       26 s() 27 s() XCHG
       25 s() 26 s() XCHG

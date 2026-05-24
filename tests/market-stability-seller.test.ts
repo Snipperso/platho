@@ -337,5 +337,18 @@ describe('MarketStabilitySeller', () => {
     expect(state.reserve_due_ath).toBe(TOTAL_RESERVE);
     expect(state.treasury_due_ton).toBe(0n);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
+
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE + toNano('1') }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount: TRANCHE,
+      recipient: env.seller.address,
+    } as BuyMarketStabilityAth);
+
+    const afterSelfRecipient = await env.seller.getGetMarketStabilitySellerState();
+    expect(afterSelfRecipient.phase).toBe(0n);
+    expect(afterSelfRecipient.reserve_due_ath).toBe(TOTAL_RESERVE);
+    expect(afterSelfRecipient.treasury_due_ton).toBe(0n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
   });
 });

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { Address } from '@ton/core';
+import { Address, beginCell } from '@ton/core';
 import { describe, expect, it } from 'vitest';
 import {
   MainnetGenesisVerifyInput,
@@ -14,6 +14,10 @@ function hash(label: string): string {
   return createHash('sha256').update(`PLATHO.MAINNET.GENESIS.HASH.${label}`).digest('hex');
 }
 
+function addressHashHex(address: string): string {
+  return beginCell().storeAddress(Address.parse(address)).endCell().hash().toString('hex');
+}
+
 function finalInput(): MainnetGenesisVerifyInput {
   const addresses = {
     ath_master: addr('ath_master'),
@@ -21,6 +25,7 @@ function finalInput(): MainnetGenesisVerifyInput {
     vault: addr('vault'),
     vault_official_ath_wallet: addr('vault_official_ath_wallet'),
     market_stability_seller: addr('market_stability_seller'),
+    market_stability_seller_initial_genesis_controller: addr('market_stability_seller_initial_genesis_controller'),
     market_stability_seller_official_ath_wallet: addr('market_stability_seller_official_ath_wallet'),
     market_stability_reserve_funder: addr('market_stability_reserve_funder'),
     market_stability_ton_treasury_receiver: addr('market_stability_ton_treasury_receiver'),
@@ -28,6 +33,7 @@ function finalInput(): MainnetGenesisVerifyInput {
     fee_accumulator: addr('fee_accumulator'),
     fee_accumulator_ton_treasury_receiver: addr('fee_accumulator_ton_treasury_receiver'),
     buyback_burn: addr('buyback_burn'),
+    buyback_burn_initial_genesis_controller: addr('buyback_burn_initial_genesis_controller'),
     buyback_burn_official_ath_wallet: addr('buyback_burn_official_ath_wallet'),
     username_registry: addr('username_registry'),
     username_registry_official_ath_wallet: addr('username_registry_official_ath_wallet'),
@@ -96,7 +102,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.market_stability_seller_official_ath_wallet,
         ton_treasury_receiver_address: addresses.market_stability_ton_treasury_receiver,
         ath_master_address: addresses.ath_master,
-        genesis_config_hash: hash('market_stability_launch_controller'),
+        genesis_config_hash: addressHashHex(addresses.market_stability_seller_initial_genesis_controller),
         pricing_frozen: false,
         reserve_due_ath: '0',
         reserve_funded_total_ath: '0',
@@ -144,7 +150,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         fee_accumulator_address: addresses.fee_accumulator,
         official_ath_wallet_address: addresses.buyback_burn_official_ath_wallet,
         ath_master_address: addresses.ath_master,
-        genesis_config_hash: hash('buyback_launch_controller'),
+        genesis_config_hash: addressHashHex(addresses.buyback_burn_initial_genesis_controller),
         route_frozen: false,
       },
       fee_accumulator: {
@@ -300,6 +306,16 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT');
   });
 
+  it('rejects final genesis when MarketStabilitySeller retained launch controller hash does not match the manifest address', () => {
+    const input = finalInput();
+    input.snapshot.market_stability_seller.genesis_config_hash = hash('wrong_market_stability_launch_controller');
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISMATCH');
+  });
+
   it('rejects final genesis when FeeAccumulator buyback split is already enabled', () => {
     const input = finalInput();
     input.snapshot.fee_accumulator.buyback_split_enabled = true;
@@ -328,5 +344,15 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('BUYBACK_LAUNCH_CONTROLLER_HASH_MISSING');
+  });
+
+  it('rejects final genesis when BuybackBurn retained launch controller hash does not match the manifest address', () => {
+    const input = finalInput();
+    input.snapshot.buyback_burn.genesis_config_hash = hash('wrong_buyback_launch_controller');
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('BUYBACK_LAUNCH_CONTROLLER_HASH_MISMATCH');
   });
 });
