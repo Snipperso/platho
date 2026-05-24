@@ -4806,9 +4806,7 @@ async function publishCapsulesThroughVault(capsules) {
     const item = results[index];
     lastResult = await sendVaultExternalBoc(item.external);
     item.result = lastResult;
-    if (index + 1 < results.length) {
-      await waitForVaultPublishNonce(provider, owner, item.clientNonce + 1n);
-    }
+    await waitForVaultPublishNonce(provider, owner, item.clientNonce + 1n);
   }
   globalThis.plathoLastVaultPublish = {
     capsules: normalizedCapsules.map((capsule) => capsule.id),
