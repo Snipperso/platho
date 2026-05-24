@@ -107,7 +107,8 @@ These are contract-to-contract callbacks, operator flows, or maintenance paths. 
 | `CapsuleHub` | `FlushFees` | Operator/keeper, not user PWA. |
 | `CapsuleHub` | `TopUpStorageReserve` | Maintenance only. |
 | `FeeAccumulator` | `DepositProtocolFee`, `SplitAccumulated`, `EnableBuybackSplit`, `FlushTreasuryDue`, `FlushBuybackDue`, `TopUpStorageReserve` | Protocol/keeper/operator. Not normal PWA. `EnableBuybackSplit` is the one-way 15% distribution / pool-launch gate. |
-| `BuybackBurn` | `Bind*`, `FreezeBuybackRoute`, `SealBuybackBurnGenesis` | Genesis/operator only. |
+| `BuybackBurn` | `Bind*`, `SealBuybackBurnGenesis` | Genesis/operator only. Final genesis seals BuybackBurn before the STON.fi pool exists. |
+| `BuybackBurn` | `FreezeBuybackRoute` | One-time post-pool launch operation after the 15% distribution gate; not normal PWA. |
 | `BuybackBurn` | `AcceptBurnReserve`, `AthTransferNotification`, `ATHBurnFinalized`, `ATHBurnFailed` | Internal callbacks. |
 | `BuybackBurn` | `ExecuteBuybackChunk`, `RetryAthBurnDue`, `RecoverStonfiRouteRefund`, `RecycleRouteRefundReserve` | Keeper/operator. Could be a separate ops panel, not core messenger PWA. |
 | `UsernameRegistry` | `BindOfficialAthWallet`, `SealGenesis` | Genesis/operator only. |

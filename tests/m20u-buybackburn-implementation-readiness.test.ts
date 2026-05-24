@@ -24,7 +24,8 @@ describe('M20U BuybackBurn implementation readiness gate', () => {
     expect(report.productionBuybackBurnImplementationReady).toBe(false);
     expect(report.addressCircularityResolution.m20fNeedsFinalBuybackBurnAddress).toBe(true);
     expect(report.addressCircularityResolution.productionStateInitCanBePreparedBeforeM20FRouteFreeze).toBe(true);
-    expect(report.addressCircularityResolution.productionRouteSealStillRequiresM20F).toBe(true);
+    expect(report.addressCircularityResolution.productionGenesisSealCanHappenBeforeM20F).toBe(true);
+    expect(report.addressCircularityResolution.productionRouteFreezeStillRequiresM20F).toBe(true);
     expect(report.blockedBy).toEqual(['M20F_MAINNET_STONFI_ROUTE_FREEZE_NOT_READY']);
   });
 
@@ -58,7 +59,7 @@ describe('M20U BuybackBurn implementation readiness gate', () => {
 
     expect(report.codexGuardrails.some((line) => line.includes('NEED_TESTNET_TON'))).toBe(true);
     expect(report.codexGuardrails.some((line) => line.includes('Never commit seed phrases'))).toBe(true);
-    expect(report.codexGuardrails.some((line) => line.includes('address-stable BuybackBurn StateInit'))).toBe(true);
+    expect(report.codexGuardrails.some((line) => line.includes('route_frozen=false'))).toBe(true);
     expect(report.codexGuardrails.some((line) => line.includes('testnet manifests and mainnet route-freeze manifests separate'))).toBe(true);
     expect(report.forbidden).toContain('turning testnet proof into mainnet route freeze');
   });

@@ -21,7 +21,8 @@ export interface BuybackBurnImplementationReadinessM20U {
   addressCircularityResolution: {
     m20fNeedsFinalBuybackBurnAddress: boolean;
     productionStateInitCanBePreparedBeforeM20FRouteFreeze: boolean;
-    productionRouteSealStillRequiresM20F: boolean;
+    productionGenesisSealCanHappenBeforeM20F: boolean;
+    productionRouteFreezeStillRequiresM20F: boolean;
     addressUnlockPreflight: string;
   };
   evidenceSources: {
@@ -116,7 +117,8 @@ export function createBuybackBurnImplementationReadinessM20U(
     addressCircularityResolution: {
       m20fNeedsFinalBuybackBurnAddress: true,
       productionStateInitCanBePreparedBeforeM20FRouteFreeze: true,
-      productionRouteSealStillRequiresM20F: true,
+      productionGenesisSealCanHappenBeforeM20F: true,
+      productionRouteFreezeStillRequiresM20F: true,
       addressUnlockPreflight: 'artifacts/M20F_MAINNET_ADDRESS_UNLOCK_READY.txt',
     },
     evidenceSources: {
@@ -138,9 +140,9 @@ export function createBuybackBurnImplementationReadinessM20U(
     },
     requiredBeforeProductionImplementation: [
       'M20T live testnet deployment/probe evidence with disposable testnet wallet',
-      'M20F mainnet STON.fi route evidence dossier passing M19F/M19E/M19C gates before production route seal/execution',
+      'M20F mainnet STON.fi route evidence dossier passing M19F/M19E/M19C gates before post-pool route freeze/execution',
       'final ATH master address',
-      'address-stable production BuybackBurn StateInit implementation before M20F final input collection; route execution remains sealed until M20F',
+      'address-stable production BuybackBurn StateInit implementation before M20F final input collection; final genesis may seal with route_frozen=false, but route execution remains blocked until post-pool M20F',
       'final BuybackBurn StateInit address',
       'official BuybackBurn ATH wallet derivation vector',
       'pinned STON.fi router/pool/pTON addresses and code hashes',
@@ -151,7 +153,7 @@ export function createBuybackBurnImplementationReadinessM20U(
     candidateContractSurface: {
       messages: [
         'AcceptBurnReserve from immutable FeeAccumulator only, exact 51.05 TON funding envelope',
-        'ExecuteBuybackChunk only when route freeze values are embedded in final implementation',
+        'ExecuteBuybackChunk only after post-seal FreezeBuybackRoute records final route values',
         'JettonTransferNotification only from official BuybackBurn ATH wallet',
         'ATHBurnFinalized only from ATH Master',
         'Route refund/failure handling without pretending burn success',
@@ -163,9 +165,9 @@ export function createBuybackBurnImplementationReadinessM20U(
         'feeAccumulatorAddress',
         'athMasterAddress',
         'officialBuybackBurnAthWalletAddress',
-        'stonfiRouterAddress',
-        'stonfiPoolAddressTonAth',
-        'stonfiPtonWalletAddress',
+        'stonfiRouterAddress after one-time route freeze',
+        'stonfiPoolAddressTonAth after one-time route freeze',
+        'stonfiPtonWalletAddress after one-time route freeze',
       ],
       state: [
         'IDLE',
@@ -189,7 +191,7 @@ export function createBuybackBurnImplementationReadinessM20U(
     implementationAcceptanceMatrix: [
       { label: 'raw 50 TON funding envelope is rejected by FeeAccumulator', required: true, source: 'M19I/M19H' },
       { label: 'exact 51.05 TON envelope is accepted only for BuybackBurn reserve path', required: true, source: 'M19I/M19H' },
-      { label: 'no production BuybackBurn before route freeze', required: true, source: 'M19C/M19F/M19G' },
+      { label: 'no production buyback execution before route freeze', required: true, source: 'M19C/M19F/M19G' },
       { label: 'pending STON.fi swap cannot be cleared by router claim alone', required: true, source: 'M19G' },
       { label: 'pending burn cannot be cleared without ATHBurnFinalized from ATH Master', required: true, source: 'M19G' },
       { label: 'refund/excess receiver remains BuybackBurn', required: true, source: 'M19H/M19F' },
@@ -207,7 +209,7 @@ export function createBuybackBurnImplementationReadinessM20U(
     codexGuardrails: [
       'Do not modify contracts during M20T unless explicitly instructed in a later milestone.',
       'Do not implement production BuybackBurn from this readiness report alone.',
-      'You may prepare an address-stable BuybackBurn StateInit candidate before M20F, but do not seal/execute a live STON.fi route until M20F passes.',
+      'You may seal production BuybackBurn before M20F only with route_frozen=false; do not freeze or execute a live STON.fi route until post-pool M20F passes.',
       'If wallet funding is missing, stop with NEED_TESTNET_TON and print only the disposable testnet address.',
       'Never commit seed phrases, private keys, .env, .env.*, *.mnemonic, *.seed, or *.secret.',
       'Keep testnet manifests and mainnet route-freeze manifests separate.',

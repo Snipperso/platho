@@ -6,14 +6,16 @@ Date: 2026-05-19
 
 Frozen source: `contracts/BuybackBurn.tact`
 
-Frozen code hash: `95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24`
+Frozen code hash: `660f6816b4bc4f25db1e5166d2d238627793ccfc75d08a0fb5e5238fc9a84218`
 
-Production unlock status: blocked until final M20F mainnet STON.fi route evidence passes. This local freeze does not set `production_buyback_burn_unlocked` or `BUYBACKBURN_IMPLEMENTATION_READY` to true.
+Production unlock status: final genesis may seal BuybackBurn with `route_frozen=false`, but route freeze and execution remain blocked until post-pool M20F mainnet STON.fi route evidence passes. This local freeze does not set `production_buyback_burn_unlocked` or `BUYBACKBURN_IMPLEMENTATION_READY` to true.
 
 ## Covered Locally
 
-- Genesis controller binding surface: FeeAccumulator, official BuybackBurn ATH wallet, route values, and seal are one-way pre-seal operations.
-- Seal burns the genesis-controller surface by clearing `genesis_config_hash`.
+- Genesis controller binding surface: FeeAccumulator and official BuybackBurn ATH wallet are one-way pre-seal operations.
+- Seal may happen before the STON.fi route exists; in that state `route_frozen=false` and `genesis_config_hash` remains as the one-time post-pool launch controller hash.
+- If the route was already frozen before seal, seal burns the controller surface immediately by clearing `genesis_config_hash`.
+- Post-seal `FreezeBuybackRoute` is allowed once while BuybackBurn has no reserve, route refund, retry due, accepted reserve count, or pending phase; successful freeze clears `genesis_config_hash`.
 - Official ATH wallet is derived from the final BuybackBurn address and ATH master address.
 - STON.fi route freeze requires a positive min-out, nonzero evidence hash, referral bps bound, and ask wallet derived from the pinned ATH pool owner.
 - FeeAccumulator can fund BuybackBurn only with the exact 51.05 TON envelope.
@@ -38,12 +40,12 @@ Production unlock status: blocked until final M20F mainnet STON.fi route evidenc
 - A pending ATH burn cannot become successful without `ATHBurnFinalized` from ATHMaster.
 - Failed route execution does not increment executed buyback count or burned ATH total.
 - Failed ATH burn preserves retryable ATH accounting until a later authenticated burn finalizes.
-- The production route cannot be sealed from testnet M20T evidence alone.
+- The production route cannot be frozen from testnet M20T evidence alone.
 
 ## Final Local Verification
 
 - `npm.cmd run build`: pass.
-- `node scripts/hash_codes.js`: BuybackBurn hash unchanged at `95286777c509acdb6799ea117be609d95fdcd866534548398bd80eb015a8fc24`.
+- `node scripts/hash_codes.js`: BuybackBurn hash `660f6816b4bc4f25db1e5166d2d238627793ccfc75d08a0fb5e5238fc9a84218`.
 - Targeted BuybackBurn route/readiness suite: 14 files, 71 tests passed.
 - Focused BuybackBurn production suite: 11 tests passed, including burn-failure retry coverage.
 - BuybackBurn auth-negative matrix: 6 tests passed.
@@ -58,7 +60,7 @@ Production unlock status: blocked until final M20F mainnet STON.fi route evidenc
 ## Residual Assumptions
 
 - Sandbox gas and forwarding behavior is a proxy, not final mainnet gas proof.
-- `BUYBACK_FUNDING_ENVELOPE_NANOTONS = 51.05 TON`, `BUYBACK_PTON_TRANSFER_GAS_NANOTONS = 0.05 TON`, ATH burn request value, notify value, and recycle reserve should be remeasured on live mainnet before final route seal.
+- `BUYBACK_FUNDING_ENVELOPE_NANOTONS = 51.05 TON`, `BUYBACK_PTON_TRANSFER_GAS_NANOTONS = 0.05 TON`, ATH burn request value, notify value, and recycle reserve should be remeasured on live mainnet before post-pool route freeze.
 - M20F must use real mainnet ATH/BuybackBurn addresses, STON.fi API simulation, official SDK/API transaction params, and refund/excess/failure proofs.
 - STON.fi router, pool, pTON wallet, and ATH wallet code hashes must be captured from mainnet before route freeze.
 - No independent human audit has reviewed this hardening pass.
@@ -67,7 +69,7 @@ Production unlock status: blocked until final M20F mainnet STON.fi route evidenc
 ## Recommended Before Final Genesis
 
 - Keep `contracts/BuybackBurn.tact` frozen unless a real bug is found.
-- Do not set production BuybackBurn readiness true until M20F route freeze and production review gates pass.
+- Do not set production BuybackBurn readiness true until post-pool M20F route freeze and production review gates pass.
 - Derive final mainnet BuybackBurn StateInit address and official BuybackBurn ATH wallet.
 - Capture final M20F route evidence and run M19F/M20F gates.
 - Repeat build, hash, targeted suite, full suite, artifact integrity, and dependency audit after final mainnet inputs are added.

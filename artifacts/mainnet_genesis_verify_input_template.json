@@ -20,8 +20,7 @@
       "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS",
       "profile_registry": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
       "profile_registry_official_ath_wallet": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
-      "profile_registry_treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS",
-      "stonfi_pool_address_ton_ath": "REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS"
+      "profile_registry_treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS"
     },
     "code_hashes": {
       "ath_master": "required: current ATHMaster code hash",
@@ -95,8 +94,8 @@
       "fee_accumulator_address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
       "official_ath_wallet_address": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
-      "route_frozen": true,
-      "stonfi_pool_address_ton_ath": "REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS"
+      "genesis_config_hash": "required: 64 lowercase hex buyback launch controller hash",
+      "route_frozen": false
     },
     "fee_accumulator": {
       "address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",

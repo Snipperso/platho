@@ -1242,7 +1242,6 @@ PROGRAM{
       s2 38 s() XCHG
       s1 41 s() XCHG
       s0 42 s() XCHG
-      $BuybackBurn$_fun_requireUnsealed INLINECALLDICT
       $BuybackBurn$_fun_requireGenesisController INLINECALLDICT
       31 s() 32 s() XCHG
       30 s() 31 s() XCHG
@@ -1268,6 +1267,29 @@ PROGRAM{
       20 s() PUSH
       NOT
       THROWANYIFNOT
+      18 s() PUSH
+      IF:<{
+        22125 PUSHINT
+        s13 PUSH
+        0 EQINT
+        THROWANYIFNOT
+        22126 PUSHINT
+        s12 PUSH
+        0 EQINT
+        THROWANYIFNOT
+        22127 PUSHINT
+        s6 PUSH
+        0 EQINT
+        THROWANYIFNOT
+        22128 PUSHINT
+        s5 PUSH
+        0 EQINT
+        THROWANYIFNOT
+        22129 PUSHINT
+        s3 PUSH
+        0 EQINT
+        THROWANYIFNOT
+      }>
       22121 PUSHINT
       39 s() PUSH
       0 GTINT
@@ -1349,19 +1371,24 @@ PROGRAM{
       17 s() POP
       17 s() POP
       17 s() POP
+      TRUE
+      s9 PUSH
+      IF:<{
+        0 PUSHINT
+        23 s() POP
+      }>
+      22 s() 31 s() XCHG
       21 s() 30 s() XCHG
       20 s() 29 s() XCHG
       19 s() 28 s() XCHG
       18 s() 27 s() XCHG
-      17 s() 26 s() XCHG
+      25 s() 26 s() XCHG
       24 s() 25 s() XCHG
       23 s() 24 s() XCHG
-      22 s() 23 s() XCHG
-      18 s() 22 s() XCHG
-      18 s() 21 s() XCHG
+      19 s() 23 s() XCHG
+      19 s() 22 s() XCHG
+      s12 21 s() XCHG
       s11 20 s() XCHG
-      s10 19 s() XCHG
-      TRUE
       s0 19 s() XCHG
       s9 18 s() XCHG
       s11 17 s() XCHG
@@ -1439,18 +1466,17 @@ PROGRAM{
       15 ROLL
       $BuybackBurn$_fun_acceptManifestHash INLINECALLDICT
       18 s() POP
-      30 s() POP
       22130 PUSHINT
-      20 s() PUSH
+      21 s() PUSH
       THROWANYIFNOT
       22131 PUSHINT
-      19 s() PUSH
+      20 s() PUSH
       THROWANYIFNOT
-      22132 PUSHINT
       18 s() PUSH
-      THROWANYIFNOT
-      0 PUSHINT
-      s0 30 s() XCHG
+      IF:<{
+        0 PUSHINT
+        31 s() POP
+      }>
       TRUE
       s0 18 s() XCHG
       $BuybackBurn$_contract_store INLINECALLDICT

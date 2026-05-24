@@ -61,8 +61,8 @@ export interface MainnetGenesisVerifyInput {
       fee_accumulator_address: string;
       official_ath_wallet_address: string;
       ath_master_address: string;
+      genesis_config_hash: string;
       route_frozen: boolean;
-      stonfi_pool_address_ton_ath: string;
     };
     fee_accumulator: BaseSnapshot & {
       buyback_burn_address: string;
@@ -201,7 +201,6 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       profile_registry: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
       profile_registry_official_ath_wallet: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
       profile_registry_treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
-      stonfi_pool_address_ton_ath: 'REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS',
     },
     code_hashes: {
       ath_master: 'required: current ATHMaster code hash',
@@ -277,8 +276,8 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         fee_accumulator_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
         official_ath_wallet_address: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        route_frozen: true,
-        stonfi_pool_address_ton_ath: 'REQUIRED_MAINNET_STONFI_TON_ATH_POOL_ADDRESS',
+        genesis_config_hash: 'required: 64 lowercase hex buyback launch controller hash',
+        route_frozen: false,
       },
       fee_accumulator: {
         address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
@@ -386,12 +385,16 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
 
   checkBase(issues, manifest, s.buyback_burn, 'buyback_burn', 'buyback_burn', 'buyback_burn');
   checkSealed(issues, manifest, s.buyback_burn, 'buyback_burn');
-  addTrue(issues, 'BUYBACK_ROUTE_NOT_FROZEN', s.buyback_burn.route_frozen, 'buyback_burn.route_frozen');
+  if (s.buyback_burn.route_frozen !== false) {
+    issues.push(issue('BUYBACK_ROUTE_FROZEN_AT_GENESIS', 'buyback_burn.route_frozen must be false at final genesis; the STON.fi route is frozen once after the 15% activity distribution / pool-launch gate.'));
+  }
+  if (!isHex64(s.buyback_burn.genesis_config_hash) || /^0{64}$/i.test(s.buyback_burn.genesis_config_hash)) {
+    issues.push(issue('BUYBACK_LAUNCH_CONTROLLER_HASH_MISSING', 'buyback_burn.genesis_config_hash must retain the non-zero one-time launch controller hash until post-pool route freeze.'));
+  }
   addAddressEq(issues, 'BUYBACK_FEE_ACCUMULATOR_MISMATCH', s.buyback_burn.fee_accumulator_address, manifest.addresses.fee_accumulator, 'buyback_burn.fee_accumulator_address');
   addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_MISMATCH', s.buyback_burn.official_ath_wallet_address, manifest.addresses.buyback_burn_official_ath_wallet, 'buyback_burn.official_ath_wallet_address');
   addAddressEq(issues, 'BUYBACK_ATH_MASTER_MISMATCH', s.buyback_burn.ath_master_address, manifest.addresses.ath_master, 'buyback_burn.ath_master_address');
   addBasechainAddress(issues, 'BUYBACK_ATH_MASTER_NOT_BASECHAIN', s.buyback_burn.ath_master_address, 'buyback_burn.ath_master_address');
-  addAddressEq(issues, 'BUYBACK_STONFI_POOL_MISMATCH', s.buyback_burn.stonfi_pool_address_ton_ath, manifest.addresses.stonfi_pool_address_ton_ath, 'buyback_burn.stonfi_pool_address_ton_ath');
 
   checkBase(issues, manifest, s.fee_accumulator, 'fee_accumulator', 'fee_accumulator', 'fee_accumulator');
   addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
