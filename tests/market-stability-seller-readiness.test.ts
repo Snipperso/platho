@@ -130,6 +130,17 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.issue_codes).toContain('MARKET_STABILITY_PRICING_EVIDENCE_HASH_MISSING');
   });
 
+  it('rejects underpriced base tranche snapshots even when x1 evidence is higher', () => {
+    const input = readyInput();
+    input.snapshot.market_stability_seller.base_tranche_price_nanotons = '1';
+    input.snapshot.market_stability_seller.evidence_x1_tranche_quote_nanotons = '1000000000';
+
+    const report = verifyMarketStabilitySellerReadiness(input);
+
+    expect(report.market_stability_seller_ready).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH');
+  });
+
   it('rejects underfunded or accounting-mismatched reserve backing', () => {
     const input = readyInput();
     input.snapshot.market_stability_seller.reserve_due_ath = '44999999999999999';

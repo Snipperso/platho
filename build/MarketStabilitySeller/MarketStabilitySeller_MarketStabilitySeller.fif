@@ -1450,7 +1450,7 @@ PROGRAM{
       23137 PUSHINT
       27 s() PUSH
       27 s() PUSH
-      GEQ
+      EQUAL
       THROWANYIFNOT
       23138 PUSHINT
       28 s() PUSH
