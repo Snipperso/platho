@@ -873,10 +873,17 @@ _ %get_quote_ton_for_amount(int $amount) method_id(118943) {
         var $msg'base_tranche_price_nanotons = in_msg~load_uint(128);
         var $msg'evidence_x1_tranche_quote_nanotons = in_msg~load_uint(128);
         var $msg'pricing_evidence_hash = in_msg~load_uint(256);
-        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireUnsealed();
         ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireGenesisController();
         ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_acceptManifestHash($msg'deployment_manifest_hash);
         throw_unless(23130, (~ $self'pricing_frozen));
+        if ($self'sealed) {
+            throw_unless(23131, ($self'phase == 0));
+            throw_unless(23132, ($self'reserve_due_ath == 0));
+            throw_unless(23133, ($self'treasury_due_ton == 0));
+            throw_unless(23134, ($self'reserve_funded_total_ath == 0));
+            throw_unless(23135, ($self'sold_ath_total == 0));
+            throw_unless(23139, ( (($self'completed_tranche_count == 0)) ? (($self'current_tranche_sold_ath == 0)) : (false) ));
+        }
         throw_unless(23136, ($msg'base_tranche_price_nanotons > 0));
         throw_unless(23137, ($msg'evidence_x1_tranche_quote_nanotons >= $msg'base_tranche_price_nanotons));
         throw_unless(23138, ($msg'pricing_evidence_hash != 0));
@@ -884,6 +891,9 @@ _ %get_quote_ton_for_amount(int $amount) method_id(118943) {
         $self'evidence_x1_tranche_quote_nanotons = $msg'evidence_x1_tranche_quote_nanotons;
         $self'pricing_evidence_hash = $msg'pricing_evidence_hash;
         $self'pricing_frozen = true;
+        if ($self'sealed) {
+            $self'genesis_config_hash = 0;
+        }
         $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
         return ();
     }
@@ -897,8 +907,9 @@ _ %get_quote_ton_for_amount(int $amount) method_id(118943) {
         throw_unless(23140, $self'reserve_funder_bound);
         throw_unless(23141, $self'official_ath_wallet_bound);
         throw_unless(23142, $self'treasury_bound);
-        throw_unless(23143, $self'pricing_frozen);
-        $self'genesis_config_hash = 0;
+        if ($self'pricing_frozen) {
+            $self'genesis_config_hash = 0;
+        }
         $self'sealed = true;
         $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
         return ();

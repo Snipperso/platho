@@ -75,9 +75,10 @@
       "official_ath_wallet_address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS",
       "ton_treasury_receiver_address": "REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
-      "genesis_config_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-      "pricing_frozen": true,
-      "reserve_due_ath": "required: decimal ATH reserve due from get_market_stability_seller_state",
+      "genesis_config_hash": "required: 64 lowercase hex market stability launch controller hash",
+      "pricing_frozen": false,
+      "reserve_due_ath": "0",
+      "reserve_funded_total_ath": "0",
       "treasury_due_ton": "0",
       "sold_ath_total": "0"
     },

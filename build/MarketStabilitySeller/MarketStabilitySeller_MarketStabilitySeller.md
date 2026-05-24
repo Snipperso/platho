@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: MarketStabilitySeller
-BoC Size: 11523 bytes
+BoC Size: 11583 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 47

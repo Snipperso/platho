@@ -39,12 +39,14 @@ The contract uses existing ATH wallet mechanics:
 
 ## Release Gates
 
-Before production use:
+The seller may be sealed before the official pool exists. In that inert state, the one-time launch controller hash remains present only so pricing can be frozen after pool-launch evidence exists. No reserve funding or sale is accepted before pricing is frozen.
+
+Before reserve use:
 
 - the final official ATH/TON pool launch price must be captured;
-- `base_tranche_price_nanotons` must be frozen before seal;
-- the seller official ATH wallet must be funded with the 45,000,000 ATH reserve before sales;
+- `base_tranche_price_nanotons` must be frozen either before seal or by the one-time post-seal launch controller while seller reserve/sales state is still zero;
+- post-seal pricing freeze must clear the launch controller hash;
+- the seller official ATH wallet must be funded with the 45,000,000 ATH reserve through authenticated ATH notification before sales;
 - the deployed code hash, StateInit hash, official ATH wallet address, reserve funder, treasury receiver, and pricing evidence hash must be archived.
 
 No post-seal price mutation, admin sale override, pause, upgrade, rescue, or governance path exists.
-

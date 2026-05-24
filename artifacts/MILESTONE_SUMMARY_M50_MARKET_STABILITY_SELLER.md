@@ -18,10 +18,10 @@ The seller releases ATH in fifteen `3,000,000 ATH` tranches at x2 through x16 fr
 
 ## Genesis Invariants
 
-- Reserve funder, official ATH wallet, TON treasury receiver, and pricing evidence are bound before seal.
+- Reserve funder, official ATH wallet, and TON treasury receiver are bound before seal.
 - Official ATH wallet must equal deterministic `ATHWallet(owner = MarketStabilitySeller, master = ATHMaster)`.
-- Pricing must be frozen before seal.
-- Seal clears the genesis controller hash.
+- Pricing may be frozen before seal or once after seal while reserve, treasury, and sale state are still zero.
+- Seal clears the genesis controller hash only if pricing was already frozen; otherwise the post-pool pricing freeze clears it.
 
 ## Verification
 
@@ -32,6 +32,7 @@ tests/market-stability-seller.test.ts
 tests/deployment-manifest-m15.test.ts
 tests/storage-topup-abi.test.ts
 tests/m16-conformance-static.test.ts
+tests/mainnet-genesis-verify.test.ts
 ```
 
 Build artifact:
@@ -39,4 +40,3 @@ Build artifact:
 ```text
 MARKET_STABILITY_SELLER_CODE_HASH
 ```
-

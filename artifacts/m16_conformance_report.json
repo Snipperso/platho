@@ -59,7 +59,7 @@
     },
     {
       "contract": "MarketStabilitySeller.tact",
-      "non_comment_lines": 454,
+      "non_comment_lines": 465,
       "receive_handlers": 12,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -120,8 +120,8 @@
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
-      "built": "85dd6995e116388e3e4ec2059110d6b861279049c683c3657702f02de0c645d4",
-      "pinned": "85dd6995e116388e3e4ec2059110d6b861279049c683c3657702f02de0c645d4",
+      "built": "30b3133f48230ddbfc54a2b91e5539519aadce456179c16602ea843b9b056339",
+      "pinned": "30b3133f48230ddbfc54a2b91e5539519aadce456179c16602ea843b9b056339",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -159,7 +159,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "12a7ff212aaf7ba70a5616e88b315a14a5c1d55982cd6d47b6f12a2704a95386",
+    "manifest_hash_hex": "17a6f6c3c531ee8b418e05a852d08ef007df39d68962ea630a9fe23bf0871722",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "BUYBACKBURN_POST_POOL_ROUTE_FREEZE_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE",
