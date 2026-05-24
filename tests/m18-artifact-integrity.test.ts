@@ -12,6 +12,8 @@ describe('M18 artifact integrity and reproducibility lock', () => {
     expect(report.code_hashes.MARKET_STABILITY_SELLER_CODE_HASH.match).toBe(true);
     expect(report.manifest.match).toBe(true);
     expect(report.manifest.status).toBe('IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS');
-    expect(report.manifest.blockers_before_final_genesis.join('\n')).toMatch(/STONFI/);
+    expect(report.manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
+    expect(report.manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
+    expect(report.manifest.blockers_before_final_genesis.join('\n')).not.toMatch(/STONFI/);
   }, 30000);
 });

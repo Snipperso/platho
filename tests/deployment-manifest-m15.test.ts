@@ -62,9 +62,11 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     expect(manifest.constants.profile_avatar_price_ath_atomic).toBe('100000000000');
     expect(manifest.constants.profile_avatar_max_parts).toBe('16');
     expect(manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
-    expect(manifest.blockers_before_final_genesis).toContain('MARKET_STABILITY_SELLER_PRICING_MUST_BE_FROZEN_FROM_FINAL_POOL_LAUNCH_EVIDENCE');
-    expect(manifest.blockers_before_final_genesis).toContain('MARKET_STABILITY_RESERVE_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_SELLER_ATH_WALLET_BEFORE_USE');
     expect(manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
+    expect(manifest.blockers_before_final_genesis).not.toContain('BUYBACKBURN_POST_POOL_ROUTE_FREEZE_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE');
+    expect(manifest.blockers_before_final_genesis).not.toContain('STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED');
+    expect(manifest.blockers_before_final_genesis).not.toContain('MARKET_STABILITY_SELLER_PRICING_MUST_BE_FROZEN_FROM_FINAL_POOL_LAUNCH_EVIDENCE');
+    expect(manifest.blockers_before_final_genesis).not.toContain('MARKET_STABILITY_RESERVE_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_SELLER_ATH_WALLET_BEFORE_USE');
     expect(manifest.manifest_hash_hex).toBe(recomputed);
     expect(BigInt(`0x${manifest.manifest_hash_hex}`).toString()).toBe(manifest.manifest_hash_uint256);
   });
