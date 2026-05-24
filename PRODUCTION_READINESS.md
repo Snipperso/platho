@@ -13,7 +13,8 @@ This file is the production freeze checklist. If any hard blocker below is still
 - Keep visible network labels, embedded wallet policy, and preview fixtures controlled through `web/platho-config.mjs`.
 - Preserve the full-size M20T testnet harness evidence before changing any BuybackBurn readiness flag; M20T evidence alone is not a production unlock.
 - Derive final mainnet BuybackBurn and official ATH wallet addresses from the production `BuybackBurn` StateInit. The M20T harness must never be selected as production BuybackBurn.
-- Complete M20F mainnet STON.fi route freeze evidence before enabling production BuybackBurn. M20F must use STON.fi mainnet API simulation and official SDK/API transaction parameters, not hardcoded testnet route data.
+- Seal production BuybackBurn with `route_frozen = false`; the ATH/TON STON.fi pool is created only after the 15% activity-distribution gate.
+- Complete M20F mainnet STON.fi route freeze evidence before calling the one-time post-pool `FreezeBuybackRoute`. M20F must use STON.fi mainnet API simulation and official SDK/API transaction parameters, not hardcoded testnet route data.
 - Keep BuybackBurn production readiness false until both M20T and M20F are complete.
 - Do an external crypto review before treating the PWA encryption layer as production security.
 
@@ -48,8 +49,8 @@ npm.cmd run web:deploy:prepare:prod
 - M20F STON.fi live collector is prepared: see `artifacts/m20f_stonfi_live_collector_input_template.json` and `artifacts/M20F_STONFI_LIVE_COLLECTOR.md`. It is expected to stay `WAITING_FOR_FINAL_MAINNET_INPUT` until final mainnet addresses and proof refs are supplied.
 - Production `contracts/BuybackBurn.tact` is present and built. M20F address-unlock preflight is tracked in `artifacts/m20f_mainnet_address_unlock_preflight.json`; current status may be `READY_FOR_MAINNET_ADDRESS_DERIVATION`, but this is not a production unlock.
 - ATHMaster now has an explicit one-shot treasury supply deployment surface. Deriving the ATHMaster address is not enough by itself; the treasury supply deployment transaction and official treasury ATH wallet balance proof must be captured before treating ATH as live.
-- BuybackBurn local freeze was reopened after external Round 6 audit findings; the current candidate includes reserve, min-out, and query-lifecycle hardening. This does not unlock production route seal.
+- BuybackBurn local freeze was reopened after external Round 6 audit findings; the current candidate includes reserve, min-out, query-lifecycle hardening, and a post-pool route-freeze gate. This does not unlock production route freeze or execution.
 - CapsuleHub v1 is now explicitly counter-only / anchor-only; no production bundle may assume on-chain page-map retrieval unless a future CapsuleHub interface change reopens audit and code hashes.
 - Storage top-up ABI coverage is explicit for Vault, CapsuleHub, FeeAccumulator, BuybackBurn, UsernameRegistry, and UsernameNFTItem. Top-up messages are no-authority storage reserve maintenance only, not balances or rescue paths.
-- M20F mainnet route-freeze preflight is tracked in `artifacts/m20f_mainnet_route_freeze_preflight.json`; current status is expected to stay blocked until final mainnet ATH/BuybackBurn addresses, STON.fi API simulation, official tx params, code hashes, and refund/excess/failure proofs are supplied.
-- BuybackBurn remains locked by M20F mainnet STON.fi route-freeze evidence and production review gates.
+- M20F mainnet route-freeze preflight is tracked in `artifacts/m20f_mainnet_route_freeze_preflight.json`; current status is expected to stay blocked until the post-15% ATH/TON pool exists and final mainnet STON.fi API simulation, official tx params, code hashes, and refund/excess/failure proofs are supplied.
+- BuybackBurn remains locked by the one-time post-pool route-freeze gate and production review gates.

@@ -150,11 +150,11 @@ export function createM20FMainnetAddressUnlockPreflight(options: {
       'Derive the final mainnet BuybackBurn StateInit address from the final genesis hash and final ATH master address.',
       'Derive the official BuybackBurn ATH wallet from that BuybackBurn address and ATH master.',
       'Feed the final mainnet ATH/BuybackBurn addresses into the M20F live STON.fi collector with real proof refs.',
-      'Keep production_buyback_burn_unlocked false until M20F route freeze and production review gates pass.',
+      'Final genesis may seal BuybackBurn with route_frozen=false; keep production_buyback_burn_unlocked false until post-pool M20F route freeze and production review gates pass.',
     ]
     : [
       'Implement contracts/BuybackBurn.tact as a production contract, not a testnet harness.',
-      'Break the StateInit circularity by deriving BuybackBurn before route freeze and binding route/official ATH wallet pre-seal.',
+      'Break the StateInit circularity by deriving BuybackBurn before route freeze; bind the official ATH wallet pre-seal and freeze the route only after pool launch.',
       'Add BuybackBurn to tact.config.json under the exact project name BuybackBurn.',
       'Build BuybackBurn and commit the generated code hash/state-init evidence.',
       'Only then derive the final mainnet BuybackBurn address and its official ATH wallet for M20F live collection.',

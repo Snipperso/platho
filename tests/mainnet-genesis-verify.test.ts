@@ -31,7 +31,6 @@ function finalInput(): MainnetGenesisVerifyInput {
     profile_registry: addr('profile_registry'),
     profile_registry_official_ath_wallet: addr('profile_registry_official_ath_wallet'),
     profile_registry_treasury_ath_receiver: addr('profile_registry_treasury_ath_receiver'),
-    stonfi_pool_address_ton_ath: addr('stonfi_pool_address_ton_ath'),
   };
   const code_hashes = {
     ath_master: hash('ath_master'),
@@ -116,8 +115,8 @@ function finalInput(): MainnetGenesisVerifyInput {
         fee_accumulator_address: addresses.fee_accumulator,
         official_ath_wallet_address: addresses.buyback_burn_official_ath_wallet,
         ath_master_address: addresses.ath_master,
-        route_frozen: true,
-        stonfi_pool_address_ton_ath: addresses.stonfi_pool_address_ton_ath,
+        genesis_config_hash: hash('buyback_launch_controller'),
+        route_frozen: false,
       },
       fee_accumulator: {
         address: addresses.fee_accumulator,
@@ -243,5 +242,25 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS');
+  });
+
+  it('rejects final genesis when BuybackBurn route is already frozen', () => {
+    const input = finalInput();
+    input.snapshot.buyback_burn.route_frozen = true;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('BUYBACK_ROUTE_FROZEN_AT_GENESIS');
+  });
+
+  it('rejects final genesis when BuybackBurn launch controller hash was cleared too early', () => {
+    const input = finalInput();
+    input.snapshot.buyback_burn.genesis_config_hash = '0'.repeat(64);
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('BUYBACK_LAUNCH_CONTROLLER_HASH_MISSING');
   });
 });

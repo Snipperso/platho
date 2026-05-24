@@ -18,7 +18,7 @@ Status: READY_FOR_MAINNET_ADDRESS_DERIVATION
 - Derive the final mainnet BuybackBurn StateInit address from the final genesis hash and final ATH master address.
 - Derive the official BuybackBurn ATH wallet from that BuybackBurn address and ATH master.
 - Feed the final mainnet ATH/BuybackBurn addresses into the M20F live STON.fi collector with real proof refs.
-- Keep production_buyback_burn_unlocked false until M20F route freeze and production review gates pass.
+- Final genesis may seal BuybackBurn with route_frozen=false; keep production_buyback_burn_unlocked false until post-pool M20F route freeze and production review gates pass.
 
 ## Address Derivation Notes
 

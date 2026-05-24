@@ -1192,6 +1192,38 @@ Bounce restores `buyback_due_ton`.
 
 ## 10. BuybackBurn
 
+### 10.0 Route Launch Gate
+
+Final genesis may seal BuybackBurn before the ATH/TON STON.fi pool exists:
+
+```text
+sealed = true
+route_frozen = false
+genesis_config_hash = hash(one_time_launch_controller)
+```
+
+In this state BuybackBurn is inert for money flow:
+
+```text
+AcceptBurnReserve rejects
+ExecuteBuybackChunk rejects
+route fallback refund/excess rejects
+```
+
+After the 15% activity-distribution / pool-launch gate, the launch controller creates
+the ATH/TON pool with real liquidity, then calls `FreezeBuybackRoute` once with the
+final router, pool owner, pTON wallet, ask wallet, min-out and evidence hash.
+
+Successful post-seal route freeze sets:
+
+```text
+route_frozen = true
+genesis_config_hash = 0
+```
+
+No second route freeze is possible. `FeeAccumulator.EnableBuybackSplit` must be
+called only after the route is frozen.
+
 ### 10.1 Accept Burn Reserve
 
 Accepts TON only from immutable FeeAccumulator.

@@ -1,5 +1,5 @@
 // Platho v1 production BuybackBurn address-stable candidate.
-// Scope: pre-seal FeeAccumulator / official ATH wallet / STON.fi route binding,
+// Scope: pre-seal FeeAccumulator / official ATH wallet binding, one-time STON.fi route binding,
 // exact M19H funding envelope intake, route execution state, ATH receipt auth,
 // and ATH burn finalization through ATHMaster.
 // No admin/owner override/pause/upgrade/governance/rescue behavior is implemented.
@@ -340,10 +340,16 @@ contract BuybackBurn {
     }
 
     receive(msg: FreezeBuybackRoute) {
-        self.requireUnsealed();
         self.requireGenesisController();
         self.acceptManifestHash(msg.deployment_manifest_hash);
         throwUnless(22120, !self.route_frozen);
+        if (self.sealed) {
+            throwUnless(22125, self.phase == BUYBACK_PHASE_IDLE);
+            throwUnless(22126, self.reserve_due_ton == 0);
+            throwUnless(22127, self.route_refund_due_ton == 0);
+            throwUnless(22128, self.ath_burn_retry_due_atomic == 0);
+            throwUnless(22129, self.accepted_reserve_count == 0);
+        }
         throwUnless(22121, msg.buyback_min_ath_out_per_50_ton_atomic > 0);
         throwUnless(22122, msg.route_evidence_hash != 0);
         throwUnless(22123, msg.referral_value_bps <= 100);
@@ -360,6 +366,9 @@ contract BuybackBurn {
         self.evidence_dex_min_out_atomic_ath = msg.evidence_dex_min_out_atomic_ath;
         self.route_evidence_hash = msg.route_evidence_hash;
         self.route_frozen = true;
+        if (self.sealed) {
+            self.genesis_config_hash = 0;
+        }
     }
 
     receive(msg: SealBuybackBurnGenesis) {
@@ -368,8 +377,9 @@ contract BuybackBurn {
         self.acceptManifestHash(msg.deployment_manifest_hash);
         throwUnless(22130, self.fee_bound);
         throwUnless(22131, self.official_ath_wallet_bound);
-        throwUnless(22132, self.route_frozen);
-        self.genesis_config_hash = 0;
+        if (self.route_frozen) {
+            self.genesis_config_hash = 0;
+        }
         self.sealed = true;
     }
 

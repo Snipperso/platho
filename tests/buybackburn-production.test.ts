@@ -188,6 +188,25 @@ async function freezeAndSeal(
   } as SealBuybackBurnGenesis);
 }
 
+async function bindAndSealWithoutRoute(env: Awaited<ReturnType<typeof setup>>) {
+  await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindBuybackFeeAccumulator',
+    deployment_manifest_hash: MANIFEST_HASH,
+    fee_accumulator_address: env.feeAccumulator.address,
+  } as BindBuybackFeeAccumulator);
+
+  await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindBuybackOfficialAthWallet',
+    deployment_manifest_hash: MANIFEST_HASH,
+    official_ath_wallet_address: env.officialAthWallet,
+  } as BindBuybackOfficialAthWallet);
+
+  await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'SealBuybackBurnGenesis',
+    deployment_manifest_hash: MANIFEST_HASH,
+  } as SealBuybackBurnGenesis);
+}
+
 function routeFreeze(env: Awaited<ReturnType<typeof setup>>, overrides: Partial<FreezeBuybackRoute> = {}): FreezeBuybackRoute {
   const base: FreezeBuybackRoute = {
     $$type: 'FreezeBuybackRoute',
@@ -292,6 +311,45 @@ describe('Production BuybackBurn candidate', () => {
 
     const afterPostSealAttempt = await env.buyback.getGetBuybackBurnConfig();
     expect(afterPostSealAttempt.fee_accumulator_address.equals(env.feeAccumulator.address)).toBe(true);
+  });
+
+  it('BUYBACK-02B: can seal before pool launch, then freeze the STON.fi route exactly once', async () => {
+    const env = await setup();
+
+    await bindAndSealWithoutRoute(env);
+
+    let config = await env.buyback.getGetBuybackBurnConfig();
+    expect(config.sealed).toBe(true);
+    expect(config.route_frozen).toBe(false);
+    expect(config.genesis_config_hash).toBe(addressHash(env.controller.address));
+
+    await env.buyback.send(env.feeAccumulator.getSender(), { value: ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE }, {
+      $$type: 'AcceptBurnReserve',
+      amount: ENVELOPE,
+    } as AcceptBurnReserve);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(0n);
+
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, routeFreeze(env, {
+      stonfi_pool_address_ton_ath: env.attacker.address,
+      ask_jetton_wallet_address: await athWalletAddress(env.attacker.address, env.athMasterAddress),
+    }));
+    expect((await env.buyback.getGetBuybackBurnConfig()).route_frozen).toBe(false);
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+
+    config = await env.buyback.getGetBuybackBurnConfig();
+    expect(config.route_frozen).toBe(true);
+    expect(config.genesis_config_hash).toBe(0n);
+    expect(config.stonfi_pool_address_ton_ath.equals(env.stonfiPoolOwner.address)).toBe(true);
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env, {
+      route_evidence_hash: ROUTE_EVIDENCE_HASH + 1n,
+    }));
+    config = await env.buyback.getGetBuybackBurnConfig();
+    expect(config.route_evidence_hash).toBe(ROUTE_EVIDENCE_HASH);
+
+    await acceptReserve(env);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
   });
 
   it('BUYBACK-03: accepts only the exact 51.05 TON envelope from the bound FeeAccumulator after seal', async () => {

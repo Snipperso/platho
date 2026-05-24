@@ -27,8 +27,9 @@ This is enforced in contract state, not only by keeper policy. A permissionless 
 Final genesis must prove:
 
 - `FeeAccumulator.buyback_split_enabled = false`
+- `BuybackBurn.route_frozen = false`
 
-The one-way enable action belongs to the post-launch operations gate after the 15% activity distribution / pool-launch condition is satisfied.
+The one-way enable action belongs after the 15% activity distribution / pool-launch condition, real pool creation, and the post-pool `BuybackBurn.FreezeBuybackRoute` operation. This prevents treasury/liquidity TON from being flushed into buyback before a real ATH/TON route exists.
 
 ## Unchanged
 

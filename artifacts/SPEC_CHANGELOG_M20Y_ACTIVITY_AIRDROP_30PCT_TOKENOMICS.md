@@ -25,6 +25,7 @@ TOTAL:                          100%
 - Explicit rationale: the airdrop is paid-usage activity mining / rebate, not a free claim campaign.
 - Explicit pre-pool utility: earned ATH may be used for username purchases before official pool launch. Message fee discounts stay locked until the 15% activity-distribution / pool-launch gate.
 - FeeAccumulator bootstrap policy: before the 15% activity distribution / pool-launch gate, protocol TON splits 100% to liquidity bootstrap / treasury; buyback split is enabled later through the one-way `EnableBuybackSplit` gate.
+- BuybackBurn route policy: final genesis seals BuybackBurn before the pool exists, with `route_frozen = false`; the real STON.fi route is frozen once only after the 15% gate and pool creation.
 
 ## Unchanged
 

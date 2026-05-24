@@ -261,7 +261,7 @@ export function validateStonfiRouteEvidenceDossierM19F(dossier: StonfiRouteEvide
     collector_issue_codes: collectorReport?.issue_codes ?? [],
     decoded: collectorReport?.decoded ?? null,
     rebuilt_hashes: collectorReport?.candidate_validation?.rebuiltHashes ?? null,
-    next_step_when_ready: 'If route_freeze_ready is true, freeze v0.19 STON.fi route values and seal/execute the production BuybackBurn route. If false, keep BuybackBurn route execution blocked.',
+    next_step_when_ready: 'If route_freeze_ready is true, use the one-time post-pool FreezeBuybackRoute operation and then enable production buyback execution. If false, keep BuybackBurn route execution blocked.',
   };
 }
 
