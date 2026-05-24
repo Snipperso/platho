@@ -17,6 +17,7 @@
     "mainnet:ath-master:derive": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_ath_master_derivation.ts",
     "m20t:preflight": "node scripts/m20t_execution_preflight.mjs",
     "m20u:readiness": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/buybackburn_contract_readiness_m20u.ts",
+    "market-stability:readiness": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/market_stability_seller_readiness.ts",
     "buyback:flush-preflight": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/buyback_flush_preflight.ts",
     "m20f:address-preflight": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_mainnet_address_unlock_preflight.ts",
     "m20f:derive-addresses": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_mainnet_address_derivation.ts",

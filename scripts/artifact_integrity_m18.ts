@@ -51,6 +51,10 @@ const stableArtifacts = [
   'artifacts/platho_v1_open_values_v0_50_market_stability_seller.md',
   'artifacts/MILESTONE_SUMMARY_M50_MARKET_STABILITY_SELLER.md',
   'artifacts/SPEC_CHANGELOG_M50_MARKET_STABILITY_SELLER.md',
+  'artifacts/market_stability_seller_readiness_input_template.json',
+  'artifacts/market_stability_seller_readiness_report.json',
+  'artifacts/MARKET_STABILITY_SELLER_READINESS.md',
+  'artifacts/MARKET_STABILITY_SELLER_READY.txt',
 ];
 
 function sha256(data: Buffer | string): string {
@@ -239,6 +243,7 @@ export async function runM18ArtifactIntegrity(writeArtifacts = true): Promise<M1
     source_lock: sourceLock,
     notes: [
       'M50 adds the MarketStabilitySeller contract and refreshes the implemented-subset artifact lock accordingly.',
+      'MarketStabilitySeller post-pool readiness artifacts are locked so the x2..x16 seller cannot be treated as operational without frozen pricing and reserve-funding evidence.',
       'JSON artifact hashes are normalized by replacing generated_at/generated_at_utc with DETERMINISTIC_ARTIFACT and sorting object keys.',
       'This is an implemented-subset artifact integrity lock, not a final genesis manifest.',
     ],

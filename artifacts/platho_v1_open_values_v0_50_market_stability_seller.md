@@ -49,5 +49,6 @@ Before reserve use:
 - if the seller is sealed before pricing, final genesis evidence must prove the retained launch controller hash matches the manifest controller address;
 - the seller official ATH wallet must be funded with the 45,000,000 ATH reserve through authenticated ATH notification before sales;
 - the deployed code hash, StateInit hash, official ATH wallet address, reserve funder, treasury receiver, and pricing evidence hash must be archived.
+- `npm.cmd run market-stability:readiness` must pass against the post-pool getter snapshot before the first reserve sale is treated as production-ready.
 
 No post-seal price mutation, admin sale override, pause, upgrade, rescue, or governance path exists.

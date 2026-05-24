@@ -27,6 +27,7 @@ npm.cmd run mainnet:ath-master:derive
 npm.cmd run m20f:address-preflight
 npm.cmd run m20f:derive-addresses
 npm.cmd run m20u:readiness
+npm.cmd run market-stability:readiness
 npm.cmd run m20f:collect
 npm.cmd run m20f:preflight
 npm.cmd audit --json
@@ -55,3 +56,4 @@ npm.cmd run web:deploy:prepare:prod
 - Storage top-up ABI coverage is explicit for Vault, CapsuleHub, FeeAccumulator, BuybackBurn, UsernameRegistry, and UsernameNFTItem. Top-up messages are no-authority storage reserve maintenance only, not balances or rescue paths.
 - M20F mainnet route-freeze preflight is tracked in `artifacts/m20f_mainnet_route_freeze_preflight.json`; current status is expected to stay blocked until the post-15% ATH/TON pool exists and final mainnet STON.fi API simulation, official tx params, code hashes, and refund/excess/failure proofs are supplied.
 - BuybackBurn remains locked by the one-time post-pool route-freeze gate and production review gates.
+- MarketStabilitySeller post-pool readiness is tracked by `npm.cmd run market-stability:readiness`. It must stay blocked until final pool launch price evidence, pricing-freeze transaction proof, official seller ATH wallet funding proof, getter snapshot, and code-hash evidence are supplied.
