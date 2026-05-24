@@ -38,5 +38,4 @@ ath_market_stability_end_multiplier = 16
 
 No existing smart contract behavior changes in M49.
 
-The automated market-stability seller remains a separate future immutable contract/release item. It must be audited before reserve ATH is operationally released.
-
+The automated market-stability seller is implemented later in M50 as a separate immutable contract/release item. It must still be covered by release evidence before reserve ATH is operationally released.

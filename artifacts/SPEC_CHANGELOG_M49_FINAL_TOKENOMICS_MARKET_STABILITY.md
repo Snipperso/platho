@@ -24,7 +24,6 @@
 - Initial pool launch target remains after approximately `15,000,000 ATH` has been distributed through Vault activity rewards.
 - Message discounts and buyback split remain gated behind the 15% activity-distribution / pool-launch policy.
 
-## Not implemented here
+## Implemented later
 
-M49 does not add a market-stability seller contract. That contract is a separate immutable money state machine and requires its own implementation, tests, audit, and release evidence before use.
-
+M49 does not add a market-stability seller contract. M50 adds that separate immutable money state machine with tests and release evidence hooks.

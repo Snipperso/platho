@@ -6,6 +6,7 @@ import { Vault, TopUpStorageReserve as VaultTopUpStorageReserve } from '../build
 import { CapsuleHub, TopUpStorageReserve as CapsuleHubTopUpStorageReserve } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator, TopUpStorageReserve as FeeAccumulatorTopUpStorageReserve } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import { BuybackBurn, TopUpStorageReserve as BuybackBurnTopUpStorageReserve } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
+import { MarketStabilitySeller, MarketStabilityTopUpStorageReserve } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 import { UsernameRegistry, UsernameRegistryTopUpStorageReserve } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { UsernameNFTItem, TopUpStorageReserve as UsernameNFTItemTopUpStorageReserve } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 
@@ -104,6 +105,20 @@ describe('Storage top-up ABI coverage', () => {
     expect(normalizeState(await buybackBurn.getGetBuybackBurnState())).toEqual(normalizeState(buybackStateBefore));
     expect(normalizeState(await buybackBurn.getGetBuybackBurnTotals())).toEqual(normalizeState(buybackTotalsBefore));
     expect(await contractBalance(blockchain, buybackBurn.address)).toBeGreaterThan(buybackBalanceBefore);
+
+    const marketSellerInit = await MarketStabilitySeller.init(0x5678n, athMaster);
+    const marketSeller = await deploy(blockchain, marketSellerInit, (address, init) => new MarketStabilitySeller(address, init));
+    const marketSellerConfigBefore = await marketSeller.getGetMarketStabilitySellerConfig();
+    const marketSellerStateBefore = await marketSeller.getGetMarketStabilitySellerState();
+    const marketSellerTotalsBefore = await marketSeller.getGetMarketStabilitySellerTotals();
+    const marketSellerBalanceBefore = await contractBalance(blockchain, marketSeller.address);
+    await marketSeller.send(donor.getSender(), { value: toNano('0.05') }, {
+      $$type: 'MarketStabilityTopUpStorageReserve',
+    } as MarketStabilityTopUpStorageReserve);
+    expect(normalizeState(await marketSeller.getGetMarketStabilitySellerConfig())).toEqual(normalizeState(marketSellerConfigBefore));
+    expect(normalizeState(await marketSeller.getGetMarketStabilitySellerState())).toEqual(normalizeState(marketSellerStateBefore));
+    expect(normalizeState(await marketSeller.getGetMarketStabilitySellerTotals())).toEqual(normalizeState(marketSellerTotalsBefore));
+    expect(await contractBalance(blockchain, marketSeller.address)).toBeGreaterThan(marketSellerBalanceBefore);
 
     const registryInit = await UsernameRegistry.init(athWallet, athMaster, treasury, true, 0n, 0n, controller.address);
     const registry = await deploy(blockchain, registryInit, (address, init) => new UsernameRegistry(address, init));

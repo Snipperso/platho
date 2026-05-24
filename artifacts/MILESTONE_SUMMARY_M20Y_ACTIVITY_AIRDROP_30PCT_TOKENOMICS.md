@@ -67,7 +67,7 @@ vault_activity_airdrop_per_wallet_cap_atomic = 0
 
 M49 supersedes the earlier M20Y founder/ecosystem/strategic reserve split. There is no founder allocation in the fixed allocation table. Founder/team upside from ATH treasury flow is tied to market-stability tranche execution after price milestones, not a direct token grant.
 
-The market stability reserve is an allocation policy only in this milestone. The automated seller is a separate immutable contract/release item and must be audited before the reserve is operationally used.
+The market stability reserve is an allocation policy only in this milestone. M50 later adds the separate immutable seller contract; final reserve use still requires seller audit evidence, frozen pricing evidence, and official seller ATH wallet funding proof.
 
 ## Remaining blockers
 

@@ -59,7 +59,7 @@ x15 initial pool price: 3,000,000 ATH
 x16 initial pool price: 3,000,000 ATH
 ```
 
-The automated market-stability seller is a separate immutable contract/release item. Until that contract is deployed and audited, the reserve is an allocation commitment, not an operational on-chain sell mechanism.
+M50 later adds the automated market-stability seller as a separate immutable contract. Until that seller is deployed, audited, sealed with frozen pricing evidence, and funded through its official ATH wallet, the reserve remains an allocation commitment, not an operational on-chain sell mechanism.
 
 ## Activity airdrop allocation
 

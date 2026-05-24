@@ -9,6 +9,7 @@ const productionContracts = [
   'BuybackBurn.tact',
   'CapsuleHub.tact',
   'FeeAccumulator.tact',
+  'MarketStabilitySeller.tact',
   'ProfileRegistry.tact',
   'UsernameNFTItem.tact',
   'UsernameRegistry.tact',
@@ -19,6 +20,7 @@ const storageTopUpReceivers = new Map<string, string>([
   ['BuybackBurn.tact', 'TopUpStorageReserve'],
   ['CapsuleHub.tact', 'TopUpStorageReserve'],
   ['FeeAccumulator.tact', 'TopUpStorageReserve'],
+  ['MarketStabilitySeller.tact', 'MarketStabilityTopUpStorageReserve'],
   ['ProfileRegistry.tact', 'ProfileRegistryTopUpStorageReserve'],
   ['UsernameNFTItem.tact', 'TopUpStorageReserve'],
   ['UsernameRegistry.tact', 'UsernameRegistryTopUpStorageReserve'],
@@ -29,6 +31,7 @@ const hashChecks: Array<[string, string, string]> = [
   ['ATHMaster', 'ATHMaster_ATHMaster', 'ATHMASTER_CODE_HASH.txt'],
   ['ATHWallet', 'ATHWallet_ATHWallet', 'ATH_WALLET_CODE_HASH.txt'],
   ['BuybackBurn', 'BuybackBurn_BuybackBurn', 'BUYBACKBURN_CODE_HASH.txt'],
+  ['MarketStabilitySeller', 'MarketStabilitySeller_MarketStabilitySeller', 'MARKET_STABILITY_SELLER_CODE_HASH.txt'],
   ['CapsuleHub', 'CapsuleHub_CapsuleHub', 'CAPSULEHUB_CODE_HASH.txt'],
   ['FeeAccumulator', 'FeeAccumulator_FeeAccumulator', 'FEEACCUMULATOR_CODE_HASH.txt'],
   ['ProfileRegistry', 'ProfileRegistry_ProfileRegistry', 'PROFILE_REGISTRY_CODE_HASH.txt'],
@@ -102,9 +105,9 @@ async function main() {
 
   const report = {
     profile: 'PLATHO.V1.M16.PRODUCTION_CONFORMANCE_AND_COMPACTNESS_PASS',
-    baseline: 'M15 implemented-subset package',
-    contract_code_changed: 'storage-top-up-only',
-    new_functional_surface_added: 'storage-top-up-only',
+    baseline: 'M50 implemented-subset package',
+    contract_code_changed: 'market-stability-seller-added',
+    new_functional_surface_added: 'MarketStabilitySeller direct reserve sale state machine',
     checks: {
       forbidden_control_surface_absent: perContract.every((x) => x.forbidden_hits.length === 0),
       empty_fallbacks_reject: perContract.every((x) => x.empty_fallback_rejects),

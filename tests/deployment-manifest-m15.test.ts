@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import {
+  MarketStabilitySeller,
+  BindMarketStabilityOfficialAthWallet as MarketSellerBindAth,
+  BindMarketStabilityReserveFunder as MarketSellerBindReserveFunder,
+  BindMarketStabilityTreasury as MarketSellerBindTreasury,
+  FreezeMarketStabilityPricing as MarketSellerFreezePricing,
+  SealMarketStabilityGenesis as MarketSellerSeal,
+} from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
 import { ProfileRegistry, BindProfileOfficialAthWallet as ProfileBindAth, SealGenesis as ProfileSeal } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import { UsernameRegistry, BindOfficialAthWallet as UsernameBindAth, SealGenesis as UsernameSeal } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { Vault, BindDeploymentManifest as VaultBind, BindOfficialAthWallet as VaultBindAth, SealGenesis as VaultSeal } from '../build/Vault/Vault_Vault';
@@ -43,18 +51,25 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     expect(manifest.constants.ath_market_stability_tranche_atomic).toBe('3000000000000000');
     expect(manifest.constants.ath_market_stability_start_multiplier).toBe('2');
     expect(manifest.constants.ath_market_stability_end_multiplier).toBe('16');
+    expect(manifest.addresses.market_stability_seller).toBeDefined();
+    expect(manifest.addresses.market_stability_seller_official_ath_wallet).toBeDefined();
+    expect(manifest.code_hashes.market_stability_seller).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.state_init_hashes.market_stability_seller_initial).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.state_init_hashes.market_stability_seller_official_ath_wallet).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('30000000000000000');
     expect(manifest.constants.vault_activity_airdrop_reward_per_message_atomic).toBe('10000000000');
     expect(manifest.constants.vault_activity_airdrop_per_wallet_cap_atomic).toBe('0');
     expect(manifest.constants.profile_avatar_price_ath_atomic).toBe('100000000000');
     expect(manifest.constants.profile_avatar_max_parts).toBe('16');
     expect(manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
+    expect(manifest.blockers_before_final_genesis).toContain('MARKET_STABILITY_SELLER_PRICING_MUST_BE_FROZEN_FROM_FINAL_POOL_LAUNCH_EVIDENCE');
+    expect(manifest.blockers_before_final_genesis).toContain('MARKET_STABILITY_RESERVE_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_SELLER_ATH_WALLET_BEFORE_USE');
     expect(manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
     expect(manifest.manifest_hash_hex).toBe(recomputed);
     expect(BigInt(`0x${manifest.manifest_hash_hex}`).toString()).toBe(manifest.manifest_hash_uint256);
   });
 
-  it('DEPLOY-M15-02/05/09: Vault, CapsuleHub, UsernameRegistry, and ProfileRegistry can seal to the same implemented-subset manifest hash and expose it', async () => {
+  it('DEPLOY-M15-02/05/09: sealable contracts can seal to the same implemented-subset manifest hash and expose it', async () => {
     const { manifest, inits, parsed } = await buildImplementedSubsetManifest();
     const manifestHash = BigInt(`0x${manifest.manifest_hash_hex}`);
     const blockchain = await Blockchain.create();
@@ -63,19 +78,23 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
 
     await deployCellContract(blockchain, parsed.vaultAddress, inits.vault);
     await deployCellContract(blockchain, parsed.capsuleHubAddress, inits.capsuleHub);
+    await deployCellContract(blockchain, parsed.marketStabilitySellerAddress, inits.marketStabilitySeller);
     await deployCellContract(blockchain, parsed.usernameRegistryAddress, inits.usernameRegistry);
     await deployCellContract(blockchain, parsed.profileRegistryAddress, inits.profileRegistry);
 
     const vault = blockchain.openContract(new Vault(parsed.vaultAddress, inits.vault));
     const capsuleHub = blockchain.openContract(new CapsuleHub(parsed.capsuleHubAddress, inits.capsuleHub));
+    const marketSeller = blockchain.openContract(new MarketStabilitySeller(parsed.marketStabilitySellerAddress, inits.marketStabilitySeller));
     const usernameRegistry = blockchain.openContract(new UsernameRegistry(parsed.usernameRegistryAddress, inits.usernameRegistry));
     const profileRegistry = blockchain.openContract(new ProfileRegistry(parsed.profileRegistryAddress, inits.profileRegistry));
 
     expect(parsed.vaultAddress.toString()).toBe(manifest.addresses.vault);
     expect(parsed.capsuleHubAddress.toString()).toBe(manifest.addresses.capsulehub);
+    expect(parsed.marketStabilitySellerAddress.toString()).toBe(manifest.addresses.market_stability_seller);
     expect(parsed.usernameRegistryAddress.toString()).toBe(manifest.addresses.username_registry);
     expect(parsed.profileRegistryAddress.toString()).toBe(manifest.addresses.profile_registry);
     expect(parsed.vaultOfficialAthWalletAddress.toString()).toBe(manifest.addresses.vault_official_ath_wallet);
+    expect(parsed.marketStabilitySellerOfficialAthWalletAddress.toString()).toBe(manifest.addresses.market_stability_seller_official_ath_wallet);
     expect(parsed.usernameRegistryOfficialAthWalletAddress.toString()).toBe(manifest.addresses.username_registry_official_ath_wallet);
     expect(parsed.profileRegistryOfficialAthWalletAddress.toString()).toBe(manifest.addresses.profile_registry_official_ath_wallet);
 
@@ -104,6 +123,28 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
       deployment_manifest_hash: manifestHash,
       official_ath_wallet_address: parsed.profileRegistryOfficialAthWalletAddress,
     } as ProfileBindAth);
+    await marketSeller.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindMarketStabilityReserveFunder',
+      deployment_manifest_hash: manifestHash,
+      reserve_funder_address: Address.parse(manifest.addresses.market_stability_reserve_funder),
+    } as MarketSellerBindReserveFunder);
+    await marketSeller.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindMarketStabilityOfficialAthWallet',
+      deployment_manifest_hash: manifestHash,
+      official_ath_wallet_address: parsed.marketStabilitySellerOfficialAthWalletAddress,
+    } as MarketSellerBindAth);
+    await marketSeller.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindMarketStabilityTreasury',
+      deployment_manifest_hash: manifestHash,
+      ton_treasury_receiver_address: Address.parse(manifest.addresses.market_stability_ton_treasury_receiver),
+    } as MarketSellerBindTreasury);
+    await marketSeller.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'FreezeMarketStabilityPricing',
+      deployment_manifest_hash: manifestHash,
+      base_tranche_price_nanotons: toNano('1'),
+      evidence_x1_tranche_quote_nanotons: toNano('1'),
+      pricing_evidence_hash: 0x5151515151515151515151515151515151515151515151515151515151515151n,
+    } as MarketSellerFreezePricing);
 
     await vault.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
@@ -121,18 +162,27 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
       $$type: 'SealGenesis',
       deployment_manifest_hash: manifestHash,
     } as ProfileSeal);
+    await marketSeller.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'SealMarketStabilityGenesis',
+      deployment_manifest_hash: manifestHash,
+    } as MarketSellerSeal);
 
     const vaultState = await vault.getGetGlobal();
     const capsuleState = await capsuleHub.getGetState();
+    const marketSellerConfig = await marketSeller.getGetMarketStabilitySellerConfig();
     const usernameState = await usernameRegistry.getGetGlobal();
     const profileState = await profileRegistry.getGetGlobal();
 
     expect(vaultState.sealed).toBe(true);
     expect(capsuleState.sealed).toBe(true);
+    expect(marketSellerConfig.sealed).toBe(true);
+    expect(marketSellerConfig.pricing_frozen).toBe(true);
     expect(usernameState.sealed).toBe(true);
     expect(profileState.sealed).toBe(true);
     expect(vaultState.deployment_manifest_hash).toBe(manifestHash);
     expect(capsuleState.deployment_manifest_hash).toBe(manifestHash);
+    expect(marketSellerConfig.deployment_manifest_hash).toBe(manifestHash);
+    expect(marketSellerConfig.genesis_config_hash).toBe(0n);
     expect(usernameState.deployment_manifest_hash).toBe(manifestHash);
     expect(profileState.deployment_manifest_hash).toBe(manifestHash);
     expect(usernameState.genesis_config_hash).toBe(manifestHash);

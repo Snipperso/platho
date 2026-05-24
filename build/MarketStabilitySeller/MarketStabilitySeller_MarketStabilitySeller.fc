@@ -1,0 +1,1017 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MarketStabilitySeller_MarketStabilitySeller.headers.fc
+;;
+;; Header files for MarketStabilitySeller
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $AthTransferNotificationAck$_store
+builder $AthTransferNotificationAck$_store(builder build_0, (int, int, int) v) inline;
+
+;; $AthTransferNotificationAck$_store_cell
+cell $AthTransferNotificationAck$_store_cell((int, int, int) v, builder b) inline;
+
+;; $ATHTransferRequest$_store
+builder $ATHTransferRequest$_store(builder build_0, (int, int, slice, slice) v) inline;
+
+;; $ATHTransferRequest$_store_cell
+cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inline;
+
+;; $ATHTransferRequest$_load_bounced
+(slice, ((int, int))) $ATHTransferRequest$_load_bounced(slice sc_0) inline;
+
+;; $MarketStabilitySeller$_store
+builder $MarketStabilitySeller$_store(builder build_0, (int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) v) inline;
+
+;; $MarketStabilitySeller$_load
+(slice, ((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int))) $MarketStabilitySeller$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $MarketStabilitySellerConfigView$_to_external
+(int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int) $MarketStabilitySellerConfigView$_to_external(((int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int)) v) inline;
+
+;; $MarketStabilitySellerStateView$_to_external
+(int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int) $MarketStabilitySellerStateView$_to_external(((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int)) v) inline;
+
+;; $MarketStabilitySellerTotalsView$_to_external
+(int, int, int) $MarketStabilitySellerTotalsView$_to_external(((int, int, int)) v) inline;
+
+;; $ATHWallet$init$_store
+builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline;
+
+;; $MarketStabilitySeller$init$_load
+(slice, ((int, slice))) $MarketStabilitySeller$init$_load(slice sc_0) inline;
+
+;; $MarketStabilitySeller$_contract_init
+(int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $MarketStabilitySeller$_contract_init(int $genesis_config_hash, slice $ath_master_address) impure inline;
+
+;; $MarketStabilitySeller$_contract_load
+(int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $MarketStabilitySeller$_contract_load() impure inline;
+
+;; $MarketStabilitySeller$_contract_store
+() $MarketStabilitySeller$_contract_store((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $ATHWallet$_init_child
+(cell, cell) $ATHWallet$_init_child(int $balance, slice $owner_address, slice $ath_master_address) inline_ref;
+
+;; $MessageParameters$_constructor_to_value_bounce_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
+
+;; $MarketStabilitySeller$_fun_requireUnsealed
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireUnsealed((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_requireSealed
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireSealed((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_requireGenesisController
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireGenesisController((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_acceptManifestHash
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_acceptManifestHash((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $hash) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_is_basechain_address
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_is_basechain_address((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, slice $address) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_deriveAthWalletAddress
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), slice) $MarketStabilitySeller$_fun_deriveAthWalletAddress((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, slice $owner) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), slice) $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_ceilDiv
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_ceilDiv((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $numerator, int $denominator) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_currentMultiplier
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_currentMultiplier((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_currentTrancheRemaining
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_currentTrancheRemaining((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_quoteTonForAmount
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_quoteTonForAmount((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $amount) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_requireNextQueryId
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireNextQueryId((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $queryId) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_recordTerminalQueryId
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_recordTerminalQueryId((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $queryId) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_clearPending
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_clearPending((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_refundTon
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_refundTon((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, slice $destination, int $amount) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_failPendingSale
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_failPendingSale((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_finalizePendingSale
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_finalizePendingSale((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash
+((int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int)) $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash(int $sealed, int $reserve_funder_bound, int $official_ath_wallet_bound, int $treasury_bound, int $pricing_frozen, int $deployment_manifest_hash, int $genesis_config_hash, slice $ath_master_address, slice $reserve_funder_address, slice $official_ath_wallet_address, slice $ton_treasury_receiver_address, int $base_tranche_price_nanotons, int $evidence_x1_tranche_quote_nanotons, int $pricing_evidence_hash) inline;
+
+;; $MarketStabilitySeller$_fun_get_market_stability_seller_config
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), (int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int)) $MarketStabilitySeller$_fun_get_market_stability_seller_config((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id
+((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int)) $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id(int $phase, int $reserve_due_ath, int $treasury_due_ton, int $pending_query_id, int $pending_amount_ath, int $pending_paid_ton, slice $pending_buyer, slice $pending_recipient, slice $pending_recipient_ath_wallet, int $completed_tranche_count, int $current_tranche_sold_ath, int $current_multiplier, int $current_tranche_remaining_ath, int $last_terminal_query_id) inline;
+
+;; $MarketStabilitySeller$_fun_get_market_stability_seller_state
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), (int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int)) $MarketStabilitySeller$_fun_get_market_stability_seller_state((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total
+((int, int, int)) $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total(int $reserve_funded_total_ath, int $sold_ath_total, int $treasury_flushed_ton_total) inline;
+
+;; $MarketStabilitySeller$_fun_get_market_stability_seller_totals
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), (int, int, int)) $MarketStabilitySeller$_fun_get_market_stability_seller_totals((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_get_official_ath_wallet_address
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), slice) $MarketStabilitySeller$_fun_get_official_ath_wallet_address((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MarketStabilitySeller$_fun_get_quote_ton_for_amount
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_get_quote_ton_for_amount((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $amount) impure inline_ref;
+
+;; $AthTransferNotificationAck$_constructor_query_id_sender_key_amount
+((int, int, int)) $AthTransferNotificationAck$_constructor_query_id_sender_key_amount(int $query_id, int $sender_key, int $amount) inline;
+
+;; $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination
+((int, int, slice, slice)) $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination(int $query_id, int $amount, slice $recipient, slice $response_destination) inline;
+
+
+;; MarketStabilitySeller_MarketStabilitySeller.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+(int, int) $global_parseStdAddress(slice $slice) impure asm """
+    REWRITESTDADDR
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; MarketStabilitySeller_MarketStabilitySeller.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: AthTransferNotificationAck
+;; Header: 0x472d9d7e
+;; TLB: ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck
+;;
+
+builder $AthTransferNotificationAck$_store(builder build_0, (int, int, int) v) inline {
+    var (v'query_id, v'amount, v'sender_key) = v;
+    build_0 = store_uint(build_0, 1194171774, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_uint(v'sender_key, 32);
+    return build_0;
+}
+
+cell $AthTransferNotificationAck$_store_cell((int, int, int) v, builder b) inline {
+    return $AthTransferNotificationAck$_store(b, v).end_cell();
+}
+
+((int, int, int)) $AthTransferNotificationAck$_constructor_query_id_sender_key_amount(int $query_id, int $sender_key, int $amount) inline {
+    return ($query_id, $amount, $sender_key);
+}
+
+;;
+;; Type: ATHTransferRequest
+;; Header: 0x41544810
+;; TLB: ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest
+;;
+
+builder $ATHTransferRequest$_store(builder build_0, (int, int, slice, slice) v) inline {
+    var (v'query_id, v'amount, v'recipient, v'response_destination) = v;
+    build_0 = store_uint(build_0, 1096042512, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'recipient);
+    build_0 = build_0.store_slice(v'response_destination);
+    return build_0;
+}
+
+cell $ATHTransferRequest$_store_cell((int, int, slice, slice) v, builder b) inline {
+    return $ATHTransferRequest$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $ATHTransferRequest$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'query_id, v'amount));
+}
+
+((int, int, slice, slice)) $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination(int $query_id, int $amount, slice $recipient, slice $response_destination) inline {
+    return ($query_id, $amount, $recipient, $response_destination);
+}
+
+;;
+;; Type: MarketStabilitySellerConfigView
+;; TLB: _ sealed:bool reserve_funder_bound:bool official_ath_wallet_bound:bool treasury_bound:bool pricing_frozen:bool deployment_manifest_hash:int257 genesis_config_hash:int257 ath_master_address:address reserve_funder_address:address official_ath_wallet_address:address ton_treasury_receiver_address:address base_tranche_price_nanotons:int257 evidence_x1_tranche_quote_nanotons:int257 pricing_evidence_hash:int257 = MarketStabilitySellerConfigView
+;;
+
+(int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int) $MarketStabilitySellerConfigView$_to_external(((int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int)) v) inline {
+    var (v'sealed, v'reserve_funder_bound, v'official_ath_wallet_bound, v'treasury_bound, v'pricing_frozen, v'deployment_manifest_hash, v'genesis_config_hash, v'ath_master_address, v'reserve_funder_address, v'official_ath_wallet_address, v'ton_treasury_receiver_address, v'base_tranche_price_nanotons, v'evidence_x1_tranche_quote_nanotons, v'pricing_evidence_hash) = v; 
+    return (v'sealed, v'reserve_funder_bound, v'official_ath_wallet_bound, v'treasury_bound, v'pricing_frozen, v'deployment_manifest_hash, v'genesis_config_hash, v'ath_master_address, v'reserve_funder_address, v'official_ath_wallet_address, v'ton_treasury_receiver_address, v'base_tranche_price_nanotons, v'evidence_x1_tranche_quote_nanotons, v'pricing_evidence_hash);
+}
+
+((int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int)) $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash(int $sealed, int $reserve_funder_bound, int $official_ath_wallet_bound, int $treasury_bound, int $pricing_frozen, int $deployment_manifest_hash, int $genesis_config_hash, slice $ath_master_address, slice $reserve_funder_address, slice $official_ath_wallet_address, slice $ton_treasury_receiver_address, int $base_tranche_price_nanotons, int $evidence_x1_tranche_quote_nanotons, int $pricing_evidence_hash) inline {
+    return ($sealed, $reserve_funder_bound, $official_ath_wallet_bound, $treasury_bound, $pricing_frozen, $deployment_manifest_hash, $genesis_config_hash, $ath_master_address, $reserve_funder_address, $official_ath_wallet_address, $ton_treasury_receiver_address, $base_tranche_price_nanotons, $evidence_x1_tranche_quote_nanotons, $pricing_evidence_hash);
+}
+
+;;
+;; Type: MarketStabilitySellerStateView
+;; TLB: _ phase:int257 reserve_due_ath:int257 treasury_due_ton:int257 pending_query_id:int257 pending_amount_ath:int257 pending_paid_ton:int257 pending_buyer:address pending_recipient:address pending_recipient_ath_wallet:address completed_tranche_count:int257 current_tranche_sold_ath:int257 current_multiplier:int257 current_tranche_remaining_ath:int257 last_terminal_query_id:int257 = MarketStabilitySellerStateView
+;;
+
+(int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int) $MarketStabilitySellerStateView$_to_external(((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int)) v) inline {
+    var (v'phase, v'reserve_due_ath, v'treasury_due_ton, v'pending_query_id, v'pending_amount_ath, v'pending_paid_ton, v'pending_buyer, v'pending_recipient, v'pending_recipient_ath_wallet, v'completed_tranche_count, v'current_tranche_sold_ath, v'current_multiplier, v'current_tranche_remaining_ath, v'last_terminal_query_id) = v; 
+    return (v'phase, v'reserve_due_ath, v'treasury_due_ton, v'pending_query_id, v'pending_amount_ath, v'pending_paid_ton, v'pending_buyer, v'pending_recipient, v'pending_recipient_ath_wallet, v'completed_tranche_count, v'current_tranche_sold_ath, v'current_multiplier, v'current_tranche_remaining_ath, v'last_terminal_query_id);
+}
+
+((int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int)) $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id(int $phase, int $reserve_due_ath, int $treasury_due_ton, int $pending_query_id, int $pending_amount_ath, int $pending_paid_ton, slice $pending_buyer, slice $pending_recipient, slice $pending_recipient_ath_wallet, int $completed_tranche_count, int $current_tranche_sold_ath, int $current_multiplier, int $current_tranche_remaining_ath, int $last_terminal_query_id) inline {
+    return ($phase, $reserve_due_ath, $treasury_due_ton, $pending_query_id, $pending_amount_ath, $pending_paid_ton, $pending_buyer, $pending_recipient, $pending_recipient_ath_wallet, $completed_tranche_count, $current_tranche_sold_ath, $current_multiplier, $current_tranche_remaining_ath, $last_terminal_query_id);
+}
+
+;;
+;; Type: MarketStabilitySellerTotalsView
+;; TLB: _ reserve_funded_total_ath:int257 sold_ath_total:int257 treasury_flushed_ton_total:int257 = MarketStabilitySellerTotalsView
+;;
+
+(int, int, int) $MarketStabilitySellerTotalsView$_to_external(((int, int, int)) v) inline {
+    var (v'reserve_funded_total_ath, v'sold_ath_total, v'treasury_flushed_ton_total) = v; 
+    return (v'reserve_funded_total_ath, v'sold_ath_total, v'treasury_flushed_ton_total);
+}
+
+((int, int, int)) $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total(int $reserve_funded_total_ath, int $sold_ath_total, int $treasury_flushed_ton_total) inline {
+    return ($reserve_funded_total_ath, $sold_ath_total, $treasury_flushed_ton_total);
+}
+
+;;
+;; Type: ATHWallet
+;; TLB: _ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pruned_notification_acks:dict<int, int> = ATHWallet
+;;
+
+builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
+    var (v'balance, v'owner_address, v'ath_master_address) = v;
+    build_0 = build_0.store_int(v'balance, 257);
+    build_0 = build_0.store_slice(v'owner_address);
+    build_0 = build_0.store_slice(v'ath_master_address);
+    return build_0;
+}
+
+cell $ATHWallet$_child_get_code() impure asm """
+    B{b5ee9c7201023e0100132f000114ff00f4a413f4bcf2c80b01020162020304f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de207e3027026d74920c21f953106d31f07de21821041544801bae30221821041544805bae30221821041544810ba040506070201481213046e058020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae30220821041544817ba08090a0b01fe5b05d33fd37ffa40308136b0f84227c705f2f48136b122c200f2f48136b25372bef2f48136b55316c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15172a1715414377f04c855308210415448025005cb1f13cb3fcb7fcecec92504085520441359c8cf8580ca00cf8440ce01fa021101f05b05d33fd37ffa4030813840f84226c705f2f481384122c200f2f481384227c000f2f4813843f8416f24135f0382082dc6c0bef2f45161a082080f42407004705148c855208210415448065004cb1f12cb3fcb7fcec910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035551237043ce30221821041544814bae30221821041544816bae30221821041544818ba1617181900e230d33fd37f59328136b3f84225c705f2f48136b422c200f2f45151a0708040077f04c8598210415448045003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f593281378c22c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f59328137f022c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5403fe8e6730d33fd37f59328138b822c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544819bae302208210472d9d7dbae302200c0d0e00ce30d33fd37f593281392622c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016430d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540f02f2821089129d5fba8eb230d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e08210a11a7001ba8eb1d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f070f0f03f68137fa21c200f2f48137fff8416f24135f038208895440bef2f48137fb5391bef2f455525387db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e28137fc216eb3f2f46f23308137fd511abaf2f41047103645768137fe5167db3c500bba16f2f45137a15063810101f45a303a3b1002d840155033045177db3c705395db3c707f541db980400ec855308210415448125005cb1f13cb3fcb7fcecec91036105c104a103b103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0055221233350052806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54017dbb1c5ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de25515db3c6c648140179bbb02ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de2db3c6c638150166db3c810101240259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206e96307070545600e06f237f55203a000654754304da5b05d33fd37ffa40fa4030813778f84228c705f2f48137795317c705f2f410575e3346895389db3c81377a27c200f2f481377b5367bef2f482083d090081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a15167a1554029db3c705410b5db3c7f541ba7710fc82333351a04fe5b05d33fd37ffa40fa40d430d0fa40d37f308137dcf8422ac705f2f48137dd5339c705f2f48137de5324c705f2f410591048103746ab5376db3c8137df29c200f2f48137e02cc200f2f48137e15369bef2f48137e22c8209c9c380bef2f42bdb3c208208989680a08137e3f8416f24135f0322bef2f4517aa1554129db3c702324331b04ea5b05d33fd37ffa40fa40d37fd3078138a4f8422bc705f2f48138a5534ac705f2f4105a1049103847bc5398db3c8138a62bc200f2f48138a728c200f2f48138a8536bbef2f48138a9288209c9c380bef2f427db3c208208989680a08138aaf8416f24135f0322bef2f4517ca155412bdb3c705410d52324331d043ce30221821041544812bae30221821041544815bae30221821041544817ba1f20212200e455308210415448125005cb1f13cb3fcb7fcecec9106b10581049103c41a0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00505503c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5402fc5410b5db3c50dc7f7128544d30011112011113c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a1057104d103e4cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0358a11037161513351c013e4440db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542902fcdb3c4ae07f7128513f4f13011113011114c855608210415448175008cb1f16cb3f14cb7f12cececb7fcb07cec9106b105b104e10394cd0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0301a11047104641501413351e013adb3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542904fc5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd30730813912f8422ec705f2f4813913537dc705f2f4105d104c103b4aef5376db3c81391429c200f2f48139152ec200f2f48139165369bef2f48139172e8209c9c380bef2f42ddb3c208208989680a0813918f8416f24135f0322bef2f4517aa1554129db3c702324332502f05b05d33fd37ffa40fa403081378223c200f2f4813783f84210691058104710394ab9db3c19c7051af2f4813784f8416f24135f0382081e8480bef2f45134a0708040077f07c8598210415448115003cb1fcb3fcb7fc91049473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00405503333704f45b05d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842105b104a103948cd2bdb3c1ec7051cf2f48137e85383c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082086acfc0a082081e8480a0bef2f410354014503b541a09db3c555053b6db3c8137eb2481010123333b3a2a043ce30221821041544819bae302218210472d9d7ebae302218210504e5052ba2d2e2f30035410478139082705104710394078db3c17f2f4550481390908db3c18f2f4550581390a07db3c17f2f45504262626002482080f4240a082086acfc0a082081e8480a003fe5410b5db3c105d104c7f7128516d0605111505041114040311130302111202011116011117c85590821041544819500bcb1f19cb3f17cb7f15ce13cecb7f01c8cbff12cb3f12cb7f12cb0f12cb07cdc91035104a10394cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901352728000afa4430c000001a58cf8680cf8480f400f400cf810162fb00f8416f24135f035004a11057104615103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5429004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002fc59f40c6fa131b3f2f48137ec298209c9c380bef2f48137ed238101012359f40c6fa131b3f2f4516da0810101f82352d0561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f544d9052fe12c855308210472d9d7d5005cb1f13cb3fcb7fcb1fcec9104910384b70441359c8cf8580ca00892b2c00011000cacf16ce01fa02806acf40f400c901fb0082080f42407009700bc8598210415448115003cb1fcb3fcb7fc9104749301a441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fe5b05d33fd37ffa40fa40d37fd3078138ae26c200f2f48138aff842105c104b103a49de26db3c1fc7051df2f48138b02ac200f2f48138b1f8416f24135f032b82080f4240a082086acfc0a082081e8480a0bef2f410354014503c541b0cdb3c55505376db3c8138b2248101012359f40c6fa131b3f2f48138b32c8209c9c380333b3a3104fa5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd3073081391c29c200f2f481391df842105f104e103d102c01111001111129db3c01111201c70501111001f2f481391e26c200f2f481391ff8416f24135f032782080f4240a082086acfc0a082081e8480a0bef2f410354014503f541e07db3c555053a6db3c333b3a3404fc5b05d33fd37fd31f30813804f84227c705f2f481380522c200f2f4478727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206ee3026f2330813807511bbaf2f4555181380807db3c5009ba16f2f481010120103654471350aa216e955b59f45a3098c801cf004133f442e250463a383b3904fe8ffd5b05d33fd31f30105610451034437727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e281380e216eb3f2f46f23105910481037469881380f07db3c500bba16f2f4813810f8230882015180a018be17f2f4810101541400546690216e955b59f45a3098c801cf004133f442e23a3b3c3d01fcbef2f48138b4238101012359f40c6fa131b3f2f4516da0810101f823561001561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f29514f104a030211110250dc1034c85550821089129d5f5007cb1f15cb3f13cb7fcb1fcecb07cec923103a48dd441359c8cf8580ca00cf8440ce01fa023200c8806acf40f400c901fb0082080f42407004700ac8598210415448115003cb1fcb3fcb7fc91048483019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00103510341023c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016820fa4430705826db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d03501ea813920248101012359f40c6fa131b3f2f481392156118209c9c380bef2f4813922238101012359f40c6fa131b3f2f4516aa0810101f823546bd0c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f2c517c107a06105c041114040311120302111102011110010f1067c8360026f82ac87001ca0055215023810101cf00cecec901fe55808210a11a7001500acb1f18cb3f16cb7f14cb1f12cecbffcb3fcb7fcb0fcb07c92804103c4baa441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f424070047004c8598210415448115003cb1fcb3fcb7fc910474730441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035144330370036c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54008a3037810101530150994133f40c6fa19401d70030925b6de2813806216eb3f2f481380908ba17f2f45513c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54004c810101f45a301510344013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54000a01aa1f01a00026c8821041544e4901cb1f01cf16c9f900a9381f008a8101012010395446135099216e955b59f45a3098c801cf004133f442e25034810101f45a304015504403c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54006ae037c00006c12116b08e248132c8f2f010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f06f2c082} B>boc PUSHREF
+""";
+
+(cell, cell) $ATHWallet$_init_child(int $balance, slice $owner_address, slice $ath_master_address) inline_ref {
+    ;; Build init code cell
+
+    ;; Contract Code: ATHWallet
+    cell init_code = $ATHWallet$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = b.store_int(false, 1);
+    b = $ATHWallet$init$_store(b, ($balance, $owner_address, $ath_master_address));
+    return (init_code, b.end_cell());
+}
+
+;;
+;; Type: MarketStabilitySeller
+;; TLB: _ genesis_config_hash:uint256 deployment_manifest_hash:uint256 ath_master_address:address reserve_funder_address:address official_ath_wallet_address:address ton_treasury_receiver_address:address reserve_funder_bound:bool official_ath_wallet_bound:bool treasury_bound:bool pricing_frozen:bool sealed:bool base_tranche_price_nanotons:uint128 evidence_x1_tranche_quote_nanotons:uint128 pricing_evidence_hash:uint256 phase:uint8 reserve_due_ath:uint128 treasury_due_ton:uint128 pending_query_id:uint64 pending_amount_ath:uint128 pending_paid_ton:uint128 pending_buyer:address pending_recipient:address pending_recipient_ath_wallet:address completed_tranche_count:uint8 current_tranche_sold_ath:uint128 last_terminal_query_id:uint64 reserve_funded_total_ath:uint128 sold_ath_total:uint128 treasury_flushed_ton_total:uint128 = MarketStabilitySeller
+;;
+
+builder $MarketStabilitySeller$_store(builder build_0, (int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) v) inline {
+    var (v'genesis_config_hash, v'deployment_manifest_hash, v'ath_master_address, v'reserve_funder_address, v'official_ath_wallet_address, v'ton_treasury_receiver_address, v'reserve_funder_bound, v'official_ath_wallet_bound, v'treasury_bound, v'pricing_frozen, v'sealed, v'base_tranche_price_nanotons, v'evidence_x1_tranche_quote_nanotons, v'pricing_evidence_hash, v'phase, v'reserve_due_ath, v'treasury_due_ton, v'pending_query_id, v'pending_amount_ath, v'pending_paid_ton, v'pending_buyer, v'pending_recipient, v'pending_recipient_ath_wallet, v'completed_tranche_count, v'current_tranche_sold_ath, v'last_terminal_query_id, v'reserve_funded_total_ath, v'sold_ath_total, v'treasury_flushed_ton_total) = v;
+    build_0 = build_0.store_uint(v'genesis_config_hash, 256);
+    build_0 = build_0.store_uint(v'deployment_manifest_hash, 256);
+    build_0 = build_0.store_slice(v'ath_master_address);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_slice(v'reserve_funder_address);
+    build_1 = build_1.store_slice(v'official_ath_wallet_address);
+    build_1 = build_1.store_slice(v'ton_treasury_receiver_address);
+    build_1 = build_1.store_int(v'reserve_funder_bound, 1);
+    build_1 = build_1.store_int(v'official_ath_wallet_bound, 1);
+    build_1 = build_1.store_int(v'treasury_bound, 1);
+    build_1 = build_1.store_int(v'pricing_frozen, 1);
+    build_1 = build_1.store_int(v'sealed, 1);
+    build_1 = build_1.store_uint(v'base_tranche_price_nanotons, 128);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_uint(v'evidence_x1_tranche_quote_nanotons, 128);
+    build_2 = build_2.store_uint(v'pricing_evidence_hash, 256);
+    build_2 = build_2.store_uint(v'phase, 8);
+    build_2 = build_2.store_uint(v'reserve_due_ath, 128);
+    build_2 = build_2.store_uint(v'treasury_due_ton, 128);
+    build_2 = build_2.store_uint(v'pending_query_id, 64);
+    build_2 = build_2.store_uint(v'pending_amount_ath, 128);
+    build_2 = build_2.store_uint(v'pending_paid_ton, 128);
+    var build_3 = begin_cell();
+    build_3 = build_3.store_slice(v'pending_buyer);
+    build_3 = build_3.store_slice(v'pending_recipient);
+    build_3 = build_3.store_slice(v'pending_recipient_ath_wallet);
+    build_3 = build_3.store_uint(v'completed_tranche_count, 8);
+    build_3 = build_3.store_uint(v'current_tranche_sold_ath, 128);
+    build_3 = build_3.store_uint(v'last_terminal_query_id, 64);
+    var build_4 = begin_cell();
+    build_4 = build_4.store_uint(v'reserve_funded_total_ath, 128);
+    build_4 = build_4.store_uint(v'sold_ath_total, 128);
+    build_4 = build_4.store_uint(v'treasury_flushed_ton_total, 128);
+    build_3 = store_builder_ref(build_3, build_4);
+    build_2 = store_builder_ref(build_2, build_3);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int))) $MarketStabilitySeller$_load(slice sc_0) inline {
+    var v'genesis_config_hash = sc_0~load_uint(256);
+    var v'deployment_manifest_hash = sc_0~load_uint(256);
+    var v'ath_master_address = sc_0~load_msg_addr();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'reserve_funder_address = sc_1~load_msg_addr();
+    var v'official_ath_wallet_address = sc_1~load_msg_addr();
+    var v'ton_treasury_receiver_address = sc_1~load_msg_addr();
+    var v'reserve_funder_bound = sc_1~load_int(1);
+    var v'official_ath_wallet_bound = sc_1~load_int(1);
+    var v'treasury_bound = sc_1~load_int(1);
+    var v'pricing_frozen = sc_1~load_int(1);
+    var v'sealed = sc_1~load_int(1);
+    var v'base_tranche_price_nanotons = sc_1~load_uint(128);
+    slice sc_2 = sc_1~load_ref().begin_parse();
+    var v'evidence_x1_tranche_quote_nanotons = sc_2~load_uint(128);
+    var v'pricing_evidence_hash = sc_2~load_uint(256);
+    var v'phase = sc_2~load_uint(8);
+    var v'reserve_due_ath = sc_2~load_uint(128);
+    var v'treasury_due_ton = sc_2~load_uint(128);
+    var v'pending_query_id = sc_2~load_uint(64);
+    var v'pending_amount_ath = sc_2~load_uint(128);
+    var v'pending_paid_ton = sc_2~load_uint(128);
+    slice sc_3 = sc_2~load_ref().begin_parse();
+    var v'pending_buyer = sc_3~load_msg_addr();
+    var v'pending_recipient = sc_3~load_msg_addr();
+    var v'pending_recipient_ath_wallet = sc_3~load_msg_addr();
+    var v'completed_tranche_count = sc_3~load_uint(8);
+    var v'current_tranche_sold_ath = sc_3~load_uint(128);
+    var v'last_terminal_query_id = sc_3~load_uint(64);
+    slice sc_4 = sc_3~load_ref().begin_parse();
+    var v'reserve_funded_total_ath = sc_4~load_uint(128);
+    var v'sold_ath_total = sc_4~load_uint(128);
+    var v'treasury_flushed_ton_total = sc_4~load_uint(128);
+    return (sc_0, (v'genesis_config_hash, v'deployment_manifest_hash, v'ath_master_address, v'reserve_funder_address, v'official_ath_wallet_address, v'ton_treasury_receiver_address, v'reserve_funder_bound, v'official_ath_wallet_bound, v'treasury_bound, v'pricing_frozen, v'sealed, v'base_tranche_price_nanotons, v'evidence_x1_tranche_quote_nanotons, v'pricing_evidence_hash, v'phase, v'reserve_due_ath, v'treasury_due_ton, v'pending_query_id, v'pending_amount_ath, v'pending_paid_ton, v'pending_buyer, v'pending_recipient, v'pending_recipient_ath_wallet, v'completed_tranche_count, v'current_tranche_sold_ath, v'last_terminal_query_id, v'reserve_funded_total_ath, v'sold_ath_total, v'treasury_flushed_ton_total));
+}
+
+(slice, ((int, slice))) $MarketStabilitySeller$init$_load(slice sc_0) inline {
+    var v'genesis_config_hash = sc_0~load_int(257);
+    var v'ath_master_address = sc_0~load_msg_addr();
+    return (sc_0, (v'genesis_config_hash, v'ath_master_address));
+}
+
+(int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $MarketStabilitySeller$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MarketStabilitySeller$_load();
+    }
+    else {
+        (int $genesis_config_hash, slice $ath_master_address) = $sc~$MarketStabilitySeller$init$_load();
+        $sc.end_parse();
+        return $MarketStabilitySeller$_contract_init($genesis_config_hash, $ath_master_address);
+    }
+}
+
+() $MarketStabilitySeller$_contract_store((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MarketStabilitySeller$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MarketStabilitySeller functions
+;;
+
+(int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $MarketStabilitySeller$_contract_init(int $genesis_config_hash, slice $ath_master_address) impure inline {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+    throw_unless(23000, ($genesis_config_hash != 0));
+    $self'genesis_config_hash = $genesis_config_hash;
+    $self'deployment_manifest_hash = 0;
+    $self'ath_master_address = $ath_master_address;
+    $self'reserve_funder_address = $ath_master_address;
+    $self'official_ath_wallet_address = $ath_master_address;
+    $self'ton_treasury_receiver_address = $ath_master_address;
+    $self'reserve_funder_bound = false;
+    $self'official_ath_wallet_bound = false;
+    $self'treasury_bound = false;
+    $self'pricing_frozen = false;
+    $self'sealed = false;
+    $self'base_tranche_price_nanotons = 0;
+    $self'evidence_x1_tranche_quote_nanotons = 0;
+    $self'pricing_evidence_hash = 0;
+    $self'phase = 0;
+    $self'reserve_due_ath = 0;
+    $self'treasury_due_ton = 0;
+    $self'pending_query_id = 0;
+    $self'pending_amount_ath = 0;
+    $self'pending_paid_ton = 0;
+    $self'pending_buyer = $ath_master_address;
+    $self'pending_recipient = $ath_master_address;
+    $self'pending_recipient_ath_wallet = $ath_master_address;
+    $self'completed_tranche_count = 0;
+    $self'current_tranche_sold_ath = 0;
+    $self'last_terminal_query_id = 0;
+    $self'reserve_funded_total_ath = 0;
+    $self'sold_ath_total = 0;
+    $self'treasury_flushed_ton_total = 0;
+    return ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireUnsealed((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23001, (~ $self'sealed));
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireSealed((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23002, $self'sealed);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireGenesisController((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23003, ($self'genesis_config_hash != 0));
+    throw_unless(23004, ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress($global_beginCell(), __tact_context_get_sender()))) == $self'genesis_config_hash));
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_acceptManifestHash((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $hash) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23005, ($hash > 1));
+    throw_unless(23006, ( (($self'deployment_manifest_hash == 0)) ? (true) : (($self'deployment_manifest_hash == $hash)) ));
+    $self'deployment_manifest_hash = $hash;
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_is_basechain_address((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, slice $address) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var ($std'workchain, $std'address) = $global_parseStdAddress($Address$_fun_asSlice($address));
+    var $fresh$ret_30 = ($std'workchain == 0);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_30);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), slice) $MarketStabilitySeller$_fun_deriveAthWalletAddress((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, slice $owner) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var ($owner_std'workchain, $owner_std'address) = $global_parseStdAddress($Address$_fun_asSlice($owner));
+    var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $owner, $self'ath_master_address);
+    var $fresh$ret_31 = $global_contractAddressExt($owner_std'workchain, $wallet_init'code, $wallet_init'data);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_31);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), slice) $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_32 = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_deriveAthWalletAddress($global_myAddress());
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_32);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_ceilDiv((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $numerator, int $denominator) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23007, ($denominator > 0));
+    ifnot ($numerator) {
+        var $fresh$ret_33 = 0;
+        return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_33);
+    }
+    var $fresh$ret_34 = ((($numerator - 1) / $denominator) + 1);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_34);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_currentMultiplier((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_35 = (2 + $self'completed_tranche_count);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_35);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_currentTrancheRemaining((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    if (($self'completed_tranche_count >= 15)) {
+        var $fresh$ret_36 = 0;
+        return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_36);
+    }
+    var $fresh$ret_37 = (3000000000000000 - $self'current_tranche_sold_ath);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_37);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_quoteTonForAmount((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $amount) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23008, $self'pricing_frozen);
+    throw_unless(23009, ($amount > 0));
+    int $remaining = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_currentTrancheRemaining();
+    throw_unless(23010, ($remaining > 0));
+    throw_unless(23011, ($amount <= $remaining));
+    int $numerator = (($self'base_tranche_price_nanotons * ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_currentMultiplier()) * $amount);
+    var $fresh$ret_38 = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_ceilDiv($numerator, 3000000000000000);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_38);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_requireNextQueryId((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $queryId) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    throw_unless(23012, ($queryId < 18446744073709551615));
+    throw_unless(23013, ($queryId == ($self'last_terminal_query_id + 1)));
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_recordTerminalQueryId((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $queryId) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    $self'last_terminal_query_id = $queryId;
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_clearPending((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    $self'phase = 0;
+    $self'pending_query_id = 0;
+    $self'pending_amount_ath = 0;
+    $self'pending_paid_ton = 0;
+    $self'pending_buyer = $self'ath_master_address;
+    $self'pending_recipient = $self'ath_master_address;
+    $self'pending_recipient_ath_wallet = $self'ath_master_address;
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_refundTon((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, slice $destination, int $amount) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    if (($amount < 100000)) {
+        return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+    }
+    $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($destination, $amount, false, 1, null()));
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_failPendingSale((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    int $queryId = $self'pending_query_id;
+    int $amount = $self'pending_amount_ath;
+    int $paid = $self'pending_paid_ton;
+    slice $buyer = $self'pending_buyer;
+    $self'reserve_due_ath = $self'reserve_due_ath + $amount;
+    ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_clearPending();
+    ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_recordTerminalQueryId($queryId);
+    ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_refundTon($buyer, $paid);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), ()) $MarketStabilitySeller$_fun_finalizePendingSale((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    int $queryId = $self'pending_query_id;
+    int $amount = $self'pending_amount_ath;
+    int $paid = $self'pending_paid_ton;
+    $self'treasury_due_ton = $self'treasury_due_ton + $paid;
+    $self'sold_ath_total = $self'sold_ath_total + $amount;
+    $self'current_tranche_sold_ath = $self'current_tranche_sold_ath + $amount;
+    if (($self'current_tranche_sold_ath == 3000000000000000)) {
+        $self'completed_tranche_count = $self'completed_tranche_count + 1;
+        $self'current_tranche_sold_ath = 0;
+    }
+    ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_clearPending();
+    ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_recordTerminalQueryId($queryId);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), ());
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), (int, int, int, int, int, int, int, slice, slice, slice, slice, int, int, int)) $MarketStabilitySeller$_fun_get_market_stability_seller_config((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_39 = $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash($self'sealed, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_39);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), (int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int)) $MarketStabilitySeller$_fun_get_market_stability_seller_state((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_40 = $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id($self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_currentMultiplier(), ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_currentTrancheRemaining(), $self'last_terminal_query_id);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_40);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), (int, int, int)) $MarketStabilitySeller$_fun_get_market_stability_seller_totals((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_41 = $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total($self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_41);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), slice) $MarketStabilitySeller$_fun_get_official_ath_wallet_address((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_42 = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_deriveOwnAthWalletAddress();
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_42);
+}
+
+((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int), int) $MarketStabilitySeller$_fun_get_quote_ton_for_amount((int, int, slice, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, slice, slice, int, int, int, int, int, int) $self, int $amount) impure inline_ref {
+    var (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)) = $self;
+    var $fresh$ret_43 = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_quoteTonForAmount($amount);
+    return (($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total), $fresh$ret_43);
+}
+
+;;
+;; Get methods of a Contract MarketStabilitySeller
+;;
+
+_ %get_market_stability_seller_config() method_id(71222) {
+    var self = $MarketStabilitySeller$_contract_load();
+    var res = self~$MarketStabilitySeller$_fun_get_market_stability_seller_config();
+    return $MarketStabilitySellerConfigView$_to_external(res);
+}
+
+_ %get_market_stability_seller_state() method_id(71462) {
+    var self = $MarketStabilitySeller$_contract_load();
+    var res = self~$MarketStabilitySeller$_fun_get_market_stability_seller_state();
+    return $MarketStabilitySellerStateView$_to_external(res);
+}
+
+_ %get_market_stability_seller_totals() method_id(106287) {
+    var self = $MarketStabilitySeller$_contract_load();
+    var res = self~$MarketStabilitySeller$_fun_get_market_stability_seller_totals();
+    return $MarketStabilitySellerTotalsView$_to_external(res);
+}
+
+_ %get_official_ath_wallet_address() method_id(110905) {
+    var self = $MarketStabilitySeller$_contract_load();
+    var res = self~$MarketStabilitySeller$_fun_get_official_ath_wallet_address();
+    return res;
+}
+
+_ %get_quote_ton_for_amount(int $amount) method_id(118943) {
+    int $amount = $amount;
+    var self = $MarketStabilitySeller$_contract_load();
+    var res = self~$MarketStabilitySeller$_fun_get_quote_ton_for_amount($amount);
+    return res;
+}
+
+;;
+;; Routing of a Contract MarketStabilitySeller
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total) = $MarketStabilitySeller$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for ATHTransferRequest message
+        if (op == 0x41544810) {
+            var ($msg'query_id, $msg'amount) = in_msg~$ATHTransferRequest$_load_bounced();
+            ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireSealed();
+            throw_unless(23250, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+            throw_unless(23251, ($self'phase == 1));
+            throw_unless(23252, ($msg'query_id == $self'pending_query_id));
+            throw_unless(23253, ($msg'amount == $self'pending_amount_ath));
+            ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_failPendingSale();
+            $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+            return ();
+        }
+        
+        return ();
+    }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive BindMarketStabilityReserveFunder message
+    if (op == 0x4d535246) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        var $msg'reserve_funder_address = in_msg~load_msg_addr();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireUnsealed();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireGenesisController();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_acceptManifestHash($msg'deployment_manifest_hash);
+        throw_unless(23100, (~ $self'reserve_funder_bound));
+        throw_unless(23101, ( ~ equal_slices_bits($msg'reserve_funder_address, $global_myAddress()) ));
+        throw_unless(23102, ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_is_basechain_address($msg'reserve_funder_address));
+        $self'reserve_funder_address = $msg'reserve_funder_address;
+        $self'reserve_funder_bound = true;
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive BindMarketStabilityOfficialAthWallet message
+    if (op == 0x4d534157) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        var $msg'official_ath_wallet_address = in_msg~load_msg_addr();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireUnsealed();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireGenesisController();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_acceptManifestHash($msg'deployment_manifest_hash);
+        throw_unless(23110, (~ $self'official_ath_wallet_bound));
+        throw_unless(23111, ( equal_slices_bits($msg'official_ath_wallet_address, ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_deriveOwnAthWalletAddress()) ));
+        $self'official_ath_wallet_address = $msg'official_ath_wallet_address;
+        $self'official_ath_wallet_bound = true;
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive BindMarketStabilityTreasury message
+    if (op == 0x4d535452) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        var $msg'ton_treasury_receiver_address = in_msg~load_msg_addr();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireUnsealed();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireGenesisController();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_acceptManifestHash($msg'deployment_manifest_hash);
+        throw_unless(23120, (~ $self'treasury_bound));
+        throw_unless(23121, ( ~ equal_slices_bits($msg'ton_treasury_receiver_address, $global_myAddress()) ));
+        throw_unless(23122, ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_is_basechain_address($msg'ton_treasury_receiver_address));
+        $self'ton_treasury_receiver_address = $msg'ton_treasury_receiver_address;
+        $self'treasury_bound = true;
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive FreezeMarketStabilityPricing message
+    if (op == 0x4d535046) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        var $msg'base_tranche_price_nanotons = in_msg~load_uint(128);
+        var $msg'evidence_x1_tranche_quote_nanotons = in_msg~load_uint(128);
+        var $msg'pricing_evidence_hash = in_msg~load_uint(256);
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireUnsealed();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireGenesisController();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_acceptManifestHash($msg'deployment_manifest_hash);
+        throw_unless(23130, (~ $self'pricing_frozen));
+        throw_unless(23136, ($msg'base_tranche_price_nanotons > 0));
+        throw_unless(23137, ($msg'evidence_x1_tranche_quote_nanotons >= $msg'base_tranche_price_nanotons));
+        throw_unless(23138, ($msg'pricing_evidence_hash != 0));
+        $self'base_tranche_price_nanotons = $msg'base_tranche_price_nanotons;
+        $self'evidence_x1_tranche_quote_nanotons = $msg'evidence_x1_tranche_quote_nanotons;
+        $self'pricing_evidence_hash = $msg'pricing_evidence_hash;
+        $self'pricing_frozen = true;
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive SealMarketStabilityGenesis message
+    if (op == 0x4d53534c) {
+        var $msg'deployment_manifest_hash = in_msg~load_uint(256);
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireUnsealed();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireGenesisController();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_acceptManifestHash($msg'deployment_manifest_hash);
+        throw_unless(23140, $self'reserve_funder_bound);
+        throw_unless(23141, $self'official_ath_wallet_bound);
+        throw_unless(23142, $self'treasury_bound);
+        throw_unless(23143, $self'pricing_frozen);
+        $self'genesis_config_hash = 0;
+        $self'sealed = true;
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive AthTransferNotification message
+    if (op == 0x472d9d7d) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_key = in_msg~load_uint(32);
+        var $msg'sender_wallet = in_msg~load_msg_addr();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireSealed();
+        throw_unless(23200, $self'pricing_frozen);
+        throw_unless(23201, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+        throw_unless(23202, ($msg'amount > 0));
+        throw_unless(23203, ( equal_slices_bits($msg'sender_wallet, $self'reserve_funder_address) ));
+        throw_unless(23204, ($Context$_get_value(__tact_context_get()) >= 3000000));
+        throw_unless(23205, (($self'reserve_funded_total_ath + $msg'amount) <= 45000000000000000));
+        $self'reserve_due_ath = $self'reserve_due_ath + $msg'amount;
+        $self'reserve_funded_total_ath = $self'reserve_funded_total_ath + $msg'amount;
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__tact_context_get_sender(), 1000000, false, 0, $AthTransferNotificationAck$_store_cell($AthTransferNotificationAck$_constructor_query_id_sender_key_amount($msg'query_id, $msg'sender_key, $msg'amount), begin_cell())));
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive BuyMarketStabilityAth message
+    if (op == 0x4d534558) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'recipient = in_msg~load_msg_addr();
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireSealed();
+        throw_unless(23210, $self'pricing_frozen);
+        throw_unless(23211, ($self'phase == 0));
+        throw_unless(23212, ($msg'query_id > 0));
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireNextQueryId($msg'query_id);
+        throw_unless(23213, ($msg'amount > 0));
+        throw_unless(23214, ($self'completed_tranche_count < 15));
+        throw_unless(23215, ($msg'amount <= ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_currentTrancheRemaining()));
+        throw_unless(23216, ($msg'amount <= $self'reserve_due_ath));
+        throw_unless(23217, ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_is_basechain_address($msg'recipient));
+        int $price = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_quoteTonForAmount($msg'amount);
+        int $requiredValue = (($price + 12000000) + 2000000);
+        throw_unless(23218, ($Context$_get_value(__tact_context_get()) >= $requiredValue));
+        slice $recipientWallet = ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_deriveAthWalletAddress($msg'recipient);
+        $self'reserve_due_ath = $self'reserve_due_ath - $msg'amount;
+        $self'phase = 1;
+        $self'pending_query_id = $msg'query_id;
+        $self'pending_amount_ath = $msg'amount;
+        $self'pending_paid_ton = $price;
+        $self'pending_buyer = __tact_context_get_sender();
+        $self'pending_recipient = $msg'recipient;
+        $self'pending_recipient_ath_wallet = $recipientWallet;
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'official_ath_wallet_address, 12000000, true, 0, $ATHTransferRequest$_store_cell($ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination($msg'query_id, $msg'amount, $msg'recipient, $global_myAddress()), begin_cell())));
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_refundTon(__tact_context_get_sender(), ($Context$_get_value(__tact_context_get()) - $requiredValue));
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive ATHTransferAck message
+    if (op == 0x41544811) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireSealed();
+        throw_unless(23230, ($self'phase == 1));
+        throw_unless(23231, ($msg'query_id == $self'pending_query_id));
+        throw_unless(23232, ($msg'amount == $self'pending_amount_ath));
+        throw_unless(23233, ( equal_slices_bits(__tact_context_get_sender(), $self'pending_recipient_ath_wallet) ));
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_finalizePendingSale();
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive ATHTransferFailed message
+    if (op == 0x41544813) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireSealed();
+        throw_unless(23240, ( equal_slices_bits(__tact_context_get_sender(), $self'official_ath_wallet_address) ));
+        throw_unless(23241, ($self'phase == 1));
+        throw_unless(23242, ($msg'query_id == $self'pending_query_id));
+        throw_unless(23243, ($msg'amount == $self'pending_amount_ath));
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_failPendingSale();
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive FlushMarketStabilityTreasuryTon message
+    if (op == 0x4d534654) {
+        var $msg'amount = in_msg~load_uint(128);
+        ($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total)~$MarketStabilitySeller$_fun_requireSealed();
+        throw_unless(23260, ($msg'amount > 0));
+        throw_unless(23261, ($msg'amount <= $self'treasury_due_ton));
+        throw_unless(23262, ($Context$_get_value(__tact_context_get()) >= 2000000));
+        $self'treasury_due_ton = $self'treasury_due_ton - $msg'amount;
+        $self'treasury_flushed_ton_total = $self'treasury_flushed_ton_total + $msg'amount;
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'ton_treasury_receiver_address, $msg'amount, false, 1, null()));
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive MarketStabilityTopUpStorageReserve message
+    if (op == 0x906182d3) {
+        var $msg = empty_tuple();
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(23999);
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'pricing_frozen, $self'sealed, $self'base_tranche_price_nanotons, $self'evidence_x1_tranche_quote_nanotons, $self'pricing_evidence_hash, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

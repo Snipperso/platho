@@ -1,0 +1,2141 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get
+  DECLPROC __tact_context_get_sender
+  DECLPROC $AthTransferNotificationAck$_store
+  DECLPROC $AthTransferNotificationAck$_store_cell
+  DECLPROC $ATHTransferRequest$_store
+  DECLPROC $ATHTransferRequest$_store_cell
+  DECLPROC $ATHTransferRequest$_load_bounced
+  DECLPROC $MarketStabilitySeller$_store
+  DECLPROC $MarketStabilitySeller$_load
+  DECLPROC $Context$_get_value
+  DECLPROC $MarketStabilitySellerConfigView$_to_external
+  DECLPROC $MarketStabilitySellerStateView$_to_external
+  DECLPROC $MarketStabilitySellerTotalsView$_to_external
+  DECLPROC $ATHWallet$init$_store
+  DECLPROC $MarketStabilitySeller$init$_load
+  DECLPROC $MarketStabilitySeller$_contract_init
+  DECLPROC $MarketStabilitySeller$_contract_load
+  DECLPROC $MarketStabilitySeller$_contract_store
+  DECLPROC $Cell$_fun_asSlice
+  DECLPROC $global_newAddress
+  DECLPROC $global_contractAddressExt
+  DECLPROC $ATHWallet$_init_child
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $MarketStabilitySeller$_fun_requireUnsealed
+  DECLPROC $MarketStabilitySeller$_fun_requireSealed
+  DECLPROC $MarketStabilitySeller$_fun_requireGenesisController
+  DECLPROC $MarketStabilitySeller$_fun_acceptManifestHash
+  DECLPROC $MarketStabilitySeller$_fun_is_basechain_address
+  DECLPROC $MarketStabilitySeller$_fun_deriveAthWalletAddress
+  DECLPROC $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress
+  DECLPROC $MarketStabilitySeller$_fun_ceilDiv
+  DECLPROC $MarketStabilitySeller$_fun_currentMultiplier
+  DECLPROC $MarketStabilitySeller$_fun_currentTrancheRemaining
+  DECLPROC $MarketStabilitySeller$_fun_quoteTonForAmount
+  DECLPROC $MarketStabilitySeller$_fun_requireNextQueryId
+  DECLPROC $MarketStabilitySeller$_fun_recordTerminalQueryId
+  DECLPROC $MarketStabilitySeller$_fun_clearPending
+  DECLPROC $MarketStabilitySeller$_fun_refundTon
+  DECLPROC $MarketStabilitySeller$_fun_failPendingSale
+  DECLPROC $MarketStabilitySeller$_fun_finalizePendingSale
+  DECLPROC $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash
+  DECLPROC $MarketStabilitySeller$_fun_get_market_stability_seller_config
+  DECLPROC $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id
+  DECLPROC $MarketStabilitySeller$_fun_get_market_stability_seller_state
+  DECLPROC $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total
+  DECLPROC $MarketStabilitySeller$_fun_get_market_stability_seller_totals
+  DECLPROC $MarketStabilitySeller$_fun_get_official_ath_wallet_address
+  DECLPROC $MarketStabilitySeller$_fun_get_quote_ton_for_amount
+  DECLPROC $AthTransferNotificationAck$_constructor_query_id_sender_key_amount
+  DECLPROC $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination
+  71222 DECLMETHOD %get_market_stability_seller_config
+  71462 DECLMETHOD %get_market_stability_seller_state
+  106287 DECLMETHOD %get_market_stability_seller_totals
+  110905 DECLMETHOD %get_official_ath_wallet_address
+  118943 DECLMETHOD %get_quote_ton_for_amount
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get PROCINLINE:<{
+    __tact_context GETGLOB
+    4 UNTUPLE
+  }>
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $AthTransferNotificationAck$_store PROCINLINE:<{
+    1194171774 PUSHINT
+    s0 s4 XCHG2
+    32 STU
+    s1 s2 XCHG
+    64 STU
+    128 STU
+    32 STU
+  }>
+  $AthTransferNotificationAck$_store_cell PROCINLINE:<{
+    3 -ROLL
+    $AthTransferNotificationAck$_store INLINECALLDICT
+    ENDC
+  }>
+  $ATHTransferRequest$_store PROCINLINE:<{
+    1096042512 PUSHINT
+    s0 s5 XCHG2
+    32 STU
+    s1 s3 XCHG
+    64 STU
+    128 STU
+    STSLICE
+    STSLICE
+  }>
+  $ATHTransferRequest$_store_cell PROCINLINE:<{
+    4 -ROLL
+    $ATHTransferRequest$_store INLINECALLDICT
+    ENDC
+  }>
+  $ATHTransferRequest$_load_bounced PROCINLINE:<{
+    64 LDU
+    128 LDU
+    -ROT
+  }>
+  $MarketStabilitySeller$_store PROCINLINE:<{
+    s1 28 s() XCHG
+    s0 29 s() XCHG
+    256 STU
+    s1 26 s() XCHG
+    256 STU
+    s1 24 s() XCHG
+    STSLICE
+    s0 22 s() XCHG
+    NEWC
+    STSLICE
+    s1 21 s() XCHG
+    STSLICE
+    s1 19 s() XCHG
+    STSLICE
+    s1 17 s() XCHG
+    1 STI
+    s1 s15 XCHG
+    1 STI
+    s1 s13 XCHG
+    1 STI
+    s1 s11 XCHG
+    1 STI
+    s1 s9 XCHG
+    1 STI
+    s1 s7 XCHG
+    128 STU
+    s0 s5 XCHG
+    NEWC
+    128 STU
+    s1 s4 XCHG
+    256 STU
+    s1 s2 XCHG
+    8 STU
+    128 STU
+    128 STU
+    s1 s2 XCHG
+    64 STU
+    s1 s2 XCHG
+    128 STU
+    s1 s2 XCHG
+    128 STU
+    s0 s2 XCHG
+    NEWC
+    STSLICE
+    s1 s3 XCHG
+    STSLICE
+    s1 s3 XCHG
+    STSLICE
+    s1 s3 XCHG
+    8 STU
+    s1 s3 XCHG
+    128 STU
+    s1 s4 XCHG
+    64 STU
+    s0 s4 XCHG
+    NEWC
+    128 STU
+    s1 s5 XCHG
+    128 STU
+    s1 s5 XCHG
+    128 STU
+    s1 s2 XCHG
+    STBREFR
+    s1 s2 XCHG
+    STBREFR
+    STBREFR
+    STBREFR
+  }>
+  $MarketStabilitySeller$_load PROCINLINE:<{
+    256 LDU
+    256 LDU
+    LDMSGADDR
+    LDREF
+    SWAP
+    CTOS
+    LDMSGADDR
+    LDMSGADDR
+    LDMSGADDR
+    1 LDI
+    1 LDI
+    1 LDI
+    1 LDI
+    1 LDI
+    128 LDU
+    LDREF
+    DROP
+    CTOS
+    128 LDU
+    256 LDU
+    8 LDU
+    128 LDU
+    128 LDU
+    64 LDU
+    128 LDU
+    128 LDU
+    LDREF
+    DROP
+    CTOS
+    LDMSGADDR
+    LDMSGADDR
+    LDMSGADDR
+    8 LDU
+    128 LDU
+    64 LDU
+    LDREF
+    DROP
+    CTOS
+    128 LDU
+    128 LDU
+    128 LDU
+    DROP
+    26 s() 29 s() XCHG
+    26 s() 28 s() XCHG
+    26 s() 27 s() XCHG
+  }>
+  $Context$_get_value PROCINLINE:<{
+    s1 s3 XCHG
+    3 BLKDROP
+  }>
+  $MarketStabilitySellerConfigView$_to_external PROCINLINE:<{
+  }>
+  $MarketStabilitySellerStateView$_to_external PROCINLINE:<{
+  }>
+  $MarketStabilitySellerTotalsView$_to_external PROCINLINE:<{
+  }>
+  $ATHWallet$init$_store PROCINLINE:<{
+    s2 s3 XCHG2
+    257 PUSHINT
+    STIX
+    STSLICE
+    STSLICE
+  }>
+  $MarketStabilitySeller$init$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    LDMSGADDR
+    -ROT
+  }>
+  $MarketStabilitySeller$_contract_init PROCINLINE:<{
+    23000 PUSHINT
+    s2 PUSH
+    0 NEQINT
+    THROWANYIFNOT
+    0 PUSHINT
+    s1 s1 s1 PUSH3
+    s4 PUSH
+    FALSE
+    FALSE
+    FALSE
+    FALSE
+    FALSE
+    s9 s9 s9 PUSH3
+    s0 s0 s0 PUSH3
+    s0 s0 s0 PUSH3
+    19 s() PUSH
+    20 s() PUSH
+    s2 s2 s2 PUSH3
+    s0 s0 s0 PUSH3
+    26 s() 27 s() XCHG
+    25 s() 26 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 24 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    s14 s15 XCHG
+    s13 s14 XCHG
+    s12 s13 XCHG
+    s11 s12 XCHG
+    s10 s11 XCHG
+    s9 s10 XCHG
+    s8 s9 XCHG
+    s7 s8 XCHG
+    s6 s7 XCHG
+  }>
+  $MarketStabilitySeller$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $MarketStabilitySeller$_load INLINECALLDICT
+      29 s() POP
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+    }>ELSE<{
+      $MarketStabilitySeller$init$_load INLINECALLDICT
+      s0 s2 XCHG
+      ENDS
+      SWAP
+      $MarketStabilitySeller$_contract_init INLINECALLDICT
+    }>
+  }>
+  $MarketStabilitySeller$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    s0 29 s() XCHG
+    s0 28 s() XCHG
+    s0 27 s() XCHG
+    s0 26 s() XCHG
+    s0 25 s() XCHG
+    s0 24 s() XCHG
+    s0 23 s() XCHG
+    s0 22 s() XCHG
+    s0 21 s() XCHG
+    s0 20 s() XCHG
+    s0 19 s() XCHG
+    s0 18 s() XCHG
+    s0 17 s() XCHG
+    s0 16 s() XCHG
+    15 -ROLL
+    $MarketStabilitySeller$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $Cell$_fun_asSlice PROCINLINE:<{
+        CTOS
+  }>
+  $global_newAddress PROCINLINE:<{
+        NEWC
+    4 PUSHINT
+    SWAP
+    3 STU
+    s1 s2 XCHG
+    8 STI
+    256 STU
+        ENDC
+    $Cell$_fun_asSlice INLINECALLDICT
+  }>
+  $global_contractAddressExt PROCINLINE:<{
+        s0 PUSH HASHCU // `data` hash
+        s2 PUSH HASHCU // `code` hash
+        SWAP2
+        CDEPTH         // `data` depth
+        SWAP
+        CDEPTH         // `code` depth
+        131380 INT     // (2 << 16) | (1 << 8) | 0x34
+        // Group 2: Composition of the Builder
+        NEWC
+        24 STU  // store refs_descriptor | bits_descriptor | data
+        16 STU  // store depth_descriptor for `code`
+        16 STU  // store depth_descriptor for `data`
+        256 STU // store `code` hash
+        256 STU // store `data` hash
+        // Group 3: SHA256 hash of the resulting Builder
+        ONE HASHEXT_SHA256
+    $global_newAddress INLINECALLDICT
+  }>
+  $ATHWallet$_init_child PROCREF:<{
+        B{b5ee9c7201023e0100132f000114ff00f4a413f4bcf2c80b01020162020304f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de207e3027026d74920c21f953106d31f07de21821041544801bae30221821041544805bae30221821041544810ba040506070201481213046e058020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812bae30220821041544815bae30220821041544817ba08090a0b01fe5b05d33fd37ffa40308136b0f84227c705f2f48136b122c200f2f48136b25372bef2f48136b55316c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15172a1715414377f04c855308210415448025005cb1f13cb3fcb7fcecec92504085520441359c8cf8580ca00cf8440ce01fa021101f05b05d33fd37ffa4030813840f84226c705f2f481384122c200f2f481384227c000f2f4813843f8416f24135f0382082dc6c0bef2f45161a082080f42407004705148c855208210415448065004cb1f12cb3fcb7fcec910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035551237043ce30221821041544814bae30221821041544816bae30221821041544818ba1617181900e230d33fd37f59328136b3f84225c705f2f48136b422c200f2f45151a0708040077f04c8598210415448045003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f593281378c22c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400ce30d33fd37f59328137f022c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5403fe8e6730d33fd37f59328138b822c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544819bae302208210472d9d7dbae302200c0d0e00ce30d33fd37f593281392622c200f2f45151a0708040077f04c8598210415448135003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016430d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540f02f2821089129d5fba8eb230d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e08210a11a7001ba8eb1d33fd37fd31f5520331068105710461035103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f070f0f03f68137fa21c200f2f48137fff8416f24135f038208895440bef2f48137fb5391bef2f455525387db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e28137fc216eb3f2f46f23308137fd511abaf2f41047103645768137fe5167db3c500bba16f2f45137a15063810101f45a303a3b1002d840155033045177db3c705395db3c707f541db980400ec855308210415448125005cb1f13cb3fcb7fcecec91036105c104a103b103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0055221233350052806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54017dbb1c5ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de25515db3c6c648140179bbb02ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de2db3c6c638150166db3c810101240259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206e96307070545600e06f237f55203a000654754304da5b05d33fd37ffa40fa4030813778f84228c705f2f48137795317c705f2f410575e3346895389db3c81377a27c200f2f481377b5367bef2f482083d090081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a15167a1554029db3c705410b5db3c7f541ba7710fc82333351a04fe5b05d33fd37ffa40fa40d430d0fa40d37f308137dcf8422ac705f2f48137dd5339c705f2f48137de5324c705f2f410591048103746ab5376db3c8137df29c200f2f48137e02cc200f2f48137e15369bef2f48137e22c8209c9c380bef2f42bdb3c208208989680a08137e3f8416f24135f0322bef2f4517aa1554129db3c702324331b04ea5b05d33fd37ffa40fa40d37fd3078138a4f8422bc705f2f48138a5534ac705f2f4105a1049103847bc5398db3c8138a62bc200f2f48138a728c200f2f48138a8536bbef2f48138a9288209c9c380bef2f427db3c208208989680a08138aaf8416f24135f0322bef2f4517ca155412bdb3c705410d52324331d043ce30221821041544812bae30221821041544815bae30221821041544817ba1f20212200e455308210415448125005cb1f13cb3fcb7fcecec9106b10581049103c41a0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00505503c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5402fc5410b5db3c50dc7f7128544d30011112011113c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a1057104d103e4cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0358a11037161513351c013e4440db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542902fcdb3c4ae07f7128513f4f13011113011114c855608210415448175008cb1f16cb3f14cb7f12cececb7fcb07cec9106b105b104e10394cd0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0301a11047104641501413351e013adb3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542904fc5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd30730813912f8422ec705f2f4813913537dc705f2f4105d104c103b4aef5376db3c81391429c200f2f48139152ec200f2f48139165369bef2f48139172e8209c9c380bef2f42ddb3c208208989680a0813918f8416f24135f0322bef2f4517aa1554129db3c702324332502f05b05d33fd37ffa40fa403081378223c200f2f4813783f84210691058104710394ab9db3c19c7051af2f4813784f8416f24135f0382081e8480bef2f45134a0708040077f07c8598210415448115003cb1fcb3fcb7fc91049473016441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00405503333704f45b05d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842105b104a103948cd2bdb3c1ec7051cf2f48137e85383c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082086acfc0a082081e8480a0bef2f410354014503b541a09db3c555053b6db3c8137eb2481010123333b3a2a043ce30221821041544819bae302218210472d9d7ebae302218210504e5052ba2d2e2f30035410478139082705104710394078db3c17f2f4550481390908db3c18f2f4550581390a07db3c17f2f45504262626002482080f4240a082086acfc0a082081e8480a003fe5410b5db3c105d104c7f7128516d0605111505041114040311130302111202011116011117c85590821041544819500bcb1f19cb3f17cb7f15ce13cecb7f01c8cbff12cb3f12cb7f12cb0f12cb07cdc91035104a10394cb0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901352728000afa4430c000001a58cf8680cf8480f400f400cf810162fb00f8416f24135f035004a11057104615103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5429004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002fc59f40c6fa131b3f2f48137ec298209c9c380bef2f48137ed238101012359f40c6fa131b3f2f4516da0810101f82352d0561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f544d9052fe12c855308210472d9d7d5005cb1f13cb3fcb7fcb1fcec9104910384b70441359c8cf8580ca00892b2c00011000cacf16ce01fa02806acf40f400c901fb0082080f42407009700bc8598210415448115003cb1fcb3fcb7fc9104749301a441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fe5b05d33fd37ffa40fa40d37fd3078138ae26c200f2f48138aff842105c104b103a49de26db3c1fc7051df2f48138b02ac200f2f48138b1f8416f24135f032b82080f4240a082086acfc0a082081e8480a0bef2f410354014503c541b0cdb3c55505376db3c8138b2248101012359f40c6fa131b3f2f48138b32c8209c9c380333b3a3104fa5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd3073081391c29c200f2f481391df842105f104e103d102c01111001111129db3c01111201c70501111001f2f481391e26c200f2f481391ff8416f24135f032782080f4240a082086acfc0a082081e8480a0bef2f410354014503f541e07db3c555053a6db3c333b3a3404fc5b05d33fd37fd31f30813804f84227c705f2f481380522c200f2f4478727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e2206ee3026f2330813807511bbaf2f4555181380807db3c5009ba16f2f481010120103654471350aa216e955b59f45a3098c801cf004133f442e250463a383b3904fe8ffd5b05d33fd31f30105610451034437727db3c238101012259f40d6fa192306ddf206e92306d9dd0fa40d37fd31f55206c136f03e281380e216eb3f2f46f23105910481037469881380f07db3c500bba16f2f4813810f8230882015180a018be17f2f4810101541400546690216e955b59f45a3098c801cf004133f442e23a3b3c3d01fcbef2f48138b4238101012359f40c6fa131b3f2f4516da0810101f823561001561001c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f29514f104a030211110250dc1034c85550821089129d5f5007cb1f15cb3f13cb7fcb1fcecb07cec923103a48dd441359c8cf8580ca00cf8440ce01fa023200c8806acf40f400c901fb0082080f42407004700ac8598210415448115003cb1fcb3fcb7fc91048483019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00103510341023c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54016820fa4430705826db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d03501ea813920248101012359f40c6fa131b3f2f481392156118209c9c380bef2f4813922238101012359f40c6fa131b3f2f4516aa0810101f823546bd0c855205023cecb7fcb1fc910354180206e953059f45a30944133f415e2717f2c517c107a06105c041114040311120302111102011110010f1067c8360026f82ac87001ca0055215023810101cf00cecec901fe55808210a11a7001500acb1f18cb3f16cb7f14cb1f12cecbffcb3fcb7fcb0fcb07c92804103c4baa441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f424070047004c8598210415448115003cb1fcb3fcb7fc910474730441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035144330370036c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54008a3037810101530150994133f40c6fa19401d70030925b6de2813806216eb3f2f481380908ba17f2f45513c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54004c810101f45a301510344013c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54000a01aa1f01a00026c8821041544e4901cb1f01cf16c9f900a9381f008a8101012010395446135099216e955b59f45a3098c801cf004133f442e25034810101f45a304015504403c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54006ae037c00006c12116b08e248132c8f2f010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f06f2c082} B>boc PUSHREF
+    NEWC
+    FALSE
+    SWAP
+    1 STI
+    3 2 BLKSWAP
+    $ATHWallet$init$_store INLINECALLDICT
+    ENDC
+  }>
+  $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
+    s3 s4 s3 XCHG3
+  }>
+  $MarketStabilitySeller$_fun_requireUnsealed PROCREF:<{
+    23001 PUSHINT
+    19 s() PUSH
+    NOT
+    THROWANYIFNOT
+  }>
+  $MarketStabilitySeller$_fun_requireSealed PROCREF:<{
+    23002 PUSHINT
+    19 s() PUSH
+    THROWANYIFNOT
+  }>
+  $MarketStabilitySeller$_fun_requireGenesisController PROCREF:<{
+    23003 PUSHINT
+    29 s() PUSH
+    0 NEQINT
+    THROWANYIFNOT
+    23004 PUSHINT
+        NEWC
+    __tact_context_get_sender INLINECALLDICT
+        STSLICER
+        ENDC
+        HASHCU
+    30 s() PUSH
+    EQUAL
+    THROWANYIFNOT
+  }>
+  $MarketStabilitySeller$_fun_acceptManifestHash PROCREF:<{
+    23005 PUSHINT
+    OVER
+    1 GTINT
+    THROWANYIFNOT
+    23006 PUSHINT
+    29 s() PUSH
+    0 EQINT
+    IF:<{
+      29 s() POP
+      TRUE
+    }>ELSE<{
+      s0 29 s() XCHG
+      OVER
+      EQUAL
+    }>
+    s1 29 s() XCHG
+    THROWANYIFNOT
+  }>
+  $MarketStabilitySeller$_fun_is_basechain_address PROCREF:<{
+        REWRITESTDADDR
+    DROP
+    0 EQINT
+  }>
+  $MarketStabilitySeller$_fun_deriveAthWalletAddress PROCREF:<{
+    DUP
+        REWRITESTDADDR
+    DROP
+    0 PUSHINT
+    ROT
+    29 s() PUSH
+    $ATHWallet$_init_child INLINECALLDICT
+    $global_contractAddressExt INLINECALLDICT
+  }>
+  $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress PROCREF:<{
+        MYADDR
+    $MarketStabilitySeller$_fun_deriveAthWalletAddress INLINECALLDICT
+  }>
+  $MarketStabilitySeller$_fun_ceilDiv PROCREF:<{
+    23007 PUSHINT
+    OVER
+    0 GTINT
+    THROWANYIFNOT
+    OVER
+    IFNOTJMP:<{
+      2DROP
+      0 PUSHINT
+    }>
+    SWAP
+    DEC
+    SWAP
+    DIV
+    INC
+  }>
+  $MarketStabilitySeller$_fun_currentMultiplier PROCREF:<{
+    s5 PUSH
+    2 ADDCONST
+  }>
+  $MarketStabilitySeller$_fun_currentTrancheRemaining PROCREF:<{
+    s5 PUSH
+    14 GTINT
+    IFJMP:<{
+      0 PUSHINT
+    }>
+    3000000000000000 PUSHINT
+    s5 PUSH
+    SUB
+  }>
+  $MarketStabilitySeller$_fun_quoteTonForAmount PROCREF:<{
+    23008 PUSHINT
+    21 s() PUSH
+    THROWANYIFNOT
+    23009 PUSHINT
+    OVER
+    0 GTINT
+    THROWANYIFNOT
+    28 s() 29 s() XCHG
+    27 s() 29 s() XCHG
+    26 s() 29 s() XCHG
+    25 s() 29 s() XCHG
+    24 s() 29 s() XCHG
+    23 s() 29 s() XCHG
+    22 s() 29 s() XCHG
+    21 s() 29 s() XCHG
+    20 s() 29 s() XCHG
+    19 s() 29 s() XCHG
+    18 s() 29 s() XCHG
+    17 s() 29 s() XCHG
+    16 s() 29 s() XCHG
+    s15 29 s() XCHG
+    s14 29 s() XCHG
+    s13 29 s() XCHG
+    s12 29 s() XCHG
+    s11 29 s() XCHG
+    s10 29 s() XCHG
+    s9 29 s() XCHG
+    s0 29 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    $MarketStabilitySeller$_fun_currentTrancheRemaining INLINECALLDICT
+    23010 PUSHINT
+    OVER
+    0 GTINT
+    THROWANYIFNOT
+    30 s() PUSH
+    23011 PUSHINT
+    s0 s2 XCHG
+    LEQ
+    THROWANYIFNOT
+    17 s() PUSH
+    28 s() 29 s() XCHG
+    27 s() 29 s() XCHG
+    26 s() 29 s() XCHG
+    25 s() 29 s() XCHG
+    24 s() 29 s() XCHG
+    23 s() 29 s() XCHG
+    22 s() 29 s() XCHG
+    21 s() 29 s() XCHG
+    20 s() 29 s() XCHG
+    19 s() 29 s() XCHG
+    18 s() 29 s() XCHG
+    17 s() 29 s() XCHG
+    16 s() 29 s() XCHG
+    s15 29 s() XCHG
+    s14 29 s() XCHG
+    s13 29 s() XCHG
+    s12 29 s() XCHG
+    s11 29 s() XCHG
+    s10 29 s() XCHG
+    s9 29 s() XCHG
+    s0 29 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    $MarketStabilitySeller$_fun_currentMultiplier INLINECALLDICT
+    s1 30 s() XCHG
+    MUL
+    SWAP
+    s0 30 s() XCHG
+    MUL
+    27 s() 29 s() XCHG
+    26 s() 28 s() XCHG
+    25 s() 27 s() XCHG
+    24 s() 26 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 24 s() XCHG
+    21 s() 23 s() XCHG
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s15 17 s() XCHG
+    s14 16 s() XCHG
+    s13 s15 XCHG
+    s12 s14 XCHG
+    s11 s13 XCHG
+    s10 s12 XCHG
+    s9 s11 XCHG
+    s8 s10 XCHG
+    s7 s9 XCHG
+    s6 s8 XCHG
+    s5 s7 XCHG
+    s4 s6 XCHG
+    s3 s5 XCHG
+    s4 s3 s0 XCHG3
+    s1 s2 XCHG
+    3000000000000000 PUSHINT
+    $MarketStabilitySeller$_fun_ceilDiv INLINECALLDICT
+  }>
+  $MarketStabilitySeller$_fun_requireNextQueryId PROCREF:<{
+    23012 PUSHINT
+    OVER
+    64 PUSHPOW2DEC
+    LESS
+    THROWANYIFNOT
+    23013 PUSHINT
+    s5 PUSH
+    INC
+    s1 s2 XCHG
+    EQUAL
+    THROWANYIFNOT
+  }>
+  $MarketStabilitySeller$_fun_recordTerminalQueryId PROCREF:<{
+    s4 POP
+  }>
+  $MarketStabilitySeller$_fun_clearPending PROCREF:<{
+    6 6 BLKDROP2
+    s8 POP
+    0 PUSHINT
+    s0 s0 s0 PUSH3
+    23 s() PUSH
+    24 s() PUSH
+    25 s() PUSH
+    s6 s14 XCHG
+    6 6 BLKSWAP
+  }>
+  $MarketStabilitySeller$_fun_refundTon PROCREF:<{
+    DUP
+    100000 PUSHINT
+    LESS
+    IFJMP:<{
+      2DROP
+    }>
+    FALSE
+    1 PUSHINT
+    PUSHNULL
+    $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+        NEWC
+        b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+        1 STI               // store `bounce`
+        b{000} STSLICECONST // store bounced = false and src = addr_none
+        STSLICE             // store `to`
+        SWAP
+        STGRAMS             // store `value`
+        106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+        STZEROES
+        // → Stack state
+        // s0: Builder
+        // s1: `body`
+        // s2: `mode`
+        STDICT
+        ENDC
+        SWAP
+        SENDRAWMSG
+  }>
+  $MarketStabilitySeller$_fun_failPendingSale PROCREF:<{
+    s11 s10 s9 PUSH3
+    s11 PUSH
+    s1 17 s() XCHG
+    s0 s2 XCHG
+    ADD
+    28 s() 31 s() XCHG
+    27 s() 30 s() XCHG
+    26 s() 29 s() XCHG
+    25 s() 31 s() XCHG
+    24 s() 30 s() XCHG
+    23 s() 29 s() XCHG
+    22 s() 31 s() XCHG
+    21 s() 30 s() XCHG
+    20 s() 29 s() XCHG
+    19 s() 31 s() XCHG
+    18 s() 30 s() XCHG
+    17 s() 29 s() XCHG
+    16 s() 31 s() XCHG
+    s15 30 s() XCHG
+    s14 29 s() XCHG
+    s0 s13 XCHG
+    s12 30 s() XCHG
+    s11 29 s() XCHG
+    s0 s10 XCHG
+    s9 30 s() XCHG
+    s8 29 s() XCHG
+    s0 s7 XCHG
+    s6 30 s() XCHG
+    s5 29 s() XCHG
+    s0 s4 XCHG
+    s3 30 s() XCHG
+    s2 29 s() XCHG
+    SWAP
+    s0 30 s() XCHG
+    $MarketStabilitySeller$_fun_clearPending INLINECALLDICT
+    28 s() 29 s() XCHG
+    27 s() 28 s() XCHG
+    26 s() 27 s() XCHG
+    25 s() 26 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 24 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    $MarketStabilitySeller$_fun_recordTerminalQueryId INLINECALLDICT
+    28 s() 30 s() XCHG
+    27 s() 29 s() XCHG
+    26 s() 28 s() XCHG
+    25 s() 27 s() XCHG
+    24 s() 26 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 24 s() XCHG
+    21 s() 23 s() XCHG
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s15 17 s() XCHG
+    s14 16 s() XCHG
+    2 14 BLKSWAP
+    $MarketStabilitySeller$_fun_refundTon INLINECALLDICT
+  }>
+  $MarketStabilitySeller$_fun_finalizePendingSale PROCREF:<{
+    s11 s10 s9 PUSH3
+    s1 s15 XCHG
+    ADD
+    s3 s14 XCPU
+    ADD
+    s6 s14 XCHG2
+    ADD
+    DUP
+    3000000000000000 PUSHINT
+    EQUAL
+    IF:<{
+      DROP
+      s0 s5 XCHG
+      INC
+      s0 s5 XCHG
+      0 PUSHINT
+    }>
+    28 s() 29 s() XCHG
+    27 s() 29 s() XCHG
+    26 s() 29 s() XCHG
+    25 s() 29 s() XCHG
+    24 s() 29 s() XCHG
+    23 s() 29 s() XCHG
+    22 s() 29 s() XCHG
+    21 s() 29 s() XCHG
+    20 s() 29 s() XCHG
+    19 s() 29 s() XCHG
+    18 s() 29 s() XCHG
+    17 s() 29 s() XCHG
+    16 s() 29 s() XCHG
+    s15 29 s() XCHG
+    s14 29 s() XCHG
+    s13 29 s() XCHG
+    s2 s12 XCHG
+    s2 s11 XCHG
+    s2 s10 XCHG
+    s2 s9 XCHG
+    s2 s8 XCHG
+    s2 s7 XCHG
+    s2 s6 XCHG
+    s5 s1 s4 XCHG3
+    s3 s1 s3 XCHG3
+    s0 29 s() XCHG
+    SWAP
+    $MarketStabilitySeller$_fun_clearPending INLINECALLDICT
+    28 s() 29 s() XCHG
+    27 s() 28 s() XCHG
+    26 s() 27 s() XCHG
+    25 s() 26 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 24 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    $MarketStabilitySeller$_fun_recordTerminalQueryId INLINECALLDICT
+  }>
+  $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash PROCINLINE:<{
+  }>
+  $MarketStabilitySeller$_fun_get_market_stability_seller_config PROCREF:<{
+    18 s() PUSH
+    23 s() PUSH
+    23 s() PUSH
+    23 s() PUSH
+    23 s() PUSH
+    32 s() PUSH
+    34 s() PUSH
+    33 s() PUSH
+    33 s() PUSH
+    33 s() PUSH
+    33 s() PUSH
+    28 s() PUSH
+    28 s() PUSH
+    28 s() PUSH
+    $MarketStabilitySellerConfigView$_constructor_sealed_reserve_funder_bound_official_ath_wallet_bound_treasury_bound_pricing_frozen_deployment_manifest_hash_genesis_config_hash_ath_master_address_reserve_funder_address_official_ath_wallet_address_ton_treasury_receiver_address_base_tranche_price_nanotons_evidence_x1_tranche_quote_nanotons_pricing_evidence_hash INLINECALLDICT
+  }>
+  $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id PROCINLINE:<{
+  }>
+  $MarketStabilitySeller$_fun_get_market_stability_seller_state PROCREF:<{
+    s14 s13 s12 PUSH3
+    s14 s13 s12 PUSH3
+    s14 s13 s12 PUSH3
+    s14 s13 PUSH2
+    28 s() 39 s() XCHG
+    27 s() 38 s() XCHG
+    26 s() 37 s() XCHG
+    25 s() 36 s() XCHG
+    24 s() 35 s() XCHG
+    23 s() 34 s() XCHG
+    22 s() 33 s() XCHG
+    21 s() 32 s() XCHG
+    20 s() 31 s() XCHG
+    19 s() 30 s() XCHG
+    18 s() 29 s() XCHG
+    17 s() 39 s() XCHG
+    16 s() 38 s() XCHG
+    s15 37 s() XCHG
+    s14 36 s() XCHG
+    s13 35 s() XCHG
+    s12 34 s() XCHG
+    s11 33 s() XCHG
+    s10 32 s() XCHG
+    s9 31 s() XCHG
+    s8 30 s() XCHG
+    s7 29 s() XCHG
+    s6 39 s() XCHG
+    s5 38 s() XCHG
+    s4 37 s() XCHG
+    s3 36 s() XCHG
+    s2 35 s() XCHG
+    s1 34 s() XCHG
+    s0 33 s() XCHG
+    $MarketStabilitySeller$_fun_currentMultiplier INLINECALLDICT
+    28 s() 29 s() XCHG
+    27 s() 29 s() XCHG
+    26 s() 29 s() XCHG
+    25 s() 29 s() XCHG
+    24 s() 29 s() XCHG
+    23 s() 29 s() XCHG
+    22 s() 29 s() XCHG
+    21 s() 29 s() XCHG
+    20 s() 29 s() XCHG
+    19 s() 29 s() XCHG
+    18 s() 29 s() XCHG
+    17 s() 29 s() XCHG
+    16 s() 29 s() XCHG
+    s15 29 s() XCHG
+    s14 29 s() XCHG
+    s13 29 s() XCHG
+    s12 29 s() XCHG
+    s11 29 s() XCHG
+    s10 29 s() XCHG
+    s9 29 s() XCHG
+    s0 29 s() XCHG
+    s0 s8 XCHG
+    s0 s7 XCHG
+    s0 s6 XCHG
+    5 -ROLL
+    $MarketStabilitySeller$_fun_currentTrancheRemaining INLINECALLDICT
+    s12 34 s() XCHG
+    s11 33 s() XCHG
+    s10 32 s() XCHG
+    s9 31 s() XCHG
+    s8 41 s() XCHG
+    s7 40 s() XCHG
+    s6 39 s() XCHG
+    s5 38 s() XCHG
+    s4 37 s() XCHG
+    s3 36 s() XCHG
+    s2 35 s() XCHG
+    s1 30 s() XCHG
+    37 s() PUSH
+    $MarketStabilitySellerStateView$_constructor_phase_reserve_due_ath_treasury_due_ton_pending_query_id_pending_amount_ath_pending_paid_ton_pending_buyer_pending_recipient_pending_recipient_ath_wallet_completed_tranche_count_current_tranche_sold_ath_current_multiplier_current_tranche_remaining_ath_last_terminal_query_id INLINECALLDICT
+    30 s() 42 s() XCHG
+    29 s() 41 s() XCHG
+    28 s() 40 s() XCHG
+    27 s() 39 s() XCHG
+    26 s() 38 s() XCHG
+    25 s() 37 s() XCHG
+    24 s() 36 s() XCHG
+    23 s() 35 s() XCHG
+    22 s() 34 s() XCHG
+    21 s() 33 s() XCHG
+    20 s() 32 s() XCHG
+    19 s() 31 s() XCHG
+    18 s() 30 s() XCHG
+    17 s() 29 s() XCHG
+    16 s() 28 s() XCHG
+    s15 27 s() XCHG
+    s14 26 s() XCHG
+    23 s() 25 s() XCHG
+    22 s() 24 s() XCHG
+    21 s() 23 s() XCHG
+    20 s() 22 s() XCHG
+    18 s() 21 s() XCHG
+    17 s() 20 s() XCHG
+    16 s() 19 s() XCHG
+    s15 18 s() XCHG
+    4 14 REVERSE
+    s14 s15 XCHG
+  }>
+  $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total PROCINLINE:<{
+  }>
+  $MarketStabilitySeller$_fun_get_market_stability_seller_totals PROCREF:<{
+    s2 s1 s0 PUSH3
+    $MarketStabilitySellerTotalsView$_constructor_reserve_funded_total_ath_sold_ath_total_treasury_flushed_ton_total INLINECALLDICT
+  }>
+  $MarketStabilitySeller$_fun_get_official_ath_wallet_address PROCREF:<{
+    $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress INLINECALLDICT
+  }>
+  $MarketStabilitySeller$_fun_get_quote_ton_for_amount PROCREF:<{
+    $MarketStabilitySeller$_fun_quoteTonForAmount INLINECALLDICT
+  }>
+  $AthTransferNotificationAck$_constructor_query_id_sender_key_amount PROCINLINE:<{
+    SWAP
+  }>
+  $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination PROCINLINE:<{
+  }>
+  %get_market_stability_seller_config PROC:<{
+    $MarketStabilitySeller$_contract_load INLINECALLDICT
+    $MarketStabilitySeller$_fun_get_market_stability_seller_config INLINECALLDICT
+    14 14 BLKDROP2
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s15 POP
+    1 13 BLKDROP2
+    $MarketStabilitySellerConfigView$_to_external INLINECALLDICT
+  }>
+  %get_market_stability_seller_state PROC:<{
+    $MarketStabilitySeller$_contract_load INLINECALLDICT
+    $MarketStabilitySeller$_fun_get_market_stability_seller_state INLINECALLDICT
+    14 14 BLKDROP2
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s14 POP
+    s15 POP
+    1 13 BLKDROP2
+    $MarketStabilitySellerStateView$_to_external INLINECALLDICT
+  }>
+  %get_market_stability_seller_totals PROC:<{
+    $MarketStabilitySeller$_contract_load INLINECALLDICT
+    $MarketStabilitySeller$_fun_get_market_stability_seller_totals INLINECALLDICT
+    15 3 BLKDROP2
+    14 3 BLKDROP2
+    $MarketStabilitySellerTotalsView$_to_external INLINECALLDICT
+  }>
+  %get_official_ath_wallet_address PROC:<{
+    $MarketStabilitySeller$_contract_load INLINECALLDICT
+    $MarketStabilitySeller$_fun_get_official_ath_wallet_address INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    13 1 BLKDROP2
+  }>
+  %get_quote_ton_for_amount PROC:<{
+    $MarketStabilitySeller$_contract_load INLINECALLDICT
+    28 s() 29 s() XCHG
+    27 s() 28 s() XCHG
+    26 s() 27 s() XCHG
+    25 s() 26 s() XCHG
+    24 s() 25 s() XCHG
+    23 s() 24 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    $MarketStabilitySeller$_fun_get_quote_ton_for_amount INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    13 1 BLKDROP2
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $MarketStabilitySeller$_contract_load INLINECALLDICT
+    s0 30 s() XCHG
+    IFJMP:<{
+      s0 28 s() XCHG
+      32 PUSHINT
+      SDSKIPFIRST
+      0 PUSHINT
+      OVER
+      SBITS
+      31 GTINT
+      IF:<{
+        DROP
+        32 LDU
+        SWAP
+      }>
+      1096042512 PUSHINT
+      EQUAL
+      IFJMP:<{
+        $ATHTransferRequest$_load_bounced INLINECALLDICT
+        s2 POP
+        s1 29 s() XCHG
+        s0 30 s() XCHG
+        $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
+        23250 PUSHINT
+        __tact_context_get_sender INLINECALLDICT
+        26 s() PUSH
+        SDEQ
+        THROWANYIFNOT
+        23251 PUSHINT
+        s15 PUSH
+        1 EQINT
+        THROWANYIFNOT
+        23252 PUSHINT
+        s0 31 s() XCHG
+        s12 PUSH
+        EQUAL
+        s1 31 s() XCHG
+        THROWANYIFNOT
+        23253 PUSHINT
+        s0 29 s() XCHG
+        s10 PUSH
+        EQUAL
+        s1 29 s() XCHG
+        THROWANYIFNOT
+        26 s() 28 s() XCHG
+        25 s() 27 s() XCHG
+        24 s() 26 s() XCHG
+        23 s() 25 s() XCHG
+        22 s() 24 s() XCHG
+        21 s() 23 s() XCHG
+        20 s() 22 s() XCHG
+        19 s() 21 s() XCHG
+        18 s() 20 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 18 s() XCHG
+        s15 17 s() XCHG
+        s14 16 s() XCHG
+        2 14 BLKSWAP
+        $MarketStabilitySeller$_fun_failPendingSale INLINECALLDICT
+        $MarketStabilitySeller$_contract_store INLINECALLDICT
+      }>
+      15 BLKDROP
+      15 BLKDROP
+    }>
+    0 PUSHINT
+    29 s() PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 29 s() XCHG
+      32 LDU
+      s0 30 s() XCHG
+    }>
+    OVER
+    1297306182 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      256 LDU
+      LDMSGADDR
+      DROP
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
+      $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
+      28 s() 29 s() XCHG
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
+      23100 PUSHINT
+      23 s() PUSH
+      NOT
+      THROWANYIFNOT
+      23101 PUSHINT
+          MYADDR
+      31 s() PUSH
+      SWAP
+      SDEQ
+      NOT
+      THROWANYIFNOT
+      27 s() 28 s() XCHG
+      26 s() 28 s() XCHG
+      25 s() 28 s() XCHG
+      24 s() 28 s() XCHG
+      23 s() 28 s() XCHG
+      22 s() 28 s() XCHG
+      21 s() 28 s() XCHG
+      20 s() 28 s() XCHG
+      19 s() 28 s() XCHG
+      18 s() 28 s() XCHG
+      17 s() 28 s() XCHG
+      16 s() 28 s() XCHG
+      s15 28 s() XCHG
+      s14 28 s() XCHG
+      s13 28 s() XCHG
+      s12 28 s() XCHG
+      s11 28 s() XCHG
+      s10 28 s() XCHG
+      s9 28 s() XCHG
+      s0 28 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      23102 PUSHINT
+      s0 29 s() XCHG
+      30 s() PUSH
+      $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
+      23 s() POP
+      25 s() POP
+      s1 28 s() XCHG
+      s0 21 s() XCHG
+      THROWANYIFNOT
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      TRUE
+      s0 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1297301847 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      256 LDU
+      LDMSGADDR
+      DROP
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
+      $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
+      28 s() 29 s() XCHG
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
+      23110 PUSHINT
+      22 s() PUSH
+      NOT
+      THROWANYIFNOT
+      27 s() 28 s() XCHG
+      26 s() 28 s() XCHG
+      25 s() 28 s() XCHG
+      24 s() 28 s() XCHG
+      23 s() 28 s() XCHG
+      22 s() 28 s() XCHG
+      21 s() 28 s() XCHG
+      20 s() 28 s() XCHG
+      19 s() 28 s() XCHG
+      18 s() 28 s() XCHG
+      17 s() 28 s() XCHG
+      16 s() 28 s() XCHG
+      s15 28 s() XCHG
+      s14 28 s() XCHG
+      s13 28 s() XCHG
+      s12 28 s() XCHG
+      s11 28 s() XCHG
+      s10 28 s() XCHG
+      s9 28 s() XCHG
+      s0 28 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      23111 PUSHINT
+      s0 29 s() XCHG
+      $MarketStabilitySeller$_fun_deriveOwnAthWalletAddress INLINECALLDICT
+      22 s() POP
+      24 s() POP
+      29 s() PUSH
+      SWAP
+      s0 21 s() XCHG
+      SDEQ
+      s1 28 s() XCHG
+      THROWANYIFNOT
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      TRUE
+      s0 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1297306706 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      256 LDU
+      LDMSGADDR
+      DROP
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
+      $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
+      28 s() 29 s() XCHG
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
+      23120 PUSHINT
+      21 s() PUSH
+      NOT
+      THROWANYIFNOT
+      23121 PUSHINT
+          MYADDR
+      31 s() PUSH
+      SWAP
+      SDEQ
+      NOT
+      THROWANYIFNOT
+      27 s() 28 s() XCHG
+      26 s() 28 s() XCHG
+      25 s() 28 s() XCHG
+      24 s() 28 s() XCHG
+      23 s() 28 s() XCHG
+      22 s() 28 s() XCHG
+      21 s() 28 s() XCHG
+      20 s() 28 s() XCHG
+      19 s() 28 s() XCHG
+      18 s() 28 s() XCHG
+      17 s() 28 s() XCHG
+      16 s() 28 s() XCHG
+      s15 28 s() XCHG
+      s14 28 s() XCHG
+      s13 28 s() XCHG
+      s12 28 s() XCHG
+      s11 28 s() XCHG
+      s10 28 s() XCHG
+      s9 28 s() XCHG
+      s0 28 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      23122 PUSHINT
+      s0 29 s() XCHG
+      30 s() PUSH
+      $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
+      21 s() POP
+      23 s() POP
+      s1 28 s() XCHG
+      s0 19 s() XCHG
+      THROWANYIFNOT
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      TRUE
+      s0 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1297305670 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      256 LDU
+      128 LDU
+      128 LDU
+      256 LDU
+      DROP
+      28 s() 30 s() XCHG
+      27 s() 29 s() XCHG
+      26 s() 30 s() XCHG
+      25 s() 29 s() XCHG
+      24 s() 30 s() XCHG
+      23 s() 29 s() XCHG
+      22 s() 30 s() XCHG
+      21 s() 29 s() XCHG
+      20 s() 30 s() XCHG
+      19 s() 29 s() XCHG
+      18 s() 30 s() XCHG
+      17 s() 29 s() XCHG
+      16 s() 30 s() XCHG
+      s15 29 s() XCHG
+      s14 30 s() XCHG
+      s13 29 s() XCHG
+      s12 30 s() XCHG
+      s11 29 s() XCHG
+      s10 30 s() XCHG
+      s9 29 s() XCHG
+      s8 30 s() XCHG
+      s7 29 s() XCHG
+      s6 30 s() XCHG
+      s5 29 s() XCHG
+      s4 30 s() XCHG
+      s3 29 s() XCHG
+      s2 30 s() XCHG
+      s1 31 s() XCHG
+      s0 32 s() XCHG
+      $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
+      $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
+      28 s() 29 s() XCHG
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
+      s15 POP
+      s15 POP
+      s15 POP
+      23130 PUSHINT
+      s0 17 s() XCHG
+      NOT
+      s1 17 s() XCHG
+      THROWANYIFNOT
+      23136 PUSHINT
+      26 s() PUSH
+      0 GTINT
+      THROWANYIFNOT
+      23137 PUSHINT
+      27 s() PUSH
+      27 s() PUSH
+      GEQ
+      THROWANYIFNOT
+      23138 PUSHINT
+      28 s() PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      24 s() 27 s() XCHG
+      23 s() 26 s() XCHG
+      22 s() 25 s() XCHG
+      21 s() 24 s() XCHG
+      20 s() 23 s() XCHG
+      19 s() 22 s() XCHG
+      18 s() 21 s() XCHG
+      17 s() 20 s() XCHG
+      16 s() 19 s() XCHG
+      TRUE
+      s0 19 s() XCHG
+      s0 s15 XCHG
+      s0 18 s() XCHG
+      s0 16 s() XCHG
+      3 12 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1297306444 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      256 LDU
+      DROP
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 29 s() XCHG
+      s1 s3 s0 XCHG3
+      $MarketStabilitySeller$_fun_requireUnsealed INLINECALLDICT
+      $MarketStabilitySeller$_fun_requireGenesisController INLINECALLDICT
+      28 s() 29 s() XCHG
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      $MarketStabilitySeller$_fun_acceptManifestHash INLINECALLDICT
+      18 s() POP
+      27 s() POP
+      23140 PUSHINT
+      21 s() PUSH
+      THROWANYIFNOT
+      23141 PUSHINT
+      20 s() PUSH
+      THROWANYIFNOT
+      23142 PUSHINT
+      19 s() PUSH
+      THROWANYIFNOT
+      23143 PUSHINT
+      18 s() PUSH
+      THROWANYIFNOT
+      0 PUSHINT
+      s0 27 s() XCHG
+      TRUE
+      s0 18 s() XCHG
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1194171773 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      64 LDU
+      128 LDU
+      32 LDU
+      LDMSGADDR
+      DROP
+      28 s() 30 s() XCHG
+      27 s() 29 s() XCHG
+      26 s() 30 s() XCHG
+      25 s() 29 s() XCHG
+      24 s() 30 s() XCHG
+      23 s() 29 s() XCHG
+      22 s() 30 s() XCHG
+      21 s() 29 s() XCHG
+      20 s() 30 s() XCHG
+      19 s() 29 s() XCHG
+      18 s() 30 s() XCHG
+      17 s() 29 s() XCHG
+      16 s() 30 s() XCHG
+      s15 29 s() XCHG
+      s14 30 s() XCHG
+      s13 29 s() XCHG
+      s12 30 s() XCHG
+      s11 29 s() XCHG
+      s10 30 s() XCHG
+      s9 29 s() XCHG
+      s8 30 s() XCHG
+      s7 29 s() XCHG
+      s6 30 s() XCHG
+      s5 29 s() XCHG
+      s4 30 s() XCHG
+      s3 29 s() XCHG
+      s2 30 s() XCHG
+      s1 31 s() XCHG
+      s0 32 s() XCHG
+      $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
+      23200 PUSHINT
+      20 s() PUSH
+      THROWANYIFNOT
+      23201 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      26 s() PUSH
+      SDEQ
+      THROWANYIFNOT
+      23202 PUSHINT
+      31 s() PUSH
+      0 GTINT
+      THROWANYIFNOT
+      23203 PUSHINT
+      s0 33 s() XCHG
+      26 s() PUSH
+      SDEQ
+      s1 33 s() XCHG
+      THROWANYIFNOT
+      23204 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      3000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      23205 PUSHINT
+      s2 PUSH
+      31 s() PUSH
+      ADD
+      45000000000000000 PUSHINT
+      LEQ
+      THROWANYIFNOT
+      s0 s12 XCHG
+      29 s() PUSH
+      ADD
+      SWAP
+      29 s() PUSH
+      ADD
+      __tact_context_get_sender INLINECALLDICT
+      1000000 PUSHINT
+      s0 30 s() XCHG
+      FALSE
+      s0 33 s() XCHG
+      0 PUSHINT
+      s0 33 s() XCHG
+      $AthTransferNotificationAck$_constructor_query_id_sender_key_amount INLINECALLDICT
+      NEWC
+      $AthTransferNotificationAck$_store_cell INLINECALLDICT
+      s1 s4 XCHG
+      s3 30 s() XCHG
+      s2 32 s() XCHG
+      s1 31 s() XCHG
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      24 s() 28 s() XCHG
+      23 s() 27 s() XCHG
+      22 s() 26 s() XCHG
+      21 s() 25 s() XCHG
+      20 s() 24 s() XCHG
+      19 s() 23 s() XCHG
+      18 s() 22 s() XCHG
+      17 s() 21 s() XCHG
+      16 s() 20 s() XCHG
+      s15 19 s() XCHG
+      s14 18 s() XCHG
+      s13 17 s() XCHG
+      s12 16 s() XCHG
+      s11 s15 XCHG
+      s10 s14 XCHG
+      s8 s12 XCHG
+      4 8 BLKSWAP
+      s2 s3 XCHG
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1297302872 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      64 LDU
+      128 LDU
+      LDMSGADDR
+      DROP
+      28 s() 29 s() XCHG
+      27 s() 29 s() XCHG
+      26 s() 29 s() XCHG
+      25 s() 29 s() XCHG
+      24 s() 29 s() XCHG
+      23 s() 29 s() XCHG
+      22 s() 29 s() XCHG
+      21 s() 29 s() XCHG
+      20 s() 29 s() XCHG
+      19 s() 29 s() XCHG
+      18 s() 29 s() XCHG
+      17 s() 29 s() XCHG
+      16 s() 29 s() XCHG
+      s15 29 s() XCHG
+      s14 29 s() XCHG
+      s13 29 s() XCHG
+      s12 29 s() XCHG
+      s11 29 s() XCHG
+      s10 29 s() XCHG
+      s9 29 s() XCHG
+      s8 29 s() XCHG
+      s7 29 s() XCHG
+      s6 29 s() XCHG
+      s5 29 s() XCHG
+      s4 29 s() XCHG
+      s3 29 s() XCHG
+      s2 29 s() XCHG
+      s1 30 s() XCHG
+      s0 31 s() XCHG
+      $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
+      23210 PUSHINT
+      20 s() PUSH
+      THROWANYIFNOT
+      23211 PUSHINT
+      s15 PUSH
+      0 EQINT
+      THROWANYIFNOT
+      23212 PUSHINT
+      30 s() PUSH
+      0 GTINT
+      THROWANYIFNOT
+      29 s() PUSH
+      $MarketStabilitySeller$_fun_requireNextQueryId INLINECALLDICT
+      23213 PUSHINT
+      31 s() PUSH
+      0 GTINT
+      THROWANYIFNOT
+      23214 PUSHINT
+      s6 PUSH
+      15 LESSINT
+      THROWANYIFNOT
+      27 s() 28 s() XCHG
+      26 s() 28 s() XCHG
+      25 s() 28 s() XCHG
+      24 s() 28 s() XCHG
+      23 s() 28 s() XCHG
+      22 s() 28 s() XCHG
+      21 s() 28 s() XCHG
+      20 s() 28 s() XCHG
+      19 s() 28 s() XCHG
+      18 s() 28 s() XCHG
+      17 s() 28 s() XCHG
+      16 s() 28 s() XCHG
+      s15 28 s() XCHG
+      s14 28 s() XCHG
+      s13 28 s() XCHG
+      s12 28 s() XCHG
+      s11 28 s() XCHG
+      s10 28 s() XCHG
+      s9 28 s() XCHG
+      s0 28 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      23215 PUSHINT
+      s0 29 s() XCHG
+      $MarketStabilitySeller$_fun_currentTrancheRemaining INLINECALLDICT
+      32 s() PUSH
+      SWAP
+      LEQ
+      s1 30 s() XCHG
+      THROWANYIFNOT
+      23216 PUSHINT
+      31 s() PUSH
+      s14 PUSH
+      LEQ
+      THROWANYIFNOT
+      23217 PUSHINT
+      s0 29 s() XCHG
+      32 s() PUSH
+      $MarketStabilitySeller$_fun_is_basechain_address INLINECALLDICT
+      s1 30 s() XCHG
+      THROWANYIFNOT
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      30 s() PUSH
+      $MarketStabilitySeller$_fun_quoteTonForAmount INLINECALLDICT
+      DUP
+      12000000 PUSHINT
+      ADD
+      2000000 PUSHINT
+      ADD
+      23218 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s2 PUSH
+      GEQ
+      THROWANYIFNOT
+      28 s() 30 s() XCHG
+      27 s() 29 s() XCHG
+      26 s() 30 s() XCHG
+      25 s() 29 s() XCHG
+      24 s() 30 s() XCHG
+      23 s() 29 s() XCHG
+      22 s() 30 s() XCHG
+      21 s() 29 s() XCHG
+      20 s() 30 s() XCHG
+      19 s() 29 s() XCHG
+      18 s() 30 s() XCHG
+      17 s() 29 s() XCHG
+      16 s() 30 s() XCHG
+      s15 29 s() XCHG
+      s14 30 s() XCHG
+      s13 29 s() XCHG
+      s12 30 s() XCHG
+      s11 29 s() XCHG
+      s10 30 s() XCHG
+      s9 29 s() XCHG
+      s8 30 s() XCHG
+      s7 29 s() XCHG
+      s6 30 s() XCHG
+      s5 29 s() XCHG
+      s4 30 s() XCHG
+      s3 29 s() XCHG
+      s2 30 s() XCHG
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      33 s() PUSH
+      $MarketStabilitySeller$_fun_deriveAthWalletAddress INLINECALLDICT
+      s7 POP
+      s7 POP
+      s7 POP
+      s7 POP
+      s7 POP
+      s7 POP
+      s9 POP
+      s0 s7 XCHG
+      26 s() PUSH
+      SUB
+      1 PUSHINT
+      26 s() PUSH
+      28 s() PUSH
+      __tact_context_get_sender INLINECALLDICT
+      31 s() PUSH
+      12000000 PUSHINT
+      TRUE
+      0 PUSHINT
+          MYADDR
+      s3 34 s() XCHG
+      s2 35 s() XCHG
+      s1 36 s() XCHG
+      $ATHTransferRequest$_constructor_query_id_amount_recipient_response_destination INLINECALLDICT
+      NEWC
+      $ATHTransferRequest$_store_cell INLINECALLDICT
+      24 s() PUSH
+      s0 s4 XCHG
+      s3 32 s() XCHG
+      s2 33 s() XCHG
+      s0 34 s() XCHG
+      SWAP
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      __tact_context_get_sender INLINECALLDICT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SWAP
+      s0 28 s() XCHG
+      SUB
+      25 s() 30 s() XCHG
+      24 s() 29 s() XCHG
+      23 s() 28 s() XCHG
+      22 s() 27 s() XCHG
+      21 s() 26 s() XCHG
+      20 s() 25 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 23 s() XCHG
+      17 s() 22 s() XCHG
+      16 s() 21 s() XCHG
+      s15 20 s() XCHG
+      s14 19 s() XCHG
+      s13 18 s() XCHG
+      s12 17 s() XCHG
+      s2 16 s() XCHG
+      s3 s15 XCHG
+      s9 s14 XCHG
+      s1 s13 XCHG
+      s3 s12 XCHG
+      s11 s10 s0 XCHG3
+      s7 s8 s0 XCHG3
+      s5 s6 s0 XCHG3
+      s4 s4 s0 XCHG3
+      s1 s3 XCHG
+      $MarketStabilitySeller$_fun_refundTon INLINECALLDICT
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1096042513 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      64 LDU
+      128 LDU
+      DROP
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
+      23230 PUSHINT
+      s15 PUSH
+      1 EQINT
+      THROWANYIFNOT
+      23231 PUSHINT
+      s0 30 s() XCHG
+      s12 PUSH
+      EQUAL
+      s1 30 s() XCHG
+      THROWANYIFNOT
+      23232 PUSHINT
+      s0 30 s() XCHG
+      s10 PUSH
+      EQUAL
+      s1 30 s() XCHG
+      THROWANYIFNOT
+      23233 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s6 PUSH
+      SDEQ
+      THROWANYIFNOT
+      26 s() 28 s() XCHG
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      $MarketStabilitySeller$_fun_finalizePendingSale INLINECALLDICT
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1096042515 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      64 LDU
+      128 LDU
+      DROP
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
+      23240 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      26 s() PUSH
+      SDEQ
+      THROWANYIFNOT
+      23241 PUSHINT
+      s15 PUSH
+      1 EQINT
+      THROWANYIFNOT
+      23242 PUSHINT
+      s0 30 s() XCHG
+      s12 PUSH
+      EQUAL
+      s1 30 s() XCHG
+      THROWANYIFNOT
+      23243 PUSHINT
+      s0 30 s() XCHG
+      s10 PUSH
+      EQUAL
+      s1 30 s() XCHG
+      THROWANYIFNOT
+      26 s() 28 s() XCHG
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      $MarketStabilitySeller$_fun_failPendingSale INLINECALLDICT
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    OVER
+    1297303124 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 28 s() XCHG
+      128 LDU
+      DROP
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      s14 s15 XCHG
+      s13 s14 XCHG
+      s12 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s9 s10 XCHG
+      s8 s9 XCHG
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s0 29 s() XCHG
+      s1 s3 s0 XCHG3
+      $MarketStabilitySeller$_fun_requireSealed INLINECALLDICT
+      23260 PUSHINT
+      30 s() PUSH
+      0 GTINT
+      THROWANYIFNOT
+      23261 PUSHINT
+      30 s() PUSH
+      s14 PUSH
+      LEQ
+      THROWANYIFNOT
+      23262 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      2000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      s0 s12 XCHG
+      29 s() PUSH
+      SUB
+      s0 s12 XCHG
+      29 s() PUSH
+      ADD
+      23 s() PUSH
+      SWAP
+      s0 30 s() XCHG
+      FALSE
+      1 PUSHINT
+      PUSHNULL
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      27 s() 28 s() XCHG
+      26 s() 27 s() XCHG
+      25 s() 26 s() XCHG
+      24 s() 25 s() XCHG
+      23 s() 24 s() XCHG
+      22 s() 23 s() XCHG
+      21 s() 22 s() XCHG
+      20 s() 21 s() XCHG
+      19 s() 20 s() XCHG
+      18 s() 19 s() XCHG
+      17 s() 18 s() XCHG
+      16 s() 17 s() XCHG
+      s15 16 s() XCHG
+      15 ROLL
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    30 s() POP
+    DUP
+    2422309587 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      28 s() POP
+      26 s() 28 s() XCHG
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    0 EQINT
+    s0 29 s() XCHG
+    33 LESSINT
+    s1 29 s() XCHG
+    AND
+    IFJMP:<{
+      23999 PUSHINT
+      THROWANY
+      26 s() 28 s() XCHG
+      25 s() 27 s() XCHG
+      24 s() 26 s() XCHG
+      23 s() 25 s() XCHG
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
+    15 BLKDROP
+    14 BLKDROP
+    130 THROW
+  }>
+}END>c
