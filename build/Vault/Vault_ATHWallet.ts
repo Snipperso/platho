@@ -3152,6 +3152,7 @@ export function dictValueParserPublishPublicFromWallet(): DictionaryValue<Publis
 export type PublishPrivateFromVault = {
     $$type: 'PublishPrivateFromVault';
     bounce_id: bigint;
+    bounce_tag: bigint;
     publish_id: bigint;
     size_class: bigint;
     crypto_suite: bigint;
@@ -3169,12 +3170,13 @@ export function storePublishPrivateFromVault(src: PublishPrivateFromVault) {
         const b_0 = builder;
         b_0.storeUint(2767741632, 32);
         b_0.storeUint(src.bounce_id, 64);
+        b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
         b_0.storeUint(src.size_class, 8);
         b_0.storeUint(src.crypto_suite, 8);
         b_0.storeUint(src.header_0_hash, 256);
-        b_0.storeUint(src.header_1_hash, 256);
         const b_1 = new Builder();
+        b_1.storeUint(src.header_1_hash, 256);
         b_1.storeUint(src.body_hash, 256);
         b_1.storeRef(src.header_0);
         b_1.storeRef(src.header_1);
@@ -3188,22 +3190,24 @@ export function loadPublishPrivateFromVault(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2767741632) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
+    const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
     const _size_class = sc_0.loadUintBig(8);
     const _crypto_suite = sc_0.loadUintBig(8);
     const _header_0_hash = sc_0.loadUintBig(256);
-    const _header_1_hash = sc_0.loadUintBig(256);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _header_1_hash = sc_1.loadUintBig(256);
     const _body_hash = sc_1.loadUintBig(256);
     const _header_0 = sc_1.loadRef();
     const _header_1 = sc_1.loadRef();
     const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPrivateFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _size_class = source.readBigNumber();
     const _crypto_suite = source.readBigNumber();
@@ -3214,11 +3218,12 @@ export function loadTuplePublishPrivateFromVault(source: TupleReader) {
     const _header_1 = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _size_class = source.readBigNumber();
     const _crypto_suite = source.readBigNumber();
@@ -3229,12 +3234,13 @@ export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
     const _header_1 = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPrivateFromVault(source: PublishPrivateFromVault) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
+    builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
     builder.writeNumber(source.size_class);
     builder.writeNumber(source.crypto_suite);
@@ -3262,6 +3268,7 @@ export function dictValueParserPublishPrivateFromVault(): DictionaryValue<Publis
 export type PublishPublicFromVault = {
     $$type: 'PublishPublicFromVault';
     bounce_id: bigint;
+    bounce_tag: bigint;
     publish_id: bigint;
     marketing_note: bigint;
     author_wallet: Address;
@@ -3277,6 +3284,7 @@ export function storePublishPublicFromVault(src: PublishPublicFromVault) {
         const b_0 = builder;
         b_0.storeUint(2351593143, 32);
         b_0.storeUint(src.bounce_id, 64);
+        b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
         b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
@@ -3294,6 +3302,7 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2351593143) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
+    const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
     const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
@@ -3303,11 +3312,12 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const _header = sc_1.loadRef();
     const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
@@ -3316,11 +3326,12 @@ export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _header = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
@@ -3329,12 +3340,13 @@ export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _header = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
+    builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
     builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
@@ -4756,8 +4768,8 @@ const ATHWallet_types: ABIType[] = [
     {"name":"CancelReceiveIntent","header":841519988,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PublishPrivateFromWallet","header":1751553222,"fields":[{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"max_charge","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PublishPublicFromWallet","header":2416888070,"fields":[{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"max_charge","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"PrunePendingPublish","header":1913380205,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"TopUpStorageReserve","header":840283645,"fields":[]},
@@ -4884,6 +4896,7 @@ export const MLKEM768_PUBKEY_SNAKE_BITS = 9472n;
 export const MLKEM768_PUBKEY_SNAKE_REFS = 9n;
 export const UINT64_MAX = 18446744073709551615n;
 export const UINT64_MOD = 18446744073709551616n;
+export const UINT160_MOD = 1461501637330902918203684832716283019655932542976n;
 export const UINT32_MAX = 4294967295n;
 export const ATH_DEPOSIT_ID_DOMAIN = 1094996041n;
 export const ATH_WITHDRAWAL_ID_DOMAIN = 1096239428n;

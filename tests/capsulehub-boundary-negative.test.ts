@@ -86,6 +86,7 @@ function vaultPrivate(overrides?: Partial<PublishPrivateFromVault>): PublishPriv
   return {
     $$type: 'PublishPrivateFromVault',
     bounce_id: 1n,
+    bounce_tag: 1n,
     publish_id: hash256('vault-private-publish'),
     size_class: sizeClass,
     crypto_suite: 1n,
@@ -106,6 +107,7 @@ function vaultPublic(author: Address, overrides?: Partial<PublishPublicFromVault
   return {
     $$type: 'PublishPublicFromVault',
     bounce_id: 2n,
+    bounce_tag: 2n,
     publish_id: hash256('vault-public-publish'),
     author_wallet: author,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,

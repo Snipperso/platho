@@ -124,6 +124,7 @@ function forwardVaultPrivate(capsuleAddress: Address, overrides?: Partial<Forwar
     $$type: 'ForwardVaultPrivate',
     capsule_hub_address: capsuleAddress,
     bounce_id: 1001n,
+    bounce_tag: 1n,
     publish_id: hash256('vault-private-publish-id'),
     size_class: sizeClass,
     crypto_suite: 1n,
@@ -146,6 +147,7 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
     $$type: 'ForwardVaultPublic',
     capsule_hub_address: capsuleAddress,
     bounce_id: 1002n,
+    bounce_tag: 2n,
     publish_id: hash256('vault-public-publish-id'),
     author_wallet: author,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
@@ -328,6 +330,7 @@ describe('CapsuleHub v1 milestone 1', () => {
     await capsule.send(attacker.getSender(), { value: toNano('0.2') }, {
       $$type: 'PublishPublicFromVault',
       bounce_id: 666n,
+      bounce_tag: 666n,
       publish_id: hash256('evil'),
       author_wallet: author.address,
       marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,

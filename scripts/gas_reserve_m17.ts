@@ -277,6 +277,7 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const privateRes = await capsule.send(blockchain.sender(vaultAddress), { value: privateValue }, {
     $$type: 'PublishPrivateFromVault',
     bounce_id: 17_101n,
+    bounce_tag: 17_101n,
     publish_id: GENESIS_HASH,
     size_class: 1n,
     crypto_suite: 1n,
@@ -291,6 +292,7 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const publicRes = await capsule.send(blockchain.sender(vaultAddress), { value: publicValue }, {
     $$type: 'PublishPublicFromVault',
     bounce_id: 17_102n,
+    bounce_tag: 17_102n,
     publish_id: GENESIS_HASH + 1n,
     author_wallet: author.address,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,

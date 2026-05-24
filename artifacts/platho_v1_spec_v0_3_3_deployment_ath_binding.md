@@ -424,6 +424,7 @@ CapsuleHub.PublishPrivateFromVault = 0xA4F862C0
 
 PublishPrivateFromVault {
   publish_bounce_id: uint64
+  publish_bounce_tag:uint160
   publish_id:        uint256
   size_class:        uint8
   crypto_suite:      uint8
@@ -441,6 +442,7 @@ CapsuleHub.PublishPublicFromVault = 0x8C2A76B7
 
 PublishPublicFromVault {
   publish_bounce_id: uint64
+  publish_bounce_tag:uint160
   publish_id:        uint256
   marketing_note:    uint152 = ASCII "sent via Platho.App"
   author_wallet:     MsgAddress
@@ -453,15 +455,18 @@ Bounce routing key:
 
 ```text
 publish_bounce_id = publish_id mod 2^64
+publish_bounce_tag = hash(cell { publish_id:uint256 }) mod 2^160
 ```
 
 Rules:
 
 ```text
-publish_bounce_id is only a bounce routing key
-publish_bounce_id is not an authentication proof
-ACK authenticity uses full publish_id
-Vault recomputes full publish_id from PendingPublish fields
+publish_bounce_id selects the PendingPublish bounce slot
+publish_bounce_tag is a compact bounce proof derived from the full publish_id
+full publish_id cannot be read in bounced handlers because TON bounced bodies expose only the first 224 payload bits after opcode
+Vault recomputes full publish_id from PendingPublish fields and checks publish_bounce_tag on bounce
+ACK authenticity still uses full publish_id
+Vault recomputes full publish_id from PendingPublish fields on ACK
 if pending_publishes[publish_bounce_id] already exists before send, Vault MUST NOT send to CapsuleHub
 collision before send is a controlled post-accept invalid signed request: nonce consumed, bounded invalid-request charge, no PLATO fee, no CapsuleHub publish
 ```

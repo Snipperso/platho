@@ -81,6 +81,7 @@ function vaultPrivate(overrides?: Partial<PublishPrivateFromVault>): PublishPriv
   return {
     $$type: 'PublishPrivateFromVault',
     bounce_id: 7001n,
+    bounce_tag: 7001n,
     publish_id: hash256('vault-private'),
     size_class: 1n,
     crypto_suite: 1n,

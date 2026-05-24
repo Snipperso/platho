@@ -34,6 +34,7 @@ const MLKEM768_PUBKEY_SNAKE_BITS: Int = 9472;
 const MLKEM768_PUBKEY_SNAKE_REFS: Int = 9;
 const UINT64_MAX: Int = 18446744073709551615;
 const UINT64_MOD: Int = 18446744073709551616;
+const UINT160_MOD: Int = 1461501637330902918203684832716283019655932542976;
 const UINT32_MAX: Int = 4294967295;
 const ATH_DEPOSIT_ID_DOMAIN: Int = 0x41445049; // "ADPI"
 const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
@@ -157,6 +158,7 @@ message(0x900EC906) PublishPublicFromWallet {
 
 message(0xA4F862C0) PublishPrivateFromVault {
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     size_class: Int as uint8;
     crypto_suite: Int as uint8;
@@ -171,6 +173,7 @@ message(0xA4F862C0) PublishPrivateFromVault {
 
 message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     marketing_note: Int as uint152;
     author_wallet: Address;
@@ -508,6 +511,13 @@ contract Vault {
 
     fun computePublishBounceId(publishId: Int): Int {
         return publishId % UINT64_MOD;
+    }
+
+    fun computePublishBounceTag(publishId: Int): Int {
+        return beginCell()
+            .storeUint(publishId, 256)
+            .endCell()
+            .hash() % UINT160_MOD;
     }
 
     fun protocolFeePaid(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
@@ -1100,6 +1110,7 @@ contract Vault {
         let publishId: Int = self.computePublishId(sender(), msg.client_nonce, msg.body_hash, PUBLISH_KIND_PRIVATE);
         throwUnless(16419, publishId != 0);
         let bounceId: Int = self.computePublishBounceId(publishId);
+        let bounceTag: Int = self.computePublishBounceTag(publishId);
         throwUnless(16420, !self.pending_publishes.exists(bounceId));
 
         self.pending_publishes.set(bounceId, PendingPublish {
@@ -1120,6 +1131,7 @@ contract Vault {
             mode: SendPayGasSeparately,
             body: PublishPrivateFromVault {
                 bounce_id: bounceId,
+                bounce_tag: bounceTag,
                 publish_id: publishId,
                 size_class: msg.size_class,
                 crypto_suite: msg.crypto_suite,
@@ -1154,6 +1166,7 @@ contract Vault {
         let publishId: Int = self.computePublishId(sender(), msg.client_nonce, msg.body_hash, PUBLISH_KIND_PUBLIC);
         throwUnless(16438, publishId != 0);
         let bounceId: Int = self.computePublishBounceId(publishId);
+        let bounceTag: Int = self.computePublishBounceTag(publishId);
         throwUnless(16439, !self.pending_publishes.exists(bounceId));
 
         self.pending_publishes.set(bounceId, PendingPublish {
@@ -1174,6 +1187,7 @@ contract Vault {
             mode: SendPayGasSeparately,
             body: PublishPublicFromVault {
                 bounce_id: bounceId,
+                bounce_tag: bounceTag,
                 publish_id: publishId,
                 marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
                 author_wallet: sender(),
@@ -1214,6 +1228,8 @@ contract Vault {
         let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
         throwUnless(16511, pendingOpt != null);
         let pending: PendingPublish = pendingOpt!!;
+        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
+        throwUnless(16514, self.computePublishBounceTag(expectedPublishId) == msg.bounce_tag);
         if (pending.tombstone) {
             throwUnless(16512, now() <= pending.created_at);
             throwUnless(16513, pending.publish_kind == PUBLISH_KIND_PRIVATE);
@@ -1232,6 +1248,8 @@ contract Vault {
         let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
         throwUnless(16521, pendingOpt != null);
         let pending: PendingPublish = pendingOpt!!;
+        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
+        throwUnless(16524, self.computePublishBounceTag(expectedPublishId) == msg.bounce_tag);
         if (pending.tombstone) {
             throwUnless(16522, now() <= pending.created_at);
             throwUnless(16523, pending.publish_kind == PUBLISH_KIND_PUBLIC);

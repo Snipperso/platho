@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
-import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   Vault,
@@ -28,6 +28,9 @@ const HEADER1 = cellHashToBigInt(HEADER1_CELL);
 const VAULT_PENDING_PUBLISH_STALE_TTL = 86_400;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH = 10_000_000_000n;
 const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2_000_000n;
+const UINT160_MOD = 1n << 160n;
+const OP_BOUNCED = 0xffffffff;
+const OP_PUBLISH_PRIVATE_FROM_VAULT = 0xa4f862c0;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -45,6 +48,14 @@ function computePublishId(owner: Address, nonce: bigint, bodyHash: bigint, publi
     .storeUint(bodyHash, 256)
     .storeUint(publishKind, 8)
     .endCell());
+}
+
+function computeBounceId(publishId: bigint): bigint {
+  return publishId & ((1n << 64n) - 1n);
+}
+
+function computeBounceTag(publishId: bigint): bigint {
+  return cellHashToBigInt(beginCell().storeUint(publishId, 256).endCell()) % UINT160_MOD;
 }
 
 async function setup() {
@@ -157,5 +168,45 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
     const afterRejectedPruneUser = await ctx.vault.getGetUser(ctx.user.address);
     expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(1n);
     expect(afterRejectedPruneUser.ath_balance).toBe(afterPendingUser.ath_balance);
+  });
+
+  it('VAULT-M14-03: bounced CapsuleHub publish must match the publish bounce tag, not only the 64-bit bounce_id', async () => {
+    const ctx = await createPendingPublish(2n);
+    const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
+    const wrongPublishIdSameBounceSlot = ctx.publishId + (1n << 64n);
+    const bounceId = computeBounceId(ctx.publishId);
+    const wrongBounceTag = computeBounceTag(wrongPublishIdSameBounceSlot);
+    expect(computeBounceId(wrongPublishIdSameBounceSlot)).toBe(bounceId);
+    expect(wrongBounceTag).not.toBe(computeBounceTag(ctx.publishId));
+
+    const bouncedBody = beginCell()
+      .storeUint(OP_BOUNCED, 32)
+      .storeUint(OP_PUBLISH_PRIVATE_FROM_VAULT, 32)
+      .storeUint(bounceId, 64)
+      .storeUint(wrongBounceTag, 160)
+      .endCell();
+
+    await ctx.blockchain.sendMessage(internal({
+      from: ctx.capsuleHub.address,
+      to: ctx.vault.address,
+      value: toNano('0.01'),
+      bounced: true,
+      bounce: false,
+      body: bouncedBody,
+    }));
+
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(1n);
+    expect(await ctx.vault.getGetUser(ctx.user.address)).toMatchObject({
+      ath_balance: afterPendingUser.ath_balance,
+    });
+
+    await ctx.vault.send(ctx.capsuleHub.getSender(), { value: toNano('0.01') }, {
+      $$type: 'CapsuleHubPublishAck',
+      publish_id: ctx.publishId,
+      entry_id: 1n,
+      entry_uid: 0xaaaabbbbccccddddn,
+    } as CapsuleHubPublishAck);
+
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 });

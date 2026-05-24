@@ -1,5 +1,6 @@
 message(0xA4F862C0) PublishPrivateFromVault {
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     size_class: Int as uint8;
     crypto_suite: Int as uint8;
@@ -14,6 +15,7 @@ message(0xA4F862C0) PublishPrivateFromVault {
 
 message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     marketing_note: Int as uint152;
     author_wallet: Address;
@@ -33,6 +35,7 @@ message(0x874E576A) CapsuleHubPublishAck {
 message(0xFA001001) ForwardVaultPrivate {
     capsule_hub_address: Address;
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     size_class: Int as uint8;
     crypto_suite: Int as uint8;
@@ -49,6 +52,7 @@ message(0xFA001001) ForwardVaultPrivate {
 message(0xFA001002) ForwardVaultPublic {
     capsule_hub_address: Address;
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     marketing_note: Int as uint152;
     author_wallet: Address;
@@ -88,6 +92,7 @@ contract MockVaultAckSink {
             mode: SendDefaultMode,
             body: PublishPrivateFromVault {
                 bounce_id: msg.bounce_id,
+                bounce_tag: msg.bounce_tag,
                 publish_id: msg.publish_id,
                 size_class: msg.size_class,
                 crypto_suite: msg.crypto_suite,
@@ -110,6 +115,7 @@ contract MockVaultAckSink {
             mode: SendDefaultMode,
             body: PublishPublicFromVault {
                 bounce_id: msg.bounce_id,
+                bounce_tag: msg.bounce_tag,
                 publish_id: msg.publish_id,
                 marketing_note: msg.marketing_note,
                 author_wallet: msg.author_wallet,
