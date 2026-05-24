@@ -330,7 +330,7 @@ contract MarketStabilitySeller {
             throwUnless(23139, self.completed_tranche_count == 0 && self.current_tranche_sold_ath == 0);
         }
         throwUnless(23136, msg.base_tranche_price_nanotons > 0);
-        throwUnless(23137, msg.evidence_x1_tranche_quote_nanotons >= msg.base_tranche_price_nanotons);
+        throwUnless(23137, msg.evidence_x1_tranche_quote_nanotons == msg.base_tranche_price_nanotons);
         throwUnless(23138, msg.pricing_evidence_hash != 0);
         self.base_tranche_price_nanotons = msg.base_tranche_price_nanotons;
         self.evidence_x1_tranche_quote_nanotons = msg.evidence_x1_tranche_quote_nanotons;

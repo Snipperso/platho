@@ -166,16 +166,6 @@ function addDecimalGtZero(issues: Issue[], code: string, actual: unknown, label:
   }
 }
 
-function addDecimalGte(issues: Issue[], code: string, actual: unknown, expected: unknown, label: string) {
-  if (!isDecimalString(actual) || !isDecimalString(expected)) {
-    issues.push(issue(code, `${label} and comparison value must be decimal integer strings.`));
-    return;
-  }
-  if (BigInt(actual) < BigInt(expected)) {
-    issues.push(issue(code, `${label} under threshold: expected at least ${expected}, got ${actual}`));
-  }
-}
-
 function checkBase(
   issues: Issue[],
   manifest: ManifestLike,
@@ -235,8 +225,8 @@ export function createMarketStabilitySellerReadinessInputTemplate(): MarketStabi
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         genesis_config_hash: '0000000000000000000000000000000000000000000000000000000000000000',
         pricing_frozen: true,
-        base_tranche_price_nanotons: 'required: decimal nanotons per 3,000,000 ATH x1 tranche',
-        evidence_x1_tranche_quote_nanotons: 'required: decimal x1 quote evidence amount',
+        base_tranche_price_nanotons: 'required: exact decimal nanotons per 3,000,000 ATH x1 tranche',
+        evidence_x1_tranche_quote_nanotons: 'required: same decimal x1 quote evidence amount',
         pricing_evidence_hash: 'required: 64 lowercase hex evidence hash',
         phase: '0',
         reserve_due_ath: '45000000000000000',
@@ -387,7 +377,7 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
     issues.push(issue('MARKET_STABILITY_LAUNCH_CONTROLLER_NOT_CLEARED', 'market_stability_seller.genesis_config_hash must be zero after the one-time post-pool pricing freeze.'));
   }
   addDecimalGtZero(issues, 'MARKET_STABILITY_BASE_PRICE_NOT_SET', seller.base_tranche_price_nanotons, 'market_stability_seller.base_tranche_price_nanotons');
-  addDecimalGte(issues, 'MARKET_STABILITY_X1_EVIDENCE_BELOW_BASE_PRICE', seller.evidence_x1_tranche_quote_nanotons, seller.base_tranche_price_nanotons, 'market_stability_seller.evidence_x1_tranche_quote_nanotons');
+  addDecimalEq(issues, 'MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH', seller.base_tranche_price_nanotons, seller.evidence_x1_tranche_quote_nanotons, 'market_stability_seller.base_tranche_price_nanotons');
   if (!isHex64(seller.pricing_evidence_hash) || isZeroHex64(seller.pricing_evidence_hash)) {
     issues.push(issue('MARKET_STABILITY_PRICING_EVIDENCE_HASH_MISSING', 'market_stability_seller.pricing_evidence_hash must be a non-zero 32-byte hex hash.'));
   }

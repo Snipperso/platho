@@ -229,6 +229,26 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
   });
 
+  it('MSTAB-01C: rejects underpriced launch evidence before freezing pricing', async () => {
+    const env = await setup();
+    await bindCore(env);
+    await sealOnly(env);
+
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'FreezeMarketStabilityPricing',
+      deployment_manifest_hash: MANIFEST_HASH,
+      base_tranche_price_nanotons: 1n,
+      evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE,
+      pricing_evidence_hash: PRICING_EVIDENCE_HASH,
+    } as FreezeMarketStabilityPricing);
+
+    const config = await env.seller.getGetMarketStabilitySellerConfig();
+    expect(config.pricing_frozen).toBe(false);
+    expect(config.base_tranche_price_nanotons).toBe(0n);
+    expect(config.evidence_x1_tranche_quote_nanotons).toBe(0n);
+    expect(config.genesis_config_hash).not.toBe(0n);
+  });
+
   it('MSTAB-02: sells only at the current tranche floor, advances x2 to x3, and flushes TON to treasury', async () => {
     const env = await setup();
     await bindFreezeSeal(env);
