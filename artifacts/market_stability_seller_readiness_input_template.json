@@ -1,0 +1,74 @@
+{
+  "document": "PLATHO.V1.MARKET_STABILITY_SELLER_READINESS_INPUT",
+  "network": "mainnet",
+  "manifest": {
+    "profile": "PLATHO.V1.FINAL_GENESIS_MANIFEST",
+    "status": "FINAL_GENESIS",
+    "manifest_hash_hex": "required: 64 lowercase hex final manifest hash",
+    "addresses": {
+      "ath_master": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "market_stability_seller": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
+      "market_stability_seller_official_ath_wallet": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS",
+      "market_stability_reserve_funder": "REQUIRED_MAINNET_MARKET_STABILITY_RESERVE_FUNDER_ADDRESS",
+      "market_stability_ton_treasury_receiver": "REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS"
+    },
+    "code_hashes": {
+      "ath_wallet": "required: current ATHWallet code hash",
+      "market_stability_seller": "required: current MarketStabilitySeller code hash"
+    },
+    "constants": {
+      "ath_market_stability_reserve_allocation_atomic": "45000000000000000",
+      "ath_market_stability_tranche_atomic": "3000000000000000",
+      "ath_market_stability_tranche_count": "15",
+      "ath_market_stability_start_multiplier": "2",
+      "ath_market_stability_end_multiplier": "16"
+    },
+    "blockers_before_final_genesis": []
+  },
+  "snapshot": {
+    "market_stability_seller": {
+      "address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
+      "code_hash": "required: current MarketStabilitySeller code hash",
+      "sealed": true,
+      "deployment_manifest_hash": "required: final manifest hash",
+      "reserve_funder_address": "REQUIRED_MAINNET_MARKET_STABILITY_RESERVE_FUNDER_ADDRESS",
+      "official_ath_wallet_address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS",
+      "ton_treasury_receiver_address": "REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "genesis_config_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "pricing_frozen": true,
+      "base_tranche_price_nanotons": "required: decimal nanotons per 3,000,000 ATH x1 tranche",
+      "evidence_x1_tranche_quote_nanotons": "required: decimal x1 quote evidence amount",
+      "pricing_evidence_hash": "required: 64 lowercase hex evidence hash",
+      "phase": "0",
+      "reserve_due_ath": "45000000000000000",
+      "treasury_due_ton": "0",
+      "pending_query_id": "0",
+      "pending_amount_ath": "0",
+      "pending_paid_ton": "0",
+      "completed_tranche_count": "0",
+      "current_tranche_sold_ath": "0",
+      "current_multiplier": "2",
+      "current_tranche_remaining_ath": "3000000000000000",
+      "last_terminal_query_id": "0",
+      "reserve_funded_total_ath": "45000000000000000",
+      "sold_ath_total": "0",
+      "treasury_flushed_ton_total": "0"
+    },
+    "market_stability_seller_official_ath_wallet": {
+      "address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "45000000000000000"
+    }
+  },
+  "evidenceRefs": {
+    "finalPoolLaunchPriceSource": "required: immutable pool launch price proof path/hash",
+    "pricingFreezeTx": "required: one-time FreezeMarketStabilityPricing transaction hash",
+    "reserveFundingTx": "required: authenticated reserve ATH notification/funding transaction hash",
+    "getterSnapshotSource": "required: immutable post-pool seller getter snapshot path/hash",
+    "codeHashProofSource": "required: immutable code hash proof path/hash",
+    "finalManifestSource": "required: immutable final genesis manifest path/hash"
+  }
+}

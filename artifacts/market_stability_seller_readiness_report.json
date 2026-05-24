@@ -1,0 +1,18 @@
+{
+  "document": "PLATHO.V1.MARKET_STABILITY_SELLER_READINESS_REPORT",
+  "status": "BLOCKED_MISSING_INPUT",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "market_stability_seller_ready": false,
+  "issue_codes": [
+    "MISSING_INPUT"
+  ],
+  "issues": [
+    {
+      "code": "MISSING_INPUT",
+      "message": "Supply a post-pool MarketStabilitySeller getter snapshot input."
+    }
+  ],
+  "checked_manifest_hash": null,
+  "reserve_allocation_atomic": null,
+  "base_tranche_price_nanotons": null
+}
