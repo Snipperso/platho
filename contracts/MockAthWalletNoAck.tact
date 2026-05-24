@@ -8,9 +8,19 @@ message(0x41544810) ATHTransferRequest {
     response_destination: Address;
 }
 
+message(0x41544801) ATHBurn {
+    query_id: Int as uint64;
+    amount: Int as uint128;
+    response_destination: Address;
+}
+
 contract MockAthWalletNoAck {
     receive(msg: ATHTransferRequest) {
         // Intentionally accept and do not reply, to keep caller pending state open in tests.
+    }
+
+    receive(msg: ATHBurn) {
+        // Intentionally accept and do not reply, to keep caller pending burn state open in tests.
     }
 
     receive() {

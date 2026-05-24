@@ -674,6 +674,65 @@ export function dictValueParserATHTransferRequest(): DictionaryValue<ATHTransfer
     }
 }
 
+export type ATHBurn = {
+    $$type: 'ATHBurn';
+    query_id: bigint;
+    amount: bigint;
+    response_destination: Address;
+}
+
+export function storeATHBurn(src: ATHBurn) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042497, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.response_destination);
+    };
+}
+
+export function loadATHBurn(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042497) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _response_destination = sc_0.loadAddress();
+    return { $$type: 'ATHBurn' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function loadTupleATHBurn(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _response_destination = source.readAddress();
+    return { $$type: 'ATHBurn' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function loadGetterTupleATHBurn(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _response_destination = source.readAddress();
+    return { $$type: 'ATHBurn' as const, query_id: _query_id, amount: _amount, response_destination: _response_destination };
+}
+
+export function storeTupleATHBurn(source: ATHBurn) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.response_destination);
+    return builder.build();
+}
+
+export function dictValueParserATHBurn(): DictionaryValue<ATHBurn> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHBurn(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHBurn(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type MockAthWalletNoAck$Data = {
     $$type: 'MockAthWalletNoAck$Data';
 }
@@ -724,7 +783,7 @@ function initMockAthWalletNoAck_init_args(src: MockAthWalletNoAck_init_args) {
 }
 
 async function MockAthWalletNoAck_init() {
-    const __code = Cell.fromHex('b5ee9c72410102010074000114ff00f4a413f4bcf2c80b0100cad301d072d721d200d200fa4021103450666f04f86102f862ed44d0d20030916d916de202915be07021d74920c21f953101d31f309132e220821041544810ba9a5b30c87f01ca00c9ed54e0c00001c121b09e814650f2f030c87f01ca00c9ed54e030f2c082ebd4df3c');
+    const __code = Cell.fromHex('b5ee9c72410102010088000114ff00f4a413f4bcf2c80b0100f2d301d072d721d200d200fa4021103450666f04f86102f862ed44d0d20030916d916de202915be07021d74920c21f953101d31f309132e220821041544810ba9a5b30c87f01ca00c9ed54e020821041544801ba9a5b30c87f01ca00c9ed54e0c00001c121b09e814650f2f030c87f01ca00c9ed54e030f2c0825c279a23');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initMockAthWalletNoAck_init_args({ $$type: 'MockAthWalletNoAck_init_args' })(builder);
@@ -822,11 +881,13 @@ const MockAthWalletNoAck_types: ABIType[] = [
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"ATHBurn","header":1096042497,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"MockAthWalletNoAck$Data","header":null,"fields":[]},
 ]
 
 const MockAthWalletNoAck_opcodes = {
     "ATHTransferRequest": 1096042512,
+    "ATHBurn": 1096042497,
 }
 
 const MockAthWalletNoAck_getters: ABIGetter[] = [
@@ -837,6 +898,7 @@ export const MockAthWalletNoAck_getterMapping: { [key: string]: string } = {
 
 const MockAthWalletNoAck_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequest"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"ATHBurn"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
 
@@ -875,11 +937,14 @@ export class MockAthWalletNoAck implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHTransferRequest | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHTransferRequest | ATHBurn | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequest') {
             body = beginCell().store(storeATHTransferRequest(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHBurn') {
+            body = beginCell().store(storeATHBurn(message)).endCell();
         }
         if (message === null) {
             body = new Cell();

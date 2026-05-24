@@ -4,11 +4,14 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
+  ATHBurnFinalized,
   AthTransferNotificationProfileAvatar,
   BindProfileOfficialAthWallet,
+  FlushProfileBurnAthDue,
   ProfileRegistry,
   SealGenesis,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
+import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 
 const MANIFEST_HASH = 0x50524f46494c45524547495354525900000000000000000000000000000001n;
 const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
@@ -56,7 +59,7 @@ async function deploySealedProfileRegistry() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWalletAddress };
+  return { blockchain, registry, officialAthWalletAddress, athMasterAddress };
 }
 
 function avatarNotification(owner: Address, overrides: Partial<AthTransferNotificationProfileAvatar> = {}): AthTransferNotificationProfileAvatar {
@@ -138,5 +141,53 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(first.avatar_hash).toBe(0x11n);
     expect(global.profile_count).toBe(1n);
     expect(global.avatar_record_count).toBe(2n);
+  });
+
+  it('PROFILE-04: burn finalization must be for the ProfileRegistry owner address', async () => {
+    const { blockchain, registry, officialAthWalletAddress, athMasterAddress } = await deploySealedProfileRegistry();
+    const owner = fixtureAddress('BURN_OWNER_CHECK');
+    const flusher = await blockchain.treasury('profile-burn-flusher');
+    const burnDue = 50_000_000_000n;
+    const queryId = 91n;
+    const mockAthWalletInit = await MockAthWalletNoAck.init();
+    await blockchain.setShardAccount(officialAthWalletAddress, createShardAccount({
+      address: officialAthWalletAddress,
+      code: mockAthWalletInit.code,
+      data: mockAthWalletInit.data,
+      balance: toNano('1'),
+      workchain: officialAthWalletAddress.workChain,
+    }));
+
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner));
+    await registry.send(flusher.getSender(), { value: toNano('0.05') }, {
+      $$type: 'FlushProfileBurnAthDue',
+      query_id: queryId,
+    } as FlushProfileBurnAthDue);
+
+    let global = await registry.getGetGlobal();
+    expect(global.burn_due_ath).toBe(0n);
+    expect(global.pending_burn_flush_count).toBe(1n);
+
+    await registry.send(blockchain.sender(athMasterAddress), { value: toNano('0.01') }, {
+      $$type: 'ATHBurnFinalized',
+      query_id: queryId,
+      amount: burnDue,
+      owner_address: fixtureAddress('WRONG_BURN_OWNER'),
+    } as ATHBurnFinalized);
+
+    global = await registry.getGetGlobal();
+    expect(global.burn_due_ath).toBe(0n);
+    expect(global.pending_burn_flush_count).toBe(1n);
+
+    await registry.send(blockchain.sender(athMasterAddress), { value: toNano('0.01') }, {
+      $$type: 'ATHBurnFinalized',
+      query_id: queryId,
+      amount: burnDue,
+      owner_address: registry.address,
+    } as ATHBurnFinalized);
+
+    global = await registry.getGetGlobal();
+    expect(global.burn_due_ath).toBe(0n);
+    expect(global.pending_burn_flush_count).toBe(0n);
   });
 });
