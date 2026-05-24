@@ -55,6 +55,7 @@ message(0x3A12D1AD) SealGenesis {
 
 message(0xA4F862C0) PublishPrivateFromVault {
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     size_class: Int as uint8;
     crypto_suite: Int as uint8;
@@ -69,6 +70,7 @@ message(0xA4F862C0) PublishPrivateFromVault {
 
 message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
     publish_id: Int as uint256;
     marketing_note: Int as uint152;
     author_wallet: Address;

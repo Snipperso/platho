@@ -961,14 +961,16 @@ PROGRAM{
       s0 s10 XCHG
       64 LDU
       NIP
+      160 LDU
+      NIP
       256 LDU
       8 LDU
       8 LDU
-      256 LDU
       256 LDU
       LDREF
       DROP
       CTOS
+      256 LDU
       256 LDU
       LDREF
       LDREF
@@ -1179,6 +1181,8 @@ PROGRAM{
       2DROP
       s0 s10 XCHG
       64 LDU
+      NIP
+      160 LDU
       NIP
       256 LDU
       152 LDU

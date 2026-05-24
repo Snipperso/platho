@@ -123,6 +123,7 @@ CapsuleHub.PublishPrivateFromVault = 0xA4F862C0
 
 PublishPrivateFromVault {
   publish_bounce_id: uint64
+  publish_bounce_tag:uint160
   publish_id:        uint256
   size_class:        uint8
   crypto_suite:      uint8
@@ -140,6 +141,7 @@ CapsuleHub.PublishPublicFromVault = 0x8C2A76B7
 
 PublishPublicFromVault {
   publish_bounce_id: uint64
+  publish_bounce_tag:uint160
   publish_id:        uint256
   marketing_note:    uint152 = ASCII "sent via Platho.App"
   author_wallet:     MsgAddress
@@ -162,17 +164,20 @@ It is a public-channel-only on-chain marker and is not part of the user-rendered
 
 ```text
 publish_bounce_id = publish_id mod 2^64
+publish_bounce_tag = hash(cell { publish_id:uint256 }) mod 2^160
 ```
 
 Rules:
 
 ```text
-1. publish_bounce_id is only a bounce-routing key.
-2. publish_bounce_id is not an authentication proof.
-3. CapsuleHub ACK uses full publish_id.
-4. Vault verifies ACK by recomputing full publish_id from PendingPublish fields.
-5. If pending_publishes[publish_bounce_id] already exists before send, Vault MUST NOT send to CapsuleHub.
-6. Collision before send is treated as a controlled post-accept invalid signed request: nonce consumed, bounded invalid-request charge, no PLATO fee, no CapsuleHub publish.
+1. publish_bounce_id selects the PendingPublish bounce slot.
+2. publish_bounce_tag is a compact bounce proof derived from the full publish_id.
+3. Bounce handlers cannot read the full publish_id because TON bounced bodies expose only the first 224 payload bits after opcode.
+4. Vault verifies bounce by recomputing full publish_id from PendingPublish fields and matching publish_bounce_tag.
+5. CapsuleHub ACK uses full publish_id.
+6. Vault verifies ACK by recomputing full publish_id from PendingPublish fields.
+7. If pending_publishes[publish_bounce_id] already exists before send, Vault MUST NOT send to CapsuleHub.
+8. Collision before send is treated as a controlled post-accept invalid signed request: nonce consumed, bounded invalid-request charge, no PLATO fee, no CapsuleHub publish.
 ```
 
 ---

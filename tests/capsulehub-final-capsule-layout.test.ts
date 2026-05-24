@@ -71,6 +71,7 @@ describe('CapsuleHub final capsule byte layout', () => {
     await capsule.send(blockchain.sender(vaultAddress), { value: PRIVATE_LONG_TERM_REQUIRED }, {
       $$type: 'PublishPrivateFromVault',
       bounce_id: 9001n,
+      bounce_tag: 9001n,
       publish_id: hashHexToBigInt(encrypted.publish.body_hash),
       size_class: 2n,
       crypto_suite: 2n,

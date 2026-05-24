@@ -8,10 +8,10 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 |---|---:|---:|---:|---:|
 | ATH_TRANSFER_SUCCESS | 1 | 2812499 | 2812499 | 11621 |
 | ATH_BURN_SUCCESS | 1 | 1366069 | 1366069 | 7950 |
-| CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3633202 | 1565089 | 22907 |
-| FEEACCUMULATOR_SPLIT_FLUSH | 4 | 2038073 | 632179 | 4778 |
+| CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
+| FEEACCUMULATOR_SPLIT_FLUSH | 5 | 2554096 | 649713 | 5041 |
 | USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 24347951 | 5071077 | 38299 |
-| VAULT_WALLET_PUBLISH | 2 | 9941209 | 5192905 | 34282 |
+| VAULT_WALLET_PUBLISH | 2 | 10135120 | 5291327 | 31111 |
 
 ## Operation details
 
@@ -31,18 +31,19 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| private_vault_publish | 2 | 1565089 | 1565089 | 22907 | 1 | 0 |
-| public_vault_publish | 2 | 1222356 | 1222356 | 17766 | 1 | 0 |
+| private_vault_publish | 2 | 1568023 | 1568023 | 22951 | 1 | 0 |
+| public_vault_publish | 2 | 1225289 | 1225289 | 17810 | 1 | 0 |
 | flush_fee_to_missing_accumulator_bounce | 3 | 845757 | 554333 | 7895 | 0 | 0 |
 
 ### FEEACCUMULATOR_SPLIT_FLUSH
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| deposit_protocol_fee | 2 | 462024 | 270823 | 2868 | 0 | 0 |
-| split_accumulated | 2 | 472357 | 262289 | 3151 | 0 | 0 |
-| flush_treasury_due | 3 | 632179 | 340755 | 4778 | 0 | 0 |
-| flush_buyback_due_bounce | 3 | 471513 | 270823 | 2368 | 1 | 1 |
+| deposit_protocol_fee | 2 | 468424 | 270823 | 2964 | 0 | 0 |
+| enable_buyback_split | 2 | 475623 | 262289 | 3200 | 0 | 0 |
+| split_accumulated | 2 | 482757 | 262289 | 3307 | 0 | 0 |
+| flush_treasury_due | 3 | 649713 | 358289 | 5041 | 0 | 0 |
+| flush_buyback_due_bounce | 3 | 477579 | 270823 | 2459 | 1 | 1 |
 
 ### USERNAME_REGISTRY_MINT_FLUSH_PRUNE
 
@@ -60,8 +61,8 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| wallet_private_publish_to_capsulehub_ack | 5 | 5192905 | 2591152 | 34282 | 1 | 1 |
-| wallet_private_publish_to_missing_capsulehub_bounce | 5 | 4748304 | 2591152 | 34282 | 1 | 0 |
+| wallet_private_publish_to_capsulehub_ack | 5 | 5291327 | 2383307 | 31111 | 1 | 1 |
+| wallet_private_publish_to_missing_capsulehub_bounce | 5 | 4843793 | 2383307 | 31111 | 1 | 0 |
 
 ## Result
 

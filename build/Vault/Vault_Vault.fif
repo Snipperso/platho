@@ -84,6 +84,7 @@ PROGRAM{
   DECLPROC $Vault$_fun_computePublishId
   DECLPROC $Vault$_fun_capsulehubCallValue
   DECLPROC $Vault$_fun_computePublishBounceId
+  DECLPROC $Vault$_fun_computePublishBounceTag
   DECLPROC $Vault$_fun_protocolFeePaid
   DECLPROC $Vault$_fun_refundPublishValue
   DECLPROC $Vault$_fun_refundPendingPublish
@@ -117,8 +118,8 @@ PROGRAM{
   DECLPROC $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt
   DECLPROC $ReceiveIntent$_constructor_sender_wallet_recipient_wallet_asset_amount_commitment_client_nonce_created_at_claimed
   DECLPROC $PendingPublish$_constructor_owner_wallet_tombstone_nonce_publish_kind_body_hash_refundable_amount_created_at
-  DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid
-  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid
+  DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid
+  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid
   91785 DECLMETHOD %get_user
   104356 DECLMETHOD %get_key_record
   118324 DECLMETHOD %get_receive_intent
@@ -249,21 +250,23 @@ PROGRAM{
   }>
   $PublishPrivateFromVault$_store PROCREF:<{
     2767741632 PUSHINT
-    s0 s12 XCHG2
+    s0 s13 XCHG2
     32 STU
-    s1 s10 XCHG
+    s1 s11 XCHG
     64 STU
-    s1 s8 XCHG
+    s1 s9 XCHG
+    160 STU
+    s1 s7 XCHG
     256 STU
-    s1 s6 XCHG
+    s1 s5 XCHG
     8 STU
-    s1 s4 XCHG
+    s1 s3 XCHG
     8 STU
-    s1 s2 XCHG
-    256 STU
     256 STU
     SWAP
     NEWC
+    256 STU
+    s1 s2 XCHG
     256 STU
     s1 s2 XCHG
     STREF
@@ -276,25 +279,27 @@ PROGRAM{
     STBREFR
   }>
   $PublishPrivateFromVault$_store_cell PROCINLINE:<{
-    11 -ROLL
+    12 -ROLL
     $PublishPrivateFromVault$_store INLINECALLDICT
     ENDC
   }>
   $PublishPrivateFromVault$_load_bounced PROCINLINE:<{
     64 LDU
-    SWAP
+    160 LDU
+    -ROT
   }>
   $PublishPublicFromVault$_store PROCINLINE:<{
     2351593143 PUSHINT
-    s0 s10 XCHG2
+    s0 s11 XCHG2
     32 STU
-    s1 s8 XCHG
+    s1 s9 XCHG
     64 STU
-    s1 s6 XCHG
+    s1 s7 XCHG
+    160 STU
+    s1 s5 XCHG
     256 STU
-    s1 s4 XCHG
+    s1 s3 XCHG
     152 STU
-    s1 s2 XCHG
     STSLICE
     SWAP
     NEWC
@@ -310,13 +315,14 @@ PROGRAM{
     STBREFR
   }>
   $PublishPublicFromVault$_store_cell PROCINLINE:<{
-    9 -ROLL
+    10 -ROLL
     $PublishPublicFromVault$_store INLINECALLDICT
     ENDC
   }>
   $PublishPublicFromVault$_load_bounced PROCINLINE:<{
     64 LDU
-    SWAP
+    160 LDU
+    -ROT
   }>
   $PendingAthWithdrawal$_store PROCINLINE:<{
     s5 s6 XCHG2
@@ -1248,6 +1254,13 @@ PROGRAM{
   $Vault$_fun_computePublishBounceId PROCREF:<{
     64 MODPOW2#
   }>
+  $Vault$_fun_computePublishBounceTag PROCREF:<{
+        NEWC
+    256 STU
+        ENDC
+        HASHCU
+    160 MODPOW2#
+  }>
   $Vault$_fun_protocolFeePaid PROCREF:<{
     s2 PUSH
     2 EQINT
@@ -1884,9 +1897,9 @@ PROGRAM{
   }>
   $PendingPublish$_constructor_owner_wallet_tombstone_nonce_publish_kind_body_hash_refundable_amount_created_at PROCINLINE:<{
   }>
-  $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid PROCINLINE:<{
+  $PublishPrivateFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid PROCINLINE:<{
   }>
-  $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid PROCINLINE:<{
+  $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid PROCINLINE:<{
   }>
   %get_user PROC:<{
     $Vault$_contract_load INLINECALLDICT
@@ -2189,24 +2202,9 @@ PROGRAM{
       IFJMP:<{
         DROP
         $PublishPrivateFromVault$_load_bounced INLINECALLDICT
-        NIP
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        s14 s15 XCHG
-        s13 s14 XCHG
-        s12 s13 XCHG
-        s11 s12 XCHG
-        s10 s11 XCHG
-        s9 s10 XCHG
-        s8 s9 XCHG
-        s7 s8 XCHG
-        s6 s7 XCHG
-        s5 s6 XCHG
-        s4 s5 XCHG
-        s3 s4 XCHG
-        s0 19 s() XCHG
-        s1 s3 s0 XCHG3
+        s2 POP
+        s1 19 s() XCHG
+        s0 20 s() XCHG
         $Vault$_fun_requireSealed INLINECALLDICT
         16510 PUSHINT
         __tact_context_get_sender INLINECALLDICT
@@ -2215,7 +2213,7 @@ PROGRAM{
         THROWANYIFNOT
         s6 PUSH
         257 PUSHINT
-        21 s() PUSH
+        22 s() PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $PendingPublish$_load_opt INLINECALLDICT
         16511 PUSHINT
@@ -2224,19 +2222,85 @@ PROGRAM{
         NOT
         THROWANYIFNOT
         $PendingPublish$_not_null INLINECALLDICT
-        s5 PUSH
+        18 s() 25 s() XCHG
+        17 s() 24 s() XCHG
+        16 s() 23 s() XCHG
+        s15 22 s() XCHG
+        s14 21 s() XCHG
+        s13 20 s() XCHG
+        s12 19 s() XCHG
+        s11 25 s() XCHG
+        s10 24 s() XCHG
+        s9 23 s() XCHG
+        s8 22 s() XCHG
+        s7 21 s() XCHG
+        s6 20 s() XCHG
+        s5 19 s() XCHG
+        s4 25 s() XCHG
+        s3 24 s() XCHG
+        s2 23 s() XCHG
+        s1 22 s() XCHG
+        s0 21 s() XCHG
+        20 s() PUSH
+        26 s() PUSH
+        25 s() PUSH
+        27 s() PUSH
+        $Vault$_fun_computePublishId INLINECALLDICT
+        18 s() 19 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 19 s() XCHG
+        s15 19 s() XCHG
+        s14 19 s() XCHG
+        s13 19 s() XCHG
+        s12 19 s() XCHG
+        s11 19 s() XCHG
+        s10 19 s() XCHG
+        s9 19 s() XCHG
+        s0 19 s() XCHG
+        s0 s8 XCHG
+        s0 s7 XCHG
+        s0 s6 XCHG
+        5 -ROLL
+        16514 PUSHINT
+        s0 20 s() XCHG
+        $Vault$_fun_computePublishBounceTag INLINECALLDICT
+        SWAP
+        s0 28 s() XCHG
+        EQUAL
+        s1 19 s() XCHG
+        THROWANYIFNOT
+        18 s() PUSH
         IF:<{
           16512 PUSHINT
               NOW
-          s2 PUSH
+          22 s() PUSH
           LEQ
           THROWANYIFNOT
           16513 PUSHINT
-          s4 PUSH
+          24 s() PUSH
           1 EQINT
           THROWANYIFNOT
           __tact_context_get INLINECALLDICT
           $Context$_get_value INLINECALLDICT
+          17 s() 26 s() XCHG
+          16 s() 25 s() XCHG
+          s15 24 s() XCHG
+          s14 23 s() XCHG
+          s13 22 s() XCHG
+          s12 21 s() XCHG
+          s11 20 s() XCHG
+          s10 19 s() XCHG
+          s9 18 s() XCHG
+          s8 17 s() XCHG
+          s7 16 s() XCHG
+          s6 s15 XCHG
+          s5 s14 XCHG
+          s4 s13 XCHG
+          s3 s12 XCHG
+          s11 s10 s0 XCHG3
+          s7 s6 s0 XCHG3
+          s5 s4 s0 XCHG3
+          s1 s3 s0 XCHG3
           $Vault$_fun_refundPendingPublish INLINECALLDICT
           s1 19 s() XCHG
           s0 s6 XCHG
@@ -2246,6 +2310,25 @@ PROGRAM{
         }>ELSE<{
           __tact_context_get INLINECALLDICT
           $Context$_get_value INLINECALLDICT
+          17 s() 26 s() XCHG
+          16 s() 25 s() XCHG
+          s15 24 s() XCHG
+          s14 23 s() XCHG
+          s13 22 s() XCHG
+          s12 21 s() XCHG
+          s11 20 s() XCHG
+          s10 19 s() XCHG
+          s9 18 s() XCHG
+          s8 17 s() XCHG
+          s7 16 s() XCHG
+          s6 s15 XCHG
+          s5 s14 XCHG
+          s4 s13 XCHG
+          s3 s12 XCHG
+          s11 s10 s0 XCHG3
+          s7 s6 s0 XCHG3
+          s5 s4 s0 XCHG3
+          s1 s3 s0 XCHG3
           $Vault$_fun_refundPendingPublish INLINECALLDICT
           s1 19 s() XCHG
           s0 s6 XCHG
@@ -2276,24 +2359,9 @@ PROGRAM{
       EQUAL
       IFJMP:<{
         $PublishPublicFromVault$_load_bounced INLINECALLDICT
-        NIP
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        s14 s15 XCHG
-        s13 s14 XCHG
-        s12 s13 XCHG
-        s11 s12 XCHG
-        s10 s11 XCHG
-        s9 s10 XCHG
-        s8 s9 XCHG
-        s7 s8 XCHG
-        s6 s7 XCHG
-        s5 s6 XCHG
-        s4 s5 XCHG
-        s3 s4 XCHG
-        s0 19 s() XCHG
-        s1 s3 s0 XCHG3
+        s2 POP
+        s1 19 s() XCHG
+        s0 20 s() XCHG
         $Vault$_fun_requireSealed INLINECALLDICT
         16520 PUSHINT
         __tact_context_get_sender INLINECALLDICT
@@ -2302,7 +2370,7 @@ PROGRAM{
         THROWANYIFNOT
         s6 PUSH
         257 PUSHINT
-        21 s() PUSH
+        22 s() PUSH
         __tact_dict_get_int_cell INLINECALLDICT
         $PendingPublish$_load_opt INLINECALLDICT
         16521 PUSHINT
@@ -2311,19 +2379,85 @@ PROGRAM{
         NOT
         THROWANYIFNOT
         $PendingPublish$_not_null INLINECALLDICT
-        s5 PUSH
+        18 s() 25 s() XCHG
+        17 s() 24 s() XCHG
+        16 s() 23 s() XCHG
+        s15 22 s() XCHG
+        s14 21 s() XCHG
+        s13 20 s() XCHG
+        s12 19 s() XCHG
+        s11 25 s() XCHG
+        s10 24 s() XCHG
+        s9 23 s() XCHG
+        s8 22 s() XCHG
+        s7 21 s() XCHG
+        s6 20 s() XCHG
+        s5 19 s() XCHG
+        s4 25 s() XCHG
+        s3 24 s() XCHG
+        s2 23 s() XCHG
+        s1 22 s() XCHG
+        s0 21 s() XCHG
+        20 s() PUSH
+        26 s() PUSH
+        25 s() PUSH
+        27 s() PUSH
+        $Vault$_fun_computePublishId INLINECALLDICT
+        18 s() 19 s() XCHG
+        17 s() 19 s() XCHG
+        16 s() 19 s() XCHG
+        s15 19 s() XCHG
+        s14 19 s() XCHG
+        s13 19 s() XCHG
+        s12 19 s() XCHG
+        s11 19 s() XCHG
+        s10 19 s() XCHG
+        s9 19 s() XCHG
+        s0 19 s() XCHG
+        s0 s8 XCHG
+        s0 s7 XCHG
+        s0 s6 XCHG
+        5 -ROLL
+        16524 PUSHINT
+        s0 20 s() XCHG
+        $Vault$_fun_computePublishBounceTag INLINECALLDICT
+        SWAP
+        s0 28 s() XCHG
+        EQUAL
+        s1 19 s() XCHG
+        THROWANYIFNOT
+        18 s() PUSH
         IF:<{
           16522 PUSHINT
               NOW
-          s2 PUSH
+          22 s() PUSH
           LEQ
           THROWANYIFNOT
           16523 PUSHINT
-          s4 PUSH
+          24 s() PUSH
           2 EQINT
           THROWANYIFNOT
           __tact_context_get INLINECALLDICT
           $Context$_get_value INLINECALLDICT
+          17 s() 26 s() XCHG
+          16 s() 25 s() XCHG
+          s15 24 s() XCHG
+          s14 23 s() XCHG
+          s13 22 s() XCHG
+          s12 21 s() XCHG
+          s11 20 s() XCHG
+          s10 19 s() XCHG
+          s9 18 s() XCHG
+          s8 17 s() XCHG
+          s7 16 s() XCHG
+          s6 s15 XCHG
+          s5 s14 XCHG
+          s4 s13 XCHG
+          s3 s12 XCHG
+          s11 s10 s0 XCHG3
+          s7 s6 s0 XCHG3
+          s5 s4 s0 XCHG3
+          s1 s3 s0 XCHG3
           $Vault$_fun_refundPendingPublish INLINECALLDICT
           s1 19 s() XCHG
           s0 s6 XCHG
@@ -2333,6 +2467,25 @@ PROGRAM{
         }>ELSE<{
           __tact_context_get INLINECALLDICT
           $Context$_get_value INLINECALLDICT
+          17 s() 26 s() XCHG
+          16 s() 25 s() XCHG
+          s15 24 s() XCHG
+          s14 23 s() XCHG
+          s13 22 s() XCHG
+          s12 21 s() XCHG
+          s11 20 s() XCHG
+          s10 19 s() XCHG
+          s9 18 s() XCHG
+          s8 17 s() XCHG
+          s7 16 s() XCHG
+          s6 s15 XCHG
+          s5 s14 XCHG
+          s4 s13 XCHG
+          s3 s12 XCHG
+          s11 s10 s0 XCHG3
+          s7 s6 s0 XCHG3
+          s5 s4 s0 XCHG3
+          s1 s3 s0 XCHG3
           $Vault$_fun_refundPendingPublish INLINECALLDICT
           s1 19 s() XCHG
           s0 s6 XCHG
@@ -4442,10 +4595,27 @@ PROGRAM{
       5 -ROLL
       19 s() PUSH
       $Vault$_fun_computePublishBounceId INLINECALLDICT
+      18 s() 19 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 19 s() XCHG
+      s15 19 s() XCHG
+      s14 19 s() XCHG
+      s13 19 s() XCHG
+      s12 19 s() XCHG
+      s11 19 s() XCHG
+      s10 19 s() XCHG
+      s9 19 s() XCHG
+      s0 19 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      20 s() PUSH
+      $Vault$_fun_computePublishBounceTag INLINECALLDICT
       16420 PUSHINT
       s8 PUSH
       257 PUSHINT
-      s3 PUSH
+      23 s() PUSH
       __tact_dict_exists_int INLINECALLDICT
       NOT
       THROWANYIFNOT
@@ -4456,38 +4626,39 @@ PROGRAM{
           NOW
       s3 s4 XCHG
       s2 s3 XCHG
-      s2 33 s() XCHG
-      27 s() PUSH
+      s2 34 s() XCHG
+      28 s() PUSH
       SWAP
-      27 s() PUSH
+      28 s() PUSH
       SWAP
       $PendingPublish$_constructor_owner_wallet_tombstone_nonce_publish_kind_body_hash_refundable_amount_created_at INLINECALLDICT
       NEWC
       $PendingPublish$_store_cell INLINECALLDICT
       s2 s8 XCHG
-      s1 29 s() XCHG
-      29 s() PUSH
+      s1 30 s() XCHG
+      21 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       s0 s6 XCHG
       INC
-      s8 27 s() XCHG
-      s7 19 s() XCHG
-      s6 25 s() XCHG
-      s5 24 s() XCHG
-      s4 23 s() XCHG
-      s3 22 s() XCHG
-      s2 21 s() XCHG
-      s1 28 s() XCHG
-      s0 29 s() XCHG
+      s9 19 s() XCHG
+      s8 28 s() XCHG
+      s7 20 s() XCHG
+      s6 26 s() XCHG
+      s5 25 s() XCHG
+      s4 24 s() XCHG
+      s3 23 s() XCHG
+      s2 22 s() XCHG
+      s1 29 s() XCHG
+      s0 30 s() XCHG
       TRUE
-      s0 31 s() XCHG
+      s0 32 s() XCHG
       1 PUSHINT
-      s0 28 s() XCHG
-      $PublishPrivateFromVault$_constructor_bounce_id_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid INLINECALLDICT
+      s0 29 s() XCHG
+      $PublishPrivateFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPrivateFromVault$_store_cell INLINECALLDICT
-      s8 PUSH
+      s7 PUSH
       s0 s4 XCHG
       s3 s13 XCHG
       s2 23 s() XCHG
@@ -4511,17 +4682,17 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s6 18 s() XCHG
-      s5 17 s() XCHG
-      s4 16 s() XCHG
-      s3 s15 XCHG
-      s14 s13 s12 XCHG3
-      s2 s11 XCHG
-      s8 s10 XCHG
+      s5 18 s() XCHG
+      s4 17 s() XCHG
+      s3 16 s() XCHG
+      s15 s14 s13 XCHG3
+      s1 s12 XCHG
+      s8 s11 XCHG
+      s5 s10 XCHG
       s6 s9 XCHG
-      s3 s8 XCHG
-      s6 s6 s5 XCHG3
-      s1 s4 XCHG
+      s8 s1 s6 XCHG3
+      s0 s5 s4 XCHG3
+      s1 s3 XCHG
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
@@ -4707,10 +4878,27 @@ PROGRAM{
       5 -ROLL
       19 s() PUSH
       $Vault$_fun_computePublishBounceId INLINECALLDICT
+      18 s() 19 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 19 s() XCHG
+      s15 19 s() XCHG
+      s14 19 s() XCHG
+      s13 19 s() XCHG
+      s12 19 s() XCHG
+      s11 19 s() XCHG
+      s10 19 s() XCHG
+      s9 19 s() XCHG
+      s0 19 s() XCHG
+      s0 s8 XCHG
+      s0 s7 XCHG
+      s0 s6 XCHG
+      5 -ROLL
+      20 s() PUSH
+      $Vault$_fun_computePublishBounceTag INLINECALLDICT
       16439 PUSHINT
       s8 PUSH
       257 PUSHINT
-      s3 PUSH
+      23 s() PUSH
       __tact_dict_exists_int INLINECALLDICT
       NOT
       THROWANYIFNOT
@@ -4721,17 +4909,17 @@ PROGRAM{
           NOW
       s3 s4 XCHG
       s2 s3 XCHG
-      s2 29 s() XCHG
-      30 s() PUSH
+      s2 30 s() XCHG
+      31 s() PUSH
       SWAP
-      27 s() PUSH
+      28 s() PUSH
       SWAP
       $PendingPublish$_constructor_owner_wallet_tombstone_nonce_publish_kind_body_hash_refundable_amount_created_at INLINECALLDICT
       NEWC
       $PendingPublish$_store_cell INLINECALLDICT
       s2 s8 XCHG
-      s1 25 s() XCHG
-      25 s() PUSH
+      s1 26 s() XCHG
+      21 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       s0 s6 XCHG
@@ -4740,18 +4928,19 @@ PROGRAM{
       1 PUSHINT
       2573421624129493433291659589718684717235138672 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s8 27 s() XCHG
-      s7 23 s() XCHG
+      s9 23 s() XCHG
+      s8 28 s() XCHG
+      s7 24 s() XCHG
       s6 s5 XCHG2
-      s4 25 s() XCHG
-      s3 28 s() XCHG
-      s2 29 s() XCHG
-      s1 30 s() XCHG
-      s0 26 s() XCHG
-      $PublishPublicFromVault$_constructor_bounce_id_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid INLINECALLDICT
+      s4 26 s() XCHG
+      s3 29 s() XCHG
+      s2 30 s() XCHG
+      s1 31 s() XCHG
+      s0 27 s() XCHG
+      $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPublicFromVault$_store_cell INLINECALLDICT
-      s12 PUSH
+      s11 PUSH
       s0 s4 XCHG
       s3 17 s() XCHG
       s2 21 s() XCHG
@@ -4775,13 +4964,19 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s10 18 s() XCHG
-      s9 17 s() XCHG
-      s8 16 s() XCHG
-      8 8 BLKSWAP
-      s1 s7 XCHG
-      s4 s6 XCHG
-      s4 s5 XCHG2
+      s9 18 s() XCHG
+      s8 17 s() XCHG
+      s7 16 s() XCHG
+      s6 s15 XCHG
+      s5 s14 XCHG
+      s4 s13 XCHG
+      s3 s12 XCHG
+      s11 s10 s9 XCHG3
+      s3 s7 XCHG
+      s3 s6 XCHG
+      s1 s5 XCHG
+      s3 s4 XCHG
+      s0 s1 s3 XCHG3
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER

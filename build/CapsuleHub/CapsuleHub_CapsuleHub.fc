@@ -891,12 +891,13 @@ _ %get_state() method_id(86957) {
     ;; Receive PublishPrivateFromVault message
     if (op == 0xa4f862c0) {
         var $msg'bounce_id = in_msg~load_uint(64);
+        var $msg'bounce_tag = in_msg~load_uint(160);
         var $msg'publish_id = in_msg~load_uint(256);
         var $msg'size_class = in_msg~load_uint(8);
         var $msg'crypto_suite = in_msg~load_uint(8);
         var $msg'header_0_hash = in_msg~load_uint(256);
-        var $msg'header_1_hash = in_msg~load_uint(256);
         slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'header_1_hash = sc_1~load_uint(256);
         var $msg'body_hash = sc_1~load_uint(256);
         var $msg'header_0 = sc_1~load_ref();
         var $msg'header_1 = sc_1~load_ref();
@@ -932,6 +933,7 @@ _ %get_state() method_id(86957) {
     ;; Receive PublishPublicFromVault message
     if (op == 0x8c2a76b7) {
         var $msg'bounce_id = in_msg~load_uint(64);
+        var $msg'bounce_tag = in_msg~load_uint(160);
         var $msg'publish_id = in_msg~load_uint(256);
         var $msg'marketing_note = in_msg~load_uint(152);
         var $msg'author_wallet = in_msg~load_msg_addr();

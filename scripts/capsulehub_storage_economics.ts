@@ -133,6 +133,7 @@ function privateVault(sizeClass: 1n | 2n, fill: number): PublishPrivateFromVault
   return {
     $$type: 'PublishPrivateFromVault',
     bounce_id: BigInt(10_000 + fill),
+    bounce_tag: BigInt(30_000 + fill),
     publish_id: hash256(`vault-private-${fill}`),
     size_class: sizeClass,
     crypto_suite: sizeClass,
@@ -152,6 +153,7 @@ function publicVault(fill: number, author: Address): PublishPublicFromVault {
   return {
     $$type: 'PublishPublicFromVault',
     bounce_id: BigInt(20_000 + fill),
+    bounce_tag: BigInt(40_000 + fill),
     publish_id: hash256(`vault-public-${fill}`),
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     author_wallet: author,

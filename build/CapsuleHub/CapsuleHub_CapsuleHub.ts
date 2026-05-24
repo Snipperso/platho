@@ -712,6 +712,7 @@ export function dictValueParserSealGenesis(): DictionaryValue<SealGenesis> {
 export type PublishPrivateFromVault = {
     $$type: 'PublishPrivateFromVault';
     bounce_id: bigint;
+    bounce_tag: bigint;
     publish_id: bigint;
     size_class: bigint;
     crypto_suite: bigint;
@@ -729,12 +730,13 @@ export function storePublishPrivateFromVault(src: PublishPrivateFromVault) {
         const b_0 = builder;
         b_0.storeUint(2767741632, 32);
         b_0.storeUint(src.bounce_id, 64);
+        b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
         b_0.storeUint(src.size_class, 8);
         b_0.storeUint(src.crypto_suite, 8);
         b_0.storeUint(src.header_0_hash, 256);
-        b_0.storeUint(src.header_1_hash, 256);
         const b_1 = new Builder();
+        b_1.storeUint(src.header_1_hash, 256);
         b_1.storeUint(src.body_hash, 256);
         b_1.storeRef(src.header_0);
         b_1.storeRef(src.header_1);
@@ -748,22 +750,24 @@ export function loadPublishPrivateFromVault(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2767741632) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
+    const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
     const _size_class = sc_0.loadUintBig(8);
     const _crypto_suite = sc_0.loadUintBig(8);
     const _header_0_hash = sc_0.loadUintBig(256);
-    const _header_1_hash = sc_0.loadUintBig(256);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _header_1_hash = sc_1.loadUintBig(256);
     const _body_hash = sc_1.loadUintBig(256);
     const _header_0 = sc_1.loadRef();
     const _header_1 = sc_1.loadRef();
     const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPrivateFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _size_class = source.readBigNumber();
     const _crypto_suite = source.readBigNumber();
@@ -774,11 +778,12 @@ export function loadTuplePublishPrivateFromVault(source: TupleReader) {
     const _header_1 = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _size_class = source.readBigNumber();
     const _crypto_suite = source.readBigNumber();
@@ -789,12 +794,13 @@ export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
     const _header_1 = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPrivateFromVault(source: PublishPrivateFromVault) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
+    builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
     builder.writeNumber(source.size_class);
     builder.writeNumber(source.crypto_suite);
@@ -822,6 +828,7 @@ export function dictValueParserPublishPrivateFromVault(): DictionaryValue<Publis
 export type PublishPublicFromVault = {
     $$type: 'PublishPublicFromVault';
     bounce_id: bigint;
+    bounce_tag: bigint;
     publish_id: bigint;
     marketing_note: bigint;
     author_wallet: Address;
@@ -837,6 +844,7 @@ export function storePublishPublicFromVault(src: PublishPublicFromVault) {
         const b_0 = builder;
         b_0.storeUint(2351593143, 32);
         b_0.storeUint(src.bounce_id, 64);
+        b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
         b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
@@ -854,6 +862,7 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2351593143) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
+    const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
     const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
@@ -863,11 +872,12 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const _header = sc_1.loadRef();
     const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
@@ -876,11 +886,12 @@ export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _header = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
+    const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
@@ -889,12 +900,13 @@ export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _header = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
+    builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
     builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
@@ -1796,7 +1808,7 @@ function initCapsuleHub_init_args(src: CapsuleHub_init_args) {
 }
 
 async function CapsuleHub_init(fee_accumulator_address: Address, vault_address: Address, vault_bound: boolean, sealed: boolean, deployment_manifest_hash: bigint, genesis_controller_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241022e01000b2c000114ff00f4a413f4bcf2c80b01020162022302f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e26fa40fa40d200d200d3ffd401d0fa40d33fd33fd37ff404f40430106b106a1069106810676c1b8e21fa40fa40d200d200810101d700d401d0fa4030161514433006d155047053006d6de20ce302702bd74920c21f95310bd31f0cde21030501380a8020d7217021d749c21f9430d31f01de8210ff775609bae3025f0c0401ccd37f0131109a108910781067105610451034413bdb3c813393f8422cc705f2f48133942cc200f2f4502ba0109a1089107810671056104510344013c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed542004f8821090e2e0cbba8f675b0ad3fffa403050bcdb3cdb3c3981326e08b318f2f481326f2ac300f2f481327025c00092357f93515abae215f2f4107910787f0810570610354403c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed54e02182103a12d1adbae302210708060902cc5b0ad3ff30109a108910781067105610451034413bdb3cdb3c378132782bc300f2f4258132790cba1bf2f481327a27f2f41089107810677f075505c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed540708000e81326528b3f2f40014813282f84227c705f2f404c28210a4f862c0bae3022182108c2a76b7bae3022182107a861031bae3023c2082105331b880ba8e31303a108a5517c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed54e0c0000bc1211bb00a181f2203fe5b0ad33f31d3ffd307d307d3ffd3ffd430d0d3ffd4d4d4d37f300a11120a0911110908111008107f106e105d104c103b02111202011113011114db3c8133f4f8422bc705f2f48133f525843fb9f2f48133f65612c300f2f455908133f70b56115611db3c1cf2f48133f82fc300f2f48133f92ec300f2f48133fa2dc300f2f4200b0c003821c0019320c0019170e2925b7fe001c00292c002923070e2917fe07004b4550972810460718133ff2f0456134434813400db3c718100f07081340156160456124434813402db3c547a98547a98547a9853a90a11150a0911140908111308071112070611110605111005104f103e4dcb561bdb3c55a0561c11110d0e000ec002928012e0790436db3c55a0561ddb3c6cb181340356170456114434813404db3c56100f1011120014c002938145a0e08123a0000ec002928011e07800c88e5d26f9005006baf2f45473fe561056105610561056105610561056105610ed41ed43ed44ed45ed47945b0bf2f0ed67ed65ed64ed63ed61800c7fed118e175142f9415024ba5240f2f401ba5220f2f458baf2f45590ed41edf101f2ff550980127fdb3804f4db3c8133fb21c200f2f456158133fd02bbf2f42455a05611db3c561601a082080f4240a082083d0900a08209c9c380a08133fef8416f24135f0358bef2f42b5613561156115611db3c810101f8232e5193095617519f0908111808071117070611160605111505041114040311130302111a0201111b011114c813141516002a20c001963082084c4b40e0c002958208989680e070001cc0029582083d0900e082082dc6c00040c813cbffcbffcbffc9c88210d119020101cb1f2dcf1612cbff12cb3fccc9f90002cc55c0db3cc94c905260206e953059f45a30944133f415e20ca4506ea08209c9c3807050c5710ac855208210874e576a5004cb1f12cbffcb3fcbffc92204103c45994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00104a10791028106710364005171e004c50cdcb3f1acbff18cbff16ce14cb0712cb0701c8cbff12cbff12cbff12cc12cc12cc12cb1fcd02fc5b0ad33f31d3ffd397fa40d430d0d3ffd3ffd4d4d37f300a11100a109f108e107d106c105b04111004103f102e011111011112db3c813458f8422bc705f2f481345924843fb9f2f481345a2ec300f2f481345f0d828873656e742076696120506c6174686f2e417070ba1df2f48134625610c300f2f481345b2fc300f2f4201904fc550a8134638134642f02561202db3c813460813461561202561102db3c81345d561282084c4b40bbf2f423561282082dc6c0a082080f4240a082080f4240a08209c9c380a081345ef8416f24135f0358bef2f455a0547bdc56135613db3c810101f8232e51630656120605111205041116040311150302111402011117011a1b1c1d00d68e6723f9005003baf2f45470cb547dcb547dcb547dcbed41ed43ed44ed45ed47945b0bf2f0ed67ed65ed64ed63ed61800c7fed118e2a0171f94102c1025230f2f420c2005230f2f420810240bb5230f2f4a93802c0005220f2f4c101f2f45590ed41edf101f2ff5509db0f00c08e5c23f9005003baf2f45470cb547dcb547dcb547dcbed41ed43ed44ed45ed47945b0bf2f0ed67ed65ed64ed63ed61800c7fed118e1f0179f94102c10a5230f2f420c2005230f2f4830cbb5220f2f4c109f2f45590ed41edf101f2ff5509db0f0042c85003cf16cbffcbffc9c88210d119020201cb1f2dcf1612cbff12cb3fccc9f90001f81115c855805089cb3f16cbff14cbff12ce01c8cbff12cbff12cc12cc12cb1fcdc94de05290206e953059f45a30944133f415e20ca450aea08209c9c3807050a8710ac855208210874e576a5004cb1f12cbffcb3fcbffc92504103a48994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004a985e2410231e0056c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed5402fc5b0ad37f30109a108910781067105610451034413bdb3c8133902cc200f2f481339153c3bbf2f48133952c82084c4b40be917f9353c3bae2f2f4813392f8416f24135f0382083d0900bef2f4512ba12b82081e8480a07f710ec8018210ff77560958cb1fcb7fc92d0450ff4343c8cf8580ca00cf8440ce01fa02806acf402021000c81326428f2f40082f400c901fb00109a1089107810671056104510344300c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed5400788e348136aff2f0108a5517c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed54e05f0bf2c0820201202429020120252701b5b8090ed44d0d200018e26fa40fa40d200d200d3ffd401d0fa40d33fd33fd37ff404f40430106b106a1069106810676c1b8e21fa40fa40d200d200810101d700d401d0fa4030161514433006d155047053006d6de2550adb3c6cba826029e218101012259f40d6fa192306ddf206e92306d8e21d0d33fd3ffd3fffa40d401d0d3ffd3ffd4d4d31f3010591058105710566c196f09e2206e8f0d30707020f82853118888221089e0316f297f55802d2d01b1b93aded44d0d200018e26fa40fa40d200d200d3ffd401d0fa40d33fd33fd37ff404f40430106b106a1069106810676c1b8e21fa40fa40d200d200810101d700d401d0fa4030161514433006d155047053006d6de2db3c6cb98280016547786547765561056102d01cbbc630f6a268690000c7137d207d206900690069ffea00e87d20699fe99fe9bffa027a021808358835083488340833b60dc710fd207d2069006900408080eb806a00e87d20180b0a8a21980368aa8238298036b6f12a856d9e1f1f1f1f1f1f1f1f1f1f1f2ad142a024e228101012259f40d6fa192306ddf206e92306d8e87d0db3c6c1d6f0de2206ee302316f2d7f55c02b2c004ed33fd3ffd3fffa40d307d307d401d0d3ffd3ffd3ffd4d4d4d31f30107d107c107b107a10791078032230707020f82854711153008888882310cd2d2d2d0000f0e98997');
+    const __code = Cell.fromHex('b5ee9c7241022f01000b5f000114ff00f4a413f4bcf2c80b01020162022402f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e26fa40fa40d200d200d3ffd401d0fa40d33fd33fd37ff404f40430106b106a1069106810676c1b8e21fa40fa40d200d200810101d700d401d0fa4030161514433006d155047053006d6de20ce302702bd74920c21f95310bd31f0cde21030501380a8020d7217021d749c21f9430d31f01de8210ff775609bae3025f0c0401ccd37f0131109a108910781067105610451034413bdb3c813393f8422cc705f2f48133942cc200f2f4502ba0109a1089107810671056104510344013c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed542104f8821090e2e0cbba8f675b0ad3fffa403050bcdb3cdb3c3981326e08b318f2f481326f2ac300f2f481327025c00092357f93515abae215f2f4107910787f0810570610354403c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed54e02182103a12d1adbae302210708060902cc5b0ad3ff30109a108910781067105610451034413bdb3cdb3c378132782bc300f2f4258132790cba1bf2f481327a27f2f41089107810677f075505c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed540708000e81326528b3f2f40014813282f84227c705f2f404c28210a4f862c0bae3022182108c2a76b7bae3022182107a861031bae3023c2082105331b880ba8e31303a108a5517c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed54e0c0000bc1211bb00a19202303fc5b0ad33f31d39f31d3ffd307d307d3ffd430d0d3ffd3ffd4d4d4d37f300a11120a0911110908111008107f106e105d104c103b02111202011113011114db3c8133f4f8422bc705f2f48133f525843fb9f2f48133f65612c300f2f455908133f70b56115611db3c1cf2f48133f82fc300f2f48133f92ec300f2f48133fa2d210b0c003821c0019320c0019170e2925b7fe001c00292c002923070e2917fe07004bcc300f2f4550972810460718133ff2f0456134434813400db3c718100f07081340156160456124434813402db3c547a98547a98547a9853a90a11150a0911140908111308071112070611110605111005104f103e4dcb561bdb3c55a0561c11110d0e000ec002928012e0790436db3c55a0561ddb3c6cb181340356170456114434813404db3c56100f1011120014c002938145a0e08123a0000ec002928011e07800c88e5d26f9005006baf2f45473fe561056105610561056105610561056105610ed41ed43ed44ed45ed47945b0bf2f0ed67ed65ed64ed63ed61800c7fed118e175142f9415024ba5240f2f401ba5220f2f458baf2f45590ed41edf101f2ff550980127fdb3804f4db3c8133fb21c200f2f456158133fd02bbf2f42455a05611db3c561601a082080f4240a082083d0900a08209c9c380a08133fef8416f24135f0358bef2f42b5613561156115611db3c810101f8232e5193095617519f0908111808071117070611160605111505041114040311130302111a0201111b011114c813141516002a20c001963082084c4b40e0c002958208989680e070001cc0029582083d0900e082082dc6c00040c813cbffcbffcbffc9c88210d119020101cb1f2dcf1612cbff12cb3fccc9f90002cc55c0db3cc94c905260206e953059f45a30944133f415e20ca4506ea08209c9c3807050c5710ac855208210874e576a5004cb1f12cbffcb3fcbffc92204103c45994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00104a107910281067103640051718004c50cdcb3f1acbff18cbff16ce14cb0712cb0701c8cbff12cbff12cbff12cc12cc12cc12cb1fcd0056c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed5402fe5b0ad33f31d39f31d3ffd397fa40d430d0d3ffd3ffd4d4d37f300a11100a109f108e107d106c105b04111004103f102e011111011112db3c813458f8422bc705f2f481345924843fb9f2f481345a2ec300f2f481345f0d828873656e742076696120506c6174686f2e417070ba1df2f48134625610c300f2f481345b2fc300211a04f8f2f4550a8134638134642f02561202db3c813460813461561202561102db3c81345d561282084c4b40bbf2f423561282082dc6c0a082080f4240a082080f4240a08209c9c380a081345ef8416f24135f0358bef2f455a0547bdc56135613db3c810101f8232e516306561206051112050411160403111503021114021b1c1d1e00d68e6723f9005003baf2f45470cb547dcb547dcb547dcbed41ed43ed44ed45ed47945b0bf2f0ed67ed65ed64ed63ed61800c7fed118e2a0171f94102c1025230f2f420c2005230f2f420810240bb5230f2f4a93802c0005220f2f4c101f2f45590ed41edf101f2ff5509db0f00c08e5c23f9005003baf2f45470cb547dcb547dcb547dcbed41ed43ed44ed45ed47945b0bf2f0ed67ed65ed64ed63ed61800c7fed118e1f0179f94102c10a5230f2f420c2005230f2f4830cbb5220f2f4c109f2f45590ed41edf101f2ff5509db0f0042c85003cf16cbffcbffc9c88210d119020201cb1f2dcf1612cbff12cb3fccc9f90001fc011117011115c855805089cb3f16cbff14cbff12ce01c8cbff12cbff12cc12cc12cb1fcdc94de05290206e953059f45a30944133f415e20ca450aea08209c9c3807050a8710ac855208210874e576a5004cb1f12cbffcb3fcbffc92504103a48994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004a985e241f005a1023c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed5402fc5b0ad37f30109a108910781067105610451034413bdb3c8133902cc200f2f481339153c3bbf2f48133952c82084c4b40be917f9353c3bae2f2f4813392f8416f24135f0382083d0900bef2f4512ba12b82081e8480a07f710ec8018210ff77560958cb1fcb7fc92d0450ff4343c8cf8580ca00cf8440ce01fa02806acf402122000c81326428f2f40082f400c901fb00109a1089107810671056104510344300c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed5400788e348136aff2f0108a5517c87f01ca0055a050abce18ce16ca0014ca0012cbff01c8ce12cb3f12cb3f12cb7f12f40012f400cdc9ed54e05f0bf2c082020120252a020120262801b5b8090ed44d0d200018e26fa40fa40d200d200d3ffd401d0fa40d33fd33fd37ff404f40430106b106a1069106810676c1b8e21fa40fa40d200d200810101d700d401d0fa4030161514433006d155047053006d6de2550adb3c6cba827029e218101012259f40d6fa192306ddf206e92306d8e21d0d33fd3ffd3fffa40d401d0d3ffd3ffd4d4d31f3010591058105710566c196f09e2206e8f0d30707020f82853118888221089e0316f297f55802e2e01b1b93aded44d0d200018e26fa40fa40d200d200d3ffd401d0fa40d33fd33fd37ff404f40430106b106a1069106810676c1b8e21fa40fa40d200d200810101d700d401d0fa4030161514433006d155047053006d6de2db3c6cb98290016547786547765561056102d01cbbc630f6a268690000c7137d207d206900690069ffea00e87d20699fe99fe9bffa027a021808358835083488340833b60dc710fd207d2069006900408080eb806a00e87d20180b0a8a21980368aa8238298036b6f12a856d9e1f1f1f1f1f1f1f1f1f1f1f2ad142b024e228101012259f40d6fa192306ddf206e92306d8e87d0db3c6c1d6f0de2206ee302316f2d7f55c02c2d004ed33fd3ffd3fffa40d307d307d401d0d3ffd3ffd3ffd4d4d4d31f30107d107c107b107a10791078032230707020f82854711153008888882310cd2e2e2e0000744ff5e5');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initCapsuleHub_init_args({ $$type: 'CapsuleHub_init_args', fee_accumulator_address, vault_address, vault_bound, sealed, deployment_manifest_hash, genesis_controller_address })(builder);
@@ -1895,8 +1907,8 @@ const CapsuleHub_types: ABIType[] = [
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"BindDeploymentManifest","header":2430787787,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"counterpart_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
-    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushFees","header":2055606321,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"TopUpStorageReserve","header":1395767424,"fields":[]},

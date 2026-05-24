@@ -16,10 +16,10 @@
       "label": "VAULT_PRIVATE_STANDARD",
       "inbound_value_nanotons": "43000000",
       "protocol_fee_delta_nanotons": "5000000",
-      "balance_delta_nanotons": "11358998",
-      "retained_non_fee_nanotons": "6358998",
+      "balance_delta_nanotons": "11356064",
+      "retained_non_fee_nanotons": "6356064",
       "required_storage_reserve_nanotons": "5000000",
-      "retained_margin_nanotons": "1358998",
+      "retained_margin_nanotons": "1356064",
       "tx_count": 2,
       "aborted_count": 0
     },
@@ -27,10 +27,10 @@
       "label": "VAULT_PRIVATE_HYBRID",
       "inbound_value_nanotons": "49000000",
       "protocol_fee_delta_nanotons": "10000000",
-      "balance_delta_nanotons": "17286931",
-      "retained_non_fee_nanotons": "7286931",
+      "balance_delta_nanotons": "17283998",
+      "retained_non_fee_nanotons": "7283998",
       "required_storage_reserve_nanotons": "5000000",
-      "retained_margin_nanotons": "2286931",
+      "retained_margin_nanotons": "2283998",
       "tx_count": 2,
       "aborted_count": 0
     },
@@ -38,13 +38,13 @@
       "label": "VAULT_PUBLIC_STANDARD",
       "inbound_value_nanotons": "40000000",
       "protocol_fee_delta_nanotons": "5000000",
-      "balance_delta_nanotons": "8703731",
-      "retained_non_fee_nanotons": "3703731",
+      "balance_delta_nanotons": "8700798",
+      "retained_non_fee_nanotons": "3700798",
       "required_storage_reserve_nanotons": "2000000",
-      "retained_margin_nanotons": "1703731",
+      "retained_margin_nanotons": "1700798",
       "tx_count": 2,
       "aborted_count": 0
     }
   ],
-  "worst_margin_nanotons": "1358998"
+  "worst_margin_nanotons": "1356064"
 }
