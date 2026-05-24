@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { Address } from '@ton/core';
+import { Address, beginCell } from '@ton/core';
 import { isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
@@ -126,7 +126,7 @@ function isPlaceholder(value: unknown): boolean {
   return v.length === 0 || v.includes('REQUIRED_') || v.includes('required:') || v.includes('EQ...') || v.includes('<');
 }
 
-function isParseableMainnetAddress(value: unknown): boolean {
+function isParseableMainnetAddress(value: unknown): value is string {
   if (typeof value !== 'string' || isPlaceholder(value)) return false;
   try {
     Address.parse(value);
@@ -138,6 +138,10 @@ function isParseableMainnetAddress(value: unknown): boolean {
 
 function sameAddress(a: string, b: string): boolean {
   return Address.parse(a).equals(Address.parse(b));
+}
+
+function addressHashHex(value: string): string {
+  return beginCell().storeAddress(Address.parse(value)).endCell().hash().toString('hex');
 }
 
 function addressWorkchain(value: unknown): number | null {
@@ -190,6 +194,18 @@ function addBasechainAddress(issues: Issue[], code: string, value: unknown, labe
   }
 }
 
+function addAddressHashEq(issues: Issue[], code: string, actualHash: unknown, expectedAddress: unknown, label: string) {
+  if (!isHex64(actualHash)) return;
+  if (!isParseableMainnetAddress(expectedAddress)) {
+    issues.push(issue(`${code}_ADDRESS_INVALID`, `${label} controller address must be a parseable mainnet address.`));
+    return;
+  }
+  const expectedHash = addressHashHex(expectedAddress);
+  if (actualHash.toLowerCase() !== expectedHash) {
+    issues.push(issue(code, `${label} mismatch: expected hash(${expectedAddress}) = ${expectedHash}, got ${actualHash}`));
+  }
+}
+
 function checkBase(
   issues: Issue[],
   manifest: ManifestLike,
@@ -218,6 +234,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       vault: 'REQUIRED_MAINNET_VAULT_ADDRESS',
       vault_official_ath_wallet: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
       market_stability_seller: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
+      market_stability_seller_initial_genesis_controller: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_ADDRESS',
       market_stability_seller_official_ath_wallet: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
       market_stability_reserve_funder: 'REQUIRED_MAINNET_MARKET_STABILITY_RESERVE_FUNDER_ADDRESS',
       market_stability_ton_treasury_receiver: 'REQUIRED_MAINNET_MARKET_STABILITY_TON_TREASURY_RECEIVER_ADDRESS',
@@ -225,6 +242,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       fee_accumulator: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
       fee_accumulator_ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
       buyback_burn: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
+      buyback_burn_initial_genesis_controller: 'REQUIRED_MAINNET_BUYBACKBURN_LAUNCH_CONTROLLER_ADDRESS',
       buyback_burn_official_ath_wallet: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
       username_registry: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
       username_registry_official_ath_wallet: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
@@ -447,6 +465,14 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   }
   if (!isHex64(marketSeller.genesis_config_hash) || /^0{64}$/i.test(marketSeller.genesis_config_hash)) {
     issues.push(issue('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING', 'market_stability_seller.genesis_config_hash must retain the non-zero one-time launch controller hash until post-pool pricing freeze.'));
+  } else {
+    addAddressHashEq(
+      issues,
+      'MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISMATCH',
+      marketSeller.genesis_config_hash,
+      manifest.addresses.market_stability_seller_initial_genesis_controller,
+      'market_stability_seller.genesis_config_hash',
+    );
   }
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_RESERVE_FUNDER_MISMATCH', marketSeller.reserve_funder_address, manifest.addresses.market_stability_reserve_funder, 'market_stability_seller.reserve_funder_address');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MISMATCH', marketSeller.official_ath_wallet_address, manifest.addresses.market_stability_seller_official_ath_wallet, 'market_stability_seller.official_ath_wallet_address');
@@ -500,6 +526,14 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   }
   if (!isHex64(s.buyback_burn.genesis_config_hash) || /^0{64}$/i.test(s.buyback_burn.genesis_config_hash)) {
     issues.push(issue('BUYBACK_LAUNCH_CONTROLLER_HASH_MISSING', 'buyback_burn.genesis_config_hash must retain the non-zero one-time launch controller hash until post-pool route freeze.'));
+  } else {
+    addAddressHashEq(
+      issues,
+      'BUYBACK_LAUNCH_CONTROLLER_HASH_MISMATCH',
+      s.buyback_burn.genesis_config_hash,
+      manifest.addresses.buyback_burn_initial_genesis_controller,
+      'buyback_burn.genesis_config_hash',
+    );
   }
   addAddressEq(issues, 'BUYBACK_FEE_ACCUMULATOR_MISMATCH', s.buyback_burn.fee_accumulator_address, manifest.addresses.fee_accumulator, 'buyback_burn.fee_accumulator_address');
   addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_MISMATCH', s.buyback_burn.official_ath_wallet_address, manifest.addresses.buyback_burn_official_ath_wallet, 'buyback_burn.official_ath_wallet_address');

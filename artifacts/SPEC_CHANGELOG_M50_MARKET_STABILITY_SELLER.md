@@ -28,5 +28,5 @@
 - No DEX route.
 - No oracle read.
 - No admin sale override.
-- No pause, rescue, upgrade, governance, or post-seal pricing mutation.
+- No pause, rescue, upgrade, governance, or post-freeze pricing mutation.
 - No reserve funding or sale before pricing is frozen.

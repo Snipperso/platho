@@ -22,6 +22,7 @@ The seller releases ATH in fifteen `3,000,000 ATH` tranches at x2 through x16 fr
 - Official ATH wallet must equal deterministic `ATHWallet(owner = MarketStabilitySeller, master = ATHMaster)`.
 - Pricing may be frozen before seal or once after seal while reserve, treasury, and sale state are still zero.
 - Seal clears the genesis controller hash only if pricing was already frozen; otherwise the post-pool pricing freeze clears it.
+- Final genesis evidence must prove any retained post-pool launch controller hash matches the manifest controller address.
 
 ## Verification
 

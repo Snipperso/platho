@@ -46,6 +46,7 @@ Before reserve use:
 - the final official ATH/TON pool launch price must be captured;
 - `base_tranche_price_nanotons` must be frozen either before seal or by the one-time post-seal launch controller while seller reserve/sales state is still zero;
 - post-seal pricing freeze must clear the launch controller hash;
+- if the seller is sealed before pricing, final genesis evidence must prove the retained launch controller hash matches the manifest controller address;
 - the seller official ATH wallet must be funded with the 45,000,000 ATH reserve through authenticated ATH notification before sales;
 - the deployed code hash, StateInit hash, official ATH wallet address, reserve funder, treasury receiver, and pricing evidence hash must be archived.
 

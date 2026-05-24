@@ -2,7 +2,7 @@
 // Scope: immutable milestone-gated ATH reserve sales at x2..x16 price floors,
 // official ATH wallet custody, TON treasury due accounting, and bounce/fail recovery.
 // No DEX route, admin sale override, pause, upgrade, governance, rescue, or
-// post-seal pricing behavior is implemented.
+// post-freeze pricing mutation is implemented.
 
 import "./ATHWallet.tact";
 
@@ -390,6 +390,7 @@ contract MarketStabilitySeller {
         throwUnless(23215, msg.amount <= self.currentTrancheRemaining());
         throwUnless(23216, msg.amount <= self.reserve_due_ath);
         throwUnless(23217, self.is_basechain_address(msg.recipient));
+        throwUnless(23219, msg.recipient != myAddress());
 
         let price: Int = self.quoteTonForAmount(msg.amount);
         let requiredValue: Int = price + MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE + MARKET_STABILITY_BUY_EXEC_RESERVE;
