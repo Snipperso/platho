@@ -971,16 +971,16 @@
           "label": "vault_balance_private_publish_to_capsulehub_ack",
           "inbound_value_nanotons": "0",
           "tx_count": 3,
-          "total_fees_nanotons": "5140197",
-          "max_single_tx_fee_nanotons": "3414374",
-          "max_gas_used": "31931",
+          "total_fees_nanotons": "5318064",
+          "max_single_tx_fee_nanotons": "3592241",
+          "max_gas_used": "34599",
           "aborted_count": 1,
           "failed_compute_count": 1,
           "transactions": [
             {
-              "total_fees_nanotons": "3414374",
-              "gas_used": "31931",
-              "gas_fees_nanotons": "2128734",
+              "total_fees_nanotons": "3592241",
+              "gas_used": "34599",
+              "gas_fees_nanotons": "2306601",
               "action_fees_nanotons": "309239",
               "fwd_fees_nanotons": "927734",
               "out_messages": 1,
@@ -1016,16 +1016,16 @@
           "label": "vault_balance_private_publish_to_missing_capsulehub_bounce",
           "inbound_value_nanotons": "0",
           "tx_count": 3,
-          "total_fees_nanotons": "4692663",
-          "max_single_tx_fee_nanotons": "3414374",
-          "max_gas_used": "31931",
+          "total_fees_nanotons": "4870530",
+          "max_single_tx_fee_nanotons": "3592241",
+          "max_gas_used": "34599",
           "aborted_count": 1,
           "failed_compute_count": 0,
           "transactions": [
             {
-              "total_fees_nanotons": "3414374",
-              "gas_used": "31931",
-              "gas_fees_nanotons": "2128734",
+              "total_fees_nanotons": "3592241",
+              "gas_used": "34599",
+              "gas_fees_nanotons": "2306601",
               "action_fees_nanotons": "309239",
               "fwd_fees_nanotons": "927734",
               "out_messages": 1,
@@ -1058,9 +1058,9 @@
           ]
         }
       ],
-      "total_fees_nanotons": "9832860",
-      "max_operation_fee_nanotons": "5140197",
-      "max_gas_used": "31931"
+      "total_fees_nanotons": "10188594",
+      "max_operation_fee_nanotons": "5318064",
+      "max_gas_used": "34599"
     }
   ]
 }
