@@ -11,8 +11,8 @@ M20X implements the Vault-side community activity airdrop:
 - 10 ATH per successfully finalized paid publish;
 - no per-wallet cap;
 - reward credited only after authenticated `CapsuleHubPublishAck` for an existing `PendingPublish`;
-- founder allocation target reduced to 5%;
-- no separate early-user / launch reserve;
+- final M49 allocation has no founder token allocation;
+- market stability reserve is tracked separately from activity rewards and is milestone-gated at x2..x16;
 - official ATH pool launch target: after approximately 15,000,000 ATH has been distributed through activity rewards.
 
 The airdrop is a genesis-backed Vault internal ATH balance credit, not a mint and not synthetic points.
@@ -66,7 +66,7 @@ The one-shot full-suite command was not used as the canonical proof in this sand
 ## Updated hashes
 
 - `VAULT_CODE_HASH=3bb2f05890991151e9bb2dd70a361ed932a24d492e3fbb685c92ff9822b0bfc0`
-- `IMPLEMENTED_SUBSET_MANIFEST_HASH=fb1260abe7b47f5c3cc11297d7da0e3c2fed26221e1d77434be89b4a9e980ffb`
+- `IMPLEMENTED_SUBSET_MANIFEST_HASH=b9f91de2c84c3067184323fd03940e60acfc9a15f760abd6d6240e5bc0c4c451`
 
 Unchanged relevant hashes:
 

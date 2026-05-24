@@ -29,14 +29,37 @@ Final distribution:
 ```text
 Community activity airdrop:      30%
 Liquidity bootstrap:             15%
-Founder allocation:               5%
-Ecosystem growth reserve:        25%
-Protocol treasury reserve:       15%
-Strategic / market operations:   10%
+Treasury / operations:           10%
+Market stability reserve:        45%
+Founder allocation:               0%
 TOTAL:                          100%
 ```
 
-There is no separate early-user / launch reserve. Early users receive ATH through paid protocol usage via the Vault activity airdrop.
+There is no founder token allocation. Early users receive ATH through paid protocol usage via the Vault activity airdrop.
+
+The market stability reserve is `45,000,000 ATH`. It is reserved for gradual market release only after price milestones, not for partnerships, discretionary founder grants, or vague ecosystem spending.
+
+Planned tranche policy:
+
+```text
+x2  initial pool price: 3,000,000 ATH
+x3  initial pool price: 3,000,000 ATH
+x4  initial pool price: 3,000,000 ATH
+x5  initial pool price: 3,000,000 ATH
+x6  initial pool price: 3,000,000 ATH
+x7  initial pool price: 3,000,000 ATH
+x8  initial pool price: 3,000,000 ATH
+x9  initial pool price: 3,000,000 ATH
+x10 initial pool price: 3,000,000 ATH
+x11 initial pool price: 3,000,000 ATH
+x12 initial pool price: 3,000,000 ATH
+x13 initial pool price: 3,000,000 ATH
+x14 initial pool price: 3,000,000 ATH
+x15 initial pool price: 3,000,000 ATH
+x16 initial pool price: 3,000,000 ATH
+```
+
+The automated market-stability seller is a separate immutable contract/release item. Until that contract is deployed and audited, the reserve is an allocation commitment, not an operational on-chain sell mechanism.
 
 ## Activity airdrop allocation
 

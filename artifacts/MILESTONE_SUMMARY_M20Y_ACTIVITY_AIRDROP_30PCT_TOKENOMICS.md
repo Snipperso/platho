@@ -11,8 +11,8 @@ M20Y updates the ATH distribution and Vault activity airdrop allocation:
 - reward remains `10 ATH` per successfully finalized paid publish;
 - maximum rewarded publishes: `3,000,000`;
 - no per-wallet cap;
-- founder allocation target: `5%`;
-- no separate early-user / launch reserve;
+- final allocation: `30%` activity airdrop, `15%` initial liquidity, `10%` treasury / operations, `45%` market stability reserve, `0%` founder allocation;
+- market stability reserve: `45,000,000 ATH` split into fifteen `3,000,000 ATH` tranches at x2..x16 from the initial pool price;
 - official ATH pool launch target: after approximately `15,000,000 ATH` has been distributed through Vault activity rewards.
 
 ## Contract changes
@@ -44,6 +44,10 @@ Updated manifest constant:
 
 ```text
 vault_activity_airdrop_total_atomic = 30000000000000000
+ath_initial_liquidity_allocation_atomic = 15000000000000000
+ath_treasury_operations_allocation_atomic = 10000000000000000
+ath_market_stability_reserve_allocation_atomic = 45000000000000000
+ath_founder_allocation_percent = 0
 ```
 
 Unchanged manifest constants:
@@ -59,6 +63,12 @@ vault_activity_airdrop_per_wallet_cap_atomic = 0
 - Targeted activity-airdrop tests: PASS
 - M16 manifest/conformance test: PASS
 
+## Final tokenomics note
+
+M49 supersedes the earlier M20Y founder/ecosystem/strategic reserve split. There is no founder allocation in the fixed allocation table. Founder/team upside from ATH treasury flow is tied to market-stability tranche execution after price milestones, not a direct token grant.
+
+The market stability reserve is an allocation policy only in this milestone. The automated seller is a separate immutable contract/release item and must be audited before the reserve is operationally used.
+
 ## Remaining blockers
 
 M20Y does not unblock production BuybackBurn.
@@ -72,4 +82,4 @@ Remaining blockers:
 ## Updated hashes
 
 - `VAULT_CODE_HASH=3bb2f05890991151e9bb2dd70a361ed932a24d492e3fbb685c92ff9822b0bfc0`
-- `IMPLEMENTED_SUBSET_MANIFEST_HASH=fb1260abe7b47f5c3cc11297d7da0e3c2fed26221e1d77434be89b4a9e980ffb`
+- `IMPLEMENTED_SUBSET_MANIFEST_HASH=b9f91de2c84c3067184323fd03940e60acfc9a15f760abd6d6240e5bc0c4c451`

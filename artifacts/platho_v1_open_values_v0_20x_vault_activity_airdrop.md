@@ -22,7 +22,7 @@ Community activity airdrop allocation:
 - `30,000,000 ATH`;
 - `30,000,000,000,000,000` atomic units.
 
-This supersedes the older 5% community airdrop candidate and the M20X 15% activity-airdrop draft. The final activity airdrop is 30% of fixed supply. No separate early-user / launch reserve exists: early user distribution is performed exclusively through the Vault activity airdrop. Supply remains fixed. No mint-after-deploy behavior is introduced.
+This supersedes the older 5% community airdrop candidate and the M20X 15% activity-airdrop draft. The final activity airdrop is 30% of fixed supply. Early user distribution is performed through the Vault activity airdrop. Supply remains fixed. No mint-after-deploy behavior is introduced.
 
 
 ## Final token distribution
@@ -30,14 +30,13 @@ This supersedes the older 5% community airdrop candidate and the M20X 15% activi
 ```text
 Community activity airdrop:      30%
 Liquidity bootstrap:             15%
-Founder allocation:               5%
-Ecosystem growth reserve:        25%
-Protocol treasury reserve:       15%
-Strategic / market operations:   10%
+Treasury / operations:           10%
+Market stability reserve:        45%
+Founder allocation:               0%
 TOTAL:                          100%
 ```
 
-There is no separate early-user / launch reserve. Early users receive ATH through paid protocol usage via the Vault activity airdrop.
+M49 fixes the final reserve policy: the `45%` market stability reserve is released only through milestone-gated x2..x16 tranches, and there is no founder token allocation.
 
 Official ATH pool launch target:
 
