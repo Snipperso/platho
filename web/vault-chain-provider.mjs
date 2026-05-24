@@ -48,6 +48,7 @@ function normalizeVaultUserView(user) {
   return {
     ...user,
     current_key_id: currentKeyId,
+    publish_nonce: uintLikeToBigInt(field(user, 'publish_nonce', 'publishNonce') ?? 0n, 'Vault user publish_nonce'),
   };
 }
 

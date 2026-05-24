@@ -1,5 +1,6 @@
-import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, external, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { keyPairFromSeed, sign } from '@ton/crypto';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,7 +25,6 @@ import {
   BindOfficialAthWallet as VaultBindAth,
   SealGenesis as VaultSeal,
   RegisterMessagingKeys,
-  PublishPrivateFromWallet,
 } from '../build/Vault/Vault_Vault';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -492,31 +492,50 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
 }
 
 async function activateVaultWallet(vault: any, user: any, seed: bigint) {
+  const seedByte = Number(seed & 0xffn);
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
   await vault.send(user.getSender(), { value: toNano('0.1') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: seed,
-    sign_pubkey: seed + 1n,
+    sign_pubkey: BigInt(`0x${keyPair.publicKey.toString('hex')}`),
     pq_kem_pubkey_hash: 0n,
     pq_kem_pubkey_len: 0n,
     pq_kem_pubkey: beginCell().endCell(),
     crypto_suite_mask: 1n,
   } as RegisterMessagingKeys);
+  return keyPair;
 }
 
-function walletPublishMessage(clientNonce: bigint, maxCharge: bigint): PublishPrivateFromWallet {
-  return {
-    $$type: 'PublishPrivateFromWallet',
-    client_nonce: clientNonce,
-    max_charge: maxCharge,
-    size_class: SIZE_STANDARD,
-    crypto_suite: SUITE_CLASSICAL,
-    header_0_hash: HEADER0,
-    header_1_hash: HEADER1,
-    body_hash: BODY_HASH,
-    header_0: HEADER0_CELL,
-    header_1: HEADER1_CELL,
-    body: BODY_CELL,
-  };
+async function depositVaultTon(vault: any, user: any, amount: bigint) {
+  await vault.send(user.getSender(), { value: amount + 12_000_000n }, {
+    $$type: 'DepositTon',
+    amount,
+  });
+}
+
+function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: bigint, secretKey: Buffer): Cell {
+  const payload = beginCell()
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(HEADER0, 256)
+    .storeUint(HEADER1, 256)
+    .storeUint(BODY_HASH, 256)
+    .storeRef(HEADER0_CELL)
+    .storeRef(HEADER1_CELL)
+    .storeRef(BODY_CELL)
+    .endCell();
+  const signedPayload = beginCell()
+    .storeAddress(owner)
+    .storeUint(clientNonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  return beginCell()
+    .storeUint(0x7E1F5031, 32)
+    .storeAddress(owner)
+    .storeBuffer(sign(signedPayload.hash(), secretKey))
+    .storeRef(signedPayload)
+    .endCell();
 }
 
 async function vaultScenario(): Promise<M17ScenarioMetric> {
@@ -541,9 +560,14 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as VaultSeal);
   await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as CapsuleSeal);
 
-  await activateVaultWallet(vault, user, 91n);
+  const keyPair = await activateVaultWallet(vault, user, 91n);
   const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-  const publishRes = await vault.send(user.getSender(), { value: maxCharge }, walletPublishMessage(0n, maxCharge));
+  await depositVaultTon(vault, user, maxCharge * 2n);
+  const userState = await vault.getGetUser(user.address);
+  const publishRes = await blockchain.sendMessage(external({
+    to: vault.address,
+    body: signedVaultPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey),
+  }));
 
   // Create stale pending by publishing to missing CapsuleHub, then prune.
   const missingCapsule = fixtureAddress('M17_MISSING_CAPSULEHUB_FOR_PRUNE');
@@ -551,16 +575,21 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   const vault2Address = contractAddress(0, vault2Init);
   await blockchain.setShardAccount(vault2Address, createShardAccount({ address: vault2Address, code: vault2Init.code, data: vault2Init.data, balance: toNano('3'), workchain: vault2Address.workChain }));
   const vault2 = blockchain.openContract(new Vault(vault2Address, vault2Init));
-  await activateVaultWallet(vault2, user, 92n);
+  const keyPair2 = await activateVaultWallet(vault2, user, 92n);
   const maxCharge2 = await vault2.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-  const pendingRes = await vault2.send(user.getSender(), { value: maxCharge2 }, walletPublishMessage(0n, maxCharge2));
+  await depositVaultTon(vault2, user, maxCharge2 * 2n);
+  const userState2 = await vault2.getGetUser(user.address);
+  const pendingRes = await blockchain.sendMessage(external({
+    to: vault2.address,
+    body: signedVaultPublishBody(user.address, userState2.publish_nonce, maxCharge2, keyPair2.secretKey),
+  }));
   const vg = await vault2.getGetGlobal();
   if (vg.pending_publish_count !== 0n) {
     // In current M14 bounce path clears pending immediately, so no stale pending exists here. Keep publish metric only.
   }
-  return scenario('VAULT_WALLET_PUBLISH', [
-    opMetric('wallet_private_publish_to_capsulehub_ack', 0n, publishRes),
-    opMetric('wallet_private_publish_to_missing_capsulehub_bounce', 0n, pendingRes),
+  return scenario('VAULT_BALANCE_PUBLISH', [
+    opMetric('vault_balance_private_publish_to_capsulehub_ack', 0n, publishRes),
+    opMetric('vault_balance_private_publish_to_missing_capsulehub_bounce', 0n, pendingRes),
   ]);
 }
 

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, external, toNano } from '@ton/core';
 import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
+import { keyPairFromSeed, sign } from '@ton/crypto';
 import { createHash } from 'crypto';
 import {
   Vault,
+  DepositTon,
   RegisterMessagingKeys,
-  PublishPrivateFromWallet,
   PrunePendingPublish,
   CapsuleHubPublishAck,
 } from '../build/Vault/Vault_Vault';
@@ -81,42 +82,68 @@ async function setup() {
 }
 
 async function registerKeys(vault: any, user: any) {
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 9));
   await vault.send(user.getSender(), { value: toNano('0.03') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: 1n,
-    sign_pubkey: 2n,
+    sign_pubkey: BigInt('0x' + keyPair.publicKey.toString('hex')),
     pq_kem_pubkey_hash: 0n,
     pq_kem_pubkey_len: 0n,
     pq_kem_pubkey: beginCell().endCell(),
     crypto_suite_mask: 1n,
   } as RegisterMessagingKeys);
+  return keyPair;
 }
 
-async function createPendingPublish(seedNonce: bigint) {
+async function depositTon(vault: any, user: any, amount: bigint) {
+  await vault.send(user.getSender(), { value: amount + 12_000_000n }, {
+    $$type: 'DepositTon',
+    amount,
+  } as DepositTon);
+}
+
+function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+  const payload = beginCell()
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(HEADER0, 256)
+    .storeUint(HEADER1, 256)
+    .storeUint(BODY_HASH, 256)
+    .storeRef(HEADER0_CELL)
+    .storeRef(HEADER1_CELL)
+    .storeRef(BODY_CELL)
+    .endCell();
+  const signedPayload = beginCell()
+    .storeAddress(owner)
+    .storeUint(nonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  return beginCell()
+    .storeUint(0x7E1F5031, 32)
+    .storeAddress(owner)
+    .storeBuffer(sign(signedPayload.hash(), secretKey))
+    .storeRef(signedPayload)
+    .endCell();
+}
+
+async function createPendingPublish() {
   const ctx = await setup();
-  await registerKeys(ctx.vault, ctx.user);
+  const keyPair = await registerKeys(ctx.vault, ctx.user);
   const maxCharge = await ctx.vault.getGetCanonicalPublishCharge(ctx.user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+  await depositTon(ctx.vault, ctx.user, maxCharge * 2n);
   const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
-  await ctx.vault.send(ctx.user.getSender(), { value: maxCharge }, {
-    $$type: 'PublishPrivateFromWallet',
-    client_nonce: seedNonce,
-    max_charge: maxCharge,
-    size_class: SIZE_STANDARD,
-    crypto_suite: SUITE_CLASSICAL,
-    header_0_hash: HEADER0,
-    header_1_hash: HEADER1,
-    body_hash: BODY_HASH,
-    header_0: HEADER0_CELL,
-    header_1: HEADER1_CELL,
-    body: BODY_CELL,
-  } as PublishPrivateFromWallet);
-  const publishId = computePublishId(ctx.user.address, seedNonce, BODY_HASH, KIND_PRIVATE);
+  await ctx.blockchain.sendMessage(external({
+    to: ctx.vault.address,
+    body: signedPrivatePublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey),
+  }));
+  const publishId = computePublishId(ctx.user.address, beforeUser.publish_nonce, BODY_HASH, KIND_PRIVATE);
   return { ...ctx, publishId, maxCharge, beforeUser };
 }
 
 describe('Vault milestone 14: stale PendingPublish prune', () => {
   it('VAULT-M14-01: stale PendingPublish prune keeps tombstone so late ACK refunds and credits airdrop', async () => {
-    const ctx = await createPendingPublish(0n);
+    const ctx = await createPendingPublish();
     const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
     const beforePruneGlobal = await ctx.vault.getGetGlobal();
     expect(beforePruneGlobal.pending_publish_count).toBe(1n);
@@ -155,7 +182,7 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
   });
 
   it('VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending', async () => {
-    const ctx = await createPendingPublish(1n);
+    const ctx = await createPendingPublish();
     const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
     expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(1n);
 
@@ -171,7 +198,7 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
   });
 
   it('VAULT-M14-03: bounced CapsuleHub publish must match the publish bounce tag, not only the 64-bit bounce_id', async () => {
-    const ctx = await createPendingPublish(2n);
+    const ctx = await createPendingPublish();
     const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
     const wrongPublishIdSameBounceSlot = ctx.publishId + (1n << 64n);
     const bounceId = computeBounceId(ctx.publishId);

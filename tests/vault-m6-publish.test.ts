@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, Cell, contractAddress, Dictionary, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, Dictionary, external, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
+import { keyPairFromSeed, sign } from '@ton/crypto';
 import {
   Vault,
   BindDeploymentManifest as VaultBind,
@@ -9,7 +10,6 @@ import {
   SealGenesis as VaultSeal,
   AthTransferNotification,
   RegisterMessagingKeys,
-  PublishPrivateFromWallet,
   storeVault$Data as storeVaultData,
 } from '../build/Vault/Vault_Vault';
 import {
@@ -188,42 +188,74 @@ async function deployBounceVault() {
 }
 
 async function registerKeys(vault: any, user: any) {
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
   await vault.send(user.getSender(), { value: toNano('0.03') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: 1n,
-    sign_pubkey: 2n,
+    sign_pubkey: BigInt('0x' + keyPair.publicKey.toString('hex')),
     pq_kem_pubkey_hash: 0n,
     pq_kem_pubkey_len: 0n,
     pq_kem_pubkey: beginCell().endCell(),
     crypto_suite_mask: 1n,
   } as RegisterMessagingKeys);
+  return keyPair;
 }
 
-async function publishPrivate(vault: any, user: any, nonce: bigint, maxCharge: bigint) {
-  await vault.send(user.getSender(), { value: maxCharge }, {
-    $$type: 'PublishPrivateFromWallet',
-    client_nonce: nonce,
-    max_charge: maxCharge,
-    size_class: SIZE_STANDARD,
-    crypto_suite: SUITE_CLASSICAL,
-    header_0_hash: HEADER0,
-    header_1_hash: HEADER1,
-    body_hash: BODY_HASH,
-    header_0: HEADER0_CELL,
-    header_1: HEADER1_CELL,
-    body: BODY_CELL,
-  } as PublishPrivateFromWallet);
+async function topUpVaultTon(vault: any, user: any, amount: bigint) {
+  await vault.send(user.getSender(), { value: amount + 12_000_000n }, {
+    $$type: 'DepositTon',
+    amount,
+  });
 }
 
-describe('Vault milestone 6: wallet-funded publish orchestration', () => {
-  it('VAULT-M6-01: wallet publish reaches CapsuleHub, receives ACK, and clears PendingPublish', async () => {
-    const { vault, capsule, user } = await deployBoundPair();
+async function publishPrivate(blockchain: Blockchain, vault: any, user: any, maxCharge: bigint) {
+  let userState = await vault.getGetUser(user.address);
+  if (userState.ton_balance < maxCharge) {
+    await topUpVaultTon(vault, user, maxCharge * 2n);
+    userState = await vault.getGetUser(user.address);
+  }
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+  await blockchain.sendMessage(external({
+    to: vault.address,
+    body: signedPrivatePublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey),
+  }));
+}
+
+function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, overrides: { signature?: Buffer; payload?: Cell } = {}): Cell {
+  const payload = beginCell()
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(HEADER0, 256)
+    .storeUint(HEADER1, 256)
+    .storeUint(BODY_HASH, 256)
+    .storeRef(HEADER0_CELL)
+    .storeRef(HEADER1_CELL)
+    .storeRef(BODY_CELL)
+    .endCell();
+  const signedDataCell = beginCell()
+    .storeAddress(owner)
+    .storeUint(nonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  const signature = overrides.signature ?? sign(signedDataCell.hash(), secretKey);
+  return beginCell()
+    .storeUint(0x7E1F5031, 32)
+    .storeAddress(owner)
+    .storeBuffer(signature)
+    .storeRef(signedDataCell)
+    .endCell();
+}
+
+describe('Vault milestone 6: Vault-balance publish orchestration', () => {
+  it('VAULT-M6-01: signed Vault-balance publish reaches CapsuleHub, receives ACK, and clears PendingPublish', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
     await registerKeys(vault, user);
     const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     const beforeUser = await vault.getGetUser(user.address);
     const beforeGlobal = await vault.getGetGlobal();
 
-    await publishPrivate(vault, user, 0n, maxCharge);
+    await publishPrivate(blockchain, vault, user, maxCharge);
 
     const afterUser = await vault.getGetUser(user.address);
     const vg = await vault.getGetGlobal();
@@ -242,12 +274,12 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
     expect(vg.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
   });
 
-  it('VAULT-M6-01B: wallet publish may include a PWA fee surcharge above canonical maxCharge', async () => {
-    const { vault, capsule, user } = await deployBoundPair();
+  it('VAULT-M6-01B: signed Vault-balance publish may include a PWA fee surcharge above canonical maxCharge', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
     await registerKeys(vault, user);
     const canonicalMaxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
 
-    await publishPrivate(vault, user, 0n, canonicalMaxCharge + 2_000_000n);
+    await publishPrivate(blockchain, vault, user, canonicalMaxCharge + 2_000_000n);
 
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
     expect((await capsule.getGetState()).private_latest_id).toBe(1n);
@@ -268,7 +300,7 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
     } as AthTransferNotification);
 
     const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    await publishPrivate(vault, user, 0n, maxCharge);
+    await publishPrivate(blockchain, vault, user, maxCharge);
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(1n);
 
     await capsule.send(deployer.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
@@ -281,13 +313,13 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
   });
 
   it('VAULT-M6-02: bounced CapsuleHub publish clears PendingPublish without activity airdrop', async () => {
-    const { vault, user } = await deployBounceVault();
+    const { blockchain, vault, user } = await deployBounceVault();
     await registerKeys(vault, user);
     const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     const beforeUser = await vault.getGetUser(user.address);
     const beforeGlobal = await vault.getGetGlobal();
 
-    await publishPrivate(vault, user, 0n, maxCharge);
+    await publishPrivate(blockchain, vault, user, maxCharge);
 
     const afterUser = await vault.getGetUser(user.address);
     const vg = await vault.getGetGlobal();
@@ -297,12 +329,59 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
     expect(vg.airdrop_distributed_ath).toBe(beforeGlobal.airdrop_distributed_ath);
   });
 
+  it('VAULT-M6-03: signed Vault-balance publish spends internal TON and refunds ACK value back into Vault balance', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    const deposit = maxCharge * 3n;
+    await vault.send(user.getSender(), { value: deposit + 12_000_000n }, {
+      $$type: 'DepositTon',
+      amount: deposit,
+    });
+
+    const before = await vault.getGetUser(user.address);
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey),
+    }));
+
+    const after = await vault.getGetUser(user.address);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    expect((await capsule.getGetState()).private_latest_id).toBe(1n);
+    expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect(after.ath_balance).toBe(before.ath_balance + AIRDROP_REWARD_PER_MESSAGE);
+    expect(after.ton_balance).toBe(before.ton_balance - maxCharge + 28_000_000n);
+  });
+
+  it('VAULT-M6-04: signed Vault-balance publish rejects replay without debiting internal TON', async () => {
+    const { blockchain, vault, user } = await deployBoundPair();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+    const deposit = maxCharge * 2n;
+    await vault.send(user.getSender(), { value: deposit + 12_000_000n }, {
+      $$type: 'DepositTon',
+      amount: deposit,
+    });
+    const message = signedPrivatePublishBody(user.address, 0n, maxCharge, keyPair.secretKey);
+
+    await blockchain.sendMessage(external({ to: vault.address, body: message }));
+    const afterFirst = await vault.getGetUser(user.address);
+    await expect(blockchain.sendMessage(external({ to: vault.address, body: message }))).rejects.toMatchObject({
+      exitCode: 16453,
+    });
+    const afterReplay = await vault.getGetUser(user.address);
+
+    expect(afterReplay.publish_nonce).toBe(afterFirst.publish_nonce);
+    expect(afterReplay.ton_balance).toBe(afterFirst.ton_balance);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
   it('VAULT-M20X-01: before 15% distribution, activity rewards do not reduce the next message fee', async () => {
-    const { vault, user } = await deployBoundPair();
+    const { blockchain, vault, user } = await deployBoundPair();
     await registerKeys(vault, user);
 
     const maxCharge1 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    await publishPrivate(vault, user, 0n, maxCharge1);
+    await publishPrivate(blockchain, vault, user, maxCharge1);
     let userAfter = await vault.getGetUser(user.address);
     let globalAfter = await vault.getGetGlobal();
     expect(userAfter.ath_balance).toBe(AIRDROP_REWARD_PER_MESSAGE);
@@ -310,7 +389,7 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
 
     const maxCharge2 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     expect(maxCharge2).toBe(maxCharge1);
-    await publishPrivate(vault, user, 1n, maxCharge2);
+    await publishPrivate(blockchain, vault, user, maxCharge2);
     userAfter = await vault.getGetUser(user.address);
     globalAfter = await vault.getGetGlobal();
     expect(userAfter.ath_balance).toBe(AIRDROP_REWARD_PER_MESSAGE * 2n);
@@ -318,13 +397,13 @@ describe('Vault milestone 6: wallet-funded publish orchestration', () => {
   });
 
   it('VAULT-M20X-02: after 15% distribution, activity ATH reduces the canonical message fee', async () => {
-    const { vault, user } = await deployBoundPair({
+    const { blockchain, vault, user } = await deployBoundPair({
       airdropRemaining: AIRDROP_DISCOUNT_UNLOCK_REMAINING,
     });
     await registerKeys(vault, user);
 
     const maxCharge1 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    await publishPrivate(vault, user, 0n, maxCharge1);
+    await publishPrivate(blockchain, vault, user, maxCharge1);
 
     const maxCharge2 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     expect(maxCharge2).toBeLessThan(maxCharge1);
