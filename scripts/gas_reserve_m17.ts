@@ -7,7 +7,7 @@ import * as path from 'path';
 import { ATHWallet, ATHTransferRequest, ATHBurn } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal, PublishPrivateFromVault, PublishPublicFromVault } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { FeeAccumulator, DepositProtocolFee, SplitAccumulated, FlushTreasuryDue, FlushBuybackDue } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+import { FeeAccumulator, DepositProtocolFee, EnableBuybackSplit, SplitAccumulated, FlushTreasuryDue, FlushBuybackDue } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
@@ -329,10 +329,12 @@ async function feeAccumulatorScenario(): Promise<M17ScenarioMetric> {
   const fee = blockchain.openContract(new FeeAccumulator(address, init));
   const amount = toNano('1');
   const depositValue = amount + toNano('0.1');
+  const enableValue = toNano('0.05');
   const splitValue = toNano('0.05');
   const flushTreasuryValue = toNano('0.1');
   const flushBuybackValue = toNano('0.2');
   const depositRes = await fee.send(capsuleHub.getSender(), { value: depositValue }, { $$type: 'DepositProtocolFee', amount } as DepositProtocolFee);
+  const enableRes = await fee.send(treasury.getSender(), { value: enableValue }, { $$type: 'EnableBuybackSplit' } as EnableBuybackSplit);
   const splitRes = await fee.send(capsuleHub.getSender(), { value: splitValue }, { $$type: 'SplitAccumulated' } as SplitAccumulated);
   const treasuryRes = await fee.send(operator.getSender(), { value: flushTreasuryValue }, { $$type: 'FlushTreasuryDue', amount: amount / 2n } as FlushTreasuryDue);
   const buybackRes = await fee.send(operator.getSender(), { value: flushBuybackValue }, { $$type: 'FlushBuybackDue', amount: amount / 2n } as FlushBuybackDue);
@@ -342,6 +344,7 @@ async function feeAccumulatorScenario(): Promise<M17ScenarioMetric> {
   }
   return scenario('FEEACCUMULATOR_SPLIT_FLUSH', [
     opMetric('deposit_protocol_fee', depositValue, depositRes),
+    opMetric('enable_buyback_split', enableValue, enableRes),
     opMetric('split_accumulated', splitValue, splitRes),
     opMetric('flush_treasury_due', flushTreasuryValue, treasuryRes),
     opMetric('flush_buyback_due_bounce', flushBuybackValue, buybackRes),

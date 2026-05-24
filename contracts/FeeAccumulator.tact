@@ -1,7 +1,8 @@
 // Platho v1 FeeAccumulator milestone implementation.
 // Scope: immutable Treasury/BuybackBurn addresses, permissionless protocol fee deposit,
-// exact integer split, treasury due flush, buyback due flush with bounce recovery.
-// No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
+// bootstrap treasury/liquidity reserve split, exact buyback split after one-way enable,
+// treasury due flush, buyback due flush with bounce recovery.
+// No override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 
 const SPLIT_BASE_BPS: Int = 10000;
 const TREASURY_SHARE_BPS: Int = 5000;
@@ -19,6 +20,8 @@ message(0xFF775609) DepositProtocolFee {
 }
 
 message(0x7B24EA03) SplitAccumulated {}
+
+message(0x8D8F2C18) EnableBuybackSplit {}
 
 message(0xDDAB4641) FlushTreasuryDue {
     amount: Int as uint128;
@@ -40,6 +43,7 @@ struct FeeAccumulatorStateView {
     accumulated_ton: Int;
     treasury_due_ton: Int;
     buyback_due_ton: Int;
+    buyback_split_enabled: Bool;
     treasury_receiver_address: Address;
     buyback_burn_address: Address;
 }
@@ -50,6 +54,7 @@ contract FeeAccumulator {
     accumulated_ton: Int as uint128;
     treasury_due_ton: Int as uint128;
     buyback_due_ton: Int as uint128;
+    buyback_split_enabled: Bool;
 
     init(treasury_receiver_address: Address, buyback_burn_address: Address) {
         self.treasury_receiver_address = treasury_receiver_address;
@@ -57,6 +62,7 @@ contract FeeAccumulator {
         self.accumulated_ton = 0;
         self.treasury_due_ton = 0;
         self.buyback_due_ton = 0;
+        self.buyback_split_enabled = false;
     }
 
     receive(msg: DepositProtocolFee) {
@@ -75,12 +81,26 @@ contract FeeAccumulator {
         throwUnless(15011, context().value >= FEEACCUMULATOR_SPLIT_EXEC_RESERVE);
 
         let amount: Int = self.accumulated_ton;
+        if (!self.buyback_split_enabled) {
+            self.accumulated_ton = 0;
+            self.treasury_due_ton += amount;
+            return;
+        }
+
         let treasury_amount: Int = (amount * TREASURY_SHARE_BPS) / SPLIT_BASE_BPS;
         let buyback_amount: Int = amount - treasury_amount;
 
         self.accumulated_ton = 0;
         self.treasury_due_ton += treasury_amount;
         self.buyback_due_ton += buyback_amount;
+    }
+
+    receive(msg: EnableBuybackSplit) {
+        throwUnless(15012, sender() == self.treasury_receiver_address);
+        throwUnless(15013, !self.buyback_split_enabled);
+        throwUnless(15014, context().value >= FEEACCUMULATOR_SPLIT_EXEC_RESERVE);
+
+        self.buyback_split_enabled = true;
     }
 
     receive(msg: FlushTreasuryDue) {
@@ -134,6 +154,7 @@ contract FeeAccumulator {
             accumulated_ton: self.accumulated_ton,
             treasury_due_ton: self.treasury_due_ton,
             buyback_due_ton: self.buyback_due_ton,
+            buyback_split_enabled: self.buyback_split_enabled,
             treasury_receiver_address: self.treasury_receiver_address,
             buyback_burn_address: self.buyback_burn_address
         };

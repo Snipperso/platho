@@ -6,6 +6,7 @@ import { createHash } from 'crypto';
 import {
   FeeAccumulator,
   DepositProtocolFee,
+  EnableBuybackSplit,
   SplitAccumulated,
   FlushTreasuryDue,
   FlushBuybackDue,
@@ -54,6 +55,12 @@ async function depositAndSplit(fee: any, capsuleHub: any, amount: bigint) {
   } as SplitAccumulated);
 }
 
+async function enableBuybackSplit(fee: any, treasury: any) {
+  await fee.send(treasury.getSender(), { value: toNano('0.05') }, {
+    $$type: 'EnableBuybackSplit',
+  } as EnableBuybackSplit);
+}
+
 describe('FeeAccumulator v1 milestone', () => {
   it('FEE-01: accepts permissionless protocol fee deposits and credits exact accounted principal only', async () => {
     const { fee, capsuleHub, attacker } = await setup();
@@ -78,9 +85,36 @@ describe('FeeAccumulator v1 milestone', () => {
     expect((await fee.getGetState()).accumulated_ton).toBe(amount * 2n);
   });
 
-  it('FEE-DUE-01/01A/01B: split is internal only, exact in nanotons, dust goes to buyback', async () => {
+  it('FEE-DUE-01: bootstrap split sends all protocol fees to treasury/liquidity before buyback is enabled', async () => {
     const { fee, capsuleHub } = await setup();
     const amount = 101n;
+
+    await depositAndSplit(fee, capsuleHub, amount);
+
+    const state = await fee.getGetState();
+    expect(state.accumulated_ton).toBe(0n);
+    expect(state.treasury_due_ton).toBe(amount);
+    expect(state.buyback_due_ton).toBe(0n);
+    expect(state.treasury_due_ton + state.buyback_due_ton).toBe(amount);
+    expect(state.buyback_split_enabled).toBe(false);
+  });
+
+  it('FEE-DUE-01B: treasury can enable buyback split once; after that dust goes to buyback', async () => {
+    const { fee, capsuleHub, attacker, treasury } = await setup();
+    const amount = 101n;
+
+    await fee.send(attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'EnableBuybackSplit',
+    } as EnableBuybackSplit);
+    expect((await fee.getGetState()).buyback_split_enabled).toBe(false);
+
+    await enableBuybackSplit(fee, treasury);
+    expect((await fee.getGetState()).buyback_split_enabled).toBe(true);
+
+    await fee.send(treasury.getSender(), { value: toNano('0.05') }, {
+      $$type: 'EnableBuybackSplit',
+    } as EnableBuybackSplit);
+    expect((await fee.getGetState()).buyback_split_enabled).toBe(true);
 
     await depositAndSplit(fee, capsuleHub, amount);
 
@@ -97,7 +131,7 @@ describe('FeeAccumulator v1 milestone', () => {
 
     await depositAndSplit(fee, capsuleHub, amount);
     const beforeTreasuryBalance = (await treasury.getBalance());
-    const treasuryDue = amount / 2n;
+    const treasuryDue = amount;
 
     await fee.send(operator.getSender(), { value: toNano('0.1') }, {
       $$type: 'FlushTreasuryDue',
@@ -107,14 +141,15 @@ describe('FeeAccumulator v1 milestone', () => {
     const state = await fee.getGetState();
     const afterTreasuryBalance = (await treasury.getBalance());
     expect(state.treasury_due_ton).toBe(0n);
-    expect(state.buyback_due_ton).toBe(amount - treasuryDue);
+    expect(state.buyback_due_ton).toBe(0n);
     expect(afterTreasuryBalance).toBeGreaterThan(beforeTreasuryBalance);
   });
 
   it('FEE-DUE-06: M19H buyback flush bounce restores the complete 51.05 TON envelope', async () => {
-    const { fee, capsuleHub, operator } = await setup({ buybackDeployed: false });
+    const { fee, capsuleHub, operator, treasury } = await setup({ buybackDeployed: false });
     const oneEnvelope = BigInt(createFundingEnvelopeProfileM19H().values.feeAccumulatorFlushAmountNanotons);
 
+    await enableBuybackSplit(fee, treasury);
     await depositAndSplit(fee, capsuleHub, oneEnvelope * 2n);
     expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
 
@@ -128,9 +163,10 @@ describe('FeeAccumulator v1 milestone', () => {
   });
 
   it('FEE-DUE-07: M19H buyback flush to deployed receiver debits exactly one complete 51.05 TON envelope', async () => {
-    const { fee, capsuleHub, operator } = await setup({ buybackDeployed: true });
+    const { fee, capsuleHub, operator, treasury } = await setup({ buybackDeployed: true });
     const oneEnvelope = BigInt(createFundingEnvelopeProfileM19H().values.feeAccumulatorFlushAmountNanotons);
 
+    await enableBuybackSplit(fee, treasury);
     await depositAndSplit(fee, capsuleHub, oneEnvelope * 2n);
     expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
 
@@ -144,9 +180,10 @@ describe('FeeAccumulator v1 milestone', () => {
   });
 
   it('FEE-DUE-08/M19H: raw 50 TON buyback offer principal is rejected as an incomplete funding envelope', async () => {
-    const { fee, capsuleHub, operator } = await setup({ buybackDeployed: true });
+    const { fee, capsuleHub, operator, treasury } = await setup({ buybackDeployed: true });
     const oneEnvelope = BigInt(createFundingEnvelopeProfileM19H().values.feeAccumulatorFlushAmountNanotons);
 
+    await enableBuybackSplit(fee, treasury);
     await depositAndSplit(fee, capsuleHub, oneEnvelope * 2n);
     expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
 

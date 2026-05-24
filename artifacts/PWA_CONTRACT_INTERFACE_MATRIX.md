@@ -106,7 +106,7 @@ These are contract-to-contract callbacks, operator flows, or maintenance paths. 
 | `CapsuleHub` | `PublishPrivateFromVault`, `PublishPublicFromVault` | Internal from Vault only; PWA must not call directly. |
 | `CapsuleHub` | `FlushFees` | Operator/keeper, not user PWA. |
 | `CapsuleHub` | `TopUpStorageReserve` | Maintenance only. |
-| `FeeAccumulator` | `DepositProtocolFee`, `SplitAccumulated`, `FlushTreasuryDue`, `FlushBuybackDue`, `TopUpStorageReserve` | Protocol/keeper/operator. Not normal PWA. |
+| `FeeAccumulator` | `DepositProtocolFee`, `SplitAccumulated`, `EnableBuybackSplit`, `FlushTreasuryDue`, `FlushBuybackDue`, `TopUpStorageReserve` | Protocol/keeper/operator. Not normal PWA. `EnableBuybackSplit` is the one-way 15% distribution / pool-launch gate. |
 | `BuybackBurn` | `Bind*`, `FreezeBuybackRoute`, `SealBuybackBurnGenesis` | Genesis/operator only. |
 | `BuybackBurn` | `AcceptBurnReserve`, `AthTransferNotification`, `ATHBurnFinalized`, `ATHBurnFailed` | Internal callbacks. |
 | `BuybackBurn` | `ExecuteBuybackChunk`, `RetryAthBurnDue`, `RecoverStonfiRouteRefund`, `RecycleRouteRefundReserve` | Keeper/operator. Could be a separate ops panel, not core messenger PWA. |

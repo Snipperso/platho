@@ -1120,6 +1120,27 @@ Split requires caller-funded execution reserve:
 context.value >= FEEACCUMULATOR_SPLIT_EXEC_RESERVE
 ```
 
+FeeAccumulator starts in bootstrap mode:
+
+```text
+buyback_split_enabled = false
+```
+
+Before the 15% activity-distribution / pool-launch gate is explicitly enabled,
+`SplitAccumulated` moves the full `accumulated_ton` amount into
+`treasury_due_ton`. This makes protocol TON available for liquidity bootstrap /
+treasury and prevents a pre-pool buyback backlog:
+
+```text
+treasury_amount = accumulated_ton
+buyback_amount = 0
+```
+
+`EnableBuybackSplit` is one-way, can only be sent by the immutable
+`treasury_receiver_address`, and requires caller-funded execution reserve.
+
+After `buyback_split_enabled` is true, split uses the normal buyback policy:
+
 ```text
 split_base_bps = 10_000
 treasury_amount = floor(accumulated_ton * TREASURY_SHARE_BPS / split_base_bps)

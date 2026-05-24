@@ -6,6 +6,7 @@ import { createHash } from 'crypto';
 import {
   FeeAccumulator,
   DepositProtocolFee,
+  EnableBuybackSplit,
   SplitAccumulated,
   FlushTreasuryDue,
   FlushBuybackDue,
@@ -70,6 +71,12 @@ async function depositAndSplit(fee: any, donor: any, amount: bigint) {
   await fee.send(donor.getSender(), { value: SPLIT_EXEC_RESERVE }, {
     $$type: 'SplitAccumulated',
   } as SplitAccumulated);
+}
+
+async function enableBuybackSplit(fee: any, treasury: any) {
+  await fee.send(treasury.getSender(), { value: SPLIT_EXEC_RESERVE }, {
+    $$type: 'EnableBuybackSplit',
+  } as EnableBuybackSplit);
 }
 
 describe('FeeAccumulator backing and caller-funded execution boundaries', () => {
@@ -145,7 +152,7 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
     await depositAndSplit(fee, donor, MIN_TREASURY_FLUSH_TON * 4n);
 
     const startingTreasuryDue = (await fee.getGetState()).treasury_due_ton;
-    expect(startingTreasuryDue).toBe(MIN_TREASURY_FLUSH_TON * 2n);
+    expect(startingTreasuryDue).toBe(MIN_TREASURY_FLUSH_TON * 4n);
 
     const partialDust = 10_000n;
     const rejectedDust = await fee.send(operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
@@ -168,11 +175,11 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
       to: treasury.address,
       success: true,
     })).toBeDefined();
-    expect((await fee.getGetState()).treasury_due_ton).toBe(MIN_TREASURY_FLUSH_TON);
+    expect((await fee.getGetState()).treasury_due_ton).toBe(MIN_TREASURY_FLUSH_TON * 3n);
 
     const finalDust = 10_000n;
     const second = await setup();
-    await depositAndSplit(second.fee, second.donor, finalDust * 2n);
+    await depositAndSplit(second.fee, second.donor, finalDust);
     expect((await second.fee.getGetState()).treasury_due_ton).toBe(finalDust);
 
     const acceptedFinalDust = await second.fee.send(second.operator.getSender(), { value: FLUSH_EXEC_RESERVE }, {
@@ -189,9 +196,10 @@ describe('FeeAccumulator backing and caller-funded execution boundaries', () => 
   });
 
   it('FEE-BACKING-03: buyback flush requires caller-funded reserve before sending the envelope', async () => {
-    const { fee, donor, operator, buyback } = await setup({ buybackDeployed: false });
+    const { fee, donor, operator, treasury, buyback } = await setup({ buybackDeployed: false });
     const oneEnvelope = BigInt(createFundingEnvelopeProfileM19H().values.feeAccumulatorFlushAmountNanotons);
 
+    await enableBuybackSplit(fee, treasury);
     await depositAndSplit(fee, donor, oneEnvelope * 2n);
     expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
 
