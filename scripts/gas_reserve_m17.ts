@@ -329,24 +329,31 @@ async function feeAccumulatorScenario(): Promise<M17ScenarioMetric> {
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({ address, code: init.code, data: init.data, balance: toNano('2'), workchain: address.workChain }));
   const fee = blockchain.openContract(new FeeAccumulator(address, init));
-  const amount = toNano('1');
-  const depositValue = amount + toNano('0.1');
+  const bootstrapAmount = toNano('1');
+  const buybackEnvelope = 51_050_000_000n;
+  const postEnableAmount = buybackEnvelope * 2n;
+  const bootstrapDepositValue = bootstrapAmount + toNano('0.1');
+  const postEnableDepositValue = postEnableAmount + toNano('0.1');
   const enableValue = toNano('0.05');
   const splitValue = toNano('0.05');
   const flushTreasuryValue = toNano('0.1');
   const flushBuybackValue = toNano('0.2');
-  const depositRes = await fee.send(capsuleHub.getSender(), { value: depositValue }, { $$type: 'DepositProtocolFee', amount } as DepositProtocolFee);
+  const bootstrapDepositRes = await fee.send(capsuleHub.getSender(), { value: bootstrapDepositValue }, { $$type: 'DepositProtocolFee', amount: bootstrapAmount } as DepositProtocolFee);
   const enableRes = await fee.send(treasury.getSender(), { value: enableValue }, { $$type: 'EnableBuybackSplit' } as EnableBuybackSplit);
+  const bootstrapTreasuryRes = await fee.send(operator.getSender(), { value: flushTreasuryValue }, { $$type: 'FlushTreasuryDue', amount: bootstrapAmount } as FlushTreasuryDue);
+  const postEnableDepositRes = await fee.send(capsuleHub.getSender(), { value: postEnableDepositValue }, { $$type: 'DepositProtocolFee', amount: postEnableAmount } as DepositProtocolFee);
   const splitRes = await fee.send(capsuleHub.getSender(), { value: splitValue }, { $$type: 'SplitAccumulated' } as SplitAccumulated);
-  const treasuryRes = await fee.send(operator.getSender(), { value: flushTreasuryValue }, { $$type: 'FlushTreasuryDue', amount: amount / 2n } as FlushTreasuryDue);
-  const buybackRes = await fee.send(operator.getSender(), { value: flushBuybackValue }, { $$type: 'FlushBuybackDue', amount: amount / 2n } as FlushBuybackDue);
+  const treasuryRes = await fee.send(operator.getSender(), { value: flushTreasuryValue }, { $$type: 'FlushTreasuryDue', amount: buybackEnvelope } as FlushTreasuryDue);
+  const buybackRes = await fee.send(operator.getSender(), { value: flushBuybackValue }, { $$type: 'FlushBuybackDue', amount: buybackEnvelope } as FlushBuybackDue);
   const state = await fee.getGetState();
-  if (state.treasury_due_ton !== 0n || state.buyback_due_ton !== amount / 2n) {
+  if (state.treasury_due_ton !== 0n || state.buyback_due_ton !== buybackEnvelope) {
     throw new Error('FeeAccumulator scenario did not preserve expected due state after buyback bounce');
   }
   return scenario('FEEACCUMULATOR_SPLIT_FLUSH', [
-    opMetric('deposit_protocol_fee', depositValue, depositRes),
+    opMetric('deposit_bootstrap_protocol_fee', bootstrapDepositValue, bootstrapDepositRes),
     opMetric('enable_buyback_split', enableValue, enableRes),
+    opMetric('flush_bootstrap_treasury_due', flushTreasuryValue, bootstrapTreasuryRes),
+    opMetric('deposit_post_enable_protocol_fee', postEnableDepositValue, postEnableDepositRes),
     opMetric('split_accumulated', splitValue, splitRes),
     opMetric('flush_treasury_due', flushTreasuryValue, treasuryRes),
     opMetric('flush_buyback_due_bounce', flushBuybackValue, buybackRes),

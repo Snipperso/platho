@@ -10,6 +10,7 @@
   - Callable only by the immutable `treasury_receiver_address`.
   - One-way: after it succeeds, it cannot be called again.
   - Requires caller-funded execution reserve.
+  - Sweeps any already accumulated bootstrap fees into `treasury_due_ton` before setting `buyback_split_enabled = true`.
 - After `EnableBuybackSplit`, `SplitAccumulated` returns to the existing 50/50 policy:
   - `treasury_due_ton += floor(amount * 5000 / 10000)`
   - `buyback_due_ton += amount - treasury_amount`
@@ -21,6 +22,8 @@ The official ATH pool is planned after approximately `15,000,000 ATH` has been d
 Before that point, protocol TON should be available for liquidity bootstrap / treasury instead of accumulating as a buyback backlog.
 
 This is enforced in contract state, not only by keeper policy. A permissionless `SplitAccumulated` before the pool-launch gate cannot put TON into `buyback_due_ton`.
+
+If protocol fees were deposited but not split before the one-way enable action, `EnableBuybackSplit` itself moves that pre-enable `accumulated_ton` into `treasury_due_ton`. Only fees deposited after the enable action can enter the post-pool 50/50 split.
 
 ## Release Gate
 

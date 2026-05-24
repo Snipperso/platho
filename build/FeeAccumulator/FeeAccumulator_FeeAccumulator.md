@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: FeeAccumulator
-BoC Size: 899 bytes
+BoC Size: 910 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 19

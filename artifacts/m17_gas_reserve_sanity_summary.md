@@ -9,7 +9,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 | ATH_TRANSFER_SUCCESS | 1 | 2812499 | 2812499 | 11621 |
 | ATH_BURN_SUCCESS | 1 | 1366069 | 1366069 | 7950 |
 | CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
-| FEEACCUMULATOR_SPLIT_FLUSH | 5 | 2554096 | 649713 | 5041 |
+| FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
 | USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 24347951 | 5071077 | 38299 |
 | VAULT_WALLET_PUBLISH | 2 | 10135120 | 5291327 | 31111 |
 
@@ -39,11 +39,13 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| deposit_protocol_fee | 2 | 468424 | 270823 | 2964 | 0 | 0 |
-| enable_buyback_split | 2 | 475623 | 262289 | 3200 | 0 | 0 |
+| deposit_bootstrap_protocol_fee | 2 | 468424 | 270823 | 2964 | 0 | 0 |
+| enable_buyback_split | 2 | 486090 | 262289 | 3357 | 0 | 0 |
+| flush_bootstrap_treasury_due | 3 | 649713 | 358289 | 5041 | 0 | 0 |
+| deposit_post_enable_protocol_fee | 2 | 470424 | 271356 | 2986 | 0 | 0 |
 | split_accumulated | 2 | 482757 | 262289 | 3307 | 0 | 0 |
 | flush_treasury_due | 3 | 649713 | 358289 | 5041 | 0 | 0 |
-| flush_buyback_due_bounce | 3 | 477579 | 270823 | 2459 | 1 | 1 |
+| flush_buyback_due_bounce | 4 | 907445 | 421400 | 5901 | 1 | 0 |
 
 ### USERNAME_REGISTRY_MINT_FLUSH_PRUNE
 

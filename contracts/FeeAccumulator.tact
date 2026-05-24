@@ -100,6 +100,10 @@ contract FeeAccumulator {
         throwUnless(15013, !self.buyback_split_enabled);
         throwUnless(15014, context().value >= FEEACCUMULATOR_SPLIT_EXEC_RESERVE);
 
+        if (self.accumulated_ton > 0) {
+            self.treasury_due_ton += self.accumulated_ton;
+            self.accumulated_ton = 0;
+        }
         self.buyback_split_enabled = true;
     }
 
