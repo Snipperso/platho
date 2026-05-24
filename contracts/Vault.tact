@@ -51,6 +51,7 @@ const PLATO_PUBLIC_POST_FEE_TON: Int = 5000000;
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
 const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 30000000000000000;
+const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH: Int = 15000000000000000;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE: Int = 6000000;
 const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 2000000;
@@ -420,6 +421,12 @@ contract Vault {
 
 
     fun discountedFee(owner: Address, fullFee: Int): Int {
+        if (!self.sealed) {
+            return fullFee;
+        }
+        if (self.genesis_config_hash > VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH) {
+            return fullFee;
+        }
         let user: UserState = self.getUserOrEmpty(owner);
         if (user.ath_balance >= ATH_FULL_DISCOUNT_AMOUNT) {
             return 0;

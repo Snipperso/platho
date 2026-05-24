@@ -72,7 +72,8 @@ PWA message pricing is per capsule. `classical-v1` has a base price of `0.010 TO
 `0.020 TON`. Both include `0.005 TON` of estimated network cost. If the PWA's conservative fee estimate is higher, it
 adds `ceil((estimate - 0.005 TON) / 0.001 TON) * 0.001 TON` as a surcharge. Contract calls still start from their
 canonical required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct
-user publish ABI in final v1; every publish is Vault -> CapsuleHub so ATH discounts apply.
+user publish ABI in final v1; every publish is Vault -> CapsuleHub. ATH discounts apply only after the Vault activity
+airdrop has distributed 15,000,000 ATH; before that gate, message protocol fees use the full fee.
 
 Public posts and comments are a separate open profile, not private capsules without encryption. They store a compact
 `PPH1` public header cell plus a raw public body cell. Public body text is `1..1024` UTF-8 bytes for both posts and

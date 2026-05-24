@@ -4,7 +4,7 @@
 
 - Added final-genesis blocker requiring the official Vault ATH wallet to be funded with the full activity airdrop allocation before final genesis readiness.
 - Added tests asserting the 30% airdrop constants and the funding blocker are present in the implemented-subset manifest.
-- Strengthened Vault publish tests to assert that airdropped ATH reduces the next canonical message fee through the existing ATH discount curve.
+- Strengthened Vault publish tests around the ATH discount curve. This is superseded by M21C: airdropped ATH reduces message fees only after the 15% activity-distribution / pool-launch gate.
 - Strengthened stale PendingPublish prune tests to assert no airdrop credit occurs on prune or late ACK after prune.
 
 ## Changed

@@ -596,7 +596,7 @@ Message Budget
 messaging key records
 Vault external session publish
 ReceiveIntent
-ATH discount calculation
+ATH discount calculation after the 15% activity-distribution / pool-launch gate
 ```
 
 Vault does not parse private payload semantics or know private recipient.
@@ -840,7 +840,14 @@ no PLATO fee
 
 ### 6.10 Max Charge
 
-Max charge uses current ATH discount:
+Max charge uses current ATH discount only after the activity-distribution gate:
+
+```text
+message_discount_unlocked = airdrop_remaining_ath <= 15_000_000 ATH
+```
+
+Before this condition is true, `discounted_fee(owner, full_fee) = full_fee`
+for public and private message publishes.
 
 ```text
 MAX_CHARGE_PRIVATE_STANDARD(owner_wallet)

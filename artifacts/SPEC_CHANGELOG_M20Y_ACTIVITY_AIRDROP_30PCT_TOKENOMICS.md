@@ -23,7 +23,7 @@ TOTAL:                          100%
 
 - Official ATH pool launch target: after approximately `15,000,000 ATH` has been distributed through Vault activity rewards.
 - Explicit rationale: the airdrop is paid-usage activity mining / rebate, not a free claim campaign.
-- Explicit pre-pool utility: earned ATH may be used for fee discounts and username purchases before official pool launch.
+- Explicit pre-pool utility: earned ATH may be used for username purchases before official pool launch. Message fee discounts stay locked until the 15% activity-distribution / pool-launch gate.
 - FeeAccumulator bootstrap policy: before the 15% activity distribution / pool-launch gate, protocol TON splits 100% to liquidity bootstrap / treasury; buyback split is enabled later through the one-way `EnableBuybackSplit` gate.
 
 ## Unchanged
