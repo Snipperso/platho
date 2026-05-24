@@ -697,6 +697,47 @@ export function dictValueParserSplitAccumulated(): DictionaryValue<SplitAccumula
     }
 }
 
+export type EnableBuybackSplit = {
+    $$type: 'EnableBuybackSplit';
+}
+
+export function storeEnableBuybackSplit(src: EnableBuybackSplit) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2374970392, 32);
+    };
+}
+
+export function loadEnableBuybackSplit(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2374970392) { throw Error('Invalid prefix'); }
+    return { $$type: 'EnableBuybackSplit' as const };
+}
+
+export function loadTupleEnableBuybackSplit(source: TupleReader) {
+    return { $$type: 'EnableBuybackSplit' as const };
+}
+
+export function loadGetterTupleEnableBuybackSplit(source: TupleReader) {
+    return { $$type: 'EnableBuybackSplit' as const };
+}
+
+export function storeTupleEnableBuybackSplit(source: EnableBuybackSplit) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserEnableBuybackSplit(): DictionaryValue<EnableBuybackSplit> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeEnableBuybackSplit(src)).endCell());
+        },
+        parse: (src) => {
+            return loadEnableBuybackSplit(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type FlushTreasuryDue = {
     $$type: 'FlushTreasuryDue';
     amount: bigint;
@@ -884,6 +925,7 @@ export type FeeAccumulatorStateView = {
     accumulated_ton: bigint;
     treasury_due_ton: bigint;
     buyback_due_ton: bigint;
+    buyback_split_enabled: boolean;
     treasury_receiver_address: Address;
     buyback_burn_address: Address;
 }
@@ -894,6 +936,7 @@ export function storeFeeAccumulatorStateView(src: FeeAccumulatorStateView) {
         b_0.storeInt(src.accumulated_ton, 257);
         b_0.storeInt(src.treasury_due_ton, 257);
         b_0.storeInt(src.buyback_due_ton, 257);
+        b_0.storeBit(src.buyback_split_enabled);
         const b_1 = new Builder();
         b_1.storeAddress(src.treasury_receiver_address);
         b_1.storeAddress(src.buyback_burn_address);
@@ -906,28 +949,31 @@ export function loadFeeAccumulatorStateView(slice: Slice) {
     const _accumulated_ton = sc_0.loadIntBig(257);
     const _treasury_due_ton = sc_0.loadIntBig(257);
     const _buyback_due_ton = sc_0.loadIntBig(257);
+    const _buyback_split_enabled = sc_0.loadBit();
     const sc_1 = sc_0.loadRef().beginParse();
     const _treasury_receiver_address = sc_1.loadAddress();
     const _buyback_burn_address = sc_1.loadAddress();
-    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address };
+    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address };
 }
 
 export function loadTupleFeeAccumulatorStateView(source: TupleReader) {
     const _accumulated_ton = source.readBigNumber();
     const _treasury_due_ton = source.readBigNumber();
     const _buyback_due_ton = source.readBigNumber();
+    const _buyback_split_enabled = source.readBoolean();
     const _treasury_receiver_address = source.readAddress();
     const _buyback_burn_address = source.readAddress();
-    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address };
+    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address };
 }
 
 export function loadGetterTupleFeeAccumulatorStateView(source: TupleReader) {
     const _accumulated_ton = source.readBigNumber();
     const _treasury_due_ton = source.readBigNumber();
     const _buyback_due_ton = source.readBigNumber();
+    const _buyback_split_enabled = source.readBoolean();
     const _treasury_receiver_address = source.readAddress();
     const _buyback_burn_address = source.readAddress();
-    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address };
+    return { $$type: 'FeeAccumulatorStateView' as const, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address };
 }
 
 export function storeTupleFeeAccumulatorStateView(source: FeeAccumulatorStateView) {
@@ -935,6 +981,7 @@ export function storeTupleFeeAccumulatorStateView(source: FeeAccumulatorStateVie
     builder.writeNumber(source.accumulated_ton);
     builder.writeNumber(source.treasury_due_ton);
     builder.writeNumber(source.buyback_due_ton);
+    builder.writeBoolean(source.buyback_split_enabled);
     builder.writeAddress(source.treasury_receiver_address);
     builder.writeAddress(source.buyback_burn_address);
     return builder.build();
@@ -958,6 +1005,7 @@ export type FeeAccumulator$Data = {
     accumulated_ton: bigint;
     treasury_due_ton: bigint;
     buyback_due_ton: bigint;
+    buyback_split_enabled: boolean;
 }
 
 export function storeFeeAccumulator$Data(src: FeeAccumulator$Data) {
@@ -968,6 +1016,7 @@ export function storeFeeAccumulator$Data(src: FeeAccumulator$Data) {
         b_0.storeUint(src.accumulated_ton, 128);
         b_0.storeUint(src.treasury_due_ton, 128);
         b_0.storeUint(src.buyback_due_ton, 128);
+        b_0.storeBit(src.buyback_split_enabled);
     };
 }
 
@@ -978,7 +1027,8 @@ export function loadFeeAccumulator$Data(slice: Slice) {
     const _accumulated_ton = sc_0.loadUintBig(128);
     const _treasury_due_ton = sc_0.loadUintBig(128);
     const _buyback_due_ton = sc_0.loadUintBig(128);
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton };
+    const _buyback_split_enabled = sc_0.loadBit();
+    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled };
 }
 
 export function loadTupleFeeAccumulator$Data(source: TupleReader) {
@@ -987,7 +1037,8 @@ export function loadTupleFeeAccumulator$Data(source: TupleReader) {
     const _accumulated_ton = source.readBigNumber();
     const _treasury_due_ton = source.readBigNumber();
     const _buyback_due_ton = source.readBigNumber();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton };
+    const _buyback_split_enabled = source.readBoolean();
+    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled };
 }
 
 export function loadGetterTupleFeeAccumulator$Data(source: TupleReader) {
@@ -996,7 +1047,8 @@ export function loadGetterTupleFeeAccumulator$Data(source: TupleReader) {
     const _accumulated_ton = source.readBigNumber();
     const _treasury_due_ton = source.readBigNumber();
     const _buyback_due_ton = source.readBigNumber();
-    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton };
+    const _buyback_split_enabled = source.readBoolean();
+    return { $$type: 'FeeAccumulator$Data' as const, treasury_receiver_address: _treasury_receiver_address, buyback_burn_address: _buyback_burn_address, accumulated_ton: _accumulated_ton, treasury_due_ton: _treasury_due_ton, buyback_due_ton: _buyback_due_ton, buyback_split_enabled: _buyback_split_enabled };
 }
 
 export function storeTupleFeeAccumulator$Data(source: FeeAccumulator$Data) {
@@ -1006,6 +1058,7 @@ export function storeTupleFeeAccumulator$Data(source: FeeAccumulator$Data) {
     builder.writeNumber(source.accumulated_ton);
     builder.writeNumber(source.treasury_due_ton);
     builder.writeNumber(source.buyback_due_ton);
+    builder.writeBoolean(source.buyback_split_enabled);
     return builder.build();
 }
 
@@ -1035,7 +1088,7 @@ function initFeeAccumulator_init_args(src: FeeAccumulator_init_args) {
 }
 
 async function FeeAccumulator_init(treasury_receiver_address: Address, buyback_burn_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241020d010002e5000114ff00f4a413f4bcf2c80b01020162020b04ced001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019efa40fa40d37fd37fd37f55406c159bfa40fa405902d101705300e206e3027025d74920c21f953105d31f06de218210ff775609bae3022182107b24ea03bae302218210ddab4641ba030405060098048020d7217021d749c21f9430d31f01de8210594ba505ba8e2fd37f0131813ab8f84224c705f2f4813ab921c200f2f415a04430c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e05f0600725b04d37f30813a9921c200f2f4813a9af8416f24135f032282081e8480a0bef2f4a04034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54008c5b34813aa221c200f2f4813aa3f8416f24135f0382081e8480bef2f420811388a8812710a90466a1047002a05054a04430c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed5401fc8e735b04d37f30813aac21c200f2f4813aad5315bbf2f4813aaf2182084c4b40be917f935315bae2f2f4813aaef8416f24135f0382084c4b40bef2f45144a170544466716d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e0218210b3d2c52dba0703fe8eef5b04d37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75316bbf2f4813abbf8416f24135f0382086acfc0bef2f45155a12582081e8480a07f7108c8018210594ba50558cb1fcb7fc9250450994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004034e03620821087a2d2c7bae302c00008090a002ac87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54003230344034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54005205c12115b08e1c813afbf2f04034c87f01ca0055405045ce12cecb7fcb7fcb7fc9ed54e05f05f2c0820151a0a75bda89a1a400033df481f481a6ffa6ffa6feaa80d82b37f481f480b205a202e0a601c5b678d8ab0c000a54721053763ddeaf4a');
+    const __code = Cell.fromHex('b5ee9c7241020d01000377000114ff00f4a413f4bcf2c80b01020162020b04d6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e10fa40fa40d37fd37fd37fd20055506c169cfa40fa405902d10170530070e207e3027026d74920c21f953106d31f07de218210ff775609bae3022182107b24ea03bae3022182108d8f2c18ba0304050600a0058020d7217021d749c21f9430d31f01de8210594ba505ba8e33d37f0131813ab8f84225c705f2f4813ab921c200f2f415a010354403c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed54e05f07007c5b05d37f30813a9921c200f2f4813a9af8416f24135f032282081e8480a0bef2f412a010354143c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed5400da5b35813aa222c200f2f4813aa3f8416f24135f0382081e8480bef2f4258e1e7002a010355512c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed54e121811388a8812710a9045122a1017003a05055a010354403c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed5403fe8e405b35813aa4f84225c705f2f4813aa506b316f2f4813aa6f8416f24135f0382081e8480bef2f455127fc87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed54e0218210ddab4641bae302218210b3d2c52dbae3023720821087a2d2c7ba8e1d303510355512c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed5407080a00ec5b05d37f30813aac21c200f2f4813aad5312bbf2f4813aaf2182084c4b40be917f935312bae2f2f4813aaef8416f24135f0382084c4b40bef2f466a170544533716d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed5401e25b05d37f30813ab621c200f2f4813aba2182180be2d12e80baf2f4813ab75316bbf2f4813abbf8416f24135f0382086acfc0bef2f45155a12582081e8480a07f7108c8018210594ba50558cb1fcb7fc9260450994343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035551209002ec87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed540060e0c00006c12116b08e20813afbf2f010355512c87f01ca0055505056ce13cecb7fcb7fcb7fca00c9ed54e05f06f2c0820159a0a75bda89a1a400031c21f481f481a6ffa6ffa6ffa400aaa0d82d39f481f480b205a202e0a600e1c5b678d8cd0c000c547321547387567ba8a4');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initFeeAccumulator_init_args({ $$type: 'FeeAccumulator_init_args', treasury_receiver_address, buyback_burn_address })(builder);
@@ -1134,17 +1187,19 @@ const FeeAccumulator_types: ABIType[] = [
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"DepositProtocolFee","header":4286010889,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"SplitAccumulated","header":2066016771,"fields":[]},
+    {"name":"EnableBuybackSplit","header":2374970392,"fields":[]},
     {"name":"FlushTreasuryDue","header":3718989377,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"FlushBuybackDue","header":3016934701,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"TopUpStorageReserve","header":2275594951,"fields":[]},
     {"name":"AcceptBurnReserve","header":1498129669,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"FeeAccumulatorStateView","header":null,"fields":[{"name":"accumulated_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"FeeAccumulator$Data","header":null,"fields":[{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"accumulated_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"FeeAccumulatorStateView","header":null,"fields":[{"name":"accumulated_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"FeeAccumulator$Data","header":null,"fields":[{"name":"treasury_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"buyback_burn_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"accumulated_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_due_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"buyback_split_enabled","type":{"kind":"simple","type":"bool","optional":false}}]},
 ]
 
 const FeeAccumulator_opcodes = {
     "DepositProtocolFee": 4286010889,
     "SplitAccumulated": 2066016771,
+    "EnableBuybackSplit": 2374970392,
     "FlushTreasuryDue": 3718989377,
     "FlushBuybackDue": 3016934701,
     "TopUpStorageReserve": 2275594951,
@@ -1162,6 +1217,7 @@ export const FeeAccumulator_getterMapping: { [key: string]: string } = {
 const FeeAccumulator_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"DepositProtocolFee"}},
     {"receiver":"internal","message":{"kind":"typed","type":"SplitAccumulated"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"EnableBuybackSplit"}},
     {"receiver":"internal","message":{"kind":"typed","type":"FlushTreasuryDue"}},
     {"receiver":"internal","message":{"kind":"typed","type":"FlushBuybackDue"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
@@ -1211,7 +1267,7 @@ export class FeeAccumulator implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | SplitAccumulated | FlushTreasuryDue | FlushBuybackDue | TopUpStorageReserve | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: DepositProtocolFee | SplitAccumulated | EnableBuybackSplit | FlushTreasuryDue | FlushBuybackDue | TopUpStorageReserve | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'DepositProtocolFee') {
@@ -1219,6 +1275,9 @@ export class FeeAccumulator implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'SplitAccumulated') {
             body = beginCell().store(storeSplitAccumulated(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'EnableBuybackSplit') {
+            body = beginCell().store(storeEnableBuybackSplit(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'FlushTreasuryDue') {
             body = beginCell().store(storeFlushTreasuryDue(message)).endCell();

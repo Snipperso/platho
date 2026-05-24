@@ -124,6 +124,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         code_hash: code_hashes.fee_accumulator,
         buyback_burn_address: addresses.buyback_burn,
         ton_treasury_receiver: addresses.fee_accumulator_ton_treasury_receiver,
+        buyback_split_enabled: false,
       },
     },
     evidenceRefs: {
@@ -232,5 +233,15 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_OWNER_MISMATCH');
     expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH');
+  });
+
+  it('rejects final genesis when FeeAccumulator buyback split is already enabled', () => {
+    const input = finalInput();
+    input.snapshot.fee_accumulator.buyback_split_enabled = true;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS');
   });
 });

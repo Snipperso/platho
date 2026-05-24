@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: FeeAccumulator
-BoC Size: 753 bytes
+BoC Size: 899 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 18
+Total structures: 19
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -53,6 +53,10 @@ Signature: `DepositProtocolFee{amount:uint128}`
 TL-B: `split_accumulated#7b24ea03  = SplitAccumulated`
 Signature: `SplitAccumulated{}`
 
+### EnableBuybackSplit
+TL-B: `enable_buyback_split#8d8f2c18  = EnableBuybackSplit`
+Signature: `EnableBuybackSplit{}`
+
 ### FlushTreasuryDue
 TL-B: `flush_treasury_due#ddab4641 amount:uint128 = FlushTreasuryDue`
 Signature: `FlushTreasuryDue{amount:uint128}`
@@ -70,12 +74,12 @@ TL-B: `accept_burn_reserve#594ba505 amount:uint128 = AcceptBurnReserve`
 Signature: `AcceptBurnReserve{amount:uint128}`
 
 ### FeeAccumulatorStateView
-TL-B: `_ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 treasury_receiver_address:address buyback_burn_address:address = FeeAccumulatorStateView`
-Signature: `FeeAccumulatorStateView{accumulated_ton:int257,treasury_due_ton:int257,buyback_due_ton:int257,treasury_receiver_address:address,buyback_burn_address:address}`
+TL-B: `_ accumulated_ton:int257 treasury_due_ton:int257 buyback_due_ton:int257 buyback_split_enabled:bool treasury_receiver_address:address buyback_burn_address:address = FeeAccumulatorStateView`
+Signature: `FeeAccumulatorStateView{accumulated_ton:int257,treasury_due_ton:int257,buyback_due_ton:int257,buyback_split_enabled:bool,treasury_receiver_address:address,buyback_burn_address:address}`
 
 ### FeeAccumulator$Data
-TL-B: `_ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 = FeeAccumulator`
-Signature: `FeeAccumulator{treasury_receiver_address:address,buyback_burn_address:address,accumulated_ton:uint128,treasury_due_ton:uint128,buyback_due_ton:uint128}`
+TL-B: `_ treasury_receiver_address:address buyback_burn_address:address accumulated_ton:uint128 treasury_due_ton:uint128 buyback_due_ton:uint128 buyback_split_enabled:bool = FeeAccumulator`
+Signature: `FeeAccumulator{treasury_receiver_address:address,buyback_burn_address:address,accumulated_ton:uint128,treasury_due_ton:uint128,buyback_due_ton:uint128,buyback_split_enabled:bool}`
 
 ## Get methods
 Total get methods: 1

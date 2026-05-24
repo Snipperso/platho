@@ -4,6 +4,7 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   DepositProtocolFee,
+  EnableBuybackSplit,
   FeeAccumulator,
   FlushBuybackDue,
   SplitAccumulated,
@@ -34,6 +35,7 @@ async function setupFeeAccumulator(buybackAddress: Address) {
     fee: blockchain.openContract(new FeeAccumulator(address, init)),
     capsuleHub,
     operator,
+    treasury,
   };
 }
 
@@ -46,6 +48,12 @@ async function depositAndSplit(fee: any, capsuleHub: any, amount: bigint) {
   await fee.send(capsuleHub.getSender(), { value: toNano('0.05') }, {
     $$type: 'SplitAccumulated',
   } as SplitAccumulated);
+}
+
+async function enableBuybackSplit(fee: any, treasury: any) {
+  await fee.send(treasury.getSender(), { value: toNano('0.05') }, {
+    $$type: 'EnableBuybackSplit',
+  } as EnableBuybackSplit);
 }
 
 describe('M20T scaled BuybackBurn harness profile', () => {
@@ -65,10 +73,11 @@ describe('M20T scaled BuybackBurn harness profile', () => {
 
   it('M20T-SCALED-02: production FeeAccumulator still rejects 0.5105 TON buyback flush', async () => {
     const buyback = fixtureAddress('UNDEPLOYED_BUYBACK');
-    const { fee, capsuleHub, operator } = await setupFeeAccumulator(buyback);
+    const { fee, capsuleHub, operator, treasury } = await setupFeeAccumulator(buyback);
     const profile = createScaledBuybackBurnHarnessM20T();
     const scaledEnvelope = BigInt(profile.values.scaledTotalFundingEnvelopeNanotons);
 
+    await enableBuybackSplit(fee, treasury);
     await depositAndSplit(fee, capsuleHub, scaledEnvelope * 2n);
     expect((await fee.getGetState()).buyback_due_ton).toBe(scaledEnvelope);
 

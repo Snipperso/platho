@@ -102,7 +102,8 @@
       "address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
       "code_hash": "required: current FeeAccumulator code hash",
       "buyback_burn_address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
-      "ton_treasury_receiver": "REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS"
+      "ton_treasury_receiver": "REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS",
+      "buyback_split_enabled": false
     }
   },
   "evidenceRefs": {

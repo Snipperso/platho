@@ -17,6 +17,7 @@ import {
 } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import {
   DepositProtocolFee,
+  EnableBuybackSplit,
   FeeAccumulator,
   FlushBuybackDue,
   SplitAccumulated,
@@ -347,6 +348,10 @@ describe('Production BuybackBurn candidate', () => {
       $$type: 'SealBuybackBurnGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
     } as SealBuybackBurnGenesis);
+
+    await productionFeeAccumulator.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'EnableBuybackSplit',
+    } as EnableBuybackSplit);
 
     const protocolFeePrincipal = ENVELOPE * 2n;
     await productionFeeAccumulator.send(env.operator.getSender(), { value: protocolFeePrincipal + toNano('0.1') }, {

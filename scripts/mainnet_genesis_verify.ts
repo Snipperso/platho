@@ -67,6 +67,7 @@ export interface MainnetGenesisVerifyInput {
     fee_accumulator: BaseSnapshot & {
       buyback_burn_address: string;
       ton_treasury_receiver: string;
+      buyback_split_enabled: boolean;
     };
   };
   evidenceRefs: {
@@ -284,6 +285,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         code_hash: 'required: current FeeAccumulator code hash',
         buyback_burn_address: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
         ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
+        buyback_split_enabled: false,
       },
     },
     evidenceRefs: {
@@ -394,6 +396,9 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   checkBase(issues, manifest, s.fee_accumulator, 'fee_accumulator', 'fee_accumulator', 'fee_accumulator');
   addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
   addAddressEq(issues, 'FEE_ACCUMULATOR_TON_TREASURY_MISMATCH', s.fee_accumulator.ton_treasury_receiver, manifest.addresses.fee_accumulator_ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
+  if (s.fee_accumulator.buyback_split_enabled !== false) {
+    issues.push(issue('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS', 'fee_accumulator.buyback_split_enabled must be false at final genesis; buyback split is enabled only after the 15% activity distribution / pool-launch gate.'));
+  }
 
   for (const [key, value] of Object.entries(input.evidenceRefs ?? {})) {
     if (isPlaceholder(value)) issues.push(issue(`MISSING_EVIDENCE_REF_${key.toUpperCase()}`, `${key} must point to immutable release evidence.`));
