@@ -17,7 +17,7 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: 10d8bec4d28369adb8e4b7f1f8d8b00302be4ad9de236279e9894dcc50ef1c56
+- Hash: 24f9bef3044f203031d0d18224e21684b3b142eefd43e3428d2e9791e8db99ce
 
 ## Remaining final-genesis blockers
 
@@ -30,8 +30,8 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 | Contract | Non-comment lines | receive handlers | bounced handlers | empty fallback rejects | storage top-up receive |
 |---|---:|---:|---:|---|---|
 | ATHMaster.tact | 115 | 3 | 1 | true | false |
-| ATHWallet.tact | 756 | 14 | 8 | true | false |
-| BuybackBurn.tact | 552 | 14 | 2 | true | true |
+| ATHWallet.tact | 898 | 16 | 9 | true | false |
+| BuybackBurn.tact | 565 | 14 | 2 | true | true |
 | CapsuleHub.tact | 498 | 7 | 1 | true | true |
 | FeeAccumulator.tact | 125 | 7 | 1 | true | true |
 | MarketStabilitySeller.tact | 466 | 12 | 1 | true | true |

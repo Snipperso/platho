@@ -23,16 +23,16 @@
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 756,
-      "receive_handlers": 14,
-      "bounced_handlers": 8,
+      "non_comment_lines": 898,
+      "receive_handlers": 16,
+      "bounced_handlers": 9,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
       "storage_top_up_receive": false
     },
     {
       "contract": "BuybackBurn.tact",
-      "non_comment_lines": 552,
+      "non_comment_lines": 565,
       "receive_handlers": 14,
       "bounced_handlers": 2,
       "forbidden_hits": [],
@@ -105,23 +105,23 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "27845e181d072be71583816c19d1da1a033f7820b202ea272cb7fe23718e685d",
-      "pinned": "27845e181d072be71583816c19d1da1a033f7820b202ea272cb7fe23718e685d",
+      "built": "79336e388a0ef7cbd6120ea08ce75d5fde44ff49c775d9c83ae95bbf4fd3e21d",
+      "pinned": "79336e388a0ef7cbd6120ea08ce75d5fde44ff49c775d9c83ae95bbf4fd3e21d",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "3b11e07332222e393ba11eb8c212edb7e48d7f173a4e2e3e0626f600405f6960",
-      "pinned": "3b11e07332222e393ba11eb8c212edb7e48d7f173a4e2e3e0626f600405f6960",
+      "built": "78fb6968c802e73ff8ccaded016e45bc4e193c8b86cd75b77d8cc3896f61d83d",
+      "pinned": "78fb6968c802e73ff8ccaded016e45bc4e193c8b86cd75b77d8cc3896f61d83d",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "1357ea17e3ec7ac92888a80175c8ff8266a96c4ea5234e62306d745ba51bbd30",
-      "pinned": "1357ea17e3ec7ac92888a80175c8ff8266a96c4ea5234e62306d745ba51bbd30",
+      "built": "2ee70c69e954d84b13460da8aed6d986fdbfb61f35c5c4347d023e4491f9e0cc",
+      "pinned": "2ee70c69e954d84b13460da8aed6d986fdbfb61f35c5c4347d023e4491f9e0cc",
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
-      "built": "9d6e349302bcc5bd90759af2005213037b99bee72018d5ffa5096bdabe87e020",
-      "pinned": "9d6e349302bcc5bd90759af2005213037b99bee72018d5ffa5096bdabe87e020",
+      "built": "b0f80fd873688d41bff0f2877784ac48d361d89fae1e13687b6899418c93b460",
+      "pinned": "b0f80fd873688d41bff0f2877784ac48d361d89fae1e13687b6899418c93b460",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -135,8 +135,8 @@
       "match": true
     },
     "PROFILE_REGISTRY_CODE_HASH": {
-      "built": "d4867f6927b4c64e31b59bc7f30a352b21638b294923383b754845c73896b59b",
-      "pinned": "d4867f6927b4c64e31b59bc7f30a352b21638b294923383b754845c73896b59b",
+      "built": "107d8e78a3ba05afab8ad4f7fa144c9544213df69020b0ef9b67919007438eee",
+      "pinned": "107d8e78a3ba05afab8ad4f7fa144c9544213df69020b0ef9b67919007438eee",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -145,13 +145,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "ad1336daba53d1cb358a9fb0efee263be44c2b67e95d8fd70062ec16dd88d845",
-      "pinned": "ad1336daba53d1cb358a9fb0efee263be44c2b67e95d8fd70062ec16dd88d845",
+      "built": "2391daf57ef3db6e8e1fbe24cb8763e83a242c9227b171e0be5cf6e3ccc7eea9",
+      "pinned": "2391daf57ef3db6e8e1fbe24cb8763e83a242c9227b171e0be5cf6e3ccc7eea9",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "20a3ccf353a2bc34bffa9e58dd3bb011380c6fd15fac8a899eb1b40cd054c3f7",
-      "pinned": "20a3ccf353a2bc34bffa9e58dd3bb011380c6fd15fac8a899eb1b40cd054c3f7",
+      "built": "7a01561752f830a8b64d33840d8a06b2b0fb4c84178a074f12991f2f75c755e2",
+      "pinned": "7a01561752f830a8b64d33840d8a06b2b0fb4c84178a074f12991f2f75c755e2",
       "match": true
     }
   },
@@ -159,7 +159,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "10d8bec4d28369adb8e4b7f1f8d8b00302be4ad9de236279e9894dcc50ef1c56",
+    "manifest_hash_hex": "24f9bef3044f203031d0d18224e21684b3b142eefd43e3428d2e9791e8db99ce",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

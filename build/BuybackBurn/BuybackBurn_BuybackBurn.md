@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: BuybackBurn
-BoC Size: 14179 bytes
+BoC Size: 15387 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 51
+Total structures: 55
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -128,6 +128,22 @@ Signature: `ATHTransferAck{query_id:uint64,amount:uint128}`
 ### ATHTransferFailed
 TL-B: `ath_transfer_failed#41544813 query_id:uint64 amount:uint128 = ATHTransferFailed`
 Signature: `ATHTransferFailed{query_id:uint64,amount:uint128}`
+
+### JettonTransfer
+TL-B: `jetton_transfer#0f8a7ea5 query_id:uint64 amount:coins destination:address response_destination:address custom_payload:Maybe ^cell forward_ton_amount:coins forward_payload:remainder<slice> = JettonTransfer`
+Signature: `JettonTransfer{query_id:uint64,amount:coins,destination:address,response_destination:address,custom_payload:Maybe ^cell,forward_ton_amount:coins,forward_payload:remainder<slice>}`
+
+### JettonInternalTransfer
+TL-B: `jetton_internal_transfer#178d4519 query_id:uint64 amount:coins from:address response_address:address forward_ton_amount:coins forward_payload:remainder<slice> = JettonInternalTransfer`
+Signature: `JettonInternalTransfer{query_id:uint64,amount:coins,from:address,response_address:address,forward_ton_amount:coins,forward_payload:remainder<slice>}`
+
+### JettonTransferNotification
+TL-B: `jetton_transfer_notification#7362d09c query_id:uint64 amount:coins sender:address forward_payload:remainder<slice> = JettonTransferNotification`
+Signature: `JettonTransferNotification{query_id:uint64,amount:coins,sender:address,forward_payload:remainder<slice>}`
+
+### JettonExcesses
+TL-B: `jetton_excesses#d53276db query_id:uint64 = JettonExcesses`
+Signature: `JettonExcesses{query_id:uint64}`
 
 ### ATHWalletDataView
 TL-B: `_ balance:int257 owner_address:address ath_master_address:address = ATHWalletDataView`

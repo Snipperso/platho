@@ -6,11 +6,11 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Scenario | Operations | Total fees, nanotons | Max op fee, nanotons | Max gas used |
 |---|---:|---:|---:|---:|
-| ATH_TRANSFER_SUCCESS | 1 | 3681342 | 3681342 | 13847 |
+| ATH_TRANSFER_SUCCESS | 1 | 4046250 | 4046250 | 15007 |
 | ATH_BURN_SUCCESS | 1 | 1371402 | 1371402 | 7950 |
 | CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 26150356 | 5939920 | 38299 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 26956831 | 6304828 | 38299 |
 | VAULT_BALANCE_PUBLISH | 2 | 4819736 | 2409868 | 20939 |
 
 ## Operation details
@@ -19,7 +19,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| owner_to_recipient_wallet | 5 | 3681342 | 2088338 | 13847 | 0 | 0 |
+| owner_to_recipient_wallet | 5 | 4046250 | 2355447 | 15007 | 0 | 0 |
 
 ### ATH_BURN_SUCCESS
 
@@ -51,13 +51,13 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| valid_username_mint_with_item_ack | 5 | 4419822 | 2727509 | 38299 | 2 | 1 |
-| invalid_username_refund_due | 3 | 2075889 | 1763555 | 25668 | 2 | 1 |
-| flush_ath_refund_due | 6 | 5939920 | 2088338 | 22602 | 0 | 0 |
-| flush_treasury_due_ath | 6 | 5651097 | 2103005 | 18134 | 0 | 0 |
+| valid_username_mint_with_item_ack | 5 | 4439689 | 2727509 | 38299 | 2 | 1 |
+| invalid_username_refund_due | 3 | 2095756 | 1763555 | 25668 | 2 | 1 |
+| flush_ath_refund_due | 6 | 6304828 | 2355447 | 22602 | 0 | 0 |
+| flush_treasury_due_ath | 6 | 6016004 | 2370113 | 18134 | 0 | 0 |
 | flush_burn_due_ath | 5 | 3219358 | 1030689 | 14930 | 0 | 0 |
-| stuck_pending_mint_creation_no_ack | 4 | 3181377 | 2727509 | 38299 | 2 | 1 |
-| prune_stale_pending_mint | 2 | 1662893 | 1378499 | 15788 | 0 | 0 |
+| stuck_pending_mint_creation_no_ack | 4 | 3201244 | 2727509 | 38299 | 2 | 1 |
+| prune_stale_pending_mint | 2 | 1679952 | 1395558 | 15788 | 0 | 0 |
 
 ### VAULT_BALANCE_PUBLISH
 
