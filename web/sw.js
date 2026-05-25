@@ -1,4 +1,4 @@
-const CACHE_NAME = 'platho-pwa-prototype-v78';
+const CACHE_NAME = 'platho-pwa-prototype-v79';
 const ASSETS = [
   './',
   './index.html',
@@ -37,6 +37,10 @@ const ASSETS = [
   './assets/icons/refresh.svg',
   './assets/icons/bolt.svg',
   './assets/icons/gear.svg',
+  './assets/icons/info.svg',
+  './docs/about-platho.md',
+  './docs/ath-whitepaper.md',
+  './docs/crypto-protocol.md',
 ];
 
 self.addEventListener('install', (event) => {

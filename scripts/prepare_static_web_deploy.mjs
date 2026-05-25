@@ -125,6 +125,7 @@ export function shouldIncludeWebRuntimeFile(relativePath) {
   if (ROOT_RUNTIME_FILES.has(path)) return true;
   if (first === 'assets') return true;
   if (first === 'channels') return ext === '.json';
+  if (first === 'docs') return ext === '.md';
   if (first === 'crypto') return ext === '.mjs';
   if (first !== 'vendor') return false;
 

@@ -99,6 +99,26 @@ import { createTonDnsProvider } from './ton-dns-provider.mjs';
 import { createUsernameRegistryTonRpcProvider } from './username-ton-rpc-provider.mjs';
 
 const appConfig = PLATHO_APP_CONFIG;
+const APP_DOCS = [
+  {
+    id: 'about',
+    label: 'About',
+    title: 'About Platho',
+    path: './docs/about-platho.md',
+  },
+  {
+    id: 'ath',
+    label: 'ATH',
+    title: 'ATH Whitepaper',
+    path: './docs/ath-whitepaper.md',
+  },
+  {
+    id: 'crypto',
+    label: 'Crypto',
+    title: 'Crypto Protocol',
+    path: './docs/crypto-protocol.md',
+  },
+];
 const basePublicChannelRegistry = appConfig.publicChannels ?? DEFAULT_PUBLIC_CHANNELS;
 const previewThreads = (appConfig.preview?.threads ?? []).map((thread) => ({
   ...thread,
@@ -106,8 +126,15 @@ const previewThreads = (appConfig.preview?.threads ?? []).map((thread) => ({
 }));
 
 const appShell = document.querySelector('.app-shell');
-const railItems = [...document.querySelectorAll('.rail-item')];
+const railItems = [...document.querySelectorAll('.rail-item[data-tab]')];
 const panels = [...document.querySelectorAll('.view-panel')];
+const docsButtons = [...document.querySelectorAll('.docs-header-button')];
+const docsDialog = document.querySelector('#docsDialog');
+const docsCloseButton = document.querySelector('#docsCloseButton');
+const docsTitle = document.querySelector('#docsTitle');
+const docsLead = document.querySelector('#docsLead');
+const docsNav = document.querySelector('#docsNav');
+const docsContent = document.querySelector('#docsContent');
 const threadList = document.querySelector('#threadList');
 const messageStrip = document.querySelector('#messageStrip');
 const activeAvatar = document.querySelector('#activeAvatar');
@@ -162,14 +189,14 @@ const vaultRotateStatus = document.querySelector('#vaultRotateStatus');
 const syncMessagesButton = document.querySelector('#syncMessagesButton');
 const messageSyncStatus = document.querySelector('#messageSyncStatus');
 const publicSyncWindowSelect = document.querySelector('#publicSyncWindowSelect');
-const publicSyncWindowStatus = document.querySelector('#publicSyncWindowStatus');
 const publicCommentsDefaultSelect = document.querySelector('#publicCommentsDefaultSelect');
-const publicCommentsDefaultStatus = document.querySelector('#publicCommentsDefaultStatus');
 const setAvatarButton = document.querySelector('#setAvatarButton');
 const profileAvatarInput = document.querySelector('#profileAvatarInput');
 const mintUsernameButton = document.querySelector('#mintUsernameButton');
 const flushUsernameRefundButton = document.querySelector('#flushUsernameRefundButton');
 const burnAthButton = document.querySelector('#burnAthButton');
+const athSupplyStatus = document.querySelector('#athSupplyStatus');
+const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
 const brandNetworkLabel = document.querySelector('#brandNetworkLabel');
 const chatCountLabel = document.querySelector('#chatCountLabel');
@@ -228,6 +255,8 @@ let publicChannelSubscriptions = null;
 let publicChannelFeedCache = {};
 let publicReadCursors = {};
 let activeThreadId = null;
+let activeDocId = APP_DOCS[0]?.id ?? null;
+const docsCache = new Map();
 let localIdentity = null;
 let localRecipientKeyPair = null;
 let localSignedPublicBundle = null;
@@ -261,6 +290,7 @@ const PROFILE_AVATAR_FALLBACK_SCAN_LIMIT = 400;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 20;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 1500;
 const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
+const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 30_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 15_000_000_000_000_000n;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS = 6_000_000n;
@@ -285,8 +315,11 @@ let vaultPocketState = {
   vault: { ton_balance: null, ath_balance: null },
 };
 let vaultProtocolState = {
-  airdrop_remaining_ath: null,
+  airdrop_remaining_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+};
+let athProtocolState = {
+  total_supply: ATH_TOTAL_SUPPLY_ATOMIC,
 };
 
 function localStorageOrNull() {
@@ -663,6 +696,234 @@ async function openActionDialog(config = {}) {
 function updateActiveActionSummary() {
   if (!activeActionDialog) return;
   renderActionSummary(activeActionDialog.summary, collectActionDialogValues());
+}
+
+function appDocById(id) {
+  return APP_DOCS.find((doc) => doc.id === id) ?? APP_DOCS[0] ?? null;
+}
+
+function renderDocsNav() {
+  if (!docsNav) return;
+  docsNav.replaceChildren();
+  for (const doc of APP_DOCS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.docId = doc.id;
+    button.className = doc.id === activeDocId ? 'is-active' : '';
+    button.setAttribute('aria-pressed', doc.id === activeDocId ? 'true' : 'false');
+    button.textContent = doc.label;
+    docsNav.append(button);
+  }
+}
+
+function setDocsStatus(message, tone = 'muted') {
+  if (!docsContent) return;
+  const status = document.createElement('div');
+  status.className = `docs-status docs-status-${tone}`;
+  status.textContent = message;
+  docsContent.replaceChildren(status);
+}
+
+function closeDocsDialog() {
+  if (docsDialog) docsDialog.hidden = true;
+}
+
+async function openDocsDialog(docId = activeDocId) {
+  if (!docsDialog) return;
+  docsDialog.hidden = false;
+  await selectDoc(docId);
+  requestAnimationFrame(() => docsContent?.focus());
+}
+
+async function selectDoc(docId) {
+  const doc = appDocById(docId);
+  if (!doc || !docsContent) return;
+  activeDocId = doc.id;
+  renderDocsNav();
+  if (docsTitle) docsTitle.textContent = doc.title;
+  if (docsLead) docsLead.textContent = 'Protocol notes and application model.';
+  setDocsStatus('Loading');
+  try {
+    let markdown = docsCache.get(doc.id);
+    if (!markdown) {
+      const response = await fetch(doc.path, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Document fetch failed: ${response.status}`);
+      markdown = await response.text();
+      docsCache.set(doc.id, markdown);
+    }
+    renderMarkdownToNode(markdown, docsContent);
+    docsContent.scrollTop = 0;
+  } catch (error) {
+    console.error(error);
+    setDocsStatus('Document unavailable', 'error');
+  }
+}
+
+function appendInlineMarkdown(parent, text) {
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\(([^)]+)\))/g;
+  let cursor = 0;
+  for (const match of text.matchAll(pattern)) {
+    if (match.index > cursor) {
+      parent.append(document.createTextNode(text.slice(cursor, match.index)));
+    }
+    const token = match[0];
+    if (token.startsWith('`')) {
+      const code = document.createElement('code');
+      code.textContent = token.slice(1, -1);
+      parent.append(code);
+    } else if (token.startsWith('**')) {
+      const strong = document.createElement('strong');
+      strong.textContent = token.slice(2, -2);
+      parent.append(strong);
+    } else {
+      const labelEnd = token.indexOf(']');
+      const href = token.slice(labelEnd + 2, -1);
+      const anchor = document.createElement('a');
+      anchor.textContent = token.slice(1, labelEnd);
+      if (/^(https?:|mailto:)/i.test(href)) {
+        anchor.href = href;
+        anchor.target = '_blank';
+        anchor.rel = 'noreferrer';
+      }
+      parent.append(anchor);
+    }
+    cursor = match.index + token.length;
+  }
+  if (cursor < text.length) {
+    parent.append(document.createTextNode(text.slice(cursor)));
+  }
+}
+
+function isMarkdownTableLine(line) {
+  const trimmed = line.trim();
+  return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.includes('|');
+}
+
+function isMarkdownTableSeparator(line) {
+  if (!isMarkdownTableLine(line)) return false;
+  return line
+    .trim()
+    .replace(/^\||\|$/g, '')
+    .split('|')
+    .every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+}
+
+function markdownTableCells(line) {
+  return line
+    .trim()
+    .replace(/^\||\|$/g, '')
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+function markdownStartsBlock(line, nextLine = '') {
+  const trimmed = line.trim();
+  return !trimmed
+    || trimmed.startsWith('```')
+    || /^#{1,4}\s+/.test(trimmed)
+    || /^[-*]\s+/.test(trimmed)
+    || /^\d+\.\s+/.test(trimmed)
+    || (isMarkdownTableLine(line) && isMarkdownTableSeparator(nextLine));
+}
+
+function renderMarkdownTable(rows) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'docs-table-wrap';
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  for (const cellText of rows[0] ?? []) {
+    const cell = document.createElement('th');
+    appendInlineMarkdown(cell, cellText);
+    headRow.append(cell);
+  }
+  thead.append(headRow);
+  table.append(thead);
+  const tbody = document.createElement('tbody');
+  for (const row of rows.slice(1)) {
+    const tr = document.createElement('tr');
+    for (const cellText of row) {
+      const cell = document.createElement('td');
+      appendInlineMarkdown(cell, cellText);
+      tr.append(cell);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrapper.append(table);
+  return wrapper;
+}
+
+function renderMarkdownToNode(markdown, target) {
+  const root = document.createElement('div');
+  root.className = 'docs-rendered';
+  const lines = String(markdown ?? '').replace(/\r\n/g, '\n').split('\n');
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+    if (trimmed.startsWith('```')) {
+      const codeLines = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.textContent = codeLines.join('\n');
+      pre.append(code);
+      root.append(pre);
+      continue;
+    }
+    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      const level = Math.min(heading[1].length + 1, 5);
+      const node = document.createElement(`h${level}`);
+      appendInlineMarkdown(node, heading[2]);
+      root.append(node);
+      index += 1;
+      continue;
+    }
+    if (isMarkdownTableLine(line) && isMarkdownTableSeparator(lines[index + 1] ?? '')) {
+      const rows = [markdownTableCells(line)];
+      index += 2;
+      while (index < lines.length && isMarkdownTableLine(lines[index])) {
+        rows.push(markdownTableCells(lines[index]));
+        index += 1;
+      }
+      root.append(renderMarkdownTable(rows));
+      continue;
+    }
+    if (/^[-*]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed)) {
+      const ordered = /^\d+\.\s+/.test(trimmed);
+      const list = document.createElement(ordered ? 'ol' : 'ul');
+      const itemPattern = ordered ? /^\d+\.\s+/ : /^[-*]\s+/;
+      while (index < lines.length && itemPattern.test(lines[index].trim())) {
+        const item = document.createElement('li');
+        appendInlineMarkdown(item, lines[index].trim().replace(itemPattern, ''));
+        list.append(item);
+        index += 1;
+      }
+      root.append(list);
+      continue;
+    }
+    const paragraphLines = [trimmed];
+    index += 1;
+    while (index < lines.length && !markdownStartsBlock(lines[index], lines[index + 1] ?? '')) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+    const paragraph = document.createElement('p');
+    appendInlineMarkdown(paragraph, paragraphLines.join(' '));
+    root.append(paragraph);
+  }
+  target.replaceChildren(root);
 }
 
 function activeThread() {
@@ -2428,12 +2689,14 @@ function athDiscountBps() {
 
 function formatDiscountPercent(bps = athDiscountBps()) {
   const basis = nonNegativeBigInt(bps);
-  if (basis >= 10_000n) return '100%';
-  const whole = basis / 100n;
-  const fraction = basis % 100n;
-  return fraction === 0n
-    ? `${whole}%`
-    : `${whole}.${fraction.toString().padStart(2, '0').replace(/0+$/, '')}%`;
+  return basis >= 10_000n ? '100%' : formatBasisPointsPercent(basis);
+}
+
+function formatAthDiscountLabel() {
+  const percent = formatDiscountPercent();
+  return messageDiscountUnlocked()
+    ? `ATH discount ${percent}`
+    : `ATH discount ${percent} (locked until 15% supply distributed)`;
 }
 
 function discountedProtocolFeeNanotons(fullFee) {
@@ -2527,7 +2790,7 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null) 
     statusParts.push('Ready');
   }
   return {
-    text: `Price ${formatTonNanotons(price)} TON - Hold ${formatTonNanotons(hold)} TON - ATH discount ${formatDiscountPercent()}${messageDiscountUnlocked() ? '' : ' (locked until 15%)'}\n${statusParts.join(' - ')}`,
+    text: `Price ${formatTonNanotons(price)} TON - Hold ${formatTonNanotons(hold)} TON - ${formatAthDiscountLabel()}\n${statusParts.join(' - ')}`,
     state: plathoWallet ? 'ready' : 'short',
     parts,
   };
@@ -2611,7 +2874,6 @@ function updatePublicCommentsDefaultUi() {
   const value = readPublicCommentsDefault();
   if (publicCommentsDefaultSelect) publicCommentsDefaultSelect.value = value;
   if (!publicCommentTarget && publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.checked = value !== 'disabled';
-  setText(publicCommentsDefaultStatus, publicCommentsDefaultLabel(value));
 }
 
 function publicSyncWindowLabel(value = readPublicSyncWindow()) {
@@ -2628,7 +2890,6 @@ function publicSyncCutoffMs(value = readPublicSyncWindow()) {
 function updatePublicSyncWindowUi() {
   const windowValue = readPublicSyncWindow();
   if (publicSyncWindowSelect) publicSyncWindowSelect.value = windowValue;
-  setText(publicSyncWindowStatus, publicSyncWindowLabel(windowValue));
 }
 
 function isFreshPublicTimestamp(value, cutoffMs = publicSyncCutoffMs()) {
@@ -2789,6 +3050,7 @@ function refreshMessagingControls() {
   if (refreshVaultButton) refreshVaultButton.disabled = !plathoWallet;
   if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet;
   if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet;
+  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet;
   if (publicMessageInput) publicMessageInput.disabled = !plathoWallet;
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet;
   publicComposer?.querySelector?.('.send-button')?.toggleAttribute('disabled', !plathoWallet);
@@ -2947,6 +3209,28 @@ railItems.forEach((item) => {
   item.addEventListener('click', () => setView(item.dataset.tab));
 });
 
+docsButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    openDocsDialog(activeDocId).catch((error) => {
+      console.error(error);
+      setDocsStatus('Document unavailable', 'error');
+    });
+  });
+});
+docsCloseButton?.addEventListener('click', closeDocsDialog);
+docsDialog?.addEventListener('click', (event) => {
+  if (event.target === docsDialog) closeDocsDialog();
+});
+docsNav?.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+  const button = target?.closest('button[data-doc-id]');
+  if (!button) return;
+  selectDoc(button.dataset.docId).catch((error) => {
+    console.error(error);
+    setDocsStatus('Document unavailable', 'error');
+  });
+});
+
 search.addEventListener('input', renderThreads);
 
 backToChatsButton?.addEventListener('click', () => {
@@ -3001,6 +3285,7 @@ document.addEventListener('keydown', (event) => {
   hideIdentityPopover();
   closeNewChatDialog();
   closeActionDialog(null);
+  closeDocsDialog();
 });
 
 actionGrid?.addEventListener('click', async (event) => {
@@ -3029,8 +3314,11 @@ actionGrid?.addEventListener('click', async (event) => {
 refreshVaultButton?.addEventListener('click', async () => {
   try {
     refreshVaultButton.disabled = true;
-    await refreshVaultDashboard();
-    await refreshVaultActivationStatus();
+    await Promise.all([
+      refreshVaultDashboard(),
+      refreshVaultActivationStatus(),
+      refreshAthProtocolStats(),
+    ]);
   } finally {
     refreshVaultButton.disabled = false;
   }
@@ -3629,6 +3917,43 @@ function formatAthAtomic(value) {
   return formatDecimalAmount(value, 9, 4);
 }
 
+function groupDecimalText(text) {
+  const [whole, fraction] = String(text ?? '').split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return fraction ? `${grouped}.${fraction}` : grouped;
+}
+
+function formatAthProfileAmount(value) {
+  if (value === null || value === undefined) return '-';
+  return `${groupDecimalText(formatAthAtomic(value))} ATH`;
+}
+
+function formatBasisPointsPercent(bps) {
+  const basis = nonNegativeBigInt(bps);
+  const whole = basis / 100n;
+  const fraction = basis % 100n;
+  return fraction === 0n
+    ? `${whole}%`
+    : `${whole}.${fraction.toString().padStart(2, '0').replace(/0+$/, '')}%`;
+}
+
+function renderAthProfileStats() {
+  setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
+  const total = nonNegativeBigInt(
+    vaultProtocolState?.airdrop_total_allocation_ath,
+    VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+  );
+  const remainingRaw = vaultProtocolState?.airdrop_remaining_ath;
+  if (remainingRaw === null || remainingRaw === undefined || total <= 0n) {
+    setText(athDropIssuedStatus, '-');
+    return;
+  }
+  const remaining = nonNegativeBigInt(remainingRaw);
+  const issued = remaining >= total ? 0n : total - remaining;
+  const percent = (issued * 10_000n) / total;
+  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)}`);
+}
+
 function formatVaultMoveAmountInput(units) {
   if (units === null || units === undefined) return '';
   return formatDecimalAmount(units, 9, 9);
@@ -4175,9 +4500,10 @@ async function refreshVaultDashboard() {
       vault: { ton_balance: null, ath_balance: null },
     };
     vaultProtocolState = {
-      airdrop_remaining_ath: null,
+      airdrop_remaining_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
       airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
     };
+    renderAthProfileStats();
     renderVaultCards(appConfig.ui?.vaultCards ?? []);
     refreshVaultMoveWidget();
     refreshComposerCostStatus();
@@ -4207,6 +4533,7 @@ async function refreshVaultDashboard() {
     airdrop_remaining_ath: global?.airdrop_remaining_ath ?? null,
     airdrop_total_allocation_ath: global?.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   };
+  renderAthProfileStats();
   renderVaultPocketCards(walletBalances, user);
   refreshComposerCostStatus();
   if (user) {
@@ -4229,6 +4556,22 @@ async function resolveAthMasterProvider() {
     ?? createAthMasterTonRpcProvider({ athMasterAddress: requireAthMasterAddress() });
   if (!provider?.getWalletAddress) throw new Error('ATHMaster provider is not configured');
   return provider;
+}
+
+async function refreshAthProtocolStats() {
+  renderAthProfileStats();
+  try {
+    const provider = await resolveAthMasterProvider();
+    if (!provider?.getJettonData) return athProtocolState;
+    const data = await provider.getJettonData({ address: requireAthMasterAddress() });
+    athProtocolState = {
+      total_supply: nonNegativeBigInt(data?.total_supply, ATH_TOTAL_SUPPLY_ATOMIC),
+    };
+    renderAthProfileStats();
+    return athProtocolState;
+  } catch {
+    return athProtocolState;
+  }
 }
 
 async function resolveUsernameRegistryProvider() {
@@ -5124,6 +5467,7 @@ async function refreshVaultActivationStatus(options = {}) {
       airdrop_remaining_ath: global?.airdrop_remaining_ath ?? vaultProtocolState.airdrop_remaining_ath ?? null,
       airdrop_total_allocation_ath: global?.airdrop_total_allocation_ath ?? vaultProtocolState.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
     };
+    renderAthProfileStats();
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
       delete globalThis.plathoVaultBinding;
       setText(vaultRecordStatus, 'activation required');
@@ -5157,6 +5501,7 @@ async function bootCrypto() {
     const preferredSuite = readPreferredCryptoSuite();
     updateKeySuiteUi(preferredSuite);
     plathoWallet = await loadPlathoWallet();
+    refreshAthProtocolStats().catch(() => {});
     if (!plathoWallet) {
       localIdentity = null;
       localRecipientKeyPair = null;
@@ -5202,6 +5547,7 @@ async function bootCrypto() {
     });
     await refreshVaultActivationStatus();
     await refreshVaultDashboard();
+    await refreshAthProtocolStats();
   } catch (error) {
     setText(encryptionStatus, 'unavailable');
     keySuiteStatus.textContent = 'blocked';
@@ -5235,6 +5581,8 @@ publicChannelFeedCache = readPublicChannelFeedCache(localStorageOrNull());
 publicReadCursors = readPublicReadCursors();
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
+renderDocsNav();
+renderAthProfileStats();
 updatePublicSyncWindowUi();
 updatePublicCommentsDefaultUi();
 setPublicCommentTarget(null);
