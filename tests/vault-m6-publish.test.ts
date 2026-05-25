@@ -29,14 +29,18 @@ import {
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const KIND_PRIVATE = 1n;
+const KIND_PUBLIC = 2n;
 const SIZE_STANDARD = 1n;
+const SUITE_PUBLIC_NONE = 0n;
 const SUITE_CLASSICAL = 1n;
 const PLATO_PRIVATE_STANDARD_FEE_TON = 5_000_000n;
+const PLATO_PUBLIC_POST_FEE_TON = 5_000_000n;
 const ATH_FULL_DISCOUNT_AMOUNT = 10_000_000_000_000n;
 const AIRDROP_TOTAL = 30_000_000_000_000_000n;
 const AIRDROP_DISCOUNT_UNLOCK_REMAINING = 15_000_000_000_000_000n;
 const AIRDROP_REWARD_PER_MESSAGE = 10_000_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = 4_000_000n;
+const VAULT_PUBLISH_LOCAL_EXEC_RESERVE = 6_000_000n;
 
 const BODY_CELL = finalPrivateBodyCell();
 const HEADER0_CELL = finalPrivateHeader0Cell();
@@ -44,6 +48,10 @@ const HEADER1_CELL = finalPrivateHeader1Cell();
 const BODY_HASH = cellHash(BODY_CELL);
 const HEADER0 = cellHash(HEADER0_CELL);
 const HEADER1 = cellHash(HEADER1_CELL);
+const PUBLIC_HEADER_CELL = beginCell().storeBuffer(Buffer.from('PPH1:post')).endCell();
+const PUBLIC_BODY_CELL = beginCell().storeBuffer(Buffer.from('public capsule body')).endCell();
+const PUBLIC_HEADER_HASH = cellHash(PUBLIC_HEADER_CELL);
+const PUBLIC_BODY_HASH = cellHash(PUBLIC_BODY_CELL);
 
 function cellHash(cell: Cell): bigint {
   return BigInt('0x' + cell.hash().toString('hex'));
@@ -221,6 +229,19 @@ async function publishPrivate(blockchain: Blockchain, vault: any, user: any, max
   }));
 }
 
+async function publishPublic(blockchain: Blockchain, vault: any, user: any, maxCharge: bigint) {
+  let userState = await vault.getGetUser(user.address);
+  if (userState.ton_balance < maxCharge) {
+    await topUpVaultTon(vault, user, maxCharge * 2n);
+    userState = await vault.getGetUser(user.address);
+  }
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+  await blockchain.sendMessage(external({
+    to: vault.address,
+    body: signedPublicPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey),
+  }));
+}
+
 function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, overrides: { signature?: Buffer; payload?: Cell } = {}): Cell {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
@@ -245,6 +266,43 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
     .storeBuffer(signature)
     .storeRef(signedDataCell)
     .endCell();
+}
+
+function signedPublicPublishBody(
+  owner: Address,
+  nonce: bigint,
+  maxCharge: bigint,
+  secretKey: Buffer,
+  overrides: { signature?: Buffer; header?: Cell; body?: Cell; payload?: Cell } = {},
+): Cell {
+  const header = overrides.header ?? PUBLIC_HEADER_CELL;
+  const body = overrides.body ?? PUBLIC_BODY_CELL;
+  const payload = overrides.payload ?? beginCell()
+    .storeUint(cellHash(header), 256)
+    .storeUint(cellHash(body), 256)
+    .storeRef(header)
+    .storeRef(body)
+    .endCell();
+  const signedDataCell = beginCell()
+    .storeAddress(owner)
+    .storeUint(nonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  const signature = overrides.signature ?? sign(signedDataCell.hash(), secretKey);
+  return beginCell()
+    .storeUint(0x7E1F5032, 32)
+    .storeAddress(owner)
+    .storeBuffer(signature)
+    .storeRef(signedDataCell)
+    .endCell();
+}
+
+function publicBodyCellChain(cells: number): Cell {
+  if (cells <= 1) {
+    return beginCell().storeUint(1, 8).endCell();
+  }
+  return beginCell().storeUint(1, 8).storeRef(publicBodyCellChain(cells - 1)).endCell();
 }
 
 describe('Vault milestone 6: Vault-balance publish orchestration', () => {
@@ -284,6 +342,92 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
     expect((await capsule.getGetState()).private_latest_id).toBe(1n);
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE_TON);
+  });
+
+  it('VAULT-CAPSULE-PUBLIC-01: signed public Vault-balance publish stores header/body and clears pending after ACK', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
+    await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    const beforeUser = await vault.getGetUser(user.address);
+
+    await publishPublic(blockchain, vault, user, maxCharge);
+
+    const afterUser = await vault.getGetUser(user.address);
+    const vg = await vault.getGetGlobal();
+    const cs = await capsule.getGetState();
+    const stored = await capsule.getGetPublicEntry(0n);
+
+    expect(vg.pending_publish_count).toBe(0n);
+    expect(cs.public_latest_id).toBe(1n);
+    expect(cs.private_latest_id).toBe(0n);
+    expect(cs.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_POST_FEE_TON);
+    expect(stored.exists).toBe(true);
+    expect(stored.author_wallet.toString()).toBe(user.address.toString());
+    expect(stored.header_hash).toBe(PUBLIC_HEADER_HASH);
+    expect(stored.body_hash).toBe(PUBLIC_BODY_HASH);
+    expect(stored.header.hash().toString('hex')).toBe(PUBLIC_HEADER_CELL.hash().toString('hex'));
+    expect(stored.body.hash().toString('hex')).toBe(PUBLIC_BODY_CELL.hash().toString('hex'));
+    expect(afterUser.ath_balance).toBe(beforeUser.ath_balance + AIRDROP_REWARD_PER_MESSAGE);
+  });
+
+  it('VAULT-CAPSULE-PUBLIC-02: malformed public header is rejected inside Vault before CapsuleHub mutation', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await topUpVaultTon(vault, user, maxCharge * 2n);
+    const beforeUser = await vault.getGetUser(user.address);
+    const beforeGlobal = await vault.getGetGlobal();
+    const invalidHeader = beginCell()
+      .storeBuffer(Buffer.from('PPH1'))
+      .storeRef(beginCell().storeUint(1, 1).endCell())
+      .endCell();
+
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey, {
+        header: invalidHeader,
+        body: PUBLIC_BODY_CELL,
+      }),
+    }));
+
+    const afterUser = await vault.getGetUser(user.address);
+    const afterGlobal = await vault.getGetGlobal();
+    const capsuleState = await capsule.getGetState();
+
+    expect(afterUser.publish_nonce).toBe(beforeUser.publish_nonce + 1n);
+    expect(afterUser.ton_balance).toBe(beforeUser.ton_balance - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+    expect(afterUser.ath_balance).toBe(beforeUser.ath_balance);
+    expect(afterGlobal.pending_publish_count).toBe(beforeGlobal.pending_publish_count);
+    expect(afterGlobal.airdrop_distributed_ath).toBe(beforeGlobal.airdrop_distributed_ath);
+    expect(capsuleState.public_latest_id).toBe(0n);
+    expect(capsuleState.accrued_plato_fee_ton).toBe(0n);
+  });
+
+  it('VAULT-CAPSULE-PUBLIC-03: oversized public body is rejected inside Vault before CapsuleHub mutation', async () => {
+    const { blockchain, vault, capsule, user } = await deployBoundPair();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await topUpVaultTon(vault, user, maxCharge * 2n);
+    const beforeUser = await vault.getGetUser(user.address);
+    const invalidBody = publicBodyCellChain(10);
+
+    await blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey, {
+        header: PUBLIC_HEADER_CELL,
+        body: invalidBody,
+      }),
+    }));
+
+    const afterUser = await vault.getGetUser(user.address);
+    const capsuleState = await capsule.getGetState();
+
+    expect(afterUser.publish_nonce).toBe(beforeUser.publish_nonce + 1n);
+    expect(afterUser.ton_balance).toBe(beforeUser.ton_balance - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+    expect(afterUser.ath_balance).toBe(beforeUser.ath_balance);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    expect(capsuleState.public_latest_id).toBe(0n);
+    expect(capsuleState.accrued_plato_fee_ton).toBe(0n);
   });
 
   it('VAULT-CAPSULE-DUST-01: after 15% distribution, discounted Vault fee dust flushes from CapsuleHub into real FeeAccumulator', async () => {
