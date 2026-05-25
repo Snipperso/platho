@@ -30,6 +30,7 @@ export interface MainnetGenesisVerifyInput {
   manifest: ManifestLike;
   snapshot: {
     ath_master: BaseSnapshot & {
+      total_supply_atomic: string;
       treasury_owner_address: string;
       treasury_supply_deployed: boolean;
     };
@@ -263,6 +264,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       fee_accumulator: 'required: current FeeAccumulator code hash',
     },
     constants: {
+      ath_total_supply_atomic: 'required: decimal atomic ATH amount',
       vault_activity_airdrop_total_atomic: 'required: decimal atomic ATH amount',
       ath_market_stability_reserve_allocation_atomic: 'required: decimal atomic ATH amount',
     },
@@ -284,6 +286,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_master: {
         address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         code_hash: 'required: current ATHMaster code hash',
+        total_supply_atomic: 'required: decimal total_supply from get_jetton_data',
         treasury_owner_address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
         treasury_supply_deployed: true,
       },
@@ -396,6 +399,10 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   for (const [key, value] of Object.entries(manifest.code_hashes ?? {})) {
     if (!isHex64(value)) issues.push(issue(`BAD_MANIFEST_CODE_HASH_${key.toUpperCase()}`, `${key} code hash must be 32-byte hex.`));
   }
+  const athTotalSupply = manifest.constants?.ath_total_supply_atomic;
+  if (!isDecimalString(athTotalSupply)) {
+    issues.push(issue('BAD_ATH_TOTAL_SUPPLY', 'manifest.constants.ath_total_supply_atomic must be a decimal atomic ATH string.'));
+  }
   const vaultActivityAirdropTotal = manifest.constants?.vault_activity_airdrop_total_atomic;
   if (!isDecimalString(vaultActivityAirdropTotal)) {
     issues.push(issue('BAD_VAULT_ACTIVITY_AIRDROP_TOTAL', 'manifest.constants.vault_activity_airdrop_total_atomic must be a decimal atomic ATH string.'));
@@ -408,6 +415,15 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   const s = input.snapshot;
   checkBase(issues, manifest, s.ath_master, 'ath_master', 'ath_master', 'ath_master');
   addAddressEq(issues, 'ATH_MASTER_TREASURY_OWNER_MISMATCH', s.ath_master.treasury_owner_address, manifest.addresses.ath_treasury_owner, 'ath_master.treasury_owner_address');
+  if (isDecimalString(athTotalSupply)) {
+    addDecimalEq(
+      issues,
+      'ATH_MASTER_TOTAL_SUPPLY_MISMATCH',
+      s.ath_master.total_supply_atomic,
+      athTotalSupply,
+      'ath_master.total_supply_atomic',
+    );
+  }
   addTrue(issues, 'ATH_TREASURY_SUPPLY_NOT_DEPLOYED', s.ath_master.treasury_supply_deployed, 'ath_master.treasury_supply_deployed');
 
   checkBase(issues, manifest, s.vault, 'vault', 'vault', 'vault');
