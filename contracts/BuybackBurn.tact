@@ -531,6 +531,7 @@ contract BuybackBurn {
 
     receive(msg: RecycleRouteRefundReserve) {
         self.requireSealed();
+        throwUnless(22363, self.route_frozen);
         throwUnless(22360, self.phase == BUYBACK_PHASE_IDLE);
         throwUnless(22362, context().value >= BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE);
         let callerTopUp: Int = context().value - BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE;
