@@ -5,10 +5,12 @@ import { createHash } from 'crypto';
 import {
   AcceptBurnReserve,
   ATHBurnFailed,
+  ATHBurnFinalized,
   AthTransferNotification,
   BindBuybackFeeAccumulator,
   BindBuybackOfficialAthWallet,
   BuybackBurn,
+  storeBuybackBurn$Data,
   ExecuteBuybackChunk,
   FreezeBuybackRoute,
   RecoverStonfiRouteRefund,
@@ -122,6 +124,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   return {
     blockchain,
     buyback,
+    buybackInit,
     athMaster,
     athMasterInit,
     athMasterAddress,
@@ -137,6 +140,56 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
     officialAthWallet,
     stonfiAskJettonWallet,
   };
+}
+
+async function forcePendingAthBurn(
+  env: Awaited<ReturnType<typeof setup>>,
+  queryId = 7n,
+  amount = 123_456n,
+) {
+  const balance = (await env.blockchain.getContract(env.buyback.address)).balance;
+  const data = beginCell().storeBit(true).store(storeBuybackBurn$Data({
+    $$type: 'BuybackBurn$Data',
+    genesis_config_hash: 0n,
+    deployment_manifest_hash: MANIFEST_HASH,
+    ath_master_address: env.athMasterAddress,
+    fee_accumulator_address: env.feeAccumulator.address,
+    official_ath_wallet_address: env.officialAthWallet,
+    stonfi_router_address: env.stonfiRouter.address,
+    stonfi_pool_address_ton_ath: env.stonfiPoolOwner.address,
+    stonfi_pton_wallet_address: env.stonfiPtonWallet.address,
+    ask_jetton_wallet_address: env.stonfiAskJettonWallet,
+    stonfi_referral_address: env.stonfiReferral.address,
+    fee_bound: true,
+    official_ath_wallet_bound: true,
+    route_frozen: true,
+    sealed: true,
+    referral_value_bps: 0n,
+    buyback_min_ath_out_per_50_ton_atomic: 95_000n,
+    evidence_quote_out_atomic_ath: 100_000n,
+    evidence_dex_min_out_atomic_ath: 95_000n,
+    route_evidence_hash: ROUTE_EVIDENCE_HASH,
+    phase: PHASE_PENDING_ATH_BURN,
+    reserve_due_ton: 0n,
+    pending_query_id: queryId,
+    pending_deadline: BigInt((env.blockchain.now ?? 0) + 600),
+    pending_route_refund_start_ton: 0n,
+    pending_dex_min_out_atomic_ath: 95_000n,
+    pending_received_ath_atomic: amount,
+    route_refund_due_ton: 0n,
+    ath_burn_retry_due_atomic: 0n,
+    last_terminal_query_id: queryId - 1n,
+    accepted_reserve_count: 1n,
+    executed_buyback_count: 0n,
+    burned_ath_total_atomic: 0n,
+  })).endCell();
+  await env.blockchain.setShardAccount(env.buyback.address, createShardAccount({
+    address: env.buyback.address,
+    code: env.buybackInit.code,
+    data,
+    balance,
+    workchain: env.buyback.address.workChain,
+  }));
 }
 
 function routeFreeze(
@@ -522,5 +575,41 @@ describe('BuybackBurn auth and negative matrix', () => {
     expect(state.phase).toBe(PHASE_IDLE);
     expect(state.ath_burn_retry_due_atomic).toBe(0n);
     expect((await env.buyback.getGetBuybackBurnTotals()).executed_buyback_count).toBe(1n);
+  });
+
+  it('rejects malformed ATHMaster finalization while preserving pending burn state', async () => {
+    const env = await setup();
+    await forcePendingAthBurn(env, 7n, 123_456n);
+
+    for (const [sender, msg] of [
+      [env.attacker.address, { $$type: 'ATHBurnFinalized', query_id: 7n, amount: 123_456n, owner_address: env.buyback.address }],
+      [env.athMasterAddress, { $$type: 'ATHBurnFinalized', query_id: 8n, amount: 123_456n, owner_address: env.buyback.address }],
+      [env.athMasterAddress, { $$type: 'ATHBurnFinalized', query_id: 7n, amount: 123_457n, owner_address: env.buyback.address }],
+      [env.athMasterAddress, { $$type: 'ATHBurnFinalized', query_id: 7n, amount: 123_456n, owner_address: env.attacker.address }],
+    ] as const) {
+      await env.buyback.send(env.blockchain.sender(sender), { value: toNano('0.01') }, msg as ATHBurnFinalized);
+      const state = await env.buyback.getGetBuybackBurnState();
+      const totals = await env.buyback.getGetBuybackBurnTotals();
+      expect(state.phase).toBe(PHASE_PENDING_ATH_BURN);
+      expect(state.pending_query_id).toBe(7n);
+      expect(state.pending_received_ath_atomic).toBe(123_456n);
+      expect(totals.executed_buyback_count).toBe(0n);
+      expect(totals.burned_ath_total_atomic).toBe(0n);
+    }
+
+    await env.buyback.send(env.blockchain.sender(env.athMasterAddress), { value: toNano('0.01') }, {
+      $$type: 'ATHBurnFinalized',
+      query_id: 7n,
+      amount: 123_456n,
+      owner_address: env.buyback.address,
+    } as ATHBurnFinalized);
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    const totals = await env.buyback.getGetBuybackBurnTotals();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.pending_received_ath_atomic).toBe(0n);
+    expect(totals.executed_buyback_count).toBe(1n);
+    expect(totals.burned_ath_total_atomic).toBe(123_456n);
   });
 });
