@@ -180,7 +180,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
     const beforeUser = await vault.getGetUser(user.address);
 
-    await vault.send(user.getSender(), { value: toNano('0.03') }, {
+    await vault.send(user.getSender(), { value: toNano('0.04') }, {
       $$type: 'WithdrawAth',
       query_id: 10n,
       amount: 750n,
@@ -194,7 +194,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     expect(afterUser.ath_balance).toBe(1_250n);
     expect(afterUser.ton_balance).toBeGreaterThan(beforeUser.ton_balance);
-    expect(afterUser.ton_balance - beforeUser.ton_balance).toBeLessThanOrEqual(toNano('0.03'));
+    expect(afterUser.ton_balance - beforeUser.ton_balance).toBeLessThanOrEqual(toNano('0.04'));
     expect((await vault.getGetPendingAthWithdrawal(10n)).exists).toBe(false);
     expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
     expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);

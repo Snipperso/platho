@@ -1383,7 +1383,7 @@ PROGRAM{
       s6 s7 PUSH2
       GEQ
       THROWANYIFNOT
-      4000000 PUSHINT
+      30000000 PUSHINT
       14204 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -1404,7 +1404,7 @@ PROGRAM{
       $ATHWallet$_init_child INLINECALLDICT
       TRUE
       s11 s10 s7 XC2PU
-      1 PUSHINT
+      0 PUSHINT
       s0 s15 XCHG
       $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination INLINECALLDICT
       NEWC
@@ -2008,15 +2008,15 @@ PROGRAM{
       14212 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      2000000 PUSHINT
+      7000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s3 s4 XCPU
       ADD
-      0 PUSHINT
-      64 PUSHINT
+      3000000 PUSHINT
+      1 PUSHINT
       s0 s7 XCHG
-      TRUE
+      FALSE
       s0 s7 XCHG
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC

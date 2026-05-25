@@ -3,6 +3,8 @@
 // and owner-authorized bounce-safe ATH transfers.
 
 const ATH_TRANSFER_NOTIFY_ACK_VALUE: Int = 1000000;
+const ATH_INTERNAL_TRANSFER_ACK_VALUE: Int = 3000000;
+const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 21000000;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 2000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
@@ -376,7 +378,7 @@ contract ATHWallet {
         self.require_basechain_owner_path(msg.recipient, msg.response_destination);
         throwUnless(14202, msg.amount > 0);
         throwUnless(14203, self.balance >= msg.amount);
-        let required_value: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        let required_value: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE + ATH_OWNER_REQUEST_EXEC_RESERVE;
         throwUnless(14204, context().value >= required_value);
         let downstream_value: Int = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE;
 
@@ -389,7 +391,7 @@ contract ATHWallet {
             to: recipient_wallet,
             value: downstream_value,
             bounce: true,
-            mode: SendPayFwdFeesSeparately,
+            mode: SendDefaultMode,
             code: recipient_init.code,
             data: recipient_init.data,
             body: ATHInternalTransfer {
@@ -521,15 +523,15 @@ contract ATHWallet {
     receive(msg: ATHInternalTransfer) {
         throwUnless(14210, msg.amount > 0);
         throwUnless(14211, sender() == self.derive_wallet_address(msg.sender_owner));
-        throwUnless(14212, context().value >= ATH_INTERNAL_TRANSFER_EXEC_RESERVE);
+        throwUnless(14212, context().value >= ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
 
         self.balance += msg.amount;
 
         message(MessageParameters {
             to: msg.response_destination,
-            value: 0,
-            mode: SendRemainingValue,
-            bounce: true,
+            value: ATH_INTERNAL_TRANSFER_ACK_VALUE,
+            mode: SendPayFwdFeesSeparately,
+            bounce: false,
             body: ATHTransferAck {
                 query_id: msg.query_id,
                 amount: msg.amount
