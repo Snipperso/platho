@@ -38,6 +38,14 @@ function payloadCell(label: string): Cell {
   return beginCell().storeBuffer(Buffer.from(`PLATHO.V1.CAPSULE.BND.PAYLOAD.${label}`, 'utf8')).endCell();
 }
 
+function refChainCell(cells: number, fill = 0x41): Cell {
+  let tail = beginCell().storeUint(fill, 8).endCell();
+  for (let i = 1; i < cells; i += 1) {
+    tail = beginCell().storeUint(fill + i, 8).storeRef(tail).endCell();
+  }
+  return tail;
+}
+
 function cellHash(cell: Cell): bigint {
   return BigInt('0x' + cell.hash().toString('hex'));
 }
@@ -312,5 +320,80 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
     const state = await capsule.getGetState();
     expect(state.public_latest_id).toBe(2n);
     expect(state.accrued_plato_fee_ton).toBe(PUBLIC_FEE * 2n);
+  }, 30000);
+
+  it('CAPSULE-PAYLOAD-04: public header is bounded to one byte-aligned cell without refs', async () => {
+    const { blockchain, capsule, mockVaultAddress, author } = await setup();
+    const required = PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + ACK_RESERVE;
+    const maxHeader = finalPublicHeaderCell(0x51, 72);
+    const tooLargeHeader = finalPublicHeaderCell(0x52, 73);
+    const refHeader = beginCell()
+      .storeBuffer(Buffer.alloc(8, 0x53))
+      .storeRef(beginCell().storeUint(0x54, 8).endCell())
+      .endCell();
+    const emptyHeader = beginCell().endCell();
+    const unalignedHeader = beginCell().storeUint(1, 1).endCell();
+
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: required }, vaultPublic(author.address, {
+      publish_id: hash256('public-header-max'),
+      header_hash: cellHash(maxHeader),
+      header: maxHeader,
+    }));
+
+    for (const [publish_id, header] of [
+      [hash256('public-header-too-large'), tooLargeHeader],
+      [hash256('public-header-ref'), refHeader],
+      [hash256('public-header-empty'), emptyHeader],
+      [hash256('public-header-unaligned'), unalignedHeader],
+    ] as const) {
+      await capsule.send(blockchain.sender(mockVaultAddress), { value: required }, vaultPublic(author.address, {
+        publish_id,
+        header_hash: cellHash(header),
+        header,
+      }));
+    }
+
+    const state = await capsule.getGetState();
+    expect(state.public_latest_id).toBe(1n);
+    expect(state.accrued_plato_fee_ton).toBe(PUBLIC_FEE);
+  }, 30000);
+
+  it('CAPSULE-PAYLOAD-05: public body cannot be empty or exceed the 9-cell/8-ref envelope', async () => {
+    const { blockchain, capsule, mockVaultAddress, author } = await setup();
+    const required = PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + ACK_RESERVE;
+    const emptyBody = beginCell().endCell();
+    const tooManyRefsBody = refChainCell(10);
+
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: required }, vaultPublic(author.address, {
+      publish_id: hash256('public-empty-body'),
+      body_hash: cellHash(emptyBody),
+      body: emptyBody,
+    }));
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: required }, vaultPublic(author.address, {
+      publish_id: hash256('public-too-many-body-refs'),
+      body_hash: cellHash(tooManyRefsBody),
+      body: tooManyRefsBody,
+    }));
+
+    const state = await capsule.getGetState();
+    expect(state.public_latest_id).toBe(0n);
+    expect(state.accrued_plato_fee_ton).toBe(0n);
+  }, 30000);
+
+  it('CAPSULE-BND-06: zero-fee public publish still stores the entry and sends ACK when exact reserves are funded', async () => {
+    const { blockchain, capsule, mockVault, mockVaultAddress, author } = await setup();
+    const zeroFeeRequired = PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + ACK_RESERVE;
+
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: zeroFeeRequired }, vaultPublic(author.address, {
+      publish_id: hash256('public-zero-fee'),
+      protocol_fee_paid: 0n,
+    }));
+
+    const state = await capsule.getGetState();
+    const stored = await capsule.getGetPublicEntry(0n);
+    expect(state.public_latest_id).toBe(1n);
+    expect(state.accrued_plato_fee_ton).toBe(0n);
+    expect(stored.exists).toBe(true);
+    expect((await mockVault.getGetState()).ack_count).toBe(1n);
   }, 30000);
 });
