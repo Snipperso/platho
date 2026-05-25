@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Address, Cell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { findTransaction } from '@ton/test-utils';
-import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   CapsuleHub,
+  DepositProtocolFee,
   FlushFees,
+  storeDepositProtocolFee,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
@@ -252,6 +254,30 @@ describe('CapsuleHub v1 milestone 1', () => {
     } as FlushFees);
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(0n);
     expect((await feeAccumulator!.getGetState()).accumulated_ton).toBe(1n);
+  });
+
+  it('CAPSULE-FEE-07: forged FeeAccumulator bounce from a non-accumulator sender cannot restore accrued fees', async () => {
+    const { blockchain, capsule, author, attacker, operator, mockVault } = await setup({ feeAccumulatorDeployed: true });
+
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
+
+    await blockchain.sendMessage(internal({
+      from: attacker.address,
+      to: capsule.address,
+      value: toNano('0.05'),
+      bounced: true,
+      bounce: false,
+      body: beginCell()
+        .storeUint(0xffffffff, 32)
+        .store(storeDepositProtocolFee({
+          $$type: 'DepositProtocolFee',
+          amount: PLATO_PUBLIC_FEE,
+        } as DepositProtocolFee))
+        .endCell(),
+    }));
+
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
   });
 
   it('CAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs', async () => {
