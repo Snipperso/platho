@@ -2490,6 +2490,9 @@ PROGRAM{
       s13 s15 XCHG
       2 13 BLKSWAP
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
+      22363 PUSHINT
+      20 s() PUSH
+      THROWANYIFNOT
       22360 PUSHINT
       s13 PUSH
       0 EQINT

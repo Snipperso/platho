@@ -345,6 +345,19 @@ describe('Production BuybackBurn candidate', () => {
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.route_refund_due_ton).toBe(0n);
 
+    await env.buyback.send(
+      env.attacker.getSender(),
+      { value: ENVELOPE + ACCOUNTING_RECYCLE_EXEC_RESERVE },
+      {
+        $$type: 'RecycleRouteRefundReserve',
+      } as RecycleRouteRefundReserve,
+    );
+    state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.reserve_due_ton).toBe(0n);
+    expect(state.route_refund_due_ton).toBe(0n);
+    expect((await env.buyback.getGetBuybackBurnConfig()).route_frozen).toBe(false);
+
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, routeFreeze(env, {
       stonfi_pool_address_ton_ath: env.attacker.address,
       ask_jetton_wallet_address: await athWalletAddress(env.attacker.address, env.athMasterAddress),
