@@ -9,7 +9,10 @@ import {
   SealGenesis,
   AthTransferNotificationMintUsername,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
-import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
+import {
+  ResendDeployedAck,
+  UsernameNFTItem,
+} from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
@@ -117,6 +120,36 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(itemState.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(itemState.username_registry_address.equals(registry.address)).toBe(true);
     expect(itemState.name_hash).toBe(hash);
+  });
+
+  it('USERNAME-REG-M10-01B: repeated item resend after finalization cannot mutate record or split due again', async () => {
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
+    const caller = await blockchain.treasury('username-registry-repeat-resend-caller');
+    const ownerWallet = fixtureAddress('USERNAME_M10_REPEAT_RESEND_OWNER');
+    const hash = nameHash('repeat');
+    const itemAddress = await registry.getGetUsernameItemAddress(ownerWallet, hash);
+
+    await sendMint(registry, officialAthWallet, ownerWallet, 'repeat', PRICE_6_PLUS);
+
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
+    const beforeRecord = await registry.getGetNameRecord(hash);
+    const beforeGlobal = await registry.getGetGlobal();
+
+    await item.send(caller.getSender(), { value: 4_000_000n }, {
+      $$type: 'ResendDeployedAck',
+    } as ResendDeployedAck);
+
+    const afterRecord = await registry.getGetNameRecord(hash);
+    const afterGlobal = await registry.getGetGlobal();
+
+    expect(beforeRecord.exists).toBe(true);
+    expect(afterRecord.exists).toBe(true);
+    expect(afterRecord.owner_wallet.equals(beforeRecord.owner_wallet)).toBe(true);
+    expect(afterRecord.item_address.equals(beforeRecord.item_address)).toBe(true);
+    expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
+    expect(afterGlobal.pending_mint_count).toBe(0n);
+    expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
+    expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
   });
 
   it('USERNAME-REG-M10-06: accepted official mint notification sends ATH notification ACK back to official wallet', async () => {

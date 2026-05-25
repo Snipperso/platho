@@ -105,11 +105,21 @@ The ACK body is derived only from immutable item state.
 The resend message uses:
 
 ```text
+value = 3_000_000 nanotons
 bounce = true
-mode = SendRemainingValue
+mode = SendPayFwdFeesSeparately
 ```
 
 The caller funds the resend attempt. The item does not debit or mutate accounting buckets.
+
+`ResendDeployedAck` is bounded:
+
+```text
+minimum inbound value = 4_000_000 nanotons
+maximum inbound value = 20_000_000 nanotons
+```
+
+The minimum covers the fixed ACK forward value plus item-side execution reserve. The maximum keeps permissionless resend from becoming a large accidental TON trap while still accepting the Registry's initial item deploy reserve.
 
 ---
 
