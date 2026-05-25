@@ -14,6 +14,7 @@ const BUYBACK_FUNDING_ENVELOPE_NANOTONS: Int = 51050000000;
 const BUYBACK_ATH_NOTIFY_ACK_VALUE: Int = 1000000;
 const BUYBACK_ATH_BURN_REQUEST_VALUE: Int = 30000000;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE: Int = 35000000;
+const BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS_NANOTONS: Int = 40000000;
 const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ACCOUNTING_RECYCLE_EXEC_RESERVE: Int = 2000000;
 const BUYBACK_ROUTE_REFUND_EXEC_RESERVE: Int = 2000000;
@@ -27,6 +28,7 @@ const BUYBACK_PHASE_PENDING_ATH_BURN: Int = 2;
 const UINT64_MAX: Int = 18446744073709551615;
 const STONFI_V2_1_DEX_OP_SWAP: Int = 0x6664de2a;
 const STONFI_V2_1_PTON_OP_TON_TRANSFER: Int = 0x01f3835d;
+const BUYBACK_ROUTE_NOTIFY_PAYLOAD_DOMAIN: Int = 0x42594E46; // "BYNF"
 
 message(0x594BA505) AcceptBurnReserve {
     amount: Int as uint128;
@@ -219,6 +221,11 @@ contract BuybackBurn {
         return self.deriveAthWalletAddress(myAddress());
     }
 
+    fun isBasechainAddress(address: Address): Bool {
+        let std: StdAddress = parseStdAddress(address.asSlice());
+        return std.workchain == 0;
+    }
+
     fun acceptManifestHash(hash: Int) {
         throwUnless(22005, hash > 1);
         throwUnless(22006, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == hash);
@@ -247,12 +254,20 @@ contract BuybackBurn {
         self.last_terminal_query_id = queryId;
     }
 
-    fun stonfiSwapPayload(deadline: Int, dexMinOut: Int): Cell {
+    fun stonfiRouteNotifyPayload(queryId: Int): Cell {
+        return beginCell()
+            .storeUint(BUYBACK_ROUTE_NOTIFY_PAYLOAD_DOMAIN, 32)
+            .storeUint(queryId, 64)
+            .endCell();
+    }
+
+    fun stonfiSwapPayload(queryId: Int, deadline: Int, dexMinOut: Int): Cell {
         let details: Cell = beginCell()
             .storeCoins(dexMinOut)
             .storeAddress(self.official_ath_wallet_address)
-            .storeCoins(0)
-            .storeBit(false)
+            .storeCoins(BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS_NANOTONS)
+            .storeBit(true)
+            .storeRef(self.stonfiRouteNotifyPayload(queryId))
             .storeCoins(0)
             .storeBit(false)
             .storeUint(self.referral_value_bps, 16)
@@ -270,7 +285,7 @@ contract BuybackBurn {
     }
 
     fun ptonTonTransferBody(queryId: Int, deadline: Int, dexMinOut: Int): Cell {
-        let payload: Cell = self.stonfiSwapPayload(deadline, dexMinOut);
+        let payload: Cell = self.stonfiSwapPayload(queryId, deadline, dexMinOut);
         return beginCell()
             .storeUint(STONFI_V2_1_PTON_OP_TON_TRANSFER, 32)
             .storeUint(queryId, 64)
@@ -358,7 +373,7 @@ contract BuybackBurn {
         throwUnless(22121, msg.buyback_min_ath_out_per_50_ton_atomic > 0);
         throwUnless(22122, msg.route_evidence_hash != 0);
         throwUnless(22123, msg.referral_value_bps <= 100);
-        throwUnless(22124, msg.ask_jetton_wallet_address == self.deriveAthWalletAddress(msg.stonfi_pool_address_ton_ath));
+        throwUnless(22124, self.isBasechainAddress(msg.ask_jetton_wallet_address));
         self.buyback_min_ath_out_per_50_ton_atomic = msg.buyback_min_ath_out_per_50_ton_atomic;
         self.validateMinOut(msg.evidence_quote_out_atomic_ath, msg.evidence_dex_min_out_atomic_ath);
         self.stonfi_router_address = msg.stonfi_router_address;

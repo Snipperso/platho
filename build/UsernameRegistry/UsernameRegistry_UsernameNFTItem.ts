@@ -2331,6 +2331,278 @@ export function dictValueParserATHTransferFailed(): DictionaryValue<ATHTransferF
     }
 }
 
+export type JettonTransfer = {
+    $$type: 'JettonTransfer';
+    query_id: bigint;
+    amount: bigint;
+    destination: Address;
+    response_destination: Address;
+    custom_payload: Cell | null;
+    forward_ton_amount: bigint;
+    forward_payload: Slice;
+}
+
+export function storeJettonTransfer(src: JettonTransfer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(260734629, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeCoins(src.amount);
+        b_0.storeAddress(src.destination);
+        b_0.storeAddress(src.response_destination);
+        if (src.custom_payload !== null && src.custom_payload !== undefined) { b_0.storeBit(true).storeRef(src.custom_payload); } else { b_0.storeBit(false); }
+        b_0.storeCoins(src.forward_ton_amount);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadJettonTransfer(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 260734629) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadCoins();
+    const _destination = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _custom_payload = sc_0.loadBit() ? sc_0.loadRef() : null;
+    const _forward_ton_amount = sc_0.loadCoins();
+    const _forward_payload = sc_0;
+    return { $$type: 'JettonTransfer' as const, query_id: _query_id, amount: _amount, destination: _destination, response_destination: _response_destination, custom_payload: _custom_payload, forward_ton_amount: _forward_ton_amount, forward_payload: _forward_payload };
+}
+
+export function loadTupleJettonTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _destination = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _custom_payload = source.readCellOpt();
+    const _forward_ton_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'JettonTransfer' as const, query_id: _query_id, amount: _amount, destination: _destination, response_destination: _response_destination, custom_payload: _custom_payload, forward_ton_amount: _forward_ton_amount, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleJettonTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _destination = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _custom_payload = source.readCellOpt();
+    const _forward_ton_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'JettonTransfer' as const, query_id: _query_id, amount: _amount, destination: _destination, response_destination: _response_destination, custom_payload: _custom_payload, forward_ton_amount: _forward_ton_amount, forward_payload: _forward_payload };
+}
+
+export function storeTupleJettonTransfer(source: JettonTransfer) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.destination);
+    builder.writeAddress(source.response_destination);
+    builder.writeCell(source.custom_payload);
+    builder.writeNumber(source.forward_ton_amount);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserJettonTransfer(): DictionaryValue<JettonTransfer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeJettonTransfer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadJettonTransfer(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type JettonInternalTransfer = {
+    $$type: 'JettonInternalTransfer';
+    query_id: bigint;
+    amount: bigint;
+    from: Address;
+    response_address: Address;
+    forward_ton_amount: bigint;
+    forward_payload: Slice;
+}
+
+export function storeJettonInternalTransfer(src: JettonInternalTransfer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(395134233, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeCoins(src.amount);
+        b_0.storeAddress(src.from);
+        b_0.storeAddress(src.response_address);
+        b_0.storeCoins(src.forward_ton_amount);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadJettonInternalTransfer(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 395134233) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadCoins();
+    const _from = sc_0.loadAddress();
+    const _response_address = sc_0.loadAddress();
+    const _forward_ton_amount = sc_0.loadCoins();
+    const _forward_payload = sc_0;
+    return { $$type: 'JettonInternalTransfer' as const, query_id: _query_id, amount: _amount, from: _from, response_address: _response_address, forward_ton_amount: _forward_ton_amount, forward_payload: _forward_payload };
+}
+
+export function loadTupleJettonInternalTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _from = source.readAddress();
+    const _response_address = source.readAddress();
+    const _forward_ton_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'JettonInternalTransfer' as const, query_id: _query_id, amount: _amount, from: _from, response_address: _response_address, forward_ton_amount: _forward_ton_amount, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleJettonInternalTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _from = source.readAddress();
+    const _response_address = source.readAddress();
+    const _forward_ton_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'JettonInternalTransfer' as const, query_id: _query_id, amount: _amount, from: _from, response_address: _response_address, forward_ton_amount: _forward_ton_amount, forward_payload: _forward_payload };
+}
+
+export function storeTupleJettonInternalTransfer(source: JettonInternalTransfer) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.from);
+    builder.writeAddress(source.response_address);
+    builder.writeNumber(source.forward_ton_amount);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserJettonInternalTransfer(): DictionaryValue<JettonInternalTransfer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeJettonInternalTransfer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadJettonInternalTransfer(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type JettonTransferNotification = {
+    $$type: 'JettonTransferNotification';
+    query_id: bigint;
+    amount: bigint;
+    sender: Address;
+    forward_payload: Slice;
+}
+
+export function storeJettonTransferNotification(src: JettonTransferNotification) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1935855772, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeCoins(src.amount);
+        b_0.storeAddress(src.sender);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadJettonTransferNotification(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1935855772) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadCoins();
+    const _sender = sc_0.loadAddress();
+    const _forward_payload = sc_0;
+    return { $$type: 'JettonTransferNotification' as const, query_id: _query_id, amount: _amount, sender: _sender, forward_payload: _forward_payload };
+}
+
+export function loadTupleJettonTransferNotification(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender = source.readAddress();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'JettonTransferNotification' as const, query_id: _query_id, amount: _amount, sender: _sender, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleJettonTransferNotification(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender = source.readAddress();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'JettonTransferNotification' as const, query_id: _query_id, amount: _amount, sender: _sender, forward_payload: _forward_payload };
+}
+
+export function storeTupleJettonTransferNotification(source: JettonTransferNotification) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.sender);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserJettonTransferNotification(): DictionaryValue<JettonTransferNotification> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeJettonTransferNotification(src)).endCell());
+        },
+        parse: (src) => {
+            return loadJettonTransferNotification(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type JettonExcesses = {
+    $$type: 'JettonExcesses';
+    query_id: bigint;
+}
+
+export function storeJettonExcesses(src: JettonExcesses) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(3576854235, 32);
+        b_0.storeUint(src.query_id, 64);
+    };
+}
+
+export function loadJettonExcesses(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 3576854235) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    return { $$type: 'JettonExcesses' as const, query_id: _query_id };
+}
+
+export function loadTupleJettonExcesses(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'JettonExcesses' as const, query_id: _query_id };
+}
+
+export function loadGetterTupleJettonExcesses(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'JettonExcesses' as const, query_id: _query_id };
+}
+
+export function storeTupleJettonExcesses(source: JettonExcesses) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    return builder.build();
+}
+
+export function dictValueParserJettonExcesses(): DictionaryValue<JettonExcesses> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeJettonExcesses(src)).endCell());
+        },
+        parse: (src) => {
+            return loadJettonExcesses(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHWalletDataView = {
     $$type: 'ATHWalletDataView';
     balance: bigint;
@@ -4151,6 +4423,10 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"ATHInternalTransferProfileAvatar","header":1096042521,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferFailed","header":1096042515,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"JettonTransfer","header":260734629,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"JettonInternalTransfer","header":395134233,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"from","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"JettonTransferNotification","header":1935855772,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"sender","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
@@ -4203,6 +4479,10 @@ const UsernameNFTItem_opcodes = {
     "ATHInternalTransferProfileAvatar": 1096042521,
     "ATHTransferAck": 1096042513,
     "ATHTransferFailed": 1096042515,
+    "JettonTransfer": 260734629,
+    "JettonInternalTransfer": 395134233,
+    "JettonTransferNotification": 1935855772,
+    "JettonExcesses": 3576854235,
     "BindOfficialAthWallet": 1715335229,
     "SealGenesis": 974311853,
     "FlushTreasuryAthDue": 1621736923,
@@ -4249,6 +4529,7 @@ export const ATH_NOTIFY_REFUND_QUERY_DOMAIN = 1096045126n;
 export const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD = 4294967296n;
 export const ATH_QUERY_ID_MOD = 18446744073709551616n;
 export const ATH_PENDING_NOTIFICATION_TTL = 86400n;
+export const JETTON_EXCESSES_VALUE = 1000000n;
 export const USERNAME_PRICE_4_CHARS = 10000000000000n;
 export const USERNAME_PRICE_5_CHARS = 1000000000000n;
 export const USERNAME_PRICE_6_PLUS_CHARS = 100000000000n;

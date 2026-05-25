@@ -26,6 +26,7 @@ import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import {
   ATHWallet,
   ATHTransferRequestWithNotify,
+  JettonTransfer,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import {
   addressRaw,
@@ -46,6 +47,7 @@ const DEADLINE_MAX_AHEAD_SECONDS = 900n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
+const BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS = 40_000_000n;
 const OP_PTON_TON_TRANSFER = 0x01f3835d;
 const UINT64_MAX = 18446744073709551615n;
 
@@ -144,7 +146,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   }));
   const buyback = blockchain.openContract(new BuybackBurn(buybackAddress, buybackInit));
   const officialAthWallet = await buyback.getGetOfficialAthWalletAddress();
-  const stonfiAskJettonWallet = await athWalletAddress(stonfiPoolOwner.address, athMasterAddress);
+  const stonfiAskJettonWallet = fixtureAddress('STONFI_SDK_ROUTER_ATH_WALLET');
 
   return {
     blockchain,
@@ -242,6 +244,33 @@ async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 
   } as ExecuteBuybackChunk);
 }
 
+async function sendStandardStonfiAthOutput(
+  env: Awaited<ReturnType<typeof setup>>,
+  queryId: bigint,
+  amount: bigint,
+  forwardTonAmount: bigint,
+) {
+  const stonfiSourceWallet = await deployAthWallet(
+    env.blockchain,
+    env.stonfiPoolOwner.address,
+    env.athMasterAddress,
+    200_000n,
+  );
+
+  await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
+    $$type: 'JettonTransfer',
+    query_id: queryId,
+    amount,
+    destination: env.buyback.address,
+    response_destination: env.stonfiPoolOwner.address,
+    custom_payload: null,
+    forward_ton_amount: forwardTonAmount,
+    forward_payload: beginCell().endCell().beginParse(),
+  } as JettonTransfer);
+
+  return stonfiSourceWallet;
+}
+
 function inboundBody(tx: any): Cell {
   const body = tx?.inMessage?.body;
   if (!body) throw new Error('missing inbound body');
@@ -291,7 +320,7 @@ describe('Production BuybackBurn candidate', () => {
     expect((await env.buyback.getGetBuybackBurnConfig()).fee_bound).toBe(false);
 
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env, {
-      ask_jetton_wallet_address: fixtureAddress('WRONG_ASK_JETTON_WALLET'),
+      ask_jetton_wallet_address: fixtureAddress('MASTERCHAIN_ASK_JETTON_WALLET', -1),
     }));
     expect((await env.buyback.getGetBuybackBurnConfig()).route_frozen).toBe(false);
 
@@ -302,6 +331,8 @@ describe('Production BuybackBurn candidate', () => {
     expect(sealed.genesis_config_hash).toBe(0n);
     expect(sealed.fee_accumulator_address.equals(env.feeAccumulator.address)).toBe(true);
     expect(sealed.route_frozen).toBe(true);
+    expect(sealed.ask_jetton_wallet_address.equals(env.stonfiAskJettonWallet)).toBe(true);
+    expect(sealed.ask_jetton_wallet_address.equals(await athWalletAddress(env.stonfiPoolOwner.address, env.athMasterAddress))).toBe(false);
 
     await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindBuybackFeeAccumulator',
@@ -540,6 +571,8 @@ describe('Production BuybackBurn candidate', () => {
     expect(addressRaw(swap.excessesAddress)).toBe(addressRaw(env.buyback.address));
     expect(addressRaw(swap.details.receiverAddress)).toBe(addressRaw(env.officialAthWallet));
     expect(swap.details.minAskAmount).toBe('95000');
+    expect(swap.details.dexCustomPayloadForwardGasAmount).toBe(BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS.toString());
+    expect(swap.details.hasDexCustomPayload).toBe(true);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
   });
 
@@ -599,6 +632,25 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_deadline).toBe(expectedDeadline);
     expect(state.reserve_due_ton).toBe(0n);
+  });
+
+  it('BUYBACK-04J: no ATH notification and no route refund remains pending after grace', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+    await executeBuyback(env, 1n);
+
+    env.blockchain.now = (env.blockchain.now ?? 0) + 1801;
+    await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RecoverStonfiRouteRefund',
+      query_id: 1n,
+    } as RecoverStonfiRouteRefund);
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
+    expect(state.pending_query_id).toBe(1n);
+    expect(state.route_refund_due_ton).toBe(0n);
+    expect(state.ath_burn_retry_due_atomic).toBe(0n);
   });
 
   it('BUYBACK-04B: pTON transfer bounce records returned TON as route refund without restoring a retryable envelope', async () => {
@@ -765,28 +817,18 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.reserve_due_ton).toBe(ENVELOPE);
   });
 
-  it('BUYBACK-05: authenticated ATH notification from the official wallet burns through ATHMaster and clears pending state', async () => {
+  it('BUYBACK-05: standard jetton ATH output is translated into authenticated burn and clears pending state', async () => {
     const env = await setup();
     await freezeAndSeal(env);
     await acceptReserve(env);
     await executeBuyback(env, 1n);
 
-    const stonfiSourceWallet = await deployAthWallet(
-      env.blockchain,
-      env.stonfiPoolOwner.address,
-      env.athMasterAddress,
-      200_000n,
+    const stonfiSourceWallet = await sendStandardStonfiAthOutput(
+      env,
+      1n,
+      100_000n,
+      BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS,
     );
-
-    await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
-      $$type: 'ATHTransferRequestWithNotify',
-      query_id: 1n,
-      amount: 100_000n,
-      recipient: env.buyback.address,
-      response_destination: env.stonfiPoolOwner.address,
-      notify_destination: env.buyback.address,
-      notify_value: BUYBACK_ROUTE_NOTIFY_MIN_VALUE,
-    } as ATHTransferRequestWithNotify);
 
     const state = await env.buyback.getGetBuybackBurnState();
     const totals = await env.buyback.getGetBuybackBurnTotals();
@@ -799,6 +841,7 @@ describe('Production BuybackBurn candidate', () => {
     expect(totals.burned_ath_total_atomic).toBe(100_000n);
     expect(jetton.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - 100_000n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await stonfiSourceWallet.getGetWalletData()).balance).toBe(100_000n);
 
     await acceptReserve(env);
     await executeBuyback(env, 1n);
@@ -813,23 +856,8 @@ describe('Production BuybackBurn candidate', () => {
     await acceptReserve(env);
     await executeBuyback(env, 1n);
 
-    const stonfiSourceWallet = await deployAthWallet(
-      env.blockchain,
-      env.stonfiPoolOwner.address,
-      env.athMasterAddress,
-      200_000n,
-    );
-
     const highNotifyValue = toNano('0.1');
-    await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
-      $$type: 'ATHTransferRequestWithNotify',
-      query_id: 1n,
-      amount: 100_000n,
-      recipient: env.buyback.address,
-      response_destination: env.stonfiPoolOwner.address,
-      notify_destination: env.buyback.address,
-      notify_value: highNotifyValue,
-    } as ATHTransferRequestWithNotify);
+    await sendStandardStonfiAthOutput(env, 1n, 100_000n, highNotifyValue);
 
     const state = await env.buyback.getGetBuybackBurnState();
     const totals = await env.buyback.getGetBuybackBurnTotals();
@@ -851,22 +879,7 @@ describe('Production BuybackBurn candidate', () => {
     await acceptReserve(env);
     await executeBuyback(env, 1n);
 
-    const stonfiSourceWallet = await deployAthWallet(
-      env.blockchain,
-      env.stonfiPoolOwner.address,
-      env.athMasterAddress,
-      200_000n,
-    );
-
-    await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
-      $$type: 'ATHTransferRequestWithNotify',
-      query_id: 1n,
-      amount: 100_000n,
-      recipient: env.buyback.address,
-      response_destination: env.stonfiPoolOwner.address,
-      notify_destination: env.buyback.address,
-      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
-    } as ATHTransferRequestWithNotify);
+    await sendStandardStonfiAthOutput(env, 1n, 100_000n, ATH_TRANSFER_NOTIFY_MIN_VALUE);
 
     const officialWallet = env.blockchain.openContract(new ATHWallet(env.officialAthWallet));
     let state = await env.buyback.getGetBuybackBurnState();
@@ -908,22 +921,7 @@ describe('Production BuybackBurn candidate', () => {
       await acceptReserve(env);
       await executeBuyback(env, 1n);
 
-      const stonfiSourceWallet = await deployAthWallet(
-        env.blockchain,
-        env.stonfiPoolOwner.address,
-        env.athMasterAddress,
-        200_000n,
-      );
-
-      await stonfiSourceWallet.send(env.stonfiPoolOwner.getSender(), { value: toNano('0.3') }, {
-        $$type: 'ATHTransferRequestWithNotify',
-        query_id: 1n,
-        amount: 100_000n,
-        recipient: env.buyback.address,
-        response_destination: env.stonfiPoolOwner.address,
-        notify_destination: env.buyback.address,
-        notify_value: notifyValue,
-      } as ATHTransferRequestWithNotify);
+      await sendStandardStonfiAthOutput(env, 1n, 100_000n, notifyValue);
 
       const state = await env.buyback.getGetBuybackBurnState();
       const totals = await env.buyback.getGetBuybackBurnTotals();

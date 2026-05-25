@@ -22,6 +22,7 @@ const ATH_NOTIFY_REFUND_QUERY_DOMAIN: Int = 0x41545246; // "ATRF"
 const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD: Int = 4294967296;
 const ATH_QUERY_ID_MOD: Int = 18446744073709551616;
 const ATH_PENDING_NOTIFICATION_TTL: Int = 86400; // 24 hours
+const JETTON_EXCESSES_VALUE: Int = 1000000;
 
 message(0x41544801) ATHBurn {
     query_id: Int as uint64;
@@ -197,6 +198,38 @@ message(0x41544813) ATHTransferFailed {
     amount: Int as uint128;
 }
 
+// TEP-74 compatible surface used by external jetton routers. Platho system
+// contracts still consume the authenticated ATH* messages above.
+message(0x0F8A7EA5) JettonTransfer {
+    query_id: Int as uint64;
+    amount: Int as coins;
+    destination: Address;
+    response_destination: Address;
+    custom_payload: Cell?;
+    forward_ton_amount: Int as coins;
+    forward_payload: Slice as remaining;
+}
+
+message(0x178D4519) JettonInternalTransfer {
+    query_id: Int as uint64;
+    amount: Int as coins;
+    from: Address;
+    response_address: Address;
+    forward_ton_amount: Int as coins;
+    forward_payload: Slice as remaining;
+}
+
+message(0x7362D09C) JettonTransferNotification {
+    query_id: Int as uint64;
+    amount: Int as coins;
+    sender: Address;
+    forward_payload: Slice as remaining;
+}
+
+message(0xD53276DB) JettonExcesses {
+    query_id: Int as uint64;
+}
+
 struct ATHWalletDataView {
     balance: Int;
     owner_address: Address;
@@ -322,6 +355,19 @@ contract ATHWallet {
             mode: SendRemainingValue,
             bounce: true,
             body: ATHTransferFailed {
+                query_id: query_id,
+                amount: amount
+            }.toCell()
+        });
+    }
+
+    fun send_source_wallet_ack(query_id: Int, amount: Int, source_wallet: Address) {
+        message(MessageParameters {
+            to: source_wallet,
+            value: ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE,
+            mode: SendPayFwdFeesSeparately,
+            bounce: false,
+            body: ATHTransferAck {
                 query_id: query_id,
                 amount: amount
             }.toCell()
@@ -588,6 +634,39 @@ contract ATHWallet {
         self.refund_owner_excess(msg.response_destination, context().value - required_value);
     }
 
+    receive(msg: JettonTransfer) {
+        throwUnless(14700, sender() == self.owner_address);
+        self.require_basechain_owner_path(msg.destination, msg.response_destination);
+        throwUnless(14701, msg.amount > 0);
+        throwUnless(14702, self.balance >= msg.amount);
+        throwUnless(14703, msg.forward_ton_amount == 0 || msg.forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
+        let required_value: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        throwUnless(14704, context().value >= required_value);
+        let downstream_value: Int = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE;
+
+        let recipient_wallet: Address = self.derive_wallet_address(msg.destination);
+        let recipient_init: StateInit = initOf ATHWallet(0, msg.destination, self.ath_master_address);
+        self.store_pending_outgoing(msg.query_id, msg.amount, recipient_wallet, msg.response_destination);
+        self.balance -= msg.amount;
+
+        send(SendParameters {
+            to: recipient_wallet,
+            value: downstream_value,
+            bounce: true,
+            mode: SendDefaultMode,
+            code: recipient_init.code,
+            data: recipient_init.data,
+            body: JettonInternalTransfer {
+                query_id: msg.query_id,
+                amount: msg.amount,
+                from: self.owner_address,
+                response_address: msg.response_destination,
+                forward_ton_amount: msg.forward_ton_amount,
+                forward_payload: msg.forward_payload
+            }.toCell()
+        });
+    }
+
     receive(msg: ATHInternalTransfer) {
         throwUnless(14210, msg.amount > 0);
         throwUnless(14211, sender() == self.derive_wallet_address(msg.sender_owner));
@@ -616,6 +695,58 @@ contract ATHWallet {
                 amount: msg.amount
             }.toCell()
         });
+    }
+
+    receive(msg: JettonInternalTransfer) {
+        throwUnless(14710, msg.amount > 0);
+        throwUnless(14711, sender() == self.derive_wallet_address(msg.from));
+        throwUnless(14712, self.is_basechain_address(msg.from));
+
+        if (msg.forward_ton_amount > 0) {
+            throwUnless(14713, msg.forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
+            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+            let sender_key: Int = self.compute_sender_key(msg.from);
+            let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
+            throwUnless(14715, !self.pending_notifications.exists(pending_key));
+            throwUnless(14716, !self.processed_notifications.exists(pending_key));
+
+            self.balance += msg.amount;
+            self.pending_notifications.set(pending_key, PendingAthTransferNotification {
+                sender_owner: msg.from,
+                amount: msg.amount,
+                created_at: now()
+            });
+
+            message(MessageParameters {
+                to: self.owner_address,
+                value: msg.forward_ton_amount,
+                mode: SendPayFwdFeesSeparately,
+                bounce: true,
+                body: AthTransferNotification {
+                    query_id: msg.query_id,
+                    sender_key: sender_key,
+                    amount: msg.amount,
+                    sender_wallet: msg.from
+                }.toCell()
+            });
+        } else {
+            throwUnless(14717, context().value >= ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+            self.balance += msg.amount;
+        }
+
+        self.send_source_wallet_ack(msg.query_id, msg.amount, sender());
+
+        if (context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + JETTON_EXCESSES_VALUE) {
+            message(MessageParameters {
+                to: msg.response_address,
+                value: JETTON_EXCESSES_VALUE,
+                mode: SendPayFwdFeesSeparately,
+                bounce: false,
+                body: JettonExcesses {
+                    query_id: msg.query_id
+                }.toCell()
+            });
+        }
     }
 
     receive(msg: ATHInternalTransferWithNotify) {
@@ -842,6 +973,10 @@ contract ATHWallet {
     }
 
     bounced(msg: bounced<ATHInternalTransferProfileAvatar>) {
+        self.restore_bounced_outgoing(msg.query_id, msg.amount);
+    }
+
+    bounced(msg: bounced<JettonInternalTransfer>) {
         self.restore_bounced_outgoing(msg.query_id, msg.amount);
     }
 

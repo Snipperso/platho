@@ -119,7 +119,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   }));
   const buyback = blockchain.openContract(new BuybackBurn(buybackAddress, buybackInit));
   const officialAthWallet = await buyback.getGetOfficialAthWalletAddress();
-  const stonfiAskJettonWallet = await athWalletAddress(stonfiPoolOwner.address, athMasterAddress);
+  const stonfiAskJettonWallet = fixtureAddress('SDK_ROUTER_ATH_WALLET');
 
   return {
     blockchain,
@@ -310,7 +310,7 @@ describe('BuybackBurn auth and negative matrix', () => {
       routeFreeze(env, { buyback_min_ath_out_per_50_ton_atomic: 0n }),
       routeFreeze(env, { route_evidence_hash: 0n }),
       routeFreeze(env, { referral_value_bps: 101n }),
-      routeFreeze(env, { ask_jetton_wallet_address: fixtureAddress('WRONG_ASK_WALLET') }),
+      routeFreeze(env, { ask_jetton_wallet_address: fixtureAddress('MASTERCHAIN_ASK_WALLET', -1) }),
       routeFreeze(env, { evidence_quote_out_atomic_ath: 100_000n, evidence_dex_min_out_atomic_ath: 94_999n }),
       routeFreeze(env, { evidence_quote_out_atomic_ath: 200_000n, evidence_dex_min_out_atomic_ath: 189_999n }),
       routeFreeze(env, { evidence_quote_out_atomic_ath: 100_000n, evidence_dex_min_out_atomic_ath: 100_001n }),
