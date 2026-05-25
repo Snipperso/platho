@@ -40,6 +40,7 @@
       "fee_accumulator": "required: current FeeAccumulator code hash"
     },
     "constants": {
+      "ath_total_supply_atomic": "required: decimal atomic ATH amount",
       "vault_activity_airdrop_total_atomic": "required: decimal atomic ATH amount",
       "ath_market_stability_reserve_allocation_atomic": "required: decimal atomic ATH amount"
     },
@@ -49,6 +50,7 @@
     "ath_master": {
       "address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "code_hash": "required: current ATHMaster code hash",
+      "total_supply_atomic": "required: decimal total_supply from get_jetton_data",
       "treasury_owner_address": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
       "treasury_supply_deployed": true
     },
@@ -59,7 +61,15 @@
       "deployment_manifest_hash": "required: final manifest hash",
       "capsule_hub_address": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
       "vault_ath_wallet_address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
-      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS"
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "user_count": "0",
+      "key_record_count": "0",
+      "receive_intent_count": "0",
+      "pending_ath_withdrawal_count": "0",
+      "pending_publish_count": "0",
+      "processed_ath_deposit_count": "0",
+      "airdrop_remaining_ath": "required: full activity airdrop allocation",
+      "airdrop_distributed_ath": "0"
     },
     "vault_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
@@ -82,7 +92,15 @@
       "reserve_due_ath": "0",
       "reserve_funded_total_ath": "0",
       "treasury_due_ton": "0",
-      "sold_ath_total": "0"
+      "sold_ath_total": "0",
+      "phase": "0",
+      "pending_query_id": "0",
+      "pending_amount_ath": "0",
+      "pending_paid_ton": "0",
+      "completed_tranche_count": "0",
+      "current_tranche_sold_ath": "0",
+      "last_terminal_query_id": "0",
+      "treasury_flushed_ton_total": "0"
     },
     "market_stability_seller_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS",
@@ -97,7 +115,10 @@
       "sealed": true,
       "deployment_manifest_hash": "required: final manifest hash",
       "vault_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
-      "fee_accumulator_address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS"
+      "fee_accumulator_address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
+      "private_latest_id": "0",
+      "public_latest_id": "0",
+      "accrued_plato_fee_ton": "0"
     },
     "username_registry": {
       "address": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
@@ -106,7 +127,15 @@
       "deployment_manifest_hash": "required: final manifest hash",
       "official_ath_wallet_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
-      "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS"
+      "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS",
+      "name_record_count": "0",
+      "pending_mint_count": "0",
+      "refund_due_count": "0",
+      "treasury_due_ath": "0",
+      "burn_due_ath": "0",
+      "pending_refund_flush_count": "0",
+      "pending_treasury_flush_count": "0",
+      "pending_burn_flush_count": "0"
     },
     "profile_registry": {
       "address": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
@@ -115,7 +144,13 @@
       "deployment_manifest_hash": "required: final manifest hash",
       "official_ath_wallet_address": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
-      "treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS"
+      "treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS",
+      "profile_count": "0",
+      "avatar_record_count": "0",
+      "treasury_due_ath": "0",
+      "burn_due_ath": "0",
+      "pending_treasury_flush_count": "0",
+      "pending_burn_flush_count": "0"
     },
     "buyback_burn": {
       "address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
@@ -126,14 +161,26 @@
       "official_ath_wallet_address": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "genesis_config_hash": "required: 64 lowercase hex buyback launch controller hash",
-      "route_frozen": false
+      "route_frozen": false,
+      "phase": "0",
+      "reserve_due_ton": "0",
+      "pending_query_id": "0",
+      "route_refund_due_ton": "0",
+      "ath_burn_retry_due_atomic": "0",
+      "last_terminal_query_id": "0",
+      "accepted_reserve_count": "0",
+      "executed_buyback_count": "0",
+      "burned_ath_total_atomic": "0"
     },
     "fee_accumulator": {
       "address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
       "code_hash": "required: current FeeAccumulator code hash",
       "buyback_burn_address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
       "ton_treasury_receiver": "REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS",
-      "buyback_split_enabled": false
+      "buyback_split_enabled": false,
+      "accumulated_ton": "0",
+      "treasury_due_ton": "0",
+      "buyback_due_ton": "0"
     }
   },
   "evidenceRefs": {

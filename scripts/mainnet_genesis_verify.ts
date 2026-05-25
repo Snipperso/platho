@@ -4,6 +4,9 @@ import { Address, beginCell } from '@ton/core';
 import { isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
+const EXPECTED_ATH_TOTAL_SUPPLY_ATOMIC = '100000000000000000';
+const EXPECTED_VAULT_ACTIVITY_AIRDROP_TOTAL_ATOMIC = '30000000000000000';
+const EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC = '45000000000000000';
 
 type Issue = { code: string; message: string };
 
@@ -496,14 +499,38 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   const athTotalSupply = manifest.constants?.ath_total_supply_atomic;
   if (!isDecimalString(athTotalSupply)) {
     issues.push(issue('BAD_ATH_TOTAL_SUPPLY', 'manifest.constants.ath_total_supply_atomic must be a decimal atomic ATH string.'));
+  } else {
+    addDecimalEq(
+      issues,
+      'ATH_TOTAL_SUPPLY_CONSTANT_MISMATCH',
+      athTotalSupply,
+      EXPECTED_ATH_TOTAL_SUPPLY_ATOMIC,
+      'manifest.constants.ath_total_supply_atomic',
+    );
   }
   const vaultActivityAirdropTotal = manifest.constants?.vault_activity_airdrop_total_atomic;
   if (!isDecimalString(vaultActivityAirdropTotal)) {
     issues.push(issue('BAD_VAULT_ACTIVITY_AIRDROP_TOTAL', 'manifest.constants.vault_activity_airdrop_total_atomic must be a decimal atomic ATH string.'));
+  } else {
+    addDecimalEq(
+      issues,
+      'VAULT_ACTIVITY_AIRDROP_TOTAL_CONSTANT_MISMATCH',
+      vaultActivityAirdropTotal,
+      EXPECTED_VAULT_ACTIVITY_AIRDROP_TOTAL_ATOMIC,
+      'manifest.constants.vault_activity_airdrop_total_atomic',
+    );
   }
   const marketStabilityReserveTotal = manifest.constants?.ath_market_stability_reserve_allocation_atomic;
   if (!isDecimalString(marketStabilityReserveTotal)) {
     issues.push(issue('BAD_MARKET_STABILITY_RESERVE_TOTAL', 'manifest.constants.ath_market_stability_reserve_allocation_atomic must be a decimal atomic ATH string.'));
+  } else {
+    addDecimalEq(
+      issues,
+      'MARKET_STABILITY_RESERVE_CONSTANT_MISMATCH',
+      marketStabilityReserveTotal,
+      EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC,
+      'manifest.constants.ath_market_stability_reserve_allocation_atomic',
+    );
   }
 
   const s = input.snapshot;
