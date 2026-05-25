@@ -41,6 +41,7 @@ const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
 const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
 const PUBLISH_KIND_PRIVATE: Int = 1;
 const PUBLISH_KIND_PUBLIC: Int = 2;
+const VAULT_PUBLISH_SIGNING_DOMAIN: Int = 0x56504231; // "VPB1"
 const SIZE_CLASS_STANDARD: Int = 1;
 const SIZE_CLASS_LONG_TERM: Int = 2;
 const CRYPTO_SUITE_PUBLIC_NONE: Int = 0;
@@ -1186,6 +1187,14 @@ contract Vault {
         throwUnless(16457, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16464, signedDomain == VAULT_PUBLISH_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16465, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16466, signedVaultAddress == myAddress());
+        let signedPublishKind: Int = signedPayload.loadUint(8);
+        throwUnless(16467, signedPublishKind == PUBLISH_KIND_PRIVATE);
         let signedOwner: Address = signedPayload.loadAddress();
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxCharge: Int = signedPayload.loadUint(128);
@@ -1306,6 +1315,14 @@ contract Vault {
         throwUnless(16487, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16493, signedDomain == VAULT_PUBLISH_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16494, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16495, signedVaultAddress == myAddress());
+        let signedPublishKind: Int = signedPayload.loadUint(8);
+        throwUnless(16496, signedPublishKind == PUBLISH_KIND_PUBLIC);
         let signedOwner: Address = signedPayload.loadAddress();
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxCharge: Int = signedPayload.loadUint(128);

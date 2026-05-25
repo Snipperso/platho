@@ -31,7 +31,7 @@ describe('PWA capsule part policy', () => {
     expect(utf8ByteLength(truncateUtf8ToBytes('\ud83d\ude80'.repeat(300), 1024))).toBe(1024);
   });
 
-  it('PWA-CAPSULE-PART-04: wallet-funded mode unlocks multi-segment sends', () => {
+  it('PWA-CAPSULE-PART-04: Vault-balance publish mode unlocks multi-segment sends', () => {
     expect(singleCapsuleMessageFits('a'.repeat(1025), false)).toBe(false);
     expect(singleCapsuleMessageFits('a'.repeat(1025), true)).toBe(true);
   });

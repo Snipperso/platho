@@ -29,6 +29,7 @@ import {
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USERNAME_MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
+const VAULT_PUBLISH_SIGNING_DOMAIN = 0x56504231n;
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
@@ -513,7 +514,7 @@ async function depositVaultTon(vault: any, user: any, amount: bigint) {
   });
 }
 
-function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: bigint, secretKey: Buffer): Cell {
+function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address): Cell {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
     .storeUint(SUITE_CLASSICAL, 8)
@@ -525,6 +526,10 @@ function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: 
     .storeRef(BODY_CELL)
     .endCell();
   const signedPayload = beginCell()
+    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
+    .storeUint(MANIFEST_HASH, 256)
+    .storeAddress(vaultAddress)
+    .storeUint(KIND_PRIVATE, 8)
     .storeAddress(owner)
     .storeUint(clientNonce, 64)
     .storeUint(maxCharge, 128)
@@ -566,7 +571,7 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   const userState = await vault.getGetUser(user.address);
   const publishRes = await blockchain.sendMessage(external({
     to: vault.address,
-    body: signedVaultPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey),
+    body: signedVaultPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey, vault.address),
   }));
 
   // Create stale pending by publishing to missing CapsuleHub, then prune.
@@ -581,7 +586,7 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   const userState2 = await vault2.getGetUser(user.address);
   const pendingRes = await blockchain.sendMessage(external({
     to: vault2.address,
-    body: signedVaultPublishBody(user.address, userState2.publish_nonce, maxCharge2, keyPair2.secretKey),
+    body: signedVaultPublishBody(user.address, userState2.publish_nonce, maxCharge2, keyPair2.secretKey, vault2.address),
   }));
   const vg = await vault2.getGetGlobal();
   if (vg.pending_publish_count !== 0n) {

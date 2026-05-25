@@ -63,10 +63,16 @@ external wallet connection mode in final v1.
 
 Private capsule on-chain cells use the final `platho.byte-layout.v1` binary layout. The PWA may wrap capsules in JSON for export/share UI, but the cells stored by `CapsuleHub` are binary bytes, not JSON and not an off-chain pointer.
 
-Every publish goes through Vault as a wallet-funded message. The embedded Platho wallet pays the canonical Vault publish
-charge directly, so there is no separate prepaid publish layer. Multi-segment text and image sends are just
-multiple wallet-funded capsule publishes in one wallet transaction when the wallet has enough TON. If the wallet is not
-available, the PWA stays in preview-only single-capsule mode and must not expose attachments.
+Every publish goes through Vault as a Vault-balance funded signed external message. The user first funds their internal
+Vault TON balance, then the PWA signs a publish request with the active `current_sign_pubkey`; a relayer can submit the
+external message without holding the wallet key. The signed payload is domain-separated with `VPB1`,
+`deployment_manifest_hash`, the target Vault address, and the publish kind before owner, nonce, max charge, and payload.
+ACK/bounce refunds return to the user's internal Vault TON balance. If the wallet/Vault balance is not available, the
+PWA stays in preview-only single-capsule mode and must not expose attachments.
+
+Because `current_sign_pubkey` authorizes Vault-balance publish spending, compromising the local messaging signing key is
+also a publish-spending compromise for that user's internal Vault TON balance. Key replacement revokes the old signing key
+for future nonce validation.
 
 PWA message pricing is per capsule. `classical-v1` has a base price of `0.010 TON`; `hybrid-v1` has a base price of
 `0.020 TON`. Both include `0.005 TON` of estimated network cost. If the PWA's conservative fee estimate is higher, it

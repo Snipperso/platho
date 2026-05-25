@@ -31,6 +31,8 @@ export const VAULT_PUBLISH_KIND = Object.freeze({
   PUBLIC: 2n,
 });
 
+export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
+
 export const VAULT_SIZE_CLASS = Object.freeze({
   STANDARD: 1n,
   LONG_TERM: 2n,
@@ -598,6 +600,17 @@ function vaultBalancePublishOwner(params) {
   return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
 }
 
+function vaultBalancePublishManifestHash(params) {
+  return params.deployment_manifest_hash
+    ?? params.deploymentManifestHash
+    ?? params.manifest_hash
+    ?? params.manifestHash;
+}
+
+function vaultBalancePublishVaultAddress(params) {
+  return params.vault_address ?? params.vaultAddress;
+}
+
 function privateVaultBalancePublishSignedDataCell(params) {
   const publish = assertObject(params.publish ?? params, 'publish');
   const payload = beginCell()
@@ -611,6 +624,10 @@ function privateVaultBalancePublishSignedDataCell(params) {
     .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
     .endCell();
   return beginCell()
+    .uint(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .uint(VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
     .address(vaultBalancePublishOwner(params), 'owner_wallet')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
@@ -627,6 +644,10 @@ function publicVaultBalancePublishSignedDataCell(params) {
     .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
     .endCell();
   return beginCell()
+    .uint(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .uint(VAULT_PUBLISH_KIND.PUBLIC, 8, 'publish_kind')
     .address(vaultBalancePublishOwner(params), 'owner_wallet')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
@@ -676,7 +697,15 @@ export async function buildVaultBalancePublishBodyCell(type, params = {}) {
 
 export async function buildVaultBalancePublishExternalBoc(type, params = {}, options = {}) {
   const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const built = await buildVaultBalancePublishBodyCell(type, params);
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const built = await buildVaultBalancePublishBodyCell(type, {
+    ...params,
+    vaultAddress,
+    deploymentManifestHash,
+  });
   const root = externalInMessageCell(vaultAddress, built.bodyCell);
   return {
     ...built,

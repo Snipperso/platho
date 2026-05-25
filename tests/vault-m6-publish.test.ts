@@ -41,6 +41,7 @@ const AIRDROP_DISCOUNT_UNLOCK_REMAINING = 15_000_000_000_000_000n;
 const AIRDROP_REWARD_PER_MESSAGE = 10_000_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = 4_000_000n;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE = 6_000_000n;
+const VAULT_PUBLISH_SIGNING_DOMAIN = 0x56504231n;
 
 const BODY_CELL = finalPrivateBodyCell();
 const HEADER0_CELL = finalPrivateHeader0Cell();
@@ -225,7 +226,9 @@ async function publishPrivate(blockchain: Blockchain, vault: any, user: any, max
   const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
   await blockchain.sendMessage(external({
     to: vault.address,
-    body: signedPrivatePublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey),
+    body: signedPrivatePublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey, {
+      vaultAddress: vault.address,
+    }),
   }));
 }
 
@@ -238,11 +241,16 @@ async function publishPublic(blockchain: Blockchain, vault: any, user: any, maxC
   const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
   await blockchain.sendMessage(external({
     to: vault.address,
-    body: signedPublicPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey),
+    body: signedPublicPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey, {
+      vaultAddress: vault.address,
+    }),
   }));
 }
 
-function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, overrides: { signature?: Buffer; payload?: Cell } = {}): Cell {
+function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, overrides: { signature?: Buffer; payload?: Cell; manifestHash?: bigint; vaultAddress?: Address; publishKind?: bigint } = {}): Cell {
+  if (!overrides.vaultAddress) {
+    throw new Error('vaultAddress is required for signed publish test body');
+  }
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
     .storeUint(SUITE_CLASSICAL, 8)
@@ -254,6 +262,10 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
     .storeRef(BODY_CELL)
     .endCell();
   const signedDataCell = beginCell()
+    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
+    .storeUint(overrides.manifestHash ?? MANIFEST_HASH, 256)
+    .storeAddress(overrides.vaultAddress)
+    .storeUint(overrides.publishKind ?? KIND_PRIVATE, 8)
     .storeAddress(owner)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
@@ -273,8 +285,11 @@ function signedPublicPublishBody(
   nonce: bigint,
   maxCharge: bigint,
   secretKey: Buffer,
-  overrides: { signature?: Buffer; header?: Cell; body?: Cell; payload?: Cell } = {},
+  overrides: { signature?: Buffer; header?: Cell; body?: Cell; payload?: Cell; manifestHash?: bigint; vaultAddress?: Address; publishKind?: bigint } = {},
 ): Cell {
+  if (!overrides.vaultAddress) {
+    throw new Error('vaultAddress is required for signed publish test body');
+  }
   const header = overrides.header ?? PUBLIC_HEADER_CELL;
   const body = overrides.body ?? PUBLIC_BODY_CELL;
   const payload = overrides.payload ?? beginCell()
@@ -284,6 +299,10 @@ function signedPublicPublishBody(
     .storeRef(body)
     .endCell();
   const signedDataCell = beginCell()
+    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
+    .storeUint(overrides.manifestHash ?? MANIFEST_HASH, 256)
+    .storeAddress(overrides.vaultAddress)
+    .storeUint(overrides.publishKind ?? KIND_PUBLIC, 8)
     .storeAddress(owner)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
@@ -385,6 +404,7 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
     await blockchain.sendMessage(external({
       to: vault.address,
       body: signedPublicPublishBody(user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
         header: invalidHeader,
         body: PUBLIC_BODY_CELL,
       }),
@@ -414,6 +434,7 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
     await blockchain.sendMessage(external({
       to: vault.address,
       body: signedPublicPublishBody(user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
         header: PUBLIC_HEADER_CELL,
         body: invalidBody,
       }),
@@ -486,7 +507,9 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
     const before = await vault.getGetUser(user.address);
     await blockchain.sendMessage(external({
       to: vault.address,
-      body: signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey),
+      body: signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
+      }),
     }));
 
     const after = await vault.getGetUser(user.address);
@@ -506,7 +529,9 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
       $$type: 'DepositTon',
       amount: deposit,
     });
-    const message = signedPrivatePublishBody(user.address, 0n, maxCharge, keyPair.secretKey);
+    const message = signedPrivatePublishBody(user.address, 0n, maxCharge, keyPair.secretKey, {
+      vaultAddress: vault.address,
+    });
 
     await blockchain.sendMessage(external({ to: vault.address, body: message }));
     const afterFirst = await vault.getGetUser(user.address);

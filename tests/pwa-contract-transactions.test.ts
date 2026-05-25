@@ -61,6 +61,7 @@ const RECIPIENT = `0:${'22'.repeat(32)}`;
 const VAULT = `0:${'33'.repeat(32)}`;
 const ATH_WALLET = `0:${'44'.repeat(32)}`;
 const USERNAME_REGISTRY = `0:${'55'.repeat(32)}`;
+const DEPLOYMENT_MANIFEST_HASH = `0x${'66'.repeat(32)}`;
 
 function generatedBody(store: (builder: any) => void) {
   return beginCell().store(store).endCell().toBoc({ idx: false, crc32: false }).toString('base64');
@@ -395,6 +396,8 @@ describe('PWA contract transaction builders', () => {
     const built = await buildVaultBalancePublishBodyCell('PublishPrivateFromVaultBalance', {
       ...fixture,
       owner_wallet: OWNER,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
       signingSecretKey,
     });
 
@@ -452,6 +455,7 @@ describe('PWA contract transaction builders', () => {
       client_nonce: 4n,
       max_charge: 57_000_000n,
       publish,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
       signingSecretKey: new Uint8Array(32).fill(0x22),
     }, {
       vaultAddress: VAULT,

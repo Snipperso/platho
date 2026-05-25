@@ -5324,6 +5324,33 @@ PROGRAM{
       THROWANYIFNOT
       s0 25 s() XCHG
           CTOS
+      32 LDU
+      16464 PUSHINT
+      s0 s2 XCHG
+      1448100401 PUSHINT
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      256 LDU
+      16465 PUSHINT
+      s0 s2 XCHG
+      19 s() PUSH
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+          LDMSGADDR
+      16466 PUSHINT
+          MYADDR
+      s1 s3 XCHG
+      SDEQ
+      s1 s2 XCHG
+      THROWANYIFNOT
+      8 LDU
+      16467 PUSHINT
+      s0 s2 XCHG
+      1 EQINT
+      s1 s2 XCHG
+      THROWANYIFNOT
           LDMSGADDR
       64 LDU
       128 LDU
@@ -5960,6 +5987,33 @@ PROGRAM{
       THROWANYIFNOT
       s0 25 s() XCHG
           CTOS
+      32 LDU
+      16493 PUSHINT
+      s0 s2 XCHG
+      1448100401 PUSHINT
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+      256 LDU
+      16494 PUSHINT
+      s0 s2 XCHG
+      19 s() PUSH
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
+          LDMSGADDR
+      16495 PUSHINT
+          MYADDR
+      s1 s3 XCHG
+      SDEQ
+      s1 s2 XCHG
+      THROWANYIFNOT
+      8 LDU
+      16496 PUSHINT
+      s0 s2 XCHG
+      2 EQINT
+      s1 s2 XCHG
+      THROWANYIFNOT
           LDMSGADDR
       64 LDU
       128 LDU
