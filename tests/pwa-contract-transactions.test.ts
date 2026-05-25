@@ -411,6 +411,17 @@ describe('PWA contract transaction builders', () => {
     expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toMatch(/^te6/);
   });
 
+  it('PWA-TX-04B: Vault-balance external publish builder requires deployment manifest hash', async () => {
+    const fixture = privatePublishFixture(58_000_000n);
+    await expect(buildVaultBalancePublishExternalBoc('PublishPrivateFromVaultBalance', {
+      ...fixture,
+      owner_wallet: OWNER,
+      signingSecretKey: new Uint8Array(32).fill(0x11),
+    }, {
+      vaultAddress: VAULT,
+    })).rejects.toThrow(/deployment_manifest_hash must be an integer/);
+  });
+
   it('PWA-TX-09: creates public post payload cells and signed Vault-balance public publish messages', async () => {
     const bodyText = 'p'.repeat(PUBLIC_POST_TEXT_MAX_BYTES);
     const payload = await createPublicPostPayload(bodyText);
