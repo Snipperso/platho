@@ -21,7 +21,13 @@ artifacts/platho-web-static-*/
 artifacts/local/
 artifacts/platho_external_audit*.zip
 artifacts/platho_external_audit*.zip.sha256
+artifacts/platho_external_audit*.zip.sha256.txt
 artifacts/platho_external_audit*.contents.txt
+artifacts/*_RU_DRAFT.md
+artifacts/cdp-*.mjs
+artifacts/platho-static-*.mjs
+artifacts/edge-*-profile/
+artifacts/vault-fresh-*.png
 
 # Browser smoke-test profiles and local runtime state
 .edge-smoke/
