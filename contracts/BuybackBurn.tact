@@ -233,6 +233,12 @@ contract BuybackBurn {
         throwUnless(22043, dexMinOut <= quoteOut);
     }
 
+    fun requireFrozenExecutionQuote(quoteOut: Int, dexMinOut: Int) {
+        self.validateMinOut(quoteOut, dexMinOut);
+        throwUnless(22046, quoteOut == self.evidence_quote_out_atomic_ath);
+        throwUnless(22047, dexMinOut == self.evidence_dex_min_out_atomic_ath);
+    }
+
     fun requireNextQueryId(queryId: Int) {
         throwUnless(22045, queryId < UINT64_MAX);
         throwUnless(22044, queryId == self.last_terminal_query_id + 1);
@@ -403,7 +409,7 @@ contract BuybackBurn {
         throwUnless(22214, msg.deadline > now());
         throwUnless(22215, msg.deadline <= now() + BUYBACK_DEADLINE_MAX_AHEAD_SECONDS);
         throwUnless(22216, context().value >= BUYBACK_PTON_TRANSFER_GAS_NANOTONS);
-        self.validateMinOut(msg.quote_out_atomic_ath, msg.dex_min_out_atomic_ath);
+        self.requireFrozenExecutionQuote(msg.quote_out_atomic_ath, msg.dex_min_out_atomic_ath);
 
         self.reserve_due_ton -= BUYBACK_FUNDING_ENVELOPE_NANOTONS;
         self.phase = BUYBACK_PHASE_PENDING_STONFI_SWAP;
