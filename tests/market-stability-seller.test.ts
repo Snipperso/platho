@@ -3,6 +3,9 @@ import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
+  ATHTransferAck,
+  ATHTransferFailed,
+  AthTransferNotification,
   BindMarketStabilityOfficialAthWallet,
   BindMarketStabilityReserveFunder,
   BindMarketStabilityTreasury,
@@ -166,12 +169,22 @@ async function sealOnly(env: Awaited<ReturnType<typeof setup>>) {
 }
 
 async function fundReserve(env: Awaited<ReturnType<typeof setup>>, amount: bigint, queryId = 1n) {
-  await env.reserveFunderAthWallet.send(env.reserveFunder.getSender(), { value: FUNDING_NOTIFY_VALUE }, {
+  await fundReserveFrom(env, env.reserveFunder, env.reserveFunderAthWallet, amount, queryId);
+}
+
+async function fundReserveFrom(
+  env: Awaited<ReturnType<typeof setup>>,
+  sourceOwner: Awaited<ReturnType<Blockchain['treasury']>>,
+  sourceAthWallet: Awaited<ReturnType<typeof deployAthWallet>>,
+  amount: bigint,
+  queryId = 1n,
+) {
+  await sourceAthWallet.send(sourceOwner.getSender(), { value: FUNDING_NOTIFY_VALUE }, {
     $$type: 'ATHTransferRequestWithNotify',
     query_id: queryId,
     amount,
     recipient: env.seller.address,
-    response_destination: env.reserveFunder.address,
+    response_destination: sourceOwner.address,
     notify_destination: env.seller.address,
     notify_value: NOTIFY_VALUE,
   } as ATHTransferRequestWithNotify);
@@ -179,6 +192,26 @@ async function fundReserve(env: Awaited<ReturnType<typeof setup>>, amount: bigin
 
 async function officialSellerAthWallet(env: Awaited<ReturnType<typeof setup>>) {
   return env.blockchain.openContract(new ATHWallet(env.officialAthWallet, await ATHWallet.init(0n, env.seller.address, env.athMaster)));
+}
+
+async function deployWrongMasterAthWalletAt(
+  blockchain: Blockchain,
+  address: Address,
+  owner: Address,
+  correctMaster: Address,
+  wrongMaster: Address,
+  athBalance: bigint,
+) {
+  const correctInit = await ATHWallet.init(0n, owner, correctMaster);
+  const wrongDataInit = await ATHWallet.init(athBalance, owner, wrongMaster);
+  await blockchain.setShardAccount(address, createShardAccount({
+    address,
+    code: correctInit.code,
+    data: wrongDataInit.data,
+    balance: toNano('1'),
+    workchain: address.workChain,
+  }));
+  return blockchain.openContract(new ATHWallet(address, correctInit));
 }
 
 describe('MarketStabilitySeller', () => {
@@ -226,6 +259,7 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
     expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth);
     expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(0n);
+    expect((await (await officialSellerAthWallet(env)).getGetPendingNotification(1n, senderKey(env.reserveFunder.address))).exists).toBe(false);
 
     await freezePricing(env);
     config = await env.seller.getGetMarketStabilitySellerConfig();
@@ -234,6 +268,35 @@ describe('MarketStabilitySeller', () => {
 
     await fundReserve(env, TRANCHE, 2n);
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
+  });
+
+  it('MSTAB-01D: forged and non-bound funding notifications do not move Seller reserve or keep ATH', async () => {
+    const env = await setup();
+    await bindFreezeSeal(env);
+
+    await env.seller.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'AthTransferNotification',
+      query_id: 710n,
+      sender_key: senderKey(env.reserveFunder.address),
+      amount: TRANCHE,
+      sender_wallet: env.reserveFunder.address,
+    } as AthTransferNotification);
+
+    expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(0n);
+
+    const wrongFunder = await env.blockchain.treasury('market-stability-wrong-reserve-funder');
+    const wrongFunderAthWallet = await deployAthWallet(env.blockchain, wrongFunder.address, env.athMaster, TRANCHE);
+    const wrongFunderInitialAth = (await wrongFunderAthWallet.getGetWalletData()).balance;
+
+    await fundReserveFrom(env, wrongFunder, wrongFunderAthWallet, TRANCHE, 711n);
+
+    const officialWallet = await officialSellerAthWallet(env);
+    expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(0n);
+    expect((await wrongFunderAthWallet.getGetWalletData()).balance).toBe(wrongFunderInitialAth);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await officialWallet.getGetPendingNotification(711n, senderKey(wrongFunder.address))).exists).toBe(false);
   });
 
   it('MSTAB-01C: rejects underpriced launch evidence before freezing pricing', async () => {
@@ -330,17 +393,20 @@ describe('MarketStabilitySeller', () => {
 
     const rejectingRecipientOwner = env.recipient.address;
     const rejectingRecipientWalletAddress = await athWalletAddress(rejectingRecipientOwner, env.athMaster);
-    const rejectInit = await MockAthWalletNoAck.init();
-    await env.blockchain.setShardAccount(rejectingRecipientWalletAddress, createShardAccount({
-      address: rejectingRecipientWalletAddress,
-      code: rejectInit.code,
-      data: rejectInit.data,
-      balance: toNano('1'),
-      workchain: rejectingRecipientWalletAddress.workChain,
-    }));
+    const rejectingRecipientWallet = await deployWrongMasterAthWalletAt(
+      env.blockchain,
+      rejectingRecipientWalletAddress,
+      rejectingRecipientOwner,
+      env.athMaster,
+      fixtureAddress('ATH_MASTER_REJECTING_RECIPIENT'),
+      123n,
+    );
 
     const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
     const buyerBefore = (await env.blockchain.getContract(env.buyer.address)).balance;
+    const officialWallet = await officialSellerAthWallet(env);
+    const officialBefore = (await officialWallet.getGetWalletData()).balance;
+    const recipientBefore = (await rejectingRecipientWallet.getGetWalletData()).balance;
 
     await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
       $$type: 'BuyMarketStabilityAth',
@@ -349,8 +415,8 @@ describe('MarketStabilitySeller', () => {
       recipient: rejectingRecipientOwner,
     } as BuyMarketStabilityAth);
 
-    const state = await env.seller.getGetMarketStabilitySellerState();
-    const totals = await env.seller.getGetMarketStabilitySellerTotals();
+    let state = await env.seller.getGetMarketStabilitySellerState();
+    let totals = await env.seller.getGetMarketStabilitySellerTotals();
     const buyerAfter = (await env.blockchain.getContract(env.buyer.address)).balance;
 
     expect(state.phase).toBe(0n);
@@ -358,7 +424,90 @@ describe('MarketStabilitySeller', () => {
     expect(state.treasury_due_ton).toBe(0n);
     expect(state.last_terminal_query_id).toBe(1n);
     expect(totals.sold_ath_total).toBe(0n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(officialBefore);
+    expect((await rejectingRecipientWallet.getGetWalletData()).balance).toBe(recipientBefore);
     expect(buyerAfter).toBeGreaterThan(buyerBefore - BUY_TRANSFER_REQUEST_VALUE - BUY_EXEC_RESERVE - toNano('0.05'));
+
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount: TRANCHE,
+      recipient: env.attacker.address,
+    } as BuyMarketStabilityAth);
+    expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TRANCHE);
+
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 2n,
+      amount: TRANCHE,
+      recipient: env.attacker.address,
+    } as BuyMarketStabilityAth);
+
+    const successRecipientWalletAddress = await athWalletAddress(env.attacker.address, env.athMaster);
+    const successRecipientWallet = env.blockchain.openContract(new ATHWallet(successRecipientWalletAddress, await ATHWallet.init(0n, env.attacker.address, env.athMaster)));
+    state = await env.seller.getGetMarketStabilitySellerState();
+    totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(state.treasury_due_ton).toBe(price);
+    expect(state.last_terminal_query_id).toBe(2n);
+    expect(totals.sold_ath_total).toBe(TRANCHE);
+    expect((await successRecipientWallet.getGetWalletData()).balance).toBe(TRANCHE);
+  });
+
+  it('MSTAB-02C: accepted transfer request without ATHWallet callback leaves sale pending and blocks new sales', async () => {
+    const env = await setup();
+    await bindFreezeSeal(env);
+    await fundReserve(env, TRANCHE);
+
+    const mockAthWalletInit = await MockAthWalletNoAck.init();
+    await env.blockchain.setShardAccount(env.officialAthWallet, createShardAccount({
+      address: env.officialAthWallet,
+      code: mockAthWalletInit.code,
+      data: mockAthWalletInit.data,
+      balance: toNano('1'),
+      workchain: env.officialAthWallet.workChain,
+    }));
+
+    const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount: TRANCHE,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    let state = await env.seller.getGetMarketStabilitySellerState();
+    let totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.phase).toBe(1n);
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(state.treasury_due_ton).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(0n);
+    expect(totals.sold_ath_total).toBe(0n);
+
+    await env.seller.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferAck',
+      query_id: 1n,
+      amount: TRANCHE,
+    } as ATHTransferAck);
+    await env.seller.send(env.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferFailed',
+      query_id: 1n,
+      amount: TRANCHE,
+    } as ATHTransferFailed);
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 2n,
+      amount: TRANCHE,
+      recipient: env.attacker.address,
+    } as BuyMarketStabilityAth);
+
+    state = await env.seller.getGetMarketStabilitySellerState();
+    totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.phase).toBe(1n);
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(state.treasury_due_ton).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(0n);
+    expect(totals.sold_ath_total).toBe(0n);
   });
 
   it('MSTAB-03: rejects over-cap reserve funding and over-tranche buys before mutation', async () => {
@@ -367,9 +516,15 @@ describe('MarketStabilitySeller', () => {
     await fundReserve(env, TOTAL_RESERVE, 1n);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(TOTAL_RESERVE);
 
+    const reserveFunderBeforeOverCap = (await env.reserveFunderAthWallet.getGetWalletData()).balance;
+    const officialWallet = await officialSellerAthWallet(env);
+    const officialBeforeOverCap = (await officialWallet.getGetWalletData()).balance;
     await fundReserve(env, 1n, 2n);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(TOTAL_RESERVE);
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TOTAL_RESERVE);
+    expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderBeforeOverCap);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(officialBeforeOverCap);
+    expect((await officialWallet.getGetPendingNotification(2n, senderKey(env.reserveFunder.address))).exists).toBe(false);
 
     const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
     await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE + toNano('1') }, {
