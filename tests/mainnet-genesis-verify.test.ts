@@ -65,6 +65,7 @@ function finalInput(): MainnetGenesisVerifyInput {
       addresses,
       code_hashes,
       constants: {
+        ath_total_supply_atomic: '100000000000000000',
         vault_activity_airdrop_total_atomic: '30000000000000000',
         ath_market_stability_reserve_allocation_atomic: '45000000000000000',
       },
@@ -74,6 +75,7 @@ function finalInput(): MainnetGenesisVerifyInput {
       ath_master: {
         address: addresses.ath_master,
         code_hash: code_hashes.ath_master,
+        total_supply_atomic: '100000000000000000',
         treasury_owner_address: addresses.ath_treasury_owner,
         treasury_supply_deployed: true,
       },
@@ -228,6 +230,16 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN');
     expect(report.issue_codes).toContain('PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN');
     expect(report.issue_codes).toContain('BUYBACK_ATH_MASTER_NOT_BASECHAIN');
+  });
+
+  it('rejects final genesis when ATHMaster total supply does not match the manifest supply constant', () => {
+    const input = finalInput();
+    input.snapshot.ath_master.total_supply_atomic = '99999999999999999';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('ATH_MASTER_TOTAL_SUPPLY_MISMATCH');
   });
 
   it('rejects sealing a correct manifest hash with the wrong ProfileRegistry official ATH wallet', () => {
