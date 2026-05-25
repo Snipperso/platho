@@ -159,4 +159,58 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
     expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
   });
+
+  it('USERNAME-REG-M13-03: pruned name can be paid again and finalized only after a fresh pending mint exists', async () => {
+    const ctx = await deploySealedRegistry();
+    const ownerWallet = fixtureAddress('USERNAME_M13_REMINT_OWNER');
+    const { hash, itemAddress } = await createStuckPendingMint(ctx, ownerWallet, 'remint');
+
+    ctx.blockchain.now = 1_700_000_000 + STALE_TTL + 1;
+    await ctx.registry.send(ctx.pruner.getSender(), { value: toNano('0.03') }, {
+      $$type: 'PrunePendingUsernameMint',
+      name_hash: hash,
+    } as PrunePendingUsernameMint);
+
+    expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
+
+    await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.03') }, {
+      $$type: 'UsernameItemDeployedAck',
+      name_hash: hash,
+      owner_wallet: ownerWallet,
+    } as UsernameItemDeployedAck);
+    expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
+
+    await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('0.15') }, {
+      $$type: 'AthTransferNotificationMintUsername',
+      query_id: 13002n,
+      amount: PRICE_6_PLUS,
+      sender_key: 0n,
+      owner_wallet: ownerWallet,
+      username_len: 6n,
+      username: usernameSlice('remint'),
+    } as AthTransferNotificationMintUsername);
+
+    expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
+    expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
+
+    await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.03') }, {
+      $$type: 'UsernameItemDeployedAck',
+      name_hash: hash,
+      owner_wallet: ownerWallet,
+    } as UsernameItemDeployedAck);
+
+    const global = await ctx.registry.getGetGlobal();
+    const record = await ctx.registry.getGetNameRecord(hash);
+    expect(record.exists).toBe(true);
+    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.item_address.equals(itemAddress)).toBe(true);
+    expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
+    expect(global.name_record_count).toBe(1n);
+    expect(global.pending_mint_count).toBe(0n);
+    expect(global.treasury_due_ath).toBe(PRICE_6_PLUS / 2n);
+    expect(global.burn_due_ath).toBe(PRICE_6_PLUS / 2n);
+  });
 });
