@@ -72,6 +72,34 @@ describe('M16 production conformance static checks', () => {
     }
   });
 
+  it('M16-CONF-01B: production runtime contains no legacy message-budget or wallet-funded publish surface', () => {
+    const runtimeFiles = [
+      ...productionContracts.map((name) => join('contracts', name)),
+      join('web', 'app.js'),
+      join('web', 'pwa-contract-transactions.mjs'),
+      join('web', 'vault-chain-provider.mjs'),
+      join('web', 'vault-ton-rpc-provider.mjs'),
+      join('scripts', 'deployment_manifest_m15.ts'),
+      join('scripts', 'mainnet_genesis_verify.ts'),
+    ];
+    const forbidden = [
+      /message_budget_ton/,
+      /TopUpMessageBudget/,
+      /budget_epoch/,
+      /SetSession/,
+      /RevokeSession/,
+      /PublishPrivateFromWallet/,
+      /PublishPublicFromWallet/,
+    ];
+
+    for (const runtimeFile of runtimeFiles) {
+      const source = stripLineComments(file(runtimeFile));
+      for (const pattern of forbidden) {
+        expect(source, `${runtimeFile} must not match ${pattern}`).not.toMatch(pattern);
+      }
+    }
+  });
+
   it('M16-CONF-02: all production contracts reject empty fallback explicitly', () => {
     for (const contract of productionContracts) {
       const source = contractSource(contract);
