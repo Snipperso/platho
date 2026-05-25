@@ -88,6 +88,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   const treasuryOwner = await blockchain.treasury('bb-neg-ath-treasury-owner');
   const stonfiRouter = await blockchain.treasury('bb-neg-stonfi-router');
   const stonfiPoolOwner = await blockchain.treasury('bb-neg-stonfi-pool-owner');
+  const stonfiAthSourceOwner = await blockchain.treasury('bb-neg-stonfi-ath-source-owner');
   const wrongPoolOwner = await blockchain.treasury('bb-neg-wrong-pool-owner');
   const stonfiPtonWallet = await blockchain.treasury('bb-neg-stonfi-pton-wallet');
   const stonfiReferral = await blockchain.treasury('bb-neg-stonfi-referral');
@@ -119,7 +120,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
   }));
   const buyback = blockchain.openContract(new BuybackBurn(buybackAddress, buybackInit));
   const officialAthWallet = await buyback.getGetOfficialAthWalletAddress();
-  const stonfiAskJettonWallet = fixtureAddress('SDK_ROUTER_ATH_WALLET');
+  const stonfiAskJettonWallet = await athWalletAddress(stonfiAthSourceOwner.address, athMasterAddress);
 
   return {
     blockchain,
@@ -134,6 +135,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
     attacker,
     stonfiRouter,
     stonfiPoolOwner,
+    stonfiAthSourceOwner,
     wrongPoolOwner,
     stonfiPtonWallet,
     stonfiReferral,
@@ -157,6 +159,7 @@ async function forcePendingAthBurn(
     official_ath_wallet_address: env.officialAthWallet,
     stonfi_router_address: env.stonfiRouter.address,
     stonfi_pool_address_ton_ath: env.stonfiPoolOwner.address,
+    stonfi_ath_source_owner_address: env.stonfiAthSourceOwner.address,
     stonfi_pton_wallet_address: env.stonfiPtonWallet.address,
     ask_jetton_wallet_address: env.stonfiAskJettonWallet,
     stonfi_referral_address: env.stonfiReferral.address,
@@ -201,6 +204,7 @@ function routeFreeze(
     deployment_manifest_hash: MANIFEST_HASH,
     stonfi_router_address: env.stonfiRouter.address,
     stonfi_pool_address_ton_ath: env.stonfiPoolOwner.address,
+    stonfi_ath_source_owner_address: env.stonfiAthSourceOwner.address,
     stonfi_pton_wallet_address: env.stonfiPtonWallet.address,
     ask_jetton_wallet_address: env.stonfiAskJettonWallet,
     stonfi_referral_address: env.stonfiReferral.address,
@@ -311,6 +315,7 @@ describe('BuybackBurn auth and negative matrix', () => {
       routeFreeze(env, { route_evidence_hash: 0n }),
       routeFreeze(env, { referral_value_bps: 101n }),
       routeFreeze(env, { ask_jetton_wallet_address: fixtureAddress('MASTERCHAIN_ASK_WALLET', -1) }),
+      routeFreeze(env, { ask_jetton_wallet_address: fixtureAddress('MISMATCHED_BASECHAIN_ASK_WALLET') }),
       routeFreeze(env, { evidence_quote_out_atomic_ath: 100_000n, evidence_dex_min_out_atomic_ath: 94_999n }),
       routeFreeze(env, { evidence_quote_out_atomic_ath: 200_000n, evidence_dex_min_out_atomic_ath: 189_999n }),
       routeFreeze(env, { evidence_quote_out_atomic_ath: 100_000n, evidence_dex_min_out_atomic_ath: 100_001n }),
@@ -423,11 +428,11 @@ describe('BuybackBurn auth and negative matrix', () => {
       query_id: 1n,
       amount: 100_000n,
       sender_key: 0n,
-      sender_wallet: env.stonfiPoolOwner.address,
+      sender_wallet: env.stonfiAthSourceOwner.address,
     } as AthTransferNotification);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
-    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 94_999n, 1n);
+    await sendStonfiAthNotify(env, env.stonfiAthSourceOwner.address, env.stonfiAthSourceOwner.getSender(), 94_999n, 1n);
     let state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
@@ -437,7 +442,7 @@ describe('BuybackBurn auth and negative matrix', () => {
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
 
-    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 100_000n, 1n, toNano('0.02'));
+    await sendStonfiAthNotify(env, env.stonfiAthSourceOwner.address, env.stonfiAthSourceOwner.getSender(), 100_000n, 1n, toNano('0.02'));
     state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
@@ -523,7 +528,7 @@ describe('BuybackBurn auth and negative matrix', () => {
     await acceptReserve(env);
     await executeBuyback(env, 1n);
 
-    await sendStonfiAthNotify(env, env.stonfiPoolOwner.address, env.stonfiPoolOwner.getSender(), 100_000n, 1n);
+    await sendStonfiAthNotify(env, env.stonfiAthSourceOwner.address, env.stonfiAthSourceOwner.getSender(), 100_000n, 1n);
 
     let state = await env.buyback.getGetBuybackBurnState();
     expect(state.phase).toBe(PHASE_IDLE);

@@ -32,6 +32,8 @@ export interface M20FMainnetRouteFreezeInput {
     buybackBurnOfficialAthWalletAddress: string;
     stonfiRouterAddress: string;
     stonfiPoolAddressTonAth: string;
+    stonfiAthSourceOwnerAddress: string;
+    stonfiAthSourceWalletAddress: string;
     stonfiPtonMasterAddress: string;
     stonfiPtonWalletAddress: string;
     askJettonWalletAddress: string;
@@ -40,6 +42,7 @@ export interface M20FMainnetRouteFreezeInput {
     athDeploymentManifest: string;
     buybackBurnStateInitVector: string;
     officialAthWalletDerivationVector: string;
+    stonfiAthSourceWalletDerivationVector: string;
     stonfiApiSimulationCapture: string;
     stonfiSdkOrApiTxParamsCapture: string;
     routerPoolPtonCodeHashes: string;
@@ -143,6 +146,8 @@ function makeTemplate(): M20FMainnetRouteFreezeInput {
       buybackBurnOfficialAthWalletAddress: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
       stonfiRouterAddress: 'REQUIRED_FROM_STONFI_API_SIMULATION_ROUTER_ADDRESS',
       stonfiPoolAddressTonAth: 'REQUIRED_FROM_STONFI_API_SIMULATION_OR_POOL_QUERY',
+      stonfiAthSourceOwnerAddress: 'REQUIRED_ATH_OUTPUT_SOURCE_OWNER_WHO_DERIVES_ASK_WALLET',
+      stonfiAthSourceWalletAddress: 'REQUIRED_DERIVED_ATH_OUTPUT_SOURCE_WALLET_ADDRESS',
       stonfiPtonMasterAddress: 'REQUIRED_FROM_STONFI_API_SIMULATION_ROUTER_PTON_MASTER',
       stonfiPtonWalletAddress: 'REQUIRED_FROM_OFFICIAL_SDK_TX_PARAMS_TO_ADDRESS',
       askJettonWalletAddress: 'REQUIRED_FROM_OFFICIAL_SDK_SWAP_PAYLOAD',
@@ -151,6 +156,7 @@ function makeTemplate(): M20FMainnetRouteFreezeInput {
       athDeploymentManifest: 'required: immutable artifact path/hash for final ATH deployment',
       buybackBurnStateInitVector: 'required: immutable artifact path/hash for final BuybackBurn StateInit',
       officialAthWalletDerivationVector: 'required: immutable artifact path/hash for official BuybackBurn ATH wallet derivation',
+      stonfiAthSourceWalletDerivationVector: 'required: immutable artifact path/hash proving source owner derives askJettonWalletAddress',
       stonfiApiSimulationCapture: 'required: STON.fi API /v1/swap/simulate capture path/hash',
       stonfiSdkOrApiTxParamsCapture: 'required: official @ston-fi/sdk/API tx params capture path/hash',
       routerPoolPtonCodeHashes: 'required: mainnet router/pool/pTON code hash proof path/hash',
@@ -313,6 +319,7 @@ export function createM20FMainnetRouteFreezePreflight(options: {
     requiredNextInputs: [
       'Deploy/freeze final mainnet ATH master and capture immutable deployment manifest.',
       'Derive final production BuybackBurn StateInit address and official BuybackBurn ATH wallet.',
+      'Derive the STON.fi ATH source owner wallet and prove it equals the SDK/API askJettonWalletAddress.',
       'Use STON.fi API mainnet simulation for exact 50 TON -> ATH route and capture router metadata.',
       'Generate official @ston-fi/sdk/@ston-fi/api tx params from the simulation result.',
       'Capture router, pool, pTON, ATH master, and ATH wallet code hashes on mainnet.',

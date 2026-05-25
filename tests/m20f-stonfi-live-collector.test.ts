@@ -10,6 +10,7 @@ import {
   addressRaw,
   buildStonfiTonToJettonTxParamsV21,
   cellBocBase64,
+  createBuybackRouteNotifyPayload,
   deterministicAddress,
   PLATHO_BUYBACK_STONFI_M19B,
 } from '../scripts/stonfi_v2_1_route_lib';
@@ -31,6 +32,8 @@ function completeInput(overrides: Partial<M20FStonfiLiveCollectorInput> = {}): M
       athMasterAddress: athMaster,
       buybackBurnAddress: addr('buybackBurn'),
       buybackBurnOfficialAthWalletAddress: addr('buybackOfficialAthWallet'),
+      stonfiAthSourceOwnerAddress: addr('stonfiAthSourceOwner'),
+      stonfiAthSourceWalletAddress: addr('askJettonWallet'),
     },
     route: {
       offerAddress: 'ton',
@@ -63,6 +66,7 @@ function completeInput(overrides: Partial<M20FStonfiLiveCollectorInput> = {}): M
       athDeploymentManifest: 'sha256:ath-deployment-mainnet',
       buybackBurnStateInitVector: 'sha256:buyback-stateinit-mainnet',
       officialAthWalletDerivationVector: 'sha256:official-ath-wallet-mainnet',
+      stonfiAthSourceWalletDerivationVector: 'sha256:stonfi-ath-source-wallet-mainnet',
       stonfiApiSimulationCapture: 'sha256:stonfi-api-simulation-mainnet',
       stonfiSdkOrApiTxParamsCapture: 'sha256:stonfi-sdk-txparams-mainnet',
       routerPoolPtonCodeHashes: 'sha256:router-pool-pton-codehashes-mainnet',
@@ -135,6 +139,8 @@ async function txParamsFor(input: M20FStonfiLiveCollectorInput, simulation: M20F
     excessesAddress: input.addresses.buybackBurnAddress,
     deadline: input.routeControls.deadline,
     forwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_ROUTE_FORWARD_GAS,
+    dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+    dexCustomPayload: createBuybackRouteNotifyPayload(input.routeControls.queryId),
     ptonTonTransferGas: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_PTON_TRANSFER_GAS,
   });
 
@@ -209,6 +215,8 @@ describe('M20F STON.fi live collector', () => {
     expect(report.decoded?.stonfiSwapPayload?.refundAddress).toBe(buybackRaw);
     expect(report.decoded?.stonfiSwapPayload?.excessesAddress).toBe(buybackRaw);
     expect(report.decoded?.stonfiSwapPayload?.details.receiverAddress).toBe(officialWalletRaw);
+    expect(report.decoded?.stonfiSwapPayload?.details.dexCustomPayloadForwardGasAmount).toBe(PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS.toString());
+    expect(report.decoded?.stonfiSwapPayload?.details.hasDexCustomPayload).toBe(true);
     expect(report.m19eReport?.route_freeze_ready).toBe(true);
   });
 

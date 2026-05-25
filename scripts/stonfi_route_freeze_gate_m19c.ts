@@ -4,6 +4,7 @@ import {
   addressRaw,
   buildStonfiTonToJettonTxParamsV21,
   cellBocBase64,
+  createBuybackRouteNotifyPayload,
   deterministicAddress,
   PLATHO_BUYBACK_STONFI_M19B,
   STONFI_SDK_SOURCE,
@@ -20,6 +21,8 @@ const fixture = {
   buybackBurnOfficialAthWalletAddress: deterministicAddress('PLATHO.M19C.fixture.buybackburn.official.ath.wallet'),
   stonfiRouterAddress: deterministicAddress('PLATHO.M19C.fixture.stonfi.router.v2_1'),
   stonfiPoolAddressTonAth: deterministicAddress('PLATHO.M19C.fixture.stonfi.pool.ton-ath'),
+  stonfiAthSourceOwnerAddress: deterministicAddress('PLATHO.M19C.fixture.stonfi.ath.source.owner'),
+  stonfiAthSourceWalletAddress: deterministicAddress('PLATHO.M19C.fixture.router.ath.wallet'),
   stonfiPtonWalletAddress: deterministicAddress('PLATHO.M19C.fixture.pton.wallet'),
   askJettonWalletAddress: deterministicAddress('PLATHO.M19C.fixture.router.ath.wallet'),
 };
@@ -42,6 +45,8 @@ const fixtureTx = buildStonfiTonToJettonTxParamsV21({
   excessesAddress: fixture.buybackBurnAddress,
   deadline,
   forwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_ROUTE_FORWARD_GAS,
+  dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+  dexCustomPayload: createBuybackRouteNotifyPayload(queryId),
   ptonTonTransferGas: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_PTON_TRANSFER_GAS,
 });
 

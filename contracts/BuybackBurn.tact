@@ -48,6 +48,7 @@ message(0x42595246) FreezeBuybackRoute { // "BYRF"
     deployment_manifest_hash: Int as uint256;
     stonfi_router_address: Address;
     stonfi_pool_address_ton_ath: Address;
+    stonfi_ath_source_owner_address: Address;
     stonfi_pton_wallet_address: Address;
     ask_jetton_wallet_address: Address;
     stonfi_referral_address: Address;
@@ -99,6 +100,7 @@ struct BuybackBurnConfigView {
     official_ath_wallet_address: Address;
     stonfi_router_address: Address;
     stonfi_pool_address_ton_ath: Address;
+    stonfi_ath_source_owner_address: Address;
     stonfi_pton_wallet_address: Address;
     ask_jetton_wallet_address: Address;
     stonfi_referral_address: Address;
@@ -136,6 +138,7 @@ contract BuybackBurn {
     official_ath_wallet_address: Address;
     stonfi_router_address: Address;
     stonfi_pool_address_ton_ath: Address;
+    stonfi_ath_source_owner_address: Address;
     stonfi_pton_wallet_address: Address;
     ask_jetton_wallet_address: Address;
     stonfi_referral_address: Address;
@@ -171,6 +174,7 @@ contract BuybackBurn {
         self.official_ath_wallet_address = ath_master_address;
         self.stonfi_router_address = ath_master_address;
         self.stonfi_pool_address_ton_ath = ath_master_address;
+        self.stonfi_ath_source_owner_address = ath_master_address;
         self.stonfi_pton_wallet_address = ath_master_address;
         self.ask_jetton_wallet_address = ath_master_address;
         self.stonfi_referral_address = ath_master_address;
@@ -374,10 +378,13 @@ contract BuybackBurn {
         throwUnless(22122, msg.route_evidence_hash != 0);
         throwUnless(22123, msg.referral_value_bps <= 100);
         throwUnless(22124, self.isBasechainAddress(msg.ask_jetton_wallet_address));
+        throwUnless(22132, self.isBasechainAddress(msg.stonfi_ath_source_owner_address));
+        throwUnless(22133, msg.ask_jetton_wallet_address == self.deriveAthWalletAddress(msg.stonfi_ath_source_owner_address));
         self.buyback_min_ath_out_per_50_ton_atomic = msg.buyback_min_ath_out_per_50_ton_atomic;
         self.validateMinOut(msg.evidence_quote_out_atomic_ath, msg.evidence_dex_min_out_atomic_ath);
         self.stonfi_router_address = msg.stonfi_router_address;
         self.stonfi_pool_address_ton_ath = msg.stonfi_pool_address_ton_ath;
+        self.stonfi_ath_source_owner_address = msg.stonfi_ath_source_owner_address;
         self.stonfi_pton_wallet_address = msg.stonfi_pton_wallet_address;
         self.ask_jetton_wallet_address = msg.ask_jetton_wallet_address;
         self.stonfi_referral_address = msg.stonfi_referral_address;
@@ -448,7 +455,7 @@ contract BuybackBurn {
         throwUnless(22301, self.phase == BUYBACK_PHASE_PENDING_STONFI_SWAP);
         throwUnless(22302, msg.query_id == self.pending_query_id);
         throwUnless(22303, msg.amount >= self.pending_dex_min_out_atomic_ath);
-        throwUnless(22304, msg.sender_wallet == self.stonfi_pool_address_ton_ath);
+        throwUnless(22304, msg.sender_wallet == self.stonfi_ath_source_owner_address);
         throwUnless(22305, context().value >= BUYBACK_ATH_NOTIFY_ACK_VALUE);
 
         if (context().value < BUYBACK_ROUTE_NOTIFY_MIN_VALUE) {
@@ -602,6 +609,7 @@ contract BuybackBurn {
             official_ath_wallet_address: self.official_ath_wallet_address,
             stonfi_router_address: self.stonfi_router_address,
             stonfi_pool_address_ton_ath: self.stonfi_pool_address_ton_ath,
+            stonfi_ath_source_owner_address: self.stonfi_ath_source_owner_address,
             stonfi_pton_wallet_address: self.stonfi_pton_wallet_address,
             ask_jetton_wallet_address: self.ask_jetton_wallet_address,
             stonfi_referral_address: self.stonfi_referral_address,

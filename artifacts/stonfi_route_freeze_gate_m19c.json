@@ -29,6 +29,8 @@
     "buybackBurnOfficialAthWalletAddress": "0:899540da68f11200896df20f0cae4ca77e5ced3753a3756b0f7689a5db29890c",
     "stonfiRouterAddress": "0:072b70e74cef314340ce386cf15e1f501d5ebc17126a4550948d2aaf4a869021",
     "stonfiPoolAddressTonAth": "0:0714490baeb2fba1e2d9e498c66ef426e95ed01f8692acb877733c0a649a0cee",
+    "stonfiAthSourceOwnerAddress": "0:648666d6545879cc9ac47c0690a982f72294db5ff246c46a258999ef25e8127a",
+    "stonfiAthSourceWalletAddress": "0:d82438bca9e5d9d89ae94e3b13f7c4e05dccc42c042b0e2edc5f8cf53cb9684d",
     "stonfiPtonWalletAddress": "0:f961caabda95ef72c9a41f54073f62340ddec44125be9f6d2334dbbcf09c53ae",
     "askJettonWalletAddress": "0:d82438bca9e5d9d89ae94e3b13f7c4e05dccc42c042b0e2edc5f8cf53cb9684d"
   },
@@ -74,10 +76,10 @@
       }
     ],
     "rebuilt_hashes": {
-      "ptonTransferBodyHash": "e1f95e5c9dd2f7702d31741f1423a1ac68fccafc9b9912b911ca9464e0441f9a",
-      "samplePtonTransferBodyHash": "e1f95e5c9dd2f7702d31741f1423a1ac68fccafc9b9912b911ca9464e0441f9a",
-      "stonfiSwapForwardPayloadHash": "19f5b0efebbe4c5256922bcdbbd63887fe9cafa095b25ca365fd7bf495438aff",
-      "sampleStonfiSwapForwardPayloadHash": "19f5b0efebbe4c5256922bcdbbd63887fe9cafa095b25ca365fd7bf495438aff"
+      "ptonTransferBodyHash": "491294472df956c766adf1c014108050c0e56e6d86f1cfdcaeceb1bd4fa55757",
+      "samplePtonTransferBodyHash": "491294472df956c766adf1c014108050c0e56e6d86f1cfdcaeceb1bd4fa55757",
+      "stonfiSwapForwardPayloadHash": "bddc8c80d241bde232e569b3e93b7a3ccae1ed627bc74c009f1fb295b02047f3",
+      "sampleStonfiSwapForwardPayloadHash": "bddc8c80d241bde232e569b3e93b7a3ccae1ed627bc74c009f1fb295b02047f3"
     },
     "decoded": {
       "ptonTransfer": {
@@ -86,7 +88,7 @@
         "tonAmount": "50000000000",
         "refundAddress": "0:d61f33ad43d233cb55769bd01a887fa0e5e23f543063708ff3b03f59f23eecdc",
         "hasForwardPayload": true,
-        "forwardPayloadHash": "19f5b0efebbe4c5256922bcdbbd63887fe9cafa095b25ca365fd7bf495438aff"
+        "forwardPayloadHash": "bddc8c80d241bde232e569b3e93b7a3ccae1ed627bc74c009f1fb295b02047f3"
       },
       "stonfiSwapPayload": {
         "op": "0x6664de2a",
@@ -97,8 +99,9 @@
         "details": {
           "minAskAmount": "950000000000000",
           "receiverAddress": "0:899540da68f11200896df20f0cae4ca77e5ced3753a3756b0f7689a5db29890c",
-          "dexCustomPayloadForwardGasAmount": "0",
-          "hasDexCustomPayload": false,
+          "dexCustomPayloadForwardGasAmount": "40000000",
+          "hasDexCustomPayload": true,
+          "dexCustomPayloadHash": "fff23740f259fe58e27ee65bc277a61dcaff731cc9abfdb035f536afe4fed3a1",
           "refundForwardGasAmount": "0",
           "hasRefundPayload": false,
           "referralValue": "10",

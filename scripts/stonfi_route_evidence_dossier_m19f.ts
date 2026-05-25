@@ -69,6 +69,8 @@ export interface StonfiRouteEvidenceDossierM19F {
     buybackBurnOfficialAthWalletDerived: boolean;
     stonfiRouterAddressPinned: boolean;
     stonfiPoolAddressTonAthPinned: boolean;
+    stonfiAthSourceOwnerPinned: boolean;
+    stonfiAthSourceWalletDerivedAndMatchesAsk: boolean;
     stonfiPtonWalletAddressPinned: boolean;
     codeHashesCaptured: boolean;
     officialSdkOrApiTxParamsCaptured: boolean;
@@ -82,6 +84,7 @@ export interface StonfiRouteEvidenceDossierM19F {
     athDeploymentManifest: string;
     buybackBurnStateInitVector: string;
     officialAthWalletDerivationVector: string;
+    stonfiAthSourceWalletDerivationVector: string;
     stonfiSdkOrApiTxParams: string;
     liveQuote: string;
     codeHashProofs: string;
@@ -111,6 +114,8 @@ export function createStonfiRouteEvidenceDossierTemplateM19F(): StonfiRouteEvide
       buybackBurnOfficialAthWalletDerived: false,
       stonfiRouterAddressPinned: false,
       stonfiPoolAddressTonAthPinned: false,
+      stonfiAthSourceOwnerPinned: false,
+      stonfiAthSourceWalletDerivedAndMatchesAsk: false,
       stonfiPtonWalletAddressPinned: false,
       codeHashesCaptured: false,
       officialSdkOrApiTxParamsCaptured: false,
@@ -124,6 +129,7 @@ export function createStonfiRouteEvidenceDossierTemplateM19F(): StonfiRouteEvide
       athDeploymentManifest: 'required: ATH deployment manifest artifact path/hash',
       buybackBurnStateInitVector: 'required: BuybackBurn StateInit vector artifact path/hash',
       officialAthWalletDerivationVector: 'required: official BuybackBurn ATH wallet derivation vector path/hash',
+      stonfiAthSourceWalletDerivationVector: 'required: ATH source owner -> ask jetton wallet derivation vector path/hash',
       stonfiSdkOrApiTxParams: 'required: official @ston-fi/sdk/API tx params capture path/hash',
       liveQuote: 'required: quote source, block/seqno/timestamp, and output amount path/hash',
       codeHashProofs: 'required: router/pool/pTON code hash evidence path/hash',
@@ -146,6 +152,7 @@ export function createFixtureFinalDossierM19F(): StonfiRouteEvidenceDossierM19F 
       athDeploymentManifest: 'fixture://ath-deployment-manifest#sha256',
       buybackBurnStateInitVector: 'fixture://buybackburn-stateinit-vector#sha256',
       officialAthWalletDerivationVector: 'fixture://official-ath-wallet-derivation-vector#sha256',
+      stonfiAthSourceWalletDerivationVector: 'fixture://stonfi-ath-source-wallet-derivation-vector#sha256',
       stonfiSdkOrApiTxParams: 'fixture://official-stonfi-sdk-tx-params#sha256',
       liveQuote: 'fixture://live-quote#block-seqno',
       codeHashProofs: 'fixture://code-hash-proofs#sha256',
@@ -190,6 +197,7 @@ export function validateStonfiRouteEvidenceDossierM19F(dossier: StonfiRouteEvide
     'athDeploymentManifest',
     'buybackBurnStateInitVector',
     'officialAthWalletDerivationVector',
+    'stonfiAthSourceWalletDerivationVector',
     'stonfiSdkOrApiTxParams',
     'liveQuote',
     'codeHashProofs',
@@ -209,7 +217,7 @@ export function validateStonfiRouteEvidenceDossierM19F(dossier: StonfiRouteEvide
     issues.push(issue('MISSING_LIVE_EVIDENCE_INPUT', 'Dossier must include liveEvidenceInput'));
   } else {
     const addresses: Record<string, unknown> = input.addresses as any;
-    for (const key of ['athMasterAddress', 'buybackBurnAddress', 'buybackBurnOfficialAthWalletAddress', 'stonfiRouterAddress', 'stonfiPoolAddressTonAth', 'stonfiPtonWalletAddress', 'askJettonWalletAddress']) {
+    for (const key of ['athMasterAddress', 'buybackBurnAddress', 'buybackBurnOfficialAthWalletAddress', 'stonfiRouterAddress', 'stonfiPoolAddressTonAth', 'stonfiAthSourceOwnerAddress', 'stonfiAthSourceWalletAddress', 'stonfiPtonWalletAddress', 'askJettonWalletAddress']) {
       if (!parseableAddress(addresses[key])) issues.push(issue(`BAD_ADDRESS_${key.toUpperCase()}`, `${key} must be a real parseable TON address, not a placeholder`));
     }
     for (const [key, value] of Object.entries(input.codeHashes as any)) {

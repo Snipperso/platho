@@ -5,6 +5,7 @@ import {
   addressRaw,
   cellBocBase64,
   cellFromBocBase64,
+  createBuybackRouteNotifyPayload,
   decodePtonTonTransferBodyV21,
   decodeStonfiSwapBodyV21,
   normalizeDecodedPtonForJson,
@@ -83,6 +84,8 @@ export interface M20FStonfiLiveCollectorInput {
     athMasterAddress: string;
     buybackBurnAddress: string;
     buybackBurnOfficialAthWalletAddress: string;
+    stonfiAthSourceOwnerAddress: string;
+    stonfiAthSourceWalletAddress: string;
   };
   route: {
     offerAddress: 'ton';
@@ -108,6 +111,7 @@ export interface M20FStonfiLiveCollectorInput {
     athDeploymentManifest: string;
     buybackBurnStateInitVector: string;
     officialAthWalletDerivationVector: string;
+    stonfiAthSourceWalletDerivationVector: string;
     stonfiApiSimulationCapture: string;
     stonfiSdkOrApiTxParamsCapture: string;
     routerPoolPtonCodeHashes: string;
@@ -195,6 +199,8 @@ export function createM20FStonfiLiveCollectorInputTemplate(): M20FStonfiLiveColl
       athMasterAddress: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
       buybackBurnAddress: 'REQUIRED_MAINNET_BUYBACKBURN_STATEINIT_ADDRESS',
       buybackBurnOfficialAthWalletAddress: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
+      stonfiAthSourceOwnerAddress: 'REQUIRED_ATH_OUTPUT_SOURCE_OWNER_FOR_ASK_JETTON_WALLET',
+      stonfiAthSourceWalletAddress: 'REQUIRED_DERIVED_ATH_OUTPUT_SOURCE_WALLET_ADDRESS',
     },
     route: {
       offerAddress: 'ton',
@@ -227,6 +233,7 @@ export function createM20FStonfiLiveCollectorInputTemplate(): M20FStonfiLiveColl
       athDeploymentManifest: shaRef('ATH deployment manifest'),
       buybackBurnStateInitVector: shaRef('BuybackBurn StateInit vector'),
       officialAthWalletDerivationVector: shaRef('official BuybackBurn ATH wallet derivation vector'),
+      stonfiAthSourceWalletDerivationVector: shaRef('STON.fi ATH source owner wallet derivation vector'),
       stonfiApiSimulationCapture: shaRef('STON.fi API simulation capture'),
       stonfiSdkOrApiTxParamsCapture: shaRef('official STON.fi SDK/API tx params capture'),
       routerPoolPtonCodeHashes: shaRef('router/pool/pTON code hash proof'),
@@ -375,6 +382,8 @@ export async function defaultGenerateTxParams(
     referralValue: input.routeControls.referralValue ?? DEFAULT_REFERRAL_VALUE,
     deadline: Number(input.routeControls.deadline),
     forwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_ROUTE_FORWARD_GAS,
+    dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+    dexCustomPayload: createBuybackRouteNotifyPayload(input.routeControls.queryId),
     queryId: BigInt(input.routeControls.queryId),
   });
 
@@ -415,6 +424,8 @@ function buildM19EInput(
       buybackBurnOfficialAthWalletAddress: input.addresses.buybackBurnOfficialAthWalletAddress,
       stonfiRouterAddress: simulation.router.address,
       stonfiPoolAddressTonAth: simulation.poolAddress,
+      stonfiAthSourceOwnerAddress: input.addresses.stonfiAthSourceOwnerAddress,
+      stonfiAthSourceWalletAddress: input.addresses.stonfiAthSourceWalletAddress,
       stonfiPtonWalletAddress: simulation.router.ptonWalletAddress,
       stonfiVaultAddress: null,
       askJettonWalletAddress: simulation.askJettonWallet,
@@ -443,6 +454,7 @@ function buildM19EInput(
       evidenceRefs: {
         sdkTxParams: input.proofRefs.stonfiSdkOrApiTxParamsCapture,
         liveQuote: input.proofRefs.stonfiApiSimulationCapture,
+        stonfiAthSourceWalletDerivation: input.proofRefs.stonfiAthSourceWalletDerivationVector,
         successExcess: input.proofRefs.successExcessProof,
         minOutFailureRefund: input.proofRefs.minOutFailureRefundProof,
         ptonRefund: input.proofRefs.ptonRefundProof,

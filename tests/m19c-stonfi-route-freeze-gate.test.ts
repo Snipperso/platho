@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildStonfiTonToJettonTxParamsV21,
   cellBocBase64,
+  createBuybackRouteNotifyPayload,
   deterministicAddress,
   PLATHO_BUYBACK_STONFI_M19B,
   STONFI_SDK_SOURCE,
@@ -25,6 +26,8 @@ function makeCandidate(overrides: Partial<StonfiRouteFreezeCandidateV21> = {}): 
     buybackBurnOfficialAthWalletAddress: deterministicAddress('M19C.test.buybackburn.official.ath.wallet'),
     stonfiRouterAddress: deterministicAddress('M19C.test.stonfi.router'),
     stonfiPoolAddressTonAth: deterministicAddress('M19C.test.stonfi.pool'),
+    stonfiAthSourceOwnerAddress: deterministicAddress('M19C.test.stonfi.ath.source.owner'),
+    stonfiAthSourceWalletAddress: deterministicAddress('M19C.test.router.ath.wallet'),
     stonfiPtonWalletAddress: deterministicAddress('M19C.test.pton.wallet'),
     askJettonWalletAddress: deterministicAddress('M19C.test.router.ath.wallet'),
   };
@@ -51,6 +54,8 @@ function makeCandidate(overrides: Partial<StonfiRouteFreezeCandidateV21> = {}): 
     excessesAddress: addresses.buybackBurnAddress,
     deadline: swap.deadline,
     forwardGasAmount: swap.routeForwardGasNanotons,
+    dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+    dexCustomPayload: createBuybackRouteNotifyPayload(swap.queryId),
     ptonTonTransferGas: swap.ptonTransferGasNanotons,
   });
 
@@ -94,6 +99,8 @@ describe('M19C STON.fi route freeze gate / live sample harness', () => {
     expect(report.issues).toEqual([]);
     expect(report.decoded?.ptonTransfer.tonAmount).toBe(PLATHO_BUYBACK_STONFI_M19B.BUYBACK_OFFER_AMOUNT.toString());
     expect(report.decoded?.stonfiSwapPayload.details.minAskAmount).toBe('950000000000000');
+    expect(report.decoded?.stonfiSwapPayload.details.dexCustomPayloadForwardGasAmount).toBe(PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS.toString());
+    expect(report.decoded?.stonfiSwapPayload.details.hasDexCustomPayload).toBe(true);
     expect(report.rebuiltHashes?.ptonTransferBodyHash).toBe(report.rebuiltHashes?.samplePtonTransferBodyHash);
     expect(report.rebuiltHashes?.stonfiSwapForwardPayloadHash).toBe(report.rebuiltHashes?.sampleStonfiSwapForwardPayloadHash);
   });
@@ -136,6 +143,17 @@ describe('M19C STON.fi route freeze gate / live sample harness', () => {
     expect(codes).toContain('SAMPLE_MIN_OUT_MISMATCH');
     expect(codes).toContain('REBUILT_PTON_BODY_HASH_MISMATCH');
     expect(codes).toContain('REBUILT_SWAP_PAYLOAD_HASH_MISMATCH');
+  });
+
+  it('rejects a candidate whose pinned ask wallet is not the derived source ATH wallet', () => {
+    const report = validateStonfiRouteFreezeCandidateV21(makeCandidate({
+      addresses: {
+        stonfiAthSourceWalletAddress: deterministicAddress('M19C.test.wrong.source.wallet'),
+      },
+    }));
+
+    expect(report.freezeReady).toBe(false);
+    expect(report.issues.map((issue) => issue.code)).toContain('ASK_JETTON_WALLET_NOT_SOURCE_ATH_WALLET');
   });
 
   it('rejects a candidate below 95% live quote even when it is above the static circuit breaker', () => {

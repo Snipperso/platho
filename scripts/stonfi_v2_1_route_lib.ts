@@ -30,6 +30,8 @@ export const PLATHO_BUYBACK_STONFI_M19B = {
   CONSERVATIVE_ROUTE_FORWARD_GAS: toNano('1'),
   CONSERVATIVE_PTON_TRANSFER_GAS: toNano('0.05'),
   CONSERVATIVE_TOTAL_STONFI_SEND_VALUE: toNano('51.05'),
+  ROUTE_ATH_NOTIFY_FORWARD_GAS: 40_000_000n,
+  ROUTE_NOTIFY_PAYLOAD_DOMAIN: 0x42594E46,
   EXCESS_AND_REFUND_RECEIVER: 'BuybackBurn',
   STATUS: 'DRAFT_NOT_FINAL_ROUTE_FREEZE',
 } as const;
@@ -107,6 +109,13 @@ export function createStonfiSwapBodyV21(params: StonfiSwapBodyV21Params): Cell {
         .storeAddress(toAddressOrNull(params.referralAddress))
         .endCell(),
     )
+    .endCell();
+}
+
+export function createBuybackRouteNotifyPayload(queryId: bigint | number | string): Cell {
+  return beginCell()
+    .storeUint(PLATHO_BUYBACK_STONFI_M19B.ROUTE_NOTIFY_PAYLOAD_DOMAIN, 32)
+    .storeUint(asBigInt(queryId), 64)
     .endCell();
 }
 
@@ -228,6 +237,7 @@ export function decodeStonfiSwapBodyV21(cell: Cell) {
       receiverAddress,
       dexCustomPayloadForwardGasAmount: dexCustomPayloadForwardGasAmount.toString(),
       hasDexCustomPayload: dexCustomPayload !== null,
+      dexCustomPayloadHash: dexCustomPayload ? cellHashHex(dexCustomPayload) : null,
       refundForwardGasAmount: refundForwardGasAmount.toString(),
       hasRefundPayload: refundPayload !== null,
       referralValue: referralValue.toString(),
@@ -283,6 +293,7 @@ export function normalizeDecodedSwapForJson(decoded: ReturnType<typeof decodeSto
       receiverAddress: jsonAddress(decoded.details.receiverAddress),
       dexCustomPayloadForwardGasAmount: decoded.details.dexCustomPayloadForwardGasAmount,
       hasDexCustomPayload: decoded.details.hasDexCustomPayload,
+      dexCustomPayloadHash: decoded.details.dexCustomPayloadHash,
       refundForwardGasAmount: decoded.details.refundForwardGasAmount,
       hasRefundPayload: decoded.details.hasRefundPayload,
       referralValue: decoded.details.referralValue,
@@ -341,6 +352,8 @@ export interface StonfiRouteFreezeCandidateV21 {
     buybackBurnOfficialAthWalletAddress: AddressLike;
     stonfiRouterAddress: AddressLike;
     stonfiPoolAddressTonAth: AddressLike;
+    stonfiAthSourceOwnerAddress: AddressLike;
+    stonfiAthSourceWalletAddress: AddressLike;
     stonfiPtonWalletAddress: AddressLike;
     stonfiVaultAddress?: AddressLike;
     askJettonWalletAddress: AddressLike;
@@ -427,11 +440,13 @@ export function validateStonfiRouteFreezeCandidateV21(candidate: StonfiRouteFree
   let buybackBurn: Address | null = null;
   let ptonWallet: Address | null = null;
   let askJettonWallet: Address | null = null;
+  let stonfiAthSourceWallet: Address | null = null;
   let buybackOfficialAthWallet: Address | null = null;
 
   try { buybackBurn = toAddressOrNull(candidate.addresses.buybackBurnAddress); } catch { addIssue(issues, 'BAD_BUYBACK_BURN_ADDRESS', 'BuybackBurn address is not parseable'); }
   try { ptonWallet = toAddressOrNull(candidate.addresses.stonfiPtonWalletAddress); } catch { addIssue(issues, 'BAD_PTON_WALLET_ADDRESS', 'STON.fi pTON wallet address is not parseable'); }
   try { askJettonWallet = toAddressOrNull(candidate.addresses.askJettonWalletAddress); } catch { addIssue(issues, 'BAD_ASK_JETTON_WALLET_ADDRESS', 'ask jetton wallet address is not parseable'); }
+  try { stonfiAthSourceWallet = toAddressOrNull(candidate.addresses.stonfiAthSourceWalletAddress); } catch { addIssue(issues, 'BAD_STONFI_ATH_SOURCE_WALLET_ADDRESS', 'STON.fi ATH source wallet address is not parseable'); }
   try { buybackOfficialAthWallet = toAddressOrNull(candidate.addresses.buybackBurnOfficialAthWalletAddress); } catch { addIssue(issues, 'BAD_BUYBACK_ATH_WALLET_ADDRESS', 'BuybackBurn official ATH wallet address is not parseable'); }
 
   for (const [label, addressLike] of Object.entries(candidate.addresses)) {
@@ -478,6 +493,9 @@ export function validateStonfiRouteFreezeCandidateV21(candidate: StonfiRouteFree
   if (dexMinOut < buybackMin) addIssue(issues, 'DEX_MIN_OUT_BELOW_BUYBACK_MIN', 'dex_min_out is below BUYBACK_MIN_ATH_OUT_PER_50_TON');
   if (quoteOut > 0n && dexMinOut < floorPercent(quoteOut, 95n, 100n)) {
     addIssue(issues, 'DEX_MIN_OUT_BELOW_95_PERCENT_QUOTE', 'dex_min_out must be at least floor(live quote out * 0.95)');
+  }
+  if (askJettonWallet && stonfiAthSourceWallet && !askJettonWallet.equals(stonfiAthSourceWallet)) {
+    addIssue(issues, 'ASK_JETTON_WALLET_NOT_SOURCE_ATH_WALLET', 'Pinned ask jetton wallet must equal the ATHWallet derived from the pinned STON.fi ATH source owner');
   }
 
   try {
@@ -536,6 +554,15 @@ export function validateStonfiRouteFreezeCandidateV21(candidate: StonfiRouteFree
     if (!decodedSwap.askJettonWalletAddress?.equals(askJettonWallet!)) {
       addIssue(issues, 'SAMPLE_ASK_JETTON_WALLET_MISMATCH', 'STON.fi sample ask jetton wallet does not match pinned ask wallet address');
     }
+    if (decodedSwap.details.dexCustomPayloadForwardGasAmount !== PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS.toString()) {
+      addIssue(issues, 'SAMPLE_NOTIFY_FORWARD_GAS_MISMATCH', 'STON.fi sample dex custom payload forward gas must fund BuybackBurn ATH notification');
+    }
+    if (!decodedSwap.details.hasDexCustomPayload) {
+      addIssue(issues, 'SAMPLE_NOTIFY_CUSTOM_PAYLOAD_MISSING', 'STON.fi sample must carry the BuybackBurn route notify custom payload');
+    }
+    if (decodedSwap.details.dexCustomPayloadHash !== cellHashHex(createBuybackRouteNotifyPayload(candidate.swap.queryId))) {
+      addIssue(issues, 'SAMPLE_NOTIFY_CUSTOM_PAYLOAD_MISMATCH', 'STON.fi sample custom payload must equal BYNF(query_id)');
+    }
 
     if (ptonWallet && askJettonWallet && buybackBurn && buybackOfficialAthWallet) {
       const rebuilt = buildStonfiTonToJettonTxParamsV21({
@@ -550,6 +577,8 @@ export function validateStonfiRouteFreezeCandidateV21(candidate: StonfiRouteFree
         excessesAddress: buybackBurn,
         deadline: BigInt(candidate.swap.deadline),
         forwardGasAmount: routeForwardGas,
+        dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+        dexCustomPayload: createBuybackRouteNotifyPayload(candidate.swap.queryId),
         ptonTonTransferGas: ptonTransferGas,
       });
       if (rebuilt.value !== totalValue) {

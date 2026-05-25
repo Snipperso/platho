@@ -6,7 +6,9 @@
   "addresses": {
     "athMasterAddress": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
     "buybackBurnAddress": "REQUIRED_MAINNET_BUYBACKBURN_STATEINIT_ADDRESS",
-    "buybackBurnOfficialAthWalletAddress": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS"
+    "buybackBurnOfficialAthWalletAddress": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
+    "stonfiAthSourceOwnerAddress": "REQUIRED_ATH_OUTPUT_SOURCE_OWNER_FOR_ASK_JETTON_WALLET",
+    "stonfiAthSourceWalletAddress": "REQUIRED_DERIVED_ATH_OUTPUT_SOURCE_WALLET_ADDRESS"
   },
   "route": {
     "offerAddress": "ton",
@@ -41,6 +43,7 @@
     "athDeploymentManifest": "required: immutable ATH deployment manifest path/hash",
     "buybackBurnStateInitVector": "required: immutable BuybackBurn StateInit vector path/hash",
     "officialAthWalletDerivationVector": "required: immutable official BuybackBurn ATH wallet derivation vector path/hash",
+    "stonfiAthSourceWalletDerivationVector": "required: immutable STON.fi ATH source owner wallet derivation vector path/hash",
     "stonfiApiSimulationCapture": "required: immutable STON.fi API simulation capture path/hash",
     "stonfiSdkOrApiTxParamsCapture": "required: immutable official STON.fi SDK/API tx params capture path/hash",
     "routerPoolPtonCodeHashes": "required: immutable router/pool/pTON code hash proof path/hash",
