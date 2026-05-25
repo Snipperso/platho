@@ -3,6 +3,7 @@ import { Address } from '@ton/core';
 
 export const BUYBACK_SPLIT_ENABLE_CALLER_RESERVE_NANOTONS = 2_000_000n;
 export const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH = 15_000_000_000_000_000n;
+const BUYBACK_PHASE_IDLE = 0n;
 
 export type BigintLike = bigint | number | string;
 
@@ -24,6 +25,18 @@ export interface EnableBuybackSplitPreflightInput {
     genesis_config_hash: BigintLike;
     fee_bound?: boolean;
     fee_accumulator_address: string;
+  };
+  buybackBurnState: {
+    phase: BigintLike;
+    reserve_due_ton: BigintLike;
+    pending_query_id: BigintLike;
+    route_refund_due_ton: BigintLike;
+    ath_burn_retry_due_atomic: BigintLike;
+  };
+  buybackBurnTotals: {
+    accepted_reserve_count: BigintLike;
+    executed_buyback_count: BigintLike;
+    burned_ath_total_atomic: BigintLike;
   };
   routeEvidence: {
     m20f_route_freeze_ready: boolean;
@@ -47,7 +60,10 @@ export interface EnableBuybackSplitPreflightResult {
   failures: EnableBuybackSplitPreflightFailure[];
 }
 
-function asBigInt(value: BigintLike, field: string): bigint {
+function asBigInt(value: BigintLike | null | undefined, field: string): bigint {
+  if (value === null || value === undefined) {
+    throw new Error(`${field} must be present`);
+  }
   if (typeof value === 'bigint') return value;
   if (typeof value === 'number') {
     if (!Number.isSafeInteger(value) || value < 0) {
@@ -72,6 +88,20 @@ function sameAddress(left: string | null | undefined, right: string | null | und
 
 function addFailure(failures: EnableBuybackSplitPreflightFailure[], id: string, message: string) {
   failures.push({ id, message });
+}
+
+function parseBigIntField(
+  failures: EnableBuybackSplitPreflightFailure[],
+  value: BigintLike | null | undefined,
+  field: string,
+  invalidId: string,
+): bigint | null {
+  try {
+    return asBigInt(value, field);
+  } catch (error) {
+    addFailure(failures, invalidId, (error as Error).message);
+    return null;
+  }
 }
 
 function addressWorkchain(value: string | null | undefined): number | null {
@@ -106,6 +136,14 @@ export function createEnableBuybackSplitPreflight(input: EnableBuybackSplitPrefl
   let accumulatedTon = -1n;
   let buybackDue = -1n;
   let genesisConfigHash = -1n;
+  const buybackBurnPhase = parseBigIntField(failures, input.buybackBurnState?.phase, 'buybackBurnState.phase', 'INVALID_BUYBACKBURN_PHASE');
+  const buybackBurnReserveDue = parseBigIntField(failures, input.buybackBurnState?.reserve_due_ton, 'buybackBurnState.reserve_due_ton', 'INVALID_BUYBACKBURN_RESERVE_DUE');
+  const buybackBurnPendingQuery = parseBigIntField(failures, input.buybackBurnState?.pending_query_id, 'buybackBurnState.pending_query_id', 'INVALID_BUYBACKBURN_PENDING_QUERY');
+  const buybackBurnRouteRefundDue = parseBigIntField(failures, input.buybackBurnState?.route_refund_due_ton, 'buybackBurnState.route_refund_due_ton', 'INVALID_BUYBACKBURN_ROUTE_REFUND_DUE');
+  const buybackBurnAthBurnRetryDue = parseBigIntField(failures, input.buybackBurnState?.ath_burn_retry_due_atomic, 'buybackBurnState.ath_burn_retry_due_atomic', 'INVALID_BUYBACKBURN_ATH_BURN_RETRY_DUE');
+  const buybackBurnAcceptedReserveCount = parseBigIntField(failures, input.buybackBurnTotals?.accepted_reserve_count, 'buybackBurnTotals.accepted_reserve_count', 'INVALID_BUYBACKBURN_ACCEPTED_RESERVE_COUNT');
+  const buybackBurnExecutedBuybackCount = parseBigIntField(failures, input.buybackBurnTotals?.executed_buyback_count, 'buybackBurnTotals.executed_buyback_count', 'INVALID_BUYBACKBURN_EXECUTED_BUYBACK_COUNT');
+  const buybackBurnBurnedTotal = parseBigIntField(failures, input.buybackBurnTotals?.burned_ath_total_atomic, 'buybackBurnTotals.burned_ath_total_atomic', 'INVALID_BUYBACKBURN_BURNED_TOTAL');
 
   try {
     airdropRemaining = asBigInt(input.vaultState.airdrop_remaining_ath, 'vaultState.airdrop_remaining_ath');
@@ -173,6 +211,38 @@ export function createEnableBuybackSplitPreflight(input: EnableBuybackSplitPrefl
 
   if (input.buybackBurnConfig.fee_bound === false) {
     addFailure(failures, 'BUYBACKBURN_FEE_NOT_BOUND', 'BuybackBurn fee binding must be complete before enabling buyback split.');
+  }
+
+  if (buybackBurnPhase !== null && buybackBurnPhase !== BUYBACK_PHASE_IDLE) {
+    addFailure(failures, 'BUYBACKBURN_PHASE_NOT_IDLE', 'BuybackBurn.phase must be IDLE before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnPendingQuery !== null && buybackBurnPendingQuery !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_PENDING_QUERY_NOT_ZERO', 'BuybackBurn.pending_query_id must be zero before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnReserveDue !== null && buybackBurnReserveDue !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_RESERVE_DUE_NOT_ZERO', 'BuybackBurn.reserve_due_ton must be zero before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnRouteRefundDue !== null && buybackBurnRouteRefundDue !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_ROUTE_REFUND_DUE_NOT_ZERO', 'BuybackBurn.route_refund_due_ton must be zero before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnAthBurnRetryDue !== null && buybackBurnAthBurnRetryDue !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_ATH_BURN_RETRY_DUE_NOT_ZERO', 'BuybackBurn.ath_burn_retry_due_atomic must be zero before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnAcceptedReserveCount !== null && buybackBurnAcceptedReserveCount !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_ACCEPTED_RESERVE_COUNT_NOT_ZERO', 'BuybackBurn.accepted_reserve_count must be zero before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnExecutedBuybackCount !== null && buybackBurnExecutedBuybackCount !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_EXECUTED_BUYBACK_COUNT_NOT_ZERO', 'BuybackBurn.executed_buyback_count must be zero before the one-way buyback split is enabled.');
+  }
+
+  if (buybackBurnBurnedTotal !== null && buybackBurnBurnedTotal !== 0n) {
+    addFailure(failures, 'BUYBACKBURN_BURNED_TOTAL_NOT_ZERO', 'BuybackBurn.burned_ath_total_atomic must be zero before the one-way buyback split is enabled.');
   }
 
   if (!sameAddress(input.buybackBurnConfig.fee_accumulator_address, input.feeAccumulatorAddress)) {

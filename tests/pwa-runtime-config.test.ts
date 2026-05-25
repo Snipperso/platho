@@ -114,7 +114,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/waitForProfileAvatarRegistryUpdate/);
     expect(app).toMatch(/ProfileRegistry provider is required to read current avatar version/);
     expect(html).toMatch(/<h2>Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
-    expect(html).toMatch(/<h2>Names and ATH<\/h2>[\s\S]*id="mintUsernameButton"/);
+    expect(html).toMatch(/<h2>Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="setAvatarButton"/);
+    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athSupplyStatus"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="burnAthButton"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
     expect(html).toMatch(/id="syncMessagesButton"/);
     expect(html).toMatch(/id="publicSyncWindowSelect"/);

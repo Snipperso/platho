@@ -35,6 +35,18 @@ function completeInput(overrides: Partial<EnableBuybackSplitPreflightInput> = {}
       fee_bound: true,
       fee_accumulator_address: FEE_ACCUMULATOR,
     },
+    buybackBurnState: {
+      phase: '0',
+      reserve_due_ton: '0',
+      pending_query_id: '0',
+      route_refund_due_ton: '0',
+      ath_burn_retry_due_atomic: '0',
+    },
+    buybackBurnTotals: {
+      accepted_reserve_count: '0',
+      executed_buyback_count: '0',
+      burned_ath_total_atomic: '0',
+    },
     routeEvidence: {
       m20f_route_freeze_ready: true,
     },
@@ -54,6 +66,14 @@ function completeInput(overrides: Partial<EnableBuybackSplitPreflightInput> = {}
     buybackBurnConfig: {
       ...base.buybackBurnConfig,
       ...(overrides.buybackBurnConfig ?? {}),
+    },
+    buybackBurnState: {
+      ...base.buybackBurnState,
+      ...(overrides.buybackBurnState ?? {}),
+    },
+    buybackBurnTotals: {
+      ...base.buybackBurnTotals,
+      ...(overrides.buybackBurnTotals ?? {}),
     },
     routeEvidence: {
       ...base.routeEvidence,
@@ -168,5 +188,53 @@ describe('EnableBuybackSplit preflight guard', () => {
     expect(report.blockers).toContain('BUYBACKBURNADDRESS_NOT_BASECHAIN');
     expect(report.blockers).toContain('FEEACCUMULATORSTATE_BUYBACK_BURN_ADDRESS_NOT_BASECHAIN');
     expect(report.blockers).toContain('BUYBACKBURNCONFIG_FEE_ACCUMULATOR_ADDRESS_NOT_BASECHAIN');
+  });
+
+  it('M40E-07: blocks dirty pending BuybackBurn state before one-way split enable', () => {
+    const report = createEnableBuybackSplitPreflight(completeInput({
+      buybackBurnState: {
+        phase: '1',
+        reserve_due_ton: '0',
+        pending_query_id: '1',
+        route_refund_due_ton: '0',
+        ath_burn_retry_due_atomic: '0',
+      },
+    }));
+
+    expect(report.ok).toBe(false);
+    expect(report.blockers).toContain('BUYBACKBURN_PHASE_NOT_IDLE');
+    expect(report.blockers).toContain('BUYBACKBURN_PENDING_QUERY_NOT_ZERO');
+  });
+
+  it('M40E-08: blocks pre-enable reserve, refund, and burn-retry dirt in BuybackBurn', () => {
+    const report = createEnableBuybackSplitPreflight(completeInput({
+      buybackBurnState: {
+        phase: '0',
+        reserve_due_ton: '51050000000',
+        pending_query_id: '0',
+        route_refund_due_ton: '49000000000',
+        ath_burn_retry_due_atomic: '1',
+      },
+    }));
+
+    expect(report.ok).toBe(false);
+    expect(report.blockers).toContain('BUYBACKBURN_RESERVE_DUE_NOT_ZERO');
+    expect(report.blockers).toContain('BUYBACKBURN_ROUTE_REFUND_DUE_NOT_ZERO');
+    expect(report.blockers).toContain('BUYBACKBURN_ATH_BURN_RETRY_DUE_NOT_ZERO');
+  });
+
+  it('M40E-09: blocks any previous BuybackBurn activity before split enable', () => {
+    const report = createEnableBuybackSplitPreflight(completeInput({
+      buybackBurnTotals: {
+        accepted_reserve_count: '1',
+        executed_buyback_count: '1',
+        burned_ath_total_atomic: '1',
+      },
+    }));
+
+    expect(report.ok).toBe(false);
+    expect(report.blockers).toContain('BUYBACKBURN_ACCEPTED_RESERVE_COUNT_NOT_ZERO');
+    expect(report.blockers).toContain('BUYBACKBURN_EXECUTED_BUYBACK_COUNT_NOT_ZERO');
+    expect(report.blockers).toContain('BUYBACKBURN_BURNED_TOTAL_NOT_ZERO');
   });
 });
