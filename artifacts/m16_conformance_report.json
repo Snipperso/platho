@@ -32,7 +32,7 @@
     },
     {
       "contract": "BuybackBurn.tact",
-      "non_comment_lines": 554,
+      "non_comment_lines": 552,
       "receive_handlers": 14,
       "bounced_handlers": 2,
       "forbidden_hits": [],
@@ -115,8 +115,8 @@
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "dea2074e10684c935ea5ff29ae0b62b9be364c249d36359f53c53639add75bd3",
-      "pinned": "dea2074e10684c935ea5ff29ae0b62b9be364c249d36359f53c53639add75bd3",
+      "built": "1357ea17e3ec7ac92888a80175c8ff8266a96c4ea5234e62306d745ba51bbd30",
+      "pinned": "1357ea17e3ec7ac92888a80175c8ff8266a96c4ea5234e62306d745ba51bbd30",
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
@@ -159,7 +159,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "ea361e69c0526f186d2d44c261186bbaf5ae32a2658fcda7a415ddce715a1c2a",
+    "manifest_hash_hex": "10d8bec4d28369adb8e4b7f1f8d8b00302be4ad9de236279e9894dcc50ef1c56",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

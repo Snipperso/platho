@@ -245,7 +245,6 @@ async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 
   await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
     $$type: 'ExecuteBuybackChunk',
     query_id: queryId,
-    deadline: BigInt((env.blockchain.now ?? 0) + 600),
     quote_out_atomic_ath: 100_000n,
     dex_min_out_atomic_ath: 95_000n,
   } as ExecuteBuybackChunk);
@@ -376,17 +375,14 @@ describe('BuybackBurn auth and negative matrix', () => {
 
     await acceptReserve(env);
 
-    const now = BigInt(env.blockchain.now ?? 0);
     const invalidExecs: ExecuteBuybackChunk[] = [
-      { $$type: 'ExecuteBuybackChunk', query_id: 0n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 2n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 901n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 0n, dex_min_out_atomic_ath: 95_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 94_999n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 189_999n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 190_000n },
-      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 100_001n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 0n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 2n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, quote_out_atomic_ath: 0n, dex_min_out_atomic_ath: 95_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 94_999n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 189_999n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 190_000n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 100_001n },
     ];
 
     for (const msg of invalidExecs) {
@@ -399,7 +395,6 @@ describe('BuybackBurn auth and negative matrix', () => {
     await env.buyback.send(env.operator.getSender(), { value: PTON_TRANSFER_GAS - 1n }, {
       $$type: 'ExecuteBuybackChunk',
       query_id: 1n,
-      deadline: now + 600n,
       quote_out_atomic_ath: 100_000n,
       dex_min_out_atomic_ath: 95_000n,
     } as ExecuteBuybackChunk);
@@ -465,7 +460,7 @@ describe('BuybackBurn auth and negative matrix', () => {
     } as RecoverStonfiRouteRefund);
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
 
-    env.blockchain.now = (env.blockchain.now ?? 0) + 1501;
+    env.blockchain.now = (env.blockchain.now ?? 0) + 1801;
     await env.buyback.send(env.attacker.getSender(), { value: ROUTE_REFUND_RECOVERY_EXEC_RESERVE - 1n }, {
       $$type: 'RecoverStonfiRouteRefund',
       query_id: 1n,

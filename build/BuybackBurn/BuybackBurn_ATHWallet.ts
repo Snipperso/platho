@@ -2722,7 +2722,6 @@ export function dictValueParserSealBuybackBurnGenesis(): DictionaryValue<SealBuy
 export type ExecuteBuybackChunk = {
     $$type: 'ExecuteBuybackChunk';
     query_id: bigint;
-    deadline: bigint;
     quote_out_atomic_ath: bigint;
     dex_min_out_atomic_ath: bigint;
 }
@@ -2732,7 +2731,6 @@ export function storeExecuteBuybackChunk(src: ExecuteBuybackChunk) {
         const b_0 = builder;
         b_0.storeUint(1113146712, 32);
         b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.deadline, 64);
         b_0.storeUint(src.quote_out_atomic_ath, 128);
         b_0.storeUint(src.dex_min_out_atomic_ath, 128);
     };
@@ -2742,32 +2740,28 @@ export function loadExecuteBuybackChunk(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1113146712) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
-    const _deadline = sc_0.loadUintBig(64);
     const _quote_out_atomic_ath = sc_0.loadUintBig(128);
     const _dex_min_out_atomic_ath = sc_0.loadUintBig(128);
-    return { $$type: 'ExecuteBuybackChunk' as const, query_id: _query_id, deadline: _deadline, quote_out_atomic_ath: _quote_out_atomic_ath, dex_min_out_atomic_ath: _dex_min_out_atomic_ath };
+    return { $$type: 'ExecuteBuybackChunk' as const, query_id: _query_id, quote_out_atomic_ath: _quote_out_atomic_ath, dex_min_out_atomic_ath: _dex_min_out_atomic_ath };
 }
 
 export function loadTupleExecuteBuybackChunk(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _deadline = source.readBigNumber();
     const _quote_out_atomic_ath = source.readBigNumber();
     const _dex_min_out_atomic_ath = source.readBigNumber();
-    return { $$type: 'ExecuteBuybackChunk' as const, query_id: _query_id, deadline: _deadline, quote_out_atomic_ath: _quote_out_atomic_ath, dex_min_out_atomic_ath: _dex_min_out_atomic_ath };
+    return { $$type: 'ExecuteBuybackChunk' as const, query_id: _query_id, quote_out_atomic_ath: _quote_out_atomic_ath, dex_min_out_atomic_ath: _dex_min_out_atomic_ath };
 }
 
 export function loadGetterTupleExecuteBuybackChunk(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _deadline = source.readBigNumber();
     const _quote_out_atomic_ath = source.readBigNumber();
     const _dex_min_out_atomic_ath = source.readBigNumber();
-    return { $$type: 'ExecuteBuybackChunk' as const, query_id: _query_id, deadline: _deadline, quote_out_atomic_ath: _quote_out_atomic_ath, dex_min_out_atomic_ath: _dex_min_out_atomic_ath };
+    return { $$type: 'ExecuteBuybackChunk' as const, query_id: _query_id, quote_out_atomic_ath: _quote_out_atomic_ath, dex_min_out_atomic_ath: _dex_min_out_atomic_ath };
 }
 
 export function storeTupleExecuteBuybackChunk(source: ExecuteBuybackChunk) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeNumber(source.deadline);
     builder.writeNumber(source.quote_out_atomic_ath);
     builder.writeNumber(source.dex_min_out_atomic_ath);
     return builder.build();
@@ -3743,7 +3737,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"BindBuybackOfficialAthWallet","header":1113145687,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"FreezeBuybackRoute","header":1113150022,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"stonfi_router_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pool_address_ton_ath","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_pton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ask_jetton_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"stonfi_referral_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"referral_value_bps","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"buyback_min_ath_out_per_50_ton_atomic","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"evidence_dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"route_evidence_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"SealBuybackBurnGenesis","header":1113150284,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
-    {"name":"ExecuteBuybackChunk","header":1113146712,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"deadline","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"ExecuteBuybackChunk","header":1113146712,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"quote_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"dex_min_out_atomic_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"RetryAthBurnDue","header":1113150036,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"RecoverStonfiRouteRefund","header":1113150019,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"RecycleRouteRefundReserve","header":1113150034,"fields":[]},
