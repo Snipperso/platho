@@ -5,11 +5,15 @@ import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   ATHWallet,
+  ATHInternalTransferMintUsername,
+  ATHInternalTransferProfileAvatar,
   ATHInternalTransferWithNotify,
   ATHTransferRequest,
   ATHTransferRequestWithNotify,
   AthTransferNotificationAck,
   PruneStaleNotification,
+  storeATHInternalTransferMintUsername,
+  storeATHInternalTransferProfileAvatar,
   storeATHInternalTransferWithNotify,
   storeAthTransferNotification,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
@@ -329,6 +333,144 @@ describe('ATH wallet transfer profile', () => {
     } as AthTransferNotificationAck);
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+  });
+
+  it('ATH-XFER-05C: processed notify tombstone is shared by username and profile-avatar variants', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_700_200_000;
+    const sourceOwner = await blockchain.treasury('ath-transfer-shared-domain-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-shared-domain-recipient');
+    const pruner = await blockchain.treasury('ath-transfer-shared-domain-pruner');
+    const master = fixtureAddress('ATH_TRANSFER_SHARED_NOTIFY_DOMAIN_MASTER');
+    const queryId = 525n;
+    const key = senderKey(sourceOwner.address);
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: queryId,
+      amount: 100n,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      notify_destination: recipientOwner.address,
+      notify_value: toNano('0.03'),
+    } as ATHTransferRequestWithNotify);
+
+    blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
+    await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+
+    const username = Buffer.from('platho', 'ascii');
+    const usernameReuse = await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientAddress,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferMintUsername({
+        $$type: 'ATHInternalTransferMintUsername',
+        query_id: queryId,
+        amount: 70n,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        username_len: BigInt(username.length),
+        username: beginCell().storeBuffer(username).endCell().beginParse(),
+      } as ATHInternalTransferMintUsername)).endCell(),
+    }));
+
+    expect(findTransaction(usernameReuse.transactions, {
+      from: sourceWallet.address,
+      to: recipientAddress,
+      success: false,
+    })).toBeDefined();
+
+    const profileReuse = await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientAddress,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferProfileAvatar({
+        $$type: 'ATHInternalTransferProfileAvatar',
+        query_id: queryId,
+        amount: 80n,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        avatar_hash: 0x1234n,
+        avatar_entry_id: 1n,
+        avatar_stream_id: 2n,
+        avatar_part_count: 1n,
+        media_format: 1n,
+      } as ATHInternalTransferProfileAvatar)).endCell(),
+    }));
+
+    expect(findTransaction(profileReuse.transactions, {
+      from: sourceWallet.address,
+      to: recipientAddress,
+      success: false,
+    })).toBeDefined();
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+  });
+
+  it('ATH-XFER-05D: bounced profile-avatar notification refunds ATH to original sender wallet', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-transfer-profile-bounce-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-profile-bounce-recipient');
+    const master = fixtureAddress('ATH_TRANSFER_PROFILE_BOUNCE_MASTER');
+    const queryId = 535n;
+    const amount = 100n;
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 0n);
+    const recipientWallet = await deployWallet(blockchain, recipientOwner.address, master, 0n);
+    const key = senderKey(sourceOwner.address);
+
+    await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferProfileAvatar({
+        $$type: 'ATHInternalTransferProfileAvatar',
+        query_id: queryId,
+        amount,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        avatar_hash: 0x9876n,
+        avatar_entry_id: 7n,
+        avatar_stream_id: 8n,
+        avatar_part_count: 2n,
+        media_format: 1n,
+      } as ATHInternalTransferProfileAvatar)).endCell(),
+    }));
+
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    await blockchain.sendMessage(internal({
+      from: recipientOwner.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      bounced: true,
+      bounce: false,
+      body: beginCell()
+        .storeUint(0xffffffff, 32)
+        .storeUint(0xA11A7001, 32)
+        .storeUint(queryId, 64)
+        .storeUint(amount, 128)
+        .storeUint(key, 32)
+        .endCell(),
+    }));
+
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(0n);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
   });
 
