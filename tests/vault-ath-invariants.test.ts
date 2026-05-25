@@ -225,7 +225,7 @@ describe('Vault ATH accounting invariants', () => {
           const amount = BigInt(50 + (rng() % 300));
           const underfunded = op === 3;
           debugContext = `seed ${seed} step ${step} withdraw user=${userIndex} amount=${amount} underfunded=${underfunded}`;
-          await vault.send(users[userIndex].getSender(), { value: underfunded ? toNano('0.003') : toNano('0.03') }, {
+          await vault.send(users[userIndex].getSender(), { value: underfunded ? toNano('0.003') : toNano('0.04') }, {
             $$type: 'WithdrawAth',
             query_id: withdrawQuery,
             amount,
