@@ -299,7 +299,7 @@ describe('MarketStabilitySeller', () => {
     expect((await officialWallet.getGetPendingNotification(711n, senderKey(wrongFunder.address))).exists).toBe(false);
   });
 
-  it('MSTAB-01C: rejects underpriced launch evidence before freezing pricing', async () => {
+  it('MSTAB-01C: rejects launch evidence mismatch in both pricing directions before freezing', async () => {
     const env = await setup();
     await bindCore(env);
     await sealOnly(env);

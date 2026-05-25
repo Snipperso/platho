@@ -141,6 +141,17 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.issue_codes).toContain('MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH');
   });
 
+  it('rejects overpriced base tranche snapshots when x1 evidence is lower', () => {
+    const input = readyInput();
+    input.snapshot.market_stability_seller.base_tranche_price_nanotons = '1000000000';
+    input.snapshot.market_stability_seller.evidence_x1_tranche_quote_nanotons = '1';
+
+    const report = verifyMarketStabilitySellerReadiness(input);
+
+    expect(report.market_stability_seller_ready).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH');
+  });
+
   it('rejects malformed x1 evidence decimals without throwing', () => {
     const input = readyInput();
     input.snapshot.market_stability_seller.evidence_x1_tranche_quote_nanotons = 'required: launch x1 quote';
