@@ -1652,42 +1652,41 @@ PROGRAM{
       2DROP
       s0 31 s() XCHG
       64 LDU
-      64 LDU
       128 LDU
       128 LDU
       DROP
-      31 s() 33 s() XCHG
+      31 s() 32 s() XCHG
       30 s() 32 s() XCHG
-      29 s() 33 s() XCHG
+      29 s() 32 s() XCHG
       28 s() 32 s() XCHG
-      27 s() 33 s() XCHG
+      27 s() 32 s() XCHG
       26 s() 32 s() XCHG
-      25 s() 33 s() XCHG
+      25 s() 32 s() XCHG
       24 s() 32 s() XCHG
-      23 s() 33 s() XCHG
+      23 s() 32 s() XCHG
       22 s() 32 s() XCHG
-      21 s() 33 s() XCHG
+      21 s() 32 s() XCHG
       20 s() 32 s() XCHG
-      19 s() 33 s() XCHG
+      19 s() 32 s() XCHG
       18 s() 32 s() XCHG
-      17 s() 33 s() XCHG
+      17 s() 32 s() XCHG
       16 s() 32 s() XCHG
-      s15 33 s() XCHG
+      s15 32 s() XCHG
       s14 32 s() XCHG
-      s13 33 s() XCHG
+      s13 32 s() XCHG
       s12 32 s() XCHG
-      s11 33 s() XCHG
+      s11 32 s() XCHG
       s10 32 s() XCHG
-      s9 33 s() XCHG
+      s9 32 s() XCHG
       s8 32 s() XCHG
-      s7 33 s() XCHG
+      s7 32 s() XCHG
       s6 32 s() XCHG
-      s5 33 s() XCHG
+      s5 32 s() XCHG
       s4 32 s() XCHG
-      s3 33 s() XCHG
+      s3 32 s() XCHG
       s2 32 s() XCHG
-      s1 34 s() XCHG
-      s0 35 s() XCHG
+      s1 33 s() XCHG
+      s0 34 s() XCHG
       $BuybackBurn$_fun_requireSealed INLINECALLDICT
       22210 PUSHINT
       20 s() PUSH
@@ -1702,25 +1701,11 @@ PROGRAM{
       GEQ
       THROWANYIFNOT
       22213 PUSHINT
-      34 s() PUSH
+      33 s() PUSH
       0 GTINT
       THROWANYIFNOT
-      33 s() PUSH
+      32 s() PUSH
       $BuybackBurn$_fun_requireNextQueryId INLINECALLDICT
-      22214 PUSHINT
-          NOW
-      34 s() PUSH
-      SWAP
-      GREATER
-      THROWANYIFNOT
-      22215 PUSHINT
-          NOW
-      900 PUSHINT
-      ADD
-      34 s() PUSH
-      SWAP
-      LEQ
-      THROWANYIFNOT
       22216 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -1745,8 +1730,8 @@ PROGRAM{
       16 s() 17 s() XCHG
       s15 16 s() XCHG
       15 ROLL
-      s0 34 s() XCHG
-      35 s() PUSH
+      s0 33 s() XCHG
+      34 s() PUSH
       $BuybackBurn$_fun_requireFrozenExecutionQuote INLINECALLDICT
       s6 POP
       s6 POP
@@ -1754,38 +1739,40 @@ PROGRAM{
       s6 POP
       s6 POP
       s7 POP
-      s0 s5 XCHG
+          NOW
+      900 PUSHINT
+      ADD
+      s0 s6 XCHG
       51050000000 PUSHINT
       SUB
       1 PUSHINT
-      27 s() PUSH
-      29 s() PUSH
-      s9 PUSH
+      28 s() PUSH
+      s8 s9 PUSH2
       32 s() PUSH
       0 PUSHINT
-      24 s() PUSH
+      25 s() PUSH
       51050000000 PUSHINT
       TRUE
       s8 PUSH
-      34 s() 35 s() XCHG
+      34 s() 36 s() XCHG
       33 s() 35 s() XCHG
-      32 s() 35 s() XCHG
+      32 s() 36 s() XCHG
       31 s() 35 s() XCHG
-      30 s() 35 s() XCHG
+      30 s() 36 s() XCHG
       29 s() 35 s() XCHG
-      28 s() 35 s() XCHG
+      28 s() 36 s() XCHG
       27 s() 35 s() XCHG
-      26 s() 35 s() XCHG
+      26 s() 36 s() XCHG
       25 s() 35 s() XCHG
-      24 s() 35 s() XCHG
+      24 s() 36 s() XCHG
       23 s() 35 s() XCHG
-      22 s() 35 s() XCHG
+      22 s() 36 s() XCHG
       21 s() 35 s() XCHG
-      20 s() 35 s() XCHG
+      20 s() 36 s() XCHG
       19 s() 35 s() XCHG
-      18 s() 35 s() XCHG
+      18 s() 36 s() XCHG
       17 s() 35 s() XCHG
-      16 s() 35 s() XCHG
+      16 s() 36 s() XCHG
       s9 s15 XCHG
       s10 s14 XCHG
       s8 s13 XCHG
@@ -1794,17 +1781,16 @@ PROGRAM{
       s5 s10 XCHG
       s4 s9 XCHG
       s8 35 s() XCHG
-      s5 s7 XCHG
-      s6 35 s() XCHG
-      s4 35 s() XCHG
+      4 4 REVERSE
+      s5 35 s() XCHG
       s3 35 s() XCHG
-      s2 36 s() XCHG
-      s1 37 s() XCHG
+      s2 37 s() XCHG
+      s1 36 s() XCHG
       s0 38 s() XCHG
       $BuybackBurn$_fun_ptonTonTransferBody INLINECALLDICT
       s4 33 s() XCHG
-      s3 34 s() XCHG
-      s2 35 s() XCHG
+      s3 35 s() XCHG
+      s2 34 s() XCHG
       s1 36 s() XCHG
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
@@ -1850,7 +1836,7 @@ PROGRAM{
       s4 s8 XCHG
       s3 s7 XCHG
       s6 s1 s4 XCHG3
-      s5 s5 s3 XCHG3
+      s5 s3 XCHG2
       $BuybackBurn$_contract_store INLINECALLDICT
     }>
     OVER

@@ -170,8 +170,8 @@ TL-B: `seal_buyback_burn_genesis#4259534c deployment_manifest_hash:uint256 = Sea
 Signature: `SealBuybackBurnGenesis{deployment_manifest_hash:uint256}`
 
 ### ExecuteBuybackChunk
-TL-B: `execute_buyback_chunk#42594558 query_id:uint64 deadline:uint64 quote_out_atomic_ath:uint128 dex_min_out_atomic_ath:uint128 = ExecuteBuybackChunk`
-Signature: `ExecuteBuybackChunk{query_id:uint64,deadline:uint64,quote_out_atomic_ath:uint128,dex_min_out_atomic_ath:uint128}`
+TL-B: `execute_buyback_chunk#42594558 query_id:uint64 quote_out_atomic_ath:uint128 dex_min_out_atomic_ath:uint128 = ExecuteBuybackChunk`
+Signature: `ExecuteBuybackChunk{query_id:uint64,quote_out_atomic_ath:uint128,dex_min_out_atomic_ath:uint128}`
 
 ### RetryAthBurnDue
 TL-B: `retry_ath_burn_due#42595254 query_id:uint64 amount:uint128 = RetryAthBurnDue`

@@ -62,7 +62,6 @@ message(0x4259534C) SealBuybackBurnGenesis { // "BYSL"
 
 message(0x42594558) ExecuteBuybackChunk { // "BYEX"
     query_id: Int as uint64;
-    deadline: Int as uint64;
     quote_out_atomic_ath: Int as uint128;
     dex_min_out_atomic_ath: Int as uint128;
 }
@@ -406,15 +405,15 @@ contract BuybackBurn {
         throwUnless(22212, self.reserve_due_ton >= BUYBACK_FUNDING_ENVELOPE_NANOTONS);
         throwUnless(22213, msg.query_id > 0);
         self.requireNextQueryId(msg.query_id);
-        throwUnless(22214, msg.deadline > now());
-        throwUnless(22215, msg.deadline <= now() + BUYBACK_DEADLINE_MAX_AHEAD_SECONDS);
         throwUnless(22216, context().value >= BUYBACK_PTON_TRANSFER_GAS_NANOTONS);
         self.requireFrozenExecutionQuote(msg.quote_out_atomic_ath, msg.dex_min_out_atomic_ath);
+        // Permissionless callers cannot choose a near-expired STON.fi route deadline.
+        let routeDeadline: Int = now() + BUYBACK_DEADLINE_MAX_AHEAD_SECONDS;
 
         self.reserve_due_ton -= BUYBACK_FUNDING_ENVELOPE_NANOTONS;
         self.phase = BUYBACK_PHASE_PENDING_STONFI_SWAP;
         self.pending_query_id = msg.query_id;
-        self.pending_deadline = msg.deadline;
+        self.pending_deadline = routeDeadline;
         self.pending_route_refund_start_ton = self.route_refund_due_ton;
         self.pending_dex_min_out_atomic_ath = msg.dex_min_out_atomic_ath;
         self.pending_received_ath_atomic = 0;
@@ -424,7 +423,7 @@ contract BuybackBurn {
             value: BUYBACK_FUNDING_ENVELOPE_NANOTONS,
             bounce: true,
             mode: SendPayFwdFeesSeparately,
-            body: self.ptonTonTransferBody(msg.query_id, msg.deadline, msg.dex_min_out_atomic_ath)
+            body: self.ptonTonTransferBody(msg.query_id, routeDeadline, msg.dex_min_out_atomic_ath)
         });
     }
 

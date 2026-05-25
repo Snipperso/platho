@@ -42,6 +42,7 @@ const ROUTE_REFUND_EXEC_RESERVE = 2_000_000n;
 const OFFER = toNano('50');
 const PHASE_IDLE = 0n;
 const PHASE_PENDING_STONFI_SWAP = 1n;
+const DEADLINE_MAX_AHEAD_SECONDS = 900n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100000000000000000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
@@ -236,7 +237,6 @@ async function executeBuyback(env: Awaited<ReturnType<typeof setup>>, queryId = 
   return await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
     $$type: 'ExecuteBuybackChunk',
     query_id: queryId,
-    deadline: BigInt((env.blockchain.now ?? 0) + 600),
     quote_out_atomic_ath: 100_000n,
     dex_min_out_atomic_ath: 95_000n,
   } as ExecuteBuybackChunk);
@@ -332,7 +332,6 @@ describe('Production BuybackBurn candidate', () => {
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
       $$type: 'ExecuteBuybackChunk',
       query_id: 1n,
-      deadline: BigInt((env.blockchain.now ?? 0) + 600),
       quote_out_atomic_ath: 100_000n,
       dex_min_out_atomic_ath: 95_000n,
     } as ExecuteBuybackChunk);
@@ -516,7 +515,6 @@ describe('Production BuybackBurn candidate', () => {
     await env.buyback.send(env.operator.getSender(), { value: toNano('0.01') }, {
       $$type: 'ExecuteBuybackChunk',
       query_id: 1n,
-      deadline: BigInt((env.blockchain.now ?? 0) + 600),
       quote_out_atomic_ath: 100_000n,
       dex_min_out_atomic_ath: 95_000n,
     } as ExecuteBuybackChunk);
@@ -553,7 +551,6 @@ describe('Production BuybackBurn candidate', () => {
     const result = await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'ExecuteBuybackChunk',
       query_id: 1n,
-      deadline: BigInt((env.blockchain.now ?? 0) + 600),
       quote_out_atomic_ath: 200_000n,
       dex_min_out_atomic_ath: 190_000n,
     } as ExecuteBuybackChunk);
@@ -570,6 +567,38 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.pending_query_id).toBe(0n);
     expect(state.route_refund_due_ton).toBe(0n);
     expect(state.last_terminal_query_id).toBe(0n);
+  });
+
+  it('BUYBACK-04I: uses a contract-computed route deadline for permissionless execution', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+
+    const now = BigInt(env.blockchain.now ?? 0);
+    const result = await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
+      $$type: 'ExecuteBuybackChunk',
+      query_id: 1n,
+      quote_out_atomic_ath: 100_000n,
+      dex_min_out_atomic_ath: 95_000n,
+    } as ExecuteBuybackChunk);
+
+    const ptonTx = findTransaction(result.transactions, {
+      from: env.buyback.address,
+      to: env.stonfiPtonWallet.address,
+      op: OP_PTON_TON_TRANSFER,
+    });
+    expect(ptonTx).toBeDefined();
+
+    const decoded = decodePtonTonTransferBodyV21(inboundBody(ptonTx));
+    const swap = decodeStonfiSwapBodyV21(decoded.forwardPayload!);
+    const expectedDeadline = now + DEADLINE_MAX_AHEAD_SECONDS;
+
+    expect(swap.deadline).toBe(expectedDeadline.toString());
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
+    expect(state.pending_deadline).toBe(expectedDeadline);
+    expect(state.reserve_due_ton).toBe(0n);
   });
 
   it('BUYBACK-04B: pTON transfer bounce records returned TON as route refund without restoring a retryable envelope', async () => {
@@ -648,7 +677,7 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_query_id).toBe(1n);
 
-    env.blockchain.now = (env.blockchain.now ?? 0) + 1501;
+    env.blockchain.now = (env.blockchain.now ?? 0) + 1801;
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
       query_id: 1n,
@@ -671,7 +700,7 @@ describe('Production BuybackBurn candidate', () => {
     await executeBuyback(env, 1n);
     await env.buyback.send(env.stonfiRouter.getSender(), { value: smallExcess }, null);
 
-    env.blockchain.now = (env.blockchain.now ?? 0) + 1501;
+    env.blockchain.now = (env.blockchain.now ?? 0) + 1801;
     await env.buyback.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'RecoverStonfiRouteRefund',
       query_id: 1n,
