@@ -414,6 +414,61 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     expect((await ctx.registry.getGetGlobal()).pending_refund_flush_count).toBe(2n);
   });
 
+  it('USERNAME-REG-BND-05B: pending refund flush id blocks treasury and burn reuse until cleared', async () => {
+    const ctx = await deployRegistryWithNoAckOfficial();
+    const refundOwner = fixtureAddress('REFUND_QUERY_GUARD_OWNER');
+    const mintOwner = fixtureAddress('DUE_QUERY_GUARD_OWNER');
+    const refundQuery = 778n;
+    const refundFlushId = await ctx.registry.getGetRefundFlushId(refundOwner, refundQuery);
+    const reserve = ATH_TRANSFER_EXEC_RESERVE + DUE_FLUSH_LOCAL_EXEC_RESERVE;
+
+    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, refundOwner, 'Larisa', PRICE_6_PLUS);
+    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, mintOwner, 'mixdue', PRICE_6_PLUS);
+
+    expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(PRICE_6_PLUS);
+    expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
+    expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(HALF_PRICE);
+
+    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
+      $$type: 'FlushAthRefundDue',
+      query_id: refundQuery,
+      owner_wallet: refundOwner,
+    } as FlushAthRefundDue);
+
+    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
+      $$type: 'FlushTreasuryAthDue',
+      query_id: refundFlushId,
+    } as FlushTreasuryAthDue);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
+      $$type: 'FlushBurnAthDue',
+      query_id: refundFlushId,
+    } as FlushBurnAthDue);
+
+    let global = await ctx.registry.getGetGlobal();
+    expect((await ctx.registry.getGetPendingRefundFlushFor(refundOwner, refundQuery)).exists).toBe(true);
+    expect((await ctx.registry.getGetPendingTreasuryFlush(refundFlushId)).exists).toBe(false);
+    expect((await ctx.registry.getGetPendingBurnFlush(refundFlushId)).exists).toBe(false);
+    expect(global.pending_refund_flush_count).toBe(1n);
+    expect(global.pending_treasury_flush_count).toBe(0n);
+    expect(global.pending_burn_flush_count).toBe(0n);
+    expect(global.treasury_due_ath).toBe(HALF_PRICE);
+    expect(global.burn_due_ath).toBe(HALF_PRICE);
+
+    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
+      $$type: 'FlushTreasuryAthDue',
+      query_id: refundFlushId + 1n,
+    } as FlushTreasuryAthDue);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
+      $$type: 'FlushBurnAthDue',
+      query_id: refundFlushId + 2n,
+    } as FlushBurnAthDue);
+
+    global = await ctx.registry.getGetGlobal();
+    expect(global.pending_refund_flush_count).toBe(1n);
+    expect(global.pending_treasury_flush_count).toBe(1n);
+    expect(global.pending_burn_flush_count).toBe(1n);
+  });
+
   it('USERNAME-REG-BND-06: masterchain treasury receiver cannot seal the registry runtime profile', async () => {
     const { registry, deployer } = await deployUnsealedRegistryWithTreasuryReceiver(-1);
 
