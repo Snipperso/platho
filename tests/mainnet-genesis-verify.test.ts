@@ -287,6 +287,39 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('ATH_MASTER_TOTAL_SUPPLY_MISMATCH');
   });
 
+  it('rejects a self-consistent manifest with a non-100M ATH total supply constant', () => {
+    const input = finalInput();
+    input.manifest.constants!.ath_total_supply_atomic = '90000000000000000';
+    input.snapshot.ath_master.total_supply_atomic = '90000000000000000';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('ATH_TOTAL_SUPPLY_CONSTANT_MISMATCH');
+  });
+
+  it('rejects a self-consistent manifest with a non-30M Vault activity airdrop constant', () => {
+    const input = finalInput();
+    input.manifest.constants!.vault_activity_airdrop_total_atomic = '20000000000000000';
+    input.snapshot.vault.airdrop_remaining_ath = '20000000000000000';
+    input.snapshot.vault_official_ath_wallet.balance_atomic = '20000000000000000';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('VAULT_ACTIVITY_AIRDROP_TOTAL_CONSTANT_MISMATCH');
+  });
+
+  it('rejects a manifest with a non-45M market-stability reserve constant', () => {
+    const input = finalInput();
+    input.manifest.constants!.ath_market_stability_reserve_allocation_atomic = '44000000000000000';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_CONSTANT_MISMATCH');
+  });
+
   it('rejects sealing a correct manifest hash with the wrong ProfileRegistry official ATH wallet', () => {
     const input = finalInput();
     input.snapshot.profile_registry.official_ath_wallet_address = addr('wrong_profile_registry_official_ath_wallet');
