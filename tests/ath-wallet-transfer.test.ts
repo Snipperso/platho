@@ -692,6 +692,104 @@ describe('ATH wallet transfer profile', () => {
     expect((await recipientWallet.getGetWalletData()).balance).toBe(existingPendingAmount);
   });
 
+  it('ATH-XFER-05G: bounced notify refund is not blocked by same-query outgoing to the same refund wallet', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-transfer-refund-same-wallet-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-refund-same-wallet-recipient');
+    const master = fixtureAddress('ATH_TRANSFER_REFUND_SAME_WALLET_MASTER');
+    const queryId = 537n;
+    const amount = 100n;
+    const existingPendingAmount = 9n;
+    const sourceWalletInit = await ATHWallet.init(0n, sourceOwner.address, master);
+    const sourceWalletAddress = contractAddress(sourceOwner.address.workChain, sourceWalletInit);
+    const mockNoAckInit = await MockAthWalletNoAck.init();
+
+    const recipientWallet = await deployWallet(blockchain, recipientOwner.address, master, existingPendingAmount);
+    await blockchain.setShardAccount(sourceWalletAddress, createShardAccount({
+      address: sourceWalletAddress,
+      code: mockNoAckInit.code,
+      data: mockNoAckInit.data,
+      balance: toNano('1'),
+      workchain: sourceWalletAddress.workChain,
+    }));
+    const key = senderKey(sourceOwner.address);
+
+    await recipientWallet.send(recipientOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ATHTransferRequest',
+      query_id: queryId,
+      amount: existingPendingAmount,
+      recipient: sourceOwner.address,
+      response_destination: recipientOwner.address,
+    } as ATHTransferRequest);
+
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(0n);
+
+    await blockchain.sendMessage(internal({
+      from: sourceWalletAddress,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferProfileAvatar({
+        $$type: 'ATHInternalTransferProfileAvatar',
+        query_id: queryId,
+        amount,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        avatar_hash: 0x9876n,
+        avatar_entry_id: 7n,
+        avatar_stream_id: 8n,
+        avatar_part_count: 2n,
+        media_format: 1n,
+      } as ATHInternalTransferProfileAvatar)).endCell(),
+    }));
+
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    const bouncedNotifyResult = await blockchain.sendMessage(internal({
+      from: recipientOwner.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      bounced: true,
+      bounce: false,
+      body: beginCell()
+        .storeUint(0xffffffff, 32)
+        .storeUint(0xA11A7001, 32)
+        .storeUint(queryId, 64)
+        .storeUint(amount, 128)
+        .storeUint(key, 32)
+        .endCell(),
+    }));
+
+    expect(findTransaction(bouncedNotifyResult.transactions, {
+      from: recipientWallet.address,
+      to: sourceWalletAddress,
+      success: true,
+    })).toBeDefined();
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+
+    await blockchain.sendMessage(internal({
+      from: sourceWalletAddress,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      bounced: true,
+      bounce: false,
+      body: beginCell()
+        .storeUint(0xffffffff, 32)
+        .store(storeATHInternalTransfer({
+          $$type: 'ATHInternalTransfer',
+          query_id: queryId,
+          amount: existingPendingAmount,
+          sender_owner: recipientOwner.address,
+          response_destination: recipientOwner.address,
+        } as ATHInternalTransfer))
+        .endCell(),
+    }));
+
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(existingPendingAmount);
+  });
+
   it('ATH-XFER-05E: forged bounced notifications cannot refund or delete pending notification state', async () => {
     const blockchain = await Blockchain.create();
     const sourceOwner = await blockchain.treasury('ath-transfer-forged-notify-source');

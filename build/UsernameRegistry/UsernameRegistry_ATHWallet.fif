@@ -71,6 +71,7 @@ PROGRAM{
   DECLPROC $ATHWallet$_fun_compute_sender_key
   DECLPROC $ATHWallet$_fun_compute_pending_notification_key
   DECLPROC $ATHWallet$_fun_compute_pending_outgoing_key
+  DECLPROC $ATHWallet$_fun_compute_notify_refund_query_id
   DECLPROC $ATHWallet$_fun_notify_transfer_value
   DECLPROC $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at
   DECLPROC $ATHWallet$_fun_store_pending_outgoing
@@ -697,6 +698,20 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $ATHWallet$_fun_compute_notify_refund_query_id PROCREF:<{
+        NEWC
+    1096045126 PUSHINT
+    SWAP
+    32 STU
+    s1 s3 XCHG
+    64 STU
+    32 STU
+    SWAP
+        STSLICER
+        ENDC
+        HASHCU
+    64 MODPOW2#
+  }>
   $ATHWallet$_fun_notify_transfer_value PROCREF:<{
     1000000 PUSHINT
     ADD
@@ -899,45 +914,50 @@ PROGRAM{
     14334 PUSHINT
     s9 s7 XCPU
     $ATHWallet$_fun_compute_sender_key INLINECALLDICT
-    s0 s11 XCHG2
+    s11 PUSH
     EQUAL
-    s1 s9 XCHG
+    s1 s10 XCHG
     THROWANYIFNOT
-    s4 s10 XCPU
+    s5 s11 XCPU
     SUB
-    s6 s6 XCHG2
+    s7 s2 XCHG2
     257 PUSHINT
         DICTIDEL
     DROP
-    s5 s6 XCHG
-    s5 s1 s3 XCHG3
-    s0 s0 s4 XCHG3
-    s7 s7 XCPU
+    s1 s6 XCHG
+    s3 s5 XCHG
+    s4 s1 s3 XCHG3
+    s2 s7 s7 XC2PU
     $ATHWallet$_fun_derive_wallet_address INLINECALLDICT
     0 PUSHINT
     s9 s6 PUSH2
     $ATHWallet$_init_child INLINECALLDICT
+    s8 s9 XCHG
+    s7 s9 XCHG
     s6 s9 XCHG
-    s5 s8 XCHG
-    s4 s7 XCHG
+    s5 s9 XCHG
+    s4 s9 XCHG
     s3 s9 XCHG
-    s8 s7 s9 XCHG3
-    s11 s12 s8 PUSH3
-    s13 PUSH
+    s9 s12 s11 XCHG3
+    s9 PUSH
+    $ATHWallet$_fun_compute_notify_refund_query_id INLINECALLDICT
+    7 -ROLL
+    s7 s12 s8 PUSH3
+    s12 PUSH
     $ATHWallet$_fun_store_pending_outgoing INLINECALLDICT
     0 PUSHINT
     TRUE
-    s13 s14 s7 XC2PU
+    s9 s14 s7 XC2PU
     64 PUSHINT
-    s0 s14 XCHG
+    s0 s13 XCHG
     $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination INLINECALLDICT
     NEWC
     $ATHInternalTransfer$_store_cell INLINECALLDICT
     s6 s9 XCHG
-    s5 s12 XCHG
+    s5 s8 XCHG
     s4 s13 XCHG
-    s3 s11 XCHG
-    s8 s10 s0 XCHG3
+    s3 s10 XCHG
+    s12 s11 s0 XCHG3
     $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
         NEWC
         b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -1006,7 +1026,8 @@ PROGRAM{
         SWAP
         SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
     s5 s1 s6 XCHG3
-    s4 s1 s3 XCHG3
+    3 -ROLL
+    s0 s4 XCHG
   }>
   $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address PROCINLINE:<{
   }>

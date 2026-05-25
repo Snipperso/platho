@@ -18,7 +18,9 @@ const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
 const ATH_OUTGOING_TRANSFER_ID_DOMAIN: Int = 0x41544F47; // "ATOG"
+const ATH_NOTIFY_REFUND_QUERY_DOMAIN: Int = 0x41545246; // "ATRF"
 const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD: Int = 4294967296;
+const ATH_QUERY_ID_MOD: Int = 18446744073709551616;
 const ATH_PENDING_NOTIFICATION_TTL: Int = 86400; // 24 hours
 
 message(0x41544801) ATHBurn {
@@ -278,6 +280,16 @@ contract ATHWallet {
             .hash();
     }
 
+    fun compute_notify_refund_query_id(query_id: Int, sender_key: Int, refund_wallet: Address): Int {
+        return beginCell()
+            .storeUint(ATH_NOTIFY_REFUND_QUERY_DOMAIN, 32)
+            .storeUint(query_id, 64)
+            .storeUint(sender_key, 32)
+            .storeAddress(refund_wallet)
+            .endCell()
+            .hash() % ATH_QUERY_ID_MOD;
+    }
+
     fun notify_transfer_value(notify_value: Int): Int {
         return notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
     }
@@ -346,7 +358,8 @@ contract ATHWallet {
 
         let refund_wallet: Address = self.derive_wallet_address(pending.sender_owner);
         let refund_init: StateInit = initOf ATHWallet(0, pending.sender_owner, self.ath_master_address);
-        self.store_pending_outgoing(query_id, amount, refund_wallet, pending.sender_owner);
+        let refund_query_id: Int = self.compute_notify_refund_query_id(query_id, sender_key, refund_wallet);
+        self.store_pending_outgoing(refund_query_id, amount, refund_wallet, pending.sender_owner);
 
         send(SendParameters {
             to: refund_wallet,
@@ -356,7 +369,7 @@ contract ATHWallet {
             code: refund_init.code,
             data: refund_init.data,
             body: ATHInternalTransfer {
-                query_id: query_id,
+                query_id: refund_query_id,
                 amount: amount,
                 sender_owner: self.owner_address,
                 response_destination: pending.sender_owner
