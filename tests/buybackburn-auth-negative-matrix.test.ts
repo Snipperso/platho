@@ -385,6 +385,7 @@ describe('BuybackBurn auth and negative matrix', () => {
       { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 0n, dex_min_out_atomic_ath: 95_000n },
       { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 94_999n },
       { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 189_999n },
+      { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 200_000n, dex_min_out_atomic_ath: 190_000n },
       { $$type: 'ExecuteBuybackChunk', query_id: 1n, deadline: now + 600n, quote_out_atomic_ath: 100_000n, dex_min_out_atomic_ath: 100_001n },
     ];
 

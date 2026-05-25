@@ -532,6 +532,33 @@ describe('Production BuybackBurn candidate', () => {
     expect((await env.buyback.getGetBuybackBurnState()).phase).toBe(PHASE_PENDING_STONFI_SWAP);
   });
 
+  it('BUYBACK-04H: rejects caller-chosen high minOut so protocol-funded route gas cannot be griefed', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+
+    const result = await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
+      $$type: 'ExecuteBuybackChunk',
+      query_id: 1n,
+      deadline: BigInt((env.blockchain.now ?? 0) + 600),
+      quote_out_atomic_ath: 200_000n,
+      dex_min_out_atomic_ath: 190_000n,
+    } as ExecuteBuybackChunk);
+
+    expect(findTransaction(result.transactions, {
+      from: env.buyback.address,
+      to: env.stonfiPtonWallet.address,
+      op: OP_PTON_TON_TRANSFER,
+    })).toBeUndefined();
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_IDLE);
+    expect(state.reserve_due_ton).toBe(ENVELOPE);
+    expect(state.pending_query_id).toBe(0n);
+    expect(state.route_refund_due_ton).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(0n);
+  });
+
   it('BUYBACK-04B: pTON transfer bounce records returned TON as route refund without restoring a retryable envelope', async () => {
     const env = await setup();
     const undeployedPtonWallet = fixtureAddress('UNDEPLOYED_PTON_WALLET');
