@@ -164,7 +164,7 @@ function signedPublicPublishBody(
     .endCell();
 }
 
-function legacySignedPrivatePublishBody(owner: any, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+function preDomainSignedPrivatePublishBody(owner: any, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
     .storeUint(SUITE_CLASSICAL, 8)
@@ -322,7 +322,7 @@ describe('Vault balance-funded publish gate', () => {
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 
-  it('VAULT-BALANCE-PUBLISH-01D: legacy v1 signed payload is rejected before balance mutation', async () => {
+  it('VAULT-BALANCE-PUBLISH-01D: pre-domain signed payload is rejected before balance mutation', async () => {
     const { blockchain, vault, user } = await setup();
     const keyPair = await registerKeys(vault, user);
     const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
@@ -331,7 +331,7 @@ describe('Vault balance-funded publish gate', () => {
 
     await expect(blockchain.sendMessage(external({
       to: vault.address,
-      body: legacySignedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey),
+      body: preDomainSignedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey),
     }))).rejects.toMatchObject({ exitCode: 16464 });
 
     const after = await vault.getGetUser(user.address);
