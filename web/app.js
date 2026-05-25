@@ -91,7 +91,7 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=3';
+} from './pwa-contract-transactions.mjs?v=4';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs';
 import { createCapsuleHubTonRpcProvider } from './capsulehub-ton-rpc-provider.mjs';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs';
@@ -2707,7 +2707,7 @@ async function recompressImageAttachment(kind) {
 
 function refreshComposerPublishPolicy() {
   const canPublish = Boolean(plathoWallet);
-  if (composer) composer.dataset.publishMode = canPublish ? 'wallet-funded' : 'wallet-required';
+  if (composer) composer.dataset.publishMode = canPublish ? 'vault-balance' : 'wallet-required';
   if (messageInput) {
     if (canPublish) {
       messageInput.removeAttribute('maxlength');
@@ -2718,7 +2718,7 @@ function refreshComposerPublishPolicy() {
     }
     autoResizeComposerTextarea(messageInput);
   }
-  if (publicComposer) publicComposer.dataset.publishMode = canPublish ? 'wallet-funded' : 'wallet-required';
+  if (publicComposer) publicComposer.dataset.publishMode = canPublish ? 'vault-balance' : 'wallet-required';
   if (publicMessageInput) {
     const publicLimit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
     if (canPublish) {
@@ -3550,6 +3550,12 @@ function requireVaultAddress() {
   const address = appConfig.vault?.address;
   if (!address) throw new Error('Vault contract address is not configured');
   return address;
+}
+
+function requireVaultDeploymentManifestHash() {
+  const hash = appConfig.vault?.deploymentManifestHash ?? globalThis.plathoVaultDeploymentManifestHash;
+  if (!hash) throw new Error('Vault deployment manifest hash is not configured');
+  return hash;
 }
 
 function requireAthMasterAddress() {
@@ -4791,6 +4797,7 @@ async function publishCapsulesThroughVault(capsules) {
       max_charge: maxCharge,
       publish,
       signingSecretKey: localIdentity.signingSecretKey,
+      deploymentManifestHash: requireVaultDeploymentManifestHash(),
     }, {
       vaultAddress: requireVaultAddress(),
     });

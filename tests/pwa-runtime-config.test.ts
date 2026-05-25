@@ -15,6 +15,7 @@ const productionConfig = {
   },
   vault: {
     address: '0:1111111111111111111111111111111111111111111111111111111111111111',
+    deploymentManifestHash: `0x${'66'.repeat(32)}`,
     provider: {
       globalName: 'plathoVaultChainProvider',
       moduleUrl: './vault-ton-rpc-provider.mjs',
@@ -263,6 +264,19 @@ describe('PWA runtime config guard', () => {
 
     expect(report.ok).toBe(false);
     expect(report.findings.map((finding) => finding.id)).toContain('PWA_PROFILE_REGISTRY_ADDRESS_REQUIRED');
+  });
+
+  it('PWA-CONFIG-04D: production config requires Vault deployment manifest hash for signed publish domain', () => {
+    const report = validatePlathoAppConfig({
+      ...productionConfig,
+      vault: {
+        ...productionConfig.vault,
+        deploymentManifestHash: null,
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.findings.map((finding) => finding.id)).toContain('PWA_VAULT_DEPLOYMENT_MANIFEST_HASH_REQUIRED');
   });
 
   it('PWA-CONFIG-05: production config does not carry external wallet connector settings', () => {

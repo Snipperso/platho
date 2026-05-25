@@ -39,6 +39,7 @@ const UINT160_MOD = 1n << 160n;
 const OP_BOUNCED = 0xffffffff;
 const OP_PUBLISH_PRIVATE_FROM_VAULT = 0xa4f862c0;
 const OP_PUBLISH_PUBLIC_FROM_VAULT = 0x8c2a76b7;
+const VAULT_PUBLISH_SIGNING_DOMAIN = 0x56504231n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -109,7 +110,7 @@ async function depositTon(vault: any, user: any, amount: bigint) {
   } as DepositTon);
 }
 
-function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address) {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
     .storeUint(SUITE_CLASSICAL, 8)
@@ -121,6 +122,10 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
     .storeRef(BODY_CELL)
     .endCell();
   const signedPayload = beginCell()
+    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
+    .storeUint(GENESIS_HASH, 256)
+    .storeAddress(vaultAddress)
+    .storeUint(KIND_PRIVATE, 8)
     .storeAddress(owner)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
@@ -134,7 +139,7 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
     .endCell();
 }
 
-function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address) {
   const payload = beginCell()
     .storeUint(PUBLIC_HEADER_HASH, 256)
     .storeUint(PUBLIC_BODY_HASH, 256)
@@ -142,6 +147,10 @@ function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigin
     .storeRef(PUBLIC_BODY_CELL)
     .endCell();
   const signedPayload = beginCell()
+    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
+    .storeUint(GENESIS_HASH, 256)
+    .storeAddress(vaultAddress)
+    .storeUint(KIND_PUBLIC, 8)
     .storeAddress(owner)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
@@ -163,7 +172,7 @@ async function createPendingPublish() {
   const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
   await ctx.blockchain.sendMessage(external({
     to: ctx.vault.address,
-    body: signedPrivatePublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey),
+    body: signedPrivatePublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey, ctx.vault.address),
   }));
   const publishId = computePublishId(ctx.user.address, beforeUser.publish_nonce, BODY_HASH, KIND_PRIVATE);
   return { ...ctx, publishId, maxCharge, beforeUser };
@@ -177,7 +186,7 @@ async function createPendingPublicPublish() {
   const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
   await ctx.blockchain.sendMessage(external({
     to: ctx.vault.address,
-    body: signedPublicPublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey),
+    body: signedPublicPublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey, ctx.vault.address),
   }));
   const publishId = computePublishId(ctx.user.address, beforeUser.publish_nonce, PUBLIC_BODY_HASH, KIND_PUBLIC);
   return { ...ctx, publishId, maxCharge, beforeUser };

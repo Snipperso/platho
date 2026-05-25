@@ -23,6 +23,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   },
   vault: {
     address: null,
+    deploymentManifestHash: null,
     provider: {
       globalName: 'plathoVaultChainProvider',
       moduleUrl: null,
@@ -164,6 +165,13 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         findings,
         'PWA_PROFILE_REGISTRY_ADDRESS_REQUIRED',
         'Production PWA config must set ProfileRegistry address for paid wallet avatar updates.',
+      );
+    }
+    if (!config?.vault?.deploymentManifestHash) {
+      addFinding(
+        findings,
+        'PWA_VAULT_DEPLOYMENT_MANIFEST_HASH_REQUIRED',
+        'Production PWA config must set Vault deploymentManifestHash for domain-separated signed publishes.',
       );
     }
   }

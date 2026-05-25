@@ -6,12 +6,12 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Scenario | Operations | Total fees, nanotons | Max op fee, nanotons | Max gas used |
 |---|---:|---:|---:|---:|
-| ATH_TRANSFER_SUCCESS | 1 | 2812499 | 2812499 | 11621 |
+| ATH_TRANSFER_SUCCESS | 1 | 2812832 | 2812832 | 11621 |
 | ATH_BURN_SUCCESS | 1 | 1366069 | 1366069 | 7950 |
 | CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 24347951 | 5071077 | 38299 |
-| VAULT_BALANCE_PUBLISH | 2 | 4638404 | 2319202 | 20142 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 24348649 | 5071410 | 38299 |
+| VAULT_BALANCE_PUBLISH | 2 | 4819736 | 2409868 | 20939 |
 
 ## Operation details
 
@@ -19,7 +19,7 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| owner_to_recipient_wallet | 4 | 2812499 | 1806785 | 11621 | 0 | 0 |
+| owner_to_recipient_wallet | 4 | 2812832 | 1807318 | 11621 | 0 | 0 |
 
 ### ATH_BURN_SUCCESS
 
@@ -53,18 +53,18 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 |---|---:|---:|---:|---:|---:|---:|
 | valid_username_mint_with_item_ack | 5 | 4404422 | 2727509 | 38299 | 2 | 1 |
 | invalid_username_refund_due | 3 | 2060489 | 1763555 | 25668 | 2 | 1 |
-| flush_ath_refund_due | 5 | 5071077 | 1806785 | 22602 | 0 | 0 |
-| flush_treasury_due_ath | 5 | 4781721 | 1820919 | 18134 | 0 | 0 |
+| flush_ath_refund_due | 5 | 5071410 | 1807318 | 22602 | 0 | 0 |
+| flush_treasury_due_ath | 5 | 4782054 | 1821452 | 18134 | 0 | 0 |
 | flush_burn_due_ath | 5 | 3213491 | 1030689 | 14930 | 0 | 0 |
 | stuck_pending_mint_creation_no_ack | 4 | 3165977 | 2727509 | 38299 | 2 | 1 |
-| prune_stale_pending_mint | 2 | 1650774 | 1366380 | 15788 | 0 | 0 |
+| prune_stale_pending_mint | 2 | 1650806 | 1366412 | 15788 | 0 | 0 |
 
 ### VAULT_BALANCE_PUBLISH
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| vault_balance_private_publish_to_capsulehub_ack | 1 | 2319202 | 2319202 | 20142 | 0 | 0 |
-| vault_balance_private_publish_to_missing_capsulehub_bounce | 1 | 2319202 | 2319202 | 20142 | 0 | 0 |
+| vault_balance_private_publish_to_capsulehub_ack | 1 | 2409868 | 2409868 | 20939 | 0 | 0 |
+| vault_balance_private_publish_to_missing_capsulehub_bounce | 1 | 2409868 | 2409868 | 20939 | 0 | 0 |
 
 ## Result
 
