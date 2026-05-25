@@ -21,7 +21,7 @@ const OP_USERNAME_MINT_NOTIFICATION = 0x89129D5F;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 const USERNAME_MINT_NOTIFY_VALUE = 30_000_000n;
 const USERNAME_MINT_OLD_OWNER_MIN_VALUE = 35_000_000n;
-const USERNAME_MINT_CANONICAL_OWNER_VALUE = 50_000_000n;
+const USERNAME_MINT_CANONICAL_OWNER_VALUE = 51_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());

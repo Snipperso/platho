@@ -348,9 +348,9 @@ describe('PWA contract transaction builders', () => {
   it('PWA-TX-07: quotes exact ATHWallet and username refund values used by the PWA', () => {
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(30_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(50_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestMintUsername', { notify_value: 31_000_000n })).toBe(51_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestProfileAvatar', { notify_value: 30_000_000n })).toBe(50_000_000n);
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(51_000_000n);
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestMintUsername', { notify_value: 31_000_000n })).toBe(52_000_000n);
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestProfileAvatar', { notify_value: 30_000_000n })).toBe(51_000_000n);
     expect(estimateUsernameRegistryAttachedValueNanotons('FlushAthRefundDue')).toBe(32_000_000n);
     expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(30_000_000n);
     expect(USERNAME_REGISTRY_RESERVES_NANOTONS.athTransferExec).toBe(30_000_000n);

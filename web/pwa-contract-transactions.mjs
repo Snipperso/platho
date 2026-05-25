@@ -84,6 +84,7 @@ export const VAULT_RESERVES_NANOTONS = Object.freeze({
 export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   transferNotifyAckValue: 1_000_000n,
   internalTransferAckValue: 3_000_000n,
+  internalTransferSourceAckValue: 1_000_000n,
   internalTransferFwdFeeAllowance: 21_000_000n,
   transferNotifyMinValue: 30_000_000n,
   transferNotifyStorageEndowment: 2_000_000n,
@@ -562,6 +563,7 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
 function athNotifyTransferValue(notifyValue) {
   return assertUint(notifyValue, 128, 'notify_value')
     + ATH_WALLET_RESERVES_NANOTONS.transferNotifyAckValue
+    + ATH_WALLET_RESERVES_NANOTONS.internalTransferSourceAckValue
     + ATH_WALLET_RESERVES_NANOTONS.transferNotifyExec
     + ATH_WALLET_RESERVES_NANOTONS.transferNotifyStorageEndowment;
 }

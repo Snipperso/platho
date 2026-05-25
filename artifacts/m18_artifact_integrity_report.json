@@ -12,27 +12,27 @@
   },
   "code_hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "c8a2476d01832102c35ad556e6dcb11fde9b98fb3b23370eb2110250ee8bf683",
-      "pinned": "c8a2476d01832102c35ad556e6dcb11fde9b98fb3b23370eb2110250ee8bf683",
-      "current_file": "c8a2476d01832102c35ad556e6dcb11fde9b98fb3b23370eb2110250ee8bf683",
+      "built": "27845e181d072be71583816c19d1da1a033f7820b202ea272cb7fe23718e685d",
+      "pinned": "27845e181d072be71583816c19d1da1a033f7820b202ea272cb7fe23718e685d",
+      "current_file": "27845e181d072be71583816c19d1da1a033f7820b202ea272cb7fe23718e685d",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "584ae866786733e97a034ed84fc353d52dff761cfcbac029192a6f82fa84a354",
-      "pinned": "584ae866786733e97a034ed84fc353d52dff761cfcbac029192a6f82fa84a354",
-      "current_file": "584ae866786733e97a034ed84fc353d52dff761cfcbac029192a6f82fa84a354",
+      "built": "3b11e07332222e393ba11eb8c212edb7e48d7f173a4e2e3e0626f600405f6960",
+      "pinned": "3b11e07332222e393ba11eb8c212edb7e48d7f173a4e2e3e0626f600405f6960",
+      "current_file": "3b11e07332222e393ba11eb8c212edb7e48d7f173a4e2e3e0626f600405f6960",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "82129f706996f5f5384f2d575bea56f1ae51b7408a32c3bd5a0c93252e11eb61",
-      "pinned": "82129f706996f5f5384f2d575bea56f1ae51b7408a32c3bd5a0c93252e11eb61",
-      "current_file": "82129f706996f5f5384f2d575bea56f1ae51b7408a32c3bd5a0c93252e11eb61",
+      "built": "dea2074e10684c935ea5ff29ae0b62b9be364c249d36359f53c53639add75bd3",
+      "pinned": "dea2074e10684c935ea5ff29ae0b62b9be364c249d36359f53c53639add75bd3",
+      "current_file": "dea2074e10684c935ea5ff29ae0b62b9be364c249d36359f53c53639add75bd3",
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
-      "built": "3cf74ae1f5ecbb8e3fdfc3d663a42fbd854bf87b8a2e6ef1dfaa2b2a010977a4",
-      "pinned": "3cf74ae1f5ecbb8e3fdfc3d663a42fbd854bf87b8a2e6ef1dfaa2b2a010977a4",
-      "current_file": "3cf74ae1f5ecbb8e3fdfc3d663a42fbd854bf87b8a2e6ef1dfaa2b2a010977a4",
+      "built": "9d6e349302bcc5bd90759af2005213037b99bee72018d5ffa5096bdabe87e020",
+      "pinned": "9d6e349302bcc5bd90759af2005213037b99bee72018d5ffa5096bdabe87e020",
+      "current_file": "9d6e349302bcc5bd90759af2005213037b99bee72018d5ffa5096bdabe87e020",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -48,15 +48,15 @@
       "match": true
     },
     "PROFILE_REGISTRY_CODE_HASH": {
-      "built": "42cd425f8724559ac533579a838119f816c7e0850d7325a7abec3291f844bcfc",
-      "pinned": "42cd425f8724559ac533579a838119f816c7e0850d7325a7abec3291f844bcfc",
-      "current_file": "42cd425f8724559ac533579a838119f816c7e0850d7325a7abec3291f844bcfc",
+      "built": "d4867f6927b4c64e31b59bc7f30a352b21638b294923383b754845c73896b59b",
+      "pinned": "d4867f6927b4c64e31b59bc7f30a352b21638b294923383b754845c73896b59b",
+      "current_file": "d4867f6927b4c64e31b59bc7f30a352b21638b294923383b754845c73896b59b",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "5278016cf77e1182e30fa8f86d78846a2893d8e4f2d9ae7888907edba6646ed5",
-      "pinned": "5278016cf77e1182e30fa8f86d78846a2893d8e4f2d9ae7888907edba6646ed5",
-      "current_file": "5278016cf77e1182e30fa8f86d78846a2893d8e4f2d9ae7888907edba6646ed5",
+      "built": "20a3ccf353a2bc34bffa9e58dd3bb011380c6fd15fac8a899eb1b40cd054c3f7",
+      "pinned": "20a3ccf353a2bc34bffa9e58dd3bb011380c6fd15fac8a899eb1b40cd054c3f7",
+      "current_file": "20a3ccf353a2bc34bffa9e58dd3bb011380c6fd15fac8a899eb1b40cd054c3f7",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -66,9 +66,9 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "a1b079a73ebaf30dd870929e581cfd3b6577446c092926135d7555488f7c774f",
-      "pinned": "a1b079a73ebaf30dd870929e581cfd3b6577446c092926135d7555488f7c774f",
-      "current_file": "a1b079a73ebaf30dd870929e581cfd3b6577446c092926135d7555488f7c774f",
+      "built": "ad1336daba53d1cb358a9fb0efee263be44c2b67e95d8fd70062ec16dd88d845",
+      "pinned": "ad1336daba53d1cb358a9fb0efee263be44c2b67e95d8fd70062ec16dd88d845",
+      "current_file": "ad1336daba53d1cb358a9fb0efee263be44c2b67e95d8fd70062ec16dd88d845",
       "match": true
     },
     "MOCK_VAULT_ATH_WALLET_CODE_HASH": {
@@ -94,8 +94,8 @@
     "m17_gas_report_passes": true
   },
   "manifest": {
-    "stored_hash": "5ff78ea7f23868a876c2ecc09f07e703c2aea21b646a1b3386e7a268880c4f92",
-    "rebuilt_hash": "5ff78ea7f23868a876c2ecc09f07e703c2aea21b646a1b3386e7a268880c4f92",
+    "stored_hash": "ea361e69c0526f186d2d44c261186bbaf5ae32a2658fcda7a415ddce715a1c2a",
+    "rebuilt_hash": "ea361e69c0526f186d2d44c261186bbaf5ae32a2658fcda7a415ddce715a1c2a",
     "match": true,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
     "blockers_before_final_genesis": [
@@ -105,27 +105,27 @@
     ]
   },
   "stable_artifact_lock": {
-    "artifacts/CURRENT_CODE_HASHES.txt": "66c6610c5461ed36eafb3c74e5426084cfe8a14b2cd482bc3f863328478dd6b8",
-    "artifacts/ATHMASTER_CODE_HASH.txt": "88da2cb2b17ec8362e048a020cc4318dbdfb0eb30d918173b636203f280deb83",
-    "artifacts/ATH_WALLET_CODE_HASH.txt": "2e52666433798887919a89ee54b9730b1828fe1b8da8d05c16c20604bb15ff4c",
-    "artifacts/BUYBACKBURN_CODE_HASH.txt": "80223c5071b93f40f80b0bf5be578a93a7b0ed7892ef35bcf0a7ffe898611149",
-    "artifacts/MARKET_STABILITY_SELLER_CODE_HASH.txt": "a9e8c82d4c7e853cdab4f77a37f12c0d746d90f31014eb9df3fb585b1fc424da",
+    "artifacts/CURRENT_CODE_HASHES.txt": "f8930af6d9c60ed69b83f09bb28dd89b775ff68bcc5564678e73ed4c7df0388f",
+    "artifacts/ATHMASTER_CODE_HASH.txt": "d1ac9512ae75c4a466f24cc9216ca23a6a7c3faff6f8466564af6a63116a7945",
+    "artifacts/ATH_WALLET_CODE_HASH.txt": "28002c3542a4f13bab18f59258f689ba76dc087e67958c84f484868387777030",
+    "artifacts/BUYBACKBURN_CODE_HASH.txt": "e697563e9e55a1a2fda8fe2afa930d6e46977c3a7e3010b882c35e7fed153ccb",
+    "artifacts/MARKET_STABILITY_SELLER_CODE_HASH.txt": "43eb83bf4a77149bad76b2143fdca622112d83e1e4950109d3fa3a2eb82b158b",
     "artifacts/CAPSULEHUB_CODE_HASH.txt": "a6dde27a92aae507a664745a41692a89eabed34aafc333f2cb6cc4da643d2ab2",
     "artifacts/FEEACCUMULATOR_CODE_HASH.txt": "fbc8b2bf82853bac9b7e8657489006de552ec9eb102901908402efdca97f6aa4",
     "artifacts/FEE_ACCUMULATOR_CODE_HASH.txt": "fbc8b2bf82853bac9b7e8657489006de552ec9eb102901908402efdca97f6aa4",
-    "artifacts/PROFILE_REGISTRY_CODE_HASH.txt": "5830cecb9cb06a7d5683cc08fb02df416074d4a237c4e0cc95b0f4fc7e22e42c",
-    "artifacts/VAULT_CODE_HASH.txt": "ade664b93e7049fa6fbc75431953db40c386ff692d174c2f387fe5c052ea1c8f",
+    "artifacts/PROFILE_REGISTRY_CODE_HASH.txt": "3944275c6d6288d71468962f57b36c9997607868a1975be9cc07a65fb6c0f689",
+    "artifacts/VAULT_CODE_HASH.txt": "b9a902390125870c35d7dab8b7a054995998157164a9628c27753a4ea32db3b3",
     "artifacts/USERNAME_NFT_ITEM_CODE_HASH.txt": "142dc02bb6afbd2dde8853155d5332a69e616cbc1785137ee30313e233585b6a",
-    "artifacts/USERNAME_REGISTRY_CODE_HASH.txt": "3083219e9dcf47c7402b68cf9deeba1021f4e76cf8f0c8c3482fde9a3f467b93",
-    "artifacts/ath_wallet_derivation_vectors.json": "d39518b10891a1ed507a45d3c83f7e67810432f4a3b3d88bb2dc26a0f7585197",
-    "artifacts/deployment_ath_wallet_binding_vectors.json": "76859bba81b376ebef3a3a6801346ed4e50e88989c9a1e4c40e3fba03fc3bfb2",
+    "artifacts/USERNAME_REGISTRY_CODE_HASH.txt": "a1c48ea0fde9ab102f59909e4be684e7ab2f06925a11bea34dbec1daedff1c29",
+    "artifacts/ath_wallet_derivation_vectors.json": "5f49c2e25a7b872830850cfc9aab28925895642f8ea25cd55de34ba37d136efa",
+    "artifacts/deployment_ath_wallet_binding_vectors.json": "10e8568dfccff6a118e3caada2b62100b51e4622bdeb6c5a1c3a316dd7962f92",
     "artifacts/username_nft_item_vectors.json": "2fc77757c2244b21ad7c2ad98a441ceb8102db8b35f51e64f5d9e88e1e4b1252",
-    "artifacts/username_registry_foundation_vectors.json": "12d1618cbf9855041e07fc1403551db1738d19384197e7cac7ce727addbf705c",
-    "artifacts/username_registry_mint_vectors.json": "f827dd13c573d5305fc840247c1f500ff888b09722934e6b9f71c50b4652b02f",
-    "artifacts/deployment_manifest_implemented_subset_m15.json": "6d3f591f2c27872cee61806f0a660e71bdd9e8eed9be478d7ca9cfa493a2c923",
-    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "f0b5292cec183263d9af3625971a02f3edf1b9da14f42d830a5fba4219688b46",
-    "artifacts/m16_conformance_report.json": "ffbae21135fbacaded6e94865c455a49501a0ef11894a2f0458b054fa961ba7d",
-    "artifacts/m17_gas_reserve_sanity_report.json": "3e9af20437e984a62f981d9ddd35c1786a6fcc2efd8edb7c98e3aa9c5383eb64",
+    "artifacts/username_registry_foundation_vectors.json": "dfdc53cb6b4920a02aa358d722f466d1f9a3506ae9cb50568d76e8a39766723d",
+    "artifacts/username_registry_mint_vectors.json": "59de218070025c46a69611c05282126459ffb88611672c56ec53f8d7328789b5",
+    "artifacts/deployment_manifest_implemented_subset_m15.json": "3c798d78d0dd7f3c0ba34fcd301df038cee6c9567addafac4991e6aaa2b7e40c",
+    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "b7b6d3d58d6440ebe41cc8504632c3b06db91696336ca4bc8d97d08e1ddaba7b",
+    "artifacts/m16_conformance_report.json": "67e03227cfaecfb43434a903d1bc9ca723128abe5996cc89585214d93f39d711",
+    "artifacts/m17_gas_reserve_sanity_report.json": "602767010897d0f2fa84e3961eaf84b7f2c745356ad817327e8ac302254a14ca",
     "artifacts/platho_v1_open_values_v0_18_artifact_integrity.md": "a7c1973794154e626df35e5d0100ad941ac4d83b362864840b012b74268d94bb",
     "artifacts/SPEC_CHANGELOG_M18_ARTIFACT_INTEGRITY.md": "709b8f4e475e2fbcb257170a4f561717e011920f44f741fde12b784b0ea4bbaf",
     "artifacts/platho_v1_open_values_v0_49_final_tokenomics_market_stability.md": "83eab5b439684c7102ecaf9b96d9213df319d9bb92b00b4368a20575a2a51766",
@@ -141,7 +141,7 @@
   },
   "source_lock": {
     "contracts\\ATHMaster.tact": "0487b185e6233ddae05adaa9c1f02496cdf7ddaa065ce758ce015a3795913133",
-    "contracts\\ATHWallet.tact": "300b1befed0644bb3ea2ab6a98abd026d3c116b62babb6ad748919473aa1f992",
+    "contracts\\ATHWallet.tact": "c3d3bcedee922b9316b3aa7a954baac338d633ae091b466dba3505c6e3a69529",
     "contracts\\BuybackBurn.tact": "8b17c980d7fb5b2ed0b034df55d2ceced63b23dd289106ba4b4494954c84548e",
     "contracts\\CapsuleHub.tact": "b84e321d8829b90497c2dc71e015b37d9e1e71c234fe46974612004d62bc3300",
     "contracts\\FeeAccumulator.tact": "867290d650b65bfe14ea79658b9a8042b89d2896ec62ada6c494d573da84b22b",
@@ -195,9 +195,9 @@
     "tests\\artifact-code-hash-hygiene.test.ts": "d2c5da405b95155e053d12a149a4730f73aa2afa798a457edcdfe367e1fe9104",
     "tests\\ath-burn-finalization.test.ts": "c13089501cd47a262cb76ba8d3570f73e2b8dcf9db369b52bce61c0835d3f258",
     "tests\\ath-ton-rpc-provider.test.ts": "f22acfffac1b9086586864e94b6c61a7ac96ddbf7a4c9dab50309819f04d6830",
-    "tests\\ath-wallet-boundary-negative.test.ts": "b355465a99b8dc207a3f0b4eb5dde381c20f81962b00d0218549aa00bad480f0",
+    "tests\\ath-wallet-boundary-negative.test.ts": "9be75f319ce71f9c93564639f54c9ecd0d320c0ded3d536995aec39047a28fc3",
     "tests\\ath-wallet-derivation.test.ts": "df5b0dd4a01f6f483349064e1dc148cf40e838df314494e0845d525206c41498",
-    "tests\\ath-wallet-transfer.test.ts": "df0590bf4109f67f37a453000badb50c573310f1cd5289a4671227a8d55af488",
+    "tests\\ath-wallet-transfer.test.ts": "6ebef809556551d44425cbef1aaf165da69f9c4ff1c732932ed71a687ba3ad4f",
     "tests\\buyback-flush-preflight.test.ts": "cf97d1332c3d222dd89d5cbffb92e79d923a59026918cb5b5b614224f5ce0a2c",
     "tests\\buybackburn-auth-negative-matrix.test.ts": "471372229d9a7211a8fadd99b689b9a244390a61f10d11819e962007893a4140",
     "tests\\buybackburn-production.test.ts": "ca0cfaa6dc414528a0fa1e1d79d79f05e2779ccf314bc9a5ab45a0e7c267d4cd",
@@ -248,7 +248,7 @@
     "tests\\profile-registry-ton-rpc-provider.test.ts": "62ed78b602105c06ce437cb888c1343dd9acc2af0e73954ec9245c6b9c95e7b5",
     "tests\\profile-registry.test.ts": "2a88d2c79207679ad3ec3f9a94692efbca32f21a700379c1c321a2409996ac80",
     "tests\\public-channel-subscriptions.test.ts": "6d4972d226b5128248ca606aa297ff3021f190b31f182dac5394ba01fbbc3ccb",
-    "tests\\pwa-contract-transactions.test.ts": "e88c894f05058e4682205f67d13268b34236c4d97978ad84ed283deca5440b0c",
+    "tests\\pwa-contract-transactions.test.ts": "f4fd74e06fd92e9f3af02bb9a9a37ce04e319c72369ecd63c78771ee9c9e05a0",
     "tests\\pwa-runtime-config.test.ts": "6037603ab9e85ef681599387804310e1328f801855a415edd1eb59217f1d7b52",
     "tests\\recipient-identities.test.ts": "eda3498f714ec5517155d4038a241218c82045af507ae438399f18e3b7bf971e",
     "tests\\spec-onchain-message-source.test.ts": "9da7a21489148dd6e945c29aec44e0b236acd23a2ae84e18b0876a559dbb1517",
@@ -256,7 +256,7 @@
     "tests\\storage-topup-abi.test.ts": "1e34d901b79bd3fc6ee888fef220f59b1c54b676985c1ae2520aa659c17b676c",
     "tests\\ton-dns-provider.test.ts": "7330299460399119f319471977dc2a84449c32f116e1296064278f9f64ffc012",
     "tests\\username-nft-item.test.ts": "9b84f44149bc8af5f73d4dd8f3a83d098c0676d8c239724f440e7022a6a5aa95",
-    "tests\\username-registry-ath-wallet-integration.test.ts": "b0dcd0f4775b94da89e2c8a1597ef6e4eb316b2c3267f90727d36d78f720ca92",
+    "tests\\username-registry-ath-wallet-integration.test.ts": "fc844ada85e804bc2a2b39931930d96da1a7695d704633534e2ff846a92d2250",
     "tests\\username-registry-auth-negative-matrix.test.ts": "1a9a634009278bef0d75071a9a400b493d0143c25bf4341cea0e2bb02a0022b3",
     "tests\\username-registry-boundary-negative.test.ts": "b862235db71c064d7a4c09eb769912b48f4d4138e2f3cb6cbe33919f6ae4d9a3",
     "tests\\username-registry-due-flush.test.ts": "8fc7f1675294cd23348c91d66e9af734a6747b31b4bfa85319274a4c47af6f46",
@@ -267,7 +267,7 @@
     "tests\\username-registry-state-invariants.test.ts": "5b7e5582777b4f3142bf1022d46d80310341c88d5ce6e54eb505a61ac8d15101",
     "tests\\username-ton-rpc-provider.test.ts": "eeb7246bb886c94781482803abbe99f5de68d7f4bed92e5b4284d9d23c542957",
     "tests\\vanity-ton-wallet-script.test.ts": "d486a1fc674d4116b5137100f42c51947d280bf71ee3da52190bb290b33102cd",
-    "tests\\vault-ath-integration.test.ts": "b304aeb987fddee23a801eeb56b0d6800ecab9ef354beeb6a16aee15f7f35337",
+    "tests\\vault-ath-integration.test.ts": "a8490eac24ba2bc8545de7e0e39e755e148c06a045aefb9d834e26b08a0b4b6a",
     "tests\\vault-ath-invariants.test.ts": "0d7e3a35f5833dd726e43d5c2c3448b4d0ca899d8851beedc296af2aacec5b53",
     "tests\\vault-auth-negative-matrix.test.ts": "4a5d0970b773955290cfdf04b001c813c55d0a08563ecc904f40fb254f90494d",
     "tests\\vault-boundary-negative.test.ts": "62bee018b28ff4ee9d7c46304565ca63fd84fc15dc40ef09344c349de08addc5",
