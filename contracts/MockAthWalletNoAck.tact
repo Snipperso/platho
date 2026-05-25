@@ -14,9 +14,20 @@ message(0x41544801) ATHBurn {
     response_destination: Address;
 }
 
+message(0x41544812) ATHInternalTransfer {
+    query_id: Int as uint64;
+    amount: Int as uint128;
+    sender_owner: Address;
+    response_destination: Address;
+}
+
 contract MockAthWalletNoAck {
     receive(msg: ATHTransferRequest) {
         // Intentionally accept and do not reply, to keep caller pending state open in tests.
+    }
+
+    receive(msg: ATHInternalTransfer) {
+        // Intentionally accept and do not reply, to keep source wallet pending state open in tests.
     }
 
     receive(msg: ATHBurn) {
