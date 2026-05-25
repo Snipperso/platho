@@ -5,14 +5,14 @@ Internal working packet for testnet rehearsal / mainnet genesis preparation. Thi
 ## Current Repository Point
 
 - Branch: `main`
-- HEAD: `7802816662fb861cb1de8b16c33eec48a35ab339`
-- HEAD title: `Ignore local audit scratch artifacts`
-- GitHub CI: `CI #92` passed for this HEAD
+- Before using this packet, confirm the current release commit with `git rev-parse HEAD`.
+- Baseline before ATH metadata pin: `28179781902e8ca81daebfef4fa823342694ae0a`
+- Baseline CI: `CI #93` passed for that baseline
 - Latest external audit archive currently present:
   - `artifacts/platho_external_audit_slim_20260525-181000_c81192e.zip`
   - SHA256: `02fd28101d14d17c348b0ad1ae2c894857542061d28598dff277c8fdbd58bdd7`
 
-Note: the latest audit archive is tied to `c81192e`. Commits after that are docs / artifact hygiene only, but a strict release freeze should either archive the current HEAD or record the docs-only delta explicitly.
+Note: the latest audit archive is tied to `c81192e`. Commits after that are docs, artifact hygiene, and deterministic deployment-input metadata only, but a strict release freeze should either archive the current HEAD or record the non-contract delta explicitly.
 
 ## Local Gate Snapshot
 
@@ -53,7 +53,21 @@ Blocked until final inputs:
 
 ## First Inputs To Fill
 
-Create `artifacts/mainnet_ath_master_derivation_input.json` from:
+ATH metadata/content is now pinned by:
+
+```text
+artifacts/ath_metadata_content.json
+```
+
+Regenerate it with:
+
+```powershell
+npm.cmd run mainnet:ath-metadata
+```
+
+This also creates a draft `artifacts/mainnet_ath_master_derivation_input.json`.
+
+Before deriving ATHMaster, finalize `artifacts/mainnet_ath_master_derivation_input.json` from:
 
 ```text
 artifacts/mainnet_ath_master_derivation_input_template.json
@@ -63,9 +77,9 @@ Required fields:
 
 - `status`: `FINAL_MAINNET_ATH_MASTER_INPUT`
 - `treasuryOwnerAddress`: final mainnet ATH treasury owner address
-- `contentBocBase64`: final ATH metadata/content cell BOC base64
+- `contentBocBase64`: final ATH metadata/content cell BOC base64, currently pinned from `artifacts/ath_metadata_content.json`
 - `proofRefs.treasuryOwnerProof`
-- `proofRefs.contentCellProof`
+- `proofRefs.contentCellProof`, currently pinned to `artifacts/ath_metadata_content.json#contentHashHex=3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea`
 - `proofRefs.athMasterBuildArtifact`
 
 Then run:
@@ -124,4 +138,4 @@ Stop immediately if any of these happens:
 
 ## Next Concrete Step
 
-Fill `artifacts/mainnet_ath_master_derivation_input.json` with final treasury owner and ATH metadata cell proof. Until that file is final and the derivation report is clean, there is no honest mainnet deployment step to execute.
+Fill `artifacts/mainnet_ath_master_derivation_input.json` with final treasury owner and final proof refs, then switch its status to `FINAL_MAINNET_ATH_MASTER_INPUT`. Until that file is final and the derivation report is clean, there is no honest mainnet deployment step to execute.

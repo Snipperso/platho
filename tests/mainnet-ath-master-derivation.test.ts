@@ -71,6 +71,25 @@ describe('Mainnet ATH Master derivation', () => {
     expect(report.invalidInputs).toContain('contentBocBase64');
   });
 
+  it('reports a valid draft content hash even while final owner inputs are still blocked', async () => {
+    const input = {
+      ...baseInput(),
+      status: 'DRAFT_MAINNET_ATH_MASTER_INPUT',
+      treasuryOwnerAddress: 'REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
+      proofRefs: {
+        ...baseInput().proofRefs,
+        treasuryOwnerProof: 'required: immutable treasury owner proof path/hash',
+      },
+    } satisfies MainnetAthMasterDerivationInput;
+    const report = await createMainnetAthMasterDerivationReport({ input });
+    const content = Cell.fromBoc(Buffer.from(input.contentBocBase64, 'base64'))[0];
+
+    expect(report.status).toBe('BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS');
+    expect(report.ath_master_derivation_ready).toBe(false);
+    expect(report.inputs.contentHash).toBe(content.hash().toString('hex'));
+    expect(report.derived.athMasterAddress).toBeNull();
+  });
+
   it('derives ATH Master address, code hash, data hash, and StateInit hash from final input', async () => {
     const input = baseInput();
     const report = await createMainnetAthMasterDerivationReport({ input });

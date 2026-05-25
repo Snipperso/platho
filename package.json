@@ -15,6 +15,7 @@
     "crypto:selftest": "node scripts/platho_web_crypto_selftest.mjs",
     "wallet:vanity": "node scripts/vanity_ton_wallet.mjs",
     "mainnet:ath-master:derive": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_ath_master_derivation.ts",
+    "mainnet:ath-metadata": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate_ath_metadata_content.ts",
     "m20t:preflight": "node scripts/m20t_execution_preflight.mjs",
     "m20u:readiness": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/buybackburn_contract_readiness_m20u.ts",
     "market-stability:readiness": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/market_stability_seller_readiness.ts",
