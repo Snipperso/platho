@@ -23,14 +23,16 @@
       "buybackBurnOfficialAthWalletAddress": "0:9b497f13390b257faf027cedae5ab2406d83624e5cb8d5f3ec7a3b0dc9c41ad7",
       "stonfiRouterAddress": "0:1e65ac045612bea0b14d1932ffb4ecaebf156584a653998321852243744cb315",
       "stonfiPoolAddressTonAth": "0:8181f7242ec3108a4f4d4411205788d459176464fd937340ec6926975c253242",
+      "stonfiAthSourceOwnerAddress": "0:227394f34004ae34ec2525609913425584a6a8dc6f9c1d06d6eb62d17bc8f100",
+      "stonfiAthSourceWalletAddress": "0:fddfab1915ee53bb8842c2a1144933f46cf907ffdd213cd07788ed575487c26b",
       "stonfiPtonWalletAddress": "0:51f22a5e02af0e314f222131cdb422c7fa7b3b90a70e62da012afa1192473677",
       "askJettonWalletAddress": "0:fddfab1915ee53bb8842c2a1144933f46cf907ffdd213cd07788ed575487c26b"
     },
     "rebuilt_hashes": {
-      "ptonTransferBodyHash": "689ec82cc6cc365181474fba1e45e4cf51f001521d5054bdde68c63007a59167",
-      "samplePtonTransferBodyHash": "689ec82cc6cc365181474fba1e45e4cf51f001521d5054bdde68c63007a59167",
-      "stonfiSwapForwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382",
-      "sampleStonfiSwapForwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382"
+      "ptonTransferBodyHash": "1e5f514aef6e5042fbce810135a44f9428623c91c203cd5c708c1281cfccdae1",
+      "samplePtonTransferBodyHash": "1e5f514aef6e5042fbce810135a44f9428623c91c203cd5c708c1281cfccdae1",
+      "stonfiSwapForwardPayloadHash": "3c84d6854b50fee2cf3f595dbff8d2a0df368c7ae544fbc7274f60391fd5fe51",
+      "sampleStonfiSwapForwardPayloadHash": "3c84d6854b50fee2cf3f595dbff8d2a0df368c7ae544fbc7274f60391fd5fe51"
     }
   },
   "supplied_validation": null,

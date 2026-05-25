@@ -39,7 +39,7 @@
         "tonAmount": "50000000000",
         "refundAddress": "0:731d541ed8d9fe9be9f966391fcab29574328729b6923b919c204687ac54c0f5",
         "hasForwardPayload": true,
-        "forwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382"
+        "forwardPayloadHash": "3c84d6854b50fee2cf3f595dbff8d2a0df368c7ae544fbc7274f60391fd5fe51"
       },
       "stonfiSwapPayload": {
         "op": "0x6664de2a",
@@ -50,8 +50,9 @@
         "details": {
           "minAskAmount": "950000000000000",
           "receiverAddress": "0:9b497f13390b257faf027cedae5ab2406d83624e5cb8d5f3ec7a3b0dc9c41ad7",
-          "dexCustomPayloadForwardGasAmount": "0",
-          "hasDexCustomPayload": false,
+          "dexCustomPayloadForwardGasAmount": "40000000",
+          "hasDexCustomPayload": true,
+          "dexCustomPayloadHash": "4514815411bf7e5a4ef36b733868e215cd36712f360ecb5c3c1c709227004f57",
           "refundForwardGasAmount": "0",
           "hasRefundPayload": false,
           "referralValue": "10",
@@ -60,10 +61,10 @@
       }
     },
     "rebuilt_hashes": {
-      "ptonTransferBodyHash": "689ec82cc6cc365181474fba1e45e4cf51f001521d5054bdde68c63007a59167",
-      "samplePtonTransferBodyHash": "689ec82cc6cc365181474fba1e45e4cf51f001521d5054bdde68c63007a59167",
-      "stonfiSwapForwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382",
-      "sampleStonfiSwapForwardPayloadHash": "92b4f99c5fd0f62f1bf0d81a4ac6586916b28966705fbf4e60d4460c78585382"
+      "ptonTransferBodyHash": "1e5f514aef6e5042fbce810135a44f9428623c91c203cd5c708c1281cfccdae1",
+      "samplePtonTransferBodyHash": "1e5f514aef6e5042fbce810135a44f9428623c91c203cd5c708c1281cfccdae1",
+      "stonfiSwapForwardPayloadHash": "3c84d6854b50fee2cf3f595dbff8d2a0df368c7ae544fbc7274f60391fd5fe51",
+      "sampleStonfiSwapForwardPayloadHash": "3c84d6854b50fee2cf3f595dbff8d2a0df368c7ae544fbc7274f60391fd5fe51"
     }
   },
   "supplied_report": null

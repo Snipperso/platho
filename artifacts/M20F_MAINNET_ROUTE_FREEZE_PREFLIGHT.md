@@ -43,6 +43,7 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_INPUTS
 
 - Deploy/freeze final mainnet ATH master and capture immutable deployment manifest.
 - Derive final production BuybackBurn StateInit address and official BuybackBurn ATH wallet.
+- Derive the STON.fi ATH source owner wallet and prove it equals the SDK/API askJettonWalletAddress.
 - Use STON.fi API mainnet simulation for exact 50 TON -> ATH route and capture router metadata.
 - Generate official @ston-fi/sdk/@ston-fi/api tx params from the simulation result.
 - Capture router, pool, pTON, ATH master, and ATH wallet code hashes on mainnet.

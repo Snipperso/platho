@@ -4,6 +4,7 @@ import {
   addressRaw,
   buildStonfiTonToJettonTxParamsV21,
   cellBocBase64,
+  createBuybackRouteNotifyPayload,
   deterministicAddress,
   PLATHO_BUYBACK_STONFI_M19B,
   STONFI_SDK_SOURCE,
@@ -49,6 +50,8 @@ export function createRouteCandidateTemplateM19D() {
         buybackBurnOfficialAthWalletAddress: 'REPLACE_WITH_FINAL_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
         stonfiRouterAddress: 'REPLACE_WITH_SELECTED_STONFI_V2_1_ROUTER_ADDRESS',
         stonfiPoolAddressTonAth: 'REPLACE_WITH_SELECTED_TON_ATH_POOL_ADDRESS',
+        stonfiAthSourceOwnerAddress: 'REPLACE_WITH_ATH_OUTPUT_SOURCE_OWNER_ADDRESS_FOR_ASK_WALLET',
+        stonfiAthSourceWalletAddress: 'REPLACE_WITH_DERIVED_ATH_OUTPUT_SOURCE_WALLET_ADDRESS',
         stonfiPtonWalletAddress: 'REPLACE_WITH_SELECTED_ROUTER_PTON_WALLET_ADDRESS',
         stonfiVaultAddress: null,
         askJettonWalletAddress: 'REPLACE_WITH_ROUTER_ATH_JETTON_WALLET_ADDRESS',
@@ -95,6 +98,8 @@ export function createFixtureFinalCandidateM19D(): StonfiRouteFreezeCandidateV21
     buybackBurnOfficialAthWalletAddress: deterministicAddress('M19D.fixture.buybackburn.official.ath.wallet'),
     stonfiRouterAddress: deterministicAddress('M19D.fixture.stonfi.router'),
     stonfiPoolAddressTonAth: deterministicAddress('M19D.fixture.stonfi.pool'),
+    stonfiAthSourceOwnerAddress: deterministicAddress('M19D.fixture.stonfi.ath.source.owner'),
+    stonfiAthSourceWalletAddress: deterministicAddress('M19D.fixture.router.ath.wallet'),
     stonfiPtonWalletAddress: deterministicAddress('M19D.fixture.pton.wallet'),
     askJettonWalletAddress: deterministicAddress('M19D.fixture.router.ath.wallet'),
   };
@@ -121,6 +126,8 @@ export function createFixtureFinalCandidateM19D(): StonfiRouteFreezeCandidateV21
     excessesAddress: addresses.buybackBurnAddress,
     deadline: swap.deadline,
     forwardGasAmount: swap.routeForwardGasNanotons,
+    dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+    dexCustomPayload: createBuybackRouteNotifyPayload(swap.queryId),
     ptonTonTransferGas: swap.ptonTransferGasNanotons,
   });
 

@@ -48,6 +48,8 @@ export interface StonfiLiveEvidenceInputM19E {
     buybackBurnOfficialAthWalletAddress: string;
     stonfiRouterAddress: string;
     stonfiPoolAddressTonAth: string;
+    stonfiAthSourceOwnerAddress: string;
+    stonfiAthSourceWalletAddress: string;
     stonfiPtonWalletAddress: string;
     stonfiVaultAddress?: string | null;
     askJettonWalletAddress: string;
@@ -86,6 +88,8 @@ export function createLiveEvidenceInputTemplateM19E(): StonfiLiveEvidenceInputM1
       buybackBurnOfficialAthWalletAddress: 'EQ... official BuybackBurn ATH wallet address',
       stonfiRouterAddress: 'EQ... selected STON.fi v2.1 router address',
       stonfiPoolAddressTonAth: 'EQ... selected STON.fi TON/ATH pool address',
+      stonfiAthSourceOwnerAddress: 'EQ... ATH output source owner whose derived ATHWallet equals askJettonWalletAddress',
+      stonfiAthSourceWalletAddress: 'EQ... derived ATH output source wallet address; must equal askJettonWalletAddress',
       stonfiPtonWalletAddress: 'EQ... pTON wallet / proxy address used by selected router route',
       stonfiVaultAddress: null,
       askJettonWalletAddress: 'EQ... router-side ATH jetton wallet address used as ask_jetton_wallet_address',

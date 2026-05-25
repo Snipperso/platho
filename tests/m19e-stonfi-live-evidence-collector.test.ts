@@ -7,6 +7,7 @@ import {
 import {
   buildStonfiTonToJettonTxParamsV21,
   cellBocBase64,
+  createBuybackRouteNotifyPayload,
   deterministicAddress,
   PLATHO_BUYBACK_STONFI_M19B,
 } from '../scripts/stonfi_v2_1_route_lib';
@@ -66,6 +67,8 @@ describe('M19E STON.fi live SDK/API evidence collector', () => {
       excessesAddress: leaked,
       deadline: input.swap.deadline,
       forwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_ROUTE_FORWARD_GAS,
+      dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+      dexCustomPayload: createBuybackRouteNotifyPayload(input.swap.queryId),
       ptonTonTransferGas: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_PTON_TRANSFER_GAS,
     });
     input.sdkTxParams.bodyBocBase64 = cellBocBase64(tx.body);
