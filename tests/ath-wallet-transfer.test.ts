@@ -5,6 +5,7 @@ import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   ATHWallet,
+  ATHInternalTransfer,
   ATHInternalTransferMintUsername,
   ATHInternalTransferProfileAvatar,
   ATHInternalTransferWithNotify,
@@ -12,6 +13,7 @@ import {
   ATHTransferRequestWithNotify,
   AthTransferNotificationAck,
   PruneStaleNotification,
+  storeATHInternalTransfer,
   storeATHInternalTransferMintUsername,
   storeATHInternalTransferProfileAvatar,
   storeATHInternalTransferWithNotify,
@@ -126,6 +128,125 @@ describe('ATH wallet transfer profile', () => {
     const deadWallet = blockchain.openContract(new ATHWallet(deadWalletAddress, deadInit));
     expect((await sourceWallet.getGetWalletData()).balance).toBe(300n);
     expect((await deadWallet.getGetWalletData()).balance).toBe(200n);
+  });
+
+  it('ATH-XFER-03B: forged bounced internal transfers cannot mint wallet balance', async () => {
+    const blockchain = await Blockchain.create();
+    const owner = await blockchain.treasury('ath-forged-bounce-owner');
+    const attacker = await blockchain.treasury('ath-forged-bounce-attacker');
+    const master = fixtureAddress('ATH_FORGED_BOUNCE_MASTER');
+    const wallet = await deployWallet(blockchain, owner.address, master, 0n);
+    const amount = 1_000_000_000_000n;
+    const username = Buffer.from('platho', 'ascii');
+
+    const forgedBodies = [
+      beginCell().store(storeATHInternalTransfer({
+        $$type: 'ATHInternalTransfer',
+        query_id: 301n,
+        amount,
+        sender_owner: owner.address,
+        response_destination: owner.address,
+      } as ATHInternalTransfer)).endCell(),
+      beginCell().store(storeATHInternalTransferWithNotify({
+        $$type: 'ATHInternalTransferWithNotify',
+        query_id: 302n,
+        amount,
+        sender_owner: owner.address,
+        response_destination: owner.address,
+        notify_destination: owner.address,
+        notify_value: toNano('0.03'),
+      } as ATHInternalTransferWithNotify)).endCell(),
+      beginCell().store(storeATHInternalTransferMintUsername({
+        $$type: 'ATHInternalTransferMintUsername',
+        query_id: 303n,
+        amount,
+        sender_owner: owner.address,
+        response_destination: owner.address,
+        notify_value: toNano('0.03'),
+        username_len: BigInt(username.length),
+        username: beginCell().storeBuffer(username).endCell().beginParse(),
+      } as ATHInternalTransferMintUsername)).endCell(),
+      beginCell().store(storeATHInternalTransferProfileAvatar({
+        $$type: 'ATHInternalTransferProfileAvatar',
+        query_id: 304n,
+        amount,
+        sender_owner: owner.address,
+        response_destination: owner.address,
+        notify_value: toNano('0.03'),
+        avatar_hash: 0xabcden,
+        avatar_entry_id: 1n,
+        avatar_stream_id: 2n,
+        avatar_part_count: 1n,
+        media_format: 1n,
+      } as ATHInternalTransferProfileAvatar)).endCell(),
+    ];
+
+    for (const body of forgedBodies) {
+      await blockchain.sendMessage(internal({
+        from: attacker.address,
+        to: wallet.address,
+        value: toNano('0.05'),
+        bounced: true,
+        bounce: false,
+        body: beginCell()
+          .storeUint(0xffffffff, 32)
+          .storeSlice(body.beginParse())
+          .endCell(),
+      }));
+      expect((await wallet.getGetWalletData()).balance).toBe(0n);
+    }
+  });
+
+  it('ATH-XFER-03C: legitimate recipient bounce restores once and consumes outgoing proof', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-legit-bounce-source');
+    const recipientOwner = fixtureAddress('ATH_LEGIT_BOUNCE_RECIPIENT');
+    const master = fixtureAddress('ATH_LEGIT_BOUNCE_MASTER');
+    const wrongMaster = fixtureAddress('ATH_LEGIT_BOUNCE_WRONG_MASTER');
+    const amount = 250n;
+    const queryId = 305n;
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientCorrectInit = await ATHWallet.init(0n, recipientOwner, master);
+    const recipientWrongDataInit = await ATHWallet.init(0n, recipientOwner, wrongMaster);
+    const recipientAddress = contractAddress(recipientOwner.workChain, recipientCorrectInit);
+    await blockchain.setShardAccount(recipientAddress, createShardAccount({
+      address: recipientAddress,
+      code: recipientCorrectInit.code,
+      data: recipientWrongDataInit.data,
+      balance: toNano('1'),
+      workchain: recipientAddress.workChain,
+    }));
+
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ATHTransferRequest',
+      query_id: queryId,
+      amount,
+      recipient: recipientOwner,
+      response_destination: sourceOwner.address,
+    } as ATHTransferRequest);
+
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(1_000n);
+
+    await blockchain.sendMessage(internal({
+      from: recipientAddress,
+      to: sourceWallet.address,
+      value: toNano('0.05'),
+      bounced: true,
+      bounce: false,
+      body: beginCell()
+        .storeUint(0xffffffff, 32)
+        .store(storeATHInternalTransfer({
+          $$type: 'ATHInternalTransfer',
+          query_id: queryId,
+          amount,
+          sender_owner: sourceOwner.address,
+          response_destination: sourceOwner.address,
+        } as ATHInternalTransfer))
+        .endCell(),
+    }));
+
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(1_000n);
   });
 
   it('ATH-XFER-04: pending notifications are keyed by sender owner plus query id', async () => {
@@ -351,7 +472,7 @@ describe('ATH wallet transfer profile', () => {
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
 
-    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.05') }, {
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.051') }, {
       $$type: 'ATHTransferRequestWithNotify',
       query_id: queryId,
       amount: 100n,
@@ -474,6 +595,99 @@ describe('ATH wallet transfer profile', () => {
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
   });
 
+  it('ATH-XFER-05E: forged bounced notifications cannot refund or delete pending notification state', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-transfer-forged-notify-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-forged-notify-recipient');
+    const attacker = await blockchain.treasury('ath-transfer-forged-notify-attacker');
+    const master = fixtureAddress('ATH_TRANSFER_FORGED_NOTIFY_MASTER');
+    const amount = 100n;
+    const key = senderKey(sourceOwner.address);
+    const username = Buffer.from('platho', 'ascii');
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 0n);
+    const recipientWallet = await deployWallet(blockchain, recipientOwner.address, master, 0n);
+
+    await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferWithNotify({
+        $$type: 'ATHInternalTransferWithNotify',
+        query_id: 551n,
+        amount,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_destination: recipientOwner.address,
+        notify_value: toNano('0.03'),
+      } as ATHInternalTransferWithNotify)).endCell(),
+    }));
+    await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferMintUsername({
+        $$type: 'ATHInternalTransferMintUsername',
+        query_id: 552n,
+        amount,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        username_len: BigInt(username.length),
+        username: beginCell().storeBuffer(username).endCell().beginParse(),
+      } as ATHInternalTransferMintUsername)).endCell(),
+    }));
+    await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferProfileAvatar({
+        $$type: 'ATHInternalTransferProfileAvatar',
+        query_id: 553n,
+        amount,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        avatar_hash: 0x9876n,
+        avatar_entry_id: 7n,
+        avatar_stream_id: 8n,
+        avatar_part_count: 2n,
+        media_format: 1n,
+      } as ATHInternalTransferProfileAvatar)).endCell(),
+    }));
+
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount * 3n);
+
+    const forgedNotifications = [
+      { op: 0x472D9D7Dn, queryId: 551n },
+      { op: 0x89129D5Fn, queryId: 552n },
+      { op: 0xA11A7001n, queryId: 553n },
+    ];
+
+    for (const { op, queryId } of forgedNotifications) {
+      await blockchain.sendMessage(internal({
+        from: attacker.address,
+        to: recipientWallet.address,
+        value: toNano('0.05'),
+        bounced: true,
+        bounce: false,
+        body: beginCell()
+          .storeUint(0xffffffff, 32)
+          .storeUint(op, 32)
+          .storeUint(queryId, 64)
+          .storeUint(amount, 128)
+          .storeUint(key, 32)
+          .endCell(),
+      }));
+    }
+
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount * 3n);
+    expect((await recipientWallet.getGetPendingNotification(551n, key)).exists).toBe(true);
+    expect((await recipientWallet.getGetPendingNotification(552n, key)).exists).toBe(true);
+    expect((await recipientWallet.getGetPendingNotification(553n, key)).exists).toBe(true);
+  });
+
   it('ATH-XFER-06: low-value bounced notify does not debit before refund hop can be funded', async () => {
     const blockchain = await Blockchain.create();
     const sourceOwner = await blockchain.treasury('ath-transfer-low-bounce-source');
@@ -485,7 +699,7 @@ describe('ATH wallet transfer profile', () => {
     const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
 
-    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.05') }, {
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.051') }, {
       $$type: 'ATHTransferRequestWithNotify',
       query_id: queryId,
       amount: 100n,

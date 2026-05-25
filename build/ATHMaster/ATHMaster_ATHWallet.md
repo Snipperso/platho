@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 4926 bytes
+BoC Size: 5604 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 38
+Total structures: 39
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -141,9 +141,13 @@ Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,
 TL-B: `_ sender_owner:address amount:uint128 created_at:uint32 = PendingAthTransferNotification`
 Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}`
 
+### PendingAthOutgoingTransfer
+TL-B: `_ recipient_wallet:address response_destination:address amount:uint128 created_at:uint32 = PendingAthOutgoingTransfer`
+Signature: `PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}`
+
 ### ATHWallet$Data
-TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pruned_notification_acks:dict<int, int> = ATHWallet`
-Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>,pruned_notification_acks:dict<int, int>}`
+TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pruned_notification_acks:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}> = ATHWallet`
+Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>,pruned_notification_acks:dict<int, int>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}>}`
 
 ### DeployTreasurySupply
 TL-B: `deploy_treasury_supply#41544807 query_id:uint64 response_destination:address = DeployTreasurySupply`

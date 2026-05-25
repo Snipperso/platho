@@ -2508,6 +2508,69 @@ export function dictValueParserPendingAthTransferNotification(): DictionaryValue
     }
 }
 
+export type PendingAthOutgoingTransfer = {
+    $$type: 'PendingAthOutgoingTransfer';
+    recipient_wallet: Address;
+    response_destination: Address;
+    amount: bigint;
+    created_at: bigint;
+}
+
+export function storePendingAthOutgoingTransfer(src: PendingAthOutgoingTransfer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeAddress(src.recipient_wallet);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeUint(src.created_at, 32);
+    };
+}
+
+export function loadPendingAthOutgoingTransfer(slice: Slice) {
+    const sc_0 = slice;
+    const _recipient_wallet = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _amount = sc_0.loadUintBig(128);
+    const _created_at = sc_0.loadUintBig(32);
+    return { $$type: 'PendingAthOutgoingTransfer' as const, recipient_wallet: _recipient_wallet, response_destination: _response_destination, amount: _amount, created_at: _created_at };
+}
+
+export function loadTuplePendingAthOutgoingTransfer(source: TupleReader) {
+    const _recipient_wallet = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _amount = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingAthOutgoingTransfer' as const, recipient_wallet: _recipient_wallet, response_destination: _response_destination, amount: _amount, created_at: _created_at };
+}
+
+export function loadGetterTuplePendingAthOutgoingTransfer(source: TupleReader) {
+    const _recipient_wallet = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _amount = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    return { $$type: 'PendingAthOutgoingTransfer' as const, recipient_wallet: _recipient_wallet, response_destination: _response_destination, amount: _amount, created_at: _created_at };
+}
+
+export function storeTuplePendingAthOutgoingTransfer(source: PendingAthOutgoingTransfer) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.recipient_wallet);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.amount);
+    builder.writeNumber(source.created_at);
+    return builder.build();
+}
+
+export function dictValueParserPendingAthOutgoingTransfer(): DictionaryValue<PendingAthOutgoingTransfer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storePendingAthOutgoingTransfer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadPendingAthOutgoingTransfer(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHWallet$Data = {
     $$type: 'ATHWallet$Data';
     balance: bigint;
@@ -2516,6 +2579,7 @@ export type ATHWallet$Data = {
     pending_notifications: Dictionary<bigint, PendingAthTransferNotification>;
     processed_notifications: Dictionary<bigint, bigint>;
     pruned_notification_acks: Dictionary<bigint, bigint>;
+    pending_outgoing_transfers: Dictionary<bigint, PendingAthOutgoingTransfer>;
 }
 
 export function storeATHWallet$Data(src: ATHWallet$Data) {
@@ -2526,7 +2590,10 @@ export function storeATHWallet$Data(src: ATHWallet$Data) {
         b_0.storeAddress(src.ath_master_address);
         b_0.storeDict(src.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification());
         b_0.storeDict(src.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
-        b_0.storeDict(src.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
+        const b_1 = new Builder();
+        b_1.storeDict(src.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
+        b_1.storeDict(src.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer());
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -2537,8 +2604,10 @@ export function loadATHWallet$Data(slice: Slice) {
     const _ath_master_address = sc_0.loadAddress();
     const _pending_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), sc_0);
     const _processed_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
-    const _pruned_notification_acks = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _pruned_notification_acks = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_1);
+    const _pending_outgoing_transfers = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), sc_1);
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function loadTupleATHWallet$Data(source: TupleReader) {
@@ -2548,7 +2617,8 @@ export function loadTupleATHWallet$Data(source: TupleReader) {
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
     const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pruned_notification_acks = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks };
+    const _pending_outgoing_transfers = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), source.readCellOpt());
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function loadGetterTupleATHWallet$Data(source: TupleReader) {
@@ -2558,7 +2628,8 @@ export function loadGetterTupleATHWallet$Data(source: TupleReader) {
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
     const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pruned_notification_acks = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks };
+    const _pending_outgoing_transfers = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), source.readCellOpt());
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
@@ -2569,6 +2640,7 @@ export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
     builder.writeCell(source.pending_notifications.size > 0 ? beginCell().storeDictDirect(source.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification()).endCell() : null);
     builder.writeCell(source.processed_notifications.size > 0 ? beginCell().storeDictDirect(source.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
     builder.writeCell(source.pruned_notification_acks.size > 0 ? beginCell().storeDictDirect(source.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
+    builder.writeCell(source.pending_outgoing_transfers.size > 0 ? beginCell().storeDictDirect(source.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer()).endCell() : null);
     return builder.build();
 }
 
@@ -4082,7 +4154,8 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pruned_notification_acks","type":{"kind":"dict","key":"int","value":"int"}}]},
+    {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pruned_notification_acks","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
     {"name":"BindOfficialAthWallet","header":1715335229,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushTreasuryAthDue","header":1621736923,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -4158,6 +4231,7 @@ export const USERNAME_ITEM_ACK_EXEC_RESERVE = 1000000n;
 export const USERNAME_ITEM_ACK_MAX_RESEND_VALUE = 20000000n;
 export const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1000000n;
 export const ATH_INTERNAL_TRANSFER_ACK_VALUE = 3000000n;
+export const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1000000n;
 export const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE = 21000000n;
 export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
 export const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2000000n;
