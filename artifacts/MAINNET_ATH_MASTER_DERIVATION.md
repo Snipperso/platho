@@ -7,8 +7,8 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS
 
 ## Inputs
 
-- treasuryOwnerAddress: not supplied
-- contentHash: not derived
+- treasuryOwnerAddress: REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS
+- contentHash: 3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea
 
 ## Derived ATH Master
 
@@ -24,7 +24,7 @@ Status: BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS
 
 - required: true
 - messageType: DeployTreasurySupply
-- senderAddress: not ready
+- senderAddress: REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS
 - recipientAthWalletAddress: not ready
 - amountAtomic: 100000000000000000
 - requiredValueNanotons: 5000000

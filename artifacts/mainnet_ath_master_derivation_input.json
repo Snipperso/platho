@@ -1,0 +1,12 @@
+{
+  "document": "PLATHO.V1.MAINNET_ATH_MASTER_DERIVATION_INPUT",
+  "network": "mainnet",
+  "status": "DRAFT_MAINNET_ATH_MASTER_INPUT",
+  "treasuryOwnerAddress": "REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+  "contentBocBase64": "te6cckEBDAEA8QABAwDAAQIBWAIHAgEgAwUBQb9FRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwQAFgBQbGF0aG8gQVRIAUG/btT5QqeEjOLLBmt3oRKMah/4xD9Dii3OJGErqf+riwMGAAgAQVRIAgEgCAoBQb9SCN70b1odT53OZqswn0qFEwXxZvke952SPvWONPmiCQkAaABVdGlsaXR5IHRva2VuIG9mIHRoZSBQbGF0aG8gY29tbXVuaWNhdGlvbiBwcm90b2NvbC4BQb9dAfpePAaQHEUEbGst3Opa92T+oO7XKhDUBPIxLOskfQsABAA5r2Mc4g==",
+  "proofRefs": {
+    "treasuryOwnerProof": "required: immutable treasury owner proof path/hash",
+    "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea",
+    "athMasterBuildArtifact": "required: immutable ATHMaster build artifact path/hash"
+  }
+}

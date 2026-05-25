@@ -4,21 +4,22 @@
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "ath_master_derivation_ready": false,
   "production_deploy_executed": false,
-  "inputSource": null,
+  "inputSource": "C:/platho/artifacts/mainnet_ath_master_derivation_input.json",
   "blockers": [
     "MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS"
   ],
   "missingInputs": [
-    "MAINNET_ATH_MASTER_DERIVATION_INPUT",
-    "FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
-    "FINAL_ATH_METADATA_CONTENT_CELL_BOC_BASE64"
+    "FINAL_MAINNET_ATH_MASTER_INPUT_STATUS",
+    "treasuryOwnerAddress",
+    "proofRefs.treasuryOwnerProof",
+    "proofRefs.athMasterBuildArtifact"
   ],
   "rejectedNonProdInputs": [],
   "invalidInputs": [],
   "inputs": {
-    "treasuryOwnerAddress": null,
-    "contentBocBase64": null,
-    "contentHash": null
+    "treasuryOwnerAddress": "REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+    "contentBocBase64": "te6cckEBDAEA8QABAwDAAQIBWAIHAgEgAwUBQb9FRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwQAFgBQbGF0aG8gQVRIAUG/btT5QqeEjOLLBmt3oRKMah/4xD9Dii3OJGErqf+riwMGAAgAQVRIAgEgCAoBQb9SCN70b1odT53OZqswn0qFEwXxZvke952SPvWONPmiCQkAaABVdGlsaXR5IHRva2VuIG9mIHRoZSBQbGF0aG8gY29tbXVuaWNhdGlvbiBwcm90b2NvbC4BQb9dAfpePAaQHEUEbGst3Opa92T+oO7XKhDUBPIxLOskfQsABAA5r2Mc4g==",
+    "contentHash": "3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea"
   },
   "derived": {
     "athMasterAddress": null,
@@ -34,7 +35,7 @@
   "treasurySupplyDeployment": {
     "required": true,
     "messageType": "DeployTreasurySupply",
-    "senderAddress": null,
+    "senderAddress": "REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
     "recipientAthWalletAddress": null,
     "amountAtomic": "100000000000000000",
     "requiredValueNanotons": "5000000",
@@ -47,5 +48,9 @@
     "athMasterCodeHash": null,
     "athDeploymentManifest": null
   },
-  "proofRefs": null
+  "proofRefs": {
+    "treasuryOwnerProof": "required: immutable treasury owner proof path/hash",
+    "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea",
+    "athMasterBuildArtifact": "required: immutable ATHMaster build artifact path/hash"
+  }
 }

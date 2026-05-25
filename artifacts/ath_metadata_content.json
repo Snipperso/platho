@@ -1,0 +1,15 @@
+{
+  "document": "PLATHO.V1.ATH_METADATA_CONTENT",
+  "format": "TEP64_ONCHAIN_METADATA",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "fields": {
+    "name": "Platho ATH",
+    "symbol": "ATH",
+    "decimals": "9",
+    "description": "Utility token of the Platho communication protocol."
+  },
+  "contentBocBase64": "te6cckEBDAEA8QABAwDAAQIBWAIHAgEgAwUBQb9FRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwQAFgBQbGF0aG8gQVRIAUG/btT5QqeEjOLLBmt3oRKMah/4xD9Dii3OJGErqf+riwMGAAgAQVRIAgEgCAoBQb9SCN70b1odT53OZqswn0qFEwXxZvke952SPvWONPmiCQkAaABVdGlsaXR5IHRva2VuIG9mIHRoZSBQbGF0aG8gY29tbXVuaWNhdGlvbiBwcm90b2NvbC4BQb9dAfpePAaQHEUEbGst3Opa92T+oO7XKhDUBPIxLOskfQsABAA5r2Mc4g==",
+  "contentHashHex": "3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea",
+  "bocSha256Hex": "ee9562392154a08be4d148627d10e43b8fb9dfb3b59480365a68447a1ec520f7",
+  "note": "Final ATHMaster StateInit also depends on final treasury owner address. This artifact only pins the token content cell."
+}

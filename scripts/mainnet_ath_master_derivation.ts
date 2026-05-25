@@ -253,10 +253,18 @@ export async function createMainnetAthMasterDerivationReport(options: {
     proofRefs: input?.proofRefs ?? null,
   };
 
+  const parsedContent = input && !isPlaceholder(input.contentBocBase64)
+    ? parseContentCell(input.contentBocBase64)
+    : null;
+
+  if (parsedContent) {
+    base.inputs.contentHash = parsedContent.hash().toString('hex');
+  }
+
   if (!input || blockers.length > 0) return base;
 
   const treasuryOwner = Address.parse(input.treasuryOwnerAddress);
-  const content = parseContentCell(input.contentBocBase64);
+  const content = parsedContent;
   if (!content) {
     return {
       ...base,
