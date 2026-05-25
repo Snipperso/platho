@@ -430,6 +430,55 @@ describe('Production BuybackBurn candidate', () => {
     expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
   });
 
+  it('BUYBACK-03C: production FeeAccumulator flush before route freeze bounces and restores buyback due', async () => {
+    const env = await setup();
+    const productionFeeAccumulator = await deployFeeAccumulator(
+      env.blockchain,
+      env.controller.address,
+      env.buyback.address,
+    );
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackFeeAccumulator',
+      deployment_manifest_hash: MANIFEST_HASH,
+      fee_accumulator_address: productionFeeAccumulator.address,
+    } as BindBuybackFeeAccumulator);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: env.officialAthWallet,
+    } as BindBuybackOfficialAthWallet);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealBuybackBurnGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealBuybackBurnGenesis);
+
+    expect((await env.buyback.getGetBuybackBurnConfig()).route_frozen).toBe(false);
+
+    await productionFeeAccumulator.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'EnableBuybackSplit',
+    } as EnableBuybackSplit);
+
+    const protocolFeePrincipal = ENVELOPE * 2n;
+    await productionFeeAccumulator.send(env.operator.getSender(), { value: protocolFeePrincipal + toNano('0.1') }, {
+      $$type: 'DepositProtocolFee',
+      amount: protocolFeePrincipal,
+    } as DepositProtocolFee);
+    await productionFeeAccumulator.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'SplitAccumulated',
+    } as SplitAccumulated);
+    expect((await productionFeeAccumulator.getGetState()).buyback_due_ton).toBe(ENVELOPE);
+
+    await productionFeeAccumulator.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'FlushBuybackDue',
+      amount: ENVELOPE,
+    } as FlushBuybackDue);
+
+    expect((await productionFeeAccumulator.getGetState()).buyback_due_ton).toBe(ENVELOPE);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(0n);
+    expect((await env.buyback.getGetBuybackBurnTotals()).accepted_reserve_count).toBe(0n);
+  });
+
   it('BUYBACK-04: execution sends the exact STON.fi pTON body with BuybackBurn refund and excess receivers', async () => {
     const env = await setup();
     await freezeAndSeal(env);
