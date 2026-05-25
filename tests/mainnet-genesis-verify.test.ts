@@ -87,6 +87,14 @@ function finalInput(): MainnetGenesisVerifyInput {
         capsule_hub_address: addresses.capsulehub,
         vault_ath_wallet_address: addresses.vault_official_ath_wallet,
         ath_master_address: addresses.ath_master,
+        user_count: '0',
+        key_record_count: '0',
+        receive_intent_count: '0',
+        pending_ath_withdrawal_count: '0',
+        pending_publish_count: '0',
+        processed_ath_deposit_count: '0',
+        airdrop_remaining_ath: '30000000000000000',
+        airdrop_distributed_ath: '0',
       },
       vault_official_ath_wallet: {
         address: addresses.vault_official_ath_wallet,
@@ -110,6 +118,14 @@ function finalInput(): MainnetGenesisVerifyInput {
         reserve_funded_total_ath: '0',
         treasury_due_ton: '0',
         sold_ath_total: '0',
+        phase: '0',
+        pending_query_id: '0',
+        pending_amount_ath: '0',
+        pending_paid_ton: '0',
+        completed_tranche_count: '0',
+        current_tranche_sold_ath: '0',
+        last_terminal_query_id: '0',
+        treasury_flushed_ton_total: '0',
       },
       market_stability_seller_official_ath_wallet: {
         address: addresses.market_stability_seller_official_ath_wallet,
@@ -125,6 +141,9 @@ function finalInput(): MainnetGenesisVerifyInput {
         deployment_manifest_hash: manifestHash,
         vault_address: addresses.vault,
         fee_accumulator_address: addresses.fee_accumulator,
+        private_latest_id: '0',
+        public_latest_id: '0',
+        accrued_plato_fee_ton: '0',
       },
       username_registry: {
         address: addresses.username_registry,
@@ -134,6 +153,14 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.username_registry_official_ath_wallet,
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.treasury_ath_receiver,
+        name_record_count: '0',
+        pending_mint_count: '0',
+        refund_due_count: '0',
+        treasury_due_ath: '0',
+        burn_due_ath: '0',
+        pending_refund_flush_count: '0',
+        pending_treasury_flush_count: '0',
+        pending_burn_flush_count: '0',
       },
       profile_registry: {
         address: addresses.profile_registry,
@@ -143,6 +170,12 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.profile_registry_official_ath_wallet,
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.profile_registry_treasury_ath_receiver,
+        profile_count: '0',
+        avatar_record_count: '0',
+        treasury_due_ath: '0',
+        burn_due_ath: '0',
+        pending_treasury_flush_count: '0',
+        pending_burn_flush_count: '0',
       },
       buyback_burn: {
         address: addresses.buyback_burn,
@@ -154,6 +187,15 @@ function finalInput(): MainnetGenesisVerifyInput {
         ath_master_address: addresses.ath_master,
         genesis_config_hash: addressHashHex(addresses.buyback_burn_initial_genesis_controller),
         route_frozen: false,
+        phase: '0',
+        reserve_due_ton: '0',
+        pending_query_id: '0',
+        route_refund_due_ton: '0',
+        ath_burn_retry_due_atomic: '0',
+        last_terminal_query_id: '0',
+        accepted_reserve_count: '0',
+        executed_buyback_count: '0',
+        burned_ath_total_atomic: '0',
       },
       fee_accumulator: {
         address: addresses.fee_accumulator,
@@ -161,6 +203,9 @@ function finalInput(): MainnetGenesisVerifyInput {
         buyback_burn_address: addresses.buyback_burn,
         ton_treasury_receiver: addresses.fee_accumulator_ton_treasury_receiver,
         buyback_split_enabled: false,
+        accumulated_ton: '0',
+        treasury_due_ton: '0',
+        buyback_due_ton: '0',
       },
     },
     evidenceRefs: {
@@ -284,6 +329,77 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH');
   });
 
+  it('rejects final genesis when Vault already has users, pending state, or distributed activity ATH', () => {
+    const input = finalInput();
+    input.snapshot.vault.user_count = '1';
+    input.snapshot.vault.key_record_count = '1';
+    input.snapshot.vault.receive_intent_count = '1';
+    input.snapshot.vault.pending_ath_withdrawal_count = '1';
+    input.snapshot.vault.pending_publish_count = '1';
+    input.snapshot.vault.processed_ath_deposit_count = '1';
+    input.snapshot.vault.airdrop_remaining_ath = '29999990000000000';
+    input.snapshot.vault.airdrop_distributed_ath = '10000000000';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('VAULT_USER_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_KEY_RECORD_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_RECEIVE_INTENT_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_PENDING_ATH_WITHDRAWAL_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_PENDING_PUBLISH_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_PROCESSED_ATH_DEPOSIT_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_AIRDROP_REMAINING_NOT_FULL_AT_GENESIS');
+    expect(report.issue_codes).toContain('VAULT_AIRDROP_DISTRIBUTED_NOT_ZERO_AT_GENESIS');
+  });
+
+  it('rejects final genesis when CapsuleHub already has entries or accrued fees', () => {
+    const input = finalInput();
+    input.snapshot.capsulehub.private_latest_id = '1';
+    input.snapshot.capsulehub.public_latest_id = '1';
+    input.snapshot.capsulehub.accrued_plato_fee_ton = '1';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('CAPSULEHUB_PRIVATE_LATEST_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('CAPSULEHUB_PUBLIC_LATEST_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('CAPSULEHUB_ACCRUED_PLATO_FEE_NOT_ZERO_AT_GENESIS');
+  });
+
+  it('rejects final genesis when registries or FeeAccumulator already hold records or due buckets', () => {
+    const input = finalInput();
+    input.snapshot.username_registry.name_record_count = '1';
+    input.snapshot.username_registry.pending_mint_count = '1';
+    input.snapshot.username_registry.refund_due_count = '1';
+    input.snapshot.username_registry.treasury_due_ath = '1';
+    input.snapshot.username_registry.burn_due_ath = '1';
+    input.snapshot.username_registry.pending_refund_flush_count = '1';
+    input.snapshot.username_registry.pending_treasury_flush_count = '1';
+    input.snapshot.username_registry.pending_burn_flush_count = '1';
+    input.snapshot.profile_registry.profile_count = '1';
+    input.snapshot.profile_registry.avatar_record_count = '1';
+    input.snapshot.profile_registry.treasury_due_ath = '1';
+    input.snapshot.profile_registry.burn_due_ath = '1';
+    input.snapshot.profile_registry.pending_treasury_flush_count = '1';
+    input.snapshot.profile_registry.pending_burn_flush_count = '1';
+    input.snapshot.fee_accumulator.accumulated_ton = '1';
+    input.snapshot.fee_accumulator.treasury_due_ton = '1';
+    input.snapshot.fee_accumulator.buyback_due_ton = '1';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('PROFILE_REGISTRY_AVATAR_RECORDS_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('PROFILE_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('FEE_ACCUMULATOR_ACCUMULATED_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('FEE_ACCUMULATOR_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('FEE_ACCUMULATOR_BUYBACK_DUE_NOT_ZERO_AT_GENESIS');
+  });
+
   it('rejects final genesis when MarketStabilitySeller is already priced or funded', () => {
     const input = finalInput();
     input.snapshot.market_stability_seller.pricing_frozen = true;
@@ -292,6 +408,14 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     input.snapshot.market_stability_seller.reserve_funded_total_ath = '1';
     input.snapshot.market_stability_seller.treasury_due_ton = '1';
     input.snapshot.market_stability_seller.sold_ath_total = '1';
+    input.snapshot.market_stability_seller.phase = '1';
+    input.snapshot.market_stability_seller.pending_query_id = '1';
+    input.snapshot.market_stability_seller.pending_amount_ath = '1';
+    input.snapshot.market_stability_seller.pending_paid_ton = '1';
+    input.snapshot.market_stability_seller.completed_tranche_count = '1';
+    input.snapshot.market_stability_seller.current_tranche_sold_ath = '1';
+    input.snapshot.market_stability_seller.last_terminal_query_id = '1';
+    input.snapshot.market_stability_seller.treasury_flushed_ton_total = '1';
     input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '1';
 
     const report = verifyMainnetGenesisSnapshot(input);
@@ -303,6 +427,14 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_PHASE_NOT_IDLE_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_PENDING_QUERY_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_PENDING_AMOUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_PENDING_PAID_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_COMPLETED_TRANCHE_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_CURRENT_TRANCHE_SOLD_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_TREASURY_FLUSHED_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS');
   });
 
@@ -341,11 +473,29 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
   it('rejects final genesis when BuybackBurn route is already frozen', () => {
     const input = finalInput();
     input.snapshot.buyback_burn.route_frozen = true;
+    input.snapshot.buyback_burn.phase = '1';
+    input.snapshot.buyback_burn.reserve_due_ton = '1';
+    input.snapshot.buyback_burn.pending_query_id = '1';
+    input.snapshot.buyback_burn.route_refund_due_ton = '1';
+    input.snapshot.buyback_burn.ath_burn_retry_due_atomic = '1';
+    input.snapshot.buyback_burn.last_terminal_query_id = '1';
+    input.snapshot.buyback_burn.accepted_reserve_count = '1';
+    input.snapshot.buyback_burn.executed_buyback_count = '1';
+    input.snapshot.buyback_burn.burned_ath_total_atomic = '1';
 
     const report = verifyMainnetGenesisSnapshot(input);
 
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('BUYBACK_ROUTE_FROZEN_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_STATE_NOT_IDLE_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_RESERVE_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_PENDING_QUERY_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_ROUTE_REFUND_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_ATH_BURN_RETRY_DUE_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_ACCEPTED_RESERVE_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_EXECUTED_COUNT_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('BUYBACK_BURNED_ATH_TOTAL_NOT_ZERO_AT_GENESIS');
   });
 
   it('rejects final genesis when BuybackBurn launch controller hash was cleared too early', () => {

@@ -38,6 +38,14 @@ export interface MainnetGenesisVerifyInput {
       capsule_hub_address: string;
       vault_ath_wallet_address: string;
       ath_master_address: string;
+      user_count: string;
+      key_record_count: string;
+      receive_intent_count: string;
+      pending_ath_withdrawal_count: string;
+      pending_publish_count: string;
+      processed_ath_deposit_count: string;
+      airdrop_remaining_ath: string;
+      airdrop_distributed_ath: string;
     };
     vault_official_ath_wallet: BaseSnapshot & {
       owner_address: string;
@@ -55,6 +63,14 @@ export interface MainnetGenesisVerifyInput {
       reserve_funded_total_ath: string;
       treasury_due_ton: string;
       sold_ath_total: string;
+      phase: string;
+      pending_query_id: string;
+      pending_amount_ath: string;
+      pending_paid_ton: string;
+      completed_tranche_count: string;
+      current_tranche_sold_ath: string;
+      last_terminal_query_id: string;
+      treasury_flushed_ton_total: string;
     };
     market_stability_seller_official_ath_wallet: BaseSnapshot & {
       owner_address: string;
@@ -64,16 +80,33 @@ export interface MainnetGenesisVerifyInput {
     capsulehub: BaseSnapshot & {
       vault_address: string;
       fee_accumulator_address: string;
+      private_latest_id: string;
+      public_latest_id: string;
+      accrued_plato_fee_ton: string;
     };
     username_registry: BaseSnapshot & {
       official_ath_wallet_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
+      name_record_count: string;
+      pending_mint_count: string;
+      refund_due_count: string;
+      treasury_due_ath: string;
+      burn_due_ath: string;
+      pending_refund_flush_count: string;
+      pending_treasury_flush_count: string;
+      pending_burn_flush_count: string;
     };
     profile_registry: BaseSnapshot & {
       official_ath_wallet_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
+      profile_count: string;
+      avatar_record_count: string;
+      treasury_due_ath: string;
+      burn_due_ath: string;
+      pending_treasury_flush_count: string;
+      pending_burn_flush_count: string;
     };
     buyback_burn: BaseSnapshot & {
       fee_accumulator_address: string;
@@ -81,11 +114,23 @@ export interface MainnetGenesisVerifyInput {
       ath_master_address: string;
       genesis_config_hash: string;
       route_frozen: boolean;
+      phase: string;
+      reserve_due_ton: string;
+      pending_query_id: string;
+      route_refund_due_ton: string;
+      ath_burn_retry_due_atomic: string;
+      last_terminal_query_id: string;
+      accepted_reserve_count: string;
+      executed_buyback_count: string;
+      burned_ath_total_atomic: string;
     };
     fee_accumulator: BaseSnapshot & {
       buyback_burn_address: string;
       ton_treasury_receiver: string;
       buyback_split_enabled: boolean;
+      accumulated_ton: string;
+      treasury_due_ton: string;
+      buyback_due_ton: string;
     };
   };
   evidenceRefs: {
@@ -186,6 +231,10 @@ function addDecimalEq(issues: Issue[], code: string, actual: unknown, expected: 
   if (BigInt(actual) !== BigInt(expected)) {
     issues.push(issue(code, `${label} mismatch: expected ${expected}, got ${actual}`));
   }
+}
+
+function addDecimalZero(issues: Issue[], code: string, actual: unknown, label: string) {
+  addDecimalEq(issues, code, actual, '0', label);
 }
 
 function addBasechainAddress(issues: Issue[], code: string, value: unknown, label: string) {
@@ -296,6 +345,14 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         capsule_hub_address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
         vault_ath_wallet_address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        user_count: '0',
+        key_record_count: '0',
+        receive_intent_count: '0',
+        pending_ath_withdrawal_count: '0',
+        pending_publish_count: '0',
+        processed_ath_deposit_count: '0',
+        airdrop_remaining_ath: 'required: full activity airdrop allocation',
+        airdrop_distributed_ath: '0',
       },
       vault_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
@@ -317,6 +374,14 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         reserve_funded_total_ath: '0',
         treasury_due_ton: '0',
         sold_ath_total: '0',
+        phase: '0',
+        pending_query_id: '0',
+        pending_amount_ath: '0',
+        pending_paid_ton: '0',
+        completed_tranche_count: '0',
+        current_tranche_sold_ath: '0',
+        last_terminal_query_id: '0',
+        treasury_flushed_ton_total: '0',
       },
       market_stability_seller_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
@@ -330,6 +395,9 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
         vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         fee_accumulator_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
+        private_latest_id: '0',
+        public_latest_id: '0',
+        accrued_plato_fee_ton: '0',
       },
       username_registry: {
         ...base,
@@ -337,6 +405,14 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         official_ath_wallet_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
+        name_record_count: '0',
+        pending_mint_count: '0',
+        refund_due_count: '0',
+        treasury_due_ath: '0',
+        burn_due_ath: '0',
+        pending_refund_flush_count: '0',
+        pending_treasury_flush_count: '0',
+        pending_burn_flush_count: '0',
       },
       profile_registry: {
         ...base,
@@ -344,6 +420,12 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         official_ath_wallet_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
+        profile_count: '0',
+        avatar_record_count: '0',
+        treasury_due_ath: '0',
+        burn_due_ath: '0',
+        pending_treasury_flush_count: '0',
+        pending_burn_flush_count: '0',
       },
       buyback_burn: {
         ...base,
@@ -353,6 +435,15 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         genesis_config_hash: 'required: 64 lowercase hex buyback launch controller hash',
         route_frozen: false,
+        phase: '0',
+        reserve_due_ton: '0',
+        pending_query_id: '0',
+        route_refund_due_ton: '0',
+        ath_burn_retry_due_atomic: '0',
+        last_terminal_query_id: '0',
+        accepted_reserve_count: '0',
+        executed_buyback_count: '0',
+        burned_ath_total_atomic: '0',
       },
       fee_accumulator: {
         address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
@@ -360,6 +451,9 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         buyback_burn_address: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
         ton_treasury_receiver: 'REQUIRED_MAINNET_TON_TREASURY_RECEIVER_ADDRESS',
         buyback_split_enabled: false,
+        accumulated_ton: '0',
+        treasury_due_ton: '0',
+        buyback_due_ton: '0',
       },
     },
     evidenceRefs: {
@@ -431,6 +525,22 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addAddressEq(issues, 'VAULT_CAPSULE_HUB_ADDRESS_MISMATCH', s.vault.capsule_hub_address, manifest.addresses.capsulehub, 'vault.capsule_hub_address');
   addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MISMATCH', s.vault.vault_ath_wallet_address, manifest.addresses.vault_official_ath_wallet, 'vault.vault_ath_wallet_address');
   addAddressEq(issues, 'VAULT_ATH_MASTER_MISMATCH', s.vault.ath_master_address, manifest.addresses.ath_master, 'vault.ath_master_address');
+  addDecimalZero(issues, 'VAULT_USER_COUNT_NOT_ZERO_AT_GENESIS', s.vault.user_count, 'vault.user_count');
+  addDecimalZero(issues, 'VAULT_KEY_RECORD_COUNT_NOT_ZERO_AT_GENESIS', s.vault.key_record_count, 'vault.key_record_count');
+  addDecimalZero(issues, 'VAULT_RECEIVE_INTENT_COUNT_NOT_ZERO_AT_GENESIS', s.vault.receive_intent_count, 'vault.receive_intent_count');
+  addDecimalZero(issues, 'VAULT_PENDING_ATH_WITHDRAWAL_COUNT_NOT_ZERO_AT_GENESIS', s.vault.pending_ath_withdrawal_count, 'vault.pending_ath_withdrawal_count');
+  addDecimalZero(issues, 'VAULT_PENDING_PUBLISH_COUNT_NOT_ZERO_AT_GENESIS', s.vault.pending_publish_count, 'vault.pending_publish_count');
+  addDecimalZero(issues, 'VAULT_PROCESSED_ATH_DEPOSIT_COUNT_NOT_ZERO_AT_GENESIS', s.vault.processed_ath_deposit_count, 'vault.processed_ath_deposit_count');
+  if (isDecimalString(vaultActivityAirdropTotal)) {
+    addDecimalEq(
+      issues,
+      'VAULT_AIRDROP_REMAINING_NOT_FULL_AT_GENESIS',
+      s.vault.airdrop_remaining_ath,
+      vaultActivityAirdropTotal,
+      'vault.airdrop_remaining_ath',
+    );
+  }
+  addDecimalZero(issues, 'VAULT_AIRDROP_DISTRIBUTED_NOT_ZERO_AT_GENESIS', s.vault.airdrop_distributed_ath, 'vault.airdrop_distributed_ath');
 
   const vaultOfficialAthWallet = (s as any).vault_official_ath_wallet ?? {
     address: '',
@@ -499,6 +609,14 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addDecimalEq(issues, 'MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.reserve_funded_total_ath, '0', 'market_stability_seller.reserve_funded_total_ath');
   addDecimalEq(issues, 'MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', marketSeller.treasury_due_ton, '0', 'market_stability_seller.treasury_due_ton');
   addDecimalEq(issues, 'MARKET_STABILITY_SOLD_TOTAL_NOT_ZERO_AT_GENESIS', marketSeller.sold_ath_total, '0', 'market_stability_seller.sold_ath_total');
+  addDecimalZero(issues, 'MARKET_STABILITY_PHASE_NOT_IDLE_AT_GENESIS', marketSeller.phase, 'market_stability_seller.phase');
+  addDecimalZero(issues, 'MARKET_STABILITY_PENDING_QUERY_NOT_ZERO_AT_GENESIS', marketSeller.pending_query_id, 'market_stability_seller.pending_query_id');
+  addDecimalZero(issues, 'MARKET_STABILITY_PENDING_AMOUNT_NOT_ZERO_AT_GENESIS', marketSeller.pending_amount_ath, 'market_stability_seller.pending_amount_ath');
+  addDecimalZero(issues, 'MARKET_STABILITY_PENDING_PAID_NOT_ZERO_AT_GENESIS', marketSeller.pending_paid_ton, 'market_stability_seller.pending_paid_ton');
+  addDecimalZero(issues, 'MARKET_STABILITY_COMPLETED_TRANCHE_COUNT_NOT_ZERO_AT_GENESIS', marketSeller.completed_tranche_count, 'market_stability_seller.completed_tranche_count');
+  addDecimalZero(issues, 'MARKET_STABILITY_CURRENT_TRANCHE_SOLD_NOT_ZERO_AT_GENESIS', marketSeller.current_tranche_sold_ath, 'market_stability_seller.current_tranche_sold_ath');
+  addDecimalZero(issues, 'MARKET_STABILITY_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS', marketSeller.last_terminal_query_id, 'market_stability_seller.last_terminal_query_id');
+  addDecimalZero(issues, 'MARKET_STABILITY_TREASURY_FLUSHED_NOT_ZERO_AT_GENESIS', marketSeller.treasury_flushed_ton_total, 'market_stability_seller.treasury_flushed_ton_total');
 
   const marketSellerOfficialAthWallet = (s as any).market_stability_seller_official_ath_wallet ?? {
     address: '',
@@ -519,6 +637,9 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   checkSealed(issues, manifest, s.capsulehub, 'capsulehub');
   addAddressEq(issues, 'CAPSULEHUB_VAULT_ADDRESS_MISMATCH', s.capsulehub.vault_address, manifest.addresses.vault, 'capsulehub.vault_address');
   addAddressEq(issues, 'CAPSULEHUB_FEE_ACCUMULATOR_MISMATCH', s.capsulehub.fee_accumulator_address, manifest.addresses.fee_accumulator, 'capsulehub.fee_accumulator_address');
+  addDecimalZero(issues, 'CAPSULEHUB_PRIVATE_LATEST_NOT_ZERO_AT_GENESIS', s.capsulehub.private_latest_id, 'capsulehub.private_latest_id');
+  addDecimalZero(issues, 'CAPSULEHUB_PUBLIC_LATEST_NOT_ZERO_AT_GENESIS', s.capsulehub.public_latest_id, 'capsulehub.public_latest_id');
+  addDecimalZero(issues, 'CAPSULEHUB_ACCRUED_PLATO_FEE_NOT_ZERO_AT_GENESIS', s.capsulehub.accrued_plato_fee_ton, 'capsulehub.accrued_plato_fee_ton');
 
   checkBase(issues, manifest, s.username_registry, 'username_registry', 'username_registry', 'username_registry');
   checkSealed(issues, manifest, s.username_registry, 'username_registry');
@@ -526,6 +647,14 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addAddressEq(issues, 'USERNAME_REGISTRY_ATH_MASTER_MISMATCH', s.username_registry.ath_master_address, manifest.addresses.ath_master, 'username_registry.ath_master_address');
   addBasechainAddress(issues, 'USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.username_registry.ath_master_address, 'username_registry.ath_master_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.username_registry.treasury_ath_receiver, manifest.addresses.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS', s.username_registry.name_record_count, 'username_registry.name_record_count');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS', s.username_registry.pending_mint_count, 'username_registry.pending_mint_count');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_REFUND_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.refund_due_count, 'username_registry.refund_due_count');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.treasury_due_ath, 'username_registry.treasury_due_ath');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.burn_due_ath, 'username_registry.burn_due_ath');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_REFUND_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_refund_flush_count, 'username_registry.pending_refund_flush_count');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_treasury_flush_count, 'username_registry.pending_treasury_flush_count');
+  addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_BURN_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_burn_flush_count, 'username_registry.pending_burn_flush_count');
 
   checkBase(issues, manifest, s.profile_registry, 'profile_registry', 'profile_registry', 'profile_registry');
   checkSealed(issues, manifest, s.profile_registry, 'profile_registry');
@@ -534,6 +663,12 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addBasechainAddress(issues, 'PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.profile_registry.ath_master_address, 'profile_registry.ath_master_address');
   addAddressEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry_treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
   addBasechainAddress(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_NOT_BASECHAIN', s.profile_registry.treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
+  addDecimalZero(issues, 'PROFILE_REGISTRY_PROFILE_COUNT_NOT_ZERO_AT_GENESIS', s.profile_registry.profile_count, 'profile_registry.profile_count');
+  addDecimalZero(issues, 'PROFILE_REGISTRY_AVATAR_RECORDS_NOT_ZERO_AT_GENESIS', s.profile_registry.avatar_record_count, 'profile_registry.avatar_record_count');
+  addDecimalZero(issues, 'PROFILE_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.profile_registry.treasury_due_ath, 'profile_registry.treasury_due_ath');
+  addDecimalZero(issues, 'PROFILE_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS', s.profile_registry.burn_due_ath, 'profile_registry.burn_due_ath');
+  addDecimalZero(issues, 'PROFILE_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.profile_registry.pending_treasury_flush_count, 'profile_registry.pending_treasury_flush_count');
+  addDecimalZero(issues, 'PROFILE_REGISTRY_PENDING_BURN_FLUSH_NOT_ZERO_AT_GENESIS', s.profile_registry.pending_burn_flush_count, 'profile_registry.pending_burn_flush_count');
 
   checkBase(issues, manifest, s.buyback_burn, 'buyback_burn', 'buyback_burn', 'buyback_burn');
   checkSealed(issues, manifest, s.buyback_burn, 'buyback_burn');
@@ -555,6 +690,15 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_MISMATCH', s.buyback_burn.official_ath_wallet_address, manifest.addresses.buyback_burn_official_ath_wallet, 'buyback_burn.official_ath_wallet_address');
   addAddressEq(issues, 'BUYBACK_ATH_MASTER_MISMATCH', s.buyback_burn.ath_master_address, manifest.addresses.ath_master, 'buyback_burn.ath_master_address');
   addBasechainAddress(issues, 'BUYBACK_ATH_MASTER_NOT_BASECHAIN', s.buyback_burn.ath_master_address, 'buyback_burn.ath_master_address');
+  addDecimalZero(issues, 'BUYBACK_STATE_NOT_IDLE_AT_GENESIS', s.buyback_burn.phase, 'buyback_burn.phase');
+  addDecimalZero(issues, 'BUYBACK_RESERVE_DUE_NOT_ZERO_AT_GENESIS', s.buyback_burn.reserve_due_ton, 'buyback_burn.reserve_due_ton');
+  addDecimalZero(issues, 'BUYBACK_PENDING_QUERY_NOT_ZERO_AT_GENESIS', s.buyback_burn.pending_query_id, 'buyback_burn.pending_query_id');
+  addDecimalZero(issues, 'BUYBACK_ROUTE_REFUND_DUE_NOT_ZERO_AT_GENESIS', s.buyback_burn.route_refund_due_ton, 'buyback_burn.route_refund_due_ton');
+  addDecimalZero(issues, 'BUYBACK_ATH_BURN_RETRY_DUE_NOT_ZERO_AT_GENESIS', s.buyback_burn.ath_burn_retry_due_atomic, 'buyback_burn.ath_burn_retry_due_atomic');
+  addDecimalZero(issues, 'BUYBACK_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS', s.buyback_burn.last_terminal_query_id, 'buyback_burn.last_terminal_query_id');
+  addDecimalZero(issues, 'BUYBACK_ACCEPTED_RESERVE_COUNT_NOT_ZERO_AT_GENESIS', s.buyback_burn.accepted_reserve_count, 'buyback_burn.accepted_reserve_count');
+  addDecimalZero(issues, 'BUYBACK_EXECUTED_COUNT_NOT_ZERO_AT_GENESIS', s.buyback_burn.executed_buyback_count, 'buyback_burn.executed_buyback_count');
+  addDecimalZero(issues, 'BUYBACK_BURNED_ATH_TOTAL_NOT_ZERO_AT_GENESIS', s.buyback_burn.burned_ath_total_atomic, 'buyback_burn.burned_ath_total_atomic');
 
   checkBase(issues, manifest, s.fee_accumulator, 'fee_accumulator', 'fee_accumulator', 'fee_accumulator');
   addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
@@ -562,6 +706,9 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   if (s.fee_accumulator.buyback_split_enabled !== false) {
     issues.push(issue('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS', 'fee_accumulator.buyback_split_enabled must be false at final genesis; buyback split is enabled only after the 15% activity distribution / pool-launch gate.'));
   }
+  addDecimalZero(issues, 'FEE_ACCUMULATOR_ACCUMULATED_NOT_ZERO_AT_GENESIS', s.fee_accumulator.accumulated_ton, 'fee_accumulator.accumulated_ton');
+  addDecimalZero(issues, 'FEE_ACCUMULATOR_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.fee_accumulator.treasury_due_ton, 'fee_accumulator.treasury_due_ton');
+  addDecimalZero(issues, 'FEE_ACCUMULATOR_BUYBACK_DUE_NOT_ZERO_AT_GENESIS', s.fee_accumulator.buyback_due_ton, 'fee_accumulator.buyback_due_ton');
 
   for (const [key, value] of Object.entries(input.evidenceRefs ?? {})) {
     if (isPlaceholder(value)) issues.push(issue(`MISSING_EVIDENCE_REF_${key.toUpperCase()}`, `${key} must point to immutable release evidence.`));
