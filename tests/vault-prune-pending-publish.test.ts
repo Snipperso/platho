@@ -18,7 +18,9 @@ import {
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const KIND_PRIVATE = 1n;
+const KIND_PUBLIC = 2n;
 const SIZE_STANDARD = 1n;
+const SUITE_PUBLIC_NONE = 0n;
 const SUITE_CLASSICAL = 1n;
 const BODY_CELL = finalPrivateBodyCell();
 const HEADER0_CELL = finalPrivateHeader0Cell();
@@ -26,12 +28,17 @@ const HEADER1_CELL = finalPrivateHeader1Cell();
 const BODY_HASH = cellHashToBigInt(BODY_CELL);
 const HEADER0 = cellHashToBigInt(HEADER0_CELL);
 const HEADER1 = cellHashToBigInt(HEADER1_CELL);
+const PUBLIC_HEADER_CELL = beginCell().storeBuffer(Buffer.from('PPH1:post')).endCell();
+const PUBLIC_BODY_CELL = beginCell().storeBuffer(Buffer.from('public tombstone body')).endCell();
+const PUBLIC_HEADER_HASH = cellHashToBigInt(PUBLIC_HEADER_CELL);
+const PUBLIC_BODY_HASH = cellHashToBigInt(PUBLIC_BODY_CELL);
 const VAULT_PENDING_PUBLISH_STALE_TTL = 86_400;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH = 10_000_000_000n;
 const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2_000_000n;
 const UINT160_MOD = 1n << 160n;
 const OP_BOUNCED = 0xffffffff;
 const OP_PUBLISH_PRIVATE_FROM_VAULT = 0xa4f862c0;
+const OP_PUBLISH_PUBLIC_FROM_VAULT = 0x8c2a76b7;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -127,6 +134,27 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
     .endCell();
 }
 
+function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer) {
+  const payload = beginCell()
+    .storeUint(PUBLIC_HEADER_HASH, 256)
+    .storeUint(PUBLIC_BODY_HASH, 256)
+    .storeRef(PUBLIC_HEADER_CELL)
+    .storeRef(PUBLIC_BODY_CELL)
+    .endCell();
+  const signedPayload = beginCell()
+    .storeAddress(owner)
+    .storeUint(nonce, 64)
+    .storeUint(maxCharge, 128)
+    .storeRef(payload)
+    .endCell();
+  return beginCell()
+    .storeUint(0x7E1F5032, 32)
+    .storeAddress(owner)
+    .storeBuffer(sign(signedPayload.hash(), secretKey))
+    .storeRef(signedPayload)
+    .endCell();
+}
+
 async function createPendingPublish() {
   const ctx = await setup();
   const keyPair = await registerKeys(ctx.vault, ctx.user);
@@ -138,6 +166,20 @@ async function createPendingPublish() {
     body: signedPrivatePublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey),
   }));
   const publishId = computePublishId(ctx.user.address, beforeUser.publish_nonce, BODY_HASH, KIND_PRIVATE);
+  return { ...ctx, publishId, maxCharge, beforeUser };
+}
+
+async function createPendingPublicPublish() {
+  const ctx = await setup();
+  const keyPair = await registerKeys(ctx.vault, ctx.user);
+  const maxCharge = await ctx.vault.getGetCanonicalPublishCharge(ctx.user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+  await depositTon(ctx.vault, ctx.user, maxCharge * 2n);
+  const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
+  await ctx.blockchain.sendMessage(external({
+    to: ctx.vault.address,
+    body: signedPublicPublishBody(ctx.user.address, beforeUser.publish_nonce, maxCharge, keyPair.secretKey),
+  }));
+  const publishId = computePublishId(ctx.user.address, beforeUser.publish_nonce, PUBLIC_BODY_HASH, KIND_PUBLIC);
   return { ...ctx, publishId, maxCharge, beforeUser };
 }
 
@@ -235,5 +277,62 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
     } as CapsuleHubPublishAck);
 
     expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-M14-04: public tombstone accepts only the matching public bounce body', async () => {
+    const ctx = await createPendingPublicPublish();
+    const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(1n);
+
+    ctx.blockchain.now = 1_700_000_000 + VAULT_PENDING_PUBLISH_STALE_TTL + 1;
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PrunePendingPublish',
+      publish_id: ctx.publishId,
+    } as PrunePendingPublish);
+
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    const bounceId = computeBounceId(ctx.publishId);
+    const bounceTag = computeBounceTag(ctx.publishId);
+    const privateBouncedBody = beginCell()
+      .storeUint(OP_BOUNCED, 32)
+      .storeUint(OP_PUBLISH_PRIVATE_FROM_VAULT, 32)
+      .storeUint(bounceId, 64)
+      .storeUint(bounceTag, 160)
+      .endCell();
+
+    await ctx.blockchain.sendMessage(internal({
+      from: ctx.capsuleHub.address,
+      to: ctx.vault.address,
+      value: toNano('0.01'),
+      bounced: true,
+      bounce: false,
+      body: privateBouncedBody,
+    }));
+
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    expect(await ctx.vault.getGetUser(ctx.user.address)).toMatchObject({
+      ath_balance: afterPendingUser.ath_balance,
+    });
+
+    const publicBouncedBody = beginCell()
+      .storeUint(OP_BOUNCED, 32)
+      .storeUint(OP_PUBLISH_PUBLIC_FROM_VAULT, 32)
+      .storeUint(bounceId, 64)
+      .storeUint(bounceTag, 160)
+      .endCell();
+
+    await ctx.blockchain.sendMessage(internal({
+      from: ctx.capsuleHub.address,
+      to: ctx.vault.address,
+      value: toNano('0.01'),
+      bounced: true,
+      bounce: false,
+      body: publicBouncedBody,
+    }));
+
+    const afterBounceUser = await ctx.vault.getGetUser(ctx.user.address);
+    expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(0n);
+    expect(afterBounceUser.ath_balance).toBe(afterPendingUser.ath_balance);
+    expect(afterBounceUser.ton_balance).toBe(afterPendingUser.ton_balance + 8_000_000n);
   });
 });
