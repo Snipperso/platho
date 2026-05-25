@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { Address, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   ATHBurnFinalized,
+  ATHBurnFailed,
+  ATHTransferAck,
+  ATHTransferFailed,
   AthTransferNotificationProfileAvatar,
   BindProfileOfficialAthWallet,
   FlushProfileBurnAthDue,
+  FlushProfileTreasuryAthDue,
   ProfileRegistry,
   SealGenesis,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
+import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x50524f46494c45524547495354525900000000000000000000000000000001n;
 const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
+const HALF_AVATAR_PRICE_ATH = 50_000_000_000n;
+const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -62,6 +70,97 @@ async function deploySealedProfileRegistry() {
   return { blockchain, registry, officialAthWalletAddress, athMasterAddress };
 }
 
+async function deployProfileRegistryWithAthSystem(options: { officialWalletBalance: bigint; deployMaster: boolean; mockOfficial?: boolean }) {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+  const deployer = await blockchain.treasury('profile-registry-ath-deployer');
+  const flusher = await blockchain.treasury('profile-registry-ath-flusher');
+  const attacker = await blockchain.treasury('profile-registry-ath-attacker');
+  const placeholderAthWallet = fixtureAddress('ATH_PROFILE_PLACEHOLDER');
+  const treasuryAthReceiver = fixtureAddress('ATH_PROFILE_TREASURY_RECEIVER');
+  const masterTreasuryOwner = fixtureAddress('ATH_PROFILE_MASTER_TREASURY');
+  const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
+
+  const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
+  const athMasterAddress = contractAddress(0, masterInit);
+  const registryInit = await ProfileRegistry.init(
+    placeholderAthWallet,
+    athMasterAddress,
+    treasuryAthReceiver,
+    false,
+    0n,
+    0n,
+    deployer.address,
+  );
+  const registryAddress = contractAddress(0, registryInit);
+  const officialZeroInit = await ATHWallet.init(0n, registryAddress, athMasterAddress);
+  const officialBalanceInit = await ATHWallet.init(options.officialWalletBalance, registryAddress, athMasterAddress);
+  const officialAthWalletAddress = contractAddress(registryAddress.workChain, officialZeroInit);
+
+  if (options.deployMaster) {
+    await blockchain.setShardAccount(athMasterAddress, createShardAccount({
+      address: athMasterAddress,
+      code: masterInit.code,
+      data: masterInit.data,
+      balance: toNano('3'),
+      workchain: athMasterAddress.workChain,
+    }));
+  }
+
+  await blockchain.setShardAccount(registryAddress, createShardAccount({
+    address: registryAddress,
+    code: registryInit.code,
+    data: registryInit.data,
+    balance: toNano('3'),
+    workchain: registryAddress.workChain,
+  }));
+
+  if (options.mockOfficial) {
+    const mockAthWalletInit = await MockAthWalletNoAck.init();
+    await blockchain.setShardAccount(officialAthWalletAddress, createShardAccount({
+      address: officialAthWalletAddress,
+      code: mockAthWalletInit.code,
+      data: mockAthWalletInit.data,
+      balance: toNano('3'),
+      workchain: officialAthWalletAddress.workChain,
+    }));
+  } else {
+    await blockchain.setShardAccount(officialAthWalletAddress, createShardAccount({
+      address: officialAthWalletAddress,
+      code: officialZeroInit.code,
+      data: officialBalanceInit.data,
+      balance: toNano('3'),
+      workchain: officialAthWalletAddress.workChain,
+    }));
+  }
+
+  const registry = blockchain.openContract(new ProfileRegistry(registryAddress, registryInit));
+  const officialAthWallet = blockchain.openContract(new ATHWallet(officialAthWalletAddress, officialZeroInit));
+  const master = blockchain.openContract(new ATHMaster(athMasterAddress, masterInit));
+
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileOfficialAthWallet',
+    deployment_manifest_hash: MANIFEST_HASH,
+    official_ath_wallet_address: officialAthWalletAddress,
+  } as BindProfileOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'SealGenesis',
+    deployment_manifest_hash: MANIFEST_HASH,
+  } as SealGenesis);
+
+  return {
+    blockchain,
+    registry,
+    officialAthWallet,
+    officialAthWalletAddress,
+    athMasterAddress,
+    master,
+    treasuryAthReceiver,
+    flusher,
+    attacker,
+  };
+}
+
 function avatarNotification(owner: Address, overrides: Partial<AthTransferNotificationProfileAvatar> = {}): AthTransferNotificationProfileAvatar {
   return {
     $$type: 'AthTransferNotificationProfileAvatar',
@@ -75,6 +174,16 @@ function avatarNotification(owner: Address, overrides: Partial<AthTransferNotifi
     avatar_part_count: overrides.avatar_part_count ?? 8n,
     media_format: overrides.media_format ?? 1n,
   };
+}
+
+async function sendAcceptedAvatar(
+  ctx: Awaited<ReturnType<typeof deployProfileRegistryWithAthSystem>>,
+  owner: Address,
+  queryId = 1n,
+) {
+  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, {
+    query_id: queryId,
+  }));
 }
 
 describe('ProfileRegistry wallet avatar pointers', () => {
@@ -114,6 +223,30 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const global = await registry.getGetGlobal();
     expect(avatar.exists).toBe(false);
     expect(global.profile_count).toBe(0n);
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.burn_due_ath).toBe(0n);
+  });
+
+  it('PROFILE-02B: malformed avatar pointers reject before mutating avatar or due state', async () => {
+    const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
+    const owner = fixtureAddress('INVALID_POINTER_OWNER');
+
+    for (const overrides of [
+      { avatar_hash: 0n },
+      { avatar_stream_id: 0n },
+      { avatar_part_count: 0n },
+      { avatar_part_count: 17n },
+      { media_format: 2n },
+      { owner_wallet: fixtureAddress('INVALID_POINTER_MASTERCHAIN_OWNER', -1) },
+    ] satisfies Array<Partial<AthTransferNotificationProfileAvatar>>) {
+      await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, overrides));
+    }
+
+    const avatar = await registry.getGetAvatar(owner);
+    const global = await registry.getGetGlobal();
+    expect(avatar.exists).toBe(false);
+    expect(global.profile_count).toBe(0n);
+    expect(global.avatar_record_count).toBe(0n);
     expect(global.treasury_due_ath).toBe(0n);
     expect(global.burn_due_ath).toBe(0n);
   });
@@ -189,5 +322,144 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     global = await registry.getGetGlobal();
     expect(global.burn_due_ath).toBe(0n);
     expect(global.pending_burn_flush_count).toBe(0n);
+  });
+
+  it('PROFILE-05: treasury flush transfers ATH to the immutable treasury receiver wallet and clears pending on ACK', async () => {
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: PROFILE_AVATAR_PRICE_ATH,
+      deployMaster: true,
+    });
+    const owner = fixtureAddress('TREASURY_FLUSH_OWNER');
+
+    await sendAcceptedAvatar(ctx, owner);
+    expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+
+    const treasuryAthWalletAddress = await ctx.registry.getGetAthWalletAddress(ctx.treasuryAthReceiver);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileTreasuryAthDue',
+      query_id: 501n,
+    } as FlushProfileTreasuryAthDue);
+
+    const treasuryWallet = ctx.blockchain.openContract(new ATHWallet(treasuryAthWalletAddress));
+    const global = await ctx.registry.getGetGlobal();
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.pending_treasury_flush_count).toBe(0n);
+    expect((await treasuryWallet.getGetWalletData()).balance).toBe(HALF_AVATAR_PRICE_ATH);
+    expect((await ctx.officialAthWallet.getGetWalletData()).balance).toBe(HALF_AVATAR_PRICE_ATH);
+  });
+
+  it('PROFILE-06: burn flush finalizes through ATHMaster and decreases total supply exactly', async () => {
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: PROFILE_AVATAR_PRICE_ATH,
+      deployMaster: true,
+    });
+    const owner = fixtureAddress('BURN_FLUSH_OWNER');
+
+    await sendAcceptedAvatar(ctx, owner);
+    expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    expect((await ctx.master.getGetJettonData()).total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileBurnAthDue',
+      query_id: 601n,
+    } as FlushProfileBurnAthDue);
+
+    const global = await ctx.registry.getGetGlobal();
+    expect((await ctx.master.getGetJettonData()).total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - HALF_AVATAR_PRICE_ATH);
+    expect(global.burn_due_ath).toBe(0n);
+    expect(global.pending_burn_flush_count).toBe(0n);
+    expect((await ctx.officialAthWallet.getGetWalletData()).balance).toBe(HALF_AVATAR_PRICE_ATH);
+  });
+
+  it('PROFILE-07: treasury and burn failures restore due and clear pending state', async () => {
+    const treasuryCtx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: 0n,
+      deployMaster: true,
+    });
+    const treasuryOwner = fixtureAddress('TREASURY_FAIL_OWNER');
+
+    await sendAcceptedAvatar(treasuryCtx, treasuryOwner);
+    await treasuryCtx.registry.send(treasuryCtx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileTreasuryAthDue',
+      query_id: 701n,
+    } as FlushProfileTreasuryAthDue);
+
+    let global = await treasuryCtx.registry.getGetGlobal();
+    expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    expect(global.pending_treasury_flush_count).toBe(0n);
+
+    const burnCtx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: PROFILE_AVATAR_PRICE_ATH,
+      deployMaster: false,
+    });
+    const burnOwner = fixtureAddress('BURN_FAIL_OWNER');
+
+    await sendAcceptedAvatar(burnCtx, burnOwner);
+    await burnCtx.registry.send(burnCtx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileBurnAthDue',
+      query_id: 702n,
+    } as FlushProfileBurnAthDue);
+
+    global = await burnCtx.registry.getGetGlobal();
+    expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    expect(global.pending_burn_flush_count).toBe(0n);
+    expect((await burnCtx.officialAthWallet.getGetWalletData()).balance).toBe(PROFILE_AVATAR_PRICE_ATH);
+  });
+
+  it('PROFILE-08: pending treasury query blocks burn reuse and forged callbacks cannot clear pending flushes', async () => {
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: 0n,
+      deployMaster: false,
+      mockOfficial: true,
+    });
+    const owner = fixtureAddress('PENDING_AUTH_OWNER');
+
+    await sendAcceptedAvatar(ctx, owner);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileTreasuryAthDue',
+      query_id: 801n,
+    } as FlushProfileTreasuryAthDue);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileBurnAthDue',
+      query_id: 801n,
+    } as FlushProfileBurnAthDue);
+
+    let global = await ctx.registry.getGetGlobal();
+    expect(global.pending_treasury_flush_count).toBe(1n);
+    expect(global.pending_burn_flush_count).toBe(0n);
+    expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileBurnAthDue',
+      query_id: 802n,
+    } as FlushProfileBurnAthDue);
+
+    await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferAck',
+      query_id: 801n,
+      amount: HALF_AVATAR_PRICE_ATH,
+    } as ATHTransferAck);
+    await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferFailed',
+      query_id: 801n,
+      amount: HALF_AVATAR_PRICE_ATH,
+    } as ATHTransferFailed);
+    await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHBurnFinalized',
+      query_id: 802n,
+      amount: HALF_AVATAR_PRICE_ATH,
+      owner_address: ctx.registry.address,
+    } as ATHBurnFinalized);
+    await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'ATHBurnFailed',
+      query_id: 802n,
+      amount: HALF_AVATAR_PRICE_ATH,
+    } as ATHBurnFailed);
+
+    global = await ctx.registry.getGetGlobal();
+    expect(global.pending_treasury_flush_count).toBe(1n);
+    expect(global.pending_burn_flush_count).toBe(1n);
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.burn_due_ath).toBe(0n);
   });
 });
