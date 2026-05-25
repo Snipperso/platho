@@ -17,6 +17,7 @@ const ATH_OWNER_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 const ATH_GENESIS_SUPPLY_EXEC_RESERVE: Int = 2000000;
 const ATH_GENESIS_SUPPLY_ACK_VALUE: Int = 1000000;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN: Int = 0x41544E49; // "ATNI"
+const ATH_OUTGOING_TRANSFER_ID_DOMAIN: Int = 0x41544F47; // "ATOG"
 const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD: Int = 4294967296;
 const ATH_PENDING_NOTIFICATION_TTL: Int = 86400; // 24 hours
 
@@ -268,13 +269,23 @@ contract ATHWallet {
         return (query_id * ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD) + sender_key;
     }
 
+    fun compute_pending_outgoing_key(query_id: Int, recipient_wallet: Address): Int {
+        return beginCell()
+            .storeUint(ATH_OUTGOING_TRANSFER_ID_DOMAIN, 32)
+            .storeUint(query_id, 64)
+            .storeAddress(recipient_wallet)
+            .endCell()
+            .hash();
+    }
+
     fun notify_transfer_value(notify_value: Int): Int {
         return notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
     }
 
     fun store_pending_outgoing(query_id: Int, amount: Int, recipient_wallet: Address, response_destination: Address) {
-        throwUnless(14230, !self.pending_outgoing_transfers.exists(query_id));
-        self.pending_outgoing_transfers.set(query_id, PendingAthOutgoingTransfer {
+        let pending_key: Int = self.compute_pending_outgoing_key(query_id, recipient_wallet);
+        throwUnless(14230, !self.pending_outgoing_transfers.exists(pending_key));
+        self.pending_outgoing_transfers.set(pending_key, PendingAthOutgoingTransfer {
             recipient_wallet: recipient_wallet,
             response_destination: response_destination,
             amount: amount,
@@ -284,12 +295,13 @@ contract ATHWallet {
 
     fun restore_bounced_outgoing(query_id: Int, amount: Int) {
         throwUnless(14220, amount > 0);
-        let pendingOpt: PendingAthOutgoingTransfer? = self.pending_outgoing_transfers.get(query_id);
+        let pending_key: Int = self.compute_pending_outgoing_key(query_id, sender());
+        let pendingOpt: PendingAthOutgoingTransfer? = self.pending_outgoing_transfers.get(pending_key);
         throwUnless(14221, pendingOpt != null);
         let pending: PendingAthOutgoingTransfer = pendingOpt!!;
         throwUnless(14222, pending.amount == amount);
         throwUnless(14223, sender() == pending.recipient_wallet);
-        self.pending_outgoing_transfers.del(query_id);
+        self.pending_outgoing_transfers.del(pending_key);
         self.balance += amount;
 
         message(MessageParameters {
@@ -765,12 +777,13 @@ contract ATHWallet {
 
     receive(msg: ATHTransferAck) {
         throwUnless(14240, msg.amount > 0);
-        let pendingOpt: PendingAthOutgoingTransfer? = self.pending_outgoing_transfers.get(msg.query_id);
+        let pending_key: Int = self.compute_pending_outgoing_key(msg.query_id, sender());
+        let pendingOpt: PendingAthOutgoingTransfer? = self.pending_outgoing_transfers.get(pending_key);
         throwUnless(14241, pendingOpt != null);
         let pending: PendingAthOutgoingTransfer = pendingOpt!!;
         throwUnless(14242, pending.amount == msg.amount);
         throwUnless(14243, sender() == pending.recipient_wallet);
-        self.pending_outgoing_transfers.del(msg.query_id);
+        self.pending_outgoing_transfers.del(pending_key);
     }
 
     receive(msg: AthTransferNotificationAck) {

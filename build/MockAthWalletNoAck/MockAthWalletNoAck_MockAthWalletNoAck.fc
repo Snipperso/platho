@@ -99,6 +99,16 @@ tuple $MockAthWalletNoAck$_contract_init() impure inline {
         return ();
     }
     
+    ;; Receive ATHInternalTransfer message
+    if (op == 0x41544812) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_owner = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        $MockAthWalletNoAck$_contract_store($self);
+        return ();
+    }
+    
     ;; Receive ATHBurn message
     if (op == 0x41544801) {
         var $msg'query_id = in_msg~load_uint(64);

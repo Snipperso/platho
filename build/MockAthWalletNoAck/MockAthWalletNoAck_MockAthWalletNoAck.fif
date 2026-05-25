@@ -72,6 +72,13 @@ PROGRAM{
       $MockAthWalletNoAck$_contract_store INLINECALLDICT
     }>
     DUP
+    1096042514 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      $MockAthWalletNoAck$_contract_store INLINECALLDICT
+    }>
+    DUP
     1096042497 PUSHINT
     EQUAL
     IFJMP:<{

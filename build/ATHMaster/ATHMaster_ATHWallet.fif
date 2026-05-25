@@ -70,6 +70,7 @@ PROGRAM{
   DECLPROC $ATHWallet$_fun_require_basechain_owner_path
   DECLPROC $ATHWallet$_fun_compute_sender_key
   DECLPROC $ATHWallet$_fun_compute_pending_notification_key
+  DECLPROC $ATHWallet$_fun_compute_pending_outgoing_key
   DECLPROC $ATHWallet$_fun_notify_transfer_value
   DECLPROC $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at
   DECLPROC $ATHWallet$_fun_store_pending_outgoing
@@ -684,6 +685,18 @@ PROGRAM{
     SWAP
     ADD
   }>
+  $ATHWallet$_fun_compute_pending_outgoing_key PROCREF:<{
+        NEWC
+    1096044359 PUSHINT
+    SWAP
+    32 STU
+    s1 s2 XCHG
+    64 STU
+    SWAP
+        STSLICER
+        ENDC
+        HASHCU
+  }>
   $ATHWallet$_fun_notify_transfer_value PROCREF:<{
     1000000 PUSHINT
     ADD
@@ -697,21 +710,34 @@ PROGRAM{
   $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at PROCINLINE:<{
   }>
   $ATHWallet$_fun_store_pending_outgoing PROCREF:<{
+    s7 s10 XCHG
+    s6 s9 XCHG
+    s5 s8 XCHG
+    s4 s10 XCHG
+    s3 s9 XCHG
+    s8 s10 s9 XCHG3
+    s10 PUSH
+    $ATHWallet$_fun_compute_pending_outgoing_key INLINECALLDICT
     14230 PUSHINT
-    s5 PUSH
+    s2 PUSH
     257 PUSHINT
-    s6 PUSH
+    s3 PUSH
     __tact_dict_exists_int INLINECALLDICT
     NOT
     THROWANYIFNOT
     257 PUSHINT
         NOW
-    s1 s4 XCHG
+    s3 s12 XCHG
+    s11 s10 s0 XCHG3
     $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at INLINECALLDICT
     NEWC
     $PendingAthOutgoingTransfer$_store_cell INLINECALLDICT
-    s1 s2 XCHG
+    s3 s9 XCHG
+    s7 s8 s0 XCHG3
     __tact_dict_set_int_cell INLINECALLDICT
+    s3 s6 XCHG
+    s5 s4 s0 XCHG3
+    s1 s2 XCHG
   }>
   $MessageParameters$_constructor_to_value_mode_bounce_body PROCINLINE:<{
     s4 s1 s3 XCHG3
@@ -724,9 +750,17 @@ PROGRAM{
     OVER
     0 GTINT
     THROWANYIFNOT
-    s2 PUSH
+    __tact_context_get_sender INLINECALLDICT
+    s7 s9 XCHG
+    5 5 REVERSE
+    s4 s8 XCHG
+    s3 s9 XCHG
+    s8 s9 s0 XCHG3
+    s8 s(-1) PUXC
+    $ATHWallet$_fun_compute_pending_outgoing_key INLINECALLDICT
+    OVER
     257 PUSHINT
-    s3 PUSH
+    s2 PUSH
     __tact_dict_get_int_cell INLINECALLDICT
     $PendingAthOutgoingTransfer$_load_opt INLINECALLDICT
     14221 PUSHINT
@@ -737,7 +771,7 @@ PROGRAM{
     $PendingAthOutgoingTransfer$_not_null INLINECALLDICT
     DROP
     14222 PUSHINT
-    s1 s4 XCPU
+    s1 s13 XCPU
     EQUAL
     THROWANYIFNOT
     14223 PUSHINT
@@ -746,22 +780,23 @@ PROGRAM{
     SDEQ
     s1 s2 XCHG
     THROWANYIFNOT
-    s2 s3 PUXC
+    s0 s2 XCHG
     257 PUSHINT
         DICTIDEL
     DROP
-    s9 s1 XCPU
+    s7 s9 XCPU
     ADD
     0 PUSHINT
     64 PUSHINT
-    s0 s4 XCHG
+    s0 s10 XCHG
     TRUE
-    s0 s4 XCHG
+    s0 s12 XCHG
     $ATHTransferFailed$_constructor_query_id_amount INLINECALLDICT
     NEWC
     $ATHTransferFailed$_store_cell INLINECALLDICT
-    s4 s5 XCHG
-    s5 s3 s0 XCHG3
+    s1 s3 XCHG
+    s10 s4 s0 XCHG3
+    s1 s11 XCHG
     $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
         NEWC
         b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -780,7 +815,8 @@ PROGRAM{
         ENDC
         SWAP
         SENDRAWMSG
-    s0 s6 XCHG
+    s5 s6 XCHG
+    2 4 BLKSWAP
   }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
@@ -2730,9 +2766,17 @@ PROGRAM{
       OVER
       0 GTINT
       THROWANYIFNOT
-      s8 PUSH
+      __tact_context_get_sender INLINECALLDICT
+      s7 s8 XCHG
+      s6 s7 XCHG
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s9 s9 s0 XCHG3
+      $ATHWallet$_fun_compute_pending_outgoing_key INLINECALLDICT
+      OVER
       257 PUSHINT
-      s3 PUSH
+      s2 PUSH
       __tact_dict_get_int_cell INLINECALLDICT
       $PendingAthOutgoingTransfer$_load_opt INLINECALLDICT
       14241 PUSHINT
@@ -2744,22 +2788,24 @@ PROGRAM{
       DROP
       NIP
       14242 PUSHINT
-      s0 s3 XCHG
+      s0 s11 XCHG
       EQUAL
-      s1 s2 XCHG
+      s1 s10 XCHG
       THROWANYIFNOT
       14243 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      ROT
+      s0 s10 XCHG2
       SDEQ
+      s1 s9 XCHG
       THROWANYIFNOT
-      s0 s7 XCHG2
+      s1 s7 XCHG
       257 PUSHINT
           DICTIDEL
       DROP
-      s4 s6 XCHG
-      s3 s5 XCHG
-      s4 s3 s0 XCHG3
+      s5 s6 XCHG
+      s4 s5 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
