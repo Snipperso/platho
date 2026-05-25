@@ -24,7 +24,7 @@ const TRANCHE = 3_000_000_000_000_000n;
 const TOTAL_RESERVE = 45_000_000_000_000_000n;
 const BASE_TRANCHE_PRICE = toNano('1');
 const NOTIFY_VALUE = 80_000_000n;
-const BUY_TRANSFER_REQUEST_VALUE = 12_000_000n;
+const BUY_TRANSFER_REQUEST_VALUE = 30_000_000n;
 const BUY_EXEC_RESERVE = 2_000_000n;
 const FUNDING_NOTIFY_VALUE = toNano('0.2');
 
@@ -177,6 +177,10 @@ async function fundReserve(env: Awaited<ReturnType<typeof setup>>, amount: bigin
   } as ATHTransferRequestWithNotify);
 }
 
+async function officialSellerAthWallet(env: Awaited<ReturnType<typeof setup>>) {
+  return env.blockchain.openContract(new ATHWallet(env.officialAthWallet, await ATHWallet.init(0n, env.seller.address, env.athMaster)));
+}
+
 describe('MarketStabilitySeller', () => {
   it('MSTAB-01: binds, freezes pricing, accepts reserve funding, and clears ATHWallet notification pending', async () => {
     const env = await setup();
@@ -211,6 +215,7 @@ describe('MarketStabilitySeller', () => {
     const env = await setup();
     await bindCore(env);
     await sealOnly(env);
+    const reserveFunderInitialAth = (await env.reserveFunderAthWallet.getGetWalletData()).balance;
 
     let config = await env.seller.getGetMarketStabilitySellerConfig();
     expect(config.sealed).toBe(true);
@@ -219,6 +224,8 @@ describe('MarketStabilitySeller', () => {
 
     await fundReserve(env, TRANCHE);
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
+    expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth);
+    expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(0n);
 
     await freezePricing(env);
     config = await env.seller.getGetMarketStabilitySellerConfig();
@@ -237,6 +244,15 @@ describe('MarketStabilitySeller', () => {
     await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'FreezeMarketStabilityPricing',
       deployment_manifest_hash: MANIFEST_HASH,
+      base_tranche_price_nanotons: BASE_TRANCHE_PRICE,
+      evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE - 1n,
+      pricing_evidence_hash: PRICING_EVIDENCE_HASH,
+    } as FreezeMarketStabilityPricing);
+    expect((await env.seller.getGetMarketStabilitySellerConfig()).pricing_frozen).toBe(false);
+
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'FreezeMarketStabilityPricing',
+      deployment_manifest_hash: MANIFEST_HASH,
       base_tranche_price_nanotons: 1n,
       evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE,
       pricing_evidence_hash: PRICING_EVIDENCE_HASH,
@@ -247,6 +263,9 @@ describe('MarketStabilitySeller', () => {
     expect(config.base_tranche_price_nanotons).toBe(0n);
     expect(config.evidence_x1_tranche_quote_nanotons).toBe(0n);
     expect(config.genesis_config_hash).not.toBe(0n);
+
+    await freezePricing(env);
+    expect((await env.seller.getGetMarketStabilitySellerConfig()).pricing_frozen).toBe(true);
   });
 
   it('MSTAB-02: sells only at the current tranche floor, advances x2 to x3, and flushes TON to treasury', async () => {
@@ -286,6 +305,14 @@ describe('MarketStabilitySeller', () => {
 
     const x3Price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
     expect(x3Price).toBe(BASE_TRANCHE_PRICE * 3n);
+
+    await env.seller.send(env.flusher.getSender(), { value: toNano('0.01') }, {
+      $$type: 'FlushMarketStabilityTreasuryTon',
+      amount: x2Price + 1n,
+    } as FlushMarketStabilityTreasuryTon);
+    state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.treasury_due_ton).toBe(x2Price);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).treasury_flushed_ton_total).toBe(0n);
 
     await env.seller.send(env.flusher.getSender(), { value: toNano('0.01') }, {
       $$type: 'FlushMarketStabilityTreasuryTon',
@@ -370,5 +397,89 @@ describe('MarketStabilitySeller', () => {
     expect(afterSelfRecipient.reserve_due_ath).toBe(TOTAL_RESERVE);
     expect(afterSelfRecipient.treasury_due_ton).toBe(0n);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
+  });
+
+  it('MSTAB-04: rejects funding before seal and buys before pricing without moving ATH reserve', async () => {
+    const env = await setup();
+    const reserveFunderInitialAth = (await env.reserveFunderAthWallet.getGetWalletData()).balance;
+
+    await fundReserve(env, TRANCHE);
+    expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
+    expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth);
+
+    await bindCore(env);
+    await sealOnly(env);
+    await env.seller.send(env.buyer.getSender(), { value: BASE_TRANCHE_PRICE * 2n + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount: 1n,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    const state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.phase).toBe(0n);
+    expect(state.reserve_due_ath).toBe(0n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
+  });
+
+  it('MSTAB-05: rejects buys above partially funded reserve before mutation', async () => {
+    const env = await setup();
+    await bindFreezeSeal(env);
+    const partialReserve = TRANCHE / 2n;
+    await fundReserve(env, partialReserve);
+
+    const amount = partialReserve + 1n;
+    const price = await env.seller.getGetQuoteTonForAmount(amount);
+    await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    const state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.phase).toBe(0n);
+    expect(state.reserve_due_ath).toBe(partialReserve);
+    expect(state.treasury_due_ton).toBe(0n);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
+  });
+
+  it('MSTAB-06: sells through the x16 tranche and rejects post-sellout buys', async () => {
+    const env = await setup();
+    await bindFreezeSeal(env);
+    await fundReserve(env, TOTAL_RESERVE);
+
+    for (let i = 0; i < 15; i += 1) {
+      const queryId = BigInt(i + 1);
+      const multiplier = BigInt(i + 2);
+      const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
+      expect(price).toBe(BASE_TRANCHE_PRICE * multiplier);
+      const recipient = fixtureAddress(`SELLOUT_RECIPIENT_${i}`);
+      await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+        $$type: 'BuyMarketStabilityAth',
+        query_id: queryId,
+        amount: TRANCHE,
+        recipient,
+      } as BuyMarketStabilityAth);
+    }
+
+    let state = await env.seller.getGetMarketStabilitySellerState();
+    let totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(state.completed_tranche_count).toBe(15n);
+    expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
+
+    await env.seller.send(env.buyer.getSender(), { value: BASE_TRANCHE_PRICE * 17n + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 16n,
+      amount: 1n,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    state = await env.seller.getGetMarketStabilitySellerState();
+    totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
+    expect(state.last_terminal_query_id).toBe(15n);
   });
 });

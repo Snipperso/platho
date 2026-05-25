@@ -146,9 +146,13 @@ function addBasechainAddress(issues: Issue[], code: string, value: unknown, labe
   }
 }
 
-function addDecimalEq(issues: Issue[], code: string, actual: unknown, expected: string, label: string) {
+function addDecimalEq(issues: Issue[], code: string, actual: unknown, expected: unknown, label: string) {
   if (!isDecimalString(actual)) {
     issues.push(issue(code, `${label} must be a decimal integer string; got ${actual}`));
+    return;
+  }
+  if (!isDecimalString(expected)) {
+    issues.push(issue(code, `${label} expected value must be a decimal integer string; got ${expected}`));
     return;
   }
   if (BigInt(actual) !== BigInt(expected)) {
@@ -377,7 +381,11 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
     issues.push(issue('MARKET_STABILITY_LAUNCH_CONTROLLER_NOT_CLEARED', 'market_stability_seller.genesis_config_hash must be zero after the one-time post-pool pricing freeze.'));
   }
   addDecimalGtZero(issues, 'MARKET_STABILITY_BASE_PRICE_NOT_SET', seller.base_tranche_price_nanotons, 'market_stability_seller.base_tranche_price_nanotons');
-  addDecimalEq(issues, 'MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH', seller.base_tranche_price_nanotons, seller.evidence_x1_tranche_quote_nanotons, 'market_stability_seller.base_tranche_price_nanotons');
+  if (!isDecimalString(seller.evidence_x1_tranche_quote_nanotons)) {
+    issues.push(issue('BAD_MARKET_STABILITY_BASE_PRICE_EVIDENCE_DECIMAL', `market_stability_seller.evidence_x1_tranche_quote_nanotons must be a decimal integer string; got ${seller.evidence_x1_tranche_quote_nanotons}`));
+  } else if (isDecimalString(seller.base_tranche_price_nanotons)) {
+    addDecimalEq(issues, 'MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH', seller.base_tranche_price_nanotons, seller.evidence_x1_tranche_quote_nanotons, 'market_stability_seller.base_tranche_price_nanotons');
+  }
   if (!isHex64(seller.pricing_evidence_hash) || isZeroHex64(seller.pricing_evidence_hash)) {
     issues.push(issue('MARKET_STABILITY_PRICING_EVIDENCE_HASH_MISSING', 'market_stability_seller.pricing_evidence_hash must be a non-zero 32-byte hex hash.'));
   }

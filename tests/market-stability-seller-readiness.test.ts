@@ -141,6 +141,16 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.issue_codes).toContain('MARKET_STABILITY_BASE_PRICE_EVIDENCE_MISMATCH');
   });
 
+  it('rejects malformed x1 evidence decimals without throwing', () => {
+    const input = readyInput();
+    input.snapshot.market_stability_seller.evidence_x1_tranche_quote_nanotons = 'required: launch x1 quote';
+
+    const report = verifyMarketStabilitySellerReadiness(input);
+
+    expect(report.market_stability_seller_ready).toBe(false);
+    expect(report.issue_codes).toContain('BAD_MARKET_STABILITY_BASE_PRICE_EVIDENCE_DECIMAL');
+  });
+
   it('rejects underfunded or accounting-mismatched reserve backing', () => {
     const input = readyInput();
     input.snapshot.market_stability_seller.reserve_due_ath = '44999999999999999';

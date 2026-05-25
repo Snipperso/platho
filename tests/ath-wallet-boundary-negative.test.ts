@@ -17,13 +17,20 @@ import { ATHMaster, ATHBurnNotification } from '../build/ATHMaster/ATHMaster_ATH
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2_000_000n;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2_000_000n;
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
+const ATH_INTERNAL_TRANSFER_ACK_VALUE = 3_000_000n;
+const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE = 21_000_000n;
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7_000_000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const ATH_OWNER_REQUEST_EXEC_RESERVE = 2_000_000n;
 const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE = 10_000_000n;
 const ATH_OWNER_BURN_MIN_VALUE = ATH_BURN_NOTIFICATION_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE;
-const ATH_OWNER_TRANSFER_MIN_VALUE = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+const ATH_INTERNAL_TRANSFER_MIN_VALUE = ATH_INTERNAL_TRANSFER_EXEC_RESERVE
+  + ATH_INTERNAL_TRANSFER_ACK_VALUE
+  + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+const ATH_OWNER_TRANSFER_MIN_VALUE = ATH_INTERNAL_TRANSFER_MIN_VALUE
+  + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE
+  + ATH_OWNER_REQUEST_EXEC_RESERVE;
 const ATH_OWNER_NOTIFY_MIN_VALUE = ATH_TRANSFER_NOTIFY_MIN_VALUE
   + ATH_TRANSFER_NOTIFY_ACK_VALUE
   + ATH_TRANSFER_NOTIFY_EXEC_RESERVE
@@ -61,7 +68,7 @@ describe('ATH wallet/master value boundary negative matrix', () => {
     const sourceWalletAddress = contractAddress(sourceOwner.workChain, sourceInit);
     const { wallet: recipientWallet } = await deployWallet(blockchain, recipientOwner, master, 0n);
 
-    await recipientWallet.send(blockchain.sender(sourceWalletAddress), { value: ATH_INTERNAL_TRANSFER_EXEC_RESERVE - 1n }, {
+    await recipientWallet.send(blockchain.sender(sourceWalletAddress), { value: ATH_INTERNAL_TRANSFER_MIN_VALUE - 1n }, {
       $$type: 'ATHInternalTransfer',
       query_id: 1n,
       amount: 100n,
@@ -71,7 +78,7 @@ describe('ATH wallet/master value boundary negative matrix', () => {
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(0n);
 
-    await recipientWallet.send(blockchain.sender(sourceWalletAddress), { value: ATH_INTERNAL_TRANSFER_EXEC_RESERVE }, {
+    await recipientWallet.send(blockchain.sender(sourceWalletAddress), { value: ATH_INTERNAL_TRANSFER_MIN_VALUE }, {
       $$type: 'ATHInternalTransfer',
       query_id: 4n,
       amount: 100n,
@@ -169,7 +176,7 @@ describe('ATH wallet/master value boundary negative matrix', () => {
     const recipientAddress = contractAddress(recipientOwner.workChain, recipientInit);
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
 
-    const oldExactMin = await sourceWallet.send(sourceOwner.getSender(), { value: ATH_INTERNAL_TRANSFER_EXEC_RESERVE }, {
+    const oldExactMin = await sourceWallet.send(sourceOwner.getSender(), { value: ATH_INTERNAL_TRANSFER_MIN_VALUE }, {
       $$type: 'ATHTransferRequest',
       query_id: 40n,
       amount: 100n,

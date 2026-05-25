@@ -76,11 +76,13 @@ export const VAULT_RESERVES_NANOTONS = Object.freeze({
   stateGrowthExec: 2_000_000n,
   depositTonExec: 2_000_000n,
   withdrawTonExec: 2_000_000n,
-  withdrawAthMinValue: 30_000_000n,
+  withdrawAthMinValue: 40_000_000n,
 });
 
 export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   transferNotifyAckValue: 1_000_000n,
+  internalTransferAckValue: 3_000_000n,
+  internalTransferFwdFeeAllowance: 21_000_000n,
   transferNotifyMinValue: 30_000_000n,
   transferNotifyStorageEndowment: 2_000_000n,
   internalTransferExec: 2_000_000n,
@@ -91,7 +93,7 @@ export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
 });
 
 export const USERNAME_REGISTRY_RESERVES_NANOTONS = Object.freeze({
-  athTransferExec: 5_000_000n,
+  athTransferExec: 30_000_000n,
   dueFlushLocalExec: 2_000_000n,
 });
 
@@ -566,6 +568,9 @@ export function estimateAthWalletAttachedValueNanotons(type, params = {}) {
   assertString(type, 'type');
   if (type === 'ATHTransferRequest') {
     return ATH_WALLET_RESERVES_NANOTONS.internalTransferExec
+      + ATH_WALLET_RESERVES_NANOTONS.internalTransferAckValue
+      + ATH_WALLET_RESERVES_NANOTONS.transferNotifyStorageEndowment
+      + ATH_WALLET_RESERVES_NANOTONS.internalTransferFwdFeeAllowance
       + ATH_WALLET_RESERVES_NANOTONS.ownerRequestExec;
   }
   if (type === 'ATHBurn') {

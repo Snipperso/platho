@@ -215,7 +215,7 @@ describe('PWA contract transaction builders', () => {
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
     expect(estimateVaultAttachedValueNanotons('CreateReceiveIntent')).toBe(7_000_000n);
     expect(estimateVaultAttachedValueNanotons('ClaimReceiveIntent', {}, { recipientUserExists: false })).toBe(12_000_000n);
-    expect(estimateVaultAttachedValueNanotons('WithdrawAth')).toBe(30_000_000n);
+    expect(estimateVaultAttachedValueNanotons('WithdrawAth')).toBe(40_000_000n);
   });
 
   it('PWA-TX-03: creates embedded wallet transaction messages with decimal nanotons and payload', () => {
@@ -345,14 +345,14 @@ describe('PWA contract transaction builders', () => {
   });
 
   it('PWA-TX-07: quotes exact ATHWallet and username refund values used by the PWA', () => {
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(4_000_000n);
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(30_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(50_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestMintUsername', { notify_value: 31_000_000n })).toBe(51_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestProfileAvatar', { notify_value: 30_000_000n })).toBe(50_000_000n);
-    expect(estimateUsernameRegistryAttachedValueNanotons('FlushAthRefundDue')).toBe(7_000_000n);
+    expect(estimateUsernameRegistryAttachedValueNanotons('FlushAthRefundDue')).toBe(32_000_000n);
     expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(30_000_000n);
-    expect(USERNAME_REGISTRY_RESERVES_NANOTONS.athTransferExec).toBe(5_000_000n);
+    expect(USERNAME_REGISTRY_RESERVES_NANOTONS.athTransferExec).toBe(30_000_000n);
   });
 
   it('PWA-TX-08: builds ATHWallet and UsernameRegistry wallet messages', () => {
@@ -365,7 +365,7 @@ describe('PWA contract transaction builders', () => {
       athWalletAddress: ATH_WALLET,
     });
     expect(athMessage.address).toBe(ATH_WALLET);
-    expect(athMessage.amount).toBe('4000000');
+    expect(athMessage.amount).toBe('30000000');
     expect(athMessage.payload).toBe(generatedBody(storeATHTransferRequest({
       $$type: 'ATHTransferRequest',
       query_id: 11n,
@@ -381,7 +381,7 @@ describe('PWA contract transaction builders', () => {
       usernameRegistryAddress: USERNAME_REGISTRY,
     });
     expect(refundMessage.address).toBe(USERNAME_REGISTRY);
-    expect(refundMessage.amount).toBe('7000000');
+    expect(refundMessage.amount).toBe('32000000');
     expect(refundMessage.payload).toBe(generatedBody(storeFlushAthRefundDue({
       $$type: 'FlushAthRefundDue',
       query_id: 22n,

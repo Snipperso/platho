@@ -13,7 +13,7 @@ const MARKET_STABILITY_START_MULTIPLIER: Int = 2;
 const MARKET_STABILITY_END_MULTIPLIER: Int = 16;
 const MARKET_STABILITY_ATH_NOTIFY_ACK_VALUE: Int = 1000000;
 const MARKET_STABILITY_LOCAL_EXEC_RESERVE: Int = 2000000;
-const MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE: Int = 12000000;
+const MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE: Int = 30000000;
 const MARKET_STABILITY_BUY_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_EXCESS_REFUND_MIN_VALUE: Int = 100000;
@@ -410,7 +410,7 @@ contract MarketStabilitySeller {
             to: self.official_ath_wallet_address,
             value: MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE,
             bounce: true,
-            mode: SendDefaultMode,
+            mode: SendPayFwdFeesSeparately,
             body: ATHTransferRequest {
                 query_id: msg.query_id,
                 amount: msg.amount,
