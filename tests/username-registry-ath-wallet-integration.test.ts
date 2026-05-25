@@ -5,6 +5,7 @@ import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   UsernameRegistry,
+  AthTransferNotificationMintUsername,
   BindOfficialAthWallet,
   SealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -175,6 +176,40 @@ describe('UsernameRegistry integration with production ATHWallet', () => {
     })).toBeDefined();
   });
 
+  it('USERNAME-ATH-PROD-01B: direct mint notification is rejected, while the same mint through production ATHWallet succeeds', async () => {
+    const { registry, user, userAthWallet } = await setup();
+    const username = 'authok';
+    const hash = nameHash(username);
+
+    await registry.send(user.getSender(), { value: toNano('0.15') }, {
+      $$type: 'AthTransferNotificationMintUsername',
+      query_id: 420n,
+      amount: PRICE_6_PLUS,
+      sender_key: 0n,
+      owner_wallet: user.address,
+      username_len: BigInt(Buffer.from(username, 'ascii').length),
+      username: usernameSlice(username),
+    } as AthTransferNotificationMintUsername);
+
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect(await registry.getGetRefundDue(user.address)).toBe(0n);
+    expect((await registry.getGetGlobal()).refund_due_count).toBe(0n);
+
+    await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: PRICE_6_PLUS,
+      queryId: 421n,
+      username,
+    });
+
+    const record = await registry.getGetNameRecord(hash);
+    expect(record.exists).toBe(true);
+    expect(record.owner_wallet.equals(user.address)).toBe(true);
+  });
+
   it('USERNAME-ATH-PROD-02: underpay through production wallet records refund due and does not mint', async () => {
     const { blockchain, registry, user, userAthWallet, officialAthWallet } = await setup();
     const username = 'underp';
@@ -203,6 +238,41 @@ describe('UsernameRegistry integration with production ATHWallet', () => {
       to: user.address,
       success: true,
     })).toBeDefined();
+  });
+
+  it('USERNAME-ATH-PROD-02B: official wallet balance backs accepted revenue and rejected refund due', async () => {
+    const { registry, user, userAthWallet, officialAthWallet } = await setup();
+    const underpay = PRICE_6_PLUS - 1n;
+
+    await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: PRICE_6_PLUS,
+      queryId: 430n,
+      username: 'backok',
+    });
+    await mintViaProductionWallet({
+      user,
+      userAthWallet,
+      registry,
+      amount: underpay,
+      queryId: 431n,
+      username: 'backno',
+    });
+
+    const global = await registry.getGetGlobal();
+    const official = await officialAthWallet.getGetWalletData();
+    const refundDue = await registry.getGetRefundDue(user.address);
+    const backedDue = global.treasury_due_ath + global.burn_due_ath + refundDue;
+
+    expect(global.name_record_count).toBe(1n);
+    expect(global.refund_due_count).toBe(1n);
+    expect(global.treasury_due_ath).toBe(PRICE_6_PLUS / 2n);
+    expect(global.burn_due_ath).toBe(PRICE_6_PLUS / 2n);
+    expect(refundDue).toBe(underpay);
+    expect(official.balance).toBe(PRICE_6_PLUS + underpay);
+    expect(official.balance).toBeGreaterThanOrEqual(backedDue);
   });
 
   it('USERNAME-ATH-PROD-03: old 35M/36M/37M owner values do not debit source ATH, while 50M reaches Registry full path', async () => {
