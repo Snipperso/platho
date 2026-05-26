@@ -291,8 +291,8 @@ const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 20;
 const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 1500;
 const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
-const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 30_000_000_000_000_000n;
-const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 15_000_000_000_000_000n;
+const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 15_000_000_000_000_000n;
+const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 0n;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE_NANOTONS = 6_000_000n;
 const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
 const VAULT_PUBLISH_NONCE_POLL_MS = 1_500;
@@ -2696,7 +2696,7 @@ function formatAthDiscountLabel() {
   const percent = formatDiscountPercent();
   return messageDiscountUnlocked()
     ? `ATH discount ${percent}`
-    : `ATH discount ${percent} (locked until 15% supply distributed)`;
+    : `ATH discount ${percent} (locked until 15% are distributed)`;
 }
 
 function discountedProtocolFeeNanotons(fullFee) {

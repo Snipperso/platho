@@ -1,16 +1,16 @@
 // Platho v1 MarketStabilitySeller.
-// Scope: immutable milestone-gated ATH reserve sales at x2..x16 price floors,
+// Scope: immutable milestone-gated ATH reserve sales at x2..x21 price floors,
 // official ATH wallet custody, TON treasury due accounting, and bounce/fail recovery.
 // No DEX route, admin sale override, pause, upgrade, governance, rescue, or
 // post-freeze pricing mutation is implemented.
 
 import "./ATHWallet.tact";
 
-const MARKET_STABILITY_TOTAL_RESERVE_ATH: Int = 45000000000000000;
+const MARKET_STABILITY_TOTAL_RESERVE_ATH: Int = 60000000000000000;
 const MARKET_STABILITY_TRANCHE_ATH: Int = 3000000000000000;
-const MARKET_STABILITY_TRANCHE_COUNT: Int = 15;
+const MARKET_STABILITY_TRANCHE_COUNT: Int = 20;
 const MARKET_STABILITY_START_MULTIPLIER: Int = 2;
-const MARKET_STABILITY_END_MULTIPLIER: Int = 16;
+const MARKET_STABILITY_END_MULTIPLIER: Int = 21;
 const MARKET_STABILITY_ATH_NOTIFY_ACK_VALUE: Int = 1000000;
 const MARKET_STABILITY_LOCAL_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE: Int = 30000000;

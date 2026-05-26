@@ -6,13 +6,13 @@ Status: **implemented and locally verified**.
 
 M20X implements the Vault-side community activity airdrop:
 
-- 30% of fixed ATH supply allocated to activity airdrop;
-- 30,000,000 ATH global cap;
+- 15% of fixed ATH supply allocated to activity airdrop;
+- 15,000,000 ATH global cap;
 - 10 ATH per successfully finalized paid publish;
 - no per-wallet cap;
 - reward credited only after authenticated `CapsuleHubPublishAck` for an existing `PendingPublish`;
 - final M49 allocation has no founder token allocation;
-- market stability reserve is tracked separately from activity rewards and is milestone-gated at x2..x16;
+- market stability reserve is tracked separately from activity rewards and is milestone-gated at x2..x21;
 - official ATH pool launch target: after approximately 15,000,000 ATH has been distributed through activity rewards.
 
 The airdrop is a genesis-backed Vault internal ATH balance credit, not a mint and not synthetic points.

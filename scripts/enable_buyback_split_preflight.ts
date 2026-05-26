@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { Address } from '@ton/core';
 
 export const BUYBACK_SPLIT_ENABLE_CALLER_RESERVE_NANOTONS = 2_000_000n;
-export const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH = 15_000_000_000_000_000n;
+export const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH = 0n;
 const BUYBACK_PHASE_IDLE = 0n;
 
 export type BigintLike = bigint | number | string;
@@ -173,7 +173,7 @@ export function createEnableBuybackSplitPreflight(input: EnableBuybackSplitPrefl
     addFailure(
       failures,
       'VAULT_AIRDROP_DISTRIBUTION_THRESHOLD_NOT_REACHED',
-      'Vault activity airdrop remaining must be at or below the 15M ATH unlock threshold before buyback split is enabled.',
+      'Vault activity airdrop remaining must be zero before buyback split is enabled.',
     );
   }
 
