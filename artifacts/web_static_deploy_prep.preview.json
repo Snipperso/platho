@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-26T08:37:50.573Z",
+  "generatedAt": "2026-05-26T21:05:44.405Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 108,
-    "totalBytes": 1831564,
-    "bundleSha256": "f635fc292c859f60d07d4314d3bdce5d0118535413e4f7ea4fc8d37851e82337",
+    "fileCount": 115,
+    "totalBytes": 2096212,
+    "bundleSha256": "e01e8c9c51504bf8d0bb780063db6d52363b8d033c8d4c7ebd3d2d2212f238c7",
     "files": [
       {
         "path": "app.js",
-        "bytes": 211638,
-        "sha256": "f2a45e0f0262a3d4a5e73a05770def7cba234bdcff1515ab8b067c7e3a7a24a2"
+        "bytes": 225976,
+        "sha256": "612d6f2e14bfc14724fd5bad41d7a52813e3338bef0597bdbb810e288b8ff978"
       },
       {
         "path": "assets/icons/back.svg",
@@ -31,6 +31,11 @@
         "path": "assets/icons/broadcast.svg",
         "bytes": 279,
         "sha256": "0b3cae7dd7189d68b2fa0c310d68808732747a168d2d0b48471f1f7f9380e092"
+      },
+      {
+        "path": "assets/icons/chat-outline.svg",
+        "bytes": 232,
+        "sha256": "58344fa75802fa8b3c96bd84a4c8d02b57f4668b3ad8b4ac9a5747d53dfad3d1"
       },
       {
         "path": "assets/icons/chat.svg",
@@ -53,9 +58,19 @@
         "sha256": "e24a041c2f714b34bba311bdd2470d7324cf305c1f6177c77713a4cb2fe8482b"
       },
       {
+        "path": "assets/icons/image.svg",
+        "bytes": 412,
+        "sha256": "1b7adcf976cb87a49756e7b917243175ffc635aa00b9f04ee556921f506bd3b7"
+      },
+      {
         "path": "assets/icons/info.svg",
         "bytes": 193,
         "sha256": "d61641cf4e746c056cafcd985755a02e8d5d8e992cb36e2603602c6495d93409"
+      },
+      {
+        "path": "assets/icons/install.svg",
+        "bytes": 179,
+        "sha256": "87e6f6c6bf95ba73c653e08731cbbf907cee6757f5cc0c91b9988a459248627a"
       },
       {
         "path": "assets/icons/plus.svg",
@@ -88,14 +103,29 @@
         "sha256": "0becc342f4c8e329bd1ebdd9448c9224e820ba8bea5563ea88e8c18e19dd3452"
       },
       {
+        "path": "assets/platho-icon-192.png",
+        "bytes": 13401,
+        "sha256": "899b5572778f11940630eed941af6bc1152fa05be7bff5bd7beb38f5bd2903ae"
+      },
+      {
+        "path": "assets/platho-icon-512.png",
+        "bytes": 68716,
+        "sha256": "120ab546e3a0782cc82e40888693cb9bbfd393e3aae174a463f6d731c3b8a73d"
+      },
+      {
         "path": "assets/platho-icon.png",
-        "bytes": 3215,
-        "sha256": "aa0b6d9a2140848da96192d1b8c52a74d7dafbe89f68e47a4d6017f2b1b8f05a"
+        "bytes": 68716,
+        "sha256": "120ab546e3a0782cc82e40888693cb9bbfd393e3aae174a463f6d731c3b8a73d"
       },
       {
         "path": "assets/platho-icon.svg",
-        "bytes": 356,
-        "sha256": "19b3be4429420b0bc5ebbaf033bd8700bacfbcaf9bf7cd497a4800b8dbeb9ee7"
+        "bytes": 992,
+        "sha256": "7a3cf603a00f814535c35da01148a3bfa31205ff1cde38b37d302274c3aba4b7"
+      },
+      {
+        "path": "assets/platho-logo-transparent.png",
+        "bytes": 73194,
+        "sha256": "52ff9948b2d932919dbd87258537ec01d80d0c5bc02ab7b5a561ec7c96401749"
       },
       {
         "path": "ath-ton-rpc-provider.mjs",
@@ -129,13 +159,13 @@
       },
       {
         "path": "docs/ath-whitepaper.md",
-        "bytes": 16218,
-        "sha256": "3e9751e2dfaae68ecbf7201384db0b8d457e7c3443f3c9716e42e058e1bc0c64"
+        "bytes": 22657,
+        "sha256": "297de01b16af87549e0b35ae7d0b089df791aac83894f9445623309d597766ec"
       },
       {
         "path": "docs/crypto-protocol.md",
-        "bytes": 19955,
-        "sha256": "afc6ca6e293861835c640940e86c2b89c9686c0186afb4664734a3278ee4d430"
+        "bytes": 21882,
+        "sha256": "405aad8afb1d2a304e35b5c19048e5403abd1b79d678482501224c5f24241e48"
       },
       {
         "path": "encrypted-message-store.mjs",
@@ -144,13 +174,13 @@
       },
       {
         "path": "index.html",
-        "bytes": 23052,
-        "sha256": "99918491a3fed7b7ce3c3dc2636fd8e1df03c751a9dc77e3958e5832afd93aad"
+        "bytes": 25924,
+        "sha256": "13286f53e13a5f2f20ab17192d6a691993c754d88edf82385fb017a49973a2f8"
       },
       {
         "path": "manifest.webmanifest",
-        "bytes": 552,
-        "sha256": "eee17433e3981b1dc8157f80e4d183a94bf824394c0fa91743afa4727e4d0e3d"
+        "bytes": 558,
+        "sha256": "de5673eff299547ea5ed2df6463d23fab3fee36fbc2c535e24e6d63d7d4f3ff3"
       },
       {
         "path": "message-pricing-policy.mjs",
@@ -166,6 +196,11 @@
         "path": "platho-wallet.mjs",
         "bytes": 16713,
         "sha256": "c9870eaf0c7ca1a020318cc0d930bb311c23292cd964b53ffb3a88ae47ee8d7c"
+      },
+      {
+        "path": "profile-registry-ton-rpc-provider.mjs",
+        "bytes": 6603,
+        "sha256": "1f336e8d5ccc43ce087ef27d7ce7777d896b1271d7c77dfce046b5474882ee43"
       },
       {
         "path": "public-channel-subscriptions.mjs",
@@ -189,13 +224,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 33681,
-        "sha256": "ea187f784bb8d31800897abbd1a9b4ec40dcc7c911bad4156e379186326c8b91"
+        "bytes": 41117,
+        "sha256": "c24b199c199277483a5db89d234538f8796128559ee808c479543928fa0d44db"
       },
       {
         "path": "sw.js",
-        "bytes": 2598,
-        "sha256": "6dd0aad5f9376cc95507a7a260b6bbfc6d139e1fa5417a11b18ef2364dd85f6e"
+        "bytes": 3396,
+        "sha256": "b74d1c10796f7c6f27e0c1ce71eab8f59c983c053f0fd295370ee8fb2c3bf101"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -204,8 +239,8 @@
       },
       {
         "path": "username-ton-rpc-provider.mjs",
-        "bytes": 15002,
-        "sha256": "2bd53fd5802f60d551c4221bf486194e4a18432c0e0634f1dd1637dbade64e01"
+        "bytes": 16960,
+        "sha256": "b10901e11ccd8570ba7562fd39cd645abd0fbfa53b8b0fb32f7a57b191c0ef86"
       },
       {
         "path": "vault-chain-provider.mjs",
@@ -558,7 +593,6 @@
       "NO_BACKEND_ARCHITECTURE.md",
       "preview-desktop.png",
       "preview-mobile.png",
-      "profile-registry-ton-rpc-provider.mjs",
       "static-server.js",
       "vendor/@noble/ciphers/README.md",
       "vendor/@noble/ciphers/_arx.d.ts",

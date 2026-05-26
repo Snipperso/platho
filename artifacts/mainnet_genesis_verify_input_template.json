@@ -3,10 +3,14 @@
   "network": "mainnet",
   "manifest": {
     "profile": "PLATHO.V1.FINAL_GENESIS_MANIFEST",
+    "version": 1,
     "status": "FINAL_GENESIS",
     "manifest_hash_hex": "required: 64 lowercase hex final manifest hash",
     "addresses": {
       "ath_master": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "ath_long_term_vesting": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS",
+      "ath_long_term_vesting_beneficiary": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_BENEFICIARY_ADDRESS",
+      "ath_long_term_vesting_official_ath_wallet": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_treasury_owner": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
       "vault": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "vault_official_ath_wallet": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
@@ -30,6 +34,7 @@
     },
     "code_hashes": {
       "ath_master": "required: current ATHMaster code hash",
+      "ath_vesting": "required: current ATHVesting code hash",
       "ath_wallet": "required: current ATHWallet code hash",
       "vault": "required: current Vault code hash",
       "market_stability_seller": "required: current MarketStabilitySeller code hash",
@@ -39,9 +44,31 @@
       "buyback_burn": "required: current BuybackBurn code hash",
       "fee_accumulator": "required: current FeeAccumulator code hash"
     },
+    "state_init_hashes": {
+      "ath_master": "required: 64 lowercase hex ATHMaster StateInit hash",
+      "ath_long_term_vesting": "required: 64 lowercase hex ATHVesting StateInit hash",
+      "ath_long_term_vesting_official_ath_wallet": "required: 64 lowercase hex ATHVesting official ATHWallet StateInit hash",
+      "vault": "required: 64 lowercase hex Vault StateInit hash",
+      "vault_official_ath_wallet": "required: 64 lowercase hex Vault official ATHWallet StateInit hash",
+      "capsulehub": "required: 64 lowercase hex CapsuleHub StateInit hash",
+      "fee_accumulator": "required: 64 lowercase hex FeeAccumulator StateInit hash",
+      "buyback_burn": "required: 64 lowercase hex BuybackBurn StateInit hash",
+      "buyback_burn_official_ath_wallet": "required: 64 lowercase hex BuybackBurn official ATHWallet StateInit hash",
+      "market_stability_seller": "required: 64 lowercase hex MarketStabilitySeller StateInit hash",
+      "market_stability_seller_official_ath_wallet": "required: 64 lowercase hex MarketStabilitySeller official ATHWallet StateInit hash",
+      "username_registry": "required: 64 lowercase hex UsernameRegistry StateInit hash",
+      "username_registry_official_ath_wallet": "required: 64 lowercase hex UsernameRegistry official ATHWallet StateInit hash",
+      "profile_registry": "required: 64 lowercase hex ProfileRegistry StateInit hash",
+      "profile_registry_official_ath_wallet": "required: 64 lowercase hex ProfileRegistry official ATHWallet StateInit hash"
+    },
     "constants": {
       "ath_total_supply_atomic": "required: decimal atomic ATH amount",
       "vault_activity_airdrop_total_atomic": "required: decimal atomic ATH amount",
+      "ath_long_term_vesting_allocation_atomic": "required: decimal atomic ATH amount",
+      "ath_long_term_vesting_period_count": "required: decimal period count",
+      "ath_long_term_vesting_period_seconds": "required: decimal period duration seconds",
+      "ath_long_term_vesting_period_unlock_amount_atomic": "required: decimal atomic ATH amount",
+      "ath_long_term_vesting_start_time_unix": "required: decimal unix timestamp",
       "ath_market_stability_reserve_allocation_atomic": "required: decimal atomic ATH amount"
     },
     "blockers_before_final_genesis": []
@@ -77,6 +104,31 @@
       "owner_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "balance_atomic": "required: decimal ATH balance from get_wallet_data"
+    },
+    "ath_long_term_vesting": {
+      "address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS",
+      "code_hash": "required: current ATHVesting code hash",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "beneficiary_address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_BENEFICIARY_ADDRESS",
+      "official_ath_wallet_address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS",
+      "start_time": "required: decimal vesting start unix timestamp",
+      "period_seconds": "31536000",
+      "period_count": "100",
+      "period_unlock_amount": "100000000000000",
+      "total_amount": "10000000000000000",
+      "phase": "0",
+      "claimed_ath": "0",
+      "pending_query_id": "0",
+      "pending_amount": "0",
+      "pending_created_at": "0",
+      "last_terminal_query_id": "0"
+    },
+    "ath_long_term_vesting_official_ath_wallet": {
+      "address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "required: exact 10M ATH vesting backing"
     },
     "market_stability_seller": {
       "address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
@@ -137,6 +189,13 @@
       "pending_treasury_flush_count": "0",
       "pending_burn_flush_count": "0"
     },
+    "username_registry_official_ath_wallet": {
+      "address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "0"
+    },
     "profile_registry": {
       "address": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
       "code_hash": "required: current contract code hash",
@@ -151,6 +210,13 @@
       "burn_due_ath": "0",
       "pending_treasury_flush_count": "0",
       "pending_burn_flush_count": "0"
+    },
+    "profile_registry_official_ath_wallet": {
+      "address": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "0"
     },
     "buyback_burn": {
       "address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
@@ -171,6 +237,13 @@
       "accepted_reserve_count": "0",
       "executed_buyback_count": "0",
       "burned_ath_total_atomic": "0"
+    },
+    "buyback_burn_official_ath_wallet": {
+      "address": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "0"
     },
     "fee_accumulator": {
       "address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",

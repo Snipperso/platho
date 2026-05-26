@@ -60,11 +60,8 @@ import {
 import {
   SINGLE_CAPSULE_USEFUL_BYTES,
   messagePartCount,
-  singleCapsuleMessageFits,
   splitBytesToParts,
   splitUtf8ToParts,
-  truncateUtf8ToBytes,
-  utf8ByteLength,
 } from './capsule-part-policy.mjs?v=1';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
@@ -129,12 +126,18 @@ const appShell = document.querySelector('.app-shell');
 const railItems = [...document.querySelectorAll('.rail-item[data-tab]')];
 const panels = [...document.querySelectorAll('.view-panel')];
 const docsButtons = [...document.querySelectorAll('.docs-header-button')];
+const installButtons = [...document.querySelectorAll('.install-header-button')];
 const docsDialog = document.querySelector('#docsDialog');
 const docsCloseButton = document.querySelector('#docsCloseButton');
 const docsTitle = document.querySelector('#docsTitle');
 const docsLead = document.querySelector('#docsLead');
 const docsNav = document.querySelector('#docsNav');
 const docsContent = document.querySelector('#docsContent');
+const installDialog = document.querySelector('#installDialog');
+const installCloseButton = document.querySelector('#installCloseButton');
+const installConfirmButton = document.querySelector('#installConfirmButton');
+const installDismissButton = document.querySelector('#installDismissButton');
+const installHelp = document.querySelector('#installHelp');
 const threadList = document.querySelector('#threadList');
 const messageStrip = document.querySelector('#messageStrip');
 const activeAvatar = document.querySelector('#activeAvatar');
@@ -201,7 +204,9 @@ const replayStoreStatus = document.querySelector('#replayStoreStatus');
 const brandNetworkLabel = document.querySelector('#brandNetworkLabel');
 const chatCountLabel = document.querySelector('#chatCountLabel');
 const publicSubtitle = document.querySelector('#publicSubtitle');
+const publicPane = document.querySelector('.public-pane');
 const publicFeed = document.querySelector('#publicFeed');
+const publicChannelDetail = document.querySelector('#publicChannelDetail');
 const publicChannelSearchRow = document.querySelector('#publicChannelSearchRow');
 const publicChannelSearch = document.querySelector('#publicChannelSearch');
 const addPublicChannelButton = document.querySelector('#addPublicChannelButton');
@@ -276,6 +281,7 @@ let publicImageAttachment = null;
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
 let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
+let deferredInstallPrompt = null;
 const KEY_SUITE_PREF_KEY = 'platho.crypto.suite.v1';
 const PLATHO_WALLET_STORAGE_KEY = 'platho.wallet.seed.v1';
 const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
@@ -283,6 +289,7 @@ const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v1';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
 const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
+const INSTALL_PROMPT_DISMISSED_STORAGE_KEY = 'platho.installPrompt.dismissed.v1';
 const PROFILE_AVATAR_POINTER_STORAGE_PREFIX = 'platho.profile.avatar.v1';
 const PROFILE_AVATAR_MEDIA_CACHE_PREFIX = 'platho.profile.avatar.media.v1';
 const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 96;
@@ -324,6 +331,75 @@ let athProtocolState = {
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
+}
+
+function isStandaloneApp() {
+  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
+}
+
+function refreshInstallButtons() {
+  const canInstall = !isStandaloneApp();
+  installButtons.forEach((button) => {
+    button.toggleAttribute('hidden', !canInstall);
+  });
+  if (installConfirmButton) {
+    installConfirmButton.textContent = deferredInstallPrompt ? 'Install' : 'How to install';
+  }
+  if (installHelp) {
+    installHelp.textContent = deferredInstallPrompt
+      ? 'The next step opens your browser install sheet. If you cancel it, the install button stays here so you can still find the manual path.'
+      : installHelpText();
+  }
+}
+
+function installPromptDismissed() {
+  return localStorageOrNull()?.getItem(INSTALL_PROMPT_DISMISSED_STORAGE_KEY) === '1';
+}
+
+function markInstallPromptDismissed() {
+  localStorageOrNull()?.setItem(INSTALL_PROMPT_DISMISSED_STORAGE_KEY, '1');
+}
+
+function openInstallDialogIfUseful() {
+  if (!installDialog || installPromptDismissed() || isStandaloneApp()) return;
+  installDialog.hidden = false;
+  refreshInstallButtons();
+}
+
+function closeInstallDialog({ dismissed = true } = {}) {
+  if (dismissed) markInstallPromptDismissed();
+  if (installDialog) installDialog.hidden = true;
+}
+
+async function promptInstallApp() {
+  if (!deferredInstallPrompt || isStandaloneApp()) {
+    if (!isStandaloneApp() && installDialog) {
+      installDialog.hidden = false;
+    }
+    refreshInstallButtons();
+    return;
+  }
+  const promptEvent = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  closeInstallDialog({ dismissed: true });
+  refreshInstallButtons();
+  try {
+    await promptEvent.prompt();
+    await promptEvent.userChoice.catch(() => null);
+  } finally {
+    refreshInstallButtons();
+  }
+}
+
+function installHelpText() {
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) {
+    return 'On iPhone or iPad, open this page in Safari, tap Share, then Add to Home Screen.';
+  }
+  if (/Android/i.test(ua)) {
+    return 'On Android Chrome, open the browser menu and choose Install app or Add to Home screen.';
+  }
+  return 'In Chrome or Edge, use the address bar install icon or the browser menu: Apps / Install this site.';
 }
 
 function profileAvatarStorageKey(owner = plathoWallet?.address) {
@@ -1197,11 +1273,13 @@ function updatePublicJumpDownVisibility() {
 }
 
 function updatePublicModeButtons() {
+  if (publicPane) publicPane.dataset.publicMode = publicDisplayMode;
   publicFeedModeButton?.setAttribute('aria-pressed', publicDisplayMode === 'feed' ? 'true' : 'false');
   publicChannelsModeButton?.setAttribute('aria-pressed', publicDisplayMode === 'channels' ? 'true' : 'false');
   if (publicChannelSearch) publicChannelSearch.placeholder = publicDisplayMode === 'channels' ? 'Search channels' : 'Search public';
   updatePublicJumpDownVisibility();
-  if (publicComposer) publicComposer.hidden = publicDisplayMode !== 'feed';
+  if (publicComposer) publicComposer.hidden = false;
+  if (publicChannelDetail) publicChannelDetail.hidden = publicDisplayMode !== 'channels';
 }
 
 function publicFeedItemMatchesSearch(item, query) {
@@ -1240,8 +1318,94 @@ function renderPublicEmpty(titleText, bodyText) {
   publicFeed.append(empty);
 }
 
+function appendPublicItemComments(article, item) {
+  const comments = Array.isArray(item?.comments) ? item.comments : [];
+  if (comments.length === 0) return;
+  const commentList = document.createElement('div');
+  commentList.className = 'comment-list';
+  for (const comment of comments) {
+    const row = document.createElement('article');
+    row.className = 'comment-item';
+    const commentAuthorRow = document.createElement('div');
+    commentAuthorRow.className = 'feed-author-row';
+    const commentAvatar = document.createElement('div');
+    commentAvatar.className = 'avatar feed-avatar';
+    commentAvatar.setAttribute('aria-hidden', 'true');
+    setAvatarNode(commentAvatar, String(comment.author ?? 'P').slice(0, 1), comment.avatarImageUrl);
+    const commentMeta = document.createElement('div');
+    commentMeta.className = 'feed-meta';
+    commentMeta.textContent = [comment.author, comment.createdAt?.slice?.(0, 10)].filter(Boolean).join(' - ');
+    commentAuthorRow.append(commentAvatar, commentMeta);
+    row.append(commentAuthorRow);
+    if (comment.text) {
+      const commentText = document.createElement('p');
+      commentText.textContent = comment.text;
+      row.append(commentText);
+    }
+    if (comment.imageUrl) {
+      const image = document.createElement('img');
+      image.className = 'feed-image';
+      image.src = comment.imageUrl;
+      image.alt = '';
+      image.loading = 'lazy';
+      row.append(image);
+    }
+    commentList.append(row);
+  }
+  article.append(commentList);
+}
+
+function appendPublicItemActions(article, item) {
+  const actions = document.createElement('div');
+  actions.className = 'feed-actions';
+  const commentButton = document.createElement('button');
+  commentButton.type = 'button';
+  const commentsAllowed = item.commentsAllowed !== false;
+  const hasChainCommentTarget = item.entryId !== undefined
+    && item.entryId !== null
+    && /^0x[0-9a-fA-F]{64}$/.test(String(item.bodyHash ?? ''));
+  const canComment = Boolean(commentsAllowed && plathoWallet && hasChainCommentTarget);
+  if (!commentsAllowed) {
+    commentButton.textContent = 'Comments off';
+  } else if (!hasChainCommentTarget) {
+    commentButton.textContent = 'Preview only';
+  } else if (!plathoWallet) {
+    commentButton.textContent = 'Create wallet';
+  } else {
+    commentButton.textContent = 'Comment';
+  }
+  commentButton.disabled = !canComment;
+  commentButton.title = !commentsAllowed
+    ? 'The author closed comments for this post'
+    : (!hasChainCommentTarget
+        ? 'This preview post is not an on-chain capsule yet'
+        : (canComment ? 'Write one immutable public comment' : 'Create or import a Platho wallet to comment'));
+  commentButton.addEventListener('click', async () => {
+    if (!canComment) return;
+    setPublicCommentTarget(item);
+  });
+  actions.append(commentButton);
+
+  const privateButton = document.createElement('button');
+  privateButton.type = 'button';
+  privateButton.textContent = 'Private chat';
+  const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
+  privateButton.disabled = !authorWallet;
+  privateButton.title = authorWallet
+    ? 'Open this author in Private'
+    : 'Author wallet is not available for this public item';
+  privateButton.addEventListener('click', () => {
+    if (!authorWallet) return;
+    openPrivateThreadForWallet(authorWallet);
+  });
+  actions.append(privateButton);
+  article.append(actions);
+}
+
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
+  publicFeed.dataset.publicMode = 'feed';
+  if (publicChannelDetail) publicChannelDetail.replaceChildren();
   publicFeed.replaceChildren();
   if ((items ?? []).length === 0) {
     renderPublicEmpty(publicChannelSearchQuery ? 'No public posts found' : 'No public posts', publicChannelSearchQuery ? 'Try another search.' : 'Follow a channel or publish the first post.');
@@ -1372,8 +1536,97 @@ function renderPublicFeed(items, options = {}) {
   requestAnimationFrame(updatePublicJumpDownVisibility);
 }
 
+function appendPublicChannelPost(container, item) {
+  const article = document.createElement('article');
+  article.className = `feed-item compact${isUnreadPublicItem(item) ? ' is-unread' : ''}`;
+  const authorRow = document.createElement('div');
+  authorRow.className = 'feed-author-row';
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar feed-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(avatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl);
+  const meta = document.createElement('div');
+  meta.className = 'feed-meta';
+  for (const label of [...(item.meta ?? []), item.createdAt?.slice?.(0, 10)].filter(Boolean)) {
+    const span = document.createElement('span');
+    span.textContent = label;
+    meta.append(span);
+  }
+  authorRow.append(avatar, meta);
+  article.append(authorRow);
+  if (item.title) {
+    const title = document.createElement('h2');
+    title.textContent = item.title;
+    article.append(title);
+  }
+  if (item.text) {
+    const text = document.createElement('p');
+    text.textContent = item.text;
+    article.append(text);
+  }
+  if (item.imageUrl) {
+    const image = document.createElement('img');
+    image.className = 'feed-image';
+    image.src = item.imageUrl;
+    image.alt = '';
+    image.loading = 'lazy';
+    article.append(image);
+  }
+  appendPublicItemComments(article, item);
+  appendPublicItemActions(article, item);
+  container.append(article);
+}
+
+function renderPublicChannelDetail(channel, items) {
+  if (!publicChannelDetail) return;
+  publicChannelDetail.replaceChildren();
+  if (!channel) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state public-channel-empty';
+    const title = document.createElement('h2');
+    title.textContent = 'No channel selected';
+    const body = document.createElement('p');
+    body.textContent = 'Choose a public channel from the list.';
+    empty.append(title, body);
+    publicChannelDetail.append(empty);
+    return;
+  }
+  const latestPost = items?.[items.length - 1] ?? null;
+  const header = document.createElement('header');
+  header.className = 'public-channel-detail-header';
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  setAvatarNode(avatar, channel.avatar, latestPost?.avatarImageUrl);
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'conversation-title';
+  const title = document.createElement('h2');
+  title.textContent = channel.name;
+  const subtitle = document.createElement('p');
+  subtitle.textContent = channel.subtitle ?? 'public channel';
+  titleWrap.append(title, subtitle);
+  header.append(avatar, titleWrap);
+
+  const list = document.createElement('div');
+  list.className = 'public-channel-detail-feed';
+  if ((items ?? []).length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state public-channel-empty';
+    const emptyTitle = document.createElement('h2');
+    emptyTitle.textContent = 'No posts yet';
+    const emptyBody = document.createElement('p');
+    emptyBody.textContent = 'This channel has no visible posts in the current history window.';
+    empty.append(emptyTitle, emptyBody);
+    list.append(empty);
+  } else {
+    for (const item of items ?? []) appendPublicChannelPost(list, item);
+  }
+  publicChannelDetail.append(header, list);
+}
+
 function renderPublicChannels() {
   if (!publicFeed) return;
+  publicFeed.dataset.publicMode = 'channels';
   publicFeed.replaceChildren();
   const query = publicChannelSearchQuery.trim().toLowerCase();
   const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
@@ -1389,48 +1642,57 @@ function renderPublicChannels() {
     });
   if (channels.length === 0) {
     renderPublicEmpty(query ? 'No channels found' : 'No public channels', query ? 'Try another search.' : 'Add a channel to follow public posts.');
+    renderPublicChannelDetail(null, []);
     return;
   }
+  const activeChannelId = channels.some((channel) => channel.id === publicChannelSubscriptions?.activeChannelId)
+    ? publicChannelSubscriptions?.activeChannelId
+    : channels[0]?.id;
   for (const channel of channels) {
     const unread = publicUnreadCount(channel.id);
     const cachedFeed = publicChannelFeedCache?.[channel.id]?.feed ?? publicChannelFeedCache?.[channel.id] ?? null;
     const latestPost = cachedFeed?.posts?.[cachedFeed.posts.length - 1] ?? null;
     const card = document.createElement('button');
     card.type = 'button';
-    card.className = `feed-item channel-item${unread > 0 ? ' is-unread' : ''}`;
-    const channelRow = document.createElement('div');
-    channelRow.className = 'feed-author-row';
+    card.className = `thread-item public-channel-item${unread > 0 ? ' is-unread' : ''}${channel.id === activeChannelId ? ' is-selected' : ''}`;
     const channelAvatar = document.createElement('div');
-    channelAvatar.className = 'avatar feed-avatar';
+    channelAvatar.className = 'avatar';
     channelAvatar.setAttribute('aria-hidden', 'true');
     setAvatarNode(channelAvatar, channel.avatar, latestPost?.avatarImageUrl);
-    const meta = document.createElement('div');
-    meta.className = 'feed-meta';
-    meta.append(document.createTextNode(channel.subtitle ?? 'public channel'));
-    channelRow.append(channelAvatar, meta);
-    const title = document.createElement('h2');
-    title.textContent = channel.name;
-    const text = document.createElement('p');
-    text.textContent = unread > 0 ? `${unread} unread post${unread === 1 ? '' : 's'}` : 'No unread posts';
-    if (channel.authorWallet) {
-      const wallet = document.createElement('p');
-      wallet.className = 'channel-wallet';
-      wallet.textContent = shortAddress(channel.authorWallet);
-      card.append(channelRow, title, text, wallet);
-    } else {
-      card.append(channelRow, title, text);
-    }
+    const main = document.createElement('div');
+    main.className = 'thread-main';
+    const top = document.createElement('div');
+    top.className = 'thread-top';
+    const name = document.createElement('div');
+    name.className = 'thread-name';
+    name.textContent = channel.name;
+    top.append(name);
+    const preview = document.createElement('div');
+    preview.className = 'thread-preview';
+    preview.textContent = unread > 0
+      ? `${unread} unread post${unread === 1 ? '' : 's'}`
+      : (latestPost?.text || 'No unread posts');
+    const state = document.createElement('div');
+    state.className = 'thread-state';
+    state.textContent = channel.authorWallet ? shortAddress(channel.authorWallet) : (channel.subtitle ?? 'public channel');
+    main.append(top, preview, state);
+    const time = document.createElement('div');
+    time.className = 'thread-time';
+    time.textContent = unread > 0 ? 'unread' : (latestPost?.createdAt?.slice?.(5, 10) ?? '');
+    card.append(channelAvatar, main, time);
     card.addEventListener('click', () => {
       publicChannelSubscriptions = {
         ...publicChannelSubscriptions,
         activeChannelId: channel.id,
       };
       writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
-      publicDisplayMode = 'feed';
-      renderPublicSurface({ anchorUnread: true });
+      renderPublicSurface({ anchorUnread: false });
     });
     publicFeed.append(card);
   }
+  const activeChannel = channels.find((channel) => channel.id === activeChannelId) ?? channels[0] ?? null;
+  const activeItems = publicFeedItemsChronological().filter((item) => item.channelId === activeChannel?.id);
+  renderPublicChannelDetail(activeChannel, activeItems);
 }
 
 function renderPublicSurface(options = {}) {
@@ -1458,12 +1720,12 @@ function setPublicCommentTarget(item = null) {
   if (active) {
     setText(publicCommentContextText, `Comment to ${item.title ?? item.id ?? 'post'}`);
     if (publicMessageInput) {
-      publicMessageInput.placeholder = 'Write a public comment';
+      publicMessageInput.placeholder = publicComposerPlaceholder();
       publicMessageInput.focus();
     }
   } else {
     if (publicMessageInput) {
-      publicMessageInput.placeholder = 'Post to public';
+      publicMessageInput.placeholder = publicComposerPlaceholder();
     }
     if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.checked = readPublicCommentsDefault() !== 'disabled';
   }
@@ -1865,6 +2127,53 @@ function publicChannelIdForAuthorWallet(authorWallet) {
     ?? publicChannelSubscriptions?.activeChannelId
     ?? publicChannelRegistry[0]?.id
     ?? 'platho.app';
+}
+
+function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
+  const wallet = String(authorWallet ?? '').trim();
+  if (!wallet) return publicChannelRegistry[0]?.id ?? 'platho.app';
+  const existing = publicChannelRegistry.find((channel) => (
+    channel.authorWallet && String(channel.authorWallet) === wallet
+  ));
+  if (existing) {
+    if (options.activate && publicChannelSubscriptions?.activeChannelId !== existing.id) {
+      publicChannelSubscriptions = {
+        ...publicChannelSubscriptions,
+        activeChannelId: existing.id,
+      };
+      writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+    }
+    return existing.id;
+  }
+
+  const id = `wallet:${wallet}`;
+  const channel = {
+    id,
+    name: 'you',
+    avatar: 'Y',
+    subtitle: `your public channel - ${shortAddress(wallet)}`,
+    authorWallet: wallet,
+  };
+  customPublicChannels = normalizePublicChannelRegistry([
+    ...customPublicChannels.filter((item) => item.id !== id),
+    channel,
+  ]);
+  writeCustomPublicChannels();
+  rebuildPublicChannelRegistry();
+
+  const subscribedById = new Map((publicChannelSubscriptions?.channels ?? []).map((item) => [item.id, item]));
+  subscribedById.set(id, { id, subscribed: true });
+  publicChannelSubscriptions = {
+    version: publicChannelSubscriptions?.version ?? 1,
+    activeChannelId: options.activate ? id : (publicChannelSubscriptions?.activeChannelId ?? id),
+    channels: publicChannelRegistry.map((item) => ({
+      id: item.id,
+      subscribed: subscribedById.get(item.id)?.subscribed === true,
+    })),
+  };
+  writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+  rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+  return id;
 }
 
 async function syncPublicChannelFromChain() {
@@ -2966,41 +3275,49 @@ async function recompressImageAttachment(kind) {
   await setImageAttachment(kind, attachment.sourceFile, modeSelect.value);
 }
 
+function privateComposerPlaceholder({ readOnly = false } = {}) {
+  if (!plathoWallet) return 'Wallet required';
+  if (readOnly) return 'Read-only channel';
+  return 'Write a private message';
+}
+
+function publicComposerPlaceholder() {
+  if (!plathoWallet) return 'Wallet required';
+  return publicCommentTarget ? 'Write a public comment' : 'Write a public message';
+}
+
 function refreshComposerPublishPolicy() {
   const canPublish = Boolean(plathoWallet);
   if (composer) composer.dataset.publishMode = canPublish ? 'vault-balance' : 'wallet-required';
   if (messageInput) {
-    if (canPublish) {
-      messageInput.removeAttribute('maxlength');
-      messageInput.placeholder = 'Message';
-    } else {
-      messageInput.setAttribute('maxlength', String(SINGLE_CAPSULE_USEFUL_BYTES));
-      messageInput.placeholder = `Message (${SINGLE_CAPSULE_USEFUL_BYTES} bytes max)`;
-    }
+    messageInput.removeAttribute('maxlength');
+    messageInput.placeholder = privateComposerPlaceholder({
+      readOnly: composer?.dataset.readOnly === 'true',
+    });
     autoResizeComposerTextarea(messageInput);
   }
   if (publicComposer) publicComposer.dataset.publishMode = canPublish ? 'vault-balance' : 'wallet-required';
   if (publicMessageInput) {
-    const publicLimit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
-    if (canPublish) {
-      publicMessageInput.removeAttribute('maxlength');
-    } else {
-      publicMessageInput.setAttribute('maxlength', String(publicLimit));
-    }
+    publicMessageInput.removeAttribute('maxlength');
+    publicMessageInput.placeholder = publicComposerPlaceholder();
     autoResizeComposerTextarea(publicMessageInput);
   }
   for (const control of attachmentControls) {
     control.disabled = !canPublish;
-    control.hidden = !canPublish;
+    control.hidden = false;
     control.setAttribute('aria-disabled', canPublish ? 'false' : 'true');
+    if (control.classList?.contains('attachment-button')) {
+      control.title = canPublish ? 'Attach image' : 'Create or import a wallet to attach images';
+    }
+  }
+  if (paymentCheckButton) {
+    paymentCheckButton.title = canPublish ? 'Create private payment check' : 'Create or import a wallet to attach a private payment check';
   }
   if (privateImageModeSelect) {
     privateImageModeSelect.disabled = !canPublish;
-    privateImageModeSelect.hidden = !canPublish;
   }
   if (publicImageModeSelect) {
     publicImageModeSelect.disabled = !canPublish;
-    publicImageModeSelect.hidden = !canPublish;
   }
   updateImageAttachmentUi('private');
   updateImageAttachmentUi('public');
@@ -3008,24 +3325,11 @@ function refreshComposerPublishPolicy() {
 }
 
 function enforceComposerByteLimit() {
-  if (!messageInput || plathoWallet) return;
-  if (singleCapsuleMessageFits(messageInput.value, false)) return;
-  const truncated = truncateUtf8ToBytes(messageInput.value, SINGLE_CAPSULE_USEFUL_BYTES);
-  messageInput.value = truncated;
-  messageInput.setSelectionRange(truncated.length, truncated.length);
-  autoResizeComposerTextarea(messageInput);
-  refreshComposerCostStatus();
+  return;
 }
 
 function enforcePublicComposerByteLimit() {
-  if (!publicMessageInput || plathoWallet) return;
-  const limit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
-  if (utf8ByteLength(publicMessageInput.value) <= limit) return;
-  const truncated = truncateUtf8ToBytes(publicMessageInput.value, limit);
-  publicMessageInput.value = truncated;
-  publicMessageInput.setSelectionRange(truncated.length, truncated.length);
-  autoResizeComposerTextarea(publicMessageInput);
-  refreshComposerCostStatus();
+  return;
 }
 
 function downloadJsonFile(filename, value) {
@@ -3051,6 +3355,15 @@ function refreshMessagingControls() {
   if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet;
   if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet;
   if (setAvatarButton) setAvatarButton.disabled = !plathoWallet;
+  if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet;
+  if (messageInput) {
+    const privateReadOnly = activeThread()?.readOnly === true;
+    messageInput.disabled = privateReadOnly || !plathoWallet;
+  }
+  if (sendButton) {
+    const privateReadOnly = activeThread()?.readOnly === true;
+    sendButton.disabled = privateReadOnly || !plathoWallet;
+  }
   if (publicMessageInput) publicMessageInput.disabled = !plathoWallet;
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet;
   publicComposer?.querySelector?.('.send-button')?.toggleAttribute('disabled', !plathoWallet);
@@ -3116,7 +3429,28 @@ function renderThreads() {
 
 function renderConversation() {
   const thread = activeThread();
-  if (!thread) return;
+  if (!thread) {
+    setAvatarNode(activeAvatar, 'P', null);
+    activeTitle.textContent = 'No private chat';
+    activeSubtitle.textContent = 'Create or choose a chat';
+    messageStrip.innerHTML = '';
+    if (identityMenuButton) {
+      identityMenuButton.hidden = true;
+      identityMenuButton.setAttribute('aria-expanded', 'false');
+    }
+    if (composer) composer.dataset.readOnly = 'true';
+    refreshComposerPublishPolicy();
+    if (messageInput) {
+      messageInput.disabled = true;
+      messageInput.placeholder = plathoWallet ? 'Create or choose a private chat' : 'Wallet required';
+      autoResizeComposerTextarea(messageInput);
+    }
+    if (sendButton) sendButton.disabled = true;
+    if (paymentCheckButton) paymentCheckButton.disabled = true;
+    if (privateImageButton) privateImageButton.disabled = true;
+    if (privateImageModeSelect) privateImageModeSelect.disabled = true;
+    return;
+  }
   setAvatarNode(activeAvatar, thread.avatar, thread.avatarImageUrl);
   renderConversationIdentity(thread);
   activeSubtitle.textContent = thread.subtitle;
@@ -3126,11 +3460,11 @@ function renderConversation() {
   if (composer) composer.dataset.readOnly = isReadOnly ? 'true' : 'false';
   refreshComposerPublishPolicy();
   if (messageInput) {
-    messageInput.disabled = isReadOnly;
-    if (isReadOnly) messageInput.placeholder = 'Read-only channel';
+    messageInput.disabled = isReadOnly || !plathoWallet;
+    messageInput.placeholder = privateComposerPlaceholder({ readOnly: isReadOnly });
   }
-  if (sendButton) sendButton.disabled = isReadOnly;
-  if (paymentCheckButton) paymentCheckButton.disabled = isReadOnly;
+  if (sendButton) sendButton.disabled = isReadOnly || !plathoWallet;
+  if (paymentCheckButton) paymentCheckButton.disabled = isReadOnly || !plathoWallet;
   if (privateImageButton) privateImageButton.disabled = isReadOnly || !plathoWallet;
   if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
 
@@ -3217,7 +3551,26 @@ docsButtons.forEach((button) => {
     });
   });
 });
+installButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    promptInstallApp().catch((error) => {
+      console.error(error);
+      refreshInstallButtons();
+    });
+  });
+});
+installConfirmButton?.addEventListener('click', () => {
+  promptInstallApp().catch((error) => {
+    console.error(error);
+    refreshInstallButtons();
+  });
+});
+installCloseButton?.addEventListener('click', () => closeInstallDialog({ dismissed: true }));
+installDismissButton?.addEventListener('click', () => closeInstallDialog({ dismissed: true }));
 docsCloseButton?.addEventListener('click', closeDocsDialog);
+installDialog?.addEventListener('click', (event) => {
+  if (event.target === installDialog) closeInstallDialog({ dismissed: true });
+});
 docsDialog?.addEventListener('click', (event) => {
   if (event.target === docsDialog) closeDocsDialog();
 });
@@ -3286,6 +3639,7 @@ document.addEventListener('keydown', (event) => {
   closeNewChatDialog();
   closeActionDialog(null);
   closeDocsDialog();
+  closeInstallDialog({ dismissed: false });
 });
 
 actionGrid?.addEventListener('click', async (event) => {
@@ -3720,56 +4074,57 @@ composer?.addEventListener('submit', async (event) => {
   enforceComposerByteLimit();
   const text = messageInput.value.trim();
   if (!text && !privateImageAttachment) return;
-  if (!singleCapsuleMessageFits(text, Boolean(plathoWallet)) && !privateImageAttachment) {
-    refreshMessagingControls();
-    return;
-  }
   const thread = threads.find((item) => item.id === activeThreadId) ?? threads[0];
   if (thread.readOnly) {
     messageInput.value = '';
     renderConversation();
     return;
   }
-  const message = { type: 'out', text, meta: 'local' };
-  if (localIdentity && localRecipientKeyPair && localSignedPublicBundle) {
-    try {
-      const recipientEntry = await resolveRecipientPeerEntry(thread);
-      const capsules = await createPrivateComposerCapsules(text, privateImageAttachment, recipientEntry, activeThreadId);
-      const capsule = capsules[0];
-      message.capsule = capsule;
-      message.capsules = capsules;
-      message.recipientWallet = recipientEntry.walletAddress;
-      if (privateImageAttachment) {
-        message.attachment = {
-          type: 'image',
-          url: privateImageAttachment.dataUrl,
-          bytes: privateImageAttachment.bytes.length,
-          mode: privateImageAttachment.mode.id,
-        };
-      }
-      message.meta = capsules.length > 1
-        ? `${capsule.header0.suite} local capsule (${capsules.length} parts)`
-        : `${capsule.header0.suite} local capsule`;
-      if (plathoWallet?.address && appConfig.vault?.address) {
-        try {
-          const publishResult = capsules.length > 1
-            ? await publishCapsulesThroughVault(capsules)
-            : await publishCapsuleThroughVault(capsule);
-          message.vaultPublish = publishResult;
-          if (publishResult.status === 'vault-publish-sent') {
-            message.meta = 'published';
-            refreshMessagingControls();
-          }
-        } catch (error) {
-          refreshMessagingControls();
-          console.error(error);
-        }
-      }
-    } catch (error) {
-      message.meta = 'encryption blocked';
-      refreshMessagingControls();
-      console.error(error);
+  if (!plathoWallet?.address || !appConfig.vault?.address) {
+    refreshMessagingControls();
+    return;
+  }
+  if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = 'Activate wallet before messaging';
+      privateComposerCostStatus.dataset.state = 'short';
     }
+    refreshMessagingControls();
+    return;
+  }
+
+  const message = { type: 'out', text, meta: 'local' };
+  try {
+    const recipientEntry = await resolveRecipientPeerEntry(thread);
+    const capsules = await createPrivateComposerCapsules(text, privateImageAttachment, recipientEntry, activeThreadId);
+    const capsule = capsules[0];
+    message.capsule = capsule;
+    message.capsules = capsules;
+    message.recipientWallet = recipientEntry.walletAddress;
+    if (privateImageAttachment) {
+      message.attachment = {
+        type: 'image',
+        url: privateImageAttachment.dataUrl,
+        bytes: privateImageAttachment.bytes.length,
+        mode: privateImageAttachment.mode.id,
+      };
+    }
+    message.meta = capsules.length > 1
+      ? `${capsule.header0.suite} local capsule (${capsules.length} parts)`
+      : `${capsule.header0.suite} local capsule`;
+    const publishResult = capsules.length > 1
+      ? await publishCapsulesThroughVault(capsules)
+      : await publishCapsuleThroughVault(capsule);
+    message.vaultPublish = publishResult;
+    if (publishResult.status !== 'vault-publish-sent') {
+      throw new Error('Vault publish was not sent');
+    }
+    message.meta = 'published';
+    refreshMessagingControls();
+  } catch (error) {
+    refreshMessagingControls();
+    console.error(error);
+    return;
   }
   thread.messages.push(message);
   thread.preview = text || (message.attachment ? 'Image' : '');
@@ -5168,7 +5523,9 @@ async function publishCapsulesThroughVault(capsules) {
 }
 
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null) {
-  const channelId = publicChannelSubscriptions?.activeChannelId ?? publicChannelRegistry[0]?.id ?? 'platho.app';
+  const channelId = ensurePublicChannelForAuthorWallet(plathoWallet?.address, {
+    activate: publicDisplayMode === 'channels',
+  });
   const profilePointer = currentProfilePointerFields();
   const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
   const feed = cached?.version === 1 && cached?.channelId === channelId
@@ -5572,6 +5929,21 @@ if (window.Telegram?.WebApp) {
 if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  refreshInstallButtons();
+  openInstallDialogIfUseful();
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  markInstallPromptDismissed();
+  closeInstallDialog({ dismissed: false });
+  refreshInstallButtons();
+});
+window.matchMedia?.('(display-mode: standalone)')?.addEventListener?.('change', refreshInstallButtons);
+refreshInstallButtons();
 
 customPublicChannels = readCustomPublicChannels();
 rebuildPublicChannelRegistry();

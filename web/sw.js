@@ -1,4 +1,4 @@
-const CACHE_NAME = 'platho-pwa-prototype-v79';
+const CACHE_NAME = 'platho-pwa-prototype-v122';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const ASSETS = [
   './ton-dns-provider.mjs',
   './capsulehub-ton-rpc-provider.mjs',
   './ath-ton-rpc-provider.mjs',
+  './profile-registry-ton-rpc-provider.mjs',
   './username-ton-rpc-provider.mjs',
   './crypto/platho-crypto.mjs',
   './replay-store.mjs',
@@ -24,12 +25,17 @@ const ASSETS = [
   './manifest.webmanifest',
   './assets/platho-icon.svg',
   './assets/platho-icon.png',
+  './assets/platho-icon-192.png',
+  './assets/platho-icon-512.png',
+  './assets/platho-logo-transparent.png',
   './assets/icons/chat.svg',
+  './assets/icons/chat-outline.svg',
   './assets/icons/broadcast.svg',
   './assets/icons/vault.svg',
   './assets/icons/user.svg',
   './assets/icons/search.svg',
   './assets/icons/plus.svg',
+  './assets/icons/image.svg',
   './assets/icons/down.svg',
   './assets/icons/up.svg',
   './assets/icons/back.svg',
@@ -37,6 +43,7 @@ const ASSETS = [
   './assets/icons/refresh.svg',
   './assets/icons/bolt.svg',
   './assets/icons/gear.svg',
+  './assets/icons/install.svg',
   './assets/icons/info.svg',
   './docs/about-platho.md',
   './docs/ath-whitepaper.md',
@@ -55,28 +62,55 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+async function cacheSameOrigin(request, response) {
+  const url = new URL(request.url);
+  if (response?.ok && url.origin === self.location.origin) {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+  return response;
+}
+
+async function cachedAppShell() {
+  return await caches.match('./index.html') || await caches.match('./') || null;
+}
+
+function appShellCacheRequest() {
+  return new Request(new URL('./index.html', self.location.href).href);
+}
+
+async function navigationResponse(event) {
+  try {
+    const response = await fetch(event.request);
+    return await cacheSameOrigin(appShellCacheRequest(), response);
+  } catch (error) {
+    return await cachedAppShell() || Response.error();
+  }
+}
+
+async function staleWhileRevalidate(event) {
+  const request = event.request;
+  const cached = await caches.match(request);
+  const network = fetch(request)
+    .then((response) => cacheSameOrigin(request, response))
+    .catch(() => cached || Response.error());
+  if (cached) {
+    event.waitUntil(network.catch(() => undefined));
+    return cached;
+  }
+  return cached || network;
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    fetch(event.request).then((response) => {
-      const url = new URL(event.request.url);
-      if (response.ok && url.origin === self.location.origin) {
-        const copy = response.clone();
-        event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)));
-      }
-      return response;
-    }).catch(() => (
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          const url = new URL(event.request.url);
-          if (response.ok && url.origin === self.location.origin) {
-            const copy = response.clone();
-            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)));
-          }
-          return response;
-        });
-      })
-    )),
-  );
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(navigationResponse(event));
+    return;
+  }
+
+  event.respondWith(staleWhileRevalidate(event));
 });

@@ -77,6 +77,8 @@ export interface MarketStabilitySellerReadinessReport {
   market_stability_seller_ready: boolean;
   issue_codes: string[];
   issues: Issue[];
+  warning_codes: string[];
+  warnings: Issue[];
   checked_manifest_hash: string | null;
   reserve_allocation_atomic: string | null;
   base_tranche_price_nanotons: string | null;
@@ -158,6 +160,22 @@ function addDecimalEq(issues: Issue[], code: string, actual: unknown, expected: 
   if (BigInt(actual) !== BigInt(expected)) {
     issues.push(issue(code, `${label} mismatch: expected ${expected}, got ${actual}`));
   }
+}
+
+function addDecimalGte(issues: Issue[], code: string, actual: unknown, expectedMinimum: unknown, label: string): boolean {
+  if (!isDecimalString(actual)) {
+    issues.push(issue(code, `${label} must be a decimal integer string; got ${actual}`));
+    return false;
+  }
+  if (!isDecimalString(expectedMinimum)) {
+    issues.push(issue(code, `${label} expected minimum value must be a decimal integer string; got ${expectedMinimum}`));
+    return false;
+  }
+  if (BigInt(actual) < BigInt(expectedMinimum)) {
+    issues.push(issue(code, `${label} underfunded: expected at least ${expectedMinimum}, got ${actual}`));
+    return false;
+  }
+  return true;
 }
 
 function addDecimalGtZero(issues: Issue[], code: string, actual: unknown, label: string) {
@@ -275,6 +293,8 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
       market_stability_seller_ready: false,
       issue_codes: ['MISSING_INPUT'],
       issues: [issue('MISSING_INPUT', 'Supply a post-pool MarketStabilitySeller getter snapshot input.')],
+      warning_codes: [],
+      warnings: [],
       checked_manifest_hash: null,
       reserve_allocation_atomic: null,
       base_tranche_price_nanotons: null,
@@ -282,6 +302,7 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
   }
 
   const issues: Issue[] = [];
+  const warnings: Issue[] = [];
   const manifest = input.manifest;
   const constants = manifest.constants ?? {};
   const reserveTotal = constants.ath_market_stability_reserve_allocation_atomic;
@@ -413,7 +434,10 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
   addAddressEq(issues, 'MARKET_STABILITY_OFFICIAL_WALLET_OWNER_MISMATCH', officialWallet.owner_address, manifest.addresses.market_stability_seller, 'market_stability_seller_official_ath_wallet.owner_address');
   addAddressEq(issues, 'MARKET_STABILITY_OFFICIAL_WALLET_MASTER_MISMATCH', officialWallet.ath_master_address, manifest.addresses.ath_master, 'market_stability_seller_official_ath_wallet.ath_master_address');
   if (isDecimalString(reserveTotal)) {
-    addDecimalEq(issues, 'MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_MISMATCH', officialWallet.balance_atomic, reserveTotal, 'market_stability_seller_official_ath_wallet.balance_atomic');
+    const walletBacked = addDecimalGte(issues, 'MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_UNDERFUNDED', officialWallet.balance_atomic, reserveTotal, 'market_stability_seller_official_ath_wallet.balance_atomic');
+    if (walletBacked && BigInt(officialWallet.balance_atomic) > BigInt(reserveTotal)) {
+      warnings.push(issue('MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_HAS_EXCESS_DONATION', `market_stability_seller_official_ath_wallet.balance_atomic has excess donated ATH above the tracked reserve: expected ${reserveTotal}, got ${officialWallet.balance_atomic}.`));
+    }
   }
 
   for (const [key, value] of Object.entries(input.evidenceRefs ?? {})) {
@@ -427,6 +451,8 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
     market_stability_seller_ready: issues.length === 0,
     issue_codes: issues.map((i) => i.code),
     issues,
+    warning_codes: warnings.map((i) => i.code),
+    warnings,
     checked_manifest_hash: manifest.manifest_hash_hex ?? null,
     reserve_allocation_atomic: isDecimalString(reserveTotal) ? reserveTotal : null,
     base_tranche_price_nanotons: isDecimalString(seller.base_tranche_price_nanotons) ? seller.base_tranche_price_nanotons : null,
@@ -447,6 +473,10 @@ function markdown(report: MarketStabilitySellerReadinessReport) {
     '## Issues',
     '',
     ...(report.issues.length > 0 ? report.issues.map((item) => `- ${item.code}: ${item.message}`) : ['- none']),
+    '',
+    '## Warnings',
+    '',
+    ...(report.warnings.length > 0 ? report.warnings.map((item) => `- ${item.code}: ${item.message}`) : ['- none']),
     '',
   ];
   return lines.join('\n');
@@ -470,6 +500,7 @@ if (require.main === module) {
     status: report.status,
     market_stability_seller_ready: report.market_stability_seller_ready,
     issue_codes: report.issue_codes,
+    warning_codes: report.warning_codes,
     output: 'artifacts/market_stability_seller_readiness_report.json',
   }, null, 2));
 }

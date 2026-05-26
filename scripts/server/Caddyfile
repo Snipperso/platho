@@ -1,0 +1,37 @@
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+(security_headers) {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Alt-Svc "clear"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "accelerometer=(), bluetooth=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=()"
+    }
+}
+
+www.platho.app {
+    import security_headers
+    redir https://platho.app{uri} permanent
+}
+
+platho.app {
+	import security_headers
+	root * /srv/platho/current
+	route {
+		@index_html path /index.html
+		redir @index_html / permanent
+		@unsupported_methods method OPTIONS POST PUT PATCH DELETE TRACE CONNECT
+		respond @unsupported_methods 405
+		@sensitive_paths path /.git* /.env* /package*.json /tact.config.json /scripts/* /artifacts/* /server-status /backup* /config.json
+		respond @sensitive_paths 404
+		encode gzip
+		try_files {path} /index.html
+		file_server
+	}
+}

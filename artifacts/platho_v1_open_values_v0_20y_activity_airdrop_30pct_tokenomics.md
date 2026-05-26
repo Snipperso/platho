@@ -29,15 +29,14 @@ Final distribution:
 ```text
 Community activity airdrop:      15%
 Liquidity bootstrap:             15%
-Treasury / operations:           10%
+Long-term protocol vesting:      10%
 Market stability reserve:        60%
-Founder allocation:               0%
 TOTAL:                          100%
 ```
 
-There is no founder token allocation. Early users receive ATH through paid protocol usage via the Vault activity airdrop.
+Early users receive ATH through paid protocol usage via the Vault activity airdrop.
 
-The market stability reserve is `60,000,000 ATH`. It is reserved for gradual market release only after price milestones, not for partnerships, discretionary founder grants, or vague ecosystem spending.
+The market stability reserve is `60,000,000 ATH`. It is reserved for gradual market release only after price milestones, not for vague discretionary spending.
 
 Planned tranche policy:
 

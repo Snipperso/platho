@@ -23,6 +23,8 @@
 - Finalizes sale only after recipient ATH wallet ACK.
 - Restores ATH reserve and refunds buyer principal on transfer fail/bounce.
 - Flushes TON proceeds only to immutable treasury.
+- Bounds sales by tracked `reserve_due_ath`, not by raw official wallet balance.
+- Treats unsolicited excess ATH in the official seller wallet as unsupported donation dust: readiness may warn, but it is not sellable reserve and can remain stuck.
 
 ## Not Added
 

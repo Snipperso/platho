@@ -110,6 +110,7 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.market_stability_seller_ready).toBe(true);
     expect(report.status).toBe('MARKET_STABILITY_SELLER_READY');
     expect(report.issue_codes).toEqual([]);
+    expect(report.warning_codes).toEqual([]);
     expect(report.reserve_allocation_atomic).toBe('60000000000000000');
     expect(report.base_tranche_price_nanotons).toBe('1000000000');
   });
@@ -173,7 +174,32 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.market_stability_seller_ready).toBe(false);
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_FULLY_FUNDED');
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_MISMATCH');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_MISMATCH');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_UNDERFUNDED');
+  });
+
+  it('rejects accounting-underfunded reserve state even when the official wallet balance is full', () => {
+    const input = readyInput();
+    input.snapshot.market_stability_seller.reserve_due_ath = '59999999999999999';
+    input.snapshot.market_stability_seller.reserve_funded_total_ath = '59999999999999999';
+    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '60000000000000000';
+
+    const report = verifyMarketStabilitySellerReadiness(input);
+
+    expect(report.market_stability_seller_ready).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_FULLY_FUNDED');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_MISMATCH');
+    expect(report.issue_codes).not.toContain('MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_UNDERFUNDED');
+  });
+
+  it('allows donated ATH dust above the tracked reserve as a non-blocking warning', () => {
+    const input = readyInput();
+    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '60000000000000001';
+
+    const report = verifyMarketStabilitySellerReadiness(input);
+
+    expect(report.market_stability_seller_ready).toBe(true);
+    expect(report.issue_codes).toEqual([]);
+    expect(report.warning_codes).toContain('MARKET_STABILITY_OFFICIAL_WALLET_BALANCE_HAS_EXCESS_DONATION');
   });
 
   it('rejects snapshots with previous sale state before operational readiness is declared', () => {

@@ -40,11 +40,15 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     expect(manifest.status).toBe('IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS');
     expect(manifest.constants.ath_activity_airdrop_allocation_percent).toBe('15');
     expect(manifest.constants.ath_initial_liquidity_allocation_percent).toBe('15');
-    expect(manifest.constants.ath_treasury_operations_allocation_percent).toBe('10');
+    expect(manifest.constants.ath_long_term_vesting_allocation_percent).toBe('10');
     expect(manifest.constants.ath_market_stability_reserve_allocation_percent).toBe('60');
-    expect(manifest.constants.ath_founder_allocation_percent).toBe('0');
+    expect(manifest.constants).not.toHaveProperty('ath_treasury_operations_allocation_percent');
+    expect(manifest.constants).not.toHaveProperty('ath_founder_allocation_percent');
     expect(manifest.constants.ath_initial_liquidity_allocation_atomic).toBe('15000000000000000');
-    expect(manifest.constants.ath_treasury_operations_allocation_atomic).toBe('10000000000000000');
+    expect(manifest.constants.ath_long_term_vesting_allocation_atomic).toBe('10000000000000000');
+    expect(manifest.constants.ath_long_term_vesting_period_count).toBe('100');
+    expect(manifest.constants.ath_long_term_vesting_period_seconds).toBe('31536000');
+    expect(manifest.constants.ath_long_term_vesting_period_unlock_amount_atomic).toBe('100000000000000');
     expect(manifest.constants.ath_market_stability_reserve_allocation_atomic).toBe('60000000000000000');
     expect(manifest.constants.ath_market_stability_tranche_count).toBe('20');
     expect(manifest.constants.ath_market_stability_tranche_percent).toBe('3');
@@ -52,8 +56,14 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     expect(manifest.constants.ath_market_stability_start_multiplier).toBe('2');
     expect(manifest.constants.ath_market_stability_end_multiplier).toBe('21');
     expect(manifest.addresses.market_stability_seller).toBeDefined();
+    expect(manifest.addresses.ath_long_term_vesting).toBeDefined();
+    expect(manifest.addresses.ath_long_term_vesting_beneficiary).toBeDefined();
+    expect(manifest.addresses.ath_long_term_vesting_official_ath_wallet).toBeDefined();
     expect(manifest.addresses.market_stability_seller_official_ath_wallet).toBeDefined();
+    expect(manifest.code_hashes.ath_vesting).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.code_hashes.market_stability_seller).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.state_init_hashes.ath_long_term_vesting_initial).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.state_init_hashes.ath_long_term_vesting_official_ath_wallet).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.state_init_hashes.market_stability_seller_initial).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.state_init_hashes.market_stability_seller_official_ath_wallet).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('15000000000000000');
@@ -62,6 +72,7 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     expect(manifest.constants.profile_avatar_price_ath_atomic).toBe('100000000000');
     expect(manifest.constants.profile_avatar_max_parts).toBe('16');
     expect(manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
+    expect(manifest.blockers_before_final_genesis).toContain('ATH_LONG_TERM_VESTING_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VESTING_ATH_WALLET_BEFORE_FINAL_GENESIS');
     expect(manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
     expect(manifest.blockers_before_final_genesis).not.toContain('BUYBACKBURN_POST_POOL_ROUTE_FREEZE_REQUIRES_M20F_MAINNET_STONFI_EVIDENCE');
     expect(manifest.blockers_before_final_genesis).not.toContain('STONFI_V2_ROUTE_AND_PAYLOAD_VALUES_NOT_PINNED');
@@ -91,11 +102,13 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
     const profileRegistry = blockchain.openContract(new ProfileRegistry(parsed.profileRegistryAddress, inits.profileRegistry));
 
     expect(parsed.vaultAddress.toString()).toBe(manifest.addresses.vault);
+    expect(parsed.athLongTermVestingAddress.toString()).toBe(manifest.addresses.ath_long_term_vesting);
     expect(parsed.capsuleHubAddress.toString()).toBe(manifest.addresses.capsulehub);
     expect(parsed.marketStabilitySellerAddress.toString()).toBe(manifest.addresses.market_stability_seller);
     expect(parsed.usernameRegistryAddress.toString()).toBe(manifest.addresses.username_registry);
     expect(parsed.profileRegistryAddress.toString()).toBe(manifest.addresses.profile_registry);
     expect(parsed.vaultOfficialAthWalletAddress.toString()).toBe(manifest.addresses.vault_official_ath_wallet);
+    expect(parsed.athLongTermVestingOfficialAthWalletAddress.toString()).toBe(manifest.addresses.ath_long_term_vesting_official_ath_wallet);
     expect(parsed.marketStabilitySellerOfficialAthWalletAddress.toString()).toBe(manifest.addresses.market_stability_seller_official_ath_wallet);
     expect(parsed.usernameRegistryOfficialAthWalletAddress.toString()).toBe(manifest.addresses.username_registry_official_ath_wallet);
     expect(parsed.profileRegistryOfficialAthWalletAddress.toString()).toBe(manifest.addresses.profile_registry_official_ath_wallet);

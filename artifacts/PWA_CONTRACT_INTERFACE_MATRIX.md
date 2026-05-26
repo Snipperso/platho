@@ -26,7 +26,7 @@ The current PWA is mostly a cryptographic/static prototype plus local messenger 
 - It can auto-submit a `SetSession` / `DepositTon` / `TopUpMessageBudget` embedded-wallet transaction when budget/session is missing, then asks the user to publish after confirmation.
 - It has a typed CapsuleHub RPC provider for private/public entry getters and hub state; public entry scan is wired into the public feed, and private entries are scanned/decrypted into encrypted local history when the local key can open them.
 - It has typed ATHMaster/ATHWallet RPC providers for wallet derivation, jetton data, wallet balance, and pending notification reads.
-- It has typed UsernameRegistry/UsernameNFTItem RPC providers for `.ath` price, record, pending/refund/due, registry global, and item-state reads.
+- It has typed UsernameRegistry/UsernameNFTItem RPC providers for `.ath` price, record, pending/refund/due, registry global, item-state reads, and an authoritative item-ownership resolver that refuses item-only ownership.
 - It wires basic `.ath` username mint and username refund flush actions in the profile pane.
 
 Remaining gaps are UI/status polish rather than missing core user-facing contract sends.
@@ -46,8 +46,8 @@ These are normal user flows. They should be implemented in the PWA, with tests, 
 | Top up message budget | `Vault` | `TopUpMessageBudget(amount)` | user wallet | Basic composer integration + transaction builder | Moves internal `ton_balance` into active message budget. Composer can submit deposit+session+topup setup for the exact needed maxCharge when budget is missing. |
 | Publish private message | `Vault` external | `COMPACT_MAGIC` external session publish | session key, broadcast by PWA | External BoC builder + provider hook | PWA builds encrypted capsule cells, signs `get_session_publish_hash`, creates external publish BoC, and broadcasts if provider exposes `sendExternalMessage`. Needs confirmation/polling polish. |
 | Publish public channel post | `Vault` external | same external publish, `publishKind = public` | session key, broadcast by PWA | Basic UI + payload/external BoC builder | Public body is raw PWA bytes, max `1024`, and final CapsuleHub send still comes from Vault. ATH discount applies only after the 15% activity-distribution gate. |
-| Deposit ATH into Vault ledger | user `ATHWallet` | `ATHTransferRequestWithNotify(query_id, amount, recipient = Vault, response_destination = user, notify_destination = Vault, notify_value)` | user wallet to user ATHWallet | Basic UI + transaction builder | PWA derives the user's ATHWallet via `ATHMaster.get_wallet_address(owner)` and sends to that wallet. |
-| Withdraw ATH from Vault ledger | `Vault` | `WithdrawAth(query_id, amount, recipient)` | user wallet | Basic UI + transaction builder | Vault sends from official Vault ATHWallet to recipient ATHWallet. PWA can now read pending withdrawal getter. |
+| Deposit ATH into Vault ledger | user `ATHWallet` | `ATHTransferRequestWithNotify(query_id, amount, recipient = Vault, response_destination = user, notify_destination = Vault, notify_value)` | user wallet to user ATHWallet | Basic UI + transaction builder | PWA derives the user's ATHWallet via `ATHMaster.get_wallet_address(owner)` and sends the notify-flow deposit to that wallet. Manual ordinary ATH transfer to the official Vault ATHWallet is unsupported and must not be presented as a deposit path. |
+| Withdraw ATH from Vault ledger | `Vault` | `WithdrawAth(query_id, amount, recipient)` | user wallet | Basic UI + transaction builder | Vault sends from official Vault ATHWallet to recipient ATHWallet. The attached TON is execution/deploy/ACK value, not user escrow; PWA copy must not promise a complete excess refund. Vault credits only authenticated ACK/fail/bounce value it receives, minus local refund reserve and capped by the original inbound. |
 | Transfer ATH to another owner | user `ATHWallet` | `ATHTransferRequest(query_id, amount, recipient, response_destination)` | user wallet to user ATHWallet | Basic UI + transaction builder | Normal ATH transfer from the user's external ATH wallet. |
 | Burn own ATH | user `ATHWallet` | `ATHBurn(query_id, amount, response_destination)` | user wallet to user ATHWallet | Basic UI + transaction builder | Direct user burn from the user's external ATH wallet. Protocol burns are internal elsewhere. |
 | Mint username | user `ATHWallet` | `ATHTransferRequestMintUsername(query_id, amount, recipient = UsernameRegistry, response_destination = user, notify_value, username_len, username)` | user wallet to user ATHWallet | Basic UI + transaction builder + quote/read provider | PWA quotes price via `UsernameRegistry.get_username_price` first and uses `.ath` names only. |
@@ -82,12 +82,12 @@ These getters are needed for normal UI correctness.
 | ATH pending notification | `ATHWallet` | `get_pending_notification(query_id, sender_key)` | Implemented in provider | Recovery/debug for notify flows. |
 | Username price | `UsernameRegistry` | `get_username_price(name_len)` | Implemented in provider | Quote exact ATH price before mint. |
 | Username record | `UsernameRegistry` | `get_name_record(name_hash)` | Implemented in provider | Resolve `.ath` ownership and item address. |
-| Username item address | `UsernameRegistry` | `get_username_item_address(owner_wallet, name_hash)` | Implemented in provider | Display/verification/debug. |
+| Username item address | `UsernameRegistry` | `get_username_item_address(owner_wallet, name_hash)` | Implemented in provider | Display/verification/debug only; `.ath` ownership is authoritative only when `get_name_record` exists and points to that exact item. |
 | Username pending mint | `UsernameRegistry` | `get_pending_mint(name_hash)` | Implemented in provider | Mint pending UI. |
 | Username refund due | `UsernameRegistry` | `get_refund_due(owner_wallet)` | Implemented in provider | Show/flush refund due. |
 | Username refund flush | `UsernameRegistry` | `get_refund_flush_id`, `get_pending_refund_flush_for` | Implemented in provider | Refund tracking. |
 | Registry global | `UsernameRegistry` | `get_global()` | Implemented in provider | Prices/due/status dashboard. |
-| Username NFT item | `UsernameNFTItem` | `get_state()` | Implemented in provider / optional UI | NFT item identity verification. |
+| Username NFT item | `UsernameNFTItem` | `get_state()` | Implemented in provider / optional UI | Item identity verification only. A deployed item without `UsernameRegistry.name_records[name_hash]` pointing to that exact item is non-authoritative and must not be treated as username ownership. Reader/indexer logic must use `resolveAuthoritativeUsernameItemOwnership` or equivalent registry-record verification before displaying ownership. |
 | Profile avatar current | `ProfileRegistry` | `get_avatar(owner_wallet)` | Implemented in provider + PWA hydrate path | Resolve current wallet avatar pointer: version, hash, first entry id, stream id, part count, media format. |
 | Profile avatar version | `ProfileRegistry` | `get_avatar_version(owner_wallet, version)` | Implemented in provider + PWA hydrate path | Historical avatar pointer for old posts/private headers that carry an older profile version. |
 | Profile registry global | `ProfileRegistry` | `get_global()` | Implemented in provider | Avatar fee due buckets and deployment sanity. |
@@ -106,11 +106,11 @@ These are contract-to-contract callbacks, operator flows, or maintenance paths. 
 | `CapsuleHub` | `PublishPrivateFromVault`, `PublishPublicFromVault` | Internal from Vault only; PWA must not call directly. |
 | `CapsuleHub` | `FlushFees` | Operator/keeper, not user PWA. |
 | `CapsuleHub` | `TopUpStorageReserve` | Maintenance only. |
-| `FeeAccumulator` | `DepositProtocolFee`, `SplitAccumulated`, `EnableBuybackSplit`, `FlushTreasuryDue`, `FlushBuybackDue`, `TopUpStorageReserve` | Protocol/keeper/operator. Not normal PWA. `EnableBuybackSplit` is the one-way 15% distribution / pool-launch gate. |
+| `FeeAccumulator` | `DepositProtocolFee`, `SplitAccumulated`, `EnableBuybackSplit`, `FlushTreasuryDue`, `FlushBuybackDue`, `TopUpStorageReserve` | Protocol/keeper/operator. Not normal PWA. `EnableBuybackSplit` is the one-way 15% distribution / pool-launch gate, executed by the immutable treasury receiver only after release preflight passes. It is not admin/rescue/pause, but it permanently switches FeeAccumulator into 50/50 treasury/buyback mode. |
 | `BuybackBurn` | `Bind*`, `SealBuybackBurnGenesis` | Genesis/operator only. Final genesis seals BuybackBurn before the STON.fi pool exists. |
 | `BuybackBurn` | `FreezeBuybackRoute` | One-time post-pool launch operation after the 15% distribution gate; not normal PWA. |
 | `BuybackBurn` | `AcceptBurnReserve`, `AthTransferNotification`, `ATHBurnFinalized`, `ATHBurnFailed` | Internal callbacks. |
-| `BuybackBurn` | `ExecuteBuybackChunk`, `RetryAthBurnDue`, `RecoverStonfiRouteRefund`, `RecycleRouteRefundReserve` | Keeper/operator. Could be a separate ops panel, not core messenger PWA. |
+| `BuybackBurn` | `ExecuteBuybackChunk`, `RetryAthBurnDue`, `RecoverStonfiRouteRefund`, `RecycleRouteRefundReserve` | Keeper/operator. Could be a separate ops panel, not core messenger PWA. Buyback burn success is `ATHBurnFinalized` received by BuybackBurn from ATHMaster, not an outbound burn request or ATHWallet burn notification; dashboards and indexers must not count the burn before that finalization. |
 | `UsernameRegistry` | `BindOfficialAthWallet`, `SealGenesis` | Genesis/operator only. |
 | `UsernameRegistry` | `AthTransferNotificationMintUsername`, `UsernameItemDeployedAck`, `ATHTransferAck`, `ATHTransferFailed`, `ATHBurnFinalized`, `ATHBurnFailed` | Internal callbacks. |
 | `UsernameRegistry` | `FlushTreasuryAthDue`, `FlushBurnAthDue` | Operator/keeper. |
@@ -192,7 +192,7 @@ Priority order for bringing the PWA into consistency with contracts:
    - `web/vault-ton-rpc-provider.mjs` now supports Vault account/session/key/receive-intent/pending-withdrawal/pricing/global getters and external `sendBoc`.
    - `web/capsulehub-ton-rpc-provider.mjs` now supports private/public entry getters and hub state.
    - `web/ath-ton-rpc-provider.mjs` now supports ATHMaster and ATHWallet getters needed by the PWA.
-   - `web/username-ton-rpc-provider.mjs` now supports UsernameRegistry and UsernameNFTItem getters needed by the PWA.
+   - `web/username-ton-rpc-provider.mjs` now supports UsernameRegistry and UsernameNFTItem getters needed by the PWA, plus `resolveAuthoritativeUsernameItemOwnership` for registry-record-only ownership checks.
    - `web/profile-registry-ton-rpc-provider.mjs` now supports ProfileRegistry avatar/global getters needed by the PWA.
 
 ## Important Product Policy
@@ -205,6 +205,28 @@ For this matrix, missing protections should be fixed in the PWA/tests when:
 - the official PWA can create a stuck state;
 - the official PWA displays a misleading balance/status;
 - the official PWA fails to use a contract capability required by v1.
+
+Vault ATH policy is intentionally narrow:
+
+- the PWA must use the user ATHWallet `ATHTransferRequestWithNotify` flow for Vault ATH deposits;
+- the PWA must not show the official Vault ATHWallet as a direct deposit address;
+- manual ordinary ATH transfer to the official Vault ATHWallet is unsupported and may not credit the Vault internal ledger;
+- `WithdrawAth` attached TON is not user escrow, and PWA wording must not promise a complete excess TON refund.
+
+MarketStabilitySeller reserve policy is also intentionally narrow:
+
+- full seller readiness requires `reserve_due_ath == 60,000,000 ATH`, `reserve_funded_total_ath == 60,000,000 ATH`, and official seller ATH wallet backing of at least `60,000,000 ATH`;
+- partial reserve funding and partial sales are valid runtime states, but they are not full-launch readiness;
+- reserve funding must use the bound reserve funder notify-flow into the official seller ATH wallet;
+- manual ordinary ATH transfer to the official seller ATHWallet is unsupported, is not tracked reserve, does not expand sellable supply, and must not be shown as a PWA deposit/funding path.
+- `market-stability:readiness` is a post-pool seller gate after `mainnet:genesis:verify`, pricing freeze, and reserve funding; it is not a standalone replacement for final genesis verification. Seller readiness is production-valid only after that readiness PASS.
+
+Authority wording policy:
+
+- do not claim that launch authority is absent from every step;
+- do claim that there is no rescue, pause, upgrade, admin drain, or arbitrary balance-control authority;
+- keep narrow one-shot or one-way authorities explicit: treasury owner one-shot ATH supply deploy, genesis controller pre-seal bind/seal, BuybackBurn route freeze, MarketStabilitySeller pricing freeze, and FeeAccumulator treasury receiver buyback split enable;
+- never treat M20T harness evidence, M20F route preflight, or MarketStabilitySeller readiness as a replacement for `mainnet:genesis:verify`.
 
 Contract fixes should be reserved for:
 

@@ -4,6 +4,7 @@ import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
+  resolveAuthoritativeUsernameItemOwnership,
 } from '../web/username-ton-rpc-provider.mjs';
 import { encodeTonAddressSliceBoc } from '../web/vault-ton-rpc-provider.mjs';
 
@@ -136,5 +137,87 @@ describe('Username TON RPC providers', () => {
 
   it('USERNAME-RPC-04: accepts user-friendly addresses in fixtures', () => {
     expect(Address.parse(OWNER).toRawString()).toBe(OWNER);
+  });
+
+  it('USERNAME-RPC-05: item ownership is authoritative only when registry record points to the exact item', async () => {
+    const hash = 0x1234n;
+    const makeItemProvider = (state = {}) => ({
+      async getState() {
+        return {
+          owner_wallet: OWNER,
+          username_registry_address: REGISTRY,
+          name_hash: hash,
+          ...state,
+        };
+      },
+    });
+    const makeRegistryProvider = (record = {}) => ({
+      async getNameRecord(nameHash: bigint) {
+        expect(nameHash).toBe(hash);
+        return {
+          exists: true,
+          owner_wallet: OWNER,
+          item_address: ITEM,
+          registered_at: 1_700_000_000n,
+          ...record,
+        };
+      },
+    });
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider: makeRegistryProvider(),
+      itemProvider: makeItemProvider(),
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: true,
+      reason: 'registry_record',
+      owner_wallet: OWNER,
+      item_address: ITEM,
+      name_hash: hash,
+    });
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider: makeRegistryProvider({ exists: false }),
+      itemProvider: makeItemProvider(),
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: false,
+      reason: 'missing_registry_record',
+    });
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider: makeRegistryProvider({ item_address: `0:${'77'.repeat(32)}` }),
+      itemProvider: makeItemProvider(),
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: false,
+      reason: 'registry_record_mismatch',
+      owner_wallet: null,
+    });
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider: makeRegistryProvider({ owner_wallet: `0:${'88'.repeat(32)}` }),
+      itemProvider: makeItemProvider(),
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: false,
+      reason: 'registry_record_mismatch',
+      owner_wallet: null,
+    });
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider: makeRegistryProvider(),
+      itemProvider: makeItemProvider({ username_registry_address: `0:${'99'.repeat(32)}` }),
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: false,
+      reason: 'item_registry_mismatch',
+      record: null,
+    });
   });
 });

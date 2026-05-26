@@ -3,6 +3,7 @@ const fs = require('fs');
 const paths = {
 ATH_WALLET_CODE_HASH:'build/ATHWallet/ATHWallet_ATHWallet.code.boc',
 ATHMASTER_CODE_HASH:'build/ATHMaster/ATHMaster_ATHMaster.code.boc',
+ATHVESTING_CODE_HASH:'build/ATHVesting/ATHVesting_ATHVesting.code.boc',
 BUYBACKBURN_CODE_HASH:'build/BuybackBurn/BuybackBurn_BuybackBurn.code.boc',
 MARKET_STABILITY_SELLER_CODE_HASH:'build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller.code.boc',
 CAPSULEHUB_CODE_HASH:'build/CapsuleHub/CapsuleHub_CapsuleHub.code.boc',

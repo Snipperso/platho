@@ -9,7 +9,9 @@ Date: 2026-05-17
 - Permissionless `DepositProtocolFee(amount)` principal accounting.
 - Deposit reserve boundary: underfunded principal-plus-exec reserve is rejected.
 - Split accounting: bootstrap mode sends 100% to treasury/liquidity; after one-way buyback enable it uses exact 50/50 integer split with dust to buyback.
-- Buyback split enable is one-way and restricted to the immutable treasury receiver.
+- Buyback split enable is one-way and restricted to the immutable treasury receiver. This is a real one-time authority:
+  it cannot steal funds, pause, rescue, or change addresses, but it permanently changes FeeAccumulator economics from
+  bootstrap treasury-only accumulation to the 50/50 treasury/buyback split.
 - Buyback split enable sweeps any pre-enable `accumulated_ton` into `treasury_due_ton` so unsplit bootstrap fees cannot become buyback due after the gate opens.
 - Split reserve boundary: underfunded split cannot move accumulated principal into due buckets.
 - Treasury flush reserve boundary and immutable terminal receiver routing.
@@ -36,7 +38,7 @@ Date: 2026-05-17
 - `FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 0.002 TON` and `FEEACCUMULATOR_FLUSH_EXEC_RESERVE = 0.003 TON` are local conservative guards and should be remeasured on testnet/mainnet.
 - Treasury receiver is a terminal immutable receiver; treasury flush is intentionally non-bounceable.
 - Production BuybackBurn/STON.fi execution remains blocked until route values and final deployment are pinned.
-- Initial final-genesis evidence must show `FeeAccumulator.buyback_split_enabled = false`; enabling belongs to the 15% activity distribution / pool-launch operations gate.
+- Initial final-genesis evidence must show `FeeAccumulator.buyback_split_enabled = false`; enabling belongs to the 15% activity distribution / pool-launch operations gate and must happen only after the release preflight passes.
 - No independent human audit has reviewed this hardening pass.
 - No formal model checker has proven all reachable states.
 

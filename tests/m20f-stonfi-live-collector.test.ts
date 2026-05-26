@@ -17,8 +17,8 @@ import {
 
 const HEX64 = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
-function addr(label: string, testOnly = false) {
-  return deterministicAddress(`M20F.LIVE.${label}`).toString({ testOnly });
+function addr(label: string, testOnly = false, workchain = 0) {
+  return deterministicAddress(`M20F.LIVE.${label}`, workchain).toString({ testOnly });
 }
 
 function completeInput(overrides: Partial<M20FStonfiLiveCollectorInput> = {}): M20FStonfiLiveCollectorInput {
@@ -194,6 +194,24 @@ describe('M20F STON.fi live collector', () => {
     expect(called).toBe(false);
     expect(report.status).toBe('BLOCKED_INPUT_NOT_READY');
     expect(report.issue_codes).toContain('NON_PROD_ADDRESS_BUYBACKBURNADDRESS');
+  });
+
+  it('rejects parseable masterchain input addresses before simulation or SDK tx generation', async () => {
+    let called = false;
+    const input = completeInput({
+      addresses: { stonfiAthSourceOwnerAddress: addr('masterchainSourceOwner', false, -1) } as any,
+    });
+    const report = await collectM20FStonfiLiveEvidence(input, {
+      capturedAt: () => 'TEST_TIME',
+      simulateSwap: async () => {
+        called = true;
+        return simulationFor(input);
+      },
+    });
+
+    expect(called).toBe(false);
+    expect(report.status).toBe('BLOCKED_INPUT_NOT_READY');
+    expect(report.issue_codes).toContain('NON_BASECHAIN_ADDRESS_STONFIATHSOURCEOWNERADDRESS');
   });
 
   it('builds M19E input from STON.fi simulation and official tx params while preserving BuybackBurn refund/excess receivers', async () => {

@@ -2,6 +2,7 @@ import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/
 import { createHash } from 'crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
+import { ATHVesting } from '../build/ATHVesting/ATHVesting_ATHVesting';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { BuybackBurn } from '../build/BuybackBurn/BuybackBurn_BuybackBurn';
 import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
@@ -36,6 +37,7 @@ export type ImplementedSubsetManifest = {
 
 export type ImplementedSubsetInits = {
   athMaster: Awaited<ReturnType<typeof ATHMaster.init>>;
+  athLongTermVesting: Awaited<ReturnType<typeof ATHVesting.init>>;
   buybackBurn: Awaited<ReturnType<typeof BuybackBurn.init>>;
   marketStabilitySeller: Awaited<ReturnType<typeof MarketStabilitySeller.init>>;
   vault: Awaited<ReturnType<typeof Vault.init>>;
@@ -51,6 +53,7 @@ export type ImplementedSubsetBuild = {
   inits: ImplementedSubsetInits;
   parsed: {
     athMasterAddress: Address;
+    athLongTermVestingAddress: Address;
     buybackBurnAddress: Address;
     marketStabilitySellerAddress: Address;
     vaultAddress: Address;
@@ -59,6 +62,7 @@ export type ImplementedSubsetBuild = {
     usernameRegistryAddress: Address;
     profileRegistryAddress: Address;
     buybackBurnOfficialAthWalletAddress: Address;
+    athLongTermVestingOfficialAthWalletAddress: Address;
     marketStabilitySellerOfficialAthWalletAddress: Address;
     vaultOfficialAthWalletAddress: Address;
     usernameRegistryOfficialAthWalletAddress: Address;
@@ -169,6 +173,8 @@ export function computeManifestCell(args: {
 
 export async function buildImplementedSubsetManifest(): Promise<ImplementedSubsetBuild> {
   const athTreasuryOwner = fixtureAddress('ATH_TREASURY_OWNER');
+  const athLongTermVestingBeneficiary = fixtureAddress('ATH_LONG_TERM_VESTING_BENEFICIARY');
+  const athLongTermVestingStartTime = 1770000000n;
   const tonTreasuryReceiver = fixtureAddress('TON_TREASURY_RECEIVER');
   const treasuryAthReceiver = fixtureAddress('TREASURY_ATH_RECEIVER');
   const profileTreasuryAthReceiver = fixtureAddress('PROFILE_TREASURY_ATH_RECEIVER');
@@ -181,6 +187,9 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
 
   const athMaster = await ATHMaster.init(athTreasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
   const athMasterAddress = contractAddress(0, athMaster);
+
+  const athLongTermVesting = await ATHVesting.init(athMasterAddress, athLongTermVestingBeneficiary, athLongTermVestingStartTime);
+  const athLongTermVestingAddress = contractAddress(0, athLongTermVesting);
 
   const buybackBurn = await BuybackBurn.init(addressHash(genesisController), athMasterAddress);
   const buybackBurnAddress = contractAddress(0, buybackBurn);
@@ -215,11 +224,17 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   const buybackBurnOfficialAthWallet = await ATHWallet.init(0n, buybackBurnAddress, athMasterAddress);
   const buybackBurnOfficialAthWalletAddress = contractAddress(buybackBurnAddress.workChain, buybackBurnOfficialAthWallet);
 
+  const athLongTermVestingOfficialAthWallet = await ATHWallet.init(0n, athLongTermVestingAddress, athMasterAddress);
+  const athLongTermVestingOfficialAthWalletAddress = contractAddress(athLongTermVestingAddress.workChain, athLongTermVestingOfficialAthWallet);
+
   const marketStabilitySellerOfficialAthWallet = await ATHWallet.init(0n, marketStabilitySellerAddress, athMasterAddress);
   const marketStabilitySellerOfficialAthWalletAddress = contractAddress(marketStabilitySellerAddress.workChain, marketStabilitySellerOfficialAthWallet);
 
   const addresses: AddressMap = {
     ath_master: athMasterAddress.toString(),
+    ath_long_term_vesting: athLongTermVestingAddress.toString(),
+    ath_long_term_vesting_beneficiary: athLongTermVestingBeneficiary.toString(),
+    ath_long_term_vesting_official_ath_wallet: athLongTermVestingOfficialAthWalletAddress.toString(),
     ath_treasury_owner: athTreasuryOwner.toString(),
     buyback_burn: buybackBurnAddress.toString(),
     buyback_burn_initial_genesis_controller: genesisController.toString(),
@@ -253,6 +268,7 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
 
   const code_hashes: HashMap = {
     ath_master: codeHash('build/ATHMaster/ATHMaster_ATHMaster.code.boc'),
+    ath_vesting: codeHash('build/ATHVesting/ATHVesting_ATHVesting.code.boc'),
     ath_wallet: codeHash('build/ATHWallet/ATHWallet_ATHWallet.code.boc'),
     buyback_burn: codeHash('build/BuybackBurn/BuybackBurn_BuybackBurn.code.boc'),
     market_stability_seller: codeHash('build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller.code.boc'),
@@ -266,6 +282,8 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
 
   const state_init_hashes: HashMap = {
     ath_master: stateInitHash(athMaster),
+    ath_long_term_vesting_initial: stateInitHash(athLongTermVesting),
+    ath_long_term_vesting_official_ath_wallet: stateInitHash(athLongTermVestingOfficialAthWallet),
     buyback_burn_initial: stateInitHash(buybackBurn),
     buyback_burn_official_ath_wallet: stateInitHash(buybackBurnOfficialAthWallet),
     market_stability_seller_initial: stateInitHash(marketStabilitySeller),
@@ -284,11 +302,14 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
     ath_total_supply_atomic: '100000000000000000',
     ath_activity_airdrop_allocation_percent: '15',
     ath_initial_liquidity_allocation_percent: '15',
-    ath_treasury_operations_allocation_percent: '10',
+    ath_long_term_vesting_allocation_percent: '10',
     ath_market_stability_reserve_allocation_percent: '60',
-    ath_founder_allocation_percent: '0',
     ath_initial_liquidity_allocation_atomic: '15000000000000000',
-    ath_treasury_operations_allocation_atomic: '10000000000000000',
+    ath_long_term_vesting_allocation_atomic: '10000000000000000',
+    ath_long_term_vesting_period_count: '100',
+    ath_long_term_vesting_period_seconds: '31536000',
+    ath_long_term_vesting_period_unlock_amount_atomic: '100000000000000',
+    ath_long_term_vesting_start_time_unix: athLongTermVestingStartTime.toString(),
     ath_market_stability_reserve_allocation_atomic: '60000000000000000',
     ath_market_stability_tranche_count: '20',
     ath_market_stability_tranche_percent: '3',
@@ -310,6 +331,7 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   const blockers_before_final_genesis = [
     'ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT',
     'FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES',
+    'ATH_LONG_TERM_VESTING_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VESTING_ATH_WALLET_BEFORE_FINAL_GENESIS',
     'VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS',
   ];
 
@@ -332,9 +354,10 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
   return {
     manifest,
     manifestCell,
-    inits: { athMaster, buybackBurn, marketStabilitySeller, vault, capsuleHub, feeAccumulator, usernameRegistry, profileRegistry },
+    inits: { athMaster, athLongTermVesting, buybackBurn, marketStabilitySeller, vault, capsuleHub, feeAccumulator, usernameRegistry, profileRegistry },
     parsed: {
       athMasterAddress,
+      athLongTermVestingAddress,
       buybackBurnAddress,
       marketStabilitySellerAddress,
       vaultAddress,
@@ -343,6 +366,7 @@ export async function buildImplementedSubsetManifest(): Promise<ImplementedSubse
       usernameRegistryAddress,
       profileRegistryAddress,
       buybackBurnOfficialAthWalletAddress,
+      athLongTermVestingOfficialAthWalletAddress,
       marketStabilitySellerOfficialAthWalletAddress,
       vaultOfficialAthWalletAddress,
       usernameRegistryOfficialAthWalletAddress,

@@ -422,6 +422,32 @@ describe('Production BuybackBurn candidate', () => {
     expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
   });
 
+  it('BUYBACK-02C: post-seal route freeze rejects non-basechain STON.fi endpoints before freezing', async () => {
+    const env = await setup();
+
+    await bindAndSealWithoutRoute(env);
+
+    const badEndpointOverrides: Array<[keyof FreezeBuybackRoute, Address]> = [
+      ['stonfi_router_address', fixtureAddress('MASTERCHAIN_STONFI_ROUTER', -1)],
+      ['stonfi_pool_address_ton_ath', fixtureAddress('MASTERCHAIN_STONFI_POOL', -1)],
+      ['stonfi_pton_wallet_address', fixtureAddress('MASTERCHAIN_STONFI_PTON_WALLET', -1)],
+      ['stonfi_referral_address', fixtureAddress('MASTERCHAIN_STONFI_REFERRAL', -1)],
+    ];
+
+    for (const [field, address] of badEndpointOverrides) {
+      await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env, {
+        [field]: address,
+      } as Partial<FreezeBuybackRoute>));
+      expect((await env.buyback.getGetBuybackBurnConfig()).route_frozen).toBe(false);
+    }
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+
+    const config = await env.buyback.getGetBuybackBurnConfig();
+    expect(config.route_frozen).toBe(true);
+    expect(config.genesis_config_hash).toBe(0n);
+  });
+
   it('BUYBACK-03: accepts only the exact 51.05 TON envelope from the bound FeeAccumulator after seal', async () => {
     const env = await setup();
 

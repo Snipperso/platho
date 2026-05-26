@@ -27,6 +27,9 @@ Production unlock status: final genesis may seal BuybackBurn with `route_frozen=
 - Full accumulated route refunds can be permissionlessly recycled into exactly one new 51.05 TON reserve envelope.
 - ATH receipt is accepted only from the official BuybackBurn ATH wallet and only from the pinned STON.fi pool owner wallet.
 - ATH burn finalization is accepted only from ATHMaster and only for the pending query/amount/owner.
+- Buyback burn success is recognized only after BuybackBurn receives authenticated `ATHBurnFinalized` from ATHMaster.
+  ATHWallet sending `ATHBurnNotification`, or BuybackBurn sending an outbound burn request, is only a burn attempt and
+  must not be counted as completed burn by release dashboards or indexers.
 - ATH burn failure and bounced burn request move ATH into retry-due accounting; retry requires caller-funded burn execution reserve.
 - Empty fallback rejects all unauthenticated value, and accepts only authenticated STON.fi route refund/excess senders after seal and route freeze.
 - Extended auth-negative matrix covers forged genesis actions, inconsistent manifest reuse, invalid route freeze parameters, malformed reserve intake, malformed execute requests, forged ATH notifications, premature route recovery, underfunded recycle, and malformed burn retry attempts.

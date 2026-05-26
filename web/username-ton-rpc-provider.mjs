@@ -207,6 +207,56 @@ export function decodeUsernameNftItemStateStack(result) {
   };
 }
 
+export async function resolveAuthoritativeUsernameItemOwnership({
+  registryProvider,
+  itemProvider,
+  itemAddress,
+  registryAddress = null,
+  registryCallOptions = {},
+  itemCallOptions = {},
+} = {}) {
+  if (!registryProvider?.getNameRecord) throw new UsernameTonRpcProviderError('UsernameRegistry provider cannot read authoritative name records');
+  if (!itemProvider?.getState) throw new UsernameTonRpcProviderError('UsernameNFTItem provider cannot read item state');
+  if (!itemAddress) throw new UsernameTonRpcProviderError('UsernameNFTItem address is required');
+
+  const parsedItemAddress = parseTonAddress(itemAddress).raw;
+  const itemState = await itemProvider.getState(itemCallOptions);
+  const parsedItemRegistry = parseTonAddress(itemState.username_registry_address).raw;
+  const expectedRegistry = registryAddress ? parseTonAddress(registryAddress).raw : null;
+  if (expectedRegistry && parsedItemRegistry !== expectedRegistry) {
+    return {
+      authoritative: false,
+      reason: 'item_registry_mismatch',
+      item_state: itemState,
+      record: null,
+    };
+  }
+
+  const record = await registryProvider.getNameRecord(itemState.name_hash, registryCallOptions);
+  if (record?.exists !== true) {
+    return {
+      authoritative: false,
+      reason: 'missing_registry_record',
+      item_state: itemState,
+      record,
+    };
+  }
+
+  const recordItemAddress = parseTonAddress(record.item_address).raw;
+  const recordOwnerWallet = parseTonAddress(record.owner_wallet).raw;
+  const itemOwnerWallet = parseTonAddress(itemState.owner_wallet).raw;
+  const authoritative = recordItemAddress === parsedItemAddress && recordOwnerWallet === itemOwnerWallet;
+  return {
+    authoritative,
+    reason: authoritative ? 'registry_record' : 'registry_record_mismatch',
+    owner_wallet: authoritative ? recordOwnerWallet : null,
+    item_address: parsedItemAddress,
+    name_hash: itemState.name_hash,
+    item_state: itemState,
+    record,
+  };
+}
+
 export function createUsernameRegistryTonRpcProvider(options = {}) {
   return {
     kind: options.kind ?? options.transport?.kind ?? 'ton-rpc',

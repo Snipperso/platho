@@ -1,8 +1,8 @@
 {
   "profile": "PLATHO.V1.M16.PRODUCTION_CONFORMANCE_AND_COMPACTNESS_PASS",
-  "baseline": "M50 implemented-subset package",
-  "contract_code_changed": "market-stability-seller-added",
-  "new_functional_surface_added": "MarketStabilitySeller direct reserve sale state machine",
+  "baseline": "M50 implemented-subset package plus ATHVesting candidate",
+  "contract_code_changed": "ath-vesting-added",
+  "new_functional_surface_added": "ATHVesting immutable long-term claim schedule",
   "checks": {
     "forbidden_control_surface_absent": true,
     "empty_fallbacks_reject": true,
@@ -22,6 +22,15 @@
       "storage_top_up_receive": false
     },
     {
+      "contract": "ATHVesting.tact",
+      "non_comment_lines": 228,
+      "receive_handlers": 5,
+      "bounced_handlers": 1,
+      "forbidden_hits": [],
+      "empty_fallback_rejects": true,
+      "storage_top_up_receive": true
+    },
+    {
       "contract": "ATHWallet.tact",
       "non_comment_lines": 898,
       "receive_handlers": 16,
@@ -32,7 +41,7 @@
     },
     {
       "contract": "BuybackBurn.tact",
-      "non_comment_lines": 573,
+      "non_comment_lines": 577,
       "receive_handlers": 14,
       "bounced_handlers": 2,
       "forbidden_hits": [],
@@ -109,14 +118,19 @@
       "pinned": "79336e388a0ef7cbd6120ea08ce75d5fde44ff49c775d9c83ae95bbf4fd3e21d",
       "match": true
     },
+    "ATHVESTING_CODE_HASH": {
+      "built": "26da1246b35693e7f890199022f9ba8b3001ee466beed2392ff24e9ffbd185c4",
+      "pinned": "26da1246b35693e7f890199022f9ba8b3001ee466beed2392ff24e9ffbd185c4",
+      "match": true
+    },
     "ATH_WALLET_CODE_HASH": {
       "built": "78fb6968c802e73ff8ccaded016e45bc4e193c8b86cd75b77d8cc3896f61d83d",
       "pinned": "78fb6968c802e73ff8ccaded016e45bc4e193c8b86cd75b77d8cc3896f61d83d",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "c2225b39dc8472db0ae3121292e1a64cb5fb8c208646d8dc410129eebf8b1b23",
-      "pinned": "c2225b39dc8472db0ae3121292e1a64cb5fb8c208646d8dc410129eebf8b1b23",
+      "built": "8a105e3cdb05317a60c84fcf4b381c39e24631794eea04dc15cc30d9d6396b23",
+      "pinned": "8a105e3cdb05317a60c84fcf4b381c39e24631794eea04dc15cc30d9d6396b23",
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
@@ -159,21 +173,25 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "0c874091663451c7da8f9f47b0a1c39cc21d1a5922e3d5c6ff76ab18fdb3dedb",
+    "manifest_hash_hex": "767a2932fcabfe5ea4c2ef5f1e2e3827bbe83a4a6f84246201b7ca63a638b4a8",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
+      "ATH_LONG_TERM_VESTING_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VESTING_ATH_WALLET_BEFORE_FINAL_GENESIS",
       "VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS"
     ],
     "constants": {
       "ath_total_supply_atomic": "100000000000000000",
       "ath_activity_airdrop_allocation_percent": "15",
       "ath_initial_liquidity_allocation_percent": "15",
-      "ath_treasury_operations_allocation_percent": "10",
+      "ath_long_term_vesting_allocation_percent": "10",
       "ath_market_stability_reserve_allocation_percent": "60",
-      "ath_founder_allocation_percent": "0",
       "ath_initial_liquidity_allocation_atomic": "15000000000000000",
-      "ath_treasury_operations_allocation_atomic": "10000000000000000",
+      "ath_long_term_vesting_allocation_atomic": "10000000000000000",
+      "ath_long_term_vesting_period_count": "100",
+      "ath_long_term_vesting_period_seconds": "31536000",
+      "ath_long_term_vesting_period_unlock_amount_atomic": "100000000000000",
+      "ath_long_term_vesting_start_time_unix": "1770000000",
       "ath_market_stability_reserve_allocation_atomic": "60000000000000000",
       "ath_market_stability_tranche_count": "20",
       "ath_market_stability_tranche_percent": "3",
@@ -194,6 +212,7 @@
   },
   "implemented_contract_files": [
     "ATHMaster.tact",
+    "ATHVesting.tact",
     "ATHWallet.tact",
     "BuybackBurn.tact",
     "CapsuleHub.tact",

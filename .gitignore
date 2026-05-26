@@ -19,10 +19,13 @@ artifacts/m20t_live_testnet_run.local.json
 artifacts/m20t_wallet_private.local.json
 artifacts/platho-web-static-*/
 artifacts/local/
+artifacts/logo.*
+artifacts/platho_njalla_ed25519.pub.txt
 artifacts/platho_external_audit*.zip
 artifacts/platho_external_audit*.zip.sha256
 artifacts/platho_external_audit*.zip.sha256.txt
 artifacts/platho_external_audit*.contents.txt
+artifacts/platho_release_checkpoint*.zip
 artifacts/*_RU_DRAFT.md
 artifacts/cdp-*.mjs
 artifacts/platho-static-*.mjs

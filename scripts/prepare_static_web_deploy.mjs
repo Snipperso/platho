@@ -34,6 +34,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'ton-dns-provider.mjs',
   'capsulehub-ton-rpc-provider.mjs',
   'ath-ton-rpc-provider.mjs',
+  'profile-registry-ton-rpc-provider.mjs',
   'username-ton-rpc-provider.mjs',
   'sw.js',
   'manifest.webmanifest',
@@ -241,7 +242,7 @@ export function createStaticWebDeployReport(input) {
     },
     checks: {
       serviceWorkerIncluded: input.files.some((file) => file.path === 'sw.js'),
-      pwaStartUrlIsStatic: input.webManifest.start_url === './index.html',
+      pwaStartUrlIsStatic: input.webManifest.start_url === './' || input.webManifest.start_url === '/',
       pwaScopeIsStatic: input.webManifest.scope === './',
       envFilesIncluded: input.files.some((file) => /^\.env/.test(file.path)),
       serverRuntimeIncluded: input.files.some((file) => file.path === 'static-server.js'),
