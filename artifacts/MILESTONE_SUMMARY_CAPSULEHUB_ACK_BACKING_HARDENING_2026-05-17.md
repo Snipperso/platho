@@ -10,7 +10,7 @@ Fixed:
 
 - accepted Vault publishes no longer return the whole remaining inbound value with ACK;
 - CapsuleHub now retains backing for `accrued_plato_fee_ton`, execution/storage reserves, keepalive, entry storage, and charged page storage;
-- ACK value is limited to `CAPSULEHUB_ACK_FORWARD_RESERVE` plus true excess above required CapsuleHub backing;
+- ACK value is limited to `CAPSULEHUB_ACK_FORWARD_RESERVE = 30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance, while later final v1 PWA surcharge above canonical required value is retained by CapsuleHub as network/storage reserve overage;
 - `CAPSULEHUB_ACK_FORWARD_RESERVE` increased from `0.001 TON` to `0.030 TON` in both `CapsuleHub` and `Vault`, because the lower reserve could leave Vault unable to process a successful publish ACK.
 
 ## Updated Tests

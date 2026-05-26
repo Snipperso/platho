@@ -12,7 +12,11 @@ Superseded note 2026-05-22: final v1 dynamic PWA pricing re-opened `context.valu
 
 Direct CapsuleHub publish paths accepted any value greater than or equal to the computed required amount. Before final v1 removed the page-storage charge, this could happen by attaching a boundary-page value after another entry had already created the page. The publish succeeded and the excess TON remained as unaccounted CapsuleHub balance.
 
-Vault-mediated publish was not changed in this pass. That path intentionally accepts a caller envelope and returns ACK/excess value to Vault.
+Vault-mediated publish was not changed in this pass. Later final v1 Vault-balance publish still allows the PWA to sign
+`maxCharge > canonical_max_charge` as a network-fee surcharge. CapsuleHub success ACK returns only the fixed publish ACK
+reserve of `30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly
+`28,000,000` nanotons in internal Vault TON balance. Surcharge above the canonical required value is retained in
+CapsuleHub as network/storage reserve overage, not returned to Vault and not counted as `accrued_plato_fee_ton`.
 
 ## Code Change
 
@@ -23,7 +27,8 @@ PublishPrivateDirect: context.value == required
 PublishPublicDirect:  context.value == required
 ```
 
-The change is intentionally narrow: direct users no longer silently donate overpayment, while Vault publish still keeps its ACK/excess accounting model.
+The change is intentionally narrow: direct users no longer silently donate overpayment, while Vault publish uses the
+final fixed-ACK model described in the superseding v1 docs.
 
 ## Regression Coverage
 

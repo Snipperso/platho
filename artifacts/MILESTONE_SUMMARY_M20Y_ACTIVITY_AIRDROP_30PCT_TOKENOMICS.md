@@ -11,7 +11,7 @@ M20Y updates the ATH distribution and Vault activity airdrop allocation:
 - reward remains `10 ATH` per successfully finalized paid publish;
 - maximum rewarded publishes: `1,500,000`;
 - no per-wallet cap;
-- final allocation: `15%` activity airdrop, `15%` initial liquidity, `10%` treasury / operations, `60%` market stability reserve, `0%` founder allocation;
+- final allocation: `15%` activity airdrop, `15%` initial liquidity, `10%` long-term protocol vesting, `60%` market stability reserve;
 - market stability reserve: `60,000,000 ATH` split into twenty `3,000,000 ATH` tranches at x2..x21 from the initial pool price;
 - official ATH pool launch target: after approximately `15,000,000 ATH` has been distributed through Vault activity rewards.
 
@@ -45,9 +45,8 @@ Updated manifest constant:
 ```text
 vault_activity_airdrop_total_atomic = 15000000000000000
 ath_initial_liquidity_allocation_atomic = 15000000000000000
-ath_treasury_operations_allocation_atomic = 10000000000000000
+ath_long_term_vesting_allocation_atomic = 10000000000000000
 ath_market_stability_reserve_allocation_atomic = 60000000000000000
-ath_founder_allocation_percent = 0
 ```
 
 Unchanged manifest constants:
@@ -65,7 +64,7 @@ vault_activity_airdrop_per_wallet_cap_atomic = 0
 
 ## Final tokenomics note
 
-M49 supersedes the earlier M20Y founder/ecosystem/strategic reserve split. There is no founder allocation in the fixed allocation table. Founder/team upside from ATH treasury flow is tied to market-stability tranche execution after price milestones, not a direct token grant.
+M49 supersedes the earlier M20Y ecosystem/strategic reserve draft and fixes the allocation table around activity, liquidity, long-term protocol vesting, and market stability.
 
 The market stability reserve is an allocation policy only in this milestone. M50 later adds the separate immutable seller contract; final reserve use still requires seller audit evidence, frozen pricing evidence, and official seller ATH wallet funding proof.
 

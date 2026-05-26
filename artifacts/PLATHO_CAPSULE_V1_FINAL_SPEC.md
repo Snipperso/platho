@@ -142,6 +142,11 @@ All public and private publishes go through Vault. For Vault session publishes, 
 ask for a wallet-confirmed Vault publish transaction for the single capsule, but the CapsuleHub call is still
 Vault -> CapsuleHub. CapsuleHub has no direct user publish ABI in final v1.
 
+The surcharge is intentionally one-way once CapsuleHub accepts the publish. CapsuleHub success ACK returns only the fixed
+publish ACK reserve of `30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly
+`28,000,000` nanotons in internal Vault TON balance. The signed amount above the canonical required value is retained in
+CapsuleHub as network/storage reserve overage. It is not `accrued_plato_fee_ton` and not a Vault refund.
+
 `protocol_fee_paid` exists only on Vault -> CapsuleHub publish messages, because Vault is the contract that knows the
 sender's ATH discount state. This keeps public channels and private messages on the same discount path. The discount
 path is locked until Vault activity rewards have distributed 15,000,000 ATH; before that gate, Vault pays the full

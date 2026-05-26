@@ -8,6 +8,7 @@ const M18_PROFILE = 'PLATHO.V1.M18.ARTIFACT_INTEGRITY_AND_REPRODUCIBILITY_LOCK';
 
 const codeHashChecks: Array<{ key: string; buildDir: string; artifactName: string; artifactFile: string; manifestKey?: string }> = [
   { key: 'ATHMASTER_CODE_HASH', buildDir: 'ATHMaster', artifactName: 'ATHMaster_ATHMaster', artifactFile: 'ATHMASTER_CODE_HASH.txt', manifestKey: 'ath_master' },
+  { key: 'ATHVESTING_CODE_HASH', buildDir: 'ATHVesting', artifactName: 'ATHVesting_ATHVesting', artifactFile: 'ATHVESTING_CODE_HASH.txt', manifestKey: 'ath_vesting' },
   { key: 'ATH_WALLET_CODE_HASH', buildDir: 'ATHWallet', artifactName: 'ATHWallet_ATHWallet', artifactFile: 'ATH_WALLET_CODE_HASH.txt', manifestKey: 'ath_wallet' },
   { key: 'BUYBACKBURN_CODE_HASH', buildDir: 'BuybackBurn', artifactName: 'BuybackBurn_BuybackBurn', artifactFile: 'BUYBACKBURN_CODE_HASH.txt', manifestKey: 'buyback_burn' },
   { key: 'MARKET_STABILITY_SELLER_CODE_HASH', buildDir: 'MarketStabilitySeller', artifactName: 'MarketStabilitySeller_MarketStabilitySeller', artifactFile: 'MARKET_STABILITY_SELLER_CODE_HASH.txt', manifestKey: 'market_stability_seller' },
@@ -24,6 +25,7 @@ const codeHashChecks: Array<{ key: string; buildDir: string; artifactName: strin
 const stableArtifacts = [
   'artifacts/CURRENT_CODE_HASHES.txt',
   'artifacts/ATHMASTER_CODE_HASH.txt',
+  'artifacts/ATHVESTING_CODE_HASH.txt',
   'artifacts/ATH_WALLET_CODE_HASH.txt',
   'artifacts/BUYBACKBURN_CODE_HASH.txt',
   'artifacts/MARKET_STABILITY_SELLER_CODE_HASH.txt',

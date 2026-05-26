@@ -6,9 +6,10 @@
     <meta name="theme-color" content="#0b0d0f">
     <meta name="color-scheme" content="dark">
     <title>Platho</title>
-    <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="icon" href="./assets/platho-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="./styles.css?v=56">
+    <link rel="manifest" href="./manifest.webmanifest?v=3">
+    <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
+    <link rel="stylesheet" href="./styles.css?v=86">
     <script type="importmap">
       {
         "imports": {
@@ -24,7 +25,7 @@
     <div class="app-shell" data-view="chats">
       <aside class="sidebar" aria-label="Navigation">
         <div class="brand">
-          <img class="brand-mark" src="./assets/platho-icon.svg" alt="" width="32" height="32">
+          <img class="brand-mark" src="./assets/platho-icon-192.png?v=3" alt="" width="34" height="34">
           <div>
             <div class="brand-name">Platho</div>
             <div class="network-pill">
@@ -62,8 +63,8 @@
               <p id="chatCountLabel">Private chats</p>
             </div>
             <div class="header-actions">
-              <button class="icon-button" type="button" aria-label="Search" title="Search">
-                <span class="icon icon-search"></span>
+              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
+                <span class="icon icon-install"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -87,14 +88,17 @@
             <button class="icon-button chat-back-button" id="backToChatsButton" type="button" aria-label="Back to private" title="Back to private">
               <span class="icon icon-back"></span>
             </button>
-            <div class="avatar" id="activeAvatar" aria-hidden="true">A</div>
+            <div class="avatar" id="activeAvatar" aria-hidden="true">P</div>
             <div class="conversation-title">
-              <h2 id="activeTitle">Ari</h2>
-              <p id="activeSubtitle">sealed 2 min ago</p>
+              <h2 id="activeTitle">No private chat</h2>
+              <p id="activeSubtitle">Create or choose a chat</p>
             </div>
             <div class="header-actions">
               <button class="icon-button" id="identityMenuButton" type="button" aria-label="Choose display name" title="Choose display name" aria-haspopup="menu" aria-expanded="false">
                 <span class="icon icon-chevron-down"></span>
+              </button>
+              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
+                <span class="icon icon-install"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -105,15 +109,15 @@
           <div class="message-strip" id="messageStrip" aria-live="polite"></div>
 
           <form class="composer" id="composer">
-            <button class="icon-button payment-check-button" id="paymentCheckButton" type="button" aria-label="Payment check" title="Payment check">
+            <button class="icon-button payment-check-button" id="paymentCheckButton" type="button" aria-label="Create private payment check" title="Create private payment check">
               <span class="icon icon-vault"></span>
             </button>
             <button class="icon-button attachment-button" id="privateImageButton" type="button" aria-label="Attach image" title="Attach image">
-              <span class="icon icon-plus"></span>
+              <span class="icon icon-image"></span>
             </button>
             <input id="privateImageInput" type="file" accept="image/*" hidden>
             <label class="sr-only" for="messageInput">Message</label>
-            <textarea id="messageInput" placeholder="Message (1024 bytes max)" maxlength="1024" rows="1" autocomplete="off"></textarea>
+            <textarea id="messageInput" placeholder="Wallet required" rows="1" autocomplete="off"></textarea>
             <button class="send-button" type="submit" aria-label="Send" title="Send">
               <span class="icon icon-bolt"></span>
             </button>
@@ -143,6 +147,9 @@ Wallet required</div>
                 <button id="publicFeedModeButton" type="button" data-public-mode="feed" aria-pressed="true">Feed</button>
                 <button id="publicChannelsModeButton" type="button" data-public-mode="channels" aria-pressed="false">Channels</button>
               </div>
+              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
+                <span class="icon icon-install"></span>
+              </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
               </button>
@@ -156,34 +163,34 @@ Wallet required</div>
             </button>
           </div>
           <div class="public-feed" id="publicFeed"></div>
+          <section class="public-channel-detail" id="publicChannelDetail" aria-label="Selected public channel" hidden></section>
           <button class="public-jump-down-button" id="publicJumpDownButton" type="button" aria-label="Jump to newest public posts" title="Jump to newest public posts" hidden>
             <span class="icon icon-down"></span>
             <span>Down</span>
           </button>
           <form class="composer public-composer" id="publicComposer">
+            <label class="composer-post-option" id="publicPostCommentsToggle" aria-label="Allow comments" title="Allow comments">
+              <input id="publicComposerCommentsCheckbox" type="checkbox" checked>
+              <span class="icon icon-chat" aria-hidden="true"></span>
+              <span class="sr-only">Allow comments</span>
+            </label>
+            <button class="icon-button attachment-button" id="publicImageButton" type="button" aria-label="Attach image" title="Attach image">
+              <span class="icon icon-image"></span>
+            </button>
+            <input id="publicImageInput" type="file" accept="image/*" hidden>
             <div class="composer-stack">
               <label class="sr-only" for="publicMessageInput">Public message</label>
-              <textarea id="publicMessageInput" placeholder="Post to public" maxlength="1024" rows="1" autocomplete="off"></textarea>
-              <div class="composer-attachment-controls">
-                <button class="icon-button attachment-button" id="publicImageButton" type="button" aria-label="Attach image" title="Attach image">
-                  <span class="icon icon-plus"></span>
-                </button>
-                <input id="publicImageInput" type="file" accept="image/*" hidden>
+              <textarea id="publicMessageInput" placeholder="Wallet required" rows="1" autocomplete="off"></textarea>
+              <div class="composer-attachment" id="publicAttachmentPanel" hidden>
+                <span id="publicAttachmentLabel">No image</span>
                 <select id="publicImageModeSelect" aria-label="Image compression">
                   <option value="low">Low 8 KiB</option>
                   <option value="medium">Medium 16 KiB</option>
                   <option value="good" selected>Good 32 KiB</option>
                   <option value="maximum">Maximum 64 KiB</option>
                 </select>
-              </div>
-              <div class="composer-attachment" id="publicAttachmentPanel" hidden>
-                <span id="publicAttachmentLabel">No image</span>
                 <button id="publicClearImageButton" type="button">Remove</button>
               </div>
-              <label class="composer-post-option" id="publicPostCommentsToggle">
-                <input id="publicComposerCommentsCheckbox" type="checkbox" checked>
-                <span>Allow comments</span>
-              </label>
               <div class="composer-context" id="publicCommentContext" hidden>
                 <span id="publicCommentContextText">Commenting</span>
                 <button type="button" id="publicCancelCommentButton">Cancel</button>
@@ -206,6 +213,9 @@ Wallet required</div>
             <div class="header-actions">
               <button class="icon-button" id="refreshVaultButton" type="button" aria-label="Refresh" title="Refresh">
                 <span class="icon icon-refresh"></span>
+              </button>
+              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
+                <span class="icon icon-install"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -292,6 +302,9 @@ Wallet required</div>
               <p id="profileHandle">Profile</p>
             </div>
             <div class="header-actions">
+              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
+                <span class="icon icon-install"></span>
+              </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
               </button>
@@ -442,7 +455,27 @@ Wallet required</div>
           </div>
         </section>
       </div>
+
+      <div class="modal-backdrop" id="installDialog" hidden>
+        <section class="install-dialog" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+          <header>
+            <div>
+              <h2 id="installTitle">Install Platho</h2>
+              <p>Use it as an app, outside stores and platform gates.</p>
+            </div>
+            <button class="icon-button" id="installCloseButton" type="button" aria-label="Close install prompt" title="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </header>
+          <p>Platho is a static PWA. After installation, the app shell, docs, and local encrypted history are cached on this device. Network access is still required for contract reads, public feed updates, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.</p>
+          <p class="install-help" id="installHelp">If your browser does not show the install sheet, use the browser menu and choose Install app or Add to Home screen.</p>
+          <div class="install-dialog-actions">
+            <button class="recipient-submit" id="installConfirmButton" type="button">Install</button>
+            <button class="secondary-button" id="installDismissButton" type="button">Not now</button>
+          </div>
+        </section>
+      </div>
     </div>
-    <script src="./app.js?v=69" type="module"></script>
+    <script src="./app.js?v=89" type="module"></script>
   </body>
 </html>

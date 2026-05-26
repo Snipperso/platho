@@ -67,8 +67,9 @@ Every publish goes through Vault as a Vault-balance funded signed external messa
 Vault TON balance, then the PWA signs a publish request with the active `current_sign_pubkey`; a relayer can submit the
 external message without holding the wallet key. The signed payload is domain-separated with `VPB1`,
 `deployment_manifest_hash`, the target Vault address, and the publish kind before owner, nonce, max charge, and payload.
-ACK/bounce refunds return to the user's internal Vault TON balance. If the Vault balance or chain access is not available,
-the PWA stays in preview-only single-capsule mode and must not expose publish actions.
+The TON value that CapsuleHub actually sends back in an ACK or bounce is credited to the user's internal Vault TON
+balance, capped by the tracked pending publish refund amount. If the Vault balance or chain access is not available, the
+PWA stays in preview-only single-capsule mode and must not expose publish actions.
 
 Because `current_sign_pubkey` authorizes Vault-balance publish spending, compromising the local messaging signing key is
 also a publish-spending compromise for that user's internal Vault TON balance. Key replacement revokes the old signing key
@@ -80,6 +81,20 @@ adds `ceil((estimate - 0.005 TON) / 0.001 TON) * 0.001 TON` as a surcharge. Cont
 canonical required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct
 user publish ABI in final v1; every publish is Vault -> CapsuleHub. ATH discounts apply only after the Vault activity
 airdrop has distributed 15,000,000 ATH; before that gate, message protocol fees use the full fee.
+
+The surcharge is a signed network/storage safety margin, not a refundable fee bucket. CapsuleHub accepts Vault publishes
+when the attached value is at least the canonical required value, but a successful publish ACK returns only the fixed
+publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly
+`28,000,000` nanotons in internal Vault TON balance. Any signed surcharge above the canonical required value remains in
+CapsuleHub as network/storage reserve overage; it is not returned to Vault and is not counted as
+`accrued_plato_fee_ton`.
+
+Vault ATH balance is credited through explicit notify-flow accounting, not by scanning the raw official wallet balance.
+The supported deposit path is the user's ATHWallet `ATHTransferRequestWithNotify` into Vault. Manual ordinary ATH
+transfer to the official Vault ATHWallet is unsupported and must not be displayed as a deposit address or treated as a
+Vault ledger credit. `WithdrawAth` is also not TON escrow: its attached TON funds downstream ATHWallet deploy/transfer,
+storage, and ACK execution, and Vault credits back only authenticated ACK/fail/bounce value it receives, minus local
+refund reserve and capped by the original inbound value.
 
 Public posts and comments are a separate open profile, not private capsules without encryption. They store a compact
 `PPH1` public header cell plus a raw public body cell. Public body text is `1..1024` UTF-8 bytes for both posts and
@@ -266,6 +281,12 @@ The compact body is bound to `header0Hash` and `header1Hash` through AES-GCM AAD
 Accepted v1 private messages are the encrypted payload cells stored by `CapsuleHub`. The production PWA does not expose manual public-bundle or encrypted-capsule JSON package exchange.
 
 Public messaging keys are registered in `Vault` key records. A sender must resolve and verify the recipient key record before encrypting a private capsule. Local encrypted history is a device cache only; it does not define delivery.
+
+`.ath` username ownership is defined by `UsernameRegistry.get_name_record`. `UsernameNFTItem` state is only supporting
+evidence after the registry has accepted the item ACK. If a pending mint is pruned after a missing item ACK, a deployed
+orphan item is not ownership unless `UsernameRegistry.name_records[name_hash]` exists and points to that exact item.
+Clients and indexers must ignore item-only ownership claims. Reader code must resolve item authority by checking the
+registry record first; item state from `get_state()` is never an ownership source by itself.
 
 The embedded Platho wallet seed is the single user secret. The PWA deterministically derives the TON wallet key and the messaging encryption/signing keys from that seed. The profile export/import flow therefore handles only the wallet seed; there is no separate messaging-key backup.
 

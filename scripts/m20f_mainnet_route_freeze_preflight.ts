@@ -123,6 +123,14 @@ function isParseableTonAddress(value: string): boolean {
   }
 }
 
+export function isBasechainTonAddress(value: string): boolean {
+  try {
+    return Address.parse(value).workChain === 0;
+  } catch {
+    return false;
+  }
+}
+
 function isDecimalString(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9]+$/.test(value);
 }
@@ -205,6 +213,9 @@ function collectInputFindings(input: M20FMainnetRouteFreezeInput | null) {
     }
     if (isTestnetFriendlyAddress(value) || hasNonProdMarker(value)) {
       rejectedNonProdInputs.push(key);
+    }
+    if (!isBasechainTonAddress(value)) {
+      rejectedNonProdInputs.push(`${key}.workchain`);
     }
   }
 

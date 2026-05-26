@@ -62,17 +62,39 @@ ATH supply is allocated across four categories:
 | --- | ---: | ---: |
 | Activity airdrop | 15% | 15,000,000 ATH |
 | Initial liquidity | 15% | 15,000,000 ATH |
-| Treasury / operations | 10% | 10,000,000 ATH |
+| Long-term protocol vesting | 10% | 10,000,000 ATH |
 | Market stability reserve | 60% | 60,000,000 ATH |
 
 This allocation defines the economic structure of Platho:
 
 - 15% of supply is distributed to users through application activity before the pool launch.
 - 15% of supply is used for initial liquidity.
-- 10% of supply remains as an operations treasury reserve.
+- 10% of supply is locked in immutable long-term vesting.
 - 60% of supply is placed in MarketStabilitySeller and sold in tranches above the launch price.
 
-The activity airdrop and market stability reserve are backed by real ATH wallet balances of the corresponding contracts. The release verifier checks these balances before final launch.
+The activity airdrop, long-term vesting reserve, and market stability reserve are backed by real ATH wallet balances of the corresponding contracts. The release verifier checks these balances before final launch.
+
+## Long-Term Protocol Vesting
+
+The long-term vesting reserve is:
+
+```text
+10,000,000 ATH
+```
+
+It is held by `ATHVesting`, not by a mutable treasury bucket. The vesting schedule is fixed in the contract:
+
+```text
+100,000 ATH per 365-day period
+100 periods
+10,000,000 ATH total
+```
+
+Anyone may trigger a claim once ATH is vested, but the beneficiary is immutable. The contract has no acceleration, beneficiary change, pause, admin sweep, rescue drain, or discretionary release function.
+
+At final genesis, the official `ATHWallet(owner = ATHVesting, master = ATHMaster)` must contain exactly `10,000,000 ATH`. The verifier also requires zero claimed ATH, idle phase, and no pending transfer before launch.
+
+This reserve is intentionally slow. It creates a long horizon for protocol development without placing a liquid 10M ATH bucket above the market at launch.
 
 ## Activity Airdrop
 
@@ -102,6 +124,16 @@ airdrop_remaining -= 10 ATH
 If the remaining airdrop bucket is below 10 ATH, the remaining amount is credited. Once the bucket is exhausted, new activity rewards stop.
 
 The activity airdrop is accounted for in Vault and backed by the pre-funded official Vault ATH wallet.
+
+Vault ATH deposits are supported only through the user's ATHWallet transfer-with-notify flow
+(`ATHTransferRequestWithNotify`) into Vault. A manual ordinary ATH transfer to the official Vault ATHWallet is
+unsupported: it can increase the raw official wallet balance, but it does not create `Vault.user.ath_balance` and must
+not be shown by the PWA as a deposit path.
+
+Vault ATH withdrawals are not TON escrow. `WithdrawAth` uses caller-provided TON for downstream ATHWallet deployment,
+transfer, storage, and ACK execution. Vault credits back only authenticated ACK/fail/bounce value it receives, minus the
+local refund reserve and capped by the original inbound value. Product copy must not promise a complete excess TON
+refund.
 
 ## Activity Price
 
@@ -158,11 +190,11 @@ The user-facing price includes protocol fee plus estimated network cost:
 | Standard private / public | 0.010 TON |
 | Long-term / hybrid private | 0.020 TON |
 
-If the PWA receives a higher conservative network estimate, it adds a surcharge to the canonical max charge. ATH discounts apply to protocol fee, not to network costs or storage reserves.
+If the PWA receives a higher conservative network estimate, it adds a surcharge to the canonical max charge. ATH discounts apply to protocol fee, not to network costs or storage reserves. This surcharge is a signed safety margin: if CapsuleHub accepts the publish, the success ACK returns only the fixed publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance. The part above the canonical required value remains in CapsuleHub as network/storage reserve overage. It is not returned to Vault and is not counted as protocol fee revenue.
 
 ## ATH Discounts
 
-ATH reduces message protocol fees after the first half of the activity airdrop has been distributed.
+ATH reduces message protocol fees after the activity airdrop has been fully distributed.
 
 Discounts unlock when remaining activity airdrop is not greater than:
 
@@ -195,7 +227,7 @@ The ATH/TON pool launches after the first `15,000,000 ATH` have been distributed
 The launch sequence is:
 
 1. Users receive ATH through real Platho usage.
-2. The first half of the activity airdrop is distributed.
+2. The full activity airdrop is distributed.
 3. ATH discounts unlock.
 4. The ATH/TON pool launches.
 5. Post-pool route evidence and pricing evidence are frozen.
@@ -247,7 +279,16 @@ treasury_amount = floor(amount * 50%)
 buyback_amount = amount - treasury_amount
 ```
 
-`EnableBuybackSplit` is a one-way action executed by the immutable treasury receiver after pool launch and buyback route freeze.
+`EnableBuybackSplit` is a one-way action executed by the immutable treasury receiver after pool launch and buyback route
+freeze. This is a real one-time authority: it cannot steal funds, pause, rescue, or change addresses, but it permanently
+changes FeeAccumulator economics from bootstrap treasury-only accumulation to the 50/50 treasury/buyback split. It is
+enabled only after the release preflight passes.
+
+Platho's release authorities are deliberately narrow and mostly one-shot. They still exist and must be named honestly:
+the treasury owner deploys the initial ATH supply once; the genesis controller performs pre-seal binding and sealing;
+the BuybackBurn launch controller freezes the post-pool route once; the MarketStabilitySeller pricing freeze is performed
+once by its launch controller; and the FeeAccumulator treasury receiver enables the one-way buyback split after preflight. None of these
+roles is a rescue, pause, upgrade, admin drain, or arbitrary balance-control mechanism.
 
 ## Buyback and Burn
 
@@ -282,7 +323,10 @@ After route freeze, BuybackBurn executes a buyback as follows:
 9. Sends the received ATH to burn through the official ATH wallet.
 10. Completes the cycle only after `ATHBurnFinalized` from `ATHMaster`.
 
-Buyback success is not defined by a router message. It is defined by actual ATH receipt in the official ATH wallet and burn finalization in ATHMaster.
+Buyback success is not defined by a router message, outbound burn request, or ATHWallet burn notification. It is defined
+only when BuybackBurn receives authenticated `ATHBurnFinalized` from ATHMaster. Until that finalization arrives,
+BuybackBurn must still be treated as pending burn or retry state; dashboards and indexers must not count the ATH as
+burned merely because a burn attempt was sent.
 
 If burn does not finalize, the received ATH moves into retry due. `RetryAthBurnDue` burns the full retry due amount.
 
@@ -310,6 +354,11 @@ An accepted mint goes through pending state and deploys `UsernameNFTItem`. Befor
 A rejected mint creates refund due. This applies to invalid usernames, wrong price, duplicate name, item deploy bounce, and stale pending mint prune.
 
 ATH from username mint becomes protocol revenue only after deployment of the corresponding item is confirmed.
+
+Username ownership is defined only by the `UsernameRegistry` name record. If item deployment was attempted but the item
+ACK never reached the registry, `PrunePendingUsernameMint` can return the paid ATH into refund due after the stale-pending
+window. A deployed `UsernameNFTItem` without `UsernameRegistry.name_records[name_hash]` pointing to that exact item is
+non-authoritative: clients, indexers, and UI must not treat the item alone as ownership of the `.ath` name.
 
 ## Profile Avatar Fees
 
@@ -342,19 +391,40 @@ A rejected avatar notification is refunded through the ATHWallet notification bo
 
 ## Market Stability Seller
 
-MarketStabilitySeller manages a separate reserve:
+MarketStabilitySeller is a public contract reserve that distributes ATH after the official pool launch:
 
 ```text
 60,000,000 ATH
 ```
 
-This reserve exists to expand circulating ATH supply in a controlled way after pool launch. Its purpose is to distribute the token more broadly as demand grows while protecting the application economy during the early market phase.
+Its purpose is to reduce the early-market distortion caused by thin liquidity. At launch, a small pool can be moved sharply by a small group of early buyers. If that happens, users who need ATH for actual Platho actions can be forced to buy into an artificial price spike.
 
-ATH remains a utility token for Platho. It is used for discounts, names, profiles, and other application actions. If a small early community meets a rapidly rising market price, ATH becomes too expensive for its intended use. In that situation the token price rises on paper, but the application economy becomes worse: new users enter with more friction, paid features become heavier, and utility loses to speculation.
+MarketStabilitySeller creates a transparent supply staircase above the launch price. It sells ATH in fixed-size tranches. Each next tranche is more expensive than the previous one, and each tranche has a hard size limit. The price is not changed manually and does not depend on discretionary team decisions.
 
-MarketStabilitySeller addresses this through a limited sale staircase. It does not fix the price forever and does not prevent market growth. It adds supply as demand appears, but does it step by step: each next part of the reserve is sold at a higher price.
+If early speculators try to absorb a large amount of ATH, they buy from the public reserve at increasing tranche prices instead of extracting all cheap liquidity from a thin pool and reselling it to users. If ordinary users need ATH for Platho, they can buy it at a known public tranche price without pushing a small pool vertically with a single demand wave.
 
-The reserve is sold after post-pool pricing freeze.
+The reserve does not dump tokens into the market. It does not sell by itself and does not create sell pressure without demand. A sale happens only when a buyer voluntarily purchases from the current tranche. If there is no demand, the reserve remains idle.
+
+The on-chain utility of ATH is specific:
+
+- `.ath` username registration is paid in ATH through UsernameRegistry;
+- profile avatar pointer updates are paid in ATH through ProfileRegistry;
+- ATH held in the user's internal Vault balance reduces the protocol fee for Vault publishes after the activity-distribution gate;
+- accepted username and avatar fees create treasury due and burn due;
+- BuybackBurn buys ATH with protocol TON fees and burns the received ATH through ATHMaster.
+
+Vault publishes are paid in TON. ATH does not pay the whole publish transaction. It reduces the protocol-fee component after the discount gate is open.
+
+This makes ATH demand tied to concrete protocol actions: `.ath` names, avatar updates, Vault fee discounts, and buyback/burn pressure. MarketStabilitySeller expands available supply only as buyers take the next tranche, so early access is public and deterministic instead of being dominated by a thin pool.
+
+The reserve is sold only after post-pool pricing freeze.
+
+Pricing freeze is a real one-time launch authority. It sets the base tranche price once from pool-launch evidence, then the launch controller hash is cleared. After that, MarketStabilitySeller cannot steal funds, pause sales, rescue balances, override buyers, or mutate the price schedule.
+
+MarketStabilitySeller readiness is a post-pool gate, not a replacement for final genesis verification. The production
+sequence is: `mainnet:genesis:verify` passes on the clean final snapshot, pricing is frozen after pool launch, the bound
+reserve funder funds the seller through notify-flow, then `market-stability:readiness` checks seller state, funding, price
+evidence, and wallet backing. Seller readiness is production-valid only after that readiness pass.
 
 Funding is accepted only:
 
@@ -363,6 +433,8 @@ Funding is accepted only:
 - through the official seller ATH wallet;
 - from the bound reserve funder;
 - up to the total cap of `60,000,000 ATH`.
+
+Only authenticated reserve funding increases sellable reserve accounting. Runtime allows partial reserve funding and partial sale, but launch readiness requires the full reserve: `reserve_due_ath == 60,000,000 ATH`, `reserve_funded_total_ath == 60,000,000 ATH`, and official wallet backing of at least `60,000,000 ATH`. An unsolicited ordinary ATH transfer into the official seller ATH wallet does not increase `reserve_due_ath` or `reserve_funded_total_ath`, does not expand sellable supply, and can remain stuck. Readiness treats official wallet balance above `60,000,000 ATH` as a warning, not as additional reserve.
 
 The reserve is split into 20 tranches:
 
@@ -408,7 +480,7 @@ A single purchase cannot cross a tranche boundary. This prevents buying ATH from
 
 TON revenue is recognized only after ATH is delivered to the buyer. If ATH transfer fails or bounces, the reserve is restored, the buyer receives the paid TON principal back, and treasury due does not increase.
 
-After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, demand, application usage, buyback pressure, and available supply.
+After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, available supply, demand for `.ath` names, avatar updates, Vault fee discounts, and buyback/burn pressure.
 
 Even at the x21 step, reference valuation remains moderate relative to the utility model:
 
@@ -417,7 +489,7 @@ Even at the x21 step, reference valuation remains moderate relative to the utili
 100,000,000 ATH = 2,100,000 TON
 ```
 
-This is 21 times above launch valuation, while still leaving room for further growth without hidden internal reserves or additional minting. After x21, the protocol holds no separate reserve that can enter the market above users.
+This is 21 times above launch valuation, while still leaving room for further growth without hidden internal reserves or additional minting. After x21, MarketStabilitySeller no longer releases reserve ATH. The only remaining protocol allocation is the slow long-term vesting schedule, capped at `100,000 ATH` per year.
 
 ## Treasury and Burn Buckets
 

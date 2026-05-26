@@ -17,7 +17,7 @@ import {
   StonfiLiveEvidenceInputM19E,
   collectLiveEvidenceM19E,
 } from './stonfi_live_evidence_collector_m19e';
-import { M20F_OFFICIAL_SOURCES, M20F_SAFE_VALUE_BOUNDS, isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
+import { M20F_OFFICIAL_SOURCES, M20F_SAFE_VALUE_BOUNDS, isBasechainTonAddress, isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
 const EXPECTED_ROUTER_MAJOR_VERSION = 2;
@@ -286,6 +286,9 @@ export function validateM20FStonfiLiveCollectorInput(input: M20FStonfiLiveCollec
     if (isTestnetFriendlyAddress(value) || hasNonProdMarker(value)) {
       issues.push(issue(`NON_PROD_ADDRESS_${key.toUpperCase()}`, `${key} must not be a testnet/fixture/preview address.`));
     }
+    if (!isBasechainTonAddress(value)) {
+      issues.push(issue(`NON_BASECHAIN_ADDRESS_${key.toUpperCase()}`, `${key} must be a basechain workchain 0 address.`));
+    }
   }
 
   if (input.route.offerAddress !== 'ton') {
@@ -399,9 +402,13 @@ function simulationIssues(input: M20FStonfiLiveCollectorInput, simulation: M20FS
     issues.push(issue('SIM_ROUTER_VERSION_NOT_V2_1', 'Simulation selected router is not the currently pinned STON.fi v2.1 router.'));
   }
   if (!isParseableAddress(simulation.router.address)) issues.push(issue('SIM_BAD_ROUTER_ADDRESS', 'Simulation router address is not parseable.'));
+  else if (!isBasechainTonAddress(simulation.router.address)) issues.push(issue('SIM_ROUTER_ADDRESS_NOT_BASECHAIN', 'Simulation router address must be basechain workchain 0.'));
   if (!isParseableAddress(simulation.poolAddress)) issues.push(issue('SIM_BAD_POOL_ADDRESS', 'Simulation pool address is not parseable.'));
+  else if (!isBasechainTonAddress(simulation.poolAddress)) issues.push(issue('SIM_POOL_ADDRESS_NOT_BASECHAIN', 'Simulation pool address must be basechain workchain 0.'));
   if (!isParseableAddress(simulation.router.ptonWalletAddress)) issues.push(issue('SIM_BAD_PTON_WALLET_ADDRESS', 'Simulation pTON wallet address is not parseable.'));
+  else if (!isBasechainTonAddress(simulation.router.ptonWalletAddress)) issues.push(issue('SIM_PTON_WALLET_ADDRESS_NOT_BASECHAIN', 'Simulation pTON wallet address must be basechain workchain 0.'));
   if (!isParseableAddress(simulation.askJettonWallet)) issues.push(issue('SIM_BAD_ASK_JETTON_WALLET', 'Simulation ask jetton wallet address is not parseable.'));
+  else if (!isBasechainTonAddress(simulation.askJettonWallet)) issues.push(issue('SIM_ASK_JETTON_WALLET_NOT_BASECHAIN', 'Simulation ask jetton wallet address must be basechain workchain 0.'));
   return issues;
 }
 

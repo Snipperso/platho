@@ -208,6 +208,11 @@ buyback_amount = accumulated_ton - treasury_amount
 
 All rounding dust goes to `buyback_amount`.
 
+`EnableBuybackSplit` is a one-time action restricted to the immutable treasury receiver. It is not admin/rescue/pause and
+does not grant fund-stealing authority, but it permanently changes FeeAccumulator economics from bootstrap treasury-only
+accumulation to the 50/50 treasury/buyback split. Release docs and checklists must require the release preflight to pass
+before this action is sent.
+
 Invariant:
 
 ```text
@@ -301,6 +306,11 @@ BUYBACK_PENDING_STORAGE_ENDOWMENT = 0.005 TON = 5_000_000 nanotons
 BUYBACK_BURN_FINALIZATION_RESERVE = FINAL AFTER ATH BURN TESTS
 ```
 
+Buyback burn success is not an outbound burn request and not an ATHWallet `ATHBurnNotification`. The success signal is
+BuybackBurn receiving authenticated `ATHBurnFinalized` from ATHMaster for the pending query, owner, and amount. Until
+that finalization arrives, release tooling, dashboards, and indexers must treat the burn as pending or retryable, not as
+completed supply reduction for BuybackBurn accounting.
+
 ### 7.6 Global Contract Storage Reserve
 
 ```text
@@ -356,7 +366,14 @@ MAX_CHARGE_PUBLIC(owner) =
   + CAPSULEHUB_ACK_FORWARD_RESERVE
 ```
 
-CapsuleHub MUST retain the protocol-fee backing, execution/storage reserves, and keepalive value for accepted Vault publishes; the ACK carries only `CAPSULEHUB_ACK_FORWARD_RESERVE` plus true excess value.
+CapsuleHub MUST retain the protocol-fee backing, execution/storage reserves, and keepalive value for accepted Vault publishes. A success ACK carries only `CAPSULEHUB_ACK_FORWARD_RESERVE = 30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance. Later final v1 PWA surcharge above canonical required value is retained by CapsuleHub as network/storage reserve overage, not returned to Vault.
+
+Vault ATH deposit is supported only through the user's ATHWallet `ATHTransferRequestWithNotify` notify-flow into Vault.
+Manual ordinary ATH transfer to the official Vault ATHWallet is unsupported: raw official wallet balance can change
+without creating a Vault internal ATH ledger credit, so the PWA must not display the official Vault ATHWallet as a
+deposit address. `WithdrawAth` attached TON is not user escrow; it funds downstream ATHWallet deployment, transfer,
+storage, and ACK execution. Vault credits back only authenticated ACK/fail/bounce value it receives, minus local refund
+reserve and capped by the original inbound value, not a complete excess TON refund.
 
 ---
 
@@ -368,19 +385,16 @@ ATH_DECIMALS = 9
 ATH_TOTAL_SUPPLY_ATOMIC = 100,000,000,000,000,000 atomic units
 ```
 
-Initial distribution freeze candidate:
+Current canonical distribution:
 
 ```text
-Liquidity bootstrap:             15%
-Founder vesting:                 10%
-Community airdrop:                5%
-Early user / free-float reserve: 10%
-Ecosystem growth reserve:        35%
-Protocol treasury reserve:       15%
-Strategic / market operations:   10%
+Activity airdrop:                15%
+Initial liquidity:               15%
+Long-term protocol vesting:      10%
+Market stability reserve:        60%
 ```
 
-Only liquidity bootstrap + explicitly released early/community allocations are intended to be liquid near launch. Other allocations must be locked, vested, or controlled by transparent release rules outside v1 core contracts.
+The long-term protocol vesting allocation is controlled by immutable ATHVesting and unlocks only 100,000 ATH per 365-day period.
 
 ATH master is fixed-supply:
 
@@ -782,7 +796,10 @@ Returned value is capped to `pending.refundable_budget_amount`.
 
 CapsuleHub ACK value is not allowed to drain protocol-fee backing from
 `CapsuleHub.accrued_plato_fee_ton`; accepted Vault publishes return only the fixed
-ACK reserve and true excess over the required CapsuleHub backing.
+publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes
+that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON
+balance. Later final v1 PWA surcharge above canonical required value is retained
+by CapsuleHub as network/storage reserve overage, not returned to Vault.
 
 ### 14.7 PrunePendingPublish Remains Blocked
 

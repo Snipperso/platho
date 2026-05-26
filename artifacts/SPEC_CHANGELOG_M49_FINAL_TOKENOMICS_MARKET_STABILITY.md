@@ -2,13 +2,14 @@
 
 ## Changed
 
-- Final ATH allocation is fixed as `15%` activity airdrop, `15%` initial liquidity, `10%` treasury / operations, `60%` market stability reserve, and `0%` founder allocation.
-- Prior founder/ecosystem/strategic split language in M20Y is superseded.
+- Final ATH allocation is fixed as `15%` activity airdrop, `15%` initial liquidity, `10%` long-term protocol vesting, and `60%` market stability reserve.
+- Prior ecosystem/strategic split language in M20Y is superseded.
 - The market stability reserve is explicit and milestone-gated instead of a vague ecosystem or partnership bucket.
 
 ## Added
 
 - Manifest constants for the final allocation table.
+- Manifest constants for immutable long-term vesting: `10,000,000 ATH`, `100` periods, `365` days per period, and `100,000 ATH` unlocked per period.
 - Manifest constants for the market stability tranche policy:
   - twenty tranches;
   - `3%` supply per tranche;

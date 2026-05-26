@@ -1539,12 +1539,36 @@ PROGRAM{
       s0 33 s() XCHG
       38 s() PUSH
       $BuybackBurn$_fun_deriveAthWalletAddress INLINECALLDICT
-      17 s() POP
-      36 s() PUSH
+      37 s() PUSH
       SWAP
-      s0 17 s() XCHG
       SDEQ
+      s1 34 s() XCHG
+      THROWANYIFNOT
+      22134 PUSHINT
+      s0 33 s() XCHG
+      40 s() PUSH
+      $BuybackBurn$_fun_isBasechainAddress INLINECALLDICT
+      s1 34 s() XCHG
+      THROWANYIFNOT
+      22135 PUSHINT
+      s0 33 s() XCHG
+      39 s() PUSH
+      $BuybackBurn$_fun_isBasechainAddress INLINECALLDICT
+      s1 34 s() XCHG
+      THROWANYIFNOT
+      22136 PUSHINT
+      s0 33 s() XCHG
+      37 s() PUSH
+      $BuybackBurn$_fun_isBasechainAddress INLINECALLDICT
+      s1 34 s() XCHG
+      THROWANYIFNOT
+      22137 PUSHINT
+      s0 33 s() XCHG
+      35 s() PUSH
+      $BuybackBurn$_fun_isBasechainAddress INLINECALLDICT
+      17 s() POP
       s1 33 s() XCHG
+      s0 16 s() XCHG
       THROWANYIFNOT
       30 s() 32 s() XCHG
       29 s() 31 s() XCHG

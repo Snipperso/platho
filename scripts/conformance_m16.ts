@@ -5,6 +5,7 @@ import { buildImplementedSubsetManifest } from './deployment_manifest_m15';
 
 const productionContracts = [
   'ATHMaster.tact',
+  'ATHVesting.tact',
   'ATHWallet.tact',
   'BuybackBurn.tact',
   'CapsuleHub.tact',
@@ -17,6 +18,7 @@ const productionContracts = [
 ];
 
 const storageTopUpReceivers = new Map<string, string>([
+  ['ATHVesting.tact', 'ATHVestingTopUpStorageReserve'],
   ['BuybackBurn.tact', 'TopUpStorageReserve'],
   ['CapsuleHub.tact', 'TopUpStorageReserve'],
   ['FeeAccumulator.tact', 'TopUpStorageReserve'],
@@ -29,6 +31,7 @@ const storageTopUpReceivers = new Map<string, string>([
 
 const hashChecks: Array<[string, string, string]> = [
   ['ATHMaster', 'ATHMaster_ATHMaster', 'ATHMASTER_CODE_HASH.txt'],
+  ['ATHVesting', 'ATHVesting_ATHVesting', 'ATHVESTING_CODE_HASH.txt'],
   ['ATHWallet', 'ATHWallet_ATHWallet', 'ATH_WALLET_CODE_HASH.txt'],
   ['BuybackBurn', 'BuybackBurn_BuybackBurn', 'BUYBACKBURN_CODE_HASH.txt'],
   ['MarketStabilitySeller', 'MarketStabilitySeller_MarketStabilitySeller', 'MARKET_STABILITY_SELLER_CODE_HASH.txt'],
@@ -105,9 +108,9 @@ async function main() {
 
   const report = {
     profile: 'PLATHO.V1.M16.PRODUCTION_CONFORMANCE_AND_COMPACTNESS_PASS',
-    baseline: 'M50 implemented-subset package',
-    contract_code_changed: 'market-stability-seller-added',
-    new_functional_surface_added: 'MarketStabilitySeller direct reserve sale state machine',
+    baseline: 'M50 implemented-subset package plus ATHVesting candidate',
+    contract_code_changed: 'ath-vesting-added',
+    new_functional_surface_added: 'ATHVesting immutable long-term claim schedule',
     checks: {
       forbidden_control_surface_absent: perContract.every((x) => x.forbidden_hits.length === 0),
       empty_fallbacks_reject: perContract.every((x) => x.empty_fallback_rejects),

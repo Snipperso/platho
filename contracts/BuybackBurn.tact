@@ -380,6 +380,10 @@ contract BuybackBurn {
         throwUnless(22124, self.isBasechainAddress(msg.ask_jetton_wallet_address));
         throwUnless(22132, self.isBasechainAddress(msg.stonfi_ath_source_owner_address));
         throwUnless(22133, msg.ask_jetton_wallet_address == self.deriveAthWalletAddress(msg.stonfi_ath_source_owner_address));
+        throwUnless(22134, self.isBasechainAddress(msg.stonfi_router_address));
+        throwUnless(22135, self.isBasechainAddress(msg.stonfi_pool_address_ton_ath));
+        throwUnless(22136, self.isBasechainAddress(msg.stonfi_pton_wallet_address));
+        throwUnless(22137, self.isBasechainAddress(msg.stonfi_referral_address));
         self.buyback_min_ath_out_per_50_ton_atomic = msg.buyback_min_ath_out_per_50_ton_atomic;
         self.validateMinOut(msg.evidence_quote_out_atomic_ath, msg.evidence_dex_min_out_atomic_ath);
         self.stonfi_router_address = msg.stonfi_router_address;

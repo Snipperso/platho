@@ -913,7 +913,7 @@ else:
 
 Returned/excess value is capped to `pending.refundable_budget_amount`.
 
-CapsuleHub ACK value must represent only ACK forward reserve plus true excess. It must not return the protocol-fee backing or charged storage reserve for an accepted publish.
+CapsuleHub ACK value must represent only the fixed publish ACK forward reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance. The ACK must not return the protocol-fee backing, charged storage reserve, or later final v1 PWA surcharge for an accepted publish.
 
 `Vault.PrunePendingPublish` is not implementation-ready until a stale-pending TTL is pinned in open values. Until then, stale pending prune behavior is blocked rather than guessed.
 
@@ -948,6 +948,15 @@ bounce-safe ATH jetton transfer
 bounce/failure restores ath_balance
 no ignored-error send mode
 ```
+
+Vault ATH deposits are supported through `ATHTransferRequestWithNotify` from the user's ATHWallet into Vault. Manual
+ordinary ATH transfer to the official Vault ATHWallet is unsupported: it can increase raw official wallet balance, but it
+does not create `users[owner].ath_balance` and the PWA must not present the official Vault ATHWallet as a deposit
+address.
+
+`WithdrawAth` attached TON is not user escrow. It funds downstream ATHWallet deployment, transfer, storage, and ACK
+execution. Vault credits back only authenticated ACK/fail/bounce value it receives, minus local refund reserve and capped
+by the original inbound value; the spec must not describe this path as a complete excess TON refund.
 
 ---
 
@@ -1123,6 +1132,11 @@ No dust remains.
 
 Split does not send external value.
 
+`EnableBuybackSplit` is a real one-time authority of the immutable treasury receiver. It is not admin/rescue/pause and
+does not grant fund-stealing authority, but it permanently changes FeeAccumulator economics from bootstrap treasury-only
+accumulation to the 50/50 treasury/buyback split. Official release checklists must require the release preflight to pass
+before the treasury receiver sends this action.
+
 ### 9.3 Treasury Flush
 
 Final non-bounceable transfer to immutable terminal treasury receiver.
@@ -1188,6 +1202,11 @@ If no authenticated ATH receipt and no authenticated TON refund/bounce arrives, 
 Prune must not restore 50 TON reserve without authenticated DEX refund/bounce.
 
 Late ATH after stale prune is burned, but original TON reserve is not restored unless authenticated refund/bounce arrives.
+
+Buyback burn success is recognized only after BuybackBurn receives authenticated `ATHBurnFinalized` from ATHMaster for the
+pending query, owner, and amount. ATHWallet sending `ATHBurnNotification`, or BuybackBurn sending an outbound burn
+request, is only a burn attempt. Docs, dashboards, and indexers must not count burned ATH or clear BuybackBurn success
+state from the burn attempt alone.
 
 ---
 

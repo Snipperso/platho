@@ -11,6 +11,11 @@
       "output": "build/ATHMaster"
     },
     {
+      "name": "ATHVesting",
+      "path": "contracts/ATHVesting.tact",
+      "output": "build/ATHVesting"
+    },
+    {
       "name": "FeeAccumulator",
       "path": "contracts/FeeAccumulator.tact",
       "output": "build/FeeAccumulator"

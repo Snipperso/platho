@@ -6,6 +6,7 @@ import { buildImplementedSubsetManifest, computeManifestCell } from '../scripts/
 
 const productionContracts = [
   'ATHMaster.tact',
+  'ATHVesting.tact',
   'ATHWallet.tact',
   'BuybackBurn.tact',
   'CapsuleHub.tact',
@@ -18,6 +19,7 @@ const productionContracts = [
 ];
 
 const storageTopUpReceivers: Array<[string, string]> = [
+  ['ATHVesting.tact', 'ATHVestingTopUpStorageReserve'],
   ['BuybackBurn.tact', 'TopUpStorageReserve'],
   ['CapsuleHub.tact', 'TopUpStorageReserve'],
   ['FeeAccumulator.tact', 'TopUpStorageReserve'],
@@ -100,6 +102,55 @@ describe('M16 production conformance static checks', () => {
     }
   });
 
+  it('M16-CONF-01C: production docs do not reference stale ATH distribution or seller gates', () => {
+    const productionDocs = [
+      join('PRODUCTION_READINESS.md'),
+      join('DEPLOYMENT_RUNBOOK.md'),
+    ];
+    const forbidden = [
+      /\b45M ATH\b/,
+      /\b45,000,000 ATH\b/,
+      /30%\s+activity airdrop/i,
+      /founder/i,
+      /x2\.\.x16/i,
+      /\bx16\b.*tranche/i,
+      /airdrop remaining\s+`?<=\s*15M ATH`?/i,
+    ];
+
+    for (const productionDoc of productionDocs) {
+      const source = file(productionDoc);
+      expect(source, `${productionDoc} must stay English-only`).not.toMatch(/[\u0400-\u04FF]/);
+      expect(source).toMatch(/pricing freeze is a real one-time launch authority/i);
+      expect(source).toMatch(/reserve_due_ath/);
+      expect(source).toMatch(/official seller ATH wallet balance above/i);
+      expect(source).toMatch(/readiness warning/i);
+      expect(source).toMatch(/can remain stuck/i);
+      if (productionDoc.endsWith('PRODUCTION_READINESS.md')) {
+        expect(source).toMatch(/Canonical ATH Tokenomics/);
+        expect(source).toMatch(/15,000,000 ATH` activity airdrop/);
+        expect(source).toMatch(/15,000,000 ATH` initial ATH\/TON liquidity/);
+        expect(source).toMatch(/10,000,000 ATH` long-term protocol vesting reserve/);
+        expect(source).toMatch(/100,000 ATH` per 365-day period/);
+        expect(source).toMatch(/60,000,000 ATH` MarketStabilitySeller reserve/);
+        expect(source).toMatch(/20` tranches of `3,000,000 ATH`, from `x2` through `x21`/);
+        expect(source).toMatch(/obsolete tokenomics brief/);
+      }
+      if (productionDoc.endsWith('DEPLOYMENT_RUNBOOK.md')) {
+        expect(source).toMatch(/Canonical ATH tokenomics for auditors/);
+        expect(source).toMatch(/`15M` activity airdrop/);
+        expect(source).toMatch(/`15M` initial liquidity/);
+        expect(source).toMatch(/`10M` long-term vesting/);
+        expect(source).toMatch(/`100,000 ATH` per 365-day period/);
+        expect(source).toMatch(/`60M` MarketStabilitySeller reserve/);
+        expect(source).toMatch(/`20` tranches of `3M ATH`, from `x2` through `x21`/);
+        expect(source).toMatch(/obsolete and must not be used as an audit baseline/);
+      }
+      for (const pattern of forbidden) {
+        expect(source, `${productionDoc} must not match stale tokenomics pattern ${pattern}`).not.toMatch(pattern);
+      }
+    }
+  });
+
   it('M16-CONF-02: all production contracts reject empty fallback explicitly', () => {
     for (const contract of productionContracts) {
       const source = contractSource(contract);
@@ -118,6 +169,7 @@ describe('M16 production conformance static checks', () => {
   it('M16-CONF-03: built code hashes match the pinned artifacts exactly', () => {
     const checks: Array<[string, string, string]> = [
       ['ATHMaster', 'ATHMaster_ATHMaster', 'ATHMASTER_CODE_HASH.txt'],
+      ['ATHVesting', 'ATHVesting_ATHVesting', 'ATHVESTING_CODE_HASH.txt'],
       ['ATHWallet', 'ATHWallet_ATHWallet', 'ATH_WALLET_CODE_HASH.txt'],
       ['BuybackBurn', 'BuybackBurn_BuybackBurn', 'BUYBACKBURN_CODE_HASH.txt'],
       ['MarketStabilitySeller', 'MarketStabilitySeller_MarketStabilitySeller', 'MARKET_STABILITY_SELLER_CODE_HASH.txt'],
@@ -133,6 +185,14 @@ describe('M16 production conformance static checks', () => {
       expect(builtCodeHash(dir, artifactName), hashArtifact).toBe(artifactHash(hashArtifact));
     }
     expect(artifactHash('FEE_ACCUMULATOR_CODE_HASH.txt')).toBe(artifactHash('FEEACCUMULATOR_CODE_HASH.txt'));
+
+    const storedReport = JSON.parse(file(join('artifacts', 'm16_conformance_report.json')));
+    for (const [dir, artifactName, hashArtifact] of checks) {
+      const key = hashArtifact.replace('.txt', '');
+      expect(storedReport.hashes[key].built, `${key} stored M16 built hash must not be stale`).toBe(builtCodeHash(dir, artifactName));
+      expect(storedReport.hashes[key].pinned, `${key} stored M16 pinned hash must not be stale`).toBe(artifactHash(hashArtifact));
+      expect(storedReport.hashes[key].match, `${key} stored M16 match flag must not be stale`).toBe(true);
+    }
   });
 
   it('M16-CONF-04: implemented-subset manifest remains canonical and explicitly non-final while blockers remain', async () => {
@@ -165,6 +225,7 @@ describe('M16 production conformance static checks', () => {
     const contractFiles = readdirSync('contracts').filter((name) => name.endsWith('.tact')).sort();
     expect(contractFiles).toEqual([
       'ATHMaster.tact',
+      'ATHVesting.tact',
       'ATHWallet.tact',
       'BuybackBurn.tact',
       'CapsuleHub.tact',

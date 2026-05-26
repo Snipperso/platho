@@ -156,6 +156,22 @@ describe('M19C STON.fi route freeze gate / live sample harness', () => {
     expect(report.issues.map((issue) => issue.code)).toContain('ASK_JETTON_WALLET_NOT_SOURCE_ATH_WALLET');
   });
 
+  it('rejects parseable masterchain route endpoint addresses', () => {
+    const report = validateStonfiRouteFreezeCandidateV21(makeCandidate({
+      addresses: {
+        stonfiRouterAddress: deterministicAddress('M19C.test.masterchain.router', -1),
+        stonfiPoolAddressTonAth: deterministicAddress('M19C.test.masterchain.pool', -1),
+        stonfiPtonWalletAddress: deterministicAddress('M19C.test.masterchain.pton', -1),
+      },
+    }));
+
+    const codes = report.issues.map((issue) => issue.code);
+    expect(report.freezeReady).toBe(false);
+    expect(codes).toContain('ROUTE_ADDRESS_NOT_BASECHAIN_STONFI_ROUTER');
+    expect(codes).toContain('ROUTE_ADDRESS_NOT_BASECHAIN_STONFI_POOL');
+    expect(codes).toContain('ROUTE_ADDRESS_NOT_BASECHAIN_PTON_WALLET');
+  });
+
   it('rejects a candidate below 95% live quote even when it is above the static circuit breaker', () => {
     const report = validateStonfiRouteFreezeCandidateV21(makeCandidate({
       swap: {

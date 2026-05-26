@@ -30,13 +30,12 @@ This supersedes the older 5% community airdrop candidate. The final activity air
 ```text
 Community activity airdrop:      15%
 Liquidity bootstrap:             15%
-Treasury / operations:           10%
+Long-term protocol vesting:      10%
 Market stability reserve:        60%
-Founder allocation:               0%
 TOTAL:                          100%
 ```
 
-M49 fixes the final reserve policy: the `60%` market stability reserve is released only through milestone-gated x2..x21 tranches, and there is no founder token allocation.
+M49 fixes the final reserve policy: the `60%` market stability reserve is released only through milestone-gated x2..x21 tranches.
 
 Official ATH pool launch target:
 

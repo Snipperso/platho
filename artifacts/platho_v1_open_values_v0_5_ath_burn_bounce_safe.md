@@ -387,19 +387,16 @@ ATH_DECIMALS = 9
 ATH_TOTAL_SUPPLY_ATOMIC = 100,000,000,000,000,000 atomic units
 ```
 
-Initial distribution freeze candidate:
+Current canonical distribution:
 
 ```text
-Liquidity bootstrap:             15%
-Founder vesting:                 10%
-Community airdrop:                5%
-Early user / free-float reserve: 10%
-Ecosystem growth reserve:        35%
-Protocol treasury reserve:       15%
-Strategic / market operations:   10%
+Activity airdrop:                15%
+Initial liquidity:               15%
+Long-term protocol vesting:      10%
+Market stability reserve:        60%
 ```
 
-Only liquidity bootstrap + explicitly released early/community allocations are intended to be liquid near launch. Other allocations must be locked, vested, or controlled by transparent release rules outside v1 core contracts.
+The long-term protocol vesting allocation is controlled by immutable ATHVesting and unlocks only 100,000 ATH per 365-day period.
 
 ATH master is fixed-supply:
 

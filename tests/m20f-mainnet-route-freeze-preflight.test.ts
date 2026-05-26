@@ -9,8 +9,8 @@ import {
 } from '../scripts/m20f_mainnet_route_freeze_preflight';
 import { deterministicAddress } from '../scripts/stonfi_v2_1_route_lib';
 
-function address(label: string, testOnly = false): string {
-  return deterministicAddress(`M20F.${label}`).toString({ testOnly });
+function address(label: string, testOnly = false, workchain = 0): string {
+  return deterministicAddress(`M20F.${label}`, workchain).toString({ testOnly });
 }
 
 function completeInput(overrides: Partial<M20FMainnetRouteFreezeInput> = {}): M20FMainnetRouteFreezeInput {
@@ -103,6 +103,24 @@ describe('M20F mainnet STON.fi route-freeze preflight', () => {
       expect(isTestnetFriendlyAddress(testnetRouter)).toBe(true);
       expect(report.status).toBe('BLOCKED_TESTNET_OR_NONPROD_INPUT');
       expect(report.rejectedNonProdInputs).toContain('stonfiRouterAddress');
+      expect(report.route_freeze_ready).toBe(false);
+    } finally {
+      rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects parseable masterchain addresses in a mainnet route-freeze input', () => {
+    const artifactsDir = withM20TArtifact();
+    try {
+      const masterchainRouter = address('masterchainRouter', false, -1);
+      const report = createM20FMainnetRouteFreezePreflight({
+        artifactsDir,
+        input: completeInput({ addresses: { stonfiRouterAddress: masterchainRouter } as any }),
+        m19fRouteFreezeReady: true,
+      });
+
+      expect(report.status).toBe('BLOCKED_TESTNET_OR_NONPROD_INPUT');
+      expect(report.rejectedNonProdInputs).toContain('stonfiRouterAddress.workchain');
       expect(report.route_freeze_ready).toBe(false);
     } finally {
       rmSync(artifactsDir, { recursive: true, force: true });

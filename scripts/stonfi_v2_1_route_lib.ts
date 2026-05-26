@@ -428,6 +428,11 @@ function addIssue(issues: StonfiRouteFreezeValidationIssue[], code: string, mess
   issues.push({ code, message });
 }
 
+function isBasechainAddressLike(value: AddressLike): boolean {
+  const parsed = toAddressOrNull(value);
+  return parsed !== null && parsed.workChain === 0;
+}
+
 function floorPercent(value: bigint, numerator: bigint, denominator: bigint): bigint {
   return (value * numerator) / denominator;
 }
@@ -456,6 +461,42 @@ export function validateStonfiRouteFreezeCandidateV21(candidate: StonfiRouteFree
       continue;
     }
     try { toAddressOrNull(addressLike as AddressLike); } catch { addIssue(issues, `BAD_${label.toUpperCase()}`, `${label} is not parseable as an address`); }
+  }
+
+  const basechainAddressFields: Array<[
+    keyof StonfiRouteFreezeCandidateV21['addresses'],
+    string,
+    string,
+  ]> = [
+    ['athMasterAddress', 'ATH_MASTER', 'ATH master address'],
+    ['buybackBurnAddress', 'BUYBACK_BURN', 'BuybackBurn address'],
+    ['buybackBurnOfficialAthWalletAddress', 'BUYBACK_OFFICIAL_ATH_WALLET', 'BuybackBurn official ATH wallet address'],
+    ['stonfiRouterAddress', 'STONFI_ROUTER', 'STON.fi router address'],
+    ['stonfiPoolAddressTonAth', 'STONFI_POOL', 'STON.fi TON/ATH pool address'],
+    ['stonfiAthSourceOwnerAddress', 'STONFI_ATH_SOURCE_OWNER', 'STON.fi ATH source owner address'],
+    ['stonfiAthSourceWalletAddress', 'STONFI_ATH_SOURCE_WALLET', 'STON.fi ATH source wallet address'],
+    ['stonfiPtonWalletAddress', 'PTON_WALLET', 'STON.fi pTON wallet address'],
+    ['askJettonWalletAddress', 'ASK_JETTON_WALLET', 'ask jetton wallet address'],
+  ];
+  for (const [field, codeLabel, label] of basechainAddressFields) {
+    const value = candidate.addresses[field];
+    if (value === undefined || value === null) continue;
+    try {
+      if (!isBasechainAddressLike(value)) {
+        addIssue(issues, `ROUTE_ADDRESS_NOT_BASECHAIN_${codeLabel}`, `${label} must be a basechain workchain 0 address`);
+      }
+    } catch {
+      // Parse errors are reported by BAD_* checks above.
+    }
+  }
+  if (candidate.addresses.stonfiVaultAddress !== undefined && candidate.addresses.stonfiVaultAddress !== null) {
+    try {
+      if (!isBasechainAddressLike(candidate.addresses.stonfiVaultAddress)) {
+        addIssue(issues, 'ROUTE_ADDRESS_NOT_BASECHAIN_STONFI_VAULT', 'STON.fi vault address must be a basechain workchain 0 address when provided');
+      }
+    } catch {
+      // Parse errors are reported by BAD_* checks above.
+    }
   }
 
   for (const [label, hash] of Object.entries(candidate.codeHashes)) {

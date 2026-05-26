@@ -153,15 +153,16 @@ describe('PWA runtime config guard', () => {
     const html = readFileSync('web/index.html', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
 
-    expect(html).toMatch(/<textarea id="messageInput"[^>]*maxlength="1024"/);
-    expect(html).toMatch(/<textarea id="publicMessageInput"[^>]*maxlength="1024"/);
-    expect(html).toMatch(/Message \(1024 bytes max\)/);
+    expect(html).not.toMatch(/<textarea id="messageInput"[^>]*maxlength=/);
+    expect(html).not.toMatch(/<textarea id="publicMessageInput"[^>]*maxlength=/);
+    expect(html).not.toMatch(/1024 bytes max/);
+    expect(app).toMatch(/removeAttribute\('maxlength'\)/);
     expect(html).toMatch(/id="privateComposerCostStatus"/);
     expect(html).toMatch(/id="publicComposerCostStatus"/);
     expect(html).toMatch(/Price checking\s+Wallet required/);
     expect(html).toMatch(/id="publicComposer"/);
     expect(html).toMatch(/id="publicComposerCommentsCheckbox"/);
-    expect(html).toMatch(/<textarea id="publicMessageInput"[\s\S]*id="publicComposerCommentsCheckbox"/);
+    expect(html).toMatch(/id="publicComposer"[\s\S]*id="publicComposerCommentsCheckbox"[\s\S]*<textarea id="publicMessageInput"/);
     expect(html).toMatch(/Allow comments/);
     expect(app).toMatch(/Open public comments\?/);
     expect(app).toMatch(/Publish with comments/);
