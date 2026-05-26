@@ -120,8 +120,8 @@
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
-      "built": "b0f80fd873688d41bff0f2877784ac48d361d89fae1e13687b6899418c93b460",
-      "pinned": "b0f80fd873688d41bff0f2877784ac48d361d89fae1e13687b6899418c93b460",
+      "built": "5e52c7416e8ba2edaa85afc8d5ee85f49f4fe987739c93fea1f81ce13ffcffd6",
+      "pinned": "5e52c7416e8ba2edaa85afc8d5ee85f49f4fe987739c93fea1f81ce13ffcffd6",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
@@ -150,8 +150,8 @@
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "7a01561752f830a8b64d33840d8a06b2b0fb4c84178a074f12991f2f75c755e2",
-      "pinned": "7a01561752f830a8b64d33840d8a06b2b0fb4c84178a074f12991f2f75c755e2",
+      "built": "29f19b383633146ccdff3111923d9abeea9dbfe6471b5aa9ae6b1e176aac0586",
+      "pinned": "29f19b383633146ccdff3111923d9abeea9dbfe6471b5aa9ae6b1e176aac0586",
       "match": true
     }
   },
@@ -159,7 +159,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "50b99099ecbca1cac879884cf6089809aa836539af546f009029cdfc76236de6",
+    "manifest_hash_hex": "0c874091663451c7da8f9f47b0a1c39cc21d1a5922e3d5c6ff76ab18fdb3dedb",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
@@ -167,19 +167,19 @@
     ],
     "constants": {
       "ath_total_supply_atomic": "100000000000000000",
-      "ath_activity_airdrop_allocation_percent": "30",
+      "ath_activity_airdrop_allocation_percent": "15",
       "ath_initial_liquidity_allocation_percent": "15",
       "ath_treasury_operations_allocation_percent": "10",
-      "ath_market_stability_reserve_allocation_percent": "45",
+      "ath_market_stability_reserve_allocation_percent": "60",
       "ath_founder_allocation_percent": "0",
       "ath_initial_liquidity_allocation_atomic": "15000000000000000",
       "ath_treasury_operations_allocation_atomic": "10000000000000000",
-      "ath_market_stability_reserve_allocation_atomic": "45000000000000000",
-      "ath_market_stability_tranche_count": "15",
+      "ath_market_stability_reserve_allocation_atomic": "60000000000000000",
+      "ath_market_stability_tranche_count": "20",
       "ath_market_stability_tranche_percent": "3",
       "ath_market_stability_tranche_atomic": "3000000000000000",
       "ath_market_stability_start_multiplier": "2",
-      "ath_market_stability_end_multiplier": "16",
+      "ath_market_stability_end_multiplier": "21",
       "buyback_offer_amount_nanotons": "50000000000",
       "buyback_funding_envelope_nanotons": "51050000000",
       "profile_avatar_price_ath_atomic": "100000000000",
@@ -187,7 +187,7 @@
       "username_pending_mint_stale_ttl_seconds": "86400",
       "username_item_ack_forward_reserve_nanotons": "3000000",
       "vault_pending_publish_stale_ttl_seconds": "86400",
-      "vault_activity_airdrop_total_atomic": "30000000000000000",
+      "vault_activity_airdrop_total_atomic": "15000000000000000",
       "vault_activity_airdrop_reward_per_message_atomic": "10000000000",
       "vault_activity_airdrop_per_wallet_cap_atomic": "0"
     }

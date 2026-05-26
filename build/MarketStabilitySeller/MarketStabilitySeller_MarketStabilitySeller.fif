@@ -468,7 +468,7 @@ PROGRAM{
   }>
   $MarketStabilitySeller$_fun_currentTrancheRemaining PROCREF:<{
     s5 PUSH
-    14 GTINT
+    19 GTINT
     IFJMP:<{
       0 PUSHINT
     }>
@@ -1619,7 +1619,7 @@ PROGRAM{
       s2 PUSH
       31 s() PUSH
       ADD
-      45000000000000000 PUSHINT
+      60000000000000000 PUSHINT
       LEQ
       THROWANYIFNOT
       s0 s12 XCHG
@@ -1739,7 +1739,7 @@ PROGRAM{
       THROWANYIFNOT
       23214 PUSHINT
       s6 PUSH
-      15 LESSINT
+      20 LESSINT
       THROWANYIFNOT
       27 s() 28 s() XCHG
       26 s() 28 s() XCHG

@@ -1,4 +1,4 @@
-# Platho v1 Open Values v0.20Y — 30% Activity Airdrop Tokenomics
+# Platho v1 Open Values v0.20Y - Activity Airdrop Tokenomics
 
 Status: implemented in Vault constants and locally verified by targeted tests.
 
@@ -27,17 +27,17 @@ ATH total supply remains fixed:
 Final distribution:
 
 ```text
-Community activity airdrop:      30%
+Community activity airdrop:      15%
 Liquidity bootstrap:             15%
 Treasury / operations:           10%
-Market stability reserve:        45%
+Market stability reserve:        60%
 Founder allocation:               0%
 TOTAL:                          100%
 ```
 
 There is no founder token allocation. Early users receive ATH through paid protocol usage via the Vault activity airdrop.
 
-The market stability reserve is `45,000,000 ATH`. It is reserved for gradual market release only after price milestones, not for partnerships, discretionary founder grants, or vague ecosystem spending.
+The market stability reserve is `60,000,000 ATH`. It is reserved for gradual market release only after price milestones, not for partnerships, discretionary founder grants, or vague ecosystem spending.
 
 Planned tranche policy:
 
@@ -57,6 +57,11 @@ x13 initial pool price: 3,000,000 ATH
 x14 initial pool price: 3,000,000 ATH
 x15 initial pool price: 3,000,000 ATH
 x16 initial pool price: 3,000,000 ATH
+x17 initial pool price: 3,000,000 ATH
+x18 initial pool price: 3,000,000 ATH
+x19 initial pool price: 3,000,000 ATH
+x20 initial pool price: 3,000,000 ATH
+x21 initial pool price: 3,000,000 ATH
 ```
 
 M50 later adds the automated market-stability seller as a separate immutable contract. Until that seller is deployed, audited, sealed with frozen pricing evidence, and funded through its official ATH wallet, the reserve remains an allocation commitment, not an operational on-chain sell mechanism.
@@ -65,17 +70,17 @@ M50 later adds the automated market-stability seller as a separate immutable con
 
 Community activity airdrop allocation:
 
-- `30%` of total ATH supply;
-- `30,000,000 ATH`;
-- `30,000,000,000,000,000` atomic units.
+- `15%` of total ATH supply;
+- `15,000,000 ATH`;
+- `15,000,000,000,000,000` atomic units.
 
 Reward rule:
 
 - `10 ATH` per successfully finalized paid publish;
 - `10,000,000,000` atomic units per reward;
-- maximum global reward count: `3,000,000` rewarded publishes.
+- maximum global reward count: `1,500,000` rewarded publishes.
 
-There is no per-wallet cap because every reward requires a paid protocol action. At roughly `0.01 TON` per message, fully exhausting the `3,000,000` publish reward pool requires about `30,000 TON` of aggregate paid user activity.
+There is no per-wallet cap because every reward requires a paid protocol action. At roughly `0.01 TON` per message, fully exhausting the `1,500,000` publish reward pool requires about `15,000 TON` of aggregate paid user activity.
 
 The activity airdrop is an early usage rebate and utility bootstrap, not a free claim campaign.
 
@@ -89,7 +94,7 @@ The official ATH liquidity pool may be launched after approximately:
 
 has been distributed through Vault activity rewards.
 
-That is `15%` of total supply and half of the final `30,000,000 ATH` activity airdrop allocation.
+That is `15%` of total supply and half of the final `15,000,000 ATH` activity airdrop allocation.
 
 The remaining `15,000,000 ATH` activity airdrop allocation continues after pool launch until the global bucket is exhausted.
 
@@ -108,7 +113,7 @@ Message protocol-fee discounts unlock only after approximately `15,000,000 ATH` 
 Vault activity airdrop constants:
 
 ```text
-vault_activity_airdrop_total_atomic = 30000000000000000
+vault_activity_airdrop_total_atomic = 15000000000000000
 vault_activity_airdrop_reward_per_message_atomic = 10000000000
 vault_activity_airdrop_per_wallet_cap_atomic = 0
 ```
@@ -119,7 +124,7 @@ vault_activity_airdrop_per_wallet_cap_atomic = 0
 
 Vault must preserve the following invariants:
 
-1. Vault must never credit more than `30,000,000 ATH` through activity rewards.
+1. Vault must never credit more than `15,000,000 ATH` through activity rewards.
 2. Activity reward can be credited only after authenticated `CapsuleHubPublishAck` for an existing `PendingPublish`.
 3. Failed, bounced, pruned, replayed, invalid, system, deposit, withdrawal, receive-intent, and username operations do not earn activity rewards.
 4. The final reward may be less than `10 ATH` only if less than `10 ATH` remains in the global bucket.

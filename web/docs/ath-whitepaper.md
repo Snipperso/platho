@@ -60,17 +60,17 @@ ATH supply is allocated across four categories:
 
 | Category | Share | Amount |
 | --- | ---: | ---: |
-| Activity airdrop | 30% | 30,000,000 ATH |
+| Activity airdrop | 15% | 15,000,000 ATH |
 | Initial liquidity | 15% | 15,000,000 ATH |
 | Treasury / operations | 10% | 10,000,000 ATH |
-| Market stability reserve | 45% | 45,000,000 ATH |
+| Market stability reserve | 60% | 60,000,000 ATH |
 
 This allocation defines the economic structure of Platho:
 
-- 30% of supply is distributed to users through application activity.
+- 15% of supply is distributed to users through application activity before the pool launch.
 - 15% of supply is used for initial liquidity.
 - 10% of supply remains as an operations treasury reserve.
-- 45% of supply is placed in MarketStabilitySeller and sold in tranches above the launch price.
+- 60% of supply is placed in MarketStabilitySeller and sold in tranches above the launch price.
 
 The activity airdrop and market stability reserve are backed by real ATH wallet balances of the corresponding contracts. The release verifier checks these balances before final launch.
 
@@ -79,7 +79,7 @@ The activity airdrop and market stability reserve are backed by real ATH wallet 
 The activity airdrop is:
 
 ```text
-30,000,000 ATH
+15,000,000 ATH
 ```
 
 Reward per successful publish:
@@ -345,7 +345,7 @@ A rejected avatar notification is refunded through the ATHWallet notification bo
 MarketStabilitySeller manages a separate reserve:
 
 ```text
-45,000,000 ATH
+60,000,000 ATH
 ```
 
 This reserve exists to expand circulating ATH supply in a controlled way after pool launch. Its purpose is to distribute the token more broadly as demand grows while protecting the application economy during the early market phase.
@@ -362,18 +362,18 @@ Funding is accepted only:
 - after pricing freeze;
 - through the official seller ATH wallet;
 - from the bound reserve funder;
-- up to the total cap of `45,000,000 ATH`.
+- up to the total cap of `60,000,000 ATH`.
 
-The reserve is split into 15 tranches:
+The reserve is split into 20 tranches:
 
 ```text
-15 * 3,000,000 ATH = 45,000,000 ATH
+20 * 3,000,000 ATH = 60,000,000 ATH
 ```
 
 Each tranche has a multiplier:
 
 ```text
-x2, x3, x4, ..., x16
+x2, x3, x4, ..., x21
 ```
 
 This creates a smooth price staircase. As project popularity grows, the market receives additional ATH supply, but each next tranche is more expensive than the previous one. Early demand does not hit a thin pool immediately, and price growth does not become a vertical wall that makes the utility token inconvenient to use.
@@ -401,21 +401,23 @@ Therefore:
 | 3 | x4 | 12,000 TON | 0.004 TON |
 | ... | ... | ... | ... |
 | 15 | x16 | 48,000 TON | 0.016 TON |
+| ... | ... | ... | ... |
+| 20 | x21 | 63,000 TON | 0.021 TON |
 
 A single purchase cannot cross a tranche boundary. This prevents buying ATH from the next tranche at the previous tranche price.
 
 TON revenue is recognized only after ATH is delivered to the buyer. If ATH transfer fails or bounces, the reserve is restored, the buyer receives the paid TON principal back, and treasury due does not increase.
 
-After the final x16 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, demand, application usage, buyback pressure, and available supply.
+After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, demand, application usage, buyback pressure, and available supply.
 
-Even at the x16 step, reference valuation remains moderate relative to the utility model:
+Even at the x21 step, reference valuation remains moderate relative to the utility model:
 
 ```text
-1 ATH = 0.016 TON
-100,000,000 ATH = 1,600,000 TON
+1 ATH = 0.021 TON
+100,000,000 ATH = 2,100,000 TON
 ```
 
-This is 16 times above launch valuation, while still leaving room for further growth without hidden internal reserves or additional minting. After x16, the protocol holds no separate reserve that can enter the market above users.
+This is 21 times above launch valuation, while still leaving room for further growth without hidden internal reserves or additional minting. After x21, the protocol holds no separate reserve that can enter the market above users.
 
 ## Treasury and Burn Buckets
 
@@ -461,7 +463,7 @@ Outgoing internal transfers in ATHWallet are protected by source-side pending ac
 6. After the first `15,000,000 ATH` are distributed, ATH discounts unlock.
 7. The ATH/TON pool launches at reference price `1 ATH = 0.001 TON`.
 8. Post-pool route evidence and pricing evidence are frozen.
-9. MarketStabilitySeller sells reserve through x2..x16 tranches.
+9. MarketStabilitySeller sells reserve through x2..x21 tranches.
 10. After split is enabled, FeeAccumulator divides protocol TON fees between treasury and buyback.
 11. BuybackBurn buys ATH with TON protocol fees and burns ATH through ATHMaster.
 12. Username and profile fees create ATH treasury due and ATH burn due.

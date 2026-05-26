@@ -1,4 +1,4 @@
-# M20Y — 30% Activity Airdrop Tokenomics
+# M20Y - Activity Airdrop Tokenomics
 
 Status: **implemented and locally verified**.
 
@@ -6,13 +6,13 @@ Status: **implemented and locally verified**.
 
 M20Y updates the ATH distribution and Vault activity airdrop allocation:
 
-- activity airdrop: `30%` of fixed supply;
-- global activity airdrop cap: `30,000,000 ATH`;
+- activity airdrop: `15%` of fixed supply;
+- global activity airdrop cap: `15,000,000 ATH`;
 - reward remains `10 ATH` per successfully finalized paid publish;
-- maximum rewarded publishes: `3,000,000`;
+- maximum rewarded publishes: `1,500,000`;
 - no per-wallet cap;
-- final allocation: `30%` activity airdrop, `15%` initial liquidity, `10%` treasury / operations, `45%` market stability reserve, `0%` founder allocation;
-- market stability reserve: `45,000,000 ATH` split into fifteen `3,000,000 ATH` tranches at x2..x16 from the initial pool price;
+- final allocation: `15%` activity airdrop, `15%` initial liquidity, `10%` treasury / operations, `60%` market stability reserve, `0%` founder allocation;
+- market stability reserve: `60,000,000 ATH` split into twenty `3,000,000 ATH` tranches at x2..x21 from the initial pool price;
 - official ATH pool launch target: after approximately `15,000,000 ATH` has been distributed through Vault activity rewards.
 
 ## Contract changes
@@ -21,7 +21,7 @@ Changed:
 
 - `contracts/Vault.tact`
 
-Only the activity airdrop global bucket constant changed from `15,000,000 ATH` to `30,000,000 ATH`.
+The activity airdrop global bucket is fixed at `15,000,000 ATH`.
 
 No changes to reward mechanics:
 
@@ -43,10 +43,10 @@ Changed:
 Updated manifest constant:
 
 ```text
-vault_activity_airdrop_total_atomic = 30000000000000000
+vault_activity_airdrop_total_atomic = 15000000000000000
 ath_initial_liquidity_allocation_atomic = 15000000000000000
 ath_treasury_operations_allocation_atomic = 10000000000000000
-ath_market_stability_reserve_allocation_atomic = 45000000000000000
+ath_market_stability_reserve_allocation_atomic = 60000000000000000
 ath_founder_allocation_percent = 0
 ```
 

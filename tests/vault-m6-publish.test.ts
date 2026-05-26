@@ -36,8 +36,8 @@ const SUITE_CLASSICAL = 1n;
 const PLATO_PRIVATE_STANDARD_FEE_TON = 5_000_000n;
 const PLATO_PUBLIC_POST_FEE_TON = 5_000_000n;
 const ATH_FULL_DISCOUNT_AMOUNT = 10_000_000_000_000n;
-const AIRDROP_TOTAL = 30_000_000_000_000_000n;
-const AIRDROP_DISCOUNT_UNLOCK_REMAINING = 15_000_000_000_000_000n;
+const AIRDROP_TOTAL = 15_000_000_000_000_000n;
+const AIRDROP_DISCOUNT_UNLOCK_REMAINING = 0n;
 const AIRDROP_REWARD_PER_MESSAGE = 10_000_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = 4_000_000n;
 const VAULT_PUBLISH_LOCAL_EXEC_RESERVE = 6_000_000n;
@@ -565,14 +565,20 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
     expect(globalAfter.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE * 2n);
   });
 
-  it('VAULT-M20X-02: after 15% distribution, activity ATH reduces the canonical message fee', async () => {
-    const { blockchain, vault, user } = await deployBoundPair({
+  it('VAULT-M20X-02: after 15% distribution, held ATH reduces the canonical message fee', async () => {
+    const { blockchain, vault, user, officialAthWallet } = await deployBoundPair({
       airdropRemaining: AIRDROP_DISCOUNT_UNLOCK_REMAINING,
     });
     await registerKeys(vault, user);
 
     const maxCharge1 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
-    await publishPrivate(blockchain, vault, user, maxCharge1);
+    await vault.send(blockchain.sender(officialAthWallet), { value: toNano('0.03') }, {
+      $$type: 'AthTransferNotification',
+      query_id: 9002n,
+      amount: AIRDROP_REWARD_PER_MESSAGE,
+      sender_key: 1n,
+      sender_wallet: user.address,
+    } as AthTransferNotification);
 
     const maxCharge2 = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
     expect(maxCharge2).toBeLessThan(maxCharge1);

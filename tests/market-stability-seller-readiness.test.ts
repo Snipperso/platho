@@ -38,11 +38,11 @@ function readyInput(): MarketStabilitySellerReadinessInput {
       addresses,
       code_hashes,
       constants: {
-        ath_market_stability_reserve_allocation_atomic: '45000000000000000',
+        ath_market_stability_reserve_allocation_atomic: '60000000000000000',
         ath_market_stability_tranche_atomic: '3000000000000000',
-        ath_market_stability_tranche_count: '15',
+        ath_market_stability_tranche_count: '20',
         ath_market_stability_start_multiplier: '2',
-        ath_market_stability_end_multiplier: '16',
+        ath_market_stability_end_multiplier: '21',
       },
       blockers_before_final_genesis: [],
     },
@@ -62,7 +62,7 @@ function readyInput(): MarketStabilitySellerReadinessInput {
         evidence_x1_tranche_quote_nanotons: '1000000000',
         pricing_evidence_hash: hash('pricing_evidence'),
         phase: '0',
-        reserve_due_ath: '45000000000000000',
+        reserve_due_ath: '60000000000000000',
         treasury_due_ton: '0',
         pending_query_id: '0',
         pending_amount_ath: '0',
@@ -72,7 +72,7 @@ function readyInput(): MarketStabilitySellerReadinessInput {
         current_multiplier: '2',
         current_tranche_remaining_ath: '3000000000000000',
         last_terminal_query_id: '0',
-        reserve_funded_total_ath: '45000000000000000',
+        reserve_funded_total_ath: '60000000000000000',
         sold_ath_total: '0',
         treasury_flushed_ton_total: '0',
       },
@@ -81,7 +81,7 @@ function readyInput(): MarketStabilitySellerReadinessInput {
         code_hash: code_hashes.ath_wallet,
         owner_address: addresses.market_stability_seller,
         ath_master_address: addresses.ath_master,
-        balance_atomic: '45000000000000000',
+        balance_atomic: '60000000000000000',
       },
     },
     evidenceRefs: {
@@ -110,7 +110,7 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.market_stability_seller_ready).toBe(true);
     expect(report.status).toBe('MARKET_STABILITY_SELLER_READY');
     expect(report.issue_codes).toEqual([]);
-    expect(report.reserve_allocation_atomic).toBe('45000000000000000');
+    expect(report.reserve_allocation_atomic).toBe('60000000000000000');
     expect(report.base_tranche_price_nanotons).toBe('1000000000');
   });
 
@@ -164,9 +164,9 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
 
   it('rejects underfunded or accounting-mismatched reserve backing', () => {
     const input = readyInput();
-    input.snapshot.market_stability_seller.reserve_due_ath = '44999999999999999';
-    input.snapshot.market_stability_seller.reserve_funded_total_ath = '44999999999999999';
-    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '44999999999999999';
+    input.snapshot.market_stability_seller.reserve_due_ath = '59999999999999999';
+    input.snapshot.market_stability_seller.reserve_funded_total_ath = '59999999999999999';
+    input.snapshot.market_stability_seller_official_ath_wallet.balance_atomic = '59999999999999999';
 
     const report = verifyMarketStabilitySellerReadiness(input);
 

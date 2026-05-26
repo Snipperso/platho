@@ -66,8 +66,8 @@ function finalInput(): MainnetGenesisVerifyInput {
       code_hashes,
       constants: {
         ath_total_supply_atomic: '100000000000000000',
-        vault_activity_airdrop_total_atomic: '30000000000000000',
-        ath_market_stability_reserve_allocation_atomic: '45000000000000000',
+        vault_activity_airdrop_total_atomic: '15000000000000000',
+        ath_market_stability_reserve_allocation_atomic: '60000000000000000',
       },
       blockers_before_final_genesis: [],
     },
@@ -93,7 +93,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         pending_ath_withdrawal_count: '0',
         pending_publish_count: '0',
         processed_ath_deposit_count: '0',
-        airdrop_remaining_ath: '30000000000000000',
+        airdrop_remaining_ath: '15000000000000000',
         airdrop_distributed_ath: '0',
       },
       vault_official_ath_wallet: {
@@ -101,7 +101,7 @@ function finalInput(): MainnetGenesisVerifyInput {
         code_hash: code_hashes.ath_wallet,
         owner_address: addresses.vault,
         ath_master_address: addresses.ath_master,
-        balance_atomic: '30000000000000000',
+        balance_atomic: '15000000000000000',
       },
       market_stability_seller: {
         address: addresses.market_stability_seller,
@@ -298,11 +298,11 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('ATH_TOTAL_SUPPLY_CONSTANT_MISMATCH');
   });
 
-  it('rejects a self-consistent manifest with a non-30M Vault activity airdrop constant', () => {
+  it('rejects a self-consistent manifest with a non-15M Vault activity airdrop constant', () => {
     const input = finalInput();
-    input.manifest.constants!.vault_activity_airdrop_total_atomic = '20000000000000000';
-    input.snapshot.vault.airdrop_remaining_ath = '20000000000000000';
-    input.snapshot.vault_official_ath_wallet.balance_atomic = '20000000000000000';
+    input.manifest.constants!.vault_activity_airdrop_total_atomic = '14000000000000000';
+    input.snapshot.vault.airdrop_remaining_ath = '14000000000000000';
+    input.snapshot.vault_official_ath_wallet.balance_atomic = '14000000000000000';
 
     const report = verifyMainnetGenesisSnapshot(input);
 
@@ -310,9 +310,9 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('VAULT_ACTIVITY_AIRDROP_TOTAL_CONSTANT_MISMATCH');
   });
 
-  it('rejects a manifest with a non-45M market-stability reserve constant', () => {
+  it('rejects a manifest with a non-60M market-stability reserve constant', () => {
     const input = finalInput();
-    input.manifest.constants!.ath_market_stability_reserve_allocation_atomic = '44000000000000000';
+    input.manifest.constants!.ath_market_stability_reserve_allocation_atomic = '59000000000000000';
 
     const report = verifyMainnetGenesisSnapshot(input);
 
@@ -332,7 +332,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
   it('rejects final genesis when official Vault ATH wallet does not fund the full activity airdrop allocation', () => {
     const input = finalInput();
-    input.snapshot.vault_official_ath_wallet.balance_atomic = '29999999999999999';
+    input.snapshot.vault_official_ath_wallet.balance_atomic = '14999999999999999';
 
     const report = verifyMainnetGenesisSnapshot(input);
 

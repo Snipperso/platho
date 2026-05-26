@@ -11,10 +11,10 @@ The seller does not route through STON.fi. It sells ATH directly at fixed tranch
 ## Reserve
 
 ```text
-Total reserve:     45,000,000 ATH
-Tranche count:     15
+Total reserve:     60,000,000 ATH
+Tranche count:     20
 Tranche size:       3,000,000 ATH
-Multipliers:        x2 through x16
+Multipliers:        x2 through x21
 Founder grant:      0 ATH
 ```
 
@@ -47,7 +47,7 @@ Before reserve use:
 - `base_tranche_price_nanotons` must exactly equal `evidence_x1_tranche_quote_nanotons` and be frozen either before seal or by the one-time post-seal launch controller while seller reserve/sales state is still zero;
 - post-seal pricing freeze must clear the launch controller hash;
 - if the seller is sealed before pricing, final genesis evidence must prove the retained launch controller hash matches the manifest controller address;
-- the seller official ATH wallet must be funded with the 45,000,000 ATH reserve through authenticated ATH notification before sales;
+- the seller official ATH wallet must be funded with the 60,000,000 ATH reserve through authenticated ATH notification before sales;
 - the deployed code hash, StateInit hash, official ATH wallet address, reserve funder, treasury receiver, and pricing evidence hash must be archived.
 - `npm.cmd run market-stability:readiness` must pass against the post-pool getter snapshot before the first reserve sale is treated as production-ready.
 

@@ -6,7 +6,7 @@ M21A audited the new Vault activity airdrop money path after M20Y/M20Z.
 
 No reproducible runtime C/H/M issue was found in the checked Vault airdrop logic.
 
-A final-genesis evidence blocker was added because the Vault cannot verify its own ATH wallet backing balance at runtime. Final genesis must require proof that the official Vault ATH wallet is funded with the full 30,000,000 ATH activity airdrop allocation.
+A final-genesis evidence blocker was added because the Vault cannot verify its own ATH wallet backing balance at runtime. Final genesis must require proof that the official Vault ATH wallet is funded with the full 15,000,000 ATH activity airdrop allocation.
 
 ## Changes
 

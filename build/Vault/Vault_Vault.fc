@@ -1291,7 +1291,7 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, int, int, int, int,
         ifnot ($self'deployment_manifest_hash) {
             $self'deployment_manifest_hash = $genesis_config_hash;
         }
-        $self'genesis_config_hash = 30000000000000000;
+        $self'genesis_config_hash = 15000000000000000;
     }
     $self'users = null();
     $self'key_records = null();
@@ -1377,7 +1377,7 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, int, int, int, int,
         var $fresh$ret_98 = $fullFee;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count), $fresh$ret_98);
     }
-    if (($self'genesis_config_hash > 15000000000000000)) {
+    if (($self'genesis_config_hash > 0)) {
         var $fresh$ret_99 = $fullFee;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count), $fresh$ret_99);
     }
@@ -1851,7 +1851,7 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, int, int, int, int,
     if ($self'sealed) {
         $airdropRemaining = $self'genesis_config_hash;
     }
-    var $fresh$ret_161 = $VaultGlobalView$_constructor_sealed_capsule_hub_bound_deployment_manifest_hash_capsule_hub_address_vault_ath_wallet_address_ath_master_address_user_count_key_record_count_receive_intent_count_pending_ath_withdrawal_count_pending_publish_count_processed_ath_deposit_count_pending_publish_stale_ttl_airdrop_remaining_ath_airdrop_distributed_ath_airdrop_reward_per_message_ath_airdrop_total_allocation_ath($self'sealed, $self'capsule_hub_bound, $self'deployment_manifest_hash, $self'capsule_hub_address, $self'vault_ath_wallet_address, $self'ath_master_address, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'processed_ath_deposit_count, 86400, $airdropRemaining, (30000000000000000 - $airdropRemaining), 10000000000, 30000000000000000);
+    var $fresh$ret_161 = $VaultGlobalView$_constructor_sealed_capsule_hub_bound_deployment_manifest_hash_capsule_hub_address_vault_ath_wallet_address_ath_master_address_user_count_key_record_count_receive_intent_count_pending_ath_withdrawal_count_pending_publish_count_processed_ath_deposit_count_pending_publish_stale_ttl_airdrop_remaining_ath_airdrop_distributed_ath_airdrop_reward_per_message_ath_airdrop_total_allocation_ath($self'sealed, $self'capsule_hub_bound, $self'deployment_manifest_hash, $self'capsule_hub_address, $self'vault_ath_wallet_address, $self'ath_master_address, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'processed_ath_deposit_count, 86400, $airdropRemaining, (15000000000000000 - $airdropRemaining), 10000000000, 15000000000000000);
     return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count), $fresh$ret_161);
 }
 
@@ -2087,7 +2087,7 @@ _ %get_global() method_id(126899) {
         throw_unless(15022, $self'capsule_hub_bound);
         throw_unless(15023, ( ~ equal_slices_bits($self'vault_ath_wallet_address, __tact_context_get_sender()) ));
         throw_unless(15024, ( equal_slices_bits($self'vault_ath_wallet_address, ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_deriveAthWalletAddress($global_myAddress())) ));
-        $self'genesis_config_hash = 30000000000000000;
+        $self'genesis_config_hash = 15000000000000000;
         $self'sealed = true;
         $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'capsule_hub_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
         return ();

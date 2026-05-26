@@ -42,6 +42,6 @@ The PWA mirrors the on-chain rule:
 ## Unchanged
 
 - Activity reward remains `10 ATH` per successful paid publish.
-- Total activity airdrop remains `30,000,000 ATH`.
+- Total activity airdrop remains `15,000,000 ATH`.
 - Username/profile ATH utility is not changed by this gate.
 - FeeAccumulator buyback split remains separately gated by M21B.

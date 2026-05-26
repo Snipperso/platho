@@ -16,6 +16,6 @@
 - No contract code changed.
 - No tests changed.
 - No runtime behavior changed.
-- Vault activity airdrop remains `30,000,000 ATH` total and `10 ATH` per successful paid publish.
+- Vault activity airdrop remains `15,000,000 ATH` total and `10 ATH` per successful paid publish.
 - `STONFI_ROUTE_FREEZE_READY=false` remains unchanged.
 - `BUYBACKBURN_IMPLEMENTATION_READY=false` remains unchanged.

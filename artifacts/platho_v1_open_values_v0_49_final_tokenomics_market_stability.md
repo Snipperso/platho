@@ -15,10 +15,10 @@ There is no mint-after-deploy mechanism.
 ## Final allocation
 
 ```text
-Community activity airdrop:      30%   30,000,000 ATH
+Community activity airdrop:      15%   15,000,000 ATH
 Initial liquidity:               15%   15,000,000 ATH
 Treasury / operations:           10%   10,000,000 ATH
-Market stability reserve:        45%   45,000,000 ATH
+Market stability reserve:        60%   60,000,000 ATH
 Founder allocation:               0%            0 ATH
 TOTAL:                          100%  100,000,000 ATH
 ```
@@ -36,8 +36,8 @@ The reserve is not a discretionary founder wallet, partnership budget, or manual
 Reserve size:
 
 ```text
-45,000,000 ATH
-45% of fixed supply
+60,000,000 ATH
+60% of fixed supply
 ```
 
 Tranche policy:
@@ -58,12 +58,17 @@ x13 initial pool price: 3,000,000 ATH
 x14 initial pool price: 3,000,000 ATH
 x15 initial pool price: 3,000,000 ATH
 x16 initial pool price: 3,000,000 ATH
+x17 initial pool price: 3,000,000 ATH
+x18 initial pool price: 3,000,000 ATH
+x19 initial pool price: 3,000,000 ATH
+x20 initial pool price: 3,000,000 ATH
+x21 initial pool price: 3,000,000 ATH
 ```
 
 Total released if all milestones execute:
 
 ```text
-15 tranches * 3,000,000 ATH = 45,000,000 ATH
+20 tranches * 3,000,000 ATH = 60,000,000 ATH
 ```
 
 Price multipliers are measured from the initial official ATH/TON pool price recorded at pool launch. A tranche should not be released below its configured multiplier floor.

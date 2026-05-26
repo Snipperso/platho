@@ -18,25 +18,25 @@ ATH total supply remains fixed:
 
 Community activity airdrop allocation:
 
-- `30%` of total ATH supply;
-- `30,000,000 ATH`;
-- `30,000,000,000,000,000` atomic units.
+- `15%` of total ATH supply;
+- `15,000,000 ATH`;
+- `15,000,000,000,000,000` atomic units.
 
-This supersedes the older 5% community airdrop candidate and the M20X 15% activity-airdrop draft. The final activity airdrop is 30% of fixed supply. Early user distribution is performed through the Vault activity airdrop. Supply remains fixed. No mint-after-deploy behavior is introduced.
+This supersedes the older 5% community airdrop candidate. The final activity airdrop is 15% of fixed supply. Early user distribution is performed through the Vault activity airdrop. Supply remains fixed. No mint-after-deploy behavior is introduced.
 
 
 ## Final token distribution
 
 ```text
-Community activity airdrop:      30%
+Community activity airdrop:      15%
 Liquidity bootstrap:             15%
 Treasury / operations:           10%
-Market stability reserve:        45%
+Market stability reserve:        60%
 Founder allocation:               0%
 TOTAL:                          100%
 ```
 
-M49 fixes the final reserve policy: the `45%` market stability reserve is released only through milestone-gated x2..x16 tranches, and there is no founder token allocation.
+M49 fixes the final reserve policy: the `60%` market stability reserve is released only through milestone-gated x2..x21 tranches, and there is no founder token allocation.
 
 Official ATH pool launch target:
 
@@ -45,7 +45,7 @@ Launch the official ATH liquidity pool after approximately 15,000,000 ATH,
 that is 15% of total supply, has been distributed through activity rewards.
 ```
 
-The remaining activity airdrop allocation continues after the pool launch until the global 30,000,000 ATH bucket is exhausted.
+The activity airdrop stops at the pool-launch gate once the global 15,000,000 ATH bucket is exhausted.
 
 ## Airdrop reward rule
 
@@ -53,7 +53,7 @@ Vault credits activity rewards to internal Vault ATH balances:
 
 - `10 ATH` per successfully finalized paid publish;
 - `10,000,000,000` atomic units per reward;
-- maximum global reward count: `3,000,000` rewarded publishes.
+- maximum global reward count: `1,500,000` rewarded publishes.
 
 A publish is rewardable only after `Vault` receives an authenticated `CapsuleHubPublishAck` from the sealed `CapsuleHub` address and validates that the ACK matches an existing `PendingPublish`.
 
@@ -67,11 +67,11 @@ Rewarded publish kinds:
 
 M20X intentionally uses only a global cap:
 
-- global cap: `30,000,000 ATH`;
+- global cap: `15,000,000 ATH`;
 - per-wallet cap: `none`;
 - manifest representation: `vault_activity_airdrop_per_wallet_cap_atomic = 0`.
 
-Reason: every rewarded publish requires a paid protocol action. At roughly `0.01 TON` per message, fully exhausting the `3,000,000` publish reward pool requires about `30,000 TON` of aggregate paid user activity. The airdrop is an activity rebate and early utility bootstrap, not a free claim campaign.
+Reason: every rewarded publish requires a paid protocol action. At roughly `0.01 TON` per message, fully exhausting the `1,500,000` publish reward pool requires about `15,000 TON` of aggregate paid user activity. The airdrop is an activity rebate and early utility bootstrap, not a free claim campaign.
 
 Users may intentionally accumulate ATH for:
 
@@ -126,7 +126,7 @@ Vault internal ATH balances created by activity rewards are real ATH claims agai
 Required deployment invariant:
 
 ```text
-Vault activity airdrop allocation = 30,000,000 ATH
+Vault activity airdrop allocation = 15,000,000 ATH
 Vault must never credit more than the remaining activity airdrop allocation
 ```
 
@@ -137,7 +137,7 @@ Vault is external-session gas-sensitive. Adding new persisted fields to Vault ca
 M20X therefore does not add new persisted Vault fields. It reuses the existing `genesis_config_hash` storage slot after seal:
 
 - before seal: `genesis_config_hash = hash(genesis_controller_address)`;
-- at `SealGenesis`: `genesis_config_hash = 30,000,000 ATH atomic`;
+- at `SealGenesis`: `genesis_config_hash = 15,000,000 ATH atomic`;
 - after seal: `genesis_config_hash` stores `airdrop_remaining_ath`;
 - the canonical sealed deployment/signing domain uses `deployment_manifest_hash`.
 

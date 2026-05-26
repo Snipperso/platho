@@ -78,7 +78,7 @@ M20Z does not:
 - change CapsuleHub code;
 - change UsernameRegistry code;
 - change FeeAccumulator code;
-- change the 30% activity airdrop bucket;
+- change the 15% activity airdrop bucket;
 - change the 10 ATH reward rule;
 - enable production BuybackBurn;
 - mark STON.fi route freeze as ready;

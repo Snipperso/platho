@@ -152,7 +152,7 @@ describe('M16 production conformance static checks', () => {
     expect(manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
     expect(manifest.blockers_before_final_genesis.join('\n')).not.toMatch(/STONFI/);
     expect(manifest.constants.vault_pending_publish_stale_ttl_seconds).toBe('86400');
-    expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('30000000000000000');
+    expect(manifest.constants.vault_activity_airdrop_total_atomic).toBe('15000000000000000');
     expect(manifest.constants.vault_activity_airdrop_reward_per_message_atomic).toBe('10000000000');
     expect(manifest.constants.vault_activity_airdrop_per_wallet_cap_atomic).toBe('0');
     expect(manifest.constants.profile_avatar_price_ath_atomic).toBe('100000000000');

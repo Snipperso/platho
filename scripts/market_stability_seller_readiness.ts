@@ -209,11 +209,11 @@ export function createMarketStabilitySellerReadinessInputTemplate(): MarketStabi
         market_stability_seller: 'required: current MarketStabilitySeller code hash',
       },
       constants: {
-        ath_market_stability_reserve_allocation_atomic: '45000000000000000',
+        ath_market_stability_reserve_allocation_atomic: '60000000000000000',
         ath_market_stability_tranche_atomic: '3000000000000000',
-        ath_market_stability_tranche_count: '15',
+        ath_market_stability_tranche_count: '20',
         ath_market_stability_start_multiplier: '2',
-        ath_market_stability_end_multiplier: '16',
+        ath_market_stability_end_multiplier: '21',
       },
       blockers_before_final_genesis: [],
     },
@@ -233,7 +233,7 @@ export function createMarketStabilitySellerReadinessInputTemplate(): MarketStabi
         evidence_x1_tranche_quote_nanotons: 'required: same decimal x1 quote evidence amount',
         pricing_evidence_hash: 'required: 64 lowercase hex evidence hash',
         phase: '0',
-        reserve_due_ath: '45000000000000000',
+        reserve_due_ath: '60000000000000000',
         treasury_due_ton: '0',
         pending_query_id: '0',
         pending_amount_ath: '0',
@@ -243,7 +243,7 @@ export function createMarketStabilitySellerReadinessInputTemplate(): MarketStabi
         current_multiplier: '2',
         current_tranche_remaining_ath: '3000000000000000',
         last_terminal_query_id: '0',
-        reserve_funded_total_ath: '45000000000000000',
+        reserve_funded_total_ath: '60000000000000000',
         sold_ath_total: '0',
         treasury_flushed_ton_total: '0',
       },
@@ -252,7 +252,7 @@ export function createMarketStabilitySellerReadinessInputTemplate(): MarketStabi
         code_hash: 'required: current ATHWallet code hash',
         owner_address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        balance_atomic: '45000000000000000',
+        balance_atomic: '60000000000000000',
       },
     },
     evidenceRefs: {
@@ -360,11 +360,11 @@ export function verifyMarketStabilitySellerReadiness(input: MarketStabilitySelle
     }
   }
 
-  addDecimalEq(issues, 'BAD_MARKET_STABILITY_RESERVE_TOTAL', reserveTotal, '45000000000000000', 'manifest.constants.ath_market_stability_reserve_allocation_atomic');
+  addDecimalEq(issues, 'BAD_MARKET_STABILITY_RESERVE_TOTAL', reserveTotal, '60000000000000000', 'manifest.constants.ath_market_stability_reserve_allocation_atomic');
   addDecimalEq(issues, 'BAD_MARKET_STABILITY_TRANCHE_AMOUNT', trancheAmount, '3000000000000000', 'manifest.constants.ath_market_stability_tranche_atomic');
-  addDecimalEq(issues, 'BAD_MARKET_STABILITY_TRANCHE_COUNT', trancheCount, '15', 'manifest.constants.ath_market_stability_tranche_count');
+  addDecimalEq(issues, 'BAD_MARKET_STABILITY_TRANCHE_COUNT', trancheCount, '20', 'manifest.constants.ath_market_stability_tranche_count');
   addDecimalEq(issues, 'BAD_MARKET_STABILITY_START_MULTIPLIER', startMultiplier, '2', 'manifest.constants.ath_market_stability_start_multiplier');
-  addDecimalEq(issues, 'BAD_MARKET_STABILITY_END_MULTIPLIER', endMultiplier, '16', 'manifest.constants.ath_market_stability_end_multiplier');
+  addDecimalEq(issues, 'BAD_MARKET_STABILITY_END_MULTIPLIER', endMultiplier, '21', 'manifest.constants.ath_market_stability_end_multiplier');
 
   checkBase(issues, manifest, seller, 'market_stability_seller', 'market_stability_seller', 'market_stability_seller');
   checkSealed(issues, manifest, seller, 'market_stability_seller');

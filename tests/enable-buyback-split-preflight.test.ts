@@ -94,7 +94,7 @@ describe('EnableBuybackSplit preflight guard', () => {
     expect(report.blockers).toEqual([]);
   });
 
-  it('M40E-02: blocks enable while the Vault activity airdrop remains above the 15M ATH threshold', () => {
+  it('M40E-02: blocks enable while the Vault activity airdrop is not fully distributed', () => {
     const report = createEnableBuybackSplitPreflight(completeInput({
       vaultState: {
         airdrop_remaining_ath: (VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH + 1n).toString(),

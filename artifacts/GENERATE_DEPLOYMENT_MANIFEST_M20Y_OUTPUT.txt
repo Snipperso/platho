@@ -47,7 +47,7 @@
     "username_pending_mint_stale_ttl_seconds": "86400",
     "username_item_ack_forward_reserve_nanotons": "3000000",
     "vault_pending_publish_stale_ttl_seconds": "86400",
-    "vault_activity_airdrop_total_atomic": "30000000000000000",
+    "vault_activity_airdrop_total_atomic": "15000000000000000",
     "vault_activity_airdrop_reward_per_message_atomic": "10000000000",
     "vault_activity_airdrop_per_wallet_cap_atomic": "0"
   },

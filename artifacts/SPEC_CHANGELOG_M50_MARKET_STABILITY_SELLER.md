@@ -18,7 +18,7 @@
 - Accepts reserve ATH only through the official seller ATH wallet and only from the bound reserve funder domain.
 - Can seal in an inert pre-pool state and freeze pricing exactly once later while reserve/sales state is still zero.
 - Requires frozen base tranche price to exactly match the captured x1 launch-price evidence.
-- Sells ATH directly to buyers at frozen tranche floor prices x2..x16.
+- Sells ATH directly to buyers at frozen tranche floor prices x2..x21.
 - Requires buyer-funded local reserve and downstream ATH transfer value.
 - Finalizes sale only after recipient ATH wallet ACK.
 - Restores ATH reserve and refunds buyer principal on transfer fail/bounce.

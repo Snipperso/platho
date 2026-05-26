@@ -1,19 +1,19 @@
-# SPEC CHANGELOG — M20Y 30% Activity Airdrop Tokenomics
+# SPEC CHANGELOG - M20Y Activity Airdrop Tokenomics
 
 ## Changed
 
-- Community activity airdrop allocation increased from 15% to 30% of fixed ATH supply.
-- Vault activity airdrop global cap increased from `15,000,000 ATH` to `30,000,000 ATH`.
-- Maximum rewarded publish count increased from `1,500,000` to `3,000,000`.
+- Community activity airdrop allocation increased from 15% to 15% of fixed ATH supply.
+- Vault activity airdrop global cap increased from `15,000,000 ATH` to `15,000,000 ATH`.
+- Maximum rewarded publish count is `1,500,000`.
 - Founder allocation target reduced to 0%.
 - Market stability reserve added as the explicit non-founder release valve for post-launch price expansion.
 - Final distribution table fixed as:
 
 ```text
-Community activity airdrop:      30%
+Community activity airdrop:      15%
 Liquidity bootstrap:             15%
 Treasury / operations:           10%
-Market stability reserve:        45%
+Market stability reserve:        60%
 Founder allocation:               0%
 TOTAL:                          100%
 ```
@@ -25,7 +25,7 @@ TOTAL:                          100%
 - Explicit pre-pool utility: earned ATH may be used for username purchases before official pool launch. Message fee discounts stay locked until the 15% activity-distribution / pool-launch gate.
 - FeeAccumulator bootstrap policy: before the 15% activity distribution / pool-launch gate, protocol TON splits 100% to liquidity bootstrap / treasury; buyback split is enabled later through the one-way `EnableBuybackSplit` gate.
 - BuybackBurn route policy: final genesis seals BuybackBurn before the pool exists, with `route_frozen = false`; the real STON.fi route is frozen once only after the 15% gate and pool creation.
-- Market stability policy: the 45% reserve is split into fifteen 3% tranches, released only at x2, x3, ..., x16 price milestones from the initial pool price. The reserve is not a founder/team allocation.
+- Market stability policy: the 60% reserve is split into twenty 3% tranches, released only at x2, x3, ..., x21 price milestones from the initial pool price. The reserve is not a founder/team allocation.
 - Market stability implementation note: no seller contract is implied by this changelog unless a separately audited immutable contract is deployed for that policy.
 
 ## Unchanged

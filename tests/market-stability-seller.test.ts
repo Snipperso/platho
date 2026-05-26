@@ -24,7 +24,7 @@ import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoA
 const MANIFEST_HASH = 0xababababababababababababababababababababababababababababababababn;
 const PRICING_EVIDENCE_HASH = 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdn;
 const TRANCHE = 3_000_000_000_000_000n;
-const TOTAL_RESERVE = 45_000_000_000_000_000n;
+const TOTAL_RESERVE = 60_000_000_000_000_000n;
 const BASE_TRANCHE_PRICE = toNano('1');
 const NOTIFY_VALUE = 80_000_000n;
 const BUY_TRANSFER_REQUEST_VALUE = 30_000_000n;
@@ -599,12 +599,12 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
   });
 
-  it('MSTAB-06: sells through the x16 tranche and rejects post-sellout buys', async () => {
+  it('MSTAB-06: sells through the x21 tranche and rejects post-sellout buys', async () => {
     const env = await setup();
     await bindFreezeSeal(env);
     await fundReserve(env, TOTAL_RESERVE);
 
-    for (let i = 0; i < 15; i += 1) {
+    for (let i = 0; i < 20; i += 1) {
       const queryId = BigInt(i + 1);
       const multiplier = BigInt(i + 2);
       const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
@@ -621,12 +621,12 @@ describe('MarketStabilitySeller', () => {
     let state = await env.seller.getGetMarketStabilitySellerState();
     let totals = await env.seller.getGetMarketStabilitySellerTotals();
     expect(state.reserve_due_ath).toBe(0n);
-    expect(state.completed_tranche_count).toBe(15n);
+    expect(state.completed_tranche_count).toBe(20n);
     expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
 
-    await env.seller.send(env.buyer.getSender(), { value: BASE_TRANCHE_PRICE * 17n + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+    await env.seller.send(env.buyer.getSender(), { value: BASE_TRANCHE_PRICE * 22n + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
       $$type: 'BuyMarketStabilityAth',
-      query_id: 16n,
+      query_id: 21n,
       amount: 1n,
       recipient: env.recipient.address,
     } as BuyMarketStabilityAth);
@@ -635,6 +635,6 @@ describe('MarketStabilitySeller', () => {
     totals = await env.seller.getGetMarketStabilitySellerTotals();
     expect(state.reserve_due_ath).toBe(0n);
     expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
-    expect(state.last_terminal_query_id).toBe(15n);
+    expect(state.last_terminal_query_id).toBe(20n);
   });
 });
