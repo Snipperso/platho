@@ -15,11 +15,14 @@ type Draft = {
   role_summary: Record<string, { label: string; normalized_address: string }>;
   initial_state_init: Record<string, { address: string; raw_address: string; state_init_hash: string }>;
   official_ath_wallets: Record<string, string>;
+  derived_ath_wallets: Record<string, { address: string; owner_address: string; ath_master_address: string; state_init_hash: string; note: string }>;
   funding_checklist: Array<{
     phase: string;
-    recipient: string;
+    required_balance_wallet: string;
+    wallet_owner_address: string;
     amount_ath: string;
     amount_atomic: string;
+    funding_route: string;
     requirement: string;
   }>;
   pre_seal_bindings: Array<[string, string]>;
@@ -53,6 +56,12 @@ function address(draft: Draft, key: string): string {
   return value;
 }
 
+function derivedAthWallet(draft: Draft, key: string): string {
+  const value = draft.derived_ath_wallets?.[key]?.address;
+  if (!value) throw new Error(`Missing derived ATH wallet ${key}`);
+  return value;
+}
+
 function stateHash(draft: Draft, key: string): string {
   const value = draft.manifest.state_init_hashes[key];
   if (!value) throw new Error(`Missing state init hash ${key}`);
@@ -65,7 +74,7 @@ function codeHash(draft: Draft, key: string): string {
   return value;
 }
 
-function buildPacket(draft: Draft) {
+export function buildPacket(draft: Draft) {
   const manifestHash = draft.manifest.manifest_hash_hex;
   const deploymentSteps = [
     {
@@ -201,18 +210,26 @@ function buildPacket(draft: Draft) {
       id: 'F01',
       signer_role: 'ath_treasury_owner',
       signer_address: role(draft, 'ath_treasury_owner'),
-      action: 'Transfer exactly 15M ATH to Vault official ATH wallet',
-      recipient: address(draft, 'vault_official_ath_wallet'),
+      action: 'Send ATHTransferRequest from Treasury Owner ATHWallet to fund Vault airdrop backing',
+      target_address: derivedAthWallet(draft, 'treasury_owner_ath_wallet'),
+      target_is: 'Treasury Owner ATHWallet',
+      recipient_owner_address: address(draft, 'vault'),
+      expected_recipient_ath_wallet: address(draft, 'vault_official_ath_wallet'),
       amount_atomic: draft.manifest.constants.vault_activity_airdrop_total_atomic,
+      warning: 'Do not send directly to the official ATH wallet address. ATHTransferRequest.recipient is the owner contract address.',
       stop_check: 'Vault official ATHWallet balance is exactly 15M ATH; Vault airdrop_remaining_ath is 15M and distributed is 0.',
     },
     {
       id: 'F02',
       signer_role: 'ath_treasury_owner',
       signer_address: role(draft, 'ath_treasury_owner'),
-      action: 'Transfer exactly 10M ATH to ATHVesting official ATH wallet',
-      recipient: address(draft, 'ath_long_term_vesting_official_ath_wallet'),
+      action: 'Send ATHTransferRequest from Treasury Owner ATHWallet to fund ATHVesting backing',
+      target_address: derivedAthWallet(draft, 'treasury_owner_ath_wallet'),
+      target_is: 'Treasury Owner ATHWallet',
+      recipient_owner_address: address(draft, 'ath_long_term_vesting'),
+      expected_recipient_ath_wallet: address(draft, 'ath_long_term_vesting_official_ath_wallet'),
       amount_atomic: draft.manifest.constants.ath_long_term_vesting_allocation_atomic,
+      warning: 'Do not send directly to the official ATH wallet address. ATHTransferRequest.recipient is the owner contract address.',
       stop_check: 'ATHVesting official ATHWallet balance is exactly 10M ATH; ATHVesting remains idle/clean.',
     },
   ];
@@ -228,6 +245,7 @@ function buildPacket(draft: Draft) {
       Object.entries(draft.initial_state_init).map(([key, value]) => [key, value.address]),
     ),
     official_ath_wallets: draft.official_ath_wallets,
+    derived_ath_wallets: draft.derived_ath_wallets,
     phase_1_deploy_contracts: deploymentSteps,
     phase_2_pre_seal_bindings: bindingSteps,
     phase_3_seal_contracts: sealSteps,
@@ -301,9 +319,9 @@ function markdown(packet: ReturnType<typeof buildPacket>): string {
     lines.push(`| ${step.id} | ${step.message} | ${step.target_address} | ${step.stop_check} |`);
   }
 
-  lines.push('', '## Phase 4: Final Genesis Funding', '', '| Step | Signer | Action | Recipient | Amount Atomic | Stop Check |', '| --- | --- | --- | --- | ---: | --- |');
+  lines.push('', '## Phase 4: Final Genesis Funding', '', '| Step | Signer | Action | Target | Recipient Owner | Expected Official Wallet | Amount Atomic | Stop Check |', '| --- | --- | --- | --- | --- | --- | ---: | --- |');
   for (const step of packet.phase_4_final_genesis_funding) {
-    lines.push(`| ${step.id} | ${step.signer_role} | ${step.action} | ${step.recipient} | ${step.amount_atomic} | ${step.stop_check} |`);
+    lines.push(`| ${step.id} | ${step.signer_role} | ${step.action} | ${step.target_address} | ${step.recipient_owner_address} | ${step.expected_recipient_ath_wallet} | ${step.amount_atomic} | ${step.stop_check} |`);
   }
 
   lines.push('', '## Phase 5: Final Genesis Verification', '');

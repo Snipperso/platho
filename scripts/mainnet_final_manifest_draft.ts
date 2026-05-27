@@ -184,6 +184,9 @@ async function buildDraft(rolesPath: string) {
   const athMaster = await ATHMaster.init(athTreasuryOwner, athContent.cell);
   const athMasterAddress = contractAddress(0, athMaster);
 
+  const treasuryOwnerAthWallet = await ATHWallet.init(0n, athTreasuryOwner, athMasterAddress);
+  const treasuryOwnerAthWalletAddress = contractAddress(athTreasuryOwner.workChain, treasuryOwnerAthWallet);
+
   const athLongTermVesting = await ATHVesting.init(athMasterAddress, vestingBeneficiary, athLongTermVestingStartTime);
   const athLongTermVestingAddress = contractAddress(0, athLongTermVesting);
 
@@ -390,26 +393,41 @@ async function buildDraft(rolesPath: string) {
       buyback_burn_official_ath_wallet: friendly(buybackBurnOfficialAthWalletAddress),
       market_stability_seller_official_ath_wallet: friendly(marketStabilitySellerOfficialAthWalletAddress),
     },
+    derived_ath_wallets: {
+      treasury_owner_ath_wallet: {
+        address: friendly(treasuryOwnerAthWalletAddress),
+        owner_address: friendly(athTreasuryOwner),
+        ath_master_address: friendly(athMasterAddress),
+        state_init_hash: stateInitHash(treasuryOwnerAthWallet),
+        note: 'Target this wallet for final-genesis ATHTransferRequest funding messages; do not target official system ATH wallets directly.',
+      },
+    },
     funding_checklist: [
       {
         phase: 'final_genesis',
-        recipient: friendly(vaultOfficialAthWalletAddress),
+        required_balance_wallet: friendly(vaultOfficialAthWalletAddress),
+        wallet_owner_address: friendly(vaultAddress),
         amount_ath: '15000000',
         amount_atomic: constants.vault_activity_airdrop_total_atomic,
+        funding_route: 'Send ATHTransferRequest to treasury_owner_ath_wallet with recipient_owner_address set to Vault.',
         requirement: 'exact balance before mainnet_genesis_verify',
       },
       {
         phase: 'final_genesis',
-        recipient: friendly(athLongTermVestingOfficialAthWalletAddress),
+        required_balance_wallet: friendly(athLongTermVestingOfficialAthWalletAddress),
+        wallet_owner_address: friendly(athLongTermVestingAddress),
         amount_ath: '10000000',
         amount_atomic: constants.ath_long_term_vesting_allocation_atomic,
+        funding_route: 'Send ATHTransferRequest to treasury_owner_ath_wallet with recipient_owner_address set to ATHVesting.',
         requirement: 'exact balance before mainnet_genesis_verify',
       },
       {
         phase: 'post_pool',
-        recipient: friendly(marketStabilitySellerOfficialAthWalletAddress),
+        required_balance_wallet: friendly(marketStabilitySellerOfficialAthWalletAddress),
+        wallet_owner_address: friendly(marketStabilitySellerAddress),
         amount_ath: '60000000',
         amount_atomic: constants.ath_market_stability_reserve_allocation_atomic,
+        funding_route: 'Fund only through MarketStabilitySeller reserve notify flow; direct ordinary transfer is unsupported.',
         requirement: 'fund only through MarketStabilitySeller reserve notify flow',
       },
     ],
@@ -470,9 +488,14 @@ function markdown(report: Awaited<ReturnType<typeof buildDraft>>): string {
     lines.push(`| ${key} | ${value} |`);
   }
 
-  lines.push('', '## Funding Checklist', '', '| Phase | Recipient | Amount ATH | Requirement |', '| --- | --- | ---: | --- |');
+  lines.push('', '## Derived ATH Wallets', '', '| Wallet | Address | Owner | Note |', '| --- | --- | --- | --- |');
+  for (const [key, value] of Object.entries(report.derived_ath_wallets)) {
+    lines.push(`| ${key} | ${value.address} | ${value.owner_address} | ${value.note} |`);
+  }
+
+  lines.push('', '## Funding Checklist', '', '| Phase | Required Balance Wallet | Wallet Owner | Amount ATH | Funding Route | Requirement |', '| --- | --- | --- | ---: | --- | --- |');
   for (const row of report.funding_checklist) {
-    lines.push(`| ${row.phase} | ${row.recipient} | ${row.amount_ath} | ${row.requirement} |`);
+    lines.push(`| ${row.phase} | ${row.required_balance_wallet} | ${row.wallet_owner_address} | ${row.amount_ath} | ${row.funding_route} | ${row.requirement} |`);
   }
 
   lines.push('', '## Pre-Seal Bindings', '', '| Message | Value |', '| --- | --- |');
