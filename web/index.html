@@ -9,7 +9,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=122">
+    <link rel="stylesheet" href="./styles.css?v=123">
     <script type="importmap">
       {
         "imports": {
@@ -333,8 +333,11 @@
                 <button id="importWalletButton" type="button"><span>Import wallet</span><strong id="importWalletStatus">24 words</strong></button>
                 <button id="unlockWalletButton" type="button"><span>Unlock wallet</span><strong id="unlockWalletStatus">not stored</strong></button>
                 <button id="changeWalletPasswordButton" type="button"><span>Change password</span><strong id="changeWalletPasswordStatus">encrypted</strong></button>
-                <button id="receiveWalletTonButton" type="button"><span>Receive TON</span><strong id="receiveWalletTonStatus">QR</strong></button>
-                <button id="sendWalletTonButton" type="button"><span>Send TON</span><strong id="sendWalletTonStatus">wallet</strong></button>
+                <div class="wallet-ton-group" aria-label="Wallet TON">
+                  <button id="walletTonBalanceButton" type="button"><span>Wallet TON</span><strong id="walletTonBalanceStatus">-</strong></button>
+                  <button id="receiveWalletTonButton" type="button"><span>Receive TON</span><strong id="receiveWalletTonStatus">QR</strong></button>
+                  <button id="sendWalletTonButton" type="button"><span>Send TON</span><strong id="sendWalletTonStatus">wallet</strong></button>
+                </div>
                 <button id="exportWalletKeyButton" type="button"><span>Export wallet key</span><strong id="exportWalletKeyStatus">encrypted file</strong></button>
                 <button id="importWalletKeyButton" type="button"><span>Import wallet key</span><strong id="importWalletKeyStatus">file</strong></button>
                 <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
@@ -347,7 +350,7 @@
                   <strong id="walletDisplayModeStatus">address</strong>
                 </label>
                 <button id="exportWalletSeedButton" type="button"><span>Export recovery phrase</span><strong id="walletAddressStatus">not created</strong></button>
-                <button id="registerVaultKeysButton" type="button"><span>Activate messaging</span><strong id="vaultDraftStatus">keys required</strong></button>
+                <button id="registerVaultKeysButton" type="button"><span>Activate Platho account</span><strong id="vaultDraftStatus">wallet required</strong></button>
                 <button id="clearLocalDataButton" type="button"><span>Clear local data</span><strong id="clearLocalDataStatus">device only</strong></button>
               </div>
             </section>
@@ -356,7 +359,7 @@
               <h2>Messages</h2>
               <div class="settings-list">
                 <button id="syncMessagesButton" type="button"><span>Sync messages</span><strong id="messageSyncStatus">tap to sync</strong></button>
-                <button id="replaceVaultKeysButton" type="button"><span>Replace message keys</span><strong id="vaultRotateStatus">activate first</strong></button>
+                <button id="replaceVaultKeysButton" type="button"><span>Replace message keys</span><strong id="vaultRotateStatus">activate account first</strong></button>
               </div>
             </section>
 
@@ -515,6 +518,6 @@
         </section>
       </div>
     </div>
-    <script src="./app.js?v=243" type="module"></script>
+    <script src="./app.js?v=244" type="module"></script>
   </body>
 </html>
