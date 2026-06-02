@@ -251,7 +251,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/aria-label="Copy wallet address"/);
     expect(html).toMatch(/id="walletDisplayModeSelect"/);
     expect(html).toMatch(/<option value="address">Address<\/option>/);
-    expect(html).toMatch(/<option value="ton_dns">TON DNS<\/option>/);
+    expect(html).not.toMatch(/<option value="ton_dns">TON DNS<\/option>/);
     expect(html).toMatch(/<option value="platho_nft">Platho name<\/option>/);
     expect(app).toMatch(/Wallet address copied/);
     expect(app).toMatch(/flashWalletIdentityStatus/);
@@ -409,16 +409,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/storage\?\.setItem\(PLATHO_WALLET_STORAGE_KEY, JSON\.stringify\(record\)\)/);
     expect(app).not.toMatch(/setItem\(PLATHO_WALLET_LEGACY_STORAGE_KEY/);
     expect(app).toMatch(/verifyWalletDisplayIdentity/);
-    expect(app).toMatch(/LINKED_TON_DNS_STORAGE_PREFIX/);
-    expect(app).toMatch(/readLinkedTonDnsName/);
-    expect(app).toMatch(/writeLinkedTonDnsName/);
+    expect(app).not.toMatch(/LINKED_TON_DNS_STORAGE_PREFIX/);
+    expect(app).not.toMatch(/readLinkedTonDnsName/);
+    expect(app).not.toMatch(/writeLinkedTonDnsName/);
     expect(app).toMatch(/LINKED_PLATHO_USERNAME_STORAGE_PREFIX/);
     expect(app).toMatch(/readLinkedPlathoUsername/);
     expect(app).toMatch(/writeLinkedPlathoUsername/);
-    expect(app).toMatch(/name resolves to this wallet/);
+    expect(app).not.toMatch(/name resolves to this wallet/);
     expect(app).toMatch(/permanent name, currently owned by this wallet/);
-    expect(app).toMatch(/No TON DNS linked/);
-    expect(app).toMatch(/Optional setup', value: 'Link TON DNS in Usernames and Avatars/);
+    expect(app).not.toMatch(/No TON DNS linked/);
+    expect(app).not.toMatch(/Optional setup', value: 'Link TON DNS in Usernames and Avatars/);
     expect(app).toMatch(/No \.ath name linked/);
     expect(app).toMatch(/Optional setup', value: 'Link \.ath name in Usernames and Avatars/);
     expect(app).not.toMatch(/Copied value/);
@@ -465,12 +465,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/avatar not active yet/);
     expect(app).toMatch(/avatar registration not confirmed/);
     expect(html).toMatch(/<h2>Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
-    expect(html).toMatch(/<h2>Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="linkTonDnsButton"[\s\S]*id="setAvatarButton"/);
+    expect(html).toMatch(/<h2>Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
     expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ TON fee/);
-    expect(html).toMatch(/Link TON DNS[\s\S]*id="linkedTonDnsStatus"[\s\S]*verify/);
+    expect(html).not.toMatch(/Link TON DNS[\s\S]*id="linkedTonDnsStatus"[\s\S]*verify/);
     expect(html).toMatch(/Link \.ath name[\s\S]*id="linkedUsernameStatus"[\s\S]*verify/);
-    expect(app).toMatch(/linkTonDnsButton\?\.addEventListener\('click'/);
-    expect(app).toMatch(/requestWalletDisplayIdentity\(WALLET_DISPLAY_MODES\.TON_DNS\)/);
+    expect(app).not.toMatch(/linkTonDnsButton\?\.addEventListener\('click'/);
+    expect(app).not.toMatch(/requestWalletDisplayIdentity\(WALLET_DISPLAY_MODES\.TON_DNS\)/);
     expect(app).toMatch(/linkUsernameButton\?\.addEventListener\('click'/);
     expect(app).toMatch(/requestWalletDisplayIdentity\(WALLET_DISPLAY_MODES\.PLATHO_NFT\)/);
     expect(app).toMatch(/setPublicChannelSubscribed/);
@@ -879,10 +879,6 @@ describe('PWA runtime config guard', () => {
   it('PWA-RPC-03: TON DNS recipient-affecting reads are fresh verified critical reads', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const criticalMethods = PLATHO_APP_CONFIG.network.tonRpc.criticalMethods;
-    const displaySource = app.slice(
-      app.indexOf('async function verifyWalletDisplayIdentity'),
-      app.indexOf('function readWalletDisplayIdentity'),
-    );
     const publicSource = app.slice(
       app.indexOf('async function resolvePublicChannelIdentity'),
       app.indexOf('function openPrivateThreadForWallet'),
@@ -893,7 +889,7 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(criticalMethods).toContain('dnsresolve');
-    for (const source of [displaySource, publicSource, recipientSource]) {
+    for (const source of [publicSource, recipientSource]) {
       expect(source).toMatch(/provider\.resolveWallet/);
       expect(source).toMatch(/rootAddress: appConfig\.tonDns\?\.rootAddress \?\? null/);
       expect(source).toMatch(/\.\.\.criticalChainReadOptions\(\)/);
@@ -1591,11 +1587,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v302/);
+    expect(sw).toMatch(/platho-pwa-prototype-v303/);
     expect(sw).toMatch(/\.\/styles\.css\?v=122/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=242/);
+    expect(sw).toMatch(/\.\/app\.js\?v=243/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

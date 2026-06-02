@@ -289,8 +289,6 @@ const publicCommentsDefaultSelect = document.querySelector('#publicCommentsDefau
 const setAvatarButton = document.querySelector('#setAvatarButton');
 const profileAvatarInput = document.querySelector('#profileAvatarInput');
 const mintUsernameButton = document.querySelector('#mintUsernameButton');
-const linkTonDnsButton = document.querySelector('#linkTonDnsButton');
-const linkedTonDnsStatus = document.querySelector('#linkedTonDnsStatus');
 const linkUsernameButton = document.querySelector('#linkUsernameButton');
 const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
 const flushUsernameRefundButton = document.querySelector('#flushUsernameRefundButton');
@@ -441,7 +439,6 @@ const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
 const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
 const INSTALL_PROMPT_DISMISSED_STORAGE_KEY = 'platho.installPrompt.dismissed.v1';
 const WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX = 'platho.wallet.displayIdentity.v1';
-const LINKED_TON_DNS_STORAGE_PREFIX = 'platho.wallet.linkedTonDns.v1';
 const LINKED_PLATHO_USERNAME_STORAGE_PREFIX = 'platho.wallet.linkedPlathoUsername.v1';
 const PROFILE_AVATAR_POINTER_STORAGE_PREFIX = 'platho.profile.avatar.v1';
 const PROFILE_AVATAR_MEDIA_CACHE_PREFIX = 'platho.profile.avatar.media.v1';
@@ -491,12 +488,10 @@ const IMAGE_COMPRESSION_MODES = Object.freeze({
 });
 const WALLET_DISPLAY_MODES = Object.freeze({
   ADDRESS: 'address',
-  TON_DNS: 'ton_dns',
   PLATHO_NFT: 'platho_nft',
 });
 const WALLET_DISPLAY_MODE_LABELS = Object.freeze({
   [WALLET_DISPLAY_MODES.ADDRESS]: 'Address',
-  [WALLET_DISPLAY_MODES.TON_DNS]: 'TON DNS',
   [WALLET_DISPLAY_MODES.PLATHO_NFT]: 'Platho name',
 });
 let vaultPocketState = {
@@ -922,10 +917,6 @@ function walletDisplayIdentityStorageKey(owner = plathoWallet?.address) {
   return owner ? `${WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX}:${owner}` : null;
 }
 
-function linkedTonDnsStorageKey(owner = plathoWallet?.address) {
-  return owner ? `${LINKED_TON_DNS_STORAGE_PREFIX}:${owner}` : null;
-}
-
 function linkedPlathoUsernameStorageKey(owner = plathoWallet?.address) {
   return owner ? `${LINKED_PLATHO_USERNAME_STORAGE_PREFIX}:${owner}` : null;
 }
@@ -950,15 +941,7 @@ function normalizeWalletDisplayIdentity(input) {
       return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
     }
   }
-  const parsed = parseRecipientIdentity(input?.label ?? input?.value ?? '');
-  if (!parsed.ok || parsed.identity.type !== RECIPIENT_IDENTITY_TYPES.TON_DNS) {
-    return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-  }
-  return {
-    mode,
-    label: parsed.identity.label,
-    verified_at: Number.isSafeInteger(Number(input?.verified_at)) ? Number(input.verified_at) : 0,
-  };
+  return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
 }
 
 function sameWalletAddress(left, right) {
@@ -1004,18 +987,7 @@ async function verifyWalletDisplayIdentity(mode, label, wallet = plathoWallet) {
     if (!sameWalletAddress(identity.ownerWallet, owner)) throw new Error(`${identity.label} belongs to another wallet`);
     return { mode: normalizedMode, label: identity.label, verified_at: Date.now() };
   }
-  const parsed = parseRecipientIdentity(label);
-  if (!parsed.ok || parsed.identity.type !== RECIPIENT_IDENTITY_TYPES.TON_DNS) {
-    throw new Error('Use a valid .ton name');
-  }
-  const provider = await resolveTonDnsProvider();
-  if (!provider?.resolveWallet) throw new Error('TON DNS provider is not configured');
-  const resolved = await provider.resolveWallet(parsed.identity.value, {
-    rootAddress: appConfig.tonDns?.rootAddress ?? null,
-    ...criticalChainReadOptions(),
-  });
-  if (!sameWalletAddress(resolved, owner)) throw new Error(`${parsed.identity.label} resolves to another wallet`);
-  return { mode: normalizedMode, label: parsed.identity.label, verified_at: Date.now() };
+  return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
 }
 
 function readWalletDisplayIdentity(owner = plathoWallet?.address) {
@@ -1025,41 +997,6 @@ function readWalletDisplayIdentity(owner = plathoWallet?.address) {
     return normalizeWalletDisplayIdentity(JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null'));
   } catch {
     return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-  }
-}
-
-function normalizeLinkedTonDnsName(input) {
-  const parsed = parseRecipientIdentity(input?.label ?? input?.value ?? input ?? '');
-  if (!parsed.ok || parsed.identity.type !== RECIPIENT_IDENTITY_TYPES.TON_DNS) return null;
-  return {
-    mode: WALLET_DISPLAY_MODES.TON_DNS,
-    label: parsed.identity.label,
-    verified_at: Number.isSafeInteger(Number(input?.verified_at)) ? Number(input.verified_at) : 0,
-  };
-}
-
-function readLinkedTonDnsName(owner = plathoWallet?.address) {
-  const key = linkedTonDnsStorageKey(owner);
-  if (key) {
-    try {
-      const linked = normalizeLinkedTonDnsName(JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null'));
-      if (linked) return linked;
-    } catch {
-      // A malformed local display alias should not break wallet rendering.
-    }
-  }
-  const legacy = readWalletDisplayIdentity(owner);
-  return legacy.mode === WALLET_DISPLAY_MODES.TON_DNS ? normalizeLinkedTonDnsName(legacy) : null;
-}
-
-function writeLinkedTonDnsName(identity, owner = plathoWallet?.address) {
-  const key = linkedTonDnsStorageKey(owner);
-  const normalized = normalizeLinkedTonDnsName(identity);
-  if (!key || !normalized) return;
-  try {
-    localStorageOrNull()?.setItem(key, JSON.stringify(normalized));
-  } catch {
-    // Local display attachment is cosmetic and can be re-linked.
   }
 }
 
@@ -1117,9 +1054,6 @@ function writeWalletDisplayIdentity(identity, owner = plathoWallet?.address) {
 
 function walletDisplayName(wallet = plathoWallet) {
   const identity = readWalletDisplayIdentity(wallet?.address);
-  if (identity.mode === WALLET_DISPLAY_MODES.TON_DNS) {
-    return readLinkedTonDnsName(wallet?.address)?.label ?? shortAddress(walletAddressForCopy(wallet));
-  }
   if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
     return readLinkedPlathoUsername(wallet?.address)?.label ?? shortAddress(walletAddressForCopy(wallet));
   }
@@ -1128,7 +1062,6 @@ function walletDisplayName(wallet = plathoWallet) {
 
 function walletDisplaySubtitle(wallet = plathoWallet) {
   const identity = readWalletDisplayIdentity(wallet?.address);
-  if (identity.mode === WALLET_DISPLAY_MODES.TON_DNS && readLinkedTonDnsName(wallet?.address)) return 'TON DNS';
   if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && readLinkedPlathoUsername(wallet?.address)) return 'Platho name';
   return 'Wallet ready';
 }
@@ -1143,24 +1076,19 @@ function renderWalletIdentity(status = null) {
     setText(identitySubtitle, status ?? (hasStored ? 'Unlock local wallet' : 'Create or import a wallet'));
     setText(walletAddressStatus, hasStored ? storedLabel : 'not created');
     setText(walletDisplayModeStatus, 'address');
-    setText(linkedTonDnsStatus, 'verify');
     setText(linkedUsernameStatus, 'verify');
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.ADDRESS;
     if (copyWalletAddressButton) copyWalletAddressButton.disabled = !storedAddress;
     return;
   }
   const identity = readWalletDisplayIdentity(plathoWallet.address);
-  const linkedTonDns = readLinkedTonDnsName(plathoWallet.address);
   const linkedUsername = readLinkedPlathoUsername(plathoWallet.address);
   setText(identityName, walletDisplayName(plathoWallet));
   setText(identitySubtitle, status ?? walletDisplaySubtitle(plathoWallet));
   setText(walletAddressStatus, shortAddress(walletAddressForCopy(plathoWallet)));
   setText(walletDisplayModeStatus, identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT
     ? linkedUsername?.label ?? 'optional'
-    : identity.mode === WALLET_DISPLAY_MODES.TON_DNS
-      ? linkedTonDns?.label ?? 'optional'
-      : 'address');
-  setText(linkedTonDnsStatus, linkedTonDns?.label ?? 'optional');
+    : 'address');
   setText(linkedUsernameStatus, linkedUsername?.label ?? 'optional');
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
@@ -6260,7 +6188,6 @@ function refreshMessagingControls() {
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !vaultKeysActive;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet;
   if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet;
-  if (linkTonDnsButton) linkTonDnsButton.disabled = !plathoWallet;
   if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet;
   if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet;
   if (setAvatarButton) setAvatarButton.disabled = !plathoWallet;
@@ -6744,26 +6671,6 @@ mintUsernameButton?.addEventListener('click', async () => {
     console.error(error);
   } finally {
     mintUsernameButton.disabled = false;
-  }
-});
-
-linkTonDnsButton?.addEventListener('click', async () => {
-  const previous = readWalletDisplayIdentity(plathoWallet?.address);
-  const previousLinked = readLinkedTonDnsName(plathoWallet?.address);
-  try {
-    linkTonDnsButton.disabled = true;
-    const identity = await requestWalletDisplayIdentity(WALLET_DISPLAY_MODES.TON_DNS);
-    if (!identity) return;
-    writeLinkedTonDnsName(identity, plathoWallet.address);
-    writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(`Linked ${identity.label}`);
-  } catch (error) {
-    flashWalletIdentityStatus('TON DNS link blocked');
-    if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(linkedTonDnsStatus, previousLinked?.label ?? 'optional');
-    console.error(error);
-  } finally {
-    linkTonDnsButton.disabled = !plathoWallet;
   }
 });
 
@@ -7461,25 +7368,6 @@ walletDisplayModeSelect?.addEventListener('change', async () => {
     let identity = null;
     if (mode === WALLET_DISPLAY_MODES.ADDRESS) {
       identity = { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-    } else if (mode === WALLET_DISPLAY_MODES.TON_DNS) {
-      const linked = readLinkedTonDnsName(plathoWallet.address);
-      if (!linked) {
-        if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-        await openActionDialog({
-          title: 'No TON DNS linked',
-          hint: 'You can link a verified .ton name in Usernames and Avatars, or keep displaying the wallet address.',
-          tone: 'muted',
-          submitLabel: 'Got it',
-          fields: [],
-          summary: [
-            { label: 'Current display', value: 'Wallet address' },
-            { label: 'Optional setup', value: 'Link TON DNS in Usernames and Avatars' },
-          ],
-        });
-        flashWalletIdentityStatus('No TON DNS linked');
-        return;
-      }
-      identity = linked;
     } else if (mode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
       const linked = readLinkedPlathoUsername(plathoWallet.address);
       if (!linked) {
@@ -7984,30 +7872,28 @@ async function importEncryptedWalletKeyFile(file) {
 async function requestWalletDisplayIdentity(mode) {
   const normalizedMode = normalizeWalletDisplayMode(mode);
   if (normalizedMode === WALLET_DISPLAY_MODES.ADDRESS) return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-  const suffix = normalizedMode === WALLET_DISPLAY_MODES.TON_DNS ? '.ton' : '.ath';
+  const suffix = '.ath';
   let feedback = `Enter a ${suffix} name for this wallet. The copy button still copies the wallet address.`;
   let tone = 'muted';
   const current = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
     ? readLinkedPlathoUsername(plathoWallet?.address)
-    : normalizedMode === WALLET_DISPLAY_MODES.TON_DNS
-      ? readLinkedTonDnsName(plathoWallet?.address)
     : readWalletDisplayIdentity(plathoWallet?.address);
   let value = current?.mode === normalizedMode ? current.label : '';
   while (true) {
     const result = await openActionDialog({
-      title: normalizedMode === WALLET_DISPLAY_MODES.TON_DNS ? 'Link TON DNS' : 'Link Platho name',
+      title: 'Link Platho name',
       hint: feedback,
       tone,
       submitLabel: 'Link name',
       fields: [{
         id: 'displayName',
         label: WALLET_DISPLAY_MODE_LABELS[normalizedMode],
-        placeholder: normalizedMode === WALLET_DISPLAY_MODES.TON_DNS ? 'name.ton' : 'name.ath',
+        placeholder: 'name.ath',
         autocomplete: 'off',
         value,
       }],
       summary: () => [
-        { label: 'Check', value: normalizedMode === WALLET_DISPLAY_MODES.TON_DNS ? 'name resolves to this wallet' : 'permanent name, currently owned by this wallet' },
+        { label: 'Check', value: 'permanent name, currently owned by this wallet' },
       ],
     });
     if (!result) return null;
