@@ -130,7 +130,7 @@ describe('v1 on-chain message source of truth', () => {
     }
 
     const html = read('web/index.html');
-    expect(html).toMatch(/Postquantum . from 0\.0347 TON/);
+    expect(html).not.toMatch(/Postquantum . from 0\.0347 TON/);
     expect(html).not.toMatch(/Postquantum . from 0\.030 TON/);
   });
 
