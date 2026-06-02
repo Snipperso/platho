@@ -9955,6 +9955,15 @@ function setPublishPartStatus(publishState, index, status, extra = {}) {
   return part;
 }
 
+function publishStatePendingCount(publishState) {
+  return (publishState?.parts ?? []).filter((item) => (
+    item.status === PUBLISH_PART_STATUS_SENT
+    || item.status === PUBLISH_PART_STATUS_UNKNOWN
+    || item.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+    || item.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
+  )).length;
+}
+
 function notifyPublishState(options, publishState, part) {
   try {
     options?.onPartState?.(part, publishState);
@@ -9967,9 +9976,14 @@ function publishStateMeta(publishState) {
   const total = Math.max(1, Number(publishState?.partCount) || 1);
   const confirmed = Math.max(0, Number(publishState?.confirmedCount) || 0);
   const submitted = Math.max(0, Number(publishState?.submittedCount) || 0);
+  const pending = Math.max(submitted, publishStatePendingCount(publishState));
   if (confirmed >= total) return 'published';
-  if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) return `partial publish ${submitted}/${total}`;
-  if (submitted > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) return `submitted ${submitted}/${total}, confirming`;
+  if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
+    if (pending <= 0) return 'send failed';
+    if (total === 1) return 'submitted, confirming';
+    return `partial publish ${pending}/${total}`;
+  }
+  if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) return `submitted ${pending}/${total}, confirming`;
   if (publishState?.status === 'failed') return 'send failed';
   return total > 1 ? `sending ${total} parts` : 'sending';
 }

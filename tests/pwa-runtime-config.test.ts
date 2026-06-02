@@ -658,7 +658,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function sendPreparedCapsulesThroughVault/);
     expect(app).toMatch(/CAPSULEHUB_PUBLISH_STATUS_CONFIRMED/);
     expect(app).toMatch(/VAULT_PUBLISH_STATUS_PARTIAL/);
-    expect(app).toMatch(/submitted \$\{submitted\}\/\$\{total\}, confirming/);
+    expect(app).toMatch(/submitted \$\{pending\}\/\$\{total\}, confirming/);
     expect(app).toMatch(/publishState: message\.publishState/);
     expect(app).toMatch(/updateMessageInEncryptedHistory/);
     expect(app).toMatch(/attemptCancelPaymentCheckAfterPublishFailure/);
@@ -796,6 +796,23 @@ describe('PWA runtime config guard', () => {
     expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
     expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
+  });
+
+  it('PWA-SEND-02B: pending single-capsule publish status does not render partial 0/1', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const metaSource = app.slice(
+      app.indexOf('function publishStatePendingCount'),
+      app.indexOf('function isVaultPublishPartialError'),
+    );
+
+    expect(metaSource).toMatch(/function publishStatePendingCount/);
+    expect(metaSource).toMatch(/PUBLISH_PART_STATUS_SENT/);
+    expect(metaSource).toMatch(/PUBLISH_PART_STATUS_UNKNOWN/);
+    expect(metaSource).toMatch(/const pending = Math\.max\(submitted, publishStatePendingCount\(publishState\)\)/);
+    expect(metaSource).toMatch(/if \(pending <= 0\) return 'send failed'/);
+    expect(metaSource).toMatch(/if \(total === 1\) return 'submitted, confirming'/);
+    expect(metaSource).toMatch(/partial publish \$\{pending\}\/\$\{total\}/);
+    expect(metaSource).not.toMatch(/partial publish \$\{submitted\}\/\$\{total\}/);
   });
 
   it('PWA-RPC-02: outbound private encryption resolves the recipient key through fresh verified reads', () => {
@@ -1572,11 +1589,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v300/);
+    expect(sw).toMatch(/platho-pwa-prototype-v301/);
     expect(sw).toMatch(/\.\/styles\.css\?v=122/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=240/);
+    expect(sw).toMatch(/\.\/app\.js\?v=241/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
