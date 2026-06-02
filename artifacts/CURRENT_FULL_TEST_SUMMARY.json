@@ -3,7 +3,7 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-02T17:31:31.425Z",
+  "generated_after_local_run": "2026-06-02T18:41:32.6688675Z",
   "discovered_test_files": 99,
   "executed_test_files": 99,
   "passed_test_files": 99,
@@ -51,9 +51,10 @@
     "It also includes the delta-pass cleanup after archive 20260602-162845: WEB-DEPLOY-04 was renamed and extended so static runtime selection explicitly includes public web/docs/*.md files while excluding top-level source docs, local server files, sourcemaps, and TypeScript sources.",
     "It also includes the final Section 15 hardening pass: final genesis verification now requires ATHVesting vested_ath and claimable_ath to be zero at genesis, MarketStabilitySeller reserve funder is rejected when it resolves to a protocol-owned role in draft/packet/verifier checks, and embedded wallet sends fail closed when RPC seqno cannot be read instead of silently signing with fallback seqno 0.",
     "Production release gates now pass for the verified mainnet genesis and production PWA; buyback route execution and MarketStabilitySeller sale activation remain intentionally staged until post-pool route/liquidity evidence is available.",
-    "It also includes the PWA private-send preflight copy fix: an unactivated messaging account now shows Activate messaging before sending, and other preflight blockers surface their concrete reason instead of generic Send blocked.",
+    "It also includes the PWA private-send preflight copy fix: an unactivated Platho account now shows Activate Platho account before sending, and other preflight blockers surface their concrete reason instead of generic Send blocked.",
     "It also includes the PWA publish-state copy fix: a single-capsule publish whose BOC was sent but chain confirmation is still pending now renders submitted, confirming instead of the misleading partial publish 0/1.",
     "It also includes the PWA fixed postquantum messaging cleanup: the obsolete profile encryption selector and its JS preference plumbing were removed because HYBRID_V1 is now the only private messaging suite.",
-    "It also includes the PWA TON DNS profile cleanup: the optional local Link TON DNS display row and linked-ton-dns storage plumbing were removed, while TON DNS recipient/public-channel resolution remains supported through fresh critical reads."
+    "It also includes the PWA TON DNS profile cleanup: the optional local Link TON DNS display row and linked-ton-dns storage plumbing were removed, while TON DNS recipient/public-channel resolution remains supported through fresh critical reads.",
+    "It also includes the PWA account activation UX cleanup: Activate Platho account now shows the activation transaction value, opens a required checkbox modal that downloads the encrypted wallet key backup before submitting the activation transaction, locks all non-profile tabs until the account has active Vault messaging keys, and adds profile Wallet TON / Receive TON / Send TON controls."
   ]
 }

@@ -382,7 +382,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/icon-swap-circular/);
     expect(css).toMatch(/\.vault-asset-amount\s*{\s*display: grid;[\s\S]*grid-template-columns: minmax\(44px, 1fr\) minmax\(58px, auto\);[\s\S]*width: 100%;\s*max-width: none;\s*justify-self: stretch;/);
     expect(css).toMatch(/\.vault-asset-amount button\s*{\s*min-width: 58px;/);
-    expect(css).toMatch(/\.balance-grid,\s*\.vault-move-list,\s*\.action-grid\s*{\s*grid-template-columns: 1fr;/);
+    expect(css).toMatch(/\.balance-grid,\s*\.vault-move-list,\s*\.action-grid,\s*\.wallet-ton-group\s*{\s*grid-template-columns: 1fr;/);
     expect(css).toMatch(/\.vault-asset-move-body\s*{\s*grid-template-columns: max-content minmax\(0, 1fr\);/);
     expect(app).toMatch(/walletBalanceInfoEndpoint/);
     expect(app).toMatch(/createTonRpcTransport/);
@@ -437,15 +437,27 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/globalThis\.sessionStorage\?\.clear\?\.\(\)/);
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
-    expect(html).toMatch(/<h2>Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="registerVaultKeysButton"/);
+    expect(html).toMatch(/<h2>Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="walletTonBalanceButton"[\s\S]*id="registerVaultKeysButton"/);
+    expect(html).toMatch(/Wallet TON[\s\S]*id="walletTonBalanceStatus"/);
+    expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
     expect(html).toMatch(/<h2>Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).toMatch(/Sync messages[\s\S]*tap to sync/);
-    expect(html).toMatch(/Replace message keys[\s\S]*activate first/);
+    expect(html).toMatch(/Replace message keys[\s\S]*activate account first/);
     expect(app).toMatch(/up to date/);
     expect(app).toMatch(/hasActiveVaultMessagingKeys/);
+    expect(app).toMatch(/hasActivePlathoAccount/);
+    expect(app).toMatch(/plathoAccountActivationFeeLabel/);
+    expect(app).toMatch(/walletTonBalanceButton\?\.addEventListener\('click'/);
+    expect(app).toMatch(/Activate Platho account first/);
+    expect(app).toMatch(/item\.dataset\.tab !== 'profile'/);
+    expect(app).toMatch(/setView\('profile'\)/);
     expect(app).not.toMatch(/rotate blocked/);
     expect(app).not.toMatch(/setText\(vaultRotateStatus, label\)/);
-    expect(app).toMatch(/vaultDraftStatus\.textContent = 'ready'/);
+    expect(app).not.toMatch(/vaultDraftStatus\.textContent = 'ready'/);
+    expect(app).toMatch(/Export key and activate/);
+    expect(app).toMatch(/backupConfirmed/);
+    expect(app).toMatch(/activationConfirmed/);
+    expect(app).toMatch(/downloadEncryptedWalletKeyBackup\(\)/);
     expect(app).toMatch(/VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES\.HYBRID_V1/);
     expect(app).toMatch(/loadMessagingIdentityFromWallet\(VAULT_RECEIVE_CRYPTO_SUITE\)/);
     expect(app).not.toMatch(/postquantum only/);
@@ -771,7 +783,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('const message = {', submitStart),
     );
 
-    expect(helperSource).toMatch(/Activate messaging before sending/);
+    expect(helperSource).toMatch(/Activate Platho account before sending/);
     expect(helperSource).toMatch(/network surcharge .* exceeds the production cap/i);
     expect(helperSource).toMatch(/RPC verification unavailable/);
     expect(submitSource).toMatch(/privateSendPreflightStatusText\(error\)/);
@@ -1587,11 +1599,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v303/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=122/);
+    expect(sw).toMatch(/platho-pwa-prototype-v304/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=123/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=243/);
+    expect(sw).toMatch(/\.\/app\.js\?v=244/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

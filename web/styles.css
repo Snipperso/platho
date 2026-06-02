@@ -80,6 +80,7 @@ button {
 
 button:disabled,
 .settings-list button:disabled,
+.rail-item:disabled,
 .action-grid button:disabled,
 .icon-button:disabled,
 .recipient-submit:disabled {
@@ -1881,6 +1882,16 @@ button.feed-item:hover {
   font-size: 14px;
 }
 
+.wallet-ton-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.wallet-ton-group button {
+  min-width: 0;
+}
+
 .profile-stat-row span {
   color: var(--muted);
 }
@@ -2214,6 +2225,21 @@ button.feed-item:hover {
 
 .action-summary strong {
   color: var(--text);
+}
+
+.action-checkbox-field label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.action-checkbox-field input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
 }
 
 .recipient-submit {
@@ -2707,7 +2733,8 @@ button.feed-item:hover {
 
   .balance-grid,
   .vault-move-list,
-  .action-grid {
+  .action-grid,
+  .wallet-ton-group {
     grid-template-columns: 1fr;
   }
 

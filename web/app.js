@@ -88,6 +88,7 @@ import {
   buildVaultUsernameMintExternalBoc,
   createVaultWalletMessage,
   createUsernameRegistryWalletMessage,
+  estimateVaultAttachedValueNanotons,
   PROFILE_AVATAR_PRICE_ATH,
   PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
   PUBLIC_BODY_MEDIA_FORMATS,
@@ -270,6 +271,8 @@ const receiveWalletTonButton = document.querySelector('#receiveWalletTonButton')
 const receiveWalletTonStatus = document.querySelector('#receiveWalletTonStatus');
 const sendWalletTonButton = document.querySelector('#sendWalletTonButton');
 const sendWalletTonStatus = document.querySelector('#sendWalletTonStatus');
+const walletTonBalanceButton = document.querySelector('#walletTonBalanceButton');
+const walletTonBalanceStatus = document.querySelector('#walletTonBalanceStatus');
 const exportWalletKeyButton = document.querySelector('#exportWalletKeyButton');
 const exportWalletKeyStatus = document.querySelector('#exportWalletKeyStatus');
 const importWalletKeyButton = document.querySelector('#importWalletKeyButton');
@@ -1464,7 +1467,7 @@ function closeNewChatDialog() {
 function collectActionDialogValues() {
   const values = {};
   for (const field of actionFields?.querySelectorAll('[name]') ?? []) {
-    values[field.name] = field.value;
+    values[field.name] = field.type === 'checkbox' ? field.checked : field.value;
   }
   return values;
 }
@@ -1529,10 +1532,24 @@ function createActionField(field) {
     return input;
   }
   const wrapper = document.createElement('div');
-  wrapper.className = 'action-field';
+  wrapper.className = field.type === 'checkbox' ? 'action-field action-checkbox-field' : 'action-field';
   const label = document.createElement('label');
   label.htmlFor = field.id;
   label.textContent = field.label;
+  if (field.type === 'checkbox') {
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = field.id;
+    input.name = field.name ?? field.id;
+    input.checked = field.checked === true;
+    input.required = field.required !== false;
+    const text = document.createElement('span');
+    text.textContent = field.label;
+    label.textContent = '';
+    label.append(input, text);
+    wrapper.append(label);
+    return wrapper;
+  }
   if (field.type === 'image-preview') {
     const card = document.createElement('div');
     card.className = 'image-preview-card';
@@ -5189,6 +5206,29 @@ function hasActiveVaultMessagingKeys() {
   }
 }
 
+function hasActivePlathoAccount() {
+  return hasActiveVaultMessagingKeys();
+}
+
+function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
+  return estimateVaultAttachedValueNanotons('RegisterMessagingKeys', localVaultDraft?.message ?? { crypto_suite_mask: VAULT_CRYPTO_SUITE.HYBRID }, {
+    userExists: user?.exists === true,
+  });
+}
+
+function plathoAccountActivationFeeLabel(user = currentVaultUserSource()) {
+  return `${formatTonNanotons(plathoAccountActivationFeeNanotons(user))} TON`;
+}
+
+function walletTonBalanceLabel() {
+  const balance = vaultPocketState.wallet?.ton_balance;
+  return balance === null || balance === undefined ? '-' : `${formatTonNanotons(balance)} TON`;
+}
+
+function refreshWalletTonProfileStatus() {
+  setText(walletTonBalanceStatus, walletTonBalanceLabel());
+}
+
 function refreshMessageActionStatuses(options = {}) {
   if (!plathoWallet) {
     if (!options.keepSyncStatus) setText(messageSyncStatus, 'wallet required');
@@ -5201,7 +5241,7 @@ function refreshMessageActionStatuses(options = {}) {
       setText(messageSyncStatus, 'tap to sync');
     }
   }
-  setText(vaultRotateStatus, hasActiveVaultMessagingKeys() ? 'ready' : 'activate first');
+  setText(vaultRotateStatus, hasActivePlathoAccount() ? 'ready' : 'activate account first');
 }
 
 function plathoWalletNetworkOptions() {
@@ -5271,7 +5311,7 @@ function shortUiErrorText(error, fallback = 'Blocked') {
 function privateSendPreflightStatusText(error) {
   const message = shortUiErrorText(error, 'Send blocked');
   if (/not enough vault ton/i.test(message)) return message;
-  if (/activate messaging before publishing/i.test(message)) return 'Activate messaging before sending';
+  if (/activate platho account before publishing/i.test(message)) return 'Activate Platho account before sending';
   if (/network surcharge .* exceeds the production cap/i.test(message)) return message;
   if (/RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message)) return 'RPC verification unavailable';
   if (/Vault chain provider|TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
@@ -5716,18 +5756,18 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
 function refreshPrivateSendButtonState() {
   if (!sendButton) return;
   const privateReadOnly = activeThread()?.readOnly === true;
-  sendButton.disabled = privateReadOnly || !plathoWallet || tonRpcLimited() || privateComposerKnownVaultTonShortfall();
+  sendButton.disabled = privateReadOnly || !plathoWallet || !hasActivePlathoAccount() || tonRpcLimited() || privateComposerKnownVaultTonShortfall();
 }
 
 function refreshPublicSendButtonState() {
   const publicSendButton = publicComposer?.querySelector?.('.send-button');
-  if (publicSendButton) publicSendButton.disabled = !plathoWallet || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
+  if (publicSendButton) publicSendButton.disabled = !plathoWallet || !hasActivePlathoAccount() || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
 }
 
 async function assertVaultHasPrivatePublishHold(suite, plan) {
   const user = rememberConnectedVaultUser(await loadConnectedVaultUser());
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate messaging before publishing');
+    throw new Error('Activate Platho account before publishing');
   }
   const hold = composerEstimatedMaxChargeNanotons(privateComposerPublishProfilesForPlan(suite, plan), 1);
   const balance = vaultTonBalanceNanotons(user);
@@ -6162,7 +6202,7 @@ async function clearPlathoLocalData() {
 }
 
 function refreshMessagingControls() {
-  const vaultKeysActive = hasActiveVaultMessagingKeys();
+  const accountActive = hasActivePlathoAccount();
   const hasStoredWallet = hasStoredPlathoWalletRecord();
   const hasKnownWallet = Boolean(plathoWallet || hasStoredWallet);
   if (createWalletButton) createWalletButton.disabled = false;
@@ -6177,6 +6217,8 @@ function refreshMessagingControls() {
   setText(receiveWalletTonStatus, currentWalletReceiveAddress() ? 'QR' : 'no wallet');
   if (sendWalletTonButton) sendWalletTonButton.disabled = !plathoWallet;
   setText(sendWalletTonStatus, plathoWallet ? 'wallet' : 'unlock');
+  if (walletTonBalanceButton) walletTonBalanceButton.disabled = !plathoWallet;
+  refreshWalletTonProfileStatus();
   if (exportWalletKeyButton) exportWalletKeyButton.disabled = !readEncryptedPlathoWalletRecord();
   setText(exportWalletKeyStatus, readEncryptedPlathoWalletRecord() ? 'encrypted file' : 'not stored');
   if (importWalletKeyButton) importWalletKeyButton.disabled = false;
@@ -6184,27 +6226,40 @@ function refreshMessagingControls() {
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = !(plathoWallet || storedWalletAddressForCopy());
   if (walletDisplayModeSelect) walletDisplayModeSelect.disabled = !plathoWallet;
-  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet;
-  if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !vaultKeysActive;
-  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet;
-  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet;
-  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet;
-  if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet;
-  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet;
-  if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet;
+  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet || accountActive;
+  setText(vaultDraftStatus, !plathoWallet
+    ? 'wallet required'
+    : accountActive
+      ? 'active'
+      : `${plathoAccountActivationFeeLabel()} TON`);
+  if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !accountActive;
+  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !accountActive;
+  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || !accountActive;
+  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !accountActive;
+  if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet || !accountActive;
+  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !accountActive;
+  if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet || !accountActive;
   if (messageInput) {
     const privateReadOnly = activeThread()?.readOnly === true;
-    messageInput.disabled = privateReadOnly || !plathoWallet;
+    messageInput.disabled = privateReadOnly || !plathoWallet || !accountActive;
   }
   if (sendButton) {
     refreshPrivateSendButtonState();
   }
-  if (publicMessageInput) publicMessageInput.disabled = !plathoWallet;
-  if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet;
+  if (publicMessageInput) publicMessageInput.disabled = !plathoWallet || !accountActive;
+  if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet || !accountActive;
   refreshPublicSendButtonState();
-  if (burnAthButton) burnAthButton.disabled = !plathoWallet;
+  if (burnAthButton) burnAthButton.disabled = !plathoWallet || !accountActive;
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
-    button.disabled = !plathoWallet;
+    button.disabled = !plathoWallet || !accountActive;
+  }
+  railItems.forEach((item) => {
+    const gated = item.dataset.tab !== 'profile';
+    item.disabled = gated && !accountActive;
+    item.title = item.disabled ? 'Activate Platho account first' : (item.getAttribute('aria-label') ?? '');
+  });
+  if (!accountActive && appShell?.dataset?.view !== 'profile') {
+    requestAnimationFrame(() => setView('profile'));
   }
   refreshVaultMoveWidget();
   refreshComposerCostStatus();
@@ -6213,6 +6268,10 @@ function refreshMessagingControls() {
 }
 
 function setView(view) {
+  if (view !== 'profile' && !hasActivePlathoAccount()) {
+    view = 'profile';
+    flashWalletIdentityStatus(plathoWallet ? 'Activate Platho account first' : 'Create or unlock wallet first');
+  }
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
@@ -6249,6 +6308,9 @@ function setView(view) {
     scheduleVaultAutoRefresh(2_000);
   }
   if (view === 'profile' && plathoWallet?.address) {
+    refreshWalletTonBalanceForProfile().catch((error) => {
+      if (!noteTonRpcRateLimit(error)) console.error(error);
+    });
     refreshAthProtocolStats().catch(() => {});
     refreshOwnProfileAvatar().catch((error) => console.error(error));
   }
@@ -6856,10 +6918,10 @@ registerVaultKeysButton?.addEventListener('click', async () => {
     registerVaultKeysButton.disabled = true;
     await submitVaultRegisterMessagingKeys();
   } catch (error) {
-    vaultDraftStatus.textContent = 'send blocked';
+    vaultDraftStatus.textContent = 'activation blocked';
     console.error(error);
   } finally {
-    registerVaultKeysButton.disabled = false;
+    refreshMessagingControls();
   }
 });
 
@@ -7038,7 +7100,7 @@ composer?.addEventListener('submit', async (event) => {
   }
   if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
     if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = 'Activate messaging before sending';
+      privateComposerCostStatus.textContent = 'Activate Platho account before sending';
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshMessagingControls();
@@ -7182,10 +7244,7 @@ createWalletButton?.addEventListener('click', async () => {
     if (!password) return;
     createWalletButton.disabled = true;
     await setPlathoWallet(walletDraft, { password });
-    const backedUp = await offerEncryptedWalletKeyBackup(
-      'Wallet created. Save an encrypted wallet key file now so browser storage cleanup cannot strand this wallet.',
-    );
-    flashWalletIdentityStatus(backedUp ? 'Wallet key exported' : 'Wallet ready');
+    flashWalletIdentityStatus('Wallet ready');
   } catch (error) {
     setText(walletAddressStatus, 'blocked');
     console.error(error);
@@ -7207,10 +7266,7 @@ importWalletButton?.addEventListener('click', async () => {
     if (!password) return;
     importWalletButton.disabled = true;
     await setPlathoWallet(walletDraft, { password });
-    const backedUp = await offerEncryptedWalletKeyBackup(
-      'Wallet imported from recovery phrase. Save an encrypted wallet key file now so you do not need to type the phrase again.',
-    );
-    flashWalletIdentityStatus(backedUp ? 'Wallet key exported' : 'Wallet ready');
+    flashWalletIdentityStatus('Wallet ready');
   } catch (error) {
     setText(walletAddressStatus, 'import blocked');
     console.error(error);
@@ -7273,6 +7329,18 @@ sendWalletTonButton?.addEventListener('click', async () => {
     await submitWalletTonTransfer();
   } catch (error) {
     setText(sendWalletTonStatus, 'blocked');
+    console.error(error);
+  } finally {
+    refreshMessagingControls();
+  }
+});
+
+walletTonBalanceButton?.addEventListener('click', async () => {
+  try {
+    walletTonBalanceButton.disabled = true;
+    await refreshWalletTonBalanceForProfile();
+  } catch (error) {
+    setText(walletTonBalanceStatus, 'blocked');
     console.error(error);
   } finally {
     refreshMessagingControls();
@@ -8577,7 +8645,7 @@ async function assertVaultProfileAvatarCanStart(owner, partCount) {
   ]);
   await requireProfileRegistryVaultRoute(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate messaging before setting an avatar');
+    throw new Error('Activate Platho account before setting an avatar');
   }
   if (!localIdentity?.signingSecretKey) {
     throw new Error('Local Platho signing key is not ready');
@@ -8605,7 +8673,7 @@ async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
   ]);
   await requireUsernameRegistryVaultRoute(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate messaging before minting a username');
+    throw new Error('Activate Platho account before minting a username');
   }
   if (!localIdentity?.signingSecretKey) {
     throw new Error('Local Platho signing key is not ready');
@@ -8633,7 +8701,7 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
   const registry = await requireProfileRegistryVaultRoute(global);
   const user = rememberConnectedVaultUser(rawUser);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate messaging before setting an avatar');
+    throw new Error('Activate Platho account before setting an avatar');
   }
   if (!localIdentity?.signingSecretKey) {
     throw new Error('Local Platho signing key is not ready');
@@ -8686,7 +8754,7 @@ async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   const registry = await requireUsernameRegistryVaultRoute(global);
   const user = rememberConnectedVaultUser(rawUser);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate messaging before minting a username');
+    throw new Error('Activate Platho account before minting a username');
   }
   if (!localIdentity?.signingSecretKey) {
     throw new Error('Local Platho signing key is not ready');
@@ -8738,6 +8806,28 @@ async function loadConnectedWalletBalances() {
   };
 }
 
+async function refreshWalletTonBalanceForProfile() {
+  if (!plathoWallet?.address) {
+    vaultPocketState = {
+      wallet: { ton_balance: null, ath_balance: vaultPocketState.wallet?.ath_balance ?? null },
+      vault: vaultPocketState.vault ?? { ton_balance: null, ath_balance: null },
+    };
+    refreshWalletTonProfileStatus();
+    return null;
+  }
+  setText(walletTonBalanceStatus, 'checking');
+  const balance = await loadConnectedTonWalletBalance();
+  vaultPocketState = {
+    wallet: {
+      ton_balance: balance,
+      ath_balance: vaultPocketState.wallet?.ath_balance ?? null,
+    },
+    vault: vaultPocketState.vault ?? { ton_balance: null, ath_balance: null },
+  };
+  refreshWalletTonProfileStatus();
+  return balance;
+}
+
 function renderVaultPocketCards(walletBalances, vaultUser) {
   vaultPocketState = {
     wallet: {
@@ -8750,6 +8840,7 @@ function renderVaultPocketCards(walletBalances, vaultUser) {
     },
   };
   renderVaultCards([]);
+  refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
 }
 
@@ -8758,6 +8849,7 @@ function resetVaultPocketState() {
     wallet: { ton_balance: null, ath_balance: null },
     vault: { ton_balance: null, ath_balance: null },
   };
+  refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
 }
 
@@ -8776,6 +8868,7 @@ function applyVaultUserPocketState(user) {
       walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
     };
   }
+  refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
   refreshComposerCostStatus();
   refreshComposerPublishPolicy();
@@ -9696,15 +9789,55 @@ async function submitVaultRegisterMessagingKeys() {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
   const user = await loadConnectedVaultUser();
   if (user.current_key_id && BigInt(user.current_key_id) !== 0n) {
-    vaultDraftStatus.textContent = 'already registered';
+    vaultDraftStatus.textContent = 'active';
     return null;
   }
+  if (!(await confirmPlathoAccountActivation(user))) return null;
+  downloadEncryptedWalletKeyBackup();
   vaultDraftStatus.textContent = 'signing';
   const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
     userExists: user.exists === true,
   });
-  vaultDraftStatus.textContent = 'register sent';
+  vaultDraftStatus.textContent = 'activation sent';
+  queueVaultPostTransactionRefresh();
   return result;
+}
+
+async function confirmPlathoAccountActivation(user) {
+  const fee = plathoAccountActivationFeeNanotons(user);
+  const walletBalance = await refreshWalletTonBalanceForProfile().catch(() => null);
+  let feedback = 'Export the encrypted wallet key, then send the account activation transaction.';
+  let tone = 'muted';
+  if (walletBalance !== null && walletBalance < fee) {
+    feedback = `Wallet TON is below the ${formatTonNanotons(fee)} TON activation transaction value. Receive TON first.`;
+    tone = 'error';
+  }
+  const result = await openActionDialog({
+    title: 'Activate Platho account',
+    hint: feedback,
+    tone,
+    submitLabel: 'Export key and activate',
+    dismissOnBackdrop: false,
+    fields: [
+      {
+        id: 'backupConfirmed',
+        type: 'checkbox',
+        label: 'I understand this will download my encrypted wallet key backup before activation.',
+      },
+      {
+        id: 'activationConfirmed',
+        type: 'checkbox',
+        label: 'I understand activation sends an on-chain Vault transaction and publishes the public keys needed for Platho messaging.',
+      },
+    ],
+    summary: [
+      { label: 'Wallet TON', value: walletBalance === null ? 'unknown' : `${formatTonNanotons(walletBalance)} TON` },
+      { label: 'Activation tx value', value: `${formatTonNanotons(fee)} TON` },
+      { label: 'Backup', value: 'encrypted wallet key JSON, protected by the local password' },
+      { label: 'After activation', value: 'private/public messaging, Vault, .ath name and avatar tabs unlock' },
+    ],
+  });
+  return result?.backupConfirmed === true && result?.activationConfirmed === true;
 }
 
 async function submitVaultReplaceMessagingKeys() {
@@ -9712,7 +9845,7 @@ async function submitVaultReplaceMessagingKeys() {
   const user = await loadConnectedVaultUser();
   const currentKeyId = BigInt(user.current_key_id ?? 0n);
   if (user.exists !== true || currentKeyId === 0n) {
-    setText(vaultRotateStatus, 'activate first');
+    setText(vaultRotateStatus, 'activate account first');
     return null;
   }
   setText(vaultRotateStatus, 'signing');
@@ -9965,7 +10098,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
   const user = await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
-    throw new Error('Activate messaging before publishing');
+    throw new Error('Activate Platho account before publishing');
   }
   if (!localIdentity?.signingSecretKey) {
     throw new Error('Local Platho signing key is not ready');
@@ -10497,7 +10630,7 @@ async function refreshVaultActivationStatus(options = {}) {
     }
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
       delete globalThis.plathoVaultBinding;
-      setText(vaultRecordStatus, 'message keys required');
+      setText(vaultRecordStatus, 'account activation required');
       refreshMessageActionStatuses();
       refreshMessagingControls();
       refreshComposerPublishPolicy();
@@ -10567,7 +10700,7 @@ async function bootCrypto() {
     const result = await runPlathoCryptoSelfTest();
     setText(encryptionStatus, result.hybrid.aadTamperRejected ? 'hybrid passed' : 'review');
     setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? 'signed bundle' : 'review');
-    vaultDraftStatus.textContent = 'ready';
+    refreshMessagingControls();
     setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
     if (appShell?.dataset?.view === 'chats') {
       const syncResult = await syncPrivateCapsulesFromChainOnce().catch((error) => {
