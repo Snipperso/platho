@@ -12,6 +12,7 @@ The current local CapsuleHub surface is intentionally small:
 
 - deploy binding: `BindDeploymentManifest`, `SealGenesis`
 - publish: `PublishPrivateFromVault`, `PublishPublicFromVault`
+- retention: `PruneCapsuleEntry`
 - fee movement: `FlushFees`
 - maintenance: `TopUpStorageReserve`
 - getters: entry/state reads
@@ -25,13 +26,13 @@ Direct user publish ABI is absent. Public and private publish entries are accept
 - Post-seal rebinding is rejected.
 - Non-Vault publish sender cannot create entries or ACKs.
 - Private publish requires the final fixed byte layout:
-  - `header_0`: 104 bytes
+  - `header_0`: 140 bytes
   - `header_1`: 30 bytes
-  - standard body: 1140 bytes
-  - hybrid body: 2228 bytes
-- Public publish stores a retrievable compact `PPH1` header cell plus a raw body cell from 1 to 1024 text bytes.
+  - hybrid body: 1204 bytes of cryptographic overhead plus exactly one selected useful slot: 1, 2, 4, 8, 16, or 32 KiB
+- Public publish validates a retrievable compact `PPH1` header cell plus a raw body cell from 1 to 1024 text bytes in the accepted publish transaction body.
 - Public publish requires the clear on-chain marker `sent via Platho.App`.
-- CapsuleHub stores retrievable payload cells, not hash-only anchors.
+- CapsuleHub stores compact authenticated headers/indexes, body hash, publish id, and contract `created_at`; heavy bodies remain in accepted publish transaction bodies and are verified by hash.
+- Compact private/public entries can be permissionlessly pruned after the configured retention window.
 - Page boundaries are metadata-only and do not change publish pricing.
 - Protocol fee accrual is exact to `protocol_fee_paid`.
 - Discounted dust fee can be final-flushed when it is the whole accrued bucket.

@@ -1,12 +1,12 @@
 # BuybackBurn Threat Model Checklist
 
-Status: locally frozen contract candidate after final engineering hardening pass, not an independent audit or formal proof.
+Status: current local contract checklist after final engineering hardening pass, not an independent audit or formal proof.
 
-Date: 2026-05-19
+Date: 2026-06-01
 
 Frozen source: `contracts/BuybackBurn.tact`
 
-Frozen code hash: `660f6816b4bc4f25db1e5166d2d238627793ccfc75d08a0fb5e5238fc9a84218`
+Current code hash: `1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2`
 
 Production unlock status: final genesis may seal BuybackBurn with `route_frozen=false`, but route freeze and execution remain blocked until post-pool M20F mainnet STON.fi route evidence passes. This local freeze does not set `production_buyback_burn_unlocked` or `BUYBACKBURN_IMPLEMENTATION_READY` to true.
 
@@ -18,6 +18,7 @@ Production unlock status: final genesis may seal BuybackBurn with `route_frozen=
 - Post-seal `FreezeBuybackRoute` is allowed once while BuybackBurn has no reserve, route refund, retry due, accepted reserve count, or pending phase; successful freeze clears `genesis_config_hash`.
 - Official ATH wallet is derived from the final BuybackBurn address and ATH master address.
 - STON.fi route freeze requires a positive min-out, nonzero evidence hash, referral bps bound, and ask wallet derived from the pinned ATH pool owner.
+- Buyback execution is a fixed-floor route. `ExecuteBuybackChunk` must provide the frozen quote and frozen `dex_min_out`; it is not a dynamic best-price mechanism and does not accept caller-supplied live market quotes.
 - FeeAccumulator can fund BuybackBurn only with the exact 51.05 TON envelope.
 - BuybackBurn executes one 50 TON offer per envelope while preserving 1.05 TON route funding.
 - pTON send uses `SendPayFwdFeesSeparately` so the exact envelope reaches the pTON wallet inbound path.
@@ -43,12 +44,13 @@ Production unlock status: final genesis may seal BuybackBurn with `route_frozen=
 - A pending ATH burn cannot become successful without `ATHBurnFinalized` from ATHMaster.
 - Failed route execution does not increment executed buyback count or burned ATH total.
 - Failed ATH burn preserves retryable ATH accounting until a later authenticated burn finalizes.
+- Ordinary ATH sent directly to the official BuybackBurn ATH wallet is not tracked by BuybackBurn state, is not burn due, and must be monitored as unexpected stuck wallet balance rather than protocol-owned reserve.
 - The production route cannot be frozen from testnet M20T evidence alone.
 
 ## Final Local Verification
 
 - `npm.cmd run build`: pass.
-- `node scripts/hash_codes.js`: BuybackBurn hash `660f6816b4bc4f25db1e5166d2d238627793ccfc75d08a0fb5e5238fc9a84218`.
+- `node scripts/hash_codes.js`: BuybackBurn hash `1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2`.
 - Targeted BuybackBurn route/readiness suite: 14 files, 71 tests passed.
 - Focused BuybackBurn production suite: 11 tests passed, including burn-failure retry coverage.
 - BuybackBurn auth-negative matrix: 6 tests passed.

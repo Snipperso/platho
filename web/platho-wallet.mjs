@@ -1,17 +1,19 @@
 import { ed25519, x25519 } from './vendor/@noble/curves/ed25519.js';
+import { hmac } from './vendor/@noble/hashes/hmac.js';
+import { pbkdf2Async } from './vendor/@noble/hashes/pbkdf2.js';
+import { sha512 } from './vendor/@noble/hashes/sha2.js';
 import { ml_kem768 } from './vendor/@noble/post-quantum/ml-kem.js';
+import { TON_MNEMONIC_WORDLIST } from './ton-mnemonic-wordlist.mjs?v=1';
 import {
   CONTRACT_CRYPTO_SUITE,
   CRYPTO_SUITES,
   ED25519_SECRET_KEY_BYTES,
   MLKEM768_PUBLIC_KEY_BYTES,
-  computeClassicalKeyId,
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-  randomBytes,
-} from './crypto/platho-crypto.mjs';
-import { tonCell } from './pwa-contract-transactions.mjs';
+} from './crypto/platho-crypto.mjs?v=2';
+import { tonCell } from './pwa-contract-transactions.mjs?v=14';
 
 const {
   beginCell,
@@ -19,15 +21,14 @@ const {
   parseBocBase64,
   computeCellHashAndDepth,
   bytesToBase64,
-  base64ToBytes,
   bytesToHex,
-  hexToBytes,
   concatBytes,
 } = tonCell;
 
 export const PLATHO_WALLET_VERSION = 1;
 export const PLATHO_WALLET_KIND = 'platho.wallet.v5r1';
 export const PLATHO_WALLET_SEED_BYTES = 32;
+export const PLATHO_WALLET_MNEMONIC_WORDS = 24;
 export const PLATHO_WALLET_WORKCHAIN = 0;
 export const PLATHO_WALLET_NETWORK_GLOBAL_IDS = Object.freeze({
   MAINNET: -239,
@@ -40,6 +41,8 @@ export const PLATHO_WALLET_V5R1_CODE_BOC =
   'te6ccgECFAEAAoEAART/APSkE/S88sgLAQIBIAINAgFIAwQC3NAg10nBIJFbj2Mg1wsfIIIQZXh0br0hghBzaW50vbCSXwPgghBleHRuuo60gCDXIQHQdNch+kAw+kT4KPpEMFi9kVvg7UTQgQFB1yH0BYMH9A5voTGRMOGAQNchcH/bPOAxINdJgQKAuZEw4HDiEA8CASAFDAIBIAYJAgFuBwgAGa3OdqJoQCDrkOuF/8AAGa8d9qJoQBDrkOuFj8ACAUgKCwAXsyX7UTQcdch1wsfgABGyYvtRNDXCgCAAGb5fD2omhAgKDrkPoCwBAvIOAR4g1wsfghBzaWduuvLgin8PAeaO8O2i7fshgwjXIgKDCNcjIIAg1yHTH9Mf0x/tRNDSANMfINMf0//XCgAK+QFAzPkQmiiUXwrbMeHywIffArNQB7Dy0IRRJbry4IVQNrry4Ib4I7vy0IgikvgA3gGkf8jKAMsfAc8Wye1UIJL4D95w2zzYEAP27aLt+wL0BCFukmwhjkwCIdc5MHCUIccAs44tAdcoIHYeQ2wg10nACPLgkyDXSsAC8uCTINcdBscSwgBSMLDy0InXTNc5MAGk6GwShAe78uCT10rAAPLgk+1V4tIAAcAAkVvg69csCBQgkXCWAdcsCBwS4lIQseMPINdKERITAJYB+kAB+kT4KPpEMFi68uCR7UTQgQFB1xj0BQSdf8jKAEAEgwf0U/Lgi44UA4MH9Fvy4Iwi1woAIW4Bs7Dy0JDiyFADzxYS9ADJ7VQAcjDXLAgkji0h8uCS0gDtRNDSAFETuvLQj1RQMJExnAGBAUDXIdcKAPLgjuLIygBYzxbJ7VST8sCN4gAQk1vbMeHXTNA=';
 
 const encoder = new TextEncoder();
+const TON_MNEMONIC_PBKDF_ITERATIONS = 100000;
+const TON_MNEMONIC_WORD_SET = new Set(TON_MNEMONIC_WORDLIST);
 
 function assertBytes(value, length, name) {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
@@ -47,14 +50,112 @@ function assertBytes(value, length, name) {
   return bytes;
 }
 
-function seedToText(seed) {
-  return `platho1.${bytesToHex(seed)}`;
+function bytesToBase64Url(bytes) {
+  return bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
-function seedFromText(value) {
-  const text = String(value ?? '').trim();
-  const raw = text.startsWith('platho1.') ? text.slice('platho1.'.length) : text;
-  return assertBytes(hexToBytes(raw, PLATHO_WALLET_SEED_BYTES, 'Platho wallet seed'), PLATHO_WALLET_SEED_BYTES, 'Platho wallet seed');
+function crc16Ccitt(bytes) {
+  let crc = 0;
+  for (const byte of bytes) {
+    crc ^= byte << 8;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 0x8000) !== 0 ? (crc << 1) ^ 0x1021 : crc << 1;
+      crc &= 0xffff;
+    }
+  }
+  return crc;
+}
+
+export function formatTonUserFriendlyAddress(address, options = {}) {
+  const parsed = parseTonAddress(address);
+  const bounceable = options.bounceable === true;
+  const testOnly = options.testOnly === true;
+  const tag = (bounceable ? 0x11 : 0x51) | (testOnly ? 0x80 : 0);
+  const body = new Uint8Array(34);
+  body[0] = tag;
+  body[1] = parsed.workchain === -1 ? 0xff : parsed.workchain & 0xff;
+  body.set(parsed.hash, 2);
+  const checksum = crc16Ccitt(body);
+  return bytesToBase64Url(concatBytes(body, new Uint8Array([checksum >> 8, checksum & 0xff])));
+}
+
+export function normalizeTonMnemonic(value) {
+  const words = (Array.isArray(value) ? value : String(value ?? '').trim().split(/\s+/))
+    .map((word) => String(word).trim().toLowerCase())
+    .filter(Boolean);
+  if (words.length !== PLATHO_WALLET_MNEMONIC_WORDS) {
+    throw new Error(`TON recovery phrase must contain ${PLATHO_WALLET_MNEMONIC_WORDS} words`);
+  }
+  for (const word of words) {
+    if (!TON_MNEMONIC_WORD_SET.has(word)) {
+      throw new Error('TON recovery phrase contains a word outside the TON word list');
+    }
+  }
+  return words;
+}
+
+function mnemonicText(words) {
+  return normalizeTonMnemonic(words).join(' ');
+}
+
+async function mnemonicEntropy(words, password = '') {
+  return hmac(sha512, encoder.encode(mnemonicText(words)), encoder.encode(password ?? ''));
+}
+
+async function pbkdf2Sha512(key, salt, iterations, length) {
+  return pbkdf2Async(sha512, key, salt, {
+    c: iterations,
+    dkLen: length,
+    asyncTick: 10,
+  });
+}
+
+async function isBasicTonMnemonicSeed(entropy) {
+  const seed = await pbkdf2Sha512(
+    entropy,
+    'TON seed version',
+    Math.max(1, Math.floor(TON_MNEMONIC_PBKDF_ITERATIONS / 256)),
+    64,
+  );
+  return seed[0] === 0;
+}
+
+export async function validateTonMnemonic(value, password = '') {
+  const words = normalizeTonMnemonic(value);
+  return isBasicTonMnemonicSeed(await mnemonicEntropy(words, password));
+}
+
+async function tonMnemonicSeed(words, salt, password = '') {
+  return pbkdf2Sha512(
+    await mnemonicEntropy(words, password),
+    salt,
+    TON_MNEMONIC_PBKDF_ITERATIONS,
+    64,
+  );
+}
+
+async function tonMnemonicWalletSecretKey(words, password = '') {
+  return (await tonMnemonicSeed(words, 'TON default seed', password)).subarray(0, 32);
+}
+
+function randomWordIndex() {
+  const cryptoImpl = globalThis.crypto;
+  if (!cryptoImpl?.getRandomValues) throw new Error('crypto.getRandomValues is unavailable');
+  const range = TON_MNEMONIC_WORDLIST.length;
+  const limit = Math.floor(0x100000000 / range) * range;
+  const bytes = new Uint8Array(4);
+  while (true) {
+    cryptoImpl.getRandomValues(bytes);
+    const value = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+    if (value < limit) return value % range;
+  }
+}
+
+export async function createTonMnemonic() {
+  while (true) {
+    const words = Array.from({ length: PLATHO_WALLET_MNEMONIC_WORDS }, () => TON_MNEMONIC_WORDLIST[randomWordIndex()]);
+    if (await validateTonMnemonic(words)) return words;
+  }
 }
 
 async function hkdfBytes(seed, info, length) {
@@ -135,9 +236,9 @@ async function contractAddressRaw(workchain, init) {
   return `${workchain}:${bytesToHex(hash)}`;
 }
 
-export async function derivePlathoWalletFromSeed(seedBytes, options = {}) {
-  const seed = assertBytes(seedBytes, PLATHO_WALLET_SEED_BYTES, 'Platho wallet seed');
-  const walletSecretKey = await hkdfBytes(seed, 'ton-wallet-v5r1-ed25519', ED25519_SECRET_KEY_BYTES);
+async function derivePlathoWalletFromKeyMaterial(rootSeed, walletSecretKeyBytes, recoveryText, options = {}) {
+  const seed = assertBytes(rootSeed, PLATHO_WALLET_SEED_BYTES, 'Platho wallet root seed');
+  const walletSecretKey = assertBytes(walletSecretKeyBytes, ED25519_SECRET_KEY_BYTES, 'Platho wallet secret key');
   const walletPublicKey = ed25519.getPublicKey(walletSecretKey);
   const workchain = options.workchain ?? PLATHO_WALLET_WORKCHAIN;
   const networkGlobalId = options.networkGlobalId ?? PLATHO_WALLET_NETWORK_GLOBAL_IDS.MAINNET;
@@ -146,11 +247,14 @@ export async function derivePlathoWalletFromSeed(seedBytes, options = {}) {
   const code = walletCodeCell();
   const data = walletDataCell(walletPublicKey, walletId);
   const init = stateInitCell(code, data);
+  const address = await contractAddressRaw(workchain, init);
+  const testOnly = networkGlobalId === PLATHO_WALLET_NETWORK_GLOBAL_IDS.TESTNET;
   return {
     version: PLATHO_WALLET_VERSION,
     kind: PLATHO_WALLET_KIND,
     seed,
-    seedText: seedToText(seed),
+    seedText: recoveryText,
+    recoveryPhrase: recoveryText,
     walletSecretKey,
     walletPublicKey,
     walletId,
@@ -165,58 +269,65 @@ export async function derivePlathoWalletFromSeed(seedBytes, options = {}) {
     networkGlobalId,
     subwalletNumber,
     workchain,
-    address: await contractAddressRaw(workchain, init),
+    address,
+    friendlyAddress: formatTonUserFriendlyAddress(address, {
+      bounceable: false,
+      testOnly,
+    }),
     stateInit: init,
     stateInitBoc: bytesToBase64(serializeBoc(init)),
   };
 }
 
+export async function derivePlathoWalletFromMnemonic(mnemonic, options = {}) {
+  const words = normalizeTonMnemonic(mnemonic);
+  if (!(await validateTonMnemonic(words, options.password ?? ''))) {
+    throw new Error('TON recovery phrase checksum is invalid');
+  }
+  const walletSecretKey = await tonMnemonicWalletSecretKey(words, options.password ?? '');
+  return derivePlathoWalletFromKeyMaterial(
+    await hkdfBytes(walletSecretKey, 'platho-messaging-root-v1', PLATHO_WALLET_SEED_BYTES),
+    walletSecretKey,
+    mnemonicText(words),
+    options,
+  );
+}
+
 export async function createPlathoWallet(options = {}) {
-  return derivePlathoWalletFromSeed(options.seed ?? randomBytes(PLATHO_WALLET_SEED_BYTES), options);
+  return derivePlathoWalletFromMnemonic(options.mnemonic ?? await createTonMnemonic(), options);
 }
 
-export async function importPlathoWallet(seedText, options = {}) {
-  return derivePlathoWalletFromSeed(seedFromText(seedText), options);
+export async function importPlathoWallet(recoveryPhrase, options = {}) {
+  return derivePlathoWalletFromMnemonic(recoveryPhrase, options);
 }
 
-export function exportPlathoWalletSeed(wallet) {
-  if (!wallet?.seed) throw new Error('Platho wallet is not loaded');
-  return seedToText(wallet.seed);
+export function exportPlathoWalletRecoveryPhrase(wallet) {
+  if (!wallet?.seedText) throw new Error('Platho wallet is not loaded');
+  return wallet.seedText;
 }
 
 export async function deriveMessagingIdentityFromWallet(wallet, suite) {
   if (!wallet?.seed) throw new Error('Platho wallet is not loaded');
-  const normalizedSuite = suite === CRYPTO_SUITES.CLASSICAL_V1 ? CRYPTO_SUITES.CLASSICAL_V1 : CRYPTO_SUITES.HYBRID_V1;
+  const normalizedSuite = CRYPTO_SUITES.HYBRID_V1;
   const x25519SecretKey = await hkdfBytes(wallet.seed, `messaging.${normalizedSuite}.x25519`, 32);
   const x25519PublicKey = x25519.getPublicKey(x25519SecretKey);
   const signingSecretKey = await hkdfBytes(wallet.seed, `messaging.${normalizedSuite}.ed25519`, ED25519_SECRET_KEY_BYTES);
-  let encryptionKeyPair;
-  if (normalizedSuite === CRYPTO_SUITES.CLASSICAL_V1) {
-    encryptionKeyPair = {
-      suite: CRYPTO_SUITES.CLASSICAL_V1,
-      contractSuite: CONTRACT_CRYPTO_SUITE.CLASSICAL,
-      keyId: await computeClassicalKeyId(x25519PublicKey),
-      x25519SecretKey,
-      x25519PublicKey,
-    };
-  } else {
-    const mlKemSeed = await hkdfBytes(wallet.seed, 'messaging.hybrid-v1.ml-kem768', 64);
-    const mlKem = ml_kem768.keygen(mlKemSeed);
-    const mlKem768PublicKey = assertBytes(mlKem.publicKey, MLKEM768_PUBLIC_KEY_BYTES, 'mlKem768PublicKey');
-    const mlKem768SecretKey = assertBytes(mlKem.secretKey, 2400, 'mlKem768SecretKey');
-    const mlKem768PublicKeyHash = await sha256(mlKem768PublicKey);
-    encryptionKeyPair = {
-      suite: CRYPTO_SUITES.HYBRID_V1,
-      contractSuite: CONTRACT_CRYPTO_SUITE.HYBRID,
-      keyId: await computeHybridKeyId(x25519PublicKey, mlKem768PublicKey),
-      x25519SecretKey,
-      x25519PublicKey,
-      mlKem768SecretKey,
-      mlKem768PublicKey,
-      mlKem768PublicKeyHash,
-      mlKem768PublicKeyLen: MLKEM768_PUBLIC_KEY_BYTES,
-    };
-  }
+  const mlKemSeed = await hkdfBytes(wallet.seed, 'messaging.hybrid-v1.ml-kem768', 64);
+  const mlKem = ml_kem768.keygen(mlKemSeed);
+  const mlKem768PublicKey = assertBytes(mlKem.publicKey, MLKEM768_PUBLIC_KEY_BYTES, 'mlKem768PublicKey');
+  const mlKem768SecretKey = assertBytes(mlKem.secretKey, 2400, 'mlKem768SecretKey');
+  const mlKem768PublicKeyHash = await sha256(mlKem768PublicKey);
+  const encryptionKeyPair = {
+    suite: CRYPTO_SUITES.HYBRID_V1,
+    contractSuite: CONTRACT_CRYPTO_SUITE.HYBRID,
+    keyId: await computeHybridKeyId(x25519PublicKey, mlKem768PublicKey),
+    x25519SecretKey,
+    x25519PublicKey,
+    mlKem768SecretKey,
+    mlKem768PublicKey,
+    mlKem768PublicKeyHash,
+    mlKem768PublicKeyLen: MLKEM768_PUBLIC_KEY_BYTES,
+  };
   return createMessagingIdentity({ encryptionKeyPair, signingSecretKey });
 }
 
@@ -317,21 +428,32 @@ function readSeqnoFromStack(result) {
   return 0;
 }
 
-export async function getPlathoWalletSeqno(wallet, transport) {
-  if (!transport?.runGetMethod) return 0;
+function walletSeqnoUnavailableError(message, cause) {
+  const error = new Error(message);
+  error.code = 'PLATHO_WALLET_SEQNO_UNAVAILABLE';
+  if (cause) error.cause = cause;
+  return error;
+}
+
+export async function getPlathoWalletSeqno(wallet, transport, options = {}) {
+  if (!transport?.runGetMethod) {
+    if (options.allowSeqnoFallback === true) return 0;
+    throw walletSeqnoUnavailableError('TON RPC runGetMethod transport is required to read wallet seqno before signing');
+  }
   try {
     return readSeqnoFromStack(await transport.runGetMethod({
       address: wallet.address,
       method: 'seqno',
       stack: [],
     }));
-  } catch {
-    return 0;
+  } catch (error) {
+    if (options.allowSeqnoFallback === true) return 0;
+    throw walletSeqnoUnavailableError('TON RPC seqno read failed; refusing to sign with fallback seqno 0', error);
   }
 }
 
 export async function buildPlathoWalletExternalBoc(wallet, messages, options = {}) {
-  const seqno = options.seqno ?? await getPlathoWalletSeqno(wallet, options.transport);
+  const seqno = options.seqno ?? await getPlathoWalletSeqno(wallet, options.transport, options);
   const body = await walletTransferBody(wallet, messages, { ...options, seqno });
   const root = externalInMessage(wallet, body, {
     includeStateInit: options.includeStateInit ?? seqno === 0,
@@ -375,7 +497,7 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
   if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
   const messages = Array.isArray(transaction?.messages) ? transaction.messages : [transaction];
   const chunks = chunkWalletMessages(messages, options.maxMessagesPerTransfer ?? PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER);
-  let seqno = options.seqno ?? await getPlathoWalletSeqno(wallet, transport);
+  let seqno = options.seqno ?? await getPlathoWalletSeqno(wallet, transport, options);
   if (chunks.length > 1 && !transport.runGetMethod && options.seqno === undefined) {
     throw new Error('TON RPC runGetMethod transport is required for multi-transfer wallet publish');
   }

@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=15';
 
 export class UsernameTonRpcProviderError extends Error {
   constructor(message) {
@@ -10,7 +10,7 @@ export class UsernameTonRpcProviderError extends Error {
 
 const USERNAME_NAME_HASH_DOMAIN = 0xC5CC7CD6;
 const USERNAME_MIN_LENGTH = 4;
-const USERNAME_MAX_LENGTH = 32;
+const USERNAME_MAX_LENGTH = 16;
 
 function toStackNumber(value) {
   const bigint = typeof value === 'bigint' ? value : BigInt(value);
@@ -18,8 +18,11 @@ function toStackNumber(value) {
 }
 
 function readStackInt(stack, index, name) {
+  if (index >= stack.length) throw new UsernameTonRpcProviderError(`Missing ${name} stack item`);
   const item = stack[index];
-  const raw = item?.value ?? item?.num ?? item;
+  const raw = item && typeof item === 'object' && !Array.isArray(item) && 'num' in item
+    ? item.num
+    : stackItemValue(item);
   if (typeof raw === 'bigint') return raw;
   if (typeof raw === 'number' && Number.isSafeInteger(raw)) return BigInt(raw);
   if (typeof raw === 'string') {
@@ -34,14 +37,44 @@ function readStackBool(stack, index, name) {
   return readStackInt(stack, index, name) !== 0n;
 }
 
+function stackItemValue(item) {
+  if (Array.isArray(item)) return item[1];
+  if (item && typeof item === 'object' && 'value' in item) return item.value;
+  return item;
+}
+
+function stackItemType(item) {
+  if (Array.isArray(item)) return String(item[0] ?? '').toLowerCase();
+  if (item && typeof item === 'object' && 'type' in item) return String(item.type ?? '').toLowerCase();
+  return typeof item;
+}
+
 function readStackAddress(stack, index, name) {
+  if (index >= stack.length) throw new UsernameTonRpcProviderError(`Missing ${name} stack item`);
   const item = stack[index];
-  if (item?.type === 'slice' && typeof item.value === 'string') {
-    return decodeTonAddressSliceBoc(item.value);
+  const value = stackItemValue(item);
+  const type = stackItemType(item);
+  if (typeof value === 'string') {
+    try {
+      return parseTonAddress(value).raw;
+    } catch {
+      if (type.includes('slice') || type.includes('cell')) return decodeTonAddressSliceBoc(value);
+    }
   }
   if (typeof item?.address === 'string') return parseTonAddress(item.address).raw;
-  if (typeof item?.value === 'string' && /^-?[0-9]+:/.test(item.value)) return parseTonAddress(item.value).raw;
+  if (value && typeof value.toString === 'function') return parseTonAddress(value.toString()).raw;
   throw new UsernameTonRpcProviderError(`${name} is not an address stack item`);
+}
+
+function readStackCell(stack, index, name) {
+  if (index >= stack.length) throw new UsernameTonRpcProviderError(`Missing ${name} stack item`);
+  const item = stack[index];
+  const value = stackItemValue(item);
+  const type = stackItemType(item);
+  if (typeof value === 'string' && (type.includes('cell') || type.includes('slice'))) return value;
+  if (typeof item?.cell === 'string') return item.cell;
+  if (typeof value === 'string') return value;
+  throw new UsernameTonRpcProviderError(`${name} is not a cell stack item`);
 }
 
 function extractStack(result) {
@@ -70,6 +103,14 @@ function stackNumber(value) {
   return { type: 'num', value: toStackNumber(value) };
 }
 
+function criticalCallOptions(callOptions = {}) {
+  const out = {};
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+    if (callOptions[key] !== undefined) out[key] = callOptions[key];
+  }
+  return out;
+}
+
 function bytesToBigInt(bytes) {
   let out = 0n;
   for (const byte of bytes) out = (out << 8n) | BigInt(byte);
@@ -93,12 +134,13 @@ async function sha256(bytes) {
 
 function normalizeUsername(username) {
   if (typeof username !== 'string') throw new TypeError('username must be a string');
-  const raw = username.toLowerCase().endsWith('.ath') ? username.slice(0, -4) : username;
+  const value = username.trim().toLowerCase();
+  const raw = value.endsWith('.ath') ? value.slice(0, -4) : value;
   if (raw.length < USERNAME_MIN_LENGTH || raw.length > USERNAME_MAX_LENGTH) {
     throw new RangeError(`username must be ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} ASCII chars`);
   }
-  if (!/^[a-z0-9]+$/.test(raw)) {
-    throw new RangeError('username must contain only lowercase ASCII letters and digits');
+  if (!/^[a-z0-9_-]+$/.test(raw)) {
+    throw new RangeError('username must contain only lowercase ASCII letters, digits, underscores, or hyphens');
   }
   return raw;
 }
@@ -136,14 +178,31 @@ export function decodeUsernameNameRecordStack(result) {
 
 export function decodePendingUsernameMintStack(result) {
   const stack = extractStack(result);
+  if (stack.length >= 10) {
+    return {
+      exists: readStackBool(stack, 0, 'username pending mint exists'),
+      query_id: readStackInt(stack, 1, 'username pending query id'),
+      sender_key: readStackInt(stack, 2, 'username pending sender key'),
+      owner_wallet: readStackAddress(stack, 3, 'username pending owner wallet'),
+      name_hash: readStackInt(stack, 4, 'username pending name hash'),
+      price_paid: readStackInt(stack, 5, 'username pending price paid'),
+      item_address: readStackAddress(stack, 6, 'username pending item address'),
+      item_deploy_value: readStackInt(stack, 7, 'username pending item deploy value'),
+      created_at: readStackInt(stack, 8, 'username pending created at'),
+      vault_funded: readStackBool(stack, 9, 'username pending vault funded'),
+    };
+  }
   return {
     exists: readStackBool(stack, 0, 'username pending mint exists'),
+    query_id: 0n,
+    sender_key: 0n,
     owner_wallet: readStackAddress(stack, 1, 'username pending owner wallet'),
     name_hash: readStackInt(stack, 2, 'username pending name hash'),
     price_paid: readStackInt(stack, 3, 'username pending price paid'),
     item_address: readStackAddress(stack, 4, 'username pending item address'),
     item_deploy_value: readStackInt(stack, 5, 'username pending item deploy value'),
     created_at: readStackInt(stack, 6, 'username pending created at'),
+    vault_funded: false,
   };
 }
 
@@ -179,31 +238,40 @@ export function decodePendingAthBurnFlushStack(result) {
 
 export function decodeUsernameRegistryGlobalStack(result) {
   const stack = extractStack(result);
+  if (stack.length !== 17) {
+    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 17 stack items, got ${stack.length}`);
+  }
   return {
     sealed: readStackBool(stack, 0, 'UsernameRegistry sealed'),
     official_ath_wallet_bound: readStackBool(stack, 1, 'UsernameRegistry official wallet bound'),
-    deployment_manifest_hash: readStackInt(stack, 2, 'UsernameRegistry manifest hash'),
-    genesis_config_hash: readStackInt(stack, 3, 'UsernameRegistry genesis config hash'),
-    official_ath_wallet_address: readStackAddress(stack, 4, 'UsernameRegistry official ATH wallet'),
-    genesis_controller_address: readStackAddress(stack, 5, 'UsernameRegistry genesis controller'),
-    name_record_count: readStackInt(stack, 6, 'UsernameRegistry name record count'),
-    pending_mint_count: readStackInt(stack, 7, 'UsernameRegistry pending mint count'),
-    refund_due_count: readStackInt(stack, 8, 'UsernameRegistry refund due count'),
-    treasury_due_ath: readStackInt(stack, 9, 'UsernameRegistry treasury due'),
-    burn_due_ath: readStackInt(stack, 10, 'UsernameRegistry burn due'),
-    pending_refund_flush_count: readStackInt(stack, 11, 'UsernameRegistry pending refund flush count'),
-    pending_treasury_flush_count: readStackInt(stack, 12, 'UsernameRegistry pending treasury flush count'),
-    pending_burn_flush_count: readStackInt(stack, 13, 'UsernameRegistry pending burn flush count'),
-    pending_mint_stale_ttl: readStackInt(stack, 14, 'UsernameRegistry pending mint stale ttl'),
+    vault_bound: readStackBool(stack, 2, 'UsernameRegistry vault bound'),
+    deployment_manifest_hash: readStackInt(stack, 3, 'UsernameRegistry manifest hash'),
+    genesis_config_hash: readStackInt(stack, 4, 'UsernameRegistry genesis config hash'),
+    official_ath_wallet_address: readStackAddress(stack, 5, 'UsernameRegistry official ATH wallet'),
+    vault_address: readStackAddress(stack, 6, 'UsernameRegistry vault'),
+    genesis_controller_address: readStackAddress(stack, 7, 'UsernameRegistry genesis controller'),
+    name_record_count: readStackInt(stack, 8, 'UsernameRegistry name record count'),
+    pending_mint_count: readStackInt(stack, 9, 'UsernameRegistry pending mint count'),
+    refund_due_count: readStackInt(stack, 10, 'UsernameRegistry refund due count'),
+    treasury_due_ath: readStackInt(stack, 11, 'UsernameRegistry treasury due'),
+    burn_due_ath: readStackInt(stack, 12, 'UsernameRegistry burn due'),
+    pending_refund_flush_count: readStackInt(stack, 13, 'UsernameRegistry pending refund flush count'),
+    pending_treasury_flush_count: readStackInt(stack, 14, 'UsernameRegistry pending treasury flush count'),
+    pending_burn_flush_count: readStackInt(stack, 15, 'UsernameRegistry pending burn flush count'),
+    pending_mint_stale_ttl: readStackInt(stack, 16, 'UsernameRegistry pending mint stale ttl'),
   };
 }
 
 export function decodeUsernameNftItemStateStack(result) {
   const stack = extractStack(result);
   return {
-    owner_wallet: readStackAddress(stack, 0, 'UsernameNFTItem owner wallet'),
-    username_registry_address: readStackAddress(stack, 1, 'UsernameNFTItem registry address'),
-    name_hash: readStackInt(stack, 2, 'UsernameNFTItem name hash'),
+    initialized: readStackBool(stack, 0, 'UsernameNFTItem initialized'),
+    owner_wallet: readStackAddress(stack, 1, 'UsernameNFTItem owner wallet'),
+    username_registry_address: readStackAddress(stack, 2, 'UsernameNFTItem registry address'),
+    name_hash: readStackInt(stack, 3, 'UsernameNFTItem name hash'),
+    username_len: readStackInt(stack, 4, 'UsernameNFTItem username length'),
+    username_cell: readStackCell(stack, 5, 'UsernameNFTItem username cell'),
+    tier: readStackInt(stack, 6, 'UsernameNFTItem tier'),
   };
 }
 
@@ -221,6 +289,14 @@ export async function resolveAuthoritativeUsernameItemOwnership({
 
   const parsedItemAddress = parseTonAddress(itemAddress).raw;
   const itemState = await itemProvider.getState(itemCallOptions);
+  if (itemState.initialized !== true) {
+    return {
+      authoritative: false,
+      reason: 'item_not_initialized',
+      item_state: itemState,
+      record: null,
+    };
+  }
   const parsedItemRegistry = parseTonAddress(itemState.username_registry_address).raw;
   const expectedRegistry = registryAddress ? parseTonAddress(registryAddress).raw : null;
   if (expectedRegistry && parsedItemRegistry !== expectedRegistry) {
@@ -243,13 +319,12 @@ export async function resolveAuthoritativeUsernameItemOwnership({
   }
 
   const recordItemAddress = parseTonAddress(record.item_address).raw;
-  const recordOwnerWallet = parseTonAddress(record.owner_wallet).raw;
   const itemOwnerWallet = parseTonAddress(itemState.owner_wallet).raw;
-  const authoritative = recordItemAddress === parsedItemAddress && recordOwnerWallet === itemOwnerWallet;
+  const authoritative = recordItemAddress === parsedItemAddress;
   return {
     authoritative,
-    reason: authoritative ? 'registry_record' : 'registry_record_mismatch',
-    owner_wallet: authoritative ? recordOwnerWallet : null,
+    reason: authoritative ? 'registry_item' : 'registry_item_mismatch',
+    owner_wallet: authoritative ? itemOwnerWallet : null,
     item_address: parsedItemAddress,
     name_hash: itemState.name_hash,
     item_state: itemState,
@@ -267,15 +342,17 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_username_price',
         stack: [stackNumber(nameLength)],
+        ...criticalCallOptions(callOptions),
       }));
     },
-    async getUsernameItemAddress(ownerWallet, nameHash, callOptions = {}) {
+    async getUsernameItemAddress(nameHash, callOptions = {}) {
       const transport = resolveTransport(options);
       const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');
       const result = await transport.runGetMethod({
         address,
         method: 'get_username_item_address',
-        stack: [stackAddress(ownerWallet), stackNumber(nameHash)],
+        stack: [stackNumber(nameHash)],
+        ...criticalCallOptions(callOptions),
       });
       return readStackAddress(extractStack(result), 0, 'username item address');
     },
@@ -286,6 +363,7 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_name_record',
         stack: [stackNumber(nameHash)],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getNameRecordByUsername(username, callOptions = {}) {
@@ -363,6 +441,7 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_ath_wallet_address',
         stack: [stackAddress(ownerWallet)],
+        ...criticalCallOptions(callOptions),
       });
       return readStackAddress(extractStack(result), 0, 'username ATH wallet address');
     },
@@ -373,6 +452,7 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_global',
         stack: [],
+        ...criticalCallOptions(callOptions),
       }));
     },
   };
@@ -388,6 +468,7 @@ export function createUsernameNftItemTonRpcProvider(options = {}) {
         address,
         method: 'get_state',
         stack: [],
+        ...criticalCallOptions(callOptions),
       }));
     },
   };

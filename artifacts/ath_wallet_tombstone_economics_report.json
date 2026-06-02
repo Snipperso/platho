@@ -1,0 +1,111 @@
+{
+  "profile": "PLATHO.V1.ATH_WALLET_TOMBSTONE_ECONOMICS",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "code_hashes": {
+    "ath_wallet": "4c90b0f1b65eea96df7992409e1819b73f63f1ae2ecb9f651c42174c85f7b88d"
+  },
+  "note": "Sandbox evidence that finalized/pruned ATH notification tombstones retain at least ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT after conservatively subtracting the terminal ACK/prune caller value. This is not a mainnet rent oracle; it is release evidence that the value envelope preserves tombstone backing across supported notification variants.",
+  "required_tombstone_endowment_nanotons": "2000000",
+  "cases": [
+    {
+      "label": "NORMAL_NOTIFY_ACK",
+      "terminal": "ack",
+      "inbound_value_nanotons": "41000000",
+      "terminal_caller_value_nanotons": "1000000",
+      "raw_balance_delta_nanotons": "6704328",
+      "retained_excluding_terminal_value_nanotons": "5704328",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "3704328",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 7,
+      "aborted_count": 3
+    },
+    {
+      "label": "USERNAME_NOTIFY_ACK",
+      "terminal": "ack",
+      "inbound_value_nanotons": "41000000",
+      "terminal_caller_value_nanotons": "1000000",
+      "raw_balance_delta_nanotons": "6705194",
+      "retained_excluding_terminal_value_nanotons": "5705194",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "3705194",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 7,
+      "aborted_count": 3
+    },
+    {
+      "label": "PROFILE_NOTIFY_ACK",
+      "terminal": "ack",
+      "inbound_value_nanotons": "41000000",
+      "terminal_caller_value_nanotons": "1000000",
+      "raw_balance_delta_nanotons": "6564527",
+      "retained_excluding_terminal_value_nanotons": "5564527",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "3564527",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 7,
+      "aborted_count": 3
+    },
+    {
+      "label": "VAULT_USERNAME_NOTIFY_ACK",
+      "terminal": "ack",
+      "inbound_value_nanotons": "43000000",
+      "terminal_caller_value_nanotons": "1000000",
+      "raw_balance_delta_nanotons": "7783127",
+      "retained_excluding_terminal_value_nanotons": "6783127",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "4783127",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 6,
+      "aborted_count": 2
+    },
+    {
+      "label": "VAULT_PROFILE_NOTIFY_ACK",
+      "terminal": "ack",
+      "inbound_value_nanotons": "43000000",
+      "terminal_caller_value_nanotons": "1000000",
+      "raw_balance_delta_nanotons": "7651260",
+      "retained_excluding_terminal_value_nanotons": "6651260",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "4651260",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 6,
+      "aborted_count": 2
+    },
+    {
+      "label": "JETTON_NOTIFY_ACK",
+      "terminal": "ack",
+      "inbound_value_nanotons": "41000000",
+      "terminal_caller_value_nanotons": "1000000",
+      "raw_balance_delta_nanotons": "6607860",
+      "retained_excluding_terminal_value_nanotons": "5607860",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "3607860",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 7,
+      "aborted_count": 3
+    },
+    {
+      "label": "NORMAL_NOTIFY_STALE_PRUNE",
+      "terminal": "prune",
+      "inbound_value_nanotons": "41000000",
+      "terminal_caller_value_nanotons": "2000000",
+      "raw_balance_delta_nanotons": "8755162",
+      "retained_excluding_terminal_value_nanotons": "6755162",
+      "required_tombstone_endowment_nanotons": "2000000",
+      "retained_margin_nanotons": "4755162",
+      "pending_exists_after_terminal": false,
+      "wallet_token_balance_atomic": "100000000",
+      "tx_count": 6,
+      "aborted_count": 2
+    }
+  ],
+  "worst_margin_nanotons": "3564527"
+}

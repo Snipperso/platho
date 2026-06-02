@@ -6,14 +6,13 @@ This document describes the client-side message encryption implemented by the st
 
 | Suite | Contract value | Purpose |
 | --- | ---: | --- |
-| `classical-v1` | `1` | Standard private messages using X25519 plus AES-GCM. |
-| `hybrid-v1` | `2` | Long-term private messages using X25519 plus ML-KEM-768 plus AES-GCM. |
+| `hybrid-v1` | `2` | Private messages using X25519 plus ML-KEM-768 plus AES-GCM. |
 
-The contract values match `CRYPTO_SUITE_CLASSICAL = 1` and `CRYPTO_SUITE_HYBRID = 2` in `contracts/Vault.tact`.
+V1 private publishing accepts only `CRYPTO_SUITE_HYBRID = 2`.
 
 ## Key bundles
 
-Every embedded Platho wallet seed deterministically derives a messaging identity with an encryption key pair and an Ed25519 signing key. The public encryption key material is exported as a public key bundle:
+Every 24-word TON recovery phrase created or imported by the PWA deterministically derives a messaging identity with an encryption key pair and an Ed25519 signing key. The public encryption key material is exported as a public key bundle:
 
 - `keyId`: SHA-256 based identifier over the public key material.
 - `x25519PublicKey`: 32-byte classical ECDH public key.
@@ -23,7 +22,7 @@ Every embedded Platho wallet seed deterministically derives a messaging identity
 
 The PWA recomputes `keyId`, `mlKem768PublicKeyHash`, and `mlKem768PublicKeyLen` before encryption. A bundle that claims a mismatched id, suite, contract suite, hash, or length is rejected.
 
-Classical recipient lookup is fully defined by the on-chain `enc_pubkey` and `sign_pubkey`. Hybrid recipient lookup is defined by those fields plus the full on-chain `pq_kem_pubkey` cell stored in the active Vault key record. The hash and length remain in the record as compact binding fields, but the full ML-KEM-768 public key is what lets another client actually encrypt a `hybrid-v1` capsule.
+Recipient lookup is defined by the on-chain `enc_pubkey`, `sign_pubkey`, and the full on-chain `pq_kem_pubkey` cell stored in the active Vault key record. The hash and length remain in the record as compact binding fields, but the full ML-KEM-768 public key is what lets another client actually encrypt a `hybrid-v1` capsule.
 
 ## Signed bundles
 
@@ -43,8 +42,8 @@ The signed bundle is a messaging-key self-signature. Wallet ownership is anchore
 
 ## Wallet ownership
 
-The production PWA does not use an external wallet connector. A user creates or imports an embedded Platho wallet seed, and the PWA
-deterministically derives both the TON wallet key and the messaging encryption/signing keys from that seed. Vault
+The production PWA does not use an external wallet connector. A user creates or imports a normal 24-word TON recovery phrase, and the PWA
+deterministically derives both the TON wallet key and the messaging encryption/signing keys from that phrase. Vault
 activation is the ownership anchor: the embedded wallet signs and sends `RegisterMessagingKeys` or `ReplaceMessagingKeys`
 from the same wallet that owns the on-chain key record.
 
@@ -56,12 +55,12 @@ Recipients trust a messaging bundle only after checking it against the active Va
 - the decoded ML-KEM-768 key bytes hash to `pq_kem_pubkey_hash`;
 - the active `current_key_id` points at the verified key record.
 
-The profile export/import flow handles the embedded wallet seed. There is no separate messaging key backup and no
+The profile export/import flow handles the 24-word TON recovery phrase. There is no separate messaging key backup and no
 external wallet connection mode in final v1.
 
 ## Compact byte layout
 
-Private capsule on-chain cells use the final `platho.byte-layout.v1` binary layout. The PWA may wrap capsules in JSON for export/share UI, but the cells stored by `CapsuleHub` are binary bytes, not JSON and not an off-chain pointer.
+Private capsule on-chain cells use the final `platho.byte-layout.v1` binary layout. The PWA may wrap capsules in JSON for export/share UI, but the protocol payload is binary bytes, not JSON and not an off-chain pointer. `CapsuleHub` stores compact authenticated headers/indexes plus the body hash; the encrypted body cell stays in the accepted publish transaction body and is reconstructed from TON message history, then verified against the stored hashes.
 
 Every publish goes through Vault as a Vault-balance funded signed external message. The user first funds their internal
 Vault TON balance, then the PWA signs a publish request with the active `current_sign_pubkey`; a relayer can submit the
@@ -69,25 +68,37 @@ external message without holding the wallet key. The signed payload is domain-se
 `deployment_manifest_hash`, the target Vault address, and the publish kind before owner, nonce, max charge, and payload.
 The TON value that CapsuleHub actually sends back in an ACK or bounce is credited to the user's internal Vault TON
 balance, capped by the tracked pending publish refund amount. If the Vault balance or chain access is not available, the
-PWA stays in preview-only single-capsule mode and must not expose publish actions.
+PWA fails closed and must not expose publish actions.
 
 Because `current_sign_pubkey` authorizes Vault-balance publish spending, compromising the local messaging signing key is
 also a publish-spending compromise for that user's internal Vault TON balance. Key replacement revokes the old signing key
 for future nonce validation.
 
-PWA message pricing is per capsule. `classical-v1` has a base price of `0.010 TON`; `hybrid-v1` has a base price of
-`0.020 TON`. Both include `0.005 TON` of estimated network cost. If the PWA's conservative fee estimate is higher, it
-adds `ceil((estimate - 0.005 TON) / 0.001 TON) * 0.001 TON` as a surcharge. Contract calls still start from their
-canonical required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct
-user publish ABI in final v1; every publish is Vault -> CapsuleHub. ATH discounts apply only after the Vault activity
-airdrop has distributed 15,000,000 ATH; before that gate, message protocol fees use the full fee.
+PWA message pricing is per capsule. With current reserves and no ATH discount, exact canonical examples are public entries from `0.0337 TON` and `hybrid-v1` 1 KiB private
+capsules from `0.0347 TON`; larger private size classes cost more by canonical class. This includes protocol
+fee, CapsuleHub compact-index storage endowment, Vault local execution reserve, and the expected ACK refund. If the PWA's
+conservative fee estimate is higher than the included network-fee allowance of `0.005 TON`, it adds
+the rounded overage as a surcharge. Contract calls still start from their canonical
+required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct user
+publish ABI in final v1; every publish is Vault -> CapsuleHub. ATH discounts apply only after the Vault activity airdrop
+has distributed 15,000,000 ATH; before that gate, message protocol fees use the full fee. The PWA must show the final
+hold and net cost for the selected content size before signing.
 
 The surcharge is a signed network/storage safety margin, not a refundable fee bucket. CapsuleHub accepts Vault publishes
 when the attached value is at least the canonical required value, but a successful publish ACK returns only the fixed
 publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly
-`28,000,000` nanotons in internal Vault TON balance. Any signed surcharge above the canonical required value remains in
+`25,800,000` nanotons in internal Vault TON balance. Any signed surcharge above the canonical required value remains in
 CapsuleHub as network/storage reserve overage; it is not returned to Vault and is not counted as
 `accrued_plato_fee_ton`.
+
+CapsuleHub protects raw TON reserve equal to `accrued_plato_fee_ton + max(100 TON, 1.25 * live_index_1y_storage_reserve)`.
+The live reserve uses unpruned private/public entry counters rather than historical `latest_id` counters. A separate
+permissionless `SweepExcessReserve` call can move only surplus above that protected amount to FeeAccumulator as
+`DepositProtocolFee`, where it follows the normal treasury/buyback split. Ordinary message sending does not perform this
+sweep. If that sweep deposit bounces, the returned amount is intentionally reclassified as backed
+`accrued_plato_fee_ton` so it can be retried through the normal fee flush path.
+
+CapsuleHub records `created_at = now()` for every private and public entry. The PWA uses that contract timestamp for ordering and for bounded transaction-history lookup; client header timestamps remain authenticated payload metadata, not discovery authority. Compact entry metadata can be pruned permissionlessly after the configured one-year retention window, while body availability depends on the chosen TON provider's message-history coverage and the user's local encrypted cache.
 
 Vault ATH balance is credited through explicit notify-flow accounting, not by scanning the raw official wallet balance.
 The supported deposit path is the user's ATHWallet `ATHTransferRequestWithNotify` into Vault. Manual ordinary ATH
@@ -99,7 +110,8 @@ refund reserve and capped by the original inbound value.
 Public posts and comments are a separate open profile, not private capsules without encryption. They store a compact
 `PPH1` public header cell plus a raw public body cell. Public body text is `1..1024` UTF-8 bytes for both posts and
 comments; public image bodies are `1..1024` compressed media bytes per part. Header metadata never reduces the user's
-1024-byte body budget. Public posts have no postquantum option; their base price is `0.010 TON` plus the same
+1024-byte body budget. Public posts have no postquantum option; public copy uses the `from 0.0337 TON` product label,
+while the current exact public base example is `0.0337 TON` plus the same
 network-fee surcharge rule. `kind = 1` is a public post; post `flags` bit 0 closes comments for that post. `kind = 2` is
 a one-level public comment with `parent_entry_id:uint64` and `parent_body_hash:uint256` in the header. `kind = 3` is a
 public image post, `kind = 4` is a public image comment, and `kind = 5` is public wallet avatar media. Public headers also carry `stream_id:uint128`,
@@ -158,7 +170,7 @@ PLB1 || version:u8 || suite:u8 || flags:u8 || reserved:u8
      || aes_gcm_ciphertext_and_tag
 ```
 
-The AES-GCM plaintext is one fixed capsule slot:
+The AES-GCM plaintext is one fixed capsule slot selected by `size_class`:
 
 ```text
 PCP1
@@ -171,15 +183,15 @@ PCP1
 || part_count:u16
 || content_len:u16
 || reserved:u16
-|| payload[1024]
+|| payload[useful_size]
 ```
 
-The useful content area is exactly 1024 bytes per capsule. A message with 1 byte, 500 bytes, or 1024 bytes of useful text has the same encrypted plaintext size. Messages above 1024 useful bytes are split into multiple capsules with encrypted `stream_id`, `part_index`, and `part_count` metadata. One capsule never contains more than one 1024-byte useful payload slot.
+The useful content area is padded to the selected 1, 2, 4, 8, 16, or 32 KiB private capsule class. A message with 1 byte, 500 bytes, or 1024 bytes of useful text has the same encrypted plaintext size in the 1 KiB class. Messages above the selected class are split into independent capsules with encrypted `stream_id`, `part_index`, and `part_count` metadata. One capsule never mixes unrelated text/image units; the receiver assembles independent capsules back into the original message.
 
 Content kinds:
 
-- `1` text: UTF-8 bytes, up to 1024 useful bytes per capsule.
-- `2` image: compressed image bytes; `media_format` is `1` WebP, `2` AVIF, `3` JPEG, or `4` PNG.
+- `1` text: UTF-8 bytes, up to the selected useful private capsule size.
+- `2` image: compressed image bytes, up to the selected useful private capsule size; `media_format` is `1` WebP, `2` AVIF, `3` JPEG, or `4` PNG.
 - `3` payment check: `asset:u8 || reserved:u8 || amount:u128 || intent_id:uint256 || secret32:uint256`.
 
 Payment check bodies intentionally do not include `tx`, activation time, or expiry. The receiver claims by `intent_id + secret32`; if the sender already cancelled the check or it was already claimed, the UI says that the check was already claimed or cancelled by the sender.
@@ -190,14 +202,18 @@ The encrypted body may be wrapped for export/share as:
 PLC1 || version:u8 || suite:u8 || chunk_index:u8 || chunk_total:u8 || message_id:u128 || body_slice
 ```
 
-For the final one-slot capsule, `chunk_total` is always `1`. `PLC1` is package/export framing only. `CapsuleHub.body` stores the assembled `PLB1` body bytes in a snake cell.
+For the final capsule body, `chunk_total` is always `1`. `PLC1` is package/export framing only. The accepted Vault -> CapsuleHub publish transaction carries the assembled `PLB1` body bytes in a snake cell; CapsuleHub persists only compact authenticated metadata and hashes.
 
 Final v1 private limits:
 
 | Suite | Useful cap per capsule | Body bytes | Export chunk bytes |
 | --- | ---: | ---: | ---: |
-| `classical-v1` | 1024 bytes | 1,140 bytes | 1,164 bytes |
-| `hybrid-v1` | 1024 bytes | 2,228 bytes | 2,252 bytes |
+| `hybrid-v1` | 1 KiB | 2,228 bytes | 2,252 bytes |
+| `hybrid-v1` | 2 KiB | 3,252 bytes | 3,276 bytes |
+| `hybrid-v1` | 4 KiB | 5,300 bytes | 5,324 bytes |
+| `hybrid-v1` | 8 KiB | 9,396 bytes | 9,420 bytes |
+| `hybrid-v1` | 16 KiB | 17,588 bytes | 17,612 bytes |
+| `hybrid-v1` | 32 KiB | 33,972 bytes | 33,996 bytes |
 
 The canonical source for this layout is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
 
@@ -209,18 +225,10 @@ Before decryption the client also checks:
 
 - compact body suite matches `header0`;
 - recipient key id matches `header0.recipientKeyId`;
-- `classical-v1` bodies do not carry ML-KEM ciphertext;
 - `hybrid-v1` bodies do carry a 1088-byte ML-KEM ciphertext;
 - every chunk has the same suite, message id, and chunk total.
 
 ## Key derivation
-
-For `classical-v1`:
-
-```text
-x25519_secret = X25519(sender_ephemeral_secret, recipient_x25519_public)
-message_key   = HKDF-SHA-256(x25519_secret, compact_aad_hash)
-```
 
 For `hybrid-v1`:
 
@@ -242,13 +250,13 @@ The client wraps compact encrypted bodies in a private capsule before publicatio
 - `header1`: the 30-byte `PH1B` binary replay header described above.
 - `body`: `platho.byte-layout.v1` chunk metadata plus base64url-encoded binary chunks.
 - `hashes`: TON `Cell.hash()` values for the exact on-chain cells that contain `header0`, `header1`, and the encrypted body bytes.
-- `chainCells`: base64 BOC payloads using `ton-snake-byte-cell.v1`; these are the cells stored by `CapsuleHub`, not an off-chain pointer.
+- `chainCells`: base64 BOC payloads using `ton-snake-byte-cell.v1`; these are the cells accepted in the Vault -> CapsuleHub publish transaction and authenticated by `CapsuleHub`, not an off-chain pointer.
 - `senderSignature`: Ed25519 signature over the capsule id and all three hashes.
 
-For `hybrid-v1`, the capsule uses CapsuleHub's long-term pair:
+For `hybrid-v1`, the capsule uses CapsuleHub's hybrid profile:
 
 ```text
-size_class   = 2
+size_class   in {1,2,4,8,16,32}
 crypto_suite = 2
 ```
 
@@ -266,9 +274,9 @@ body_cell     = snake-cell(compact encrypted body bytes)
 
 Vault publish messages carry `protocol_fee_paid`, because Vault is the discount authority for ATH-backed pricing.
 
-The useful payload capacity is the capacity of the encrypted body bytes that are actually serialized into `body_cell` and accepted by `CapsuleHub`. A hash without the matching persisted cell is not a published message. Local history is cache only; it does not define delivery in v1.
+The useful payload capacity is the capacity of the encrypted body bytes that are actually serialized into `body_cell` and accepted by `CapsuleHub`. A hash without the matching accepted publish transaction body is not a readable v1 message. Local history is cache only; it does not define delivery in v1.
 
-For Vault external session signing, the hashes-ref order remains contract-compatible:
+For Vault external publish signing, the hashes-ref order remains contract-compatible:
 
 ```text
 body_hash || header_0_hash || header_1_hash
@@ -278,32 +286,42 @@ The compact body is bound to `header0Hash` and `header1Hash` through AES-GCM AAD
 
 ## Delivery source of truth
 
-Accepted v1 private messages are the encrypted payload cells stored by `CapsuleHub`. The production PWA does not expose manual public-bundle or encrypted-capsule JSON package exchange.
+Accepted v1 private messages are compact CapsuleHub entries plus the encrypted payload cells carried by the accepted publish transaction body. The PWA retrieves those cells from TON message history and verifies them against CapsuleHub hashes before decrypting. The production PWA does not expose manual public-bundle or encrypted-capsule JSON package exchange.
 
 Public messaging keys are registered in `Vault` key records. A sender must resolve and verify the recipient key record before encrypting a private capsule. Local encrypted history is a device cache only; it does not define delivery.
 
-`.ath` username ownership is defined by `UsernameRegistry.get_name_record`. `UsernameNFTItem` state is only supporting
-evidence after the registry has accepted the item ACK. If a pending mint is pruned after a missing item ACK, a deployed
-orphan item is not ownership unless `UsernameRegistry.name_records[name_hash]` exists and points to that exact item.
-Clients and indexers must ignore item-only ownership claims. Reader code must resolve item authority by checking the
-registry record first; item state from `get_state()` is never an ownership source by itself.
+`.ath` username authority has two parts. `UsernameRegistry.get_name_record` proves that a name exists and points to the
+exact `UsernameNFTItem` for that name. The current owner is then read from that item state. Transfers change the item
+owner; the registry record remains the name-to-item anchor. The item exposes standard NFT data and TEP-64 on-chain
+metadata, including `name = <username>.ath`, without a server-hosted metadata URI. V1 username bytes are deliberately
+literal: leading, trailing, consecutive, and all-separator names are valid when every byte is in the allowed `a-z`,
+`0-9`, `_`, `-` set and length is 4..16. If a pending mint becomes stale after
+a missing item ACK, `PrunePendingUsernameMint` is non-destructive in v1: it proves the stale condition but does not delete
+pending state or create refund due. A deployed item becomes an authoritative username only after the registry finalizes
+the matching name record through a valid late ACK or `ResendDeployedAck`. Clients and indexers must ignore item-only
+ownership claims and must not use the registry record owner as the current owner after transfers.
 
-The embedded Platho wallet seed is the single user secret. The PWA deterministically derives the TON wallet key and the messaging encryption/signing keys from that seed. The profile export/import flow therefore handles only the wallet seed; there is no separate messaging-key backup.
+The 24-word TON recovery phrase is the single user secret. The PWA deterministically derives the TON wallet key and the messaging encryption/signing keys from that phrase. The profile export/import flow therefore handles only the recovery phrase; there is no separate messaging-key backup.
 
 ## Replay and expiry policy
 
-Private capsules default to a 24-hour TTL and are capped at 30 days. The verifier rejects:
+Private capsules default to a 24-hour TTL and are capped at 30 days. Live/off-chain capsule package verification rejects:
 
 - capsules created too far in the future;
 - expired capsules;
 - TTLs above the policy cap;
 - duplicated capsule ids in the caller-provided replay cache.
 
+Chain-history import is different: when a private entry is already accepted by CapsuleHub and the body is recovered from
+accepted TON transaction history or the local encrypted cache, the PWA verifies the entry hashes, body/header cells, and
+decryption, but it does not reject solely because the header expiry is in the past. Otherwise retained chain history would
+become unreadable by design.
+
 The replay cache is local state; production clients can back it with IndexedDB or another device-local store. No backend is required.
 
 ## No-backend rule
 
-The encryption layer does not require a Platho backend. A server may host static files, but delivered messages must remain reconstructable from `CapsuleHub` chain state and the server never receives plaintext, private keys, or a server-side session secret.
+The encryption layer does not require a Platho backend. A server may host static files, but private delivery is anchored by `CapsuleHub` chain state plus accepted publish transaction bodies: the compact entry proves the hashes, and the body must still be available from TON message history or the user's local encrypted cache. The server never receives plaintext, private keys, or a server-side session secret.
 
 ## Vault registration draft
 
@@ -311,10 +329,10 @@ The client can derive a `RegisterMessagingKeys` draft from a verified signed bun
 
 - `enc_pubkey`: 32-byte X25519 public key as uint256.
 - `sign_pubkey`: 32-byte Ed25519 signing public key as uint256.
-- `pq_kem_pubkey_hash`: SHA-256 of the ML-KEM-768 public key for `hybrid-v1`, otherwise zero.
-- `pq_kem_pubkey_len`: `1184` for `hybrid-v1`, otherwise zero.
-- `pq_kem_pubkey`: canonical snake-cell containing exactly 1184 ML-KEM-768 public-key bytes for `hybrid-v1`, otherwise an empty cell.
-- `crypto_suite_mask`: `1` for `classical-v1`, `2` for `hybrid-v1`.
+- `pq_kem_pubkey_hash`: SHA-256 of the ML-KEM-768 public key.
+- `pq_kem_pubkey_len`: `1184`.
+- `pq_kem_pubkey`: canonical snake-cell containing exactly 1184 ML-KEM-768 public-key bytes.
+- `crypto_suite_mask`: `2` for `hybrid-v1`.
 
 This draft is submitted by the embedded Platho wallet activation flow. Once the wallet is activated in Vault, other activated users can resolve its public messaging key record and encrypt private capsules to it.
 
@@ -336,7 +354,7 @@ The PWA exposes this as a fail-closed provider bridge in `web/vault-chain-provid
 
 If no provider is configured, Vault binding stays unavailable rather than accepting a local draft or UI placeholder. A production/static deployment can install a provider on `globalThis.plathoVaultChainProvider` that reads the deployed Vault through a TON API mirror or light-client compatible transport.
 
-The static runtime includes `web/vault-ton-rpc-provider.mjs` as the production-provider skeleton. It can wrap a TON Center v3 compatible `runGetMethod` endpoint or a custom `globalThis.plathoTonRpcTransport`. The provider:
+The static runtime includes `web/vault-ton-rpc-provider.mjs` as the production-provider skeleton. It can wrap TON Center v3 compatible endpoints or a custom `globalThis.plathoTonRpcTransport` installed by the host bundle. The current PWA does not expose a built-in user RPC settings screen; if documentation claims user-chosen RPC, that UI must exist. The provider:
 
 - encodes `get_user(owner)` owner addresses as `slice` BoC stack items;
 - calls `get_key_record(current_key_id)` with a numeric stack item;
@@ -365,6 +383,6 @@ The PWA also has a device-local encrypted message history store. It uses a non-e
 
 The header is bound as AES-GCM additional authenticated data. Changing thread id, timestamp, direction, capsule id, nonce, or ciphertext prevents the record from opening. If IndexedDB is unavailable, the app falls back to encrypted in-memory history for that session and avoids writing plaintext to persistent browser storage.
 
-## Remaining production work
+## Production status
 
-The prototype currently proves message encryption, signed bundle validation, encrypted local message history, embedded Platho wallet derivation, local Vault registration draft generation, fail-closed Vault chain binding, Vault key-record field binding, private capsule hashing, sender signatures, durable replay storage, wallet seed export/import, and replay checks. Before production private messaging, the client still needs production Vault provider configuration, key rotation UI, and external cryptographic review.
+The mainnet release path uses embedded TON wallet derivation, Vault-anchored messaging keys, signed bundle validation, fail-closed Vault chain binding, private capsule cell hashing, sender signatures, durable replay storage, encrypted local message history, and recovery phrase export/import. Production deployment must keep the PWA configuration pinned to the verified mainnet manifest and approved TON RPC providers; independent crypto review remains recommended for long-term assurance.

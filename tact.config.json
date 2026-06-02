@@ -76,6 +76,11 @@
       "output": "build/MockUsernameRegistryAckSink"
     },
     {
+      "name": "MockRegistryNotificationNoAck",
+      "path": "contracts/MockRegistryNotificationNoAck.tact",
+      "output": "build/MockRegistryNotificationNoAck"
+    },
+    {
       "name": "MockUsernameNFTItemNoAck",
       "path": "contracts/MockUsernameNFTItemNoAck.tact",
       "output": "build/MockUsernameNFTItemNoAck"

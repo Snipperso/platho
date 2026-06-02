@@ -16,6 +16,7 @@ const MARKET_STABILITY_LOCAL_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_ATH_TRANSFER_REQUEST_VALUE: Int = 30000000;
 const MARKET_STABILITY_BUY_EXEC_RESERVE: Int = 2000000;
 const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE: Int = 2000000;
+const MARKET_STABILITY_MIN_TREASURY_FLUSH_TON: Int = MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE;
 const MARKET_STABILITY_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 const MARKET_STABILITY_PHASE_IDLE: Int = 0;
 const MARKET_STABILITY_PHASE_PENDING_ATH_TRANSFER: Int = 1;
@@ -453,6 +454,7 @@ contract MarketStabilitySeller {
         self.requireSealed();
         throwUnless(23260, msg.amount > 0);
         throwUnless(23261, msg.amount <= self.treasury_due_ton);
+        throwUnless(23263, msg.amount >= MARKET_STABILITY_MIN_TREASURY_FLUSH_TON || msg.amount == self.treasury_due_ton);
         throwUnless(23262, context().value >= MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE);
         self.treasury_due_ton -= msg.amount;
         self.treasury_flushed_ton_total += msg.amount;

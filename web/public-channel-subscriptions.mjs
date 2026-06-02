@@ -3,6 +3,7 @@ export const PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY = 'platho.publicSubscriptions.v1';
 export const PUBLIC_CHANNEL_FEED_CACHE_KEY = 'platho.publicChannelFeeds.v1';
 
 export const DEFAULT_PUBLIC_CHANNEL_ID = 'platho.app';
+export const DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET = 'UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH';
 
 export const DEFAULT_PUBLIC_CHANNELS = Object.freeze([
   Object.freeze({
@@ -10,7 +11,7 @@ export const DEFAULT_PUBLIC_CHANNELS = Object.freeze([
     name: 'platho.app',
     avatar: 'P',
     subtitle: 'official read-only channel',
-    sourceUrl: './channels/platho.app/feed.json',
+    authorWallet: DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,
   }),
 ]);
 
@@ -134,7 +135,7 @@ export function readPublicChannelFeedCache(storage) {
   if (!storage?.getItem) return {};
   try {
     const parsed = JSON.parse(storage.getItem(PUBLIC_CHANNEL_FEED_CACHE_KEY) ?? '{}');
-    return isObject(parsed) ? parsed : {};
+    return isObject(parsed) ? stripStoredPublicFeedVerification(parsed) : {};
   } catch {
     return {};
   }
@@ -173,6 +174,9 @@ function normalizeFeedPost(post) {
     avatarImageUrl: nonEmptyString(post.avatarImageUrl ?? post.avatar_image_url),
     bodyHash: nonEmptyString(post.bodyHash),
     entryUid: nonEmptyString(post.entryUid),
+    chainVerified: post.chainVerified === true,
+    publishStatus: nonEmptyString(post.publishStatus),
+    publishState: isObject(post.publishState) ? safeClone(post.publishState) : null,
     commentsAllowed: post.commentsAllowed !== false,
     comments: (Array.isArray(post.comments) ? post.comments : [])
       .map(normalizeFeedComment)
@@ -204,7 +208,24 @@ function normalizeFeedComment(comment) {
     avatarImageUrl: nonEmptyString(comment.avatarImageUrl ?? comment.avatar_image_url),
     bodyHash: nonEmptyString(comment.bodyHash),
     entryUid: nonEmptyString(comment.entryUid),
+    chainVerified: comment.chainVerified === true,
+    publishStatus: nonEmptyString(comment.publishStatus),
+    publishState: isObject(comment.publishState) ? safeClone(comment.publishState) : null,
   };
+}
+
+function stripStoredPublicFeedVerification(cache) {
+  const cloned = safeClone(cache);
+  for (const record of Object.values(cloned)) {
+    const feed = record?.feed ?? record;
+    if (!Array.isArray(feed?.posts)) continue;
+    for (const post of feed.posts) {
+      post.chainVerified = false;
+      if (!Array.isArray(post.comments)) continue;
+      for (const comment of post.comments) comment.chainVerified = false;
+    }
+  }
+  return cloned;
 }
 
 export function normalizePublicChannelFeed(value, expectedChannelId) {
@@ -256,7 +277,7 @@ export function publicChannelFeedToThread(channel, feed) {
     messages: posts.map((post) => ({
       type: 'in',
       text: post.title ? `${post.title}\n${post.text}` : post.text,
-      meta: [post.author ?? normalizedChannel.name, shortTime(post.createdAt), post.entryUid ? `uid ${post.entryUid.slice(0, 8)}` : null]
+      meta: [post.author ?? normalizedChannel.name, post.publishStatus, shortTime(post.createdAt), post.chainVerified && post.entryUid ? `uid ${post.entryUid.slice(0, 8)}` : null]
         .filter(Boolean)
         .join(' · '),
       publicPostId: post.id,
@@ -271,6 +292,9 @@ export function publicChannelFeedToThread(channel, feed) {
       publicEntryId: post.entryId,
       publicReadEntryId: post.readEntryId,
       publicBodyHash: post.bodyHash,
+      publicChainVerified: post.chainVerified === true,
+      publicPublishStatus: post.publishStatus,
+      publicPublishState: post.publishState,
       publicCommentsAllowed: post.commentsAllowed !== false,
       publicComments: post.comments,
       attachment: post.imageUrl ? { type: 'image', url: post.imageUrl } : null,
@@ -314,6 +338,9 @@ export function publicChannelThreadsToFeedItems(threads) {
         entryId: message.publicEntryId,
         readEntryId: message.publicReadEntryId,
         bodyHash: message.publicBodyHash,
+        chainVerified: message.publicChainVerified === true,
+        publishStatus: message.publicPublishStatus,
+        publishState: message.publicPublishState,
         authorWallet: message.publicAuthorWallet,
         profileVersion: message.publicProfileVersion,
         avatarHash: message.publicAvatarHash,

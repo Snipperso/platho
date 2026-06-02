@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-05-26T21:05:44.405Z",
+  "generatedAt": "2026-06-02T16:33:55.764Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 115,
-    "totalBytes": 2096212,
-    "bundleSha256": "e01e8c9c51504bf8d0bb780063db6d52363b8d033c8d4c7ebd3d2d2212f238c7",
+    "fileCount": 126,
+    "totalBytes": 2783753,
+    "bundleSha256": "8e0444213090e7af78237edee9b008416f9ac9979c435f063ab9d9eaec6b5bf4",
     "files": [
       {
         "path": "app.js",
-        "bytes": 225976,
-        "sha256": "612d6f2e14bfc14724fd5bad41d7a52813e3338bef0597bdbb810e288b8ff978"
+        "bytes": 428918,
+        "sha256": "f49418ddbb03c7a80a0db5bec01f5571507e90274d50a6a83e2f58758d0ffa96"
       },
       {
         "path": "assets/icons/back.svg",
@@ -48,9 +48,19 @@
         "sha256": "b608f2f4616858c1a48dc75283d09dbbbf2453b0bc194be5e122f9bb45ed8276"
       },
       {
+        "path": "assets/icons/copy.svg",
+        "bytes": 345,
+        "sha256": "d98e0998750fa26bee5c6e7b976cf508e9694bfc412c8a4cf7d7de68360552d0"
+      },
+      {
         "path": "assets/icons/down.svg",
         "bytes": 154,
         "sha256": "fbf091250538376e7982e938ed005454031ec099e823a618926375565148aea4"
+      },
+      {
+        "path": "assets/icons/download.svg",
+        "bytes": 188,
+        "sha256": "05fbd43e4896feffc54499414b8fc77e581bef0b9136e892d55390aaaf8037b9"
       },
       {
         "path": "assets/icons/gear.svg",
@@ -73,6 +83,11 @@
         "sha256": "87e6f6c6bf95ba73c653e08731cbbf907cee6757f5cc0c91b9988a459248627a"
       },
       {
+        "path": "assets/icons/open-app.svg",
+        "bytes": 164,
+        "sha256": "8ea793478a9393c2aa718cdff932fa07e135bb150fe3932cea77e94fe00687bd"
+      },
+      {
         "path": "assets/icons/plus.svg",
         "bytes": 125,
         "sha256": "069b59def41c91b277ff0bec92a23f1f1d4390ea49f44c36061a3477fe31b9ed"
@@ -86,6 +101,11 @@
         "path": "assets/icons/search.svg",
         "bytes": 190,
         "sha256": "ed6a2bb9d9bc98392ffd80113080cb752762079d1c5cd73b46de16faf1752259"
+      },
+      {
+        "path": "assets/icons/swap-circular.svg",
+        "bytes": 249,
+        "sha256": "4a66d441912c9d0eeca8e5a3da3b67d4cdb6c5dbe56b6b27b530d8bbaaa32349"
       },
       {
         "path": "assets/icons/up.svg",
@@ -129,93 +149,98 @@
       },
       {
         "path": "ath-ton-rpc-provider.mjs",
-        "bytes": 5971,
-        "sha256": "c1b688fc17f05329aab0711339cfabb9be8bfd0737f1c22b0294f0a0c4041899"
+        "bytes": 6190,
+        "sha256": "d807d28780442d1bf07adf62b7d4f6ec290b3e8e3ebb73f712f44b3573914249"
       },
       {
         "path": "capsule-part-policy.mjs",
-        "bytes": 2910,
-        "sha256": "50a02e581715593042746d7b7c63943ad7ab1a5855bebf8cc0f99bcc001355f9"
+        "bytes": 6333,
+        "sha256": "ba21d4c8fb7818139ebbccb4e7e24d6f208d82583b78c22d6c48b53c066674db"
       },
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
-        "bytes": 6844,
-        "sha256": "3b80501c2b7016a1f537f733300bcc7836aafd0f93cc585d05bade38b4ce5dc6"
+        "bytes": 30312,
+        "sha256": "1ede0941cc56add28ac07b463425e43eed77f4166acddd9b3adb6c649d9d7d23"
       },
       {
         "path": "channels/platho.app/feed.json",
-        "bytes": 369,
-        "sha256": "34c422aa558769ea1c29141eb6a169fbb01434019f9d09be5a646ab0768e3128"
+        "bytes": 443,
+        "sha256": "d2bc6e1635eb3da69e1fcb838bc83363952a218853bc51c018c4dddac5030c4d"
       },
       {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 103963,
-        "sha256": "2fa8102653ef38c3959cbcd038a8c7c90fa88aa366bc3bf35baf494f7cdb97d5"
+        "bytes": 108819,
+        "sha256": "afdad001f2005eea2441da68820a420c463b0f5149d76ea42966a7daf9ee1943"
       },
       {
         "path": "docs/about-platho.md",
-        "bytes": 3255,
-        "sha256": "70535df846ffcaef81aaa5cc896592a00278d014655c498e311b7fe86854a194"
+        "bytes": 3545,
+        "sha256": "44fbb15a94d8c4572f4615ccb787aeafd9b92eb6a78a1eaa0ea09e8e9a597a1e"
       },
       {
         "path": "docs/ath-whitepaper.md",
-        "bytes": 22657,
-        "sha256": "297de01b16af87549e0b35ae7d0b089df791aac83894f9445623309d597766ec"
+        "bytes": 26736,
+        "sha256": "5d1cdbb83051219e98e0fe690cbdcaf2f74999c9e36ecb31c4c6e65192b820fe"
       },
       {
         "path": "docs/crypto-protocol.md",
-        "bytes": 21882,
-        "sha256": "405aad8afb1d2a304e35b5c19048e5403abd1b79d678482501224c5f24241e48"
+        "bytes": 25093,
+        "sha256": "f68433a04f144beb06ebb4497e7bcead3ced9bd539c7ce3320a46d01436681b2"
       },
       {
         "path": "encrypted-message-store.mjs",
-        "bytes": 10539,
-        "sha256": "d80609a13215025c4edd06f278651b4088c026833a51be73cc155ba817f87332"
+        "bytes": 10803,
+        "sha256": "4b6d5e7187510ab037fa8a1336fcf388234ddc54d6837b530249b75a6f567883"
       },
       {
         "path": "index.html",
-        "bytes": 25924,
-        "sha256": "13286f53e13a5f2f20ab17192d6a691993c754d88edf82385fb017a49973a2f8"
+        "bytes": 30084,
+        "sha256": "3bc33409984430c3d7f18159c84ab71755286ebb7ce89c101b013076d4087a67"
       },
       {
         "path": "manifest.webmanifest",
-        "bytes": 558,
-        "sha256": "de5673eff299547ea5ed2df6463d23fab3fee36fbc2c535e24e6d63d7d4f3ff3"
+        "bytes": 686,
+        "sha256": "dd9b9dafe0a7c139ad706a89d78933301ce870fabcfaa685d76d81c2a766effb"
       },
       {
         "path": "message-pricing-policy.mjs",
-        "bytes": 3423,
-        "sha256": "23ee4c944cb7f6336cda0654c780a0571e5e27a7186573115ad42f1b03ca5e85"
+        "bytes": 7733,
+        "sha256": "b7b00ce4eb2514aaf26d95d29712e1858cfeefcbef6d8a1126f2a0d6445591dd"
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 5229,
-        "sha256": "f90686f3c0555d44879c9b517ac0ae74b8659a0dc88545b07e5653477301e2af"
+        "bytes": 10304,
+        "sha256": "274dd8e70e930c3d43bc5d98a9ab0c3f2a8132d31825b4ee2be50ea8f2921717"
       },
       {
         "path": "platho-wallet.mjs",
-        "bytes": 16713,
-        "sha256": "c9870eaf0c7ca1a020318cc0d930bb311c23292cd964b53ffb3a88ae47ee8d7c"
+        "bytes": 20953,
+        "sha256": "9c3cb3e6fb608336894f2839c10ba9e0da4e555e7bab1fae7d965107eaa28e86"
       },
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
-        "bytes": 6603,
-        "sha256": "1f336e8d5ccc43ce087ef27d7ce7777d896b1271d7c77dfce046b5474882ee43"
+        "bytes": 8229,
+        "sha256": "07b2cd1e7f132d5e9dd58b8549eaf8b18180e9be8ebc3acc076e12e0c6967df7"
       },
       {
         "path": "public-channel-subscriptions.mjs",
-        "bytes": 12279,
-        "sha256": "b7cb828c3bb1f80ac39b2656801904eb6459d54916bd780b12a339a650d3938f"
+        "bytes": 13614,
+        "sha256": "bc0e07002e9152fb291becb934fca4331c0cf40f7ba9f01fe41b8af2f3aece3d"
       },
       {
         "path": "pwa-contract-transactions.mjs",
-        "bytes": 53934,
-        "sha256": "49d4c2bf7e118ca7de29235e0123d2b1be9d9eb30ad9172c77af9f33c1a81123"
+        "bytes": 62263,
+        "sha256": "59ba570e78309f8af340909e9ccddf15a7585cbf8906b3201313c710d37ef3db"
+      },
+      {
+        "path": "qr-code.mjs",
+        "bytes": 7802,
+        "sha256": "1e57a437e0328a21087d0ecd324b52f07f51e5a996759fd94ef0d663223b3eae"
       },
       {
         "path": "recipient-identities.mjs",
-        "bytes": 8429,
-        "sha256": "046601fb0bf7fcb9b87eafa8b1b7993bf11f907a3ab0e8c2688d39764172d57d"
+        "bytes": 8409,
+        "sha256": "6a34342a323a452c574e09beca8fc5225fb21d06c6ad9da9c7f6e07a69951ef5"
       },
       {
         "path": "replay-store.mjs",
@@ -224,33 +249,58 @@
       },
       {
         "path": "styles.css",
-        "bytes": 41117,
-        "sha256": "c24b199c199277483a5db89d234538f8796128559ee808c479543928fa0d44db"
+        "bytes": 51023,
+        "sha256": "12b5070a0caa16280cf82b19fa908dcb18ef65bcd67410259c6886307643cebb"
       },
       {
         "path": "sw.js",
-        "bytes": 3396,
-        "sha256": "b74d1c10796f7c6f27e0c1ce71eab8f59c983c053f0fd295370ee8fb2c3bf101"
+        "bytes": 5221,
+        "sha256": "446d199040372e88f867e7aca061c7246b4043d87b3baafd6575407b087cc735"
       },
       {
         "path": "ton-dns-provider.mjs",
-        "bytes": 11438,
-        "sha256": "66cbe71e1fb8766b8f54e4c88a32edeccab8aa8f26f5c11da5c9789d3921bf6f"
+        "bytes": 11578,
+        "sha256": "1e106b1bd4044dce7b2df66b00d5f74d7c89c4e6529f27993dcb8c580ca727e0"
+      },
+      {
+        "path": "ton-mnemonic-wordlist.mjs",
+        "bytes": 17320,
+        "sha256": "d13dec6a205cd361f9b87b7165095fa811c951cae210732a47032cdd9bd99575"
       },
       {
         "path": "username-ton-rpc-provider.mjs",
-        "bytes": 16960,
-        "sha256": "b10901e11ccd8570ba7562fd39cd645abd0fbfa53b8b0fb32f7a57b191c0ef86"
+        "bytes": 20368,
+        "sha256": "ba7a4eb9550df2790b663f6591515223ebf221b908c858c663d6300d301bb572"
       },
       {
         "path": "vault-chain-provider.mjs",
-        "bytes": 6495,
-        "sha256": "d6a24f0a51bb931a1b332a8a7a8756bd304fd277fb496c1ce2d22de9e6ba91bc"
+        "bytes": 6499,
+        "sha256": "402b28f768082c8e926903b133947100b5a1e7b6ba5fd4fff508cab3e9ad1657"
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 22795,
-        "sha256": "e8732baae233432cab037627071798ee0e72f1ce6fdbadad351fe5cadc6f6847"
+        "bytes": 61325,
+        "sha256": "68fdfb2b71c1e939b92b04d0053eae7688ff2b249f55ba03d6bf03fac6b14e69"
+      },
+      {
+        "path": "vendor/@jsquash/webp/LICENSE",
+        "bytes": 11343,
+        "sha256": "8c3690b09c168f196446cf5904332023bbc15eb92b6a7cee470ac829e6a65d20"
+      },
+      {
+        "path": "vendor/@jsquash/webp/codec/LICENSE.codec.md",
+        "bytes": 1495,
+        "sha256": "e293d1dddc9785200b1f58a4f5293543cf8566d9e0b8a3c02fad955035b19f42"
+      },
+      {
+        "path": "vendor/@jsquash/webp/codec/enc/webp_enc.js",
+        "bytes": 38665,
+        "sha256": "5fd62301662e37785aec38e38807926f72933d4c8b919018a43faf1b1ca760f6"
+      },
+      {
+        "path": "vendor/@jsquash/webp/codec/enc/webp_enc.wasm",
+        "bytes": 281261,
+        "sha256": "b6085bb6702f144e9dc6016d58d230b34a84976bf0d080b7390b4b4b137d6ab7"
       },
       {
         "path": "vendor/@noble/ciphers/LICENSE",
@@ -586,6 +636,11 @@
         "path": "vendor/@noble/post-quantum/utils.js",
         "bytes": 15333,
         "sha256": "b3d97248f0a16ea60119de0585def637a8aa3f27c4124d8825e1709588de53f8"
+      },
+      {
+        "path": "webp-encoder.mjs",
+        "bytes": 2887,
+        "sha256": "0ecbbc627b232ecda048978dafc942870751369896650712d36830ba8649d9b3"
       }
     ],
     "excludedWebFiles": [
@@ -842,42 +897,11 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
   "blockers": [],
   "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION",
-    "PWA_MODE_NOT_PRODUCTION",
-    "PWA_NETWORK_NOT_MAINNET",
-    "CRYPTO_PROD_REMAINING_WORK",
-    "PROD_CHECKLIST_OPEN_BLOCKERS",
-    "TESTNET_ENV_PRESENT"
+    "STATIC_PACKAGE_IS_NON_PRODUCTION"
   ],
-  "productionFindings": [
-    {
-      "id": "PWA_MODE_NOT_PRODUCTION",
-      "file": "web/platho-config.mjs",
-      "message": "PWA config is not in production mode."
-    },
-    {
-      "id": "PWA_NETWORK_NOT_MAINNET",
-      "file": "web/platho-config.mjs",
-      "message": "PWA config does not target mainnet."
-    },
-    {
-      "id": "CRYPTO_PROD_REMAINING_WORK",
-      "file": "web/CRYPTO_PROTOCOL.md",
-      "message": "Crypto protocol still documents production blockers."
-    },
-    {
-      "id": "PROD_CHECKLIST_OPEN_BLOCKERS",
-      "file": "PRODUCTION_READINESS.md",
-      "message": "Production readiness checklist still has open hard blockers."
-    },
-    {
-      "id": "TESTNET_ENV_PRESENT",
-      "file": ".env.testnet.local",
-      "message": "Testnet env file is present. Production deploy must not run from this workspace/config."
-    }
-  ]
+  "productionFindings": []
 }

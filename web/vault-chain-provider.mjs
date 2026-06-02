@@ -1,4 +1,4 @@
-import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs';
+import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs?v=2';
 
 export class VaultChainProviderUnavailableError extends Error {
   constructor(message = 'Vault chain provider is not configured') {

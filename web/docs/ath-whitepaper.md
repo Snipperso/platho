@@ -2,7 +2,7 @@
 
 ## The Platho Protocol Token
 
-ATH is the utility token of Platho. It is used for activity rewards, publish discounts, `.ath` usernames, profile avatar updates, market-stability sales, buyback, and burn.
+ATH is the utility token of Platho. It is used for activity rewards, post-airdrop protocol-fee discounts, `.ath` usernames, profile avatar updates, market-stability sales, buyback, and burn.
 
 ATH is not an administrative token. It does not grant the ability to rewrite balances, pause operations, mint new supply, or change user ownership rules. Its role is to power the application economy and connect Platho usage with on-chain accounting.
 
@@ -137,10 +137,17 @@ refund.
 
 ## Activity Price
 
-A standard message costs the user:
+Public product copy may say messages start from the current exact public base price:
 
 ```text
-0.01 TON
+from 0.0337 TON
+```
+
+Current exact canonical examples before ATH discount are:
+
+```text
+public post: 0.0337 TON
+hybrid private 1 KiB capsule: 0.0347 TON
 ```
 
 For a successful publish, the user receives:
@@ -155,21 +162,19 @@ At the launch reference price:
 10 ATH * 0.001 TON = 0.01 TON
 ```
 
-This ties the early ATH distribution to the actual cost of an application action.
+This ties the early ATH distribution to real application usage. The reward is an activity bonus, not a refund, cashback,
+rebate, or promise that ATH will compensate the TON cost of a publish. The launch reference value of `10 ATH` can be
+lower than the TON cost of the capsule, and that is intentional: users receive early network ownership for real usage,
+not a guaranteed reimbursement.
 
-A post-quantum / hybrid message costs the user:
+Product copy may summarize capsule pricing as messages from `0.0337 TON`; current exact canonical examples are public posts from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`. Larger private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
+body changes the Vault/CapsuleHub execution and storage reserve. The reward remains `10 ATH` per successfully finalized
+capsule, regardless of capsule size.
 
-```text
-0.02 TON
-```
+Private publishing uses the hybrid security profile by default: X25519 + ML-KEM-768 + AES-GCM. There is no cheaper classical private-message mode in V1.
 
-The reward remains:
-
-```text
-10 ATH
-```
-
-Hybrid publishing is more expensive because it uses a heavier security profile: X25519 + ML-KEM-768 + AES-GCM. The additional payment buys the security profile, not a higher farming rate.
+ATH may trade above or below the launch reference price after the official pool exists. The protocol docs must not present
+the activity reward as investment return, profit expectation, or price guarantee.
 
 ## Protocol Fee and User Price
 
@@ -179,27 +184,27 @@ Protocol fee:
 
 | Publish type | Protocol fee |
 | --- | ---: |
-| Standard private message | 0.005 TON |
-| Public post | 0.005 TON |
-| Long-term / hybrid private message | 0.010 TON |
+| Public post | 0.010 TON |
+| Hybrid private message | 0.010 TON |
 
-The user-facing price includes protocol fee plus estimated network cost:
+The user-facing price includes protocol fee, compact index/header storage endowment, Vault local execution reserve, and the expected ACK refund:
 
 | Publish type | User-facing price |
 | --- | ---: |
-| Standard private / public | 0.010 TON |
-| Long-term / hybrid private | 0.020 TON |
+| Public/product label | from 0.0337 TON |
+| Current public post exact example | 0.0337 TON |
+| Current hybrid private 1 KiB exact example | 0.0347 TON |
 
-If the PWA receives a higher conservative network estimate, it adds a surcharge to the canonical max charge. ATH discounts apply to protocol fee, not to network costs or storage reserves. This surcharge is a signed safety margin: if CapsuleHub accepts the publish, the success ACK returns only the fixed publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance. The part above the canonical required value remains in CapsuleHub as network/storage reserve overage. It is not returned to Vault and is not counted as protocol fee revenue.
+If the PWA receives a higher conservative network estimate, it adds the estimated overage to the canonical max charge, rounded up to clean `0.001 TON` steps. ATH discounts apply to protocol fee, not to network costs or storage reserves. This surcharge is a signed safety margin: if CapsuleHub accepts the publish, the success ACK returns only the fixed publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault TON balance. The part above the canonical required value remains in CapsuleHub as network/storage reserve overage. It is not returned to Vault and is not counted as `accrued_plato_fee_ton` at publish time. Only raw surplus above CapsuleHub's protected reserve may later be swept permissionlessly to FeeAccumulator, where it follows normal treasury/buyback accounting. CapsuleHub stores compact authenticated entry metadata and the body hash; the heavy body is recovered from accepted publish transaction history and verified locally.
 
 ## ATH Discounts
 
 ATH reduces message protocol fees after the activity airdrop has been fully distributed.
 
-Discounts unlock when remaining activity airdrop is not greater than:
+Discounts unlock only when the remaining activity airdrop is:
 
 ```text
-15,000,000 ATH
+airdrop_remaining_ath == 0 ATH
 ```
 
 Before this point, protocol fee is paid in full.
@@ -210,19 +215,20 @@ Full discount threshold:
 10,000 ATH
 ```
 
-If the user's internal ATH balance in Vault is at least `10,000 ATH`, the protocol fee for publishing becomes zero.
+If the user's internal ATH balance in Vault is at least `10,000 ATH`, the user reaches the full protocol-fee discount tier for the Platho fee component. Network costs and storage reserves are still paid.
 
 If the balance is below `10,000 ATH`, the fee decreases linearly:
 
 ```text
-discounted_fee = full_fee * (10,000 ATH - user_ath_balance) / 10,000 ATH
+raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 ATH)) / 10,000 ATH)
+discounted_fee = raw_discounted_fee
 ```
 
-The calculation rounds up. This prevents undercharging on fractional values.
+The calculation rounds up. With current constants, the full protocol fee is `0.010 TON` (`10,000,000 nanotons`) for both public and private capsules, and the maximum reduction is `0.010 TON` per capsule.
 
 ## Pool Launch
 
-The ATH/TON pool launches after the first `15,000,000 ATH` have been distributed through the activity airdrop.
+The ATH/TON pool launches after the full `15,000,000 ATH` activity airdrop has been distributed.
 
 The launch sequence is:
 
@@ -250,6 +256,10 @@ TON side at the launch price:
 ```text
 15,000,000 ATH * 0.001 TON = 15,000 TON
 ```
+
+Protocol fees collected before the pool launch are not expected to fully fund the TON side of initial liquidity. The
+initial liquidity plan may require project/treasury funding in addition to protocol revenue. This is part of the launch
+bootstrap and does not turn activity rewards into a TON-denominated claim.
 
 The pool launches around a token that has already been distributed through application usage. This separates ATH from an empty listing without a user base.
 
@@ -351,14 +361,25 @@ An accepted mint goes through pending state and deploys `UsernameNFTItem`. Befor
 50% -> burn_due_ath
 ```
 
-A rejected mint creates refund due. This applies to invalid usernames, wrong price, duplicate name, item deploy bounce, and stale pending mint prune.
+A rejected mint creates refund due for direct username payments when the registry can reject the notification before
+creating a pending item deployment: invalid usernames, wrong price, or duplicate name. For Vault-funded mints, these
+rejections bounce back through the Vault ATH wallet so the user's internal Vault ATH can be restored instead of creating
+an external refund bucket.
 
 ATH from username mint becomes protocol revenue only after deployment of the corresponding item is confirmed.
 
-Username ownership is defined only by the `UsernameRegistry` name record. If item deployment was attempted but the item
-ACK never reached the registry, `PrunePendingUsernameMint` can return the paid ATH into refund due after the stale-pending
-window. A deployed `UsernameNFTItem` without `UsernameRegistry.name_records[name_hash]` pointing to that exact item is
-non-authoritative: clients, indexers, and UI must not treat the item alone as ownership of the `.ath` name.
+Username authority is split deliberately: `UsernameRegistry` anchors the name to one exact `UsernameNFTItem`, and the
+item state carries the current owner. Transfers of the item transfer the username. The item exposes standard NFT data
+and TEP-64 on-chain metadata, including `name = <username>.ath`; it does not depend on a Platho server for metadata.
+V1 username bytes are literal and not display-normalized: leading, trailing, consecutive, and all-separator names are
+valid when every byte is in the allowed `a-z`, `0-9`, `_`, `-` set and length is 4..16.
+If item deployment was attempted but the item ACK never reached the registry, `PrunePendingUsernameMint` is intentionally
+non-destructive in V1: it does not guess failure, delete pending state, or create refund due. The recovery path is a late
+`UsernameItemDeployedAck` or `UsernameNFTItem.ResendDeployedAck`, so an initialized item can still become authoritative.
+If the item deployment actually bounces, the registry asks the official ATH wallet to refund the pending notification.
+A deployed `UsernameNFTItem` without `UsernameRegistry.name_records[name_hash]` pointing to that exact item is
+non-authoritative: clients, indexers, and UI must not treat the item alone as ownership of the `.ath` name, and must not
+use the registry record owner as the current owner after transfers.
 
 ## Profile Avatar Fees
 
@@ -389,6 +410,8 @@ An accepted update creates a new avatar version and splits the fee:
 
 A rejected avatar notification is refunded through the ATHWallet notification bounce path. ProfileRegistry does not create a separate refund bucket for malformed avatar updates.
 
+ProfileRegistry stores the authenticated avatar pointer, not permanent image bytes. The PWA must reconstruct avatar WebP data from public CapsuleHub entries or local cache and verify the bytes against the stored `avatar_hash`; missing or pruned history is shown as unavailable.
+
 ## Market Stability Seller
 
 MarketStabilitySeller is a public contract reserve that distributes ATH after the official pool launch:
@@ -415,7 +438,7 @@ The on-chain utility of ATH is specific:
 
 Vault publishes are paid in TON. ATH does not pay the whole publish transaction. It reduces the protocol-fee component after the discount gate is open.
 
-This makes ATH demand tied to concrete protocol actions: `.ath` names, avatar updates, Vault fee discounts, and buyback/burn pressure. MarketStabilitySeller expands available supply only as buyers take the next tranche, so early access is public and deterministic instead of being dominated by a thin pool.
+This makes ATH demand tied to concrete protocol actions: `.ath` names, avatar updates, post-airdrop Vault protocol-fee discounts, and buyback/burn pressure. MarketStabilitySeller expands available supply only as buyers take the next tranche, so early access is public and deterministic instead of being dominated by a thin pool.
 
 The reserve is sold only after post-pool pricing freeze.
 
@@ -480,7 +503,7 @@ A single purchase cannot cross a tranche boundary. This prevents buying ATH from
 
 TON revenue is recognized only after ATH is delivered to the buyer. If ATH transfer fails or bounces, the reserve is restored, the buyer receives the paid TON principal back, and treasury due does not increase.
 
-After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, available supply, demand for `.ath` names, avatar updates, Vault fee discounts, and buyback/burn pressure.
+After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, available supply, demand for `.ath` names, avatar updates, post-airdrop Vault protocol-fee discounts, and buyback/burn pressure.
 
 Even at the x21 step, reference valuation remains moderate relative to the utility model:
 
@@ -489,7 +512,7 @@ Even at the x21 step, reference valuation remains moderate relative to the utili
 100,000,000 ATH = 2,100,000 TON
 ```
 
-This is 21 times above launch valuation, while still leaving room for further growth without hidden internal reserves or additional minting. After x21, MarketStabilitySeller no longer releases reserve ATH. The only remaining protocol allocation is the slow long-term vesting schedule, capped at `100,000 ATH` per year.
+At the x21 step, MarketStabilitySeller has finished its programmed reserve release. After that, ATH price is fully market-determined by liquidity, usage demand, available supply, and buyback/burn pressure. The only remaining protocol allocation is the slow long-term vesting schedule, capped at `100,000 ATH` per year.
 
 ## Treasury and Burn Buckets
 
@@ -523,16 +546,18 @@ ATHWallet handles:
 
 Contracts that accept ATH as payment do not accept direct messages from arbitrary addresses. They accept notifications only from their official ATHWallet. Source wallet authentication is performed inside ATHWallet through deterministic wallet derivation.
 
+ATH exposes TEP-74-like transfer entrypoints for generic jetton tooling, but Platho protocol actions use authenticated ATH notification messages. External integrations must not assume that Platho notify flows emit a generic `JettonTransferNotification`.
+
 Outgoing internal transfers in ATHWallet are protected by source-side pending accounting and source acknowledgement. Balance is not restored from a bounce body without pending proof.
 
 ## ATH Lifecycle
 
 1. `ATHMaster` creates fixed supply of `100,000,000 ATH`.
 2. Treasury deploy one-shot receives supply in the treasury ATH wallet.
-3. Supply is allocated across activity, liquidity, treasury, and market stability.
+3. Supply is allocated across activity, liquidity, long-term vesting, and market stability.
 4. Users publish messages through Vault.
 5. A successful publish credits `10 ATH` activity reward.
-6. After the first `15,000,000 ATH` are distributed, ATH discounts unlock.
+6. After the full `15,000,000 ATH` activity airdrop is distributed and `airdrop_remaining_ath == 0`, ATH protocol-fee discounts unlock.
 7. The ATH/TON pool launches at reference price `1 ATH = 0.001 TON`.
 8. Post-pool route evidence and pricing evidence are frozen.
 9. MarketStabilitySeller sells reserve through x2..x21 tranches.
@@ -550,6 +575,6 @@ ATH connects four layers of Platho:
 3. **Discounts** - ATH balance reduces protocol fee after the distribution gate.
 4. **Supply reduction** - part of ATH fees and buyback output is burned through ATHMaster.
 
-The model begins with fixed supply and reference valuation of `100,000 TON`. The primary user distribution is tied to the price of an action: `0.01 TON` for a standard message and `10 ATH` reward. After the first 15% of supply is distributed, the pool launches, discounts unlock, and the buyback path opens.
+The model begins with fixed supply and reference valuation of `100,000 TON`. The primary user distribution is tied to real paid usage: product copy may say messages start from `0.0337 TON`, while current exact examples are `0.0337 TON` for a public post and `0.0347 TON` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
 
 ATH exists as a working token inside Platho: it is distributed through activity, used in paid actions, reduces protocol fee, is sold from reserve through a defined staircase, and is burned through on-chain burn. After the market-stability staircase, the future ATH price is determined by the market and protocol usage.

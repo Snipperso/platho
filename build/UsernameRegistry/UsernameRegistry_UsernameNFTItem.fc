@@ -11,47 +11,122 @@
 ;; __tact_context_get
 (int, slice, int, slice) __tact_context_get() inline;
 
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_set_uint_cell
+(cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline;
+
 ;; $UsernameItemDeployedAck$_store
 builder $UsernameItemDeployedAck$_store(builder build_0, (int, slice) v) inline;
 
 ;; $UsernameItemDeployedAck$_store_cell
 cell $UsernameItemDeployedAck$_store_cell((int, slice) v, builder b) inline;
 
+;; $NftOwnershipAssigned$_store
+builder $NftOwnershipAssigned$_store(builder build_0, (int, slice, slice) v) inline;
+
+;; $NftOwnershipAssigned$_store_cell
+cell $NftOwnershipAssigned$_store_cell((int, slice, slice) v, builder b) inline;
+
+;; $NftExcesses$_store
+builder $NftExcesses$_store(builder build_0, (int) v) inline;
+
+;; $NftExcesses$_store_cell
+cell $NftExcesses$_store_cell((int) v, builder b) inline;
+
+;; $UsernameNftOnchainContent$_store
+builder $UsernameNftOnchainContent$_store(builder build_0, (int, cell) v) inline;
+
+;; $UsernameNftOnchainContent$_store_cell
+cell $UsernameNftOnchainContent$_store_cell((int, cell) v, builder b) inline;
+
 ;; $UsernameNFTItem$_store
-builder $UsernameNFTItem$_store(builder build_0, (slice, slice, int) v) inline;
+builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, cell) v) inline;
 
 ;; $UsernameNFTItem$_load
-(slice, ((slice, slice, int))) $UsernameNFTItem$_load(slice sc_0) inline;
+(slice, ((int, slice, slice, int, int, cell))) $UsernameNFTItem$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
 
 ;; $UsernameNFTItemStateView$_to_external
-(slice, slice, int) $UsernameNFTItemStateView$_to_external(((slice, slice, int)) v) inline;
+(int, slice, slice, int, int, cell, int) $UsernameNFTItemStateView$_to_external(((int, slice, slice, int, int, cell, int)) v) inline;
+
+;; $UsernameNftDataView$_to_external
+(int, int, slice, slice, cell) $UsernameNftDataView$_to_external(((int, int, slice, slice, cell)) v) inline;
 
 ;; $UsernameNFTItem$init$_load
-(slice, ((slice, slice, int))) $UsernameNFTItem$init$_load(slice sc_0) inline;
+(slice, ((slice, int))) $UsernameNFTItem$init$_load(slice sc_0) inline;
 
 ;; $UsernameNFTItem$_contract_init
-(slice, slice, int) $UsernameNFTItem$_contract_init(slice $owner_wallet, slice $username_registry_address, int $name_hash) impure inline;
+(int, slice, slice, int, int, cell) $UsernameNFTItem$_contract_init(slice $username_registry_address, int $name_hash) impure inline;
 
 ;; $UsernameNFTItem$_contract_load
-(slice, slice, int) $UsernameNFTItem$_contract_load() impure inline;
+(int, slice, slice, int, int, cell) $UsernameNFTItem$_contract_load() impure inline;
 
 ;; $UsernameNFTItem$_contract_store
-() $UsernameNFTItem$_contract_store((slice, slice, int) v) impure inline;
+() $UsernameNFTItem$_contract_store((int, slice, slice, int, int, cell) v) impure inline;
 
-;; $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash
-((slice, slice, int)) $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash(slice $owner_wallet, slice $username_registry_address, int $name_hash) inline;
+;; $UsernameNFTItem$_fun_isBasechainAddress
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isBasechainAddress((int, slice, slice, int, int, cell) $self, slice $address) impure inline_ref;
 
-;; $UsernameNFTItem$_fun_get_state
-((slice, slice, int), (slice, slice, int)) $UsernameNFTItem$_fun_get_state((slice, slice, int) $self) impure inline_ref;
+;; $UsernameNFTItem$_fun_isValidNameLength
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isValidNameLength((int, slice, slice, int, int, cell) $self, int $name_len) impure inline_ref;
+
+;; $UsernameNFTItem$_fun_isValidUsernameBytes
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isValidUsernameBytes((int, slice, slice, int, int, cell) $self, int $name_len, slice $username) impure inline_ref;
+
+;; $UsernameNFTItem$_fun_computeNameHash
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_computeNameHash((int, slice, slice, int, int, cell) $self, slice $username) impure inline_ref;
+
+;; $UsernameNFTItem$_fun_tier
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_tier((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $UsernameNFTItem$_fun_snakeNameCell
+((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_snakeNameCell((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $UsernameNFTItem$_fun_snakeDescriptionCell
+((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_snakeDescriptionCell((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $UsernameNftOnchainContent$_constructor_marker_metadata
+((int, cell)) $UsernameNftOnchainContent$_constructor_marker_metadata(int $marker, cell $metadata) inline;
+
+;; $UsernameNFTItem$_fun_individualContent
+((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_individualContent((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $UsernameNFTItem$_fun_normalizedForwardPayload
+((int, slice, slice, int, int, cell), slice) $UsernameNFTItem$_fun_normalizedForwardPayload((int, slice, slice, int, int, cell) $self, slice $payload) impure inline_ref;
 
 ;; $MessageParameters$_constructor_to_value_bounce_mode_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
 
 ;; $UsernameItemDeployedAck$_constructor_name_hash_owner_wallet
 ((int, slice)) $UsernameItemDeployedAck$_constructor_name_hash_owner_wallet(int $name_hash, slice $owner_wallet) inline;
+
+;; $UsernameNFTItem$_fun_sendDeployedAck
+((int, slice, slice, int, int, cell), ()) $UsernameNFTItem$_fun_sendDeployedAck((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $UsernameNFTItemStateView$_constructor_initialized_owner_wallet_username_registry_address_name_hash_username_len_username_tier
+((int, slice, slice, int, int, cell, int)) $UsernameNFTItemStateView$_constructor_initialized_owner_wallet_username_registry_address_name_hash_username_len_username_tier(int $initialized, slice $owner_wallet, slice $username_registry_address, int $name_hash, int $username_len, cell $username, int $tier) inline;
+
+;; $UsernameNFTItem$_fun_get_state
+((int, slice, slice, int, int, cell), (int, slice, slice, int, int, cell, int)) $UsernameNFTItem$_fun_get_state((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content
+((int, int, slice, slice, cell)) $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content(int $initialized, int $index, slice $collection_address, slice $owner_address, cell $individual_content) inline;
+
+;; $UsernameNFTItem$_fun_get_nft_data
+((int, slice, slice, int, int, cell), (int, int, slice, slice, cell)) $UsernameNFTItem$_fun_get_nft_data((int, slice, slice, int, int, cell) $self) impure inline_ref;
+
+;; $MessageParameters$_constructor_to_value_mode_bounce_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline;
+
+;; $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload
+((int, slice, slice)) $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload(int $query_id, slice $previous_owner, slice $forward_payload) inline;
+
+;; $NftExcesses$_constructor_query_id
+((int)) $NftExcesses$_constructor_query_id(int $query_id) inline;
 
 
 ;; UsernameRegistry_UsernameNFTItem.stdlib.fc
@@ -63,6 +138,27 @@ global int __tact_randomized;
 (int, slice, int, slice) __tact_context_get() inline {
     return __tact_context;
 }
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+(cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = udict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (udict_set_ref(d, kl, k, v), ());
+    }
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
 
 () $global_message((int, cell, int, slice, int) $params) impure asm """
     NEWC
@@ -84,6 +180,40 @@ global int __tact_randomized;
     SENDRAWMSG
 """;
 
+(int, int) $global_parseStdAddress(slice $slice) impure asm """
+    REWRITESTDADDR
+""";
+
+builder $Builder$_fun_storeBit(int $value, builder $self) impure asm """
+    1 STI
+""";
+
+builder $Builder$_fun_storeSlice(builder $self, slice $slice) impure asm """
+    STSLICER
+""";
+
+int $Slice$_fun_bits(slice $self) impure asm """
+    SBITS
+""";
+
+int $Slice$_fun_empty(slice $self) impure asm """
+    SEMPTY
+""";
+
+int $Slice$_fun_refsEmpty(slice $self) impure asm """
+    SREMPTY
+""";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+int $Cell$_fun_hash(cell $self) impure asm """
+    HASHCU
+""";
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
 ;; UsernameRegistry_UsernameNFTItem.storage.fc
 ;;
 ;; Type: Context
@@ -101,6 +231,10 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 ;;
 
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, $value, $to, $bounce);
 }
 
@@ -127,60 +261,143 @@ cell $UsernameItemDeployedAck$_store_cell((int, slice) v, builder b) inline {
 }
 
 ;;
-;; Type: UsernameNFTItemStateView
-;; TLB: _ owner_wallet:address username_registry_address:address name_hash:int257 = UsernameNFTItemStateView
+;; Type: NftOwnershipAssigned
+;; Header: 0x05138d91
+;; TLB: nft_ownership_assigned#05138d91 query_id:uint64 previous_owner:address forward_payload:remainder<slice> = NftOwnershipAssigned
 ;;
 
-(slice, slice, int) $UsernameNFTItemStateView$_to_external(((slice, slice, int)) v) inline {
-    var (v'owner_wallet, v'username_registry_address, v'name_hash) = v; 
-    return (v'owner_wallet, v'username_registry_address, v'name_hash);
+builder $NftOwnershipAssigned$_store(builder build_0, (int, slice, slice) v) inline {
+    var (v'query_id, v'previous_owner, v'forward_payload) = v;
+    build_0 = store_uint(build_0, 85167505, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_slice(v'previous_owner);
+    build_0 = build_0.store_slice(v'forward_payload);
+    return build_0;
 }
 
-((slice, slice, int)) $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash(slice $owner_wallet, slice $username_registry_address, int $name_hash) inline {
-    return ($owner_wallet, $username_registry_address, $name_hash);
+cell $NftOwnershipAssigned$_store_cell((int, slice, slice) v, builder b) inline {
+    return $NftOwnershipAssigned$_store(b, v).end_cell();
+}
+
+((int, slice, slice)) $NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload(int $query_id, slice $previous_owner, slice $forward_payload) inline {
+    return ($query_id, $previous_owner, $forward_payload);
+}
+
+;;
+;; Type: NftExcesses
+;; Header: 0xd53276db
+;; TLB: nft_excesses#d53276db query_id:uint64 = NftExcesses
+;;
+
+builder $NftExcesses$_store(builder build_0, (int) v) inline {
+    var (v'query_id) = v;
+    build_0 = store_uint(build_0, 3576854235, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    return build_0;
+}
+
+cell $NftExcesses$_store_cell((int) v, builder b) inline {
+    return $NftExcesses$_store(b, v).end_cell();
+}
+
+((int)) $NftExcesses$_constructor_query_id(int $query_id) inline {
+    return ($query_id);
+}
+
+;;
+;; Type: UsernameNFTItemStateView
+;; TLB: _ initialized:bool owner_wallet:address username_registry_address:address name_hash:int257 username_len:int257 username:^cell tier:int257 = UsernameNFTItemStateView
+;;
+
+(int, slice, slice, int, int, cell, int) $UsernameNFTItemStateView$_to_external(((int, slice, slice, int, int, cell, int)) v) inline {
+    var (v'initialized, v'owner_wallet, v'username_registry_address, v'name_hash, v'username_len, v'username, v'tier) = v; 
+    return (v'initialized, v'owner_wallet, v'username_registry_address, v'name_hash, v'username_len, v'username, v'tier);
+}
+
+((int, slice, slice, int, int, cell, int)) $UsernameNFTItemStateView$_constructor_initialized_owner_wallet_username_registry_address_name_hash_username_len_username_tier(int $initialized, slice $owner_wallet, slice $username_registry_address, int $name_hash, int $username_len, cell $username, int $tier) inline {
+    return ($initialized, $owner_wallet, $username_registry_address, $name_hash, $username_len, $username, $tier);
+}
+
+;;
+;; Type: UsernameNftDataView
+;; TLB: _ initialized:bool index:int257 collection_address:address owner_address:address individual_content:^cell = UsernameNftDataView
+;;
+
+(int, int, slice, slice, cell) $UsernameNftDataView$_to_external(((int, int, slice, slice, cell)) v) inline {
+    var (v'initialized, v'index, v'collection_address, v'owner_address, v'individual_content) = v; 
+    return (v'initialized, v'index, v'collection_address, v'owner_address, v'individual_content);
+}
+
+((int, int, slice, slice, cell)) $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content(int $initialized, int $index, slice $collection_address, slice $owner_address, cell $individual_content) inline {
+    return ($initialized, $index, $collection_address, $owner_address, $individual_content);
+}
+
+;;
+;; Type: UsernameNftOnchainContent
+;; TLB: _ marker:uint8 metadata:dict<uint256, ^cell> = UsernameNftOnchainContent
+;;
+
+builder $UsernameNftOnchainContent$_store(builder build_0, (int, cell) v) inline {
+    var (v'marker, v'metadata) = v;
+    build_0 = build_0.store_uint(v'marker, 8);
+    build_0 = build_0.store_dict(v'metadata);
+    return build_0;
+}
+
+cell $UsernameNftOnchainContent$_store_cell((int, cell) v, builder b) inline {
+    return $UsernameNftOnchainContent$_store(b, v).end_cell();
+}
+
+((int, cell)) $UsernameNftOnchainContent$_constructor_marker_metadata(int $marker, cell $metadata) inline {
+    return ($marker, $metadata);
 }
 
 ;;
 ;; Type: UsernameNFTItem
-;; TLB: _ owner_wallet:address username_registry_address:address name_hash:uint256 = UsernameNFTItem
+;; TLB: _ initialized:bool owner_wallet:address username_registry_address:address name_hash:uint256 username_len:uint8 username:^cell = UsernameNFTItem
 ;;
 
-builder $UsernameNFTItem$_store(builder build_0, (slice, slice, int) v) inline {
-    var (v'owner_wallet, v'username_registry_address, v'name_hash) = v;
+builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, cell) v) inline {
+    var (v'initialized, v'owner_wallet, v'username_registry_address, v'name_hash, v'username_len, v'username) = v;
+    build_0 = build_0.store_int(v'initialized, 1);
     build_0 = build_0.store_slice(v'owner_wallet);
     build_0 = build_0.store_slice(v'username_registry_address);
     build_0 = build_0.store_uint(v'name_hash, 256);
+    build_0 = build_0.store_uint(v'username_len, 8);
+    build_0 = build_0.store_ref(v'username);
     return build_0;
 }
 
-(slice, ((slice, slice, int))) $UsernameNFTItem$_load(slice sc_0) inline {
+(slice, ((int, slice, slice, int, int, cell))) $UsernameNFTItem$_load(slice sc_0) inline {
+    var v'initialized = sc_0~load_int(1);
     var v'owner_wallet = sc_0~load_msg_addr();
     var v'username_registry_address = sc_0~load_msg_addr();
     var v'name_hash = sc_0~load_uint(256);
-    return (sc_0, (v'owner_wallet, v'username_registry_address, v'name_hash));
+    var v'username_len = sc_0~load_uint(8);
+    var v'username = sc_0~load_ref();
+    return (sc_0, (v'initialized, v'owner_wallet, v'username_registry_address, v'name_hash, v'username_len, v'username));
 }
 
-(slice, ((slice, slice, int))) $UsernameNFTItem$init$_load(slice sc_0) inline {
-    var v'owner_wallet = sc_0~load_msg_addr();
+(slice, ((slice, int))) $UsernameNFTItem$init$_load(slice sc_0) inline {
     var v'username_registry_address = sc_0~load_msg_addr();
     var v'name_hash = sc_0~load_int(257);
-    return (sc_0, (v'owner_wallet, v'username_registry_address, v'name_hash));
+    return (sc_0, (v'username_registry_address, v'name_hash));
 }
 
-(slice, slice, int) $UsernameNFTItem$_contract_load() impure inline {
+(int, slice, slice, int, int, cell) $UsernameNFTItem$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
         return $sc~$UsernameNFTItem$_load();
     }
     else {
-        (slice $owner_wallet, slice $username_registry_address, int $name_hash) = $sc~$UsernameNFTItem$init$_load();
+        (slice $username_registry_address, int $name_hash) = $sc~$UsernameNFTItem$init$_load();
         $sc.end_parse();
-        return $UsernameNFTItem$_contract_init($owner_wallet, $username_registry_address, $name_hash);
+        return $UsernameNFTItem$_contract_init($username_registry_address, $name_hash);
     }
 }
 
-() $UsernameNFTItem$_contract_store((slice, slice, int) v) impure inline {
+() $UsernameNFTItem$_contract_store((int, slice, slice, int, int, cell) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $UsernameNFTItem$_store(b, v);
@@ -191,19 +408,129 @@ builder $UsernameNFTItem$_store(builder build_0, (slice, slice, int) v) inline {
 ;; Contract UsernameNFTItem functions
 ;;
 
-(slice, slice, int) $UsernameNFTItem$_contract_init(slice $owner_wallet, slice $username_registry_address, int $name_hash) impure inline {
-    var (($self'owner_wallet, $self'username_registry_address, $self'name_hash)) = (null(), null(), null());
+(int, slice, slice, int, int, cell) $UsernameNFTItem$_contract_init(slice $username_registry_address, int $name_hash) impure inline {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = (null(), null(), null(), null(), null(), null());
     throw_unless(18001, ($name_hash != 0));
-    $self'owner_wallet = $owner_wallet;
+    $self'initialized = false;
+    $self'owner_wallet = $username_registry_address;
     $self'username_registry_address = $username_registry_address;
     $self'name_hash = $name_hash;
-    return ($self'owner_wallet, $self'username_registry_address, $self'name_hash);
+    $self'username_len = 0;
+    $self'username = $Builder$_fun_endCell($global_beginCell());
+    return ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username);
 }
 
-((slice, slice, int), (slice, slice, int)) $UsernameNFTItem$_fun_get_state((slice, slice, int) $self) impure inline_ref {
-    var (($self'owner_wallet, $self'username_registry_address, $self'name_hash)) = $self;
-    var $fresh$ret_0 = $UsernameNFTItemStateView$_constructor_owner_wallet_username_registry_address_name_hash($self'owner_wallet, $self'username_registry_address, $self'name_hash);
-    return (($self'owner_wallet, $self'username_registry_address, $self'name_hash), $fresh$ret_0);
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isBasechainAddress((int, slice, slice, int, int, cell) $self, slice $address) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var ($std'workchain, $std'address) = $global_parseStdAddress($Address$_fun_asSlice($address));
+    var $fresh$ret_0 = ($std'workchain == 0);
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_0);
+}
+
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isValidNameLength((int, slice, slice, int, int, cell) $self, int $name_len) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var $fresh$ret_1 = ( (($name_len >= 4)) ? (($name_len <= 16)) : (false) );
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_1);
+}
+
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_isValidUsernameBytes((int, slice, slice, int, int, cell) $self, int $name_len, slice $username) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    ifnot (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isValidNameLength($name_len)) {
+        var $fresh$ret_2 = false;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_2);
+    }
+    if (($Slice$_fun_bits($username) != ($name_len * 8))) {
+        var $fresh$ret_3 = false;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_3);
+    }
+    ifnot ($Slice$_fun_refsEmpty($username)) {
+        var $fresh$ret_4 = false;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_4);
+    }
+    slice $cursor = $username;
+    int $i = 0;
+    while (($i < $name_len)) {
+        int $ch = $cursor~load_uint(8);
+        int $lower = ( (($ch >= 97)) ? (($ch <= 122)) : (false) );
+        int $digit = ( (($ch >= 48)) ? (($ch <= 57)) : (false) );
+        int $separator = ( (($ch == 45)) ? (true) : (($ch == 95)) );
+        ifnot (( (( ($lower) ? (true) : ($digit) )) ? (true) : ($separator) )) {
+            var $fresh$ret_5 = false;
+            return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_5);
+        }
+        $i = $i + 1;
+    }
+    var $fresh$ret_6 = $Slice$_fun_empty($cursor);
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_6);
+}
+
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_computeNameHash((int, slice, slice, int, int, cell) $self, slice $username) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var $fresh$ret_7 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeSlice(store_uint($global_beginCell(), 3318512854, 32), $username)));
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_7);
+}
+
+((int, slice, slice, int, int, cell), int) $UsernameNFTItem$_fun_tier((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    if (($self'username_len == 4)) {
+        var $fresh$ret_8 = 1;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_8);
+    }
+    if (($self'username_len == 5)) {
+        var $fresh$ret_9 = 2;
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_9);
+    }
+    var $fresh$ret_10 = 3;
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_10);
+}
+
+((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_snakeNameCell((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var $fresh$ret_11 = $Builder$_fun_endCell(store_uint($Builder$_fun_storeSlice(store_uint($global_beginCell(), 0, 8), $Cell$_fun_beginParse($self'username)), 778138728, 32));
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_11);
+}
+
+((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_snakeDescriptionCell((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var $fresh$ret_12 = $Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 0, 8), 417581970078258680283550545719946597, 120));
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_12);
+}
+
+((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_individualContent((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    cell $metadata = null();
+    $metadata~__tact_dict_set_uint_cell(256, 59089242681608890680090686026688704441792375738894456860693970539822503415433, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_snakeNameCell());
+    $metadata~__tact_dict_set_uint_cell(256, 90922719342317012409671596374183159143637506542604000676488204638996496437508, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_snakeDescriptionCell());
+    var $fresh$ret_13 = $UsernameNftOnchainContent$_store_cell($UsernameNftOnchainContent$_constructor_marker_metadata(0, $metadata), begin_cell());
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_13);
+}
+
+((int, slice, slice, int, int, cell), slice) $UsernameNFTItem$_fun_normalizedForwardPayload((int, slice, slice, int, int, cell) $self, slice $payload) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    if ($Slice$_fun_empty($payload)) {
+        var $fresh$ret_14 = $Cell$_fun_beginParse($Builder$_fun_endCell($Builder$_fun_storeBit(false, $global_beginCell())));
+        return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_14);
+    }
+    var $fresh$ret_15 = $payload;
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_15);
+}
+
+((int, slice, slice, int, int, cell), ()) $UsernameNFTItem$_fun_sendDeployedAck((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'username_registry_address, 3000000, true, 1, $UsernameItemDeployedAck$_store_cell($UsernameItemDeployedAck$_constructor_name_hash_owner_wallet($self'name_hash, $self'owner_wallet), begin_cell())));
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), ());
+}
+
+((int, slice, slice, int, int, cell), (int, slice, slice, int, int, cell, int)) $UsernameNFTItem$_fun_get_state((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var $fresh$ret_16 = $UsernameNFTItemStateView$_constructor_initialized_owner_wallet_username_registry_address_name_hash_username_len_username_tier($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_tier());
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_16);
+}
+
+((int, slice, slice, int, int, cell), (int, int, slice, slice, cell)) $UsernameNFTItem$_fun_get_nft_data((int, slice, slice, int, int, cell) $self) impure inline_ref {
+    var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
+    var $fresh$ret_17 = $UsernameNftDataView$_constructor_initialized_index_collection_address_owner_address_individual_content($self'initialized, $self'name_hash, $self'username_registry_address, $self'owner_wallet, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_individualContent());
+    return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_17);
 }
 
 ;;
@@ -214,6 +541,12 @@ _ %get_state() method_id(86957) {
     var self = $UsernameNFTItem$_contract_load();
     var res = self~$UsernameNFTItem$_fun_get_state();
     return $UsernameNFTItemStateView$_to_external(res);
+}
+
+_ %get_nft_data() method_id(102351) {
+    var self = $UsernameNFTItem$_contract_load();
+    var res = self~$UsernameNFTItem$_fun_get_nft_data();
+    return $UsernameNftDataView$_to_external(res);
 }
 
 ;;
@@ -236,7 +569,7 @@ _ %get_state() method_id(86957) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'owner_wallet, $self'username_registry_address, $self'name_hash) = $UsernameNFTItem$_contract_load();
+    var ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username) = $UsernameNFTItem$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) { return (); }
@@ -245,27 +578,74 @@ _ %get_state() method_id(86957) {
     if (in_msg_length >= 32) {
         op = in_msg~load_uint(32);
     }
+    ;; Receive InitializeUsernameItem message
+    if (op == 0x554e494e) {
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        var $msg'username_len = in_msg~load_uint(8);
+        var $msg'username = in_msg;
+        throw_unless(18010, ( equal_slices_bits(__tact_context_get_sender(), $self'username_registry_address) ));
+        throw_unless(18011, (~ $self'initialized));
+        throw_unless(18012, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($msg'owner_wallet));
+        throw_unless(18013, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isValidUsernameBytes($msg'username_len, $msg'username));
+        throw_unless(18014, (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_computeNameHash($msg'username) == $self'name_hash));
+        throw_unless(18015, ($Context$_get_value(__tact_context_get()) >= 4000000));
+        $self'initialized = true;
+        $self'owner_wallet = $msg'owner_wallet;
+        $self'username_len = $msg'username_len;
+        $self'username = $Builder$_fun_endCell($Builder$_fun_storeSlice($global_beginCell(), $msg'username));
+        ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_sendDeployedAck();
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
+        return ();
+    }
+    
     ;; Receive ResendDeployedAck message
     if (op == 0x639cfc6c) {
         var $msg = empty_tuple();
-        throw_unless(18002, ($Context$_get_value(__tact_context_get()) >= 4000000));
-        throw_unless(18003, ($Context$_get_value(__tact_context_get()) <= 20000000));
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'username_registry_address, 3000000, true, 1, $UsernameItemDeployedAck$_store_cell($UsernameItemDeployedAck$_constructor_name_hash_owner_wallet($self'name_hash, $self'owner_wallet), begin_cell())));
-        $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
+        throw_unless(18020, $self'initialized);
+        throw_unless(18021, ($Context$_get_value(__tact_context_get()) >= 4000000));
+        throw_unless(18022, ($Context$_get_value(__tact_context_get()) <= 20000000));
+        ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_sendDeployedAck();
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
+        return ();
+    }
+    
+    ;; Receive NftTransfer message
+    if (op == 0x5fcc3d14) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'new_owner = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        var $msg'custom_payload = in_msg~load_maybe_ref();
+        var $msg'forward_amount = in_msg~load_varuint16();
+        var $msg'forward_payload = in_msg;
+        throw_unless(18030, $self'initialized);
+        throw_unless(18031, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_wallet) ));
+        throw_unless(18032, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($msg'new_owner));
+        throw_unless(18033, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_isBasechainAddress($msg'response_destination));
+        throw_unless(18034, ($msg'forward_amount >= 0));
+        throw_unless(18035, ($Context$_get_value(__tact_context_get()) >= ((2000000 + $msg'forward_amount) + 10000000)));
+        slice $previousOwner = $self'owner_wallet;
+        $self'owner_wallet = $msg'new_owner;
+        if (($msg'forward_amount > 0)) {
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'new_owner, $msg'forward_amount, 1, false, $NftOwnershipAssigned$_store_cell($NftOwnershipAssigned$_constructor_query_id_previous_owner_forward_payload($msg'query_id, $previousOwner, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)~$UsernameNFTItem$_fun_normalizedForwardPayload($msg'forward_payload)), begin_cell())));
+        }
+        if (($Context$_get_value(__tact_context_get()) >= (((2000000 + $msg'forward_amount) + 10000000) + 100000))) {
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 0, 64, false, $NftExcesses$_store_cell($NftExcesses$_constructor_query_id($msg'query_id), begin_cell())));
+        }
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
         return ();
     }
     
     ;; Receive TopUpStorageReserve message
     if (op == 0x27acdf8b) {
         var $msg = empty_tuple();
-        $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(18099);
-        $UsernameNFTItem$_contract_store(($self'owner_wallet, $self'username_registry_address, $self'name_hash));
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username));
         return ();
     }
     ;; Throw if not handled

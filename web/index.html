@@ -9,7 +9,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=86">
+    <link rel="stylesheet" href="./styles.css?v=122">
     <script type="importmap">
       {
         "imports": {
@@ -36,6 +36,11 @@
         </div>
 
         <nav class="rail" aria-label="Primary">
+          <div class="rail-vault-balance" aria-label="Vault balance" data-nav-vault-balance>
+            <span>Vault</span>
+            <strong data-nav-vault-ton>0 TON</strong>
+            <strong data-nav-vault-ath>0 ATH</strong>
+          </div>
           <button class="rail-item is-active" type="button" data-tab="chats" aria-label="Private" title="Private">
             <span class="icon icon-chat"></span>
             <span>Private</span>
@@ -58,13 +63,13 @@
       <main class="workspace">
         <section class="list-pane view-panel is-active" data-panel="chats" aria-label="Private">
           <header class="pane-header">
-            <div>
+            <div class="pane-title-block">
               <h1>Platho.app</h1>
               <p id="chatCountLabel">Private chats</p>
             </div>
             <div class="header-actions">
-              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
-                <span class="icon icon-install"></span>
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
+                <span class="icon icon-open-app"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -97,8 +102,8 @@
               <button class="icon-button" id="identityMenuButton" type="button" aria-label="Choose display name" title="Choose display name" aria-haspopup="menu" aria-expanded="false">
                 <span class="icon icon-chevron-down"></span>
               </button>
-              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
-                <span class="icon icon-install"></span>
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
+                <span class="icon icon-open-app"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -131,14 +136,13 @@
               </select>
               <button id="privateClearImageButton" type="button">Remove</button>
             </div>
-            <div class="composer-cost-status" id="privateComposerCostStatus">Price checking
-Wallet required</div>
+            <div class="composer-cost-status" id="privateComposerCostStatus">Wallet required</div>
           </form>
         </section>
 
         <section class="content-pane public-pane view-panel" data-panel="public" aria-label="Public feed">
           <header class="pane-header inline">
-            <div>
+            <div class="pane-title-block">
               <h1>Platho.app</h1>
               <p id="publicSubtitle">Public channels</p>
             </div>
@@ -147,8 +151,8 @@ Wallet required</div>
                 <button id="publicFeedModeButton" type="button" data-public-mode="feed" aria-pressed="true">Feed</button>
                 <button id="publicChannelsModeButton" type="button" data-public-mode="channels" aria-pressed="false">Channels</button>
               </div>
-              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
-                <span class="icon icon-install"></span>
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
+                <span class="icon icon-open-app"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -199,23 +203,19 @@ Wallet required</div>
             <button class="send-button" type="submit" aria-label="Publish" title="Publish">
               <span class="icon icon-bolt"></span>
             </button>
-            <div class="composer-cost-status" id="publicComposerCostStatus">Price checking
-Wallet required</div>
+            <div class="composer-cost-status" id="publicComposerCostStatus">Wallet required</div>
           </form>
         </section>
 
         <section class="content-pane vault-pane view-panel" data-panel="vault" aria-label="Vault">
           <header class="pane-header inline">
-            <div>
+            <div class="pane-title-block">
               <h1>Platho.app</h1>
               <p id="vaultSubtitle">Vault</p>
             </div>
             <div class="header-actions">
-              <button class="icon-button" id="refreshVaultButton" type="button" aria-label="Refresh" title="Refresh">
-                <span class="icon icon-refresh"></span>
-              </button>
-              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
-                <span class="icon icon-install"></span>
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
+                <span class="icon icon-open-app"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -223,87 +223,87 @@ Wallet required</div>
             </div>
           </header>
 
-          <div class="vault-move-list" id="vaultMoveList">
-            <form class="vault-asset-move-card" id="vaultMoveTonForm" data-vault-move-asset="TON">
-              <header class="vault-asset-move-header">
-                <div>
-                  <span>TON</span>
-                  <strong>Move TON</strong>
-                </div>
-                <div class="vault-asset-balances">
-                  <span>Wallet <strong id="vaultMoveTonWalletBalance" data-vault-wallet-balance>-</strong></span>
-                  <span>Vault <strong id="vaultMoveTonVaultBalance" data-vault-vault-balance>-</strong></span>
-                </div>
-              </header>
+          <div class="vault-scroll-content">
+            <div class="vault-move-list" id="vaultMoveList">
+              <form class="vault-asset-move-card" id="vaultMoveTonForm" data-vault-move-asset="TON">
+                <header class="vault-asset-move-header">
+                  <div>
+                    <span>TON</span>
+                    <strong>Move TON</strong>
+                  </div>
+                  <div class="vault-asset-balances">
+                    <span>Wallet <strong id="vaultMoveTonWalletBalance" data-vault-wallet-balance>0</strong></span>
+                    <span>Vault <strong id="vaultMoveTonVaultBalance" data-vault-vault-balance>0</strong></span>
+                  </div>
+                </header>
 
-              <div class="vault-asset-move-body">
-                <div class="vault-asset-route">
-                  <span id="vaultMoveTonFromLabel" data-vault-from-label>Wallet</span>
-                  <button class="vault-asset-switch" id="vaultMoveTonDirectionButton" type="button" data-vault-direction-button aria-label="Switch TON direction" title="Switch direction">
-                    <span class="icon icon-down"></span>
-                    <span class="icon icon-up"></span>
-                  </button>
-                  <span id="vaultMoveTonToLabel" data-vault-to-label>Vault</span>
+                <div class="vault-asset-move-body">
+                  <div class="vault-asset-route">
+                    <span id="vaultMoveTonFromLabel" data-vault-from-label>Wallet</span>
+                    <button class="vault-asset-switch" id="vaultMoveTonDirectionButton" type="button" data-vault-direction-button aria-label="Switch TON direction" title="Switch direction">
+                      <span class="icon icon-swap-circular"></span>
+                    </button>
+                    <span id="vaultMoveTonToLabel" data-vault-to-label>Vault</span>
+                  </div>
+                  <div class="vault-asset-amount">
+                    <input id="vaultMoveTonAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+                    <button id="vaultMoveTonMaxButton" data-vault-max-button type="button">MAX</button>
+                  </div>
                 </div>
-                <div class="vault-asset-amount">
-                  <input id="vaultMoveTonAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
-                  <button id="vaultMoveTonMaxButton" data-vault-max-button type="button">MAX</button>
-                </div>
-              </div>
 
-              <button class="vault-move-submit" id="vaultMoveTonSubmitButton" data-vault-submit-button type="submit">Move TON to Vault</button>
-            </form>
+                <button class="vault-move-submit" id="vaultMoveTonSubmitButton" data-vault-submit-button type="submit">Move TON to Vault</button>
+              </form>
 
-            <form class="vault-asset-move-card" id="vaultMoveAthForm" data-vault-move-asset="ATH">
-              <header class="vault-asset-move-header">
-                <div>
-                  <span>ATH</span>
-                  <strong>Move ATH</strong>
-                </div>
-                <div class="vault-asset-balances">
-                  <span>Wallet <strong id="vaultMoveAthWalletBalance" data-vault-wallet-balance>-</strong></span>
-                  <span>Vault <strong id="vaultMoveAthVaultBalance" data-vault-vault-balance>-</strong></span>
-                </div>
-              </header>
+              <form class="vault-asset-move-card" id="vaultMoveAthForm" data-vault-move-asset="ATH">
+                <header class="vault-asset-move-header">
+                  <div>
+                    <span>ATH</span>
+                    <strong>Move ATH</strong>
+                  </div>
+                  <div class="vault-asset-balances">
+                    <span>Wallet <strong id="vaultMoveAthWalletBalance" data-vault-wallet-balance>0</strong></span>
+                    <span>Vault <strong id="vaultMoveAthVaultBalance" data-vault-vault-balance>0</strong></span>
+                  </div>
+                </header>
 
-              <div class="vault-asset-move-body">
-                <div class="vault-asset-route">
-                  <span id="vaultMoveAthFromLabel" data-vault-from-label>Wallet</span>
-                  <button class="vault-asset-switch" id="vaultMoveAthDirectionButton" type="button" data-vault-direction-button aria-label="Switch ATH direction" title="Switch direction">
-                    <span class="icon icon-down"></span>
-                    <span class="icon icon-up"></span>
-                  </button>
-                  <span id="vaultMoveAthToLabel" data-vault-to-label>Vault</span>
+                <div class="vault-asset-move-body">
+                  <div class="vault-asset-route">
+                    <span id="vaultMoveAthFromLabel" data-vault-from-label>Wallet</span>
+                    <button class="vault-asset-switch" id="vaultMoveAthDirectionButton" type="button" data-vault-direction-button aria-label="Switch ATH direction" title="Switch direction">
+                      <span class="icon icon-swap-circular"></span>
+                    </button>
+                    <span id="vaultMoveAthToLabel" data-vault-to-label>Vault</span>
+                  </div>
+                  <div class="vault-asset-amount">
+                    <input id="vaultMoveAthAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+                    <button id="vaultMoveAthMaxButton" data-vault-max-button type="button">MAX</button>
+                  </div>
                 </div>
-                <div class="vault-asset-amount">
-                  <input id="vaultMoveAthAmountInput" data-vault-move-input type="text" inputmode="decimal" autocomplete="off" placeholder="0">
-                  <button id="vaultMoveAthMaxButton" data-vault-max-button type="button">MAX</button>
-                </div>
-              </div>
 
-              <button class="vault-move-submit" id="vaultMoveAthSubmitButton" data-vault-submit-button type="submit">Move ATH to Vault</button>
-            </form>
+                <button class="vault-move-submit" id="vaultMoveAthSubmitButton" data-vault-submit-button type="submit">Move ATH to Vault</button>
+              </form>
+            </div>
+
+            <div class="action-grid" id="actionGrid"></div>
+
+            <div class="vault-pocket-note">
+              <strong>Wallet and Vault are separate for security.</strong>
+              <span>Your wallet pays gas and holds funds outside the app. Vault holds only the funds you move there for encrypted checks, payments, and ATH discounts.</span>
+            </div>
+
+            <div class="ledger" id="ledgerRows"></div>
           </div>
-
-          <div class="action-grid" id="actionGrid"></div>
-
-          <div class="vault-pocket-note">
-            <strong>Wallet and Vault are separate for security.</strong>
-            <span>Your wallet pays gas and holds funds outside the app. Vault holds only the funds you move there for encrypted checks, payments, and ATH discounts.</span>
-          </div>
-
-          <div class="ledger" id="ledgerRows"></div>
         </section>
 
         <section class="content-pane profile-pane view-panel" data-panel="profile" aria-label="Profile">
           <header class="pane-header inline">
-            <div>
+            <div class="pane-title-block">
               <h1>Platho.app</h1>
               <p id="profileHandle">Profile</p>
             </div>
             <div class="header-actions">
-              <button class="icon-button install-header-button" type="button" aria-label="Install Platho" title="Install Platho">
-                <span class="icon icon-install"></span>
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
+                <span class="icon icon-open-app"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
@@ -311,22 +311,45 @@ Wallet required</div>
             </div>
           </header>
 
-          <div class="identity-block">
-            <div class="avatar large" id="profileAvatar" aria-hidden="true">P</div>
-            <div>
-              <h2 id="identityName">No wallet</h2>
-              <p id="identitySubtitle">Create or import a wallet</p>
+          <div class="profile-scroll-content">
+            <div class="identity-block">
+              <div class="avatar large" id="profileAvatar" aria-hidden="true">P</div>
+              <div class="identity-copy-layout">
+                <div class="identity-title-row">
+                  <h2 id="identityName">No wallet</h2>
+                  <button class="icon-button identity-copy-button" id="copyWalletAddressButton" type="button" aria-label="Copy wallet address" title="Copy wallet address" disabled>
+                    <span class="icon icon-copy"></span>
+                  </button>
+                </div>
+                <p id="identitySubtitle">Create or import a wallet</p>
+              </div>
             </div>
-          </div>
 
-          <div class="profile-sections">
+            <div class="profile-sections">
             <section class="profile-section" aria-label="Wallet">
               <h2>Wallet</h2>
               <div class="settings-list">
-                <button id="createWalletButton" type="button"><span>Create wallet</span><strong>recommended</strong></button>
-                <button id="importWalletButton" type="button"><span>Import wallet</span><strong>seed</strong></button>
-                <button id="exportWalletSeedButton" type="button"><span>Export wallet seed</span><strong id="walletAddressStatus">not created</strong></button>
-                <button id="registerVaultKeysButton" type="button"><span>Activate wallet</span><strong id="vaultDraftStatus">required</strong></button>
+                <button id="createWalletButton" type="button"><span>Create wallet</span><strong id="createWalletStatus">recommended</strong></button>
+                <button id="importWalletButton" type="button"><span>Import wallet</span><strong id="importWalletStatus">24 words</strong></button>
+                <button id="unlockWalletButton" type="button"><span>Unlock wallet</span><strong id="unlockWalletStatus">not stored</strong></button>
+                <button id="changeWalletPasswordButton" type="button"><span>Change password</span><strong id="changeWalletPasswordStatus">encrypted</strong></button>
+                <button id="receiveWalletTonButton" type="button"><span>Receive TON</span><strong id="receiveWalletTonStatus">QR</strong></button>
+                <button id="sendWalletTonButton" type="button"><span>Send TON</span><strong id="sendWalletTonStatus">wallet</strong></button>
+                <button id="exportWalletKeyButton" type="button"><span>Export wallet key</span><strong id="exportWalletKeyStatus">encrypted file</strong></button>
+                <button id="importWalletKeyButton" type="button"><span>Import wallet key</span><strong id="importWalletKeyStatus">file</strong></button>
+                <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
+                <label class="settings-select-row" for="walletDisplayModeSelect">
+                  <span>Display as</span>
+                  <select id="walletDisplayModeSelect" aria-label="Wallet display mode">
+                    <option value="address">Address</option>
+                    <option value="ton_dns">TON DNS</option>
+                    <option value="platho_nft">Platho name</option>
+                  </select>
+                  <strong id="walletDisplayModeStatus">address</strong>
+                </label>
+                <button id="exportWalletSeedButton" type="button"><span>Export recovery phrase</span><strong id="walletAddressStatus">not created</strong></button>
+                <button id="registerVaultKeysButton" type="button"><span>Activate messaging</span><strong id="vaultDraftStatus">keys required</strong></button>
+                <button id="clearLocalDataButton" type="button"><span>Clear local data</span><strong id="clearLocalDataStatus">device only</strong></button>
               </div>
             </section>
 
@@ -334,15 +357,13 @@ Wallet required</div>
               <h2>Messages</h2>
               <div class="settings-list">
                 <label class="settings-select-row" for="keySuiteSelect">
-                  <span>Encryption mode</span>
-                  <select id="keySuiteSelect" aria-label="Encryption type">
-                    <option value="hybrid-v1">Postquantum · 1 KiB/capsule</option>
-                    <option value="classical-v1">Standard · 1 KiB/capsule</option>
+                  <span>Encryption</span>
+                  <select id="keySuiteSelect" aria-label="Private message encryption type">
+                    <option value="hybrid-v1">Postquantum - from 0.0347 TON</option>
                   </select>
-                  <strong id="keySuiteStatus">checking</strong>
                 </label>
-                <button id="syncMessagesButton" type="button"><span>Sync messages</span><strong id="messageSyncStatus">chain</strong></button>
-                <button id="replaceVaultKeysButton" type="button"><span>Rotate keys</span><strong id="vaultRotateStatus">suite</strong></button>
+                <button id="syncMessagesButton" type="button"><span>Sync messages</span><strong id="messageSyncStatus">tap to sync</strong></button>
+                <button id="replaceVaultKeysButton" type="button"><span>Replace message keys</span><strong id="vaultRotateStatus">activate first</strong></button>
               </div>
             </section>
 
@@ -355,14 +376,14 @@ Wallet required</div>
                     <option value="7">7 days</option>
                     <option value="30">30 days</option>
                     <option value="90">90 days</option>
-                    <option value="all">All time · slow sync</option>
+                    <option value="all">All retained history · slow sync</option>
                   </select>
                 </label>
                 <label class="settings-select-row compact-select-row" for="publicCommentsDefaultSelect">
                   <span>Comments by default</span>
                   <select id="publicCommentsDefaultSelect" aria-label="Default public comment setting">
-                    <option value="enabled">Allowed</option>
                     <option value="disabled">Closed</option>
+                    <option value="enabled">Allowed - not recommended</option>
                   </select>
                 </label>
               </div>
@@ -371,8 +392,10 @@ Wallet required</div>
             <section class="profile-section" aria-label="Usernames and avatars">
               <h2>Usernames and Avatars</h2>
               <div class="settings-list">
-                <button id="mintUsernameButton" type="button"><span>Mint .ath name</span><strong>Username</strong></button>
-                <button id="setAvatarButton" type="button"><span>Set avatar</span><strong>100 ATH</strong></button>
+                <button id="mintUsernameButton" type="button"><span>Mint .ath name</span><strong>100-10k ATH + TON fee</strong></button>
+                <button id="linkUsernameButton" type="button"><span>Link .ath name</span><strong id="linkedUsernameStatus">verify</strong></button>
+                <button id="linkTonDnsButton" type="button"><span>Link TON DNS</span><strong id="linkedTonDnsStatus">verify</strong></button>
+                <button id="setAvatarButton" type="button"><span>Set avatar</span><strong>100 ATH + TON fee</strong></button>
                 <input id="profileAvatarInput" type="file" accept="image/*" hidden>
                 <button id="flushUsernameRefundButton" type="button"><span>Claim failed mint refund</span><strong>ATH</strong></button>
               </div>
@@ -394,6 +417,7 @@ Wallet required</div>
                 <button id="burnAthButton" type="button"><span>Burn ATH</span><strong>wallet</strong></button>
               </div>
             </section>
+            </div>
           </div>
         </section>
       </main>
@@ -438,6 +462,28 @@ Wallet required</div>
         </form>
       </div>
 
+      <div class="modal-backdrop image-lightbox-backdrop" id="imageLightboxDialog" hidden>
+        <section class="image-lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="imageLightboxTitle">
+          <header>
+            <div>
+              <h2 id="imageLightboxTitle">Full-size preview</h2>
+              <p id="imageLightboxMeta">Final compressed image</p>
+            </div>
+            <div class="image-lightbox-actions">
+              <button class="icon-button" id="imageLightboxDownloadButton" type="button" aria-label="Download image" title="Download image">
+                <span class="icon icon-download"></span>
+              </button>
+              <button class="icon-button" id="imageLightboxCloseButton" type="button" aria-label="Close full-size preview" title="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+          </header>
+          <div class="image-lightbox-viewport">
+            <img id="imageLightboxImage" alt="Full-size final image preview">
+          </div>
+        </section>
+      </div>
+
       <div class="modal-backdrop" id="docsDialog" hidden>
         <section class="docs-dialog" role="dialog" aria-modal="true" aria-labelledby="docsTitle">
           <header>
@@ -460,14 +506,15 @@ Wallet required</div>
         <section class="install-dialog" role="dialog" aria-modal="true" aria-labelledby="installTitle">
           <header>
             <div>
-              <h2 id="installTitle">Install Platho</h2>
-              <p>Use it as an app, outside stores and platform gates.</p>
+              <h2 id="installTitle">Open or install Platho</h2>
+              <p id="installLead">Use it as an app, outside stores and platform gates.</p>
             </div>
             <button class="icon-button" id="installCloseButton" type="button" aria-label="Close install prompt" title="Close">
               <span aria-hidden="true">&times;</span>
             </button>
           </header>
-          <p>Platho is a static PWA. After installation, the app shell, docs, and local encrypted history are cached on this device. Network access is still required for contract reads, public feed updates, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.</p>
+          <p id="installBody">Platho is a static PWA. After installation, the app shell, docs, and bounded local encrypted history are cached on this device. The cache improves recovery, but it is not a universal backup. Network access is still required for contract reads, verified public feed updates, message-history retrieval, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.</p>
+          <ol class="install-steps" id="installSteps" hidden></ol>
           <p class="install-help" id="installHelp">If your browser does not show the install sheet, use the browser menu and choose Install app or Add to Home screen.</p>
           <div class="install-dialog-actions">
             <button class="recipient-submit" id="installConfirmButton" type="button">Install</button>
@@ -476,6 +523,6 @@ Wallet required</div>
         </section>
       </div>
     </div>
-    <script src="./app.js?v=89" type="module"></script>
+    <script src="./app.js?v=239" type="module"></script>
   </body>
 </html>

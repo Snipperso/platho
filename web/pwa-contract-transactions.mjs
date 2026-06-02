@@ -1,4 +1,4 @@
-import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs';
+import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const VAULT_OPS = Object.freeze({
@@ -12,6 +12,8 @@ export const VAULT_OPS = Object.freeze({
   CancelReceiveIntent: 841519988,
   PublishPrivateFromVaultBalance: 2115981361,
   PublishPublicFromVaultBalance: 2115981362,
+  SetProfileAvatarFromVaultBalance: 2115981363,
+  MintUsernameFromVaultBalance: 2115981364,
 });
 
 export const ATH_WALLET_OPS = Object.freeze({
@@ -32,10 +34,17 @@ export const VAULT_PUBLISH_KIND = Object.freeze({
 });
 
 export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
+export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
+export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
 
 export const VAULT_SIZE_CLASS = Object.freeze({
+  KIB_1: 1n,
+  KIB_2: 2n,
+  KIB_4: 4n,
+  KIB_8: 8n,
+  KIB_16: 16n,
+  KIB_32: 32n,
   STANDARD: 1n,
-  LONG_TERM: 2n,
 });
 
 export const VAULT_CRYPTO_SUITE = Object.freeze({
@@ -69,6 +78,8 @@ export const PUBLIC_COMMENT_TEXT_MAX_BYTES = PUBLIC_POST_BODY_MAX_BYTES;
 export const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 export const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
 export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 30_000_000n;
+export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 61_000_000n;
+export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 63_000_000n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({
   userStateStorage: 10_000_000n,
@@ -348,8 +359,14 @@ function parseBocBase64(value) {
     throw new Error('Invalid BoC magic');
   }
   let offset = 4;
-  const sizeBytes = bytes[offset]; offset += 1;
+  const flags = bytes[offset]; offset += 1;
+  const hasIndex = (flags & 0x80) !== 0;
+  const hasCrc32 = (flags & 0x40) !== 0;
+  const hasCacheBits = (flags & 0x20) !== 0;
+  const bocFlags = (flags >> 3) & 0x03;
+  const sizeBytes = flags & 0x07;
   const offsetBytes = bytes[offset]; offset += 1;
+  if (hasCacheBits || bocFlags !== 0) throw new Error('Unsupported BoC flags');
   if (sizeBytes < 1 || sizeBytes > 4 || offsetBytes < 1 || offsetBytes > 4) {
     throw new Error('Unsupported BoC counter width');
   }
@@ -359,7 +376,15 @@ function parseBocBase64(value) {
   const totalCellsSize = Number(readBigUintBytes(bytes, offset, offsetBytes, 'BOC total cells size')); offset += offsetBytes;
   if (rootsCount !== 1 || absentCount !== 0) throw new Error('Unsupported BoC root/absent count');
   const rootIndex = Number(readBigUintBytes(bytes, offset, sizeBytes, 'BOC root index')); offset += sizeBytes;
+  if (hasIndex) {
+    const indexBytes = cellsCount * offsetBytes;
+    if (offset + indexBytes > bytes.length) throw new Error('BOC index table is truncated');
+    offset += indexBytes;
+  }
   const cellsStart = offset;
+  const cellsEnd = cellsStart + totalCellsSize;
+  const trailerBytes = hasCrc32 ? 4 : 0;
+  if (cellsEnd + trailerBytes > bytes.length) throw new Error('BOC cells data is truncated');
   const parsed = [];
   for (let index = 0; index < cellsCount; index += 1) {
     if (offset + 2 > bytes.length) throw new Error('BOC cell descriptor is truncated');
@@ -391,7 +416,8 @@ function parseBocBase64(value) {
     }
     parsed.push({ data, bitLength, refIndexes });
   }
-  if (offset !== cellsStart + totalCellsSize) throw new Error('BOC cell size mismatch');
+  if (offset !== cellsEnd) throw new Error('BOC cell size mismatch');
+  if (bytes.length !== cellsEnd + trailerBytes) throw new Error('BOC trailing data mismatch');
   const cells = parsed.map((cell) => ({ data: cell.data, bitLength: cell.bitLength, refs: [] }));
   for (let index = 0; index < parsed.length; index += 1) {
     cells[index].refs = parsed[index].refIndexes.map((refIndex) => {
@@ -513,16 +539,17 @@ export function beginCell() {
 function normalizeUsernameBytes(username) {
   const value = assertString(username, 'username');
   const raw = value.toLowerCase().endsWith('.ath') ? value.slice(0, -4) : value;
-  if (raw.length < 4 || raw.length > 32) throw new RangeError('username must be 4-32 ASCII chars');
-  if (!/^[a-z0-9]+$/.test(raw)) throw new RangeError('username must contain only lowercase ASCII letters and digits');
+  if (raw.length < 4 || raw.length > 16) throw new RangeError('username must be 4-16 ASCII chars');
+  if (!/^[a-z0-9_-]+$/.test(raw)) {
+    throw new RangeError('username must contain only lowercase ASCII letters, digits, underscores, or hyphens');
+  }
   return new TextEncoder().encode(raw);
 }
 
 function keyRecordStorageEndowment(cryptoSuiteMask) {
   const mask = toBigInt(cryptoSuiteMask, 'crypto_suite_mask');
-  if (mask === 1n) return VAULT_RESERVES_NANOTONS.keyRecordStandardStorage;
   if (mask === 2n) return VAULT_RESERVES_NANOTONS.keyRecordLongTermStorage;
-  throw new RangeError('Unsupported crypto suite mask for Vault key storage quote');
+  throw new RangeError('Platho v1 messaging keys require hybrid-v1');
 }
 
 export function estimateVaultAttachedValueNanotons(type, params = {}, context = {}) {
@@ -603,14 +630,24 @@ function vaultBalancePublishOwner(params) {
 }
 
 function vaultBalancePublishManifestHash(params) {
-  return params.deployment_manifest_hash
+  const value = params.deployment_manifest_hash
     ?? params.deploymentManifestHash
     ?? params.manifest_hash
     ?? params.manifestHash;
+  if (typeof value === 'string' && /^[0-9a-fA-F]{64}$/.test(value.trim())) {
+    return `0x${value.trim()}`;
+  }
+  return value;
 }
 
 function vaultBalancePublishVaultAddress(params) {
   return params.vault_address ?? params.vaultAddress;
+}
+
+function basechainAddressHashValue(address, name) {
+  const parsed = parseTonAddress(assertString(address, name));
+  if (parsed.workchain !== 0) throw new Error(`${name} must be a basechain address`);
+  return bytesToBigInt(parsed.hash);
 }
 
 function privateVaultBalancePublishSignedDataCell(params) {
@@ -628,11 +665,13 @@ function privateVaultBalancePublishSignedDataCell(params) {
   return beginCell()
     .uint(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
     .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
     .uint(VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
-    .address(vaultBalancePublishOwner(params), 'owner_wallet')
+    .uint(basechainAddressHashValue(vaultBalancePublishOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+    .uint(publish.size_class, 8, 'signed_size_class')
+    .uint(publish.crypto_suite, 8, 'signed_crypto_suite')
     .ref(payload, 'payload')
     .endCell();
 }
@@ -663,6 +702,66 @@ function vaultBalancePublishSignedDataCell(type, params = {}) {
   if (type === 'PublishPrivateFromVaultBalance') return privateVaultBalancePublishSignedDataCell(params);
   if (type === 'PublishPublicFromVaultBalance') return publicVaultBalancePublishSignedDataCell(params);
   throw new Error(`Unsupported Vault balance publish type ${type}`);
+}
+
+function vaultProfileAvatarOwner(params) {
+  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
+}
+
+function vaultProfileAvatarRegistryAddress(params) {
+  return params.profile_registry_address
+    ?? params.profileRegistryAddress
+    ?? params.registry_address
+    ?? params.registryAddress;
+}
+
+function vaultProfileAvatarSignedDataCell(params) {
+  const avatarPayload = beginCell()
+    .address(vaultProfileAvatarRegistryAddress(params), 'profile_registry_address')
+    .uint(publishHashValue(params.avatar_hash ?? params.avatarHash, 'avatar_hash'), 256, 'avatar_hash')
+    .uint(params.avatar_entry_id ?? params.avatarEntryId ?? 0n, 64, 'avatar_entry_id')
+    .uint(params.avatar_stream_id ?? params.avatarStreamId, 128, 'avatar_stream_id')
+    .uint(params.avatar_part_count ?? params.avatarPartCount, 16, 'avatar_part_count')
+    .uint(params.media_format ?? params.mediaFormat ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP, 8, 'media_format')
+    .endCell();
+  return beginCell()
+    .uint(VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .address(vaultProfileAvatarOwner(params), 'owner_wallet')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .uint(params.max_ton_charge ?? params.maxTonCharge, 128, 'max_ton_charge')
+    .ref(avatarPayload, 'avatar_payload')
+    .endCell();
+}
+
+function vaultUsernameMintRegistryAddress(params) {
+  return params.username_registry_address
+    ?? params.usernameRegistryAddress
+    ?? params.registry_address
+    ?? params.registryAddress;
+}
+
+function vaultUsernameMintOwner(params) {
+  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
+}
+
+function vaultUsernameMintSignedDataCell(params) {
+  const usernameBytes = normalizeUsernameBytes(params.username);
+  const usernamePayload = beginCell()
+    .address(vaultUsernameMintRegistryAddress(params), 'username_registry_address')
+    .uint(usernameBytes.length, 8, 'username_len')
+    .bytesValue(usernameBytes, usernameBytes.length, 'username')
+    .endCell();
+  return beginCell()
+    .uint(VAULT_USERNAME_MINT_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .address(vaultUsernameMintOwner(params), 'owner_wallet')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .uint(params.max_ton_charge ?? params.maxTonCharge, 128, 'max_ton_charge')
+    .ref(usernamePayload, 'username_payload')
+    .endCell();
 }
 
 function externalInMessageCell(destinationAddress, bodyCell) {
@@ -704,6 +803,80 @@ export async function buildVaultBalancePublishExternalBoc(type, params = {}, opt
     ?? params.deployment_manifest_hash
     ?? params.deploymentManifestHash;
   const built = await buildVaultBalancePublishBodyCell(type, {
+    ...params,
+    vaultAddress,
+    deploymentManifestHash,
+  });
+  const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  return {
+    ...built,
+    boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
+export async function buildVaultProfileAvatarBodyCell(params = {}) {
+  assertObject(params, 'params');
+  const signedData = vaultProfileAvatarSignedDataCell(params);
+  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedData);
+  const signature = ed25519.sign(hash, signingSecretKey);
+  return {
+    bodyCell: beginVaultBody(VAULT_OPS.SetProfileAvatarFromVaultBalance)
+      .address(vaultProfileAvatarOwner(params), 'owner_wallet')
+      .bytesValue(signature, 64, 'signature')
+      .ref(signedData, 'signed_payload')
+      .endCell(),
+    signedData,
+    signedDataHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+  };
+}
+
+export async function buildVaultProfileAvatarExternalBoc(params = {}, options = {}) {
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const built = await buildVaultProfileAvatarBodyCell({
+    ...params,
+    vaultAddress,
+    deploymentManifestHash,
+  });
+  const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  return {
+    ...built,
+    boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
+export async function buildVaultUsernameMintBodyCell(params = {}) {
+  assertObject(params, 'params');
+  const signedData = vaultUsernameMintSignedDataCell(params);
+  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedData);
+  const signature = ed25519.sign(hash, signingSecretKey);
+  return {
+    bodyCell: beginVaultBody(VAULT_OPS.MintUsernameFromVaultBalance)
+      .address(vaultUsernameMintOwner(params), 'owner_wallet')
+      .bytesValue(signature, 64, 'signature')
+      .ref(signedData, 'signed_payload')
+      .endCell(),
+    signedData,
+    signedDataHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+  };
+}
+
+export async function buildVaultUsernameMintExternalBoc(params = {}, options = {}) {
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const built = await buildVaultUsernameMintBodyCell({
     ...params,
     vaultAddress,
     deploymentManifestHash,
@@ -962,6 +1135,25 @@ function publicCommentsAllowed(input) {
   return true;
 }
 
+function publicCreatedAtSeconds(input) {
+  if (!input || typeof input !== 'object' || ArrayBuffer.isView(input) || input instanceof ArrayBuffer) return 0;
+  const direct = input.createdAtSec ?? input.created_at_sec;
+  if (direct !== undefined && direct !== null) return Number(assertUint(direct, 32, 'public created_at_sec'));
+  const ms = input.createdAtMs ?? input.created_at_ms;
+  if (ms !== undefined && ms !== null) {
+    const value = Number(ms);
+    if (!Number.isFinite(value) || value < 0) throw new RangeError('public createdAtMs must be non-negative');
+    return Number(assertUint(Math.floor(value / 1000), 32, 'public created_at_sec'));
+  }
+  const createdAt = input.createdAt ?? input.created_at;
+  if (createdAt !== undefined && createdAt !== null && String(createdAt).trim()) {
+    const parsed = Date.parse(String(createdAt));
+    if (!Number.isFinite(parsed) || parsed < 0) throw new RangeError('public createdAt must be a valid date');
+    return Number(assertUint(Math.floor(parsed / 1000), 32, 'public created_at_sec'));
+  }
+  return 0;
+}
+
 function publicProfilePointerBytes(input) {
   const profileVersion = input && typeof input === 'object' && !ArrayBuffer.isView(input) && !(input instanceof ArrayBuffer)
     ? (input.profileVersion ?? input.profile_version ?? 0)
@@ -981,6 +1173,7 @@ function publicHeaderBytes(input) {
   const streamId = publicStreamIdBytes(input);
   const partIndex = publicPartNumber(input?.partIndex ?? input?.part_index ?? 0, 'public part index');
   const partCount = publicPartNumber(input?.partCount ?? input?.part_count ?? 1, 'public part count');
+  const createdAtSec = publicCreatedAtSeconds(input);
   const isImage = kind === PUBLIC_BODY_KIND.IMAGE_POST || kind === PUBLIC_BODY_KIND.IMAGE_COMMENT;
   const mediaFormat = isImage
     ? Number(input?.mediaFormat ?? input?.media_format ?? input?.format ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP)
@@ -990,7 +1183,7 @@ function publicHeaderBytes(input) {
     streamId,
     bigintToBytes(BigInt(partIndex), 2, 'part_index'),
     bigintToBytes(BigInt(partCount), 2, 'part_count'),
-    new Uint8Array(4),
+    bigintToBytes(BigInt(createdAtSec), 4, 'created_at_sec'),
   );
   const profileBytes = publicProfilePointerBytes(input);
   if (kind === PUBLIC_BODY_KIND.POST) {
@@ -1193,9 +1386,7 @@ function readPublicBodyBytes(headerBytes, bodyBytes) {
     const partIndex = Number(readBigUintBytes(header, 24, 2, 'part_index'));
     const partCount = Number(readBigUintBytes(header, 26, 2, 'part_count'));
     if (partCount <= 0 || partIndex >= partCount) throw new Error('Public part index mismatch');
-    for (let i = 28; i < 32; i += 1) {
-      if (header[i] !== 0) throw new Error('Unsupported public part reserved bytes');
-    }
+    const createdAtSec = Number(readBigUintBytes(header, 28, 4, 'created_at_sec'));
     return {
       streamId,
       stream_id: `0x${bytesToHex(streamId)}`,
@@ -1203,6 +1394,8 @@ function readPublicBodyBytes(headerBytes, bodyBytes) {
       part_index: partIndex,
       partCount,
       part_count: partCount,
+      createdAtSec,
+      created_at_sec: createdAtSec,
     };
   };
   const readProfilePointer = () => {

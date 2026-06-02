@@ -6,6 +6,8 @@ import {
   Vault,
   BindDeploymentManifest as VaultBind,
   BindOfficialAthWallet as VaultBindAth,
+  BindProfileRegistry as VaultBindProfile,
+  BindUsernameRegistry as VaultBindUsername,
   SealGenesis as VaultSeal,
 } from '../build/Vault/Vault_Vault';
 import {
@@ -16,11 +18,13 @@ import {
 import {
   UsernameRegistry,
   BindOfficialAthWallet as RegistryBindAth,
+  BindUsernameVault as RegistryBindVault,
   SealGenesis as RegistrySeal,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   ProfileRegistry,
   BindProfileOfficialAthWallet as ProfileBindAth,
+  BindProfileVault as ProfileBindVault,
   SealGenesis as ProfileSeal,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
@@ -147,6 +151,8 @@ describe('Deployment genesis controller auth', () => {
     const { genesisController, attacker, officialAthWallet, vault, capsuleAddress, vaultPlaceholder } = await deployUnsealedVaultCapsulePair();
     const attackerCapsule = fixtureAddress('GENESIS_AUTH_ATTACKER_CAPSULE');
     const attackerAthWallet = fixtureAddress('GENESIS_AUTH_ATTACKER_ATH_WALLET');
+    const profileRegistryAddress = fixtureAddress('GENESIS_AUTH_VAULT_PROFILE_REGISTRY');
+    const usernameRegistryAddress = fixtureAddress('GENESIS_AUTH_VAULT_USERNAME_REGISTRY');
 
     await vault.send(attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindDeploymentManifest',
@@ -185,6 +191,22 @@ describe('Deployment genesis controller auth', () => {
     } as VaultSeal);
     expect((await vault.getGetGlobal()).sealed).toBe(false);
 
+    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as VaultSeal);
+    expect((await vault.getGetGlobal()).sealed).toBe(false);
+
+    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindProfileRegistry',
+      deployment_manifest_hash: MANIFEST_HASH,
+      profile_registry_address: profileRegistryAddress,
+    } as VaultBindProfile);
+    await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindUsernameRegistry',
+      deployment_manifest_hash: MANIFEST_HASH,
+      username_registry_address: usernameRegistryAddress,
+    } as VaultBindUsername);
     await vault.send(genesisController.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -259,8 +281,23 @@ describe('Deployment genesis controller auth', () => {
       deployment_manifest_hash: MANIFEST_HASH,
     } as RegistrySeal);
     global = await registry.getGetGlobal();
+    expect(global.sealed).toBe(false);
+
+    const vaultAddress = fixtureAddress('GENESIS_AUTH_USERNAME_VAULT');
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindUsernameVault',
+      deployment_manifest_hash: MANIFEST_HASH,
+      vault_address: vaultAddress,
+    } as RegistryBindVault);
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as RegistrySeal);
+    global = await registry.getGetGlobal();
     expect(global.sealed).toBe(true);
     expect(global.official_ath_wallet_address.equals(officialAthWallet)).toBe(true);
+    expect(global.vault_bound).toBe(true);
+    expect(global.vault_address.equals(vaultAddress)).toBe(true);
 
     await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
@@ -304,8 +341,23 @@ describe('Deployment genesis controller auth', () => {
       deployment_manifest_hash: MANIFEST_HASH,
     } as ProfileSeal);
     global = await registry.getGetGlobal();
+    expect(global.sealed).toBe(false);
+
+    const vaultAddress = fixtureAddress('GENESIS_AUTH_PROFILE_VAULT');
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindProfileVault',
+      deployment_manifest_hash: MANIFEST_HASH,
+      vault_address: vaultAddress,
+    } as ProfileBindVault);
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as ProfileSeal);
+    global = await registry.getGetGlobal();
     expect(global.sealed).toBe(true);
     expect(global.official_ath_wallet_address.equals(officialAthWallet)).toBe(true);
+    expect(global.vault_bound).toBe(true);
+    expect(global.vault_address.equals(vaultAddress)).toBe(true);
 
     await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindProfileOfficialAthWallet',

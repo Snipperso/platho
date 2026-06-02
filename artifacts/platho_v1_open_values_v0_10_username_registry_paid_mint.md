@@ -87,11 +87,11 @@ masterchain downstream deployment and transfer paths.
 Accepted v1 username bytes:
 
 ```text
-length: 4..32 bytes inclusive
-allowed bytes: ASCII a-z and ASCII 0-9 only
+length: 4..16 bytes inclusive
+allowed bytes: ASCII a-z, ASCII 0-9, underscore, and hyphen only
 unicode: forbidden
 uppercase: forbidden
-hyphen / underscore / dot / space: forbidden
+dot / space / unicode / uppercase: forbidden
 normalization: none
 ```
 
@@ -126,7 +126,7 @@ Pinned price tiers remain:
 ```text
 4 chars: 10_000 ATH = 10_000_000_000_000 atomic ATH
 5 chars: 1_000 ATH = 1_000_000_000_000 atomic ATH
-6..32 chars: 100 ATH = 100_000_000_000 atomic ATH
+6..16 chars: 100 ATH = 100_000_000_000 atomic ATH
 ```
 
 M10 uses exact-price mint:

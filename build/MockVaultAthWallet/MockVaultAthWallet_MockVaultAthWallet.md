@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: MockVaultAthWallet
-BoC Size: 284 bytes
+BoC Size: 287 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 15
@@ -46,8 +46,8 @@ TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
 ### AthTransferNotification
-TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_key:uint32 sender_wallet:address = AthTransferNotification`
-Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_key:uint32,sender_wallet:address}`
+TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 sender_key:uint160 amount:uint128 sender_wallet:address = AthTransferNotification`
+Signature: `AthTransferNotification{query_id:uint64,sender_key:uint160,amount:uint128,sender_wallet:address}`
 
 ### VaultAthTransferRequest
 TL-B: `vault_ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = VaultAthTransferRequest`

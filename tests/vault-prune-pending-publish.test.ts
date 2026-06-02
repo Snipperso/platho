@@ -15,13 +15,14 @@ import {
   finalPrivateHeader0Cell,
   finalPrivateHeader1Cell,
 } from './helpers/capsule-cells';
+import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const KIND_PRIVATE = 1n;
 const KIND_PUBLIC = 2n;
 const SIZE_STANDARD = 1n;
 const SUITE_PUBLIC_NONE = 0n;
-const SUITE_CLASSICAL = 1n;
+const SUITE_HYBRID = 2n;
 const BODY_CELL = finalPrivateBodyCell();
 const HEADER0_CELL = finalPrivateHeader0Cell();
 const HEADER1_CELL = finalPrivateHeader1Cell();
@@ -35,6 +36,7 @@ const PUBLIC_BODY_HASH = cellHashToBigInt(PUBLIC_BODY_CELL);
 const VAULT_PENDING_PUBLISH_STALE_TTL = 86_400;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH = 10_000_000_000n;
 const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2_000_000n;
+const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE = 4_200_000n;
 const UINT160_MOD = 1n << 160n;
 const OP_BOUNCED = 0xffffffff;
 const OP_PUBLISH_PRIVATE_FROM_VAULT = 0xa4f862c0;
@@ -47,6 +49,10 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 function cellHashToBigInt(cell: Cell): bigint {
   return BigInt('0x' + cell.hash().toString('hex'));
+}
+
+function addressHash(address: Address): bigint {
+  return BigInt('0x' + address.hash.toString('hex'));
 }
 
 function computePublishId(owner: Address, nonce: bigint, bodyHash: bigint, publishKind: bigint): bigint {
@@ -91,14 +97,9 @@ async function setup() {
 
 async function registerKeys(vault: any, user: any) {
   const keyPair = keyPairFromSeed(Buffer.alloc(32, 9));
-  await vault.send(user.getSender(), { value: toNano('0.03') }, {
+  await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
-    enc_pubkey: 1n,
-    sign_pubkey: BigInt('0x' + keyPair.publicKey.toString('hex')),
-    pq_kem_pubkey_hash: 0n,
-    pq_kem_pubkey_len: 0n,
-    pq_kem_pubkey: beginCell().endCell(),
-    crypto_suite_mask: 1n,
+    ...hybridMessagingKeyFields(1n, BigInt('0x' + keyPair.publicKey.toString('hex'))),
   } as RegisterMessagingKeys);
   return keyPair;
 }
@@ -113,7 +114,7 @@ async function depositTon(vault: any, user: any, amount: bigint) {
 function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address) {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
-    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(SUITE_HYBRID, 8)
     .storeUint(HEADER0, 256)
     .storeUint(HEADER1, 256)
     .storeUint(BODY_HASH, 256)
@@ -124,11 +125,13 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
   const signedPayload = beginCell()
     .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(GENESIS_HASH, 256)
-    .storeAddress(vaultAddress)
+    .storeUint(addressHash(vaultAddress), 256)
     .storeUint(KIND_PRIVATE, 8)
-    .storeAddress(owner)
+    .storeUint(addressHash(owner), 256)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_HYBRID, 8)
     .storeRef(payload)
     .endCell();
   return beginCell()
@@ -167,7 +170,7 @@ function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigin
 async function createPendingPublish() {
   const ctx = await setup();
   const keyPair = await registerKeys(ctx.vault, ctx.user);
-  const maxCharge = await ctx.vault.getGetCanonicalPublishCharge(ctx.user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+  const maxCharge = await ctx.vault.getGetCanonicalPublishCharge(ctx.user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
   await depositTon(ctx.vault, ctx.user, maxCharge * 2n);
   const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
   await ctx.blockchain.sendMessage(external({
@@ -342,6 +345,6 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
     const afterBounceUser = await ctx.vault.getGetUser(ctx.user.address);
     expect((await ctx.vault.getGetGlobal()).pending_publish_count).toBe(0n);
     expect(afterBounceUser.ath_balance).toBe(afterPendingUser.ath_balance);
-    expect(afterBounceUser.ton_balance).toBe(afterPendingUser.ton_balance + 8_000_000n);
+    expect(afterBounceUser.ton_balance).toBe(afterPendingUser.ton_balance + toNano('0.01') - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE);
   });
 });

@@ -1,18 +1,33 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, relative } from 'path';
 import { createHash } from 'crypto';
 import { Address, beginCell, Cell } from '@ton/core';
 import { isTestnetFriendlyAddress } from './m20f_mainnet_route_freeze_preflight';
 
 const ARTIFACTS_DIR = join(process.cwd(), 'artifacts');
+export const DEFAULT_MAINNET_GENESIS_VERIFY_INPUT_PATH = join(ARTIFACTS_DIR, 'mainnet_genesis_verify_input.json');
 const FINAL_MANIFEST_DOMAIN = 'PLATHO.V1.FINAL_GENESIS_MANIFEST';
 const EXPECTED_ATH_TOTAL_SUPPLY_ATOMIC = '100000000000000000';
 const EXPECTED_VAULT_ACTIVITY_AIRDROP_TOTAL_ATOMIC = '15000000000000000';
+const EXPECTED_ATH_TREASURY_OWNER_REMAINING_ATOMIC = '75000000000000000';
 const EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC = '60000000000000000';
 const EXPECTED_ATH_LONG_TERM_VESTING_ATOMIC = '10000000000000000';
 const EXPECTED_ATH_LONG_TERM_VESTING_PERIOD_COUNT = '100';
 const EXPECTED_ATH_LONG_TERM_VESTING_PERIOD_SECONDS = '31536000';
 const EXPECTED_ATH_LONG_TERM_VESTING_PERIOD_UNLOCK_ATOMIC = '100000000000000';
+const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
+  ATHMASTER_CODE_HASH: 'ath_master',
+  ATHVESTING_CODE_HASH: 'ath_vesting',
+  ATH_WALLET_CODE_HASH: 'ath_wallet',
+  BUYBACKBURN_CODE_HASH: 'buyback_burn',
+  MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
+  CAPSULEHUB_CODE_HASH: 'capsulehub',
+  FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
+  PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
+  USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
+  USERNAME_REGISTRY_CODE_HASH: 'username_registry',
+  VAULT_CODE_HASH: 'vault',
+};
 
 type Issue = { code: string; message: string };
 
@@ -31,6 +46,7 @@ type ManifestLike = {
 type BaseSnapshot = {
   address: string;
   code_hash: string;
+  account_state?: 'active' | 'uninit';
   sealed?: boolean;
   deployment_manifest_hash?: string;
 };
@@ -46,7 +62,12 @@ export interface MainnetGenesisVerifyInput {
       treasury_supply_deployed: boolean;
     };
     vault: BaseSnapshot & {
+      capsule_hub_bound: boolean;
       capsule_hub_address: string;
+      profile_registry_bound: boolean;
+      profile_registry_address: string;
+      username_registry_bound: boolean;
+      username_registry_address: string;
       vault_ath_wallet_address: string;
       ath_master_address: string;
       user_count: string;
@@ -63,6 +84,11 @@ export interface MainnetGenesisVerifyInput {
       ath_master_address: string;
       balance_atomic: string;
     };
+    ath_treasury_owner_ath_wallet: BaseSnapshot & {
+      owner_address: string;
+      ath_master_address: string;
+      balance_atomic: string;
+    };
     ath_long_term_vesting: BaseSnapshot & {
       ath_master_address: string;
       beneficiary_address: string;
@@ -74,6 +100,8 @@ export interface MainnetGenesisVerifyInput {
       total_amount: string;
       phase: string;
       claimed_ath: string;
+      vested_ath: string;
+      claimable_ath: string;
       pending_query_id: string;
       pending_amount: string;
       pending_created_at: string;
@@ -110,6 +138,8 @@ export interface MainnetGenesisVerifyInput {
       balance_atomic: string;
     };
     capsulehub: BaseSnapshot & {
+      ton_balance: string;
+      vault_bound: boolean;
       vault_address: string;
       fee_accumulator_address: string;
       private_latest_id: string;
@@ -117,7 +147,10 @@ export interface MainnetGenesisVerifyInput {
       accrued_plato_fee_ton: string;
     };
     username_registry: BaseSnapshot & {
+      official_ath_wallet_bound: boolean;
       official_ath_wallet_address: string;
+      vault_bound: boolean;
+      vault_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
       name_record_count: string;
@@ -135,7 +168,10 @@ export interface MainnetGenesisVerifyInput {
       balance_atomic: string;
     };
     profile_registry: BaseSnapshot & {
+      official_ath_wallet_bound: boolean;
       official_ath_wallet_address: string;
+      vault_bound: boolean;
+      vault_address: string;
       ath_master_address: string;
       treasury_ath_receiver: string;
       profile_count: string;
@@ -192,14 +228,18 @@ export interface MainnetGenesisVerifyReport {
   status: 'BLOCKED_MISSING_INPUT' | 'BLOCKED_GENESIS_MISMATCH' | 'MAINNET_GENESIS_VERIFIED';
   generated_at: 'DETERMINISTIC_ARTIFACT';
   mainnet_genesis_verified: boolean;
+  input_source: string | null;
+  input_sha256: string | null;
+  evidence_refs: MainnetGenesisVerifyInput['evidenceRefs'] | null;
   issue_codes: string[];
   issues: Issue[];
   checked_manifest_hash: string | null;
 }
 
-function readJson(path: string): any {
-  return JSON.parse(readFileSync(path, 'utf8'));
-}
+type GenesisVerifyInputMetadata = {
+  inputSource?: string | null;
+  inputSha256?: string | null;
+};
 
 function issue(code: string, message: string): Issue {
   return { code, message };
@@ -235,6 +275,68 @@ function sameAddress(a: string, b: string): boolean {
 
 function sha256(data: string | Buffer): Buffer {
   return createHash('sha256').update(data).digest();
+}
+
+function sha256Hex(data: string | Buffer): string {
+  return createHash('sha256').update(data).digest('hex');
+}
+
+function normalizedArtifactSource(path: string): string {
+  return relative(process.cwd(), path).replace(/\\/g, '/');
+}
+
+function parseKeyValueLines(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx < 0) continue;
+    out[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+  }
+  return out;
+}
+
+function currentBuildConsistencyIssues(input: MainnetGenesisVerifyInput): Issue[] {
+  const currentCodeHashesPath = join(ARTIFACTS_DIR, 'CURRENT_CODE_HASHES.txt');
+  if (!existsSync(currentCodeHashesPath)) {
+    return [
+      issue(
+        'CURRENT_CODE_HASHES_MISSING',
+        'artifacts/CURRENT_CODE_HASHES.txt is required before this final genesis snapshot can be treated as current-release evidence.',
+      ),
+    ];
+  }
+
+  const currentCodeHashes = parseKeyValueLines(readFileSync(currentCodeHashesPath, 'utf8'));
+  const mismatches: string[] = [];
+  for (const [currentKey, manifestKey] of Object.entries(CURRENT_CODE_HASH_TO_MANIFEST_KEY)) {
+    const currentHash = currentCodeHashes[currentKey]?.toLowerCase();
+    const manifestHash = input.manifest.code_hashes?.[manifestKey]?.toLowerCase();
+    if (!currentHash || !manifestHash || currentHash !== manifestHash) {
+      mismatches.push(`${manifestKey}: current=${currentHash ?? 'missing'}, manifest=${manifestHash ?? 'missing'}`);
+    }
+  }
+
+  if (mismatches.length === 0) return [];
+  return [
+    issue(
+      'CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST',
+      `Final genesis evidence does not belong to the current local build: ${mismatches.join('; ')}.`,
+    ),
+  ];
+}
+
+function withAdditionalIssues(report: MainnetGenesisVerifyReport, additionalIssues: Issue[]): MainnetGenesisVerifyReport {
+  if (additionalIssues.length === 0) return report;
+  const issues = [...report.issues, ...additionalIssues];
+  return {
+    ...report,
+    status: 'BLOCKED_GENESIS_MISMATCH',
+    mainnet_genesis_verified: false,
+    issues,
+    issue_codes: Array.from(new Set(issues.map((item) => item.code))),
+  };
 }
 
 function hexToBuffer(hex: string): Buffer {
@@ -337,6 +439,12 @@ function addAddressEq(issues: Issue[], code: string, actual: string, expected: s
   }
 }
 
+function addAddressNotEq(issues: Issue[], code: string, actual: string, forbidden: string, label: string, forbiddenLabel: string) {
+  if (isParseableMainnetAddress(actual) && isParseableMainnetAddress(forbidden) && sameAddress(actual, forbidden)) {
+    issues.push(issue(code, `${label} must not equal ${forbiddenLabel}`));
+  }
+}
+
 function addTrue(issues: Issue[], code: string, actual: boolean | undefined, label: string) {
   if (actual !== true) {
     issues.push(issue(code, `${label} must be true`));
@@ -371,6 +479,69 @@ function addBasechainAddress(issues: Issue[], code: string, value: unknown, labe
   const workchain = addressWorkchain(value);
   if (workchain !== null && workchain !== 0) {
     issues.push(issue(code, `${label} must be a basechain workchain 0 address for the current release; got workchain ${workchain}.`));
+  }
+}
+
+function addDistinctManifestAddresses(issues: Issue[], manifest: ManifestLike, keys: string[], code: string) {
+  for (let i = 0; i < keys.length; i += 1) {
+    for (let j = i + 1; j < keys.length; j += 1) {
+      const leftKey = keys[i];
+      const rightKey = keys[j];
+      const left = manifest.addresses?.[leftKey];
+      const right = manifest.addresses?.[rightKey];
+      if (!isParseableMainnetAddress(left) || !isParseableMainnetAddress(right)) continue;
+      if (sameAddress(left, right)) {
+        issues.push(issue(
+          code,
+          `manifest.addresses.${leftKey} and manifest.addresses.${rightKey} must be distinct protocol contract addresses; both resolve to ${left}.`,
+        ));
+      }
+    }
+  }
+}
+
+const PROTOCOL_TREASURY_DENYLIST_KEYS = [
+  'ath_master',
+  'ath_long_term_vesting',
+  'ath_long_term_vesting_official_ath_wallet',
+  'ath_treasury_owner_ath_wallet',
+  'buyback_burn',
+  'buyback_burn_initial_genesis_controller',
+  'buyback_burn_launch_controller',
+  'buyback_burn_official_ath_wallet',
+  'capsulehub',
+  'capsulehub_initial_vault_placeholder',
+  'fee_accumulator',
+  'genesis_controller_one_shot',
+  'market_stability_seller',
+  'market_stability_seller_initial_genesis_controller',
+  'market_stability_seller_launch_controller',
+  'market_stability_seller_official_ath_wallet',
+  'profile_registry',
+  'profile_registry_initial_ath_wallet_placeholder',
+  'profile_registry_official_ath_wallet',
+  'username_registry',
+  'username_registry_initial_ath_wallet_placeholder',
+  'username_registry_official_ath_wallet',
+  'vault',
+  'vault_initial_capsulehub_placeholder',
+  'vault_official_ath_wallet',
+];
+
+function addManifestTreasuryReceiverNotProtocolOwned(
+  issues: Issue[],
+  manifest: ManifestLike,
+  receiverKey: string,
+  code: string,
+) {
+  const receiver = manifest.addresses?.[receiverKey];
+  if (!isParseableMainnetAddress(receiver)) return;
+  for (const forbiddenKey of PROTOCOL_TREASURY_DENYLIST_KEYS) {
+    const forbidden = manifest.addresses?.[forbiddenKey];
+    if (!isParseableMainnetAddress(forbidden)) continue;
+    if (sameAddress(receiver, forbidden)) {
+      issues.push(issue(code, `manifest.addresses.${receiverKey} must not equal protocol role ${forbiddenKey}.`));
+    }
   }
 }
 
@@ -423,6 +594,63 @@ function checkBase(
   addEq(issues, `${contractKey.toUpperCase()}_CODE_HASH_MISMATCH`, snapshot.code_hash?.toLowerCase(), manifest.code_hashes[codeHashKey], `${contractKey}.code_hash`);
 }
 
+function checkRequiredStateInitHash(issues: Issue[], manifest: ManifestLike, key: string, label: string) {
+  if (!isHex64(manifest.state_init_hashes?.[key])) {
+    issues.push(issue(`${key.toUpperCase()}_STATE_INIT_HASH_MISSING`, `${label} StateInit hash must be present in manifest.state_init_hashes for deterministic uninit verification.`));
+  }
+}
+
+function checkFundedOfficialAthWallet(
+  issues: Issue[],
+  manifest: ManifestLike,
+  snapshot: BaseSnapshot & { owner_address: string; ath_master_address: string; balance_atomic: string },
+  contractKey: string,
+  addressKey: string,
+  ownerAddress: string,
+  expectedBalance: string,
+  balanceIssueCode: string,
+) {
+  if (snapshot.account_state !== undefined && snapshot.account_state !== 'active') {
+    issues.push(issue(`${contractKey.toUpperCase()}_NOT_ACTIVE`, `${contractKey}.account_state must be active because this official ATHWallet must be funded at final genesis.`));
+  }
+  checkBase(issues, manifest, snapshot, contractKey, addressKey, 'ath_wallet');
+  addAddressEq(issues, `${contractKey.toUpperCase()}_OWNER_MISMATCH`, snapshot.owner_address, ownerAddress, `${contractKey}.owner_address`);
+  addAddressEq(issues, `${contractKey.toUpperCase()}_MASTER_MISMATCH`, snapshot.ath_master_address, manifest.addresses.ath_master, `${contractKey}.ath_master_address`);
+  addDecimalEq(issues, balanceIssueCode, snapshot.balance_atomic, expectedBalance, `${contractKey}.balance_atomic`);
+}
+
+function checkZeroOfficialAthWallet(
+  issues: Issue[],
+  manifest: ManifestLike,
+  snapshot: (BaseSnapshot & { owner_address?: string; ath_master_address?: string; balance_atomic: string }) | undefined,
+  contractKey: string,
+  addressKey: string,
+  missingIssueCode: string,
+  ownerMismatchCode: string,
+  masterMismatchCode: string,
+  fundedIssueCode: string,
+  ownerAddress: string,
+) {
+  if (!snapshot) {
+    issues.push(issue(missingIssueCode, `snapshot.${contractKey} getter/account-state data is required.`));
+    return;
+  }
+  addAddressEq(issues, `${contractKey.toUpperCase()}_ADDRESS_MISMATCH`, snapshot.address, manifest.addresses[addressKey], `${contractKey}.address`);
+  addDecimalEq(issues, fundedIssueCode, snapshot.balance_atomic, '0', `${contractKey}.balance_atomic`);
+
+  if (snapshot.account_state === 'uninit') {
+    checkRequiredStateInitHash(issues, manifest, addressKey, contractKey);
+    return;
+  }
+
+  if (snapshot.account_state !== undefined && snapshot.account_state !== 'active') {
+    issues.push(issue(`${contractKey.toUpperCase()}_ACCOUNT_STATE_INVALID`, `${contractKey}.account_state must be active or uninit.`));
+  }
+  checkBase(issues, manifest, snapshot, contractKey, addressKey, 'ath_wallet');
+  addAddressEq(issues, ownerMismatchCode, snapshot.owner_address ?? '', ownerAddress, `${contractKey}.owner_address`);
+  addAddressEq(issues, masterMismatchCode, snapshot.ath_master_address ?? '', manifest.addresses.ath_master, `${contractKey}.ath_master_address`);
+}
+
 function checkSealed(issues: Issue[], manifest: ManifestLike, snapshot: BaseSnapshot, contractKey: string) {
   addTrue(issues, `${contractKey.toUpperCase()}_NOT_SEALED`, snapshot.sealed, `${contractKey}.sealed`);
   addEq(issues, `${contractKey.toUpperCase()}_MANIFEST_HASH_MISMATCH`, snapshot.deployment_manifest_hash, manifest.manifest_hash_hex, `${contractKey}.deployment_manifest_hash`);
@@ -440,6 +668,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       ath_long_term_vesting_beneficiary: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_BENEFICIARY_ADDRESS',
       ath_long_term_vesting_official_ath_wallet: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS',
       ath_treasury_owner: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
+      ath_treasury_owner_ath_wallet: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS',
       vault: 'REQUIRED_MAINNET_VAULT_ADDRESS',
       vault_official_ath_wallet: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
       market_stability_seller: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
@@ -467,6 +696,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       vault: 'required: current Vault code hash',
       market_stability_seller: 'required: current MarketStabilitySeller code hash',
       capsulehub: 'required: current CapsuleHub code hash',
+      username_nft_item: 'required: current UsernameNFTItem code hash',
       username_registry: 'required: current UsernameRegistry code hash',
       profile_registry: 'required: current ProfileRegistry code hash',
       buyback_burn: 'required: current BuybackBurn code hash',
@@ -474,6 +704,7 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
     },
     state_init_hashes: {
       ath_master: 'required: 64 lowercase hex ATHMaster StateInit hash',
+      ath_treasury_owner_ath_wallet: 'required: 64 lowercase hex Treasury Owner ATHWallet StateInit hash',
       ath_long_term_vesting: 'required: 64 lowercase hex ATHVesting StateInit hash',
       ath_long_term_vesting_official_ath_wallet: 'required: 64 lowercase hex ATHVesting official ATHWallet StateInit hash',
       vault: 'required: 64 lowercase hex Vault StateInit hash',
@@ -524,7 +755,12 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       vault: {
         ...base,
         address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
+        capsule_hub_bound: true,
         capsule_hub_address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
+        profile_registry_bound: true,
+        profile_registry_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
+        username_registry_bound: true,
+        username_registry_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
         vault_ath_wallet_address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         user_count: '0',
@@ -538,10 +774,19 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       },
       vault_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS',
+        account_state: 'active',
         code_hash: 'required: current ATHWallet code hash',
         owner_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: 'required: decimal ATH balance from get_wallet_data',
+      },
+      ath_treasury_owner_ath_wallet: {
+        address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS',
+        account_state: 'active',
+        code_hash: 'required: current ATHWallet code hash',
+        owner_address: 'REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS',
+        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        balance_atomic: 'required: exact remaining 75M ATH genesis custody balance',
       },
       ath_long_term_vesting: {
         address: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS',
@@ -554,15 +799,18 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         period_count: '100',
         period_unlock_amount: '100000000000000',
         total_amount: '10000000000000000',
-        phase: '0',
-        claimed_ath: '0',
-        pending_query_id: '0',
-        pending_amount: '0',
-        pending_created_at: '0',
+      phase: '0',
+      claimed_ath: '0',
+      vested_ath: '0',
+      claimable_ath: '0',
+      pending_query_id: '0',
+      pending_amount: '0',
+      pending_created_at: '0',
         last_terminal_query_id: '0',
       },
       ath_long_term_vesting_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS',
+        account_state: 'active',
         code_hash: 'required: current ATHWallet code hash',
         owner_address: 'REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
@@ -592,14 +840,17 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       },
       market_stability_seller_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS',
-        code_hash: 'required: current ATHWallet code hash',
-        owner_address: 'REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
-        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
-        balance_atomic: 'required: decimal ATH balance from get_wallet_data',
+        account_state: 'uninit',
+        code_hash: '',
+        owner_address: 'optional when uninit; if active, REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS',
+        ath_master_address: 'optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        balance_atomic: '0',
       },
       capsulehub: {
         ...base,
         address: 'REQUIRED_MAINNET_CAPSULEHUB_ADDRESS',
+        ton_balance: 'required: decimal raw account TON balance in nanotons; no genesis reserve prefund is required',
+        vault_bound: true,
         vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         fee_accumulator_address: 'REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS',
         private_latest_id: '0',
@@ -609,7 +860,10 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       username_registry: {
         ...base,
         address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
+        official_ath_wallet_bound: true,
         official_ath_wallet_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
+        vault_bound: true,
+        vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
         name_record_count: '0',
@@ -623,15 +877,19 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       },
       username_registry_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
-        code_hash: 'required: current ATHWallet code hash',
-        owner_address: 'REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
-        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        account_state: 'uninit',
+        code_hash: '',
+        owner_address: 'optional when uninit; if active, REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS',
+        ath_master_address: 'optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: '0',
       },
       profile_registry: {
         ...base,
         address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
+        official_ath_wallet_bound: true,
         official_ath_wallet_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
+        vault_bound: true,
+        vault_address: 'REQUIRED_MAINNET_VAULT_ADDRESS',
         ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         treasury_ath_receiver: 'REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS',
         profile_count: '0',
@@ -643,9 +901,10 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       },
       profile_registry_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS',
-        code_hash: 'required: current ATHWallet code hash',
-        owner_address: 'REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
-        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        account_state: 'uninit',
+        code_hash: '',
+        owner_address: 'optional when uninit; if active, REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS',
+        ath_master_address: 'optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: '0',
       },
       buyback_burn: {
@@ -668,9 +927,10 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
       },
       buyback_burn_official_ath_wallet: {
         address: 'REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS',
-        code_hash: 'required: current ATHWallet code hash',
-        owner_address: 'REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
-        ath_master_address: 'REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
+        account_state: 'uninit',
+        code_hash: '',
+        owner_address: 'optional when uninit; if active, REQUIRED_MAINNET_BUYBACKBURN_ADDRESS',
+        ath_master_address: 'optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS',
         balance_atomic: '0',
       },
       fee_accumulator: {
@@ -692,13 +952,19 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
   };
 }
 
-export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | null): MainnetGenesisVerifyReport {
+export function verifyMainnetGenesisSnapshot(
+  input: MainnetGenesisVerifyInput | null,
+  metadata: GenesisVerifyInputMetadata = {},
+): MainnetGenesisVerifyReport {
   if (!input) {
     return {
       document: 'PLATHO.V1.MAINNET_GENESIS_VERIFY_REPORT',
       status: 'BLOCKED_MISSING_INPUT',
       generated_at: 'DETERMINISTIC_ARTIFACT',
       mainnet_genesis_verified: false,
+      input_source: metadata.inputSource ?? null,
+      input_sha256: metadata.inputSha256 ?? null,
+      evidence_refs: null,
       issue_codes: ['MISSING_INPUT'],
       issues: [issue('MISSING_INPUT', 'Supply a final mainnet genesis getter snapshot input.')],
       checked_manifest_hash: null,
@@ -718,18 +984,29 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   for (const [key, value] of Object.entries(manifest.addresses ?? {})) {
     if (!isParseableMainnetAddress(value)) issues.push(issue(`BAD_MANIFEST_ADDRESS_${key.toUpperCase()}`, `${key} must be a parseable mainnet address.`));
   }
+  addDistinctManifestAddresses(
+    issues,
+    manifest,
+    ['vault', 'capsulehub', 'profile_registry', 'username_registry'],
+    'FINAL_GENESIS_CORE_CONTRACT_ADDRESS_COLLISION',
+  );
   const manifestBasechainChecks: [string, string][] = [
     ['ath_master', 'ATH_MASTER_NOT_BASECHAIN'],
     ['ath_long_term_vesting', 'ATH_LONG_TERM_VESTING_NOT_BASECHAIN'],
     ['ath_long_term_vesting_beneficiary', 'ATH_LONG_TERM_VESTING_BENEFICIARY_NOT_BASECHAIN'],
     ['ath_long_term_vesting_official_ath_wallet', 'ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
+    ['ath_treasury_owner', 'ATH_TREASURY_OWNER_NOT_BASECHAIN'],
+    ['ath_treasury_owner_ath_wallet', 'ATH_TREASURY_OWNER_ATH_WALLET_NOT_BASECHAIN'],
+    ['genesis_controller_one_shot', 'GENESIS_CONTROLLER_ONE_SHOT_NOT_BASECHAIN'],
     ['vault', 'VAULT_NOT_BASECHAIN'],
     ['vault_official_ath_wallet', 'VAULT_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
     ['capsulehub', 'CAPSULEHUB_NOT_BASECHAIN'],
     ['fee_accumulator', 'FEE_ACCUMULATOR_NOT_BASECHAIN'],
     ['buyback_burn', 'BUYBACK_BURN_NOT_BASECHAIN'],
+    ['buyback_burn_initial_genesis_controller', 'BUYBACK_BURN_INITIAL_GENESIS_CONTROLLER_NOT_BASECHAIN'],
     ['buyback_burn_official_ath_wallet', 'BUYBACK_BURN_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
     ['market_stability_seller', 'MARKET_STABILITY_SELLER_NOT_BASECHAIN'],
+    ['market_stability_seller_initial_genesis_controller', 'MARKET_STABILITY_SELLER_INITIAL_GENESIS_CONTROLLER_NOT_BASECHAIN'],
     ['market_stability_seller_official_ath_wallet', 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
     ['username_registry', 'USERNAME_REGISTRY_NOT_BASECHAIN'],
     ['username_registry_official_ath_wallet', 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
@@ -737,12 +1014,43 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
     ['profile_registry_official_ath_wallet', 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BASECHAIN'],
     ['treasury_ath_receiver', 'TREASURY_ATH_RECEIVER_NOT_BASECHAIN'],
     ['profile_registry_treasury_ath_receiver', 'PROFILE_REGISTRY_TREASURY_ATH_RECEIVER_NOT_BASECHAIN'],
+    ['fee_accumulator_ton_treasury_receiver', 'FEE_ACCUMULATOR_TON_TREASURY_NOT_BASECHAIN'],
     ['market_stability_reserve_funder', 'MARKET_STABILITY_RESERVE_FUNDER_NOT_BASECHAIN'],
     ['market_stability_ton_treasury_receiver', 'MARKET_STABILITY_TON_TREASURY_NOT_BASECHAIN'],
   ];
   for (const [key, code] of manifestBasechainChecks) {
     addBasechainAddress(issues, code, manifest.addresses?.[key], `manifest.addresses.${key}`);
   }
+  addManifestTreasuryReceiverNotProtocolOwned(
+    issues,
+    manifest,
+    'treasury_ath_receiver',
+    'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_PROTOCOL_ROLE',
+  );
+  addManifestTreasuryReceiverNotProtocolOwned(
+    issues,
+    manifest,
+    'profile_registry_treasury_ath_receiver',
+    'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_PROTOCOL_ROLE',
+  );
+  addManifestTreasuryReceiverNotProtocolOwned(
+    issues,
+    manifest,
+    'fee_accumulator_ton_treasury_receiver',
+    'FEE_ACCUMULATOR_TON_TREASURY_IS_PROTOCOL_ROLE',
+  );
+  addManifestTreasuryReceiverNotProtocolOwned(
+    issues,
+    manifest,
+    'market_stability_ton_treasury_receiver',
+    'MARKET_STABILITY_TON_TREASURY_IS_PROTOCOL_ROLE',
+  );
+  addManifestTreasuryReceiverNotProtocolOwned(
+    issues,
+    manifest,
+    'market_stability_reserve_funder',
+    'MARKET_STABILITY_RESERVE_FUNDER_IS_PROTOCOL_ROLE',
+  );
   for (const [key, value] of Object.entries(manifest.code_hashes ?? {})) {
     if (!isHex64(value)) issues.push(issue(`BAD_MANIFEST_CODE_HASH_${key.toUpperCase()}`, `${key} code hash must be 32-byte hex.`));
   }
@@ -824,6 +1132,7 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
     ['ATH_MASTER_ADDRESS_NOT_BASECHAIN', (s as any).ath_master?.address, 'ath_master.address'],
     ['ATH_LONG_TERM_VESTING_ADDRESS_NOT_BASECHAIN', (s as any).ath_long_term_vesting?.address, 'ath_long_term_vesting.address'],
     ['ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).ath_long_term_vesting_official_ath_wallet?.address, 'ath_long_term_vesting_official_ath_wallet.address'],
+    ['ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).ath_treasury_owner_ath_wallet?.address, 'ath_treasury_owner_ath_wallet.address'],
     ['VAULT_ADDRESS_NOT_BASECHAIN', (s as any).vault?.address, 'vault.address'],
     ['VAULT_OFFICIAL_ATH_WALLET_ADDRESS_NOT_BASECHAIN', (s as any).vault_official_ath_wallet?.address, 'vault_official_ath_wallet.address'],
     ['CAPSULEHUB_ADDRESS_NOT_BASECHAIN', (s as any).capsulehub?.address, 'capsulehub.address'],
@@ -843,6 +1152,7 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
 
   checkBase(issues, manifest, s.ath_master, 'ath_master', 'ath_master', 'ath_master');
   addAddressEq(issues, 'ATH_MASTER_TREASURY_OWNER_MISMATCH', s.ath_master.treasury_owner_address, manifest.addresses.ath_treasury_owner, 'ath_master.treasury_owner_address');
+  addBasechainAddress(issues, 'ATH_MASTER_TREASURY_OWNER_NOT_BASECHAIN', s.ath_master.treasury_owner_address, 'ath_master.treasury_owner_address');
   if (isDecimalString(athTotalSupply)) {
     addDecimalEq(
       issues,
@@ -856,7 +1166,14 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
 
   checkBase(issues, manifest, s.vault, 'vault', 'vault', 'vault');
   checkSealed(issues, manifest, s.vault, 'vault');
+  addTrue(issues, 'VAULT_CAPSULE_HUB_NOT_BOUND', s.vault.capsule_hub_bound, 'vault.capsule_hub_bound');
   addAddressEq(issues, 'VAULT_CAPSULE_HUB_ADDRESS_MISMATCH', s.vault.capsule_hub_address, manifest.addresses.capsulehub, 'vault.capsule_hub_address');
+  addTrue(issues, 'VAULT_PROFILE_REGISTRY_NOT_BOUND', s.vault.profile_registry_bound, 'vault.profile_registry_bound');
+  addAddressEq(issues, 'VAULT_PROFILE_REGISTRY_ADDRESS_MISMATCH', s.vault.profile_registry_address, manifest.addresses.profile_registry, 'vault.profile_registry_address');
+  addBasechainAddress(issues, 'VAULT_PROFILE_REGISTRY_ADDRESS_NOT_BASECHAIN', s.vault.profile_registry_address, 'vault.profile_registry_address');
+  addTrue(issues, 'VAULT_USERNAME_REGISTRY_NOT_BOUND', s.vault.username_registry_bound, 'vault.username_registry_bound');
+  addAddressEq(issues, 'VAULT_USERNAME_REGISTRY_ADDRESS_MISMATCH', s.vault.username_registry_address, manifest.addresses.username_registry, 'vault.username_registry_address');
+  addBasechainAddress(issues, 'VAULT_USERNAME_REGISTRY_ADDRESS_NOT_BASECHAIN', s.vault.username_registry_address, 'vault.username_registry_address');
   addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MISMATCH', s.vault.vault_ath_wallet_address, manifest.addresses.vault_official_ath_wallet, 'vault.vault_ath_wallet_address');
   addAddressEq(issues, 'VAULT_ATH_MASTER_MISMATCH', s.vault.ath_master_address, manifest.addresses.ath_master, 'vault.ath_master_address');
   addDecimalZero(issues, 'VAULT_USER_COUNT_NOT_ZERO_AT_GENESIS', s.vault.user_count, 'vault.user_count');
@@ -886,18 +1203,37 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   if (!(s as any).vault_official_ath_wallet) {
     issues.push(issue('MISSING_VAULT_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.vault_official_ath_wallet getter data is required.'));
   }
-  checkBase(issues, manifest, vaultOfficialAthWallet, 'vault_official_ath_wallet', 'vault_official_ath_wallet', 'ath_wallet');
-  addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', vaultOfficialAthWallet.owner_address, manifest.addresses.vault, 'vault_official_ath_wallet.owner_address');
-  addAddressEq(issues, 'VAULT_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', vaultOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'vault_official_ath_wallet.ath_master_address');
-  if (isDecimalString(vaultActivityAirdropTotal)) {
-    addDecimalEq(
-      issues,
-      'VAULT_ACTIVITY_AIRDROP_BACKING_BALANCE_NOT_EXACT',
-      vaultOfficialAthWallet.balance_atomic,
-      vaultActivityAirdropTotal,
-      'vault_official_ath_wallet.balance_atomic',
-    );
+  checkFundedOfficialAthWallet(
+    issues,
+    manifest,
+    vaultOfficialAthWallet,
+    'vault_official_ath_wallet',
+    'vault_official_ath_wallet',
+    manifest.addresses.vault,
+    vaultActivityAirdropTotal ?? '',
+    'VAULT_ACTIVITY_AIRDROP_BACKING_BALANCE_NOT_EXACT',
+  );
+
+  const athTreasuryOwnerAthWallet = (s as any).ath_treasury_owner_ath_wallet ?? {
+    address: '',
+    code_hash: '',
+    owner_address: '',
+    ath_master_address: '',
+    balance_atomic: '',
+  };
+  if (!(s as any).ath_treasury_owner_ath_wallet) {
+    issues.push(issue('MISSING_ATH_TREASURY_OWNER_ATH_WALLET_SNAPSHOT', 'snapshot.ath_treasury_owner_ath_wallet getter data is required to prove custody of the remaining 75M ATH at final genesis.'));
   }
+  checkFundedOfficialAthWallet(
+    issues,
+    manifest,
+    athTreasuryOwnerAthWallet,
+    'ath_treasury_owner_ath_wallet',
+    'ath_treasury_owner_ath_wallet',
+    manifest.addresses.ath_treasury_owner,
+    EXPECTED_ATH_TREASURY_OWNER_REMAINING_ATOMIC,
+    'ATH_TREASURY_OWNER_REMAINING_BALANCE_NOT_EXACT',
+  );
 
   const athLongTermVesting = (s as any).ath_long_term_vesting ?? {
     address: '',
@@ -914,6 +1250,8 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
     total_amount: '',
     phase: '',
     claimed_ath: '',
+    vested_ath: '',
+    claimable_ath: '',
     pending_query_id: '',
     pending_amount: '',
     pending_created_at: '',
@@ -939,6 +1277,8 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   }
   addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_PHASE_NOT_IDLE_AT_GENESIS', athLongTermVesting.phase, 'ath_long_term_vesting.phase');
   addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_CLAIMED_NOT_ZERO_AT_GENESIS', athLongTermVesting.claimed_ath, 'ath_long_term_vesting.claimed_ath');
+  addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_VESTED_NOT_ZERO_AT_GENESIS', athLongTermVesting.vested_ath, 'ath_long_term_vesting.vested_ath');
+  addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_CLAIMABLE_NOT_ZERO_AT_GENESIS', athLongTermVesting.claimable_ath, 'ath_long_term_vesting.claimable_ath');
   addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_PENDING_QUERY_NOT_ZERO_AT_GENESIS', athLongTermVesting.pending_query_id, 'ath_long_term_vesting.pending_query_id');
   addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_PENDING_AMOUNT_NOT_ZERO_AT_GENESIS', athLongTermVesting.pending_amount, 'ath_long_term_vesting.pending_amount');
   addDecimalZero(issues, 'ATH_LONG_TERM_VESTING_PENDING_CREATED_NOT_ZERO_AT_GENESIS', athLongTermVesting.pending_created_at, 'ath_long_term_vesting.pending_created_at');
@@ -954,18 +1294,16 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   if (!(s as any).ath_long_term_vesting_official_ath_wallet) {
     issues.push(issue('MISSING_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.ath_long_term_vesting_official_ath_wallet getter data is required.'));
   }
-  checkBase(issues, manifest, athLongTermVestingOfficialAthWallet, 'ath_long_term_vesting_official_ath_wallet', 'ath_long_term_vesting_official_ath_wallet', 'ath_wallet');
-  addAddressEq(issues, 'ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', athLongTermVestingOfficialAthWallet.owner_address, manifest.addresses.ath_long_term_vesting, 'ath_long_term_vesting_official_ath_wallet.owner_address');
-  addAddressEq(issues, 'ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', athLongTermVestingOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'ath_long_term_vesting_official_ath_wallet.ath_master_address');
-  if (isDecimalString(longTermVestingTotal)) {
-    addDecimalEq(
-      issues,
-      'ATH_LONG_TERM_VESTING_BACKING_BALANCE_NOT_EXACT',
-      athLongTermVestingOfficialAthWallet.balance_atomic,
-      longTermVestingTotal,
-      'ath_long_term_vesting_official_ath_wallet.balance_atomic',
-    );
-  }
+  checkFundedOfficialAthWallet(
+    issues,
+    manifest,
+    athLongTermVestingOfficialAthWallet,
+    'ath_long_term_vesting_official_ath_wallet',
+    'ath_long_term_vesting_official_ath_wallet',
+    manifest.addresses.ath_long_term_vesting,
+    longTermVestingTotal ?? '',
+    'ATH_LONG_TERM_VESTING_BACKING_BALANCE_NOT_EXACT',
+  );
 
   const marketSeller = (s as any).market_stability_seller ?? {
     address: '',
@@ -1022,36 +1360,44 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addDecimalZero(issues, 'MARKET_STABILITY_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS', marketSeller.last_terminal_query_id, 'market_stability_seller.last_terminal_query_id');
   addDecimalZero(issues, 'MARKET_STABILITY_TREASURY_FLUSHED_NOT_ZERO_AT_GENESIS', marketSeller.treasury_flushed_ton_total, 'market_stability_seller.treasury_flushed_ton_total');
 
-  const marketSellerOfficialAthWallet = (s as any).market_stability_seller_official_ath_wallet ?? {
-    address: '',
-    code_hash: '',
-    owner_address: '',
-    ath_master_address: '',
-    balance_atomic: '',
-  };
-  if (!(s as any).market_stability_seller_official_ath_wallet) {
-    issues.push(issue('MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.market_stability_seller_official_ath_wallet getter data is required.'));
-  }
-  checkBase(issues, manifest, marketSellerOfficialAthWallet, 'market_stability_seller_official_ath_wallet', 'market_stability_seller_official_ath_wallet', 'ath_wallet');
-  addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', marketSellerOfficialAthWallet.owner_address, manifest.addresses.market_stability_seller, 'market_stability_seller_official_ath_wallet.owner_address');
-  addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', marketSellerOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'market_stability_seller_official_ath_wallet.ath_master_address');
-  addDecimalEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS', marketSellerOfficialAthWallet.balance_atomic, '0', 'market_stability_seller_official_ath_wallet.balance_atomic');
+  checkZeroOfficialAthWallet(
+    issues,
+    manifest,
+    (s as any).market_stability_seller_official_ath_wallet,
+    'market_stability_seller_official_ath_wallet',
+    'market_stability_seller_official_ath_wallet',
+    'MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT',
+    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_OWNER_MISMATCH',
+    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MASTER_MISMATCH',
+    'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
+    manifest.addresses.market_stability_seller,
+  );
 
   checkBase(issues, manifest, s.capsulehub, 'capsulehub', 'capsulehub', 'capsulehub');
   checkSealed(issues, manifest, s.capsulehub, 'capsulehub');
+  addTrue(issues, 'CAPSULEHUB_VAULT_NOT_BOUND', s.capsulehub.vault_bound, 'capsulehub.vault_bound');
   addAddressEq(issues, 'CAPSULEHUB_VAULT_ADDRESS_MISMATCH', s.capsulehub.vault_address, manifest.addresses.vault, 'capsulehub.vault_address');
   addAddressEq(issues, 'CAPSULEHUB_FEE_ACCUMULATOR_MISMATCH', s.capsulehub.fee_accumulator_address, manifest.addresses.fee_accumulator, 'capsulehub.fee_accumulator_address');
+  addDecimalGte(issues, 'CAPSULEHUB_TON_BALANCE_INVALID_AT_GENESIS', s.capsulehub.ton_balance, '0', 'capsulehub.ton_balance');
   addDecimalZero(issues, 'CAPSULEHUB_PRIVATE_LATEST_NOT_ZERO_AT_GENESIS', s.capsulehub.private_latest_id, 'capsulehub.private_latest_id');
   addDecimalZero(issues, 'CAPSULEHUB_PUBLIC_LATEST_NOT_ZERO_AT_GENESIS', s.capsulehub.public_latest_id, 'capsulehub.public_latest_id');
   addDecimalZero(issues, 'CAPSULEHUB_ACCRUED_PLATO_FEE_NOT_ZERO_AT_GENESIS', s.capsulehub.accrued_plato_fee_ton, 'capsulehub.accrued_plato_fee_ton');
 
   checkBase(issues, manifest, s.username_registry, 'username_registry', 'username_registry', 'username_registry');
   checkSealed(issues, manifest, s.username_registry, 'username_registry');
+  addTrue(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BOUND', s.username_registry.official_ath_wallet_bound, 'username_registry.official_ath_wallet_bound');
   addAddressEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.username_registry.official_ath_wallet_address, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.official_ath_wallet_address');
+  addTrue(issues, 'USERNAME_REGISTRY_VAULT_NOT_BOUND', s.username_registry.vault_bound, 'username_registry.vault_bound');
+  addAddressEq(issues, 'USERNAME_REGISTRY_VAULT_ADDRESS_MISMATCH', s.username_registry.vault_address, manifest.addresses.vault, 'username_registry.vault_address');
+  addBasechainAddress(issues, 'USERNAME_REGISTRY_VAULT_ADDRESS_NOT_BASECHAIN', s.username_registry.vault_address, 'username_registry.vault_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_ATH_MASTER_MISMATCH', s.username_registry.ath_master_address, manifest.addresses.ath_master, 'username_registry.ath_master_address');
   addBasechainAddress(issues, 'USERNAME_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.username_registry.ath_master_address, 'username_registry.ath_master_address');
   addAddressEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.username_registry.treasury_ath_receiver, manifest.addresses.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
   addBasechainAddress(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_NOT_BASECHAIN', s.username_registry.treasury_ath_receiver, 'username_registry.treasury_ath_receiver');
+  addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_USERNAME_REGISTRY', s.username_registry.treasury_ath_receiver, manifest.addresses.username_registry, 'username_registry.treasury_ath_receiver', 'username_registry');
+  addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_OFFICIAL_ATH_WALLET', s.username_registry.treasury_ath_receiver, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.treasury_ath_receiver', 'username_registry_official_ath_wallet');
+  addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_VAULT', s.username_registry.treasury_ath_receiver, manifest.addresses.vault, 'username_registry.treasury_ath_receiver', 'vault');
+  addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.username_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'username_registry.treasury_ath_receiver', 'ath_master');
   addDecimalZero(issues, 'USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS', s.username_registry.name_record_count, 'username_registry.name_record_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS', s.username_registry.pending_mint_count, 'username_registry.pending_mint_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_REFUND_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.refund_due_count, 'username_registry.refund_due_count');
@@ -1061,28 +1407,34 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_treasury_flush_count, 'username_registry.pending_treasury_flush_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_BURN_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_burn_flush_count, 'username_registry.pending_burn_flush_count');
 
-  const usernameRegistryOfficialAthWallet = (s as any).username_registry_official_ath_wallet ?? {
-    address: '',
-    code_hash: '',
-    owner_address: '',
-    ath_master_address: '',
-    balance_atomic: '',
-  };
-  if (!(s as any).username_registry_official_ath_wallet) {
-    issues.push(issue('MISSING_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.username_registry_official_ath_wallet getter data is required.'));
-  }
-  checkBase(issues, manifest, usernameRegistryOfficialAthWallet, 'username_registry_official_ath_wallet', 'username_registry_official_ath_wallet', 'ath_wallet');
-  addAddressEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', usernameRegistryOfficialAthWallet.owner_address, manifest.addresses.username_registry, 'username_registry_official_ath_wallet.owner_address');
-  addAddressEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', usernameRegistryOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'username_registry_official_ath_wallet.ath_master_address');
-  addDecimalEq(issues, 'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS', usernameRegistryOfficialAthWallet.balance_atomic, '0', 'username_registry_official_ath_wallet.balance_atomic');
+  checkZeroOfficialAthWallet(
+    issues,
+    manifest,
+    (s as any).username_registry_official_ath_wallet,
+    'username_registry_official_ath_wallet',
+    'username_registry_official_ath_wallet',
+    'MISSING_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_SNAPSHOT',
+    'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_OWNER_MISMATCH',
+    'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_MASTER_MISMATCH',
+    'USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
+    manifest.addresses.username_registry,
+  );
 
   checkBase(issues, manifest, s.profile_registry, 'profile_registry', 'profile_registry', 'profile_registry');
   checkSealed(issues, manifest, s.profile_registry, 'profile_registry');
+  addTrue(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_NOT_BOUND', s.profile_registry.official_ath_wallet_bound, 'profile_registry.official_ath_wallet_bound');
   addAddressEq(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_MISMATCH', s.profile_registry.official_ath_wallet_address, manifest.addresses.profile_registry_official_ath_wallet, 'profile_registry.official_ath_wallet_address');
+  addTrue(issues, 'PROFILE_REGISTRY_VAULT_NOT_BOUND', s.profile_registry.vault_bound, 'profile_registry.vault_bound');
+  addAddressEq(issues, 'PROFILE_REGISTRY_VAULT_ADDRESS_MISMATCH', s.profile_registry.vault_address, manifest.addresses.vault, 'profile_registry.vault_address');
+  addBasechainAddress(issues, 'PROFILE_REGISTRY_VAULT_ADDRESS_NOT_BASECHAIN', s.profile_registry.vault_address, 'profile_registry.vault_address');
   addAddressEq(issues, 'PROFILE_REGISTRY_ATH_MASTER_MISMATCH', s.profile_registry.ath_master_address, manifest.addresses.ath_master, 'profile_registry.ath_master_address');
   addBasechainAddress(issues, 'PROFILE_REGISTRY_ATH_MASTER_NOT_BASECHAIN', s.profile_registry.ath_master_address, 'profile_registry.ath_master_address');
   addAddressEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_MISMATCH', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry_treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
   addBasechainAddress(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_NOT_BASECHAIN', s.profile_registry.treasury_ath_receiver, 'profile_registry.treasury_ath_receiver');
+  addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_PROFILE_REGISTRY', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry, 'profile_registry.treasury_ath_receiver', 'profile_registry');
+  addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_OFFICIAL_ATH_WALLET', s.profile_registry.treasury_ath_receiver, manifest.addresses.profile_registry_official_ath_wallet, 'profile_registry.treasury_ath_receiver', 'profile_registry_official_ath_wallet');
+  addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_VAULT', s.profile_registry.treasury_ath_receiver, manifest.addresses.vault, 'profile_registry.treasury_ath_receiver', 'vault');
+  addAddressNotEq(issues, 'PROFILE_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.profile_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'profile_registry.treasury_ath_receiver', 'ath_master');
   addDecimalZero(issues, 'PROFILE_REGISTRY_PROFILE_COUNT_NOT_ZERO_AT_GENESIS', s.profile_registry.profile_count, 'profile_registry.profile_count');
   addDecimalZero(issues, 'PROFILE_REGISTRY_AVATAR_RECORDS_NOT_ZERO_AT_GENESIS', s.profile_registry.avatar_record_count, 'profile_registry.avatar_record_count');
   addDecimalZero(issues, 'PROFILE_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.profile_registry.treasury_due_ath, 'profile_registry.treasury_due_ath');
@@ -1090,20 +1442,18 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addDecimalZero(issues, 'PROFILE_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.profile_registry.pending_treasury_flush_count, 'profile_registry.pending_treasury_flush_count');
   addDecimalZero(issues, 'PROFILE_REGISTRY_PENDING_BURN_FLUSH_NOT_ZERO_AT_GENESIS', s.profile_registry.pending_burn_flush_count, 'profile_registry.pending_burn_flush_count');
 
-  const profileRegistryOfficialAthWallet = (s as any).profile_registry_official_ath_wallet ?? {
-    address: '',
-    code_hash: '',
-    owner_address: '',
-    ath_master_address: '',
-    balance_atomic: '',
-  };
-  if (!(s as any).profile_registry_official_ath_wallet) {
-    issues.push(issue('MISSING_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.profile_registry_official_ath_wallet getter data is required.'));
-  }
-  checkBase(issues, manifest, profileRegistryOfficialAthWallet, 'profile_registry_official_ath_wallet', 'profile_registry_official_ath_wallet', 'ath_wallet');
-  addAddressEq(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', profileRegistryOfficialAthWallet.owner_address, manifest.addresses.profile_registry, 'profile_registry_official_ath_wallet.owner_address');
-  addAddressEq(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', profileRegistryOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'profile_registry_official_ath_wallet.ath_master_address');
-  addDecimalEq(issues, 'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS', profileRegistryOfficialAthWallet.balance_atomic, '0', 'profile_registry_official_ath_wallet.balance_atomic');
+  checkZeroOfficialAthWallet(
+    issues,
+    manifest,
+    (s as any).profile_registry_official_ath_wallet,
+    'profile_registry_official_ath_wallet',
+    'profile_registry_official_ath_wallet',
+    'MISSING_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_SNAPSHOT',
+    'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_OWNER_MISMATCH',
+    'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_MASTER_MISMATCH',
+    'PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
+    manifest.addresses.profile_registry,
+  );
 
   checkBase(issues, manifest, s.buyback_burn, 'buyback_burn', 'buyback_burn', 'buyback_burn');
   checkSealed(issues, manifest, s.buyback_burn, 'buyback_burn');
@@ -1135,24 +1485,23 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
   addDecimalZero(issues, 'BUYBACK_EXECUTED_COUNT_NOT_ZERO_AT_GENESIS', s.buyback_burn.executed_buyback_count, 'buyback_burn.executed_buyback_count');
   addDecimalZero(issues, 'BUYBACK_BURNED_ATH_TOTAL_NOT_ZERO_AT_GENESIS', s.buyback_burn.burned_ath_total_atomic, 'buyback_burn.burned_ath_total_atomic');
 
-  const buybackOfficialAthWallet = (s as any).buyback_burn_official_ath_wallet ?? {
-    address: '',
-    code_hash: '',
-    owner_address: '',
-    ath_master_address: '',
-    balance_atomic: '',
-  };
-  if (!(s as any).buyback_burn_official_ath_wallet) {
-    issues.push(issue('MISSING_BUYBACK_OFFICIAL_ATH_WALLET_SNAPSHOT', 'snapshot.buyback_burn_official_ath_wallet getter data is required.'));
-  }
-  checkBase(issues, manifest, buybackOfficialAthWallet, 'buyback_burn_official_ath_wallet', 'buyback_burn_official_ath_wallet', 'ath_wallet');
-  addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_OWNER_MISMATCH', buybackOfficialAthWallet.owner_address, manifest.addresses.buyback_burn, 'buyback_burn_official_ath_wallet.owner_address');
-  addAddressEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_MASTER_MISMATCH', buybackOfficialAthWallet.ath_master_address, manifest.addresses.ath_master, 'buyback_burn_official_ath_wallet.ath_master_address');
-  addDecimalEq(issues, 'BUYBACK_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS', buybackOfficialAthWallet.balance_atomic, '0', 'buyback_burn_official_ath_wallet.balance_atomic');
+  checkZeroOfficialAthWallet(
+    issues,
+    manifest,
+    (s as any).buyback_burn_official_ath_wallet,
+    'buyback_burn_official_ath_wallet',
+    'buyback_burn_official_ath_wallet',
+    'MISSING_BUYBACK_OFFICIAL_ATH_WALLET_SNAPSHOT',
+    'BUYBACK_OFFICIAL_ATH_WALLET_OWNER_MISMATCH',
+    'BUYBACK_OFFICIAL_ATH_WALLET_MASTER_MISMATCH',
+    'BUYBACK_OFFICIAL_ATH_WALLET_FUNDED_AT_GENESIS',
+    manifest.addresses.buyback_burn,
+  );
 
   checkBase(issues, manifest, s.fee_accumulator, 'fee_accumulator', 'fee_accumulator', 'fee_accumulator');
   addAddressEq(issues, 'FEE_ACCUMULATOR_BUYBACK_BURN_MISMATCH', s.fee_accumulator.buyback_burn_address, manifest.addresses.buyback_burn, 'fee_accumulator.buyback_burn_address');
   addAddressEq(issues, 'FEE_ACCUMULATOR_TON_TREASURY_MISMATCH', s.fee_accumulator.ton_treasury_receiver, manifest.addresses.fee_accumulator_ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
+  addBasechainAddress(issues, 'FEE_ACCUMULATOR_TON_TREASURY_RECEIVER_NOT_BASECHAIN', s.fee_accumulator.ton_treasury_receiver, 'fee_accumulator.ton_treasury_receiver');
   if (s.fee_accumulator.buyback_split_enabled !== false) {
     issues.push(issue('FEE_ACCUMULATOR_BUYBACK_SPLIT_ENABLED_AT_GENESIS', 'fee_accumulator.buyback_split_enabled must be false at final genesis; buyback split is enabled only after the 15% activity distribution / pool-launch gate.'));
   }
@@ -1169,6 +1518,9 @@ export function verifyMainnetGenesisSnapshot(input: MainnetGenesisVerifyInput | 
     status: issues.length === 0 ? 'MAINNET_GENESIS_VERIFIED' : 'BLOCKED_GENESIS_MISMATCH',
     generated_at: 'DETERMINISTIC_ARTIFACT',
     mainnet_genesis_verified: issues.length === 0,
+    input_source: metadata.inputSource ?? null,
+    input_sha256: metadata.inputSha256 ?? null,
+    evidence_refs: input.evidenceRefs ?? null,
     issue_codes: issues.map((i) => i.code),
     issues,
     checked_manifest_hash: manifest.manifest_hash_hex ?? null,
@@ -1183,6 +1535,14 @@ function markdown(report: MainnetGenesisVerifyReport) {
     '',
     `- mainnet_genesis_verified: ${report.mainnet_genesis_verified}`,
     `- checked_manifest_hash: ${report.checked_manifest_hash ?? 'none'}`,
+    `- input_source: ${report.input_source ?? 'none'}`,
+    `- input_sha256: ${report.input_sha256 ?? 'none'}`,
+    '',
+    '## Evidence refs',
+    '',
+    ...(report.evidence_refs
+      ? Object.entries(report.evidence_refs).map(([key, value]) => `- ${key}: ${value}`)
+      : ['- none']),
     '',
     '## Issues',
     '',
@@ -1192,12 +1552,19 @@ function markdown(report: MainnetGenesisVerifyReport) {
   return lines.join('\n');
 }
 
-export function writeMainnetGenesisVerifyArtifacts(inputPath?: string) {
+export function writeMainnetGenesisVerifyArtifacts(inputPath = DEFAULT_MAINNET_GENESIS_VERIFY_INPUT_PATH) {
   mkdirSync(ARTIFACTS_DIR, { recursive: true });
   writeFileSync(join(ARTIFACTS_DIR, 'mainnet_genesis_verify_input_template.json'), `${JSON.stringify(createMainnetGenesisVerifyInputTemplate(), null, 2)}\n`);
 
-  const input = inputPath && existsSync(inputPath) ? readJson(inputPath) as MainnetGenesisVerifyInput : null;
-  const report = verifyMainnetGenesisSnapshot(input);
+  const inputRaw = inputPath && existsSync(inputPath) ? readFileSync(inputPath, 'utf8') : null;
+  const input = inputRaw ? JSON.parse(inputRaw) as MainnetGenesisVerifyInput : null;
+  const snapshotReport = verifyMainnetGenesisSnapshot(input, {
+    inputSource: inputRaw ? normalizedArtifactSource(inputPath) : null,
+    inputSha256: inputRaw ? sha256Hex(inputRaw) : null,
+  });
+  const report = input
+    ? withAdditionalIssues(snapshotReport, currentBuildConsistencyIssues(input))
+    : snapshotReport;
   writeFileSync(join(ARTIFACTS_DIR, 'mainnet_genesis_verify_report.json'), `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(join(ARTIFACTS_DIR, 'MAINNET_GENESIS_VERIFY.md'), markdown(report));
   writeFileSync(join(ARTIFACTS_DIR, 'MAINNET_GENESIS_VERIFIED.txt'), `${report.mainnet_genesis_verified}\n`);
@@ -1205,10 +1572,12 @@ export function writeMainnetGenesisVerifyArtifacts(inputPath?: string) {
 }
 
 if (require.main === module) {
-  const report = writeMainnetGenesisVerifyArtifacts(process.argv[2]);
+  const report = writeMainnetGenesisVerifyArtifacts(process.argv[2] ?? DEFAULT_MAINNET_GENESIS_VERIFY_INPUT_PATH);
   console.log(JSON.stringify({
     status: report.status,
     mainnet_genesis_verified: report.mainnet_genesis_verified,
+    input_source: report.input_source,
+    input_sha256: report.input_sha256,
     issue_codes: report.issue_codes,
     output: 'artifacts/mainnet_genesis_verify_report.json',
   }, null, 2));

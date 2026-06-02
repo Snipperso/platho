@@ -4,6 +4,13 @@
   "status": "LIVE_COORDINATION_MATRIX",
   "productionApproval": false,
   "purpose": "Track acknowledged audit findings across rounds so already-triaged issues are not rediscovered as new blockers without new evidence.",
+  "acceptedNonBlockingReleaseRisks": [
+    {
+      "id": "UNFT-01",
+      "productionBlocker": false,
+      "releaseDisposition": "Accepted V1 direct-caller-funded recovery/top-up footgun. No contract patch planned for V1."
+    }
+  ],
   "auditSessions": [
     {
       "id": "SESSION-VAULT-01",
@@ -50,8 +57,9 @@
     {
       "id": "UNFT-01",
       "area": "UsernameNFTItem.ResendDeployedAck",
-      "severity": "P2_LOW_MEDIUM_MONEY_FOOTGUN",
-      "status": "ACKNOWLEDGED_OPEN",
+      "severity": "P2_LOW_MEDIUM_DIRECT_CALLER_FUNDED_FOOTGUN",
+      "status": "ACCEPTED_NON_BLOCKING_DIRECT_CALLER_FUNDED_FOOTGUN",
+      "productionBlocker": false,
       "summary": "Permissionless ResendDeployedAck can retain caller-funded TON in the item balance when the Registry rejects the ACK, for example after pending mint is already absent. The loss is capped by the current 20_000_000 nanotON resend max.",
       "notP0P1Rationale": [
         "ATH principal is not lost.",
@@ -59,11 +67,10 @@
         "Caller funds the resend.",
         "Maximum accepted resend value caps the exposure."
       ],
-      "currentDecision": "Do not bluntly require exact 4_000_000 nanotons because initial Registry deploy uses the same ACK body and intentionally funds item storage with the deploy reserve.",
+      "currentDecision": "Accepted V1 behavior. ResendDeployedAck is a caller-funded recovery/top-up action; it does not affect ATH principal, username records, registry accounting, or another user's balance. Do not bluntly require exact 4_000_000 nanotons because initial Registry deploy uses the same ACK body and intentionally funds item storage with the deploy reserve.",
       "nextActionOptions": [
-        "Document ResendDeployedAck as caller-funded top-up/recovery behavior.",
-        "Split initial deploy ACK from public resend ABI.",
-        "Add resend-specific bounded refund semantics with dust-safe behavior."
+        "Keep public/PWA flows from calling resend casually.",
+        "Document ResendDeployedAck as caller-funded top-up/recovery behavior."
       ],
       "relatedArtifacts": [
         "artifacts/MILESTONE_SUMMARY_M37_USERNAME_NFT_ITEM_ACK_OVERPAY_GUARD.md",
@@ -104,17 +111,18 @@
       "area": "CapsuleHub on-chain payload storage economics",
       "severity": "P1_PRODUCTION_EVIDENCE_BLOCKER",
       "status": "FIXED_REGRESSED",
-      "summary": "CapsuleHub now stores retrievable payload cells. Private cells are exact-size. Public entries store compact PPH1 header bytes plus raw public text body bytes, 1..1024 bytes for both posts and comments. Page boundaries have no stored counters and no first-page price lottery, and sandbox economics show retained non-fee balance remains above configured storage reserve for Vault-only publish paths.",
+      "summary": "CapsuleHub now stores compact authenticated entry state: private headers, public header, body hash, publish id, author where applicable, and contract created_at. Heavy private/public bodies are accepted in the publish transaction body and verified by stored hashes instead of remaining in contract state. Page boundaries have no stored counters and no first-page price lottery, and sandbox economics show retained non-fee balance remains above configured storage reserve for Vault-only publish paths.",
       "notManualMisuseRationale": [
         "The official PWA can send normal max-size text or image payload cells.",
         "The contract accepts max-size payload cells under the current v1 caps.",
         "Publish fees and storage endowments are not currently size-scaled.",
         "Protocol fee accrued in CapsuleHub remains a liability owed to FeeAccumulator while storage rent is paid from the same physical balance."
       ],
-      "currentDecision": "Closed for canonical PWA v1 payloads by exact-size private CapsuleHub gates, bounded public payload gates, and dedicated storage-economics evidence. Hash-only delivery remains forbidden.",
+      "currentDecision": "Closed for canonical PWA v1 payloads by exact-size private CapsuleHub gates, bounded public payload gates, compact authenticated state, transaction-history body retrieval, and dedicated storage-economics evidence. Hash-only delivery without a retrievable accepted publish body remains forbidden.",
       "fix": [
-        "Public publish validation now stores compact PPH1 header bytes separately from raw body text, so both posts and comments expose a full 1..1024 body bytes instead of padding to private capsule size.",
-        "Private publish bodies and headers remain exact-size: header0 104 bytes, header1 30 bytes, standard body 1140 bytes, hybrid body 2228 bytes.",
+        "Public publish validation now stores compact PPH1 header/index state and verifies raw body text from the accepted transaction body, so both posts and comments expose a full 1..1024 body bytes instead of padding to private capsule size.",
+        "Private publish bodies and headers remain exact-size at publish validation: header0 140 bytes, header1 30 bytes, and hybrid body size is 1204 bytes of cryptographic overhead plus exactly one selected useful slot: 1, 2, 4, 8, 16, or 32 KiB.",
+        "Entry state includes contract created_at and can be pruned after the configured retention window.",
         "Per-page storage charging was removed from publish pricing; clients can derive page windows from sequential entry ids.",
         "Direct user publish ABI was removed; public and private publishes now enter CapsuleHub only through Vault so ATH discounts apply consistently.",
         "A dedicated storage-economics harness verifies retained non-fee balance remains above configured storage reserve after transaction fees and ACK sends."

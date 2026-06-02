@@ -37,13 +37,13 @@
     "official BuybackBurn ATH wallet derivation vector",
     "pinned STON.fi router/pool/pTON addresses and code hashes",
     "official SDK/API tx params for exactly 50 TON -> ATH",
-    "live quote and dex_min_out policy",
+    "fixed-floor frozen quote and dex_min_out policy",
     "refund/excess/bounce evidence returning value to BuybackBurn"
   ],
   "candidateContractSurface": {
     "messages": [
       "AcceptBurnReserve from immutable FeeAccumulator only, exact 51.05 TON funding envelope",
-      "ExecuteBuybackChunk only after post-seal FreezeBuybackRoute records final route values",
+      "ExecuteBuybackChunk only after post-seal FreezeBuybackRoute records final fixed-floor route values",
       "JettonTransferNotification only from official BuybackBurn ATH wallet",
       "ATHBurnFinalized only from ATH Master",
       "Route refund/failure handling without pretending burn success",
@@ -110,6 +110,16 @@
       "source": "M19H/M19F"
     },
     {
+      "label": "frozen quote/minOut is a fixed floor and not a caller-supplied dynamic quote",
+      "required": true,
+      "source": "SECTION4/FEEBUY-03"
+    },
+    {
+      "label": "ordinary ATH sent to the official BuybackBurn ATH wallet is untracked and not burn-due",
+      "required": true,
+      "source": "SECTION4/FEEBUY-04"
+    },
+    {
       "label": "testnet evidence is separated from mainnet route freeze",
       "required": true,
       "source": "M20T"
@@ -130,6 +140,8 @@
     "clearing pending burn without ATHBurnFinalized from ATH Master",
     "treating transfer-to-dead-address as burn",
     "turning testnet proof into mainnet route freeze",
+    "treating the frozen BuybackBurn minOut as a dynamic fair-market quote",
+    "using the official BuybackBurn ATH wallet as a deposit or surplus-burn address",
     "setting STONFI_ROUTE_FREEZE_READY=true from templates or placeholders",
     "setting BUYBACKBURN_IMPLEMENTATION_READY=true before both M20T and M20F are complete",
     "adding owner/admin rescue/pause/governance surfaces to make route uncertainty manageable",

@@ -9,7 +9,9 @@ import {
   ATHTransferAck,
   ATHTransferFailed,
   AthTransferNotificationProfileAvatar,
+  AthTransferNotificationVaultProfileAvatar,
   BindProfileOfficialAthWallet,
+  BindProfileVault,
   FlushProfileBurnAthDue,
   FlushProfileTreasuryAthDue,
   ProfileRegistry,
@@ -27,6 +29,7 @@ const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
 const HALF_AVATAR_PRICE_ATH = 50_000_000_000n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
+const ATH_SENDER_KEY_MOD = 1n << 160n;
 const PROFILE_AVATAR_NOTIFY_VALUE = 30_000_000n;
 const OP_PROFILE_AVATAR_NOTIFICATION = 0xA11A7001;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
@@ -35,13 +38,14 @@ function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.PROFILE.${label}`).digest());
 }
 
-function senderKey(senderOwner: Address): bigint {
+function senderKey(senderOwner: Address, queryId: bigint): bigint {
   return BigInt('0x' + beginCell()
     .storeUint(ATH_TRANSFER_NOTIFY_ID_DOMAIN, 32)
+    .storeUint(queryId, 64)
     .storeAddress(senderOwner)
     .endCell()
     .hash()
-    .toString('hex')) % 4_294_967_296n;
+    .toString('hex')) % ATH_SENDER_KEY_MOD;
 }
 
 async function deployAthWallet(
@@ -71,6 +75,7 @@ async function deploySealedProfileRegistry() {
   const placeholderAthWallet = fixtureAddress('PLACEHOLDER_PROFILE_ATH_WALLET');
   const athMasterAddress = fixtureAddress('PROFILE_ATH_MASTER');
   const treasuryAthReceiver = fixtureAddress('PROFILE_TREASURY_ATH_RECEIVER');
+  const vaultAddress = fixtureAddress('PROFILE_VAULT');
 
   const init = await ProfileRegistry.init(
     placeholderAthWallet,
@@ -98,11 +103,63 @@ async function deploySealedProfileRegistry() {
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindProfileOfficialAthWallet);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindProfileVault);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWalletAddress, athMasterAddress };
+  return { blockchain, registry, officialAthWalletAddress, athMasterAddress, vaultAddress };
+}
+
+async function deployProfileRegistryReadyToSeal(options: {
+  treasuryAthReceiver: Address;
+  vaultAddress?: Address;
+  athMasterAddress?: Address;
+  forcedRegistryAddress?: Address;
+}) {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+  const deployer = await blockchain.treasury('profile-registry-seal-deployer');
+  const placeholderAthWallet = fixtureAddress('SEAL_TREASURY_PLACEHOLDER');
+  const athMasterAddress = options.athMasterAddress ?? fixtureAddress('SEAL_TREASURY_ATH_MASTER');
+  const vaultAddress = options.vaultAddress ?? fixtureAddress('SEAL_TREASURY_VAULT');
+
+  const init = await ProfileRegistry.init(
+    placeholderAthWallet,
+    athMasterAddress,
+    options.treasuryAthReceiver,
+    false,
+    0n,
+    0n,
+    deployer.address,
+  );
+  const address = options.forcedRegistryAddress ?? contractAddress(0, init);
+  await blockchain.setShardAccount(address, createShardAccount({
+    address,
+    code: init.code,
+    data: init.data,
+    balance: toNano('2'),
+    workchain: address.workChain,
+  }));
+  const registry = blockchain.openContract(new ProfileRegistry(address, init));
+  const officialAthWalletAddress = await registry.getGetAthWalletAddress(address);
+
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileOfficialAthWallet',
+    deployment_manifest_hash: MANIFEST_HASH,
+    official_ath_wallet_address: officialAthWalletAddress,
+  } as BindProfileOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindProfileVault);
+
+  return { registry, deployer, address, officialAthWalletAddress, athMasterAddress, vaultAddress };
 }
 
 async function deployProfileRegistryWithAthSystem(options: { officialWalletBalance: bigint; deployMaster: boolean; mockOfficial?: boolean }) {
@@ -113,6 +170,7 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
   const attacker = await blockchain.treasury('profile-registry-ath-attacker');
   const placeholderAthWallet = fixtureAddress('ATH_PROFILE_PLACEHOLDER');
   const treasuryAthReceiver = fixtureAddress('ATH_PROFILE_TREASURY_RECEIVER');
+  const vaultAddress = fixtureAddress('ATH_PROFILE_VAULT');
   const masterTreasuryOwner = fixtureAddress('ATH_PROFILE_MASTER_TREASURY');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
 
@@ -179,6 +237,11 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindProfileOfficialAthWallet);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindProfileVault);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
@@ -191,6 +254,7 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
     athMasterAddress,
     master,
     treasuryAthReceiver,
+    vaultAddress,
     flusher,
     attacker,
   };
@@ -202,6 +266,26 @@ function avatarNotification(owner: Address, overrides: Partial<AthTransferNotifi
     query_id: overrides.query_id ?? 1n,
     amount: overrides.amount ?? PROFILE_AVATAR_PRICE_ATH,
     sender_key: overrides.sender_key ?? 77n,
+    owner_wallet: overrides.owner_wallet ?? owner,
+    avatar_hash: overrides.avatar_hash ?? 0xabc123n,
+    avatar_entry_id: overrides.avatar_entry_id ?? 0n,
+    avatar_stream_id: overrides.avatar_stream_id ?? 0x11223344556677889900aabbccddeeffn,
+    avatar_part_count: overrides.avatar_part_count ?? 8n,
+    media_format: overrides.media_format ?? 1n,
+  };
+}
+
+function vaultAvatarNotification(
+  payerWallet: Address,
+  owner: Address,
+  overrides: Partial<AthTransferNotificationVaultProfileAvatar> = {},
+): AthTransferNotificationVaultProfileAvatar {
+  return {
+    $$type: 'AthTransferNotificationVaultProfileAvatar',
+    query_id: overrides.query_id ?? 1n,
+    amount: overrides.amount ?? PROFILE_AVATAR_PRICE_ATH,
+    sender_key: overrides.sender_key ?? senderKey(payerWallet, overrides.query_id ?? 1n),
+    payer_wallet: overrides.payer_wallet ?? payerWallet,
     owner_wallet: overrides.owner_wallet ?? owner,
     avatar_hash: overrides.avatar_hash ?? 0xabc123n,
     avatar_entry_id: overrides.avatar_entry_id ?? 0n,
@@ -264,6 +348,114 @@ async function sendProfileAvatarViaProductionWallet(params: {
 }
 
 describe('ProfileRegistry wallet avatar pointers', () => {
+  it('PROFILE-00: SealGenesis requires the bound Vault for Vault-funded avatar support', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_700_000_000;
+    const deployer = await blockchain.treasury('profile-seal-vault-deployer');
+    const placeholderAthWallet = fixtureAddress('SEAL_VAULT_PLACEHOLDER');
+    const athMasterAddress = fixtureAddress('SEAL_VAULT_ATH_MASTER');
+    const treasuryAthReceiver = fixtureAddress('SEAL_VAULT_TREASURY');
+    const vaultAddress = fixtureAddress('SEAL_VAULT_BOUND');
+
+    const init = await ProfileRegistry.init(
+      placeholderAthWallet,
+      athMasterAddress,
+      treasuryAthReceiver,
+      false,
+      0n,
+      0n,
+      deployer.address,
+    );
+    const address = contractAddress(0, init);
+    await blockchain.setShardAccount(address, createShardAccount({
+      address,
+      code: init.code,
+      data: init.data,
+      balance: toNano('2'),
+      workchain: address.workChain,
+    }));
+    const registry = blockchain.openContract(new ProfileRegistry(address, init));
+    const officialAthWalletAddress = await registry.getGetAthWalletAddress(address);
+
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindProfileOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: officialAthWalletAddress,
+    } as BindProfileOfficialAthWallet);
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+
+    let global = await registry.getGetGlobal();
+    expect(global.sealed).toBe(false);
+    expect(global.vault_bound).toBe(false);
+
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindProfileVault',
+      deployment_manifest_hash: MANIFEST_HASH,
+      vault_address: vaultAddress,
+    } as BindProfileVault);
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+
+    global = await registry.getGetGlobal();
+    expect(global.sealed).toBe(true);
+    expect(global.vault_bound).toBe(true);
+    expect(global.vault_address.equals(vaultAddress)).toBe(true);
+  });
+
+  it('PROFILE-00B: SealGenesis rejects protocol-owned treasury ATH receivers', async () => {
+    const forcedSelfAddress = fixtureAddress('SEAL_TREASURY_SELF_REGISTRY');
+    const selfTreasury = await deployProfileRegistryReadyToSeal({
+      treasuryAthReceiver: forcedSelfAddress,
+      forcedRegistryAddress: forcedSelfAddress,
+    });
+    await selfTreasury.registry.send(selfTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await selfTreasury.registry.getGetGlobal()).sealed).toBe(false);
+
+    const forcedOfficialOwner = fixtureAddress('SEAL_TREASURY_OFFICIAL_OWNER');
+    const officialWalletInit = await ATHWallet.init(0n, forcedOfficialOwner, fixtureAddress('SEAL_TREASURY_OFFICIAL_MASTER'));
+    const officialTreasuryReceiver = contractAddress(forcedOfficialOwner.workChain, officialWalletInit);
+    const officialTreasury = await deployProfileRegistryReadyToSeal({
+      treasuryAthReceiver: officialTreasuryReceiver,
+      athMasterAddress: fixtureAddress('SEAL_TREASURY_OFFICIAL_MASTER'),
+      forcedRegistryAddress: forcedOfficialOwner,
+    });
+    await officialTreasury.registry.send(officialTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await officialTreasury.registry.getGetGlobal()).sealed).toBe(false);
+
+    const vaultAddress = fixtureAddress('SEAL_TREASURY_AS_VAULT');
+    const vaultTreasury = await deployProfileRegistryReadyToSeal({
+      treasuryAthReceiver: vaultAddress,
+      vaultAddress,
+    });
+    await vaultTreasury.registry.send(vaultTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await vaultTreasury.registry.getGetGlobal()).sealed).toBe(false);
+
+    const athMasterAddress = fixtureAddress('SEAL_TREASURY_AS_ATH_MASTER');
+    const masterTreasury = await deployProfileRegistryReadyToSeal({
+      treasuryAthReceiver: athMasterAddress,
+      athMasterAddress,
+    });
+    await masterTreasury.registry.send(masterTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await masterTreasury.registry.getGetGlobal()).sealed).toBe(false);
+  });
+
   it('PROFILE-01: accepts paid official avatar notification, stores version, and splits ATH due', async () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('OWNER_ONE');
@@ -505,11 +697,19 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(global.pending_treasury_flush_count).toBe(1n);
     expect(global.pending_burn_flush_count).toBe(0n);
     expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    const treasuryPending = await ctx.registry.getGetPendingTreasuryFlush(801n);
+    expect(treasuryPending.exists).toBe(true);
+    expect(treasuryPending.amount).toBe(HALF_AVATAR_PRICE_ATH);
+    expect(treasuryPending.created_at).toBeGreaterThan(0n);
 
     await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
       $$type: 'FlushProfileBurnAthDue',
       query_id: 802n,
     } as FlushProfileBurnAthDue);
+    const burnPending = await ctx.registry.getGetPendingBurnFlush(802n);
+    expect(burnPending.exists).toBe(true);
+    expect(burnPending.amount).toBe(HALF_AVATAR_PRICE_ATH);
+    expect(burnPending.created_at).toBeGreaterThan(0n);
 
     await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'ATHTransferAck',
@@ -561,7 +761,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const global = await ctx.registry.getGetGlobal();
     const sourceWallet = await ctx.userAthWallet.getGetWalletData();
     const officialWallet = await ctx.officialAthWallet.getGetWalletData();
-    const key = senderKey(ctx.user.address);
+    const key = senderKey(ctx.user.address, 901n);
 
     expect(avatar.exists).toBe(true);
     expect(avatar.owner_wallet.equals(ctx.user.address)).toBe(true);
@@ -604,7 +804,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     for (const [index, rejected] of rejectedCases.entries()) {
       const ctx = await deployProfilePaymentProductionFixture(PROFILE_AVATAR_PRICE_ATH);
       const queryId = 1_000n + BigInt(index);
-      const key = senderKey(ctx.user.address);
+      const key = senderKey(ctx.user.address, queryId);
 
       await sendProfileAvatarViaProductionWallet({
         user: ctx.user,
@@ -664,5 +864,38 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
     expect(sourceWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
     expect(officialWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
+  });
+
+  it('PROFILE-12: accepts Vault-funded avatar notification only from the bound Vault payer', async () => {
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: 0n,
+      deployMaster: true,
+    });
+    const owner = fixtureAddress('VAULT_FUNDED_AVATAR_OWNER');
+    const forgedOwner = fixtureAddress('VAULT_FUNDED_FORGED_OWNER');
+    const attackerVault = fixtureAddress('VAULT_FUNDED_ATTACKER_VAULT');
+
+    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
+      query_id: 1_201n,
+      avatar_hash: 0x1201n,
+    }));
+
+    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(attackerVault, forgedOwner, {
+      query_id: 1_202n,
+      avatar_hash: 0x1202n,
+    }));
+
+    const avatar = await ctx.registry.getGetAvatar(owner);
+    const forgedAvatar = await ctx.registry.getGetAvatar(forgedOwner);
+    const global = await ctx.registry.getGetGlobal();
+
+    expect(avatar.exists).toBe(true);
+    expect(avatar.owner_wallet.equals(owner)).toBe(true);
+    expect(avatar.avatar_hash).toBe(0x1201n);
+    expect(forgedAvatar.exists).toBe(false);
+    expect(global.profile_count).toBe(1n);
+    expect(global.avatar_record_count).toBe(1n);
+    expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+    expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
   });
 });

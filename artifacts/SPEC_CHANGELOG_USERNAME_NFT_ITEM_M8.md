@@ -4,7 +4,9 @@ Accepted a narrow UsernameNFTItem implementation profile without expanding Usern
 
 ## Added
 
-- `UsernameNFTItemDataV1 { owner_wallet, username_registry_address, name_hash }`
+- Historical M8 note, superseded by final transferable username NFT semantics:
+  `UsernameNFTItemDataV1 { initialized, owner_wallet, username_registry_address, name_hash, username_len, username }`
+  and item address derivation is registry + name hash only; current owner is mutable through `NftTransfer`.
 - deterministic item address derivation formula
 - `UsernameNFTItem.ResendDeployedAck` outbound ACK body:
   - `name_hash:uint256`
@@ -17,4 +19,5 @@ Accepted a narrow UsernameNFTItem implementation profile without expanding Usern
 - UsernameRegistry mint finalization remains unimplemented.
 - UsernameRegistry due buckets remain unimplemented.
 - Username NFT item deploy reserve remains not final.
-- No transfer/seize/revoke/admin behavior exists.
+- No seize, revoke, admin transfer, upgrade, pause, or rescue behavior exists. Final v1 adds standard owner-only
+  `NftTransfer` so usernames can be sold or moved as normal NFTs.

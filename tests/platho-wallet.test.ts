@@ -6,10 +6,14 @@ import {
   PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
   buildPlathoWalletExternalBoc,
   createPlathoWallet,
+  derivePlathoWalletFromMnemonic,
   deriveMessagingIdentityFromWallet,
-  exportPlathoWalletSeed,
+  exportPlathoWalletRecoveryPhrase,
+  formatTonUserFriendlyAddress,
+  getPlathoWalletSeqno,
   importPlathoWallet,
   sendPlathoWalletTransaction,
+  validateTonMnemonic,
 } from '../web/platho-wallet.mjs';
 import {
   CRYPTO_SUITES,
@@ -21,11 +25,22 @@ import {
   verifySignedPublicKeyBundle,
 } from '../web/crypto/platho-crypto.mjs';
 
-const seed = Uint8Array.from({ length: 32 }, (_, index) => index);
+const mnemonic = [
+  'hospital', 'stove', 'relief', 'fringe', 'tongue', 'always', 'charge', 'angry',
+  'urge', 'sentence', 'again', 'match', 'nerve', 'inquiry', 'senior', 'coconut',
+  'label', 'tumble', 'carry', 'category', 'beauty', 'bean', 'road', 'solution',
+];
+const mnemonicText = mnemonic.join(' ');
+const mnemonicSecretKeyHex = '9d659a6c2234db7f6e4f977e6e8653b9f5946d557163f31034011375d8f3f97d';
+const bobMnemonic = [
+  'dose', 'ice', 'enrich', 'trigger', 'test', 'dove', 'century', 'still',
+  'betray', 'gas', 'diet', 'dune', 'use', 'other', 'base', 'gym', 'mad',
+  'law', 'immense', 'village', 'world', 'example', 'praise', 'game',
+];
 
 describe('embedded Platho wallet', () => {
   it('PLATHO-WALLET-01: derives the same v5r1 wallet address as @ton/ton', async () => {
-    const wallet = await createPlathoWallet({ seed });
+    const wallet = await derivePlathoWalletFromMnemonic(mnemonic);
     const reference = WalletContractV5R1.create({
       workchain: wallet.workchain,
       publicKey: Buffer.from(wallet.walletPublicKey),
@@ -33,22 +48,27 @@ describe('embedded Platho wallet', () => {
     });
 
     expect(wallet.address).toBe(reference.address.toRawString());
-    expect(wallet.seedText).toBe(`platho1.${Buffer.from(seed).toString('hex')}`);
+    expect(Buffer.from(wallet.walletSecretKey).toString('hex')).toBe(mnemonicSecretKeyHex);
+    expect(wallet.seedText).toBe(mnemonicText);
+    expect(wallet.friendlyAddress).toBe(formatTonUserFriendlyAddress(wallet.address));
+    expect(Address.parse(wallet.friendlyAddress).toRawString()).toBe(wallet.address);
+    await expect(validateTonMnemonic(mnemonic)).resolves.toBe(true);
   });
 
-  it('PLATHO-WALLET-02: imports the seed and deterministically derives messaging keys', async () => {
-    const wallet = await createPlathoWallet({ seed });
-    const imported = await importPlathoWallet(exportPlathoWalletSeed(wallet));
+  it('PLATHO-WALLET-02: imports the recovery phrase and deterministically derives messaging keys', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const imported = await importPlathoWallet(exportPlathoWalletRecoveryPhrase(wallet));
     const first = await deriveMessagingIdentityFromWallet(wallet, CRYPTO_SUITES.HYBRID_V1);
     const second = await deriveMessagingIdentityFromWallet(imported, CRYPTO_SUITES.HYBRID_V1);
 
     expect(imported.address).toBe(wallet.address);
     expect(second.encryptionKeyPair.keyId).toBe(first.encryptionKeyPair.keyId);
     expect(Buffer.from(second.signingPublicKey).toString('hex')).toBe(Buffer.from(first.signingPublicKey).toString('hex'));
+    await expect(importPlathoWallet(`platho1.${'00'.repeat(32)}`)).rejects.toThrow(/24 words|checksum|word/i);
   });
 
   it('PLATHO-WALLET-03: builds parseable wallet external message BoC', async () => {
-    const wallet = await createPlathoWallet({ seed });
+    const wallet = await createPlathoWallet({ mnemonic });
     const built = await buildPlathoWalletExternalBoc(wallet, {
       address: `0:${'11'.repeat(32)}`,
       amount: '1000000',
@@ -66,7 +86,7 @@ describe('embedded Platho wallet', () => {
 
   it('PLATHO-WALLET-04: sends a real sandbox v5r1 wallet transfer', async () => {
     const blockchain = await Blockchain.create();
-    const wallet = await createPlathoWallet({ seed });
+    const wallet = await createPlathoWallet({ mnemonic });
     const funder = await blockchain.treasury('platho-wallet-funder');
     const recipient = await blockchain.treasury('platho-wallet-recipient');
 
@@ -93,7 +113,7 @@ describe('embedded Platho wallet', () => {
 
   it('PLATHO-WALLET-04B: sends more than four internal messages in one v5r1 transfer', async () => {
     const blockchain = await Blockchain.create();
-    const wallet = await createPlathoWallet({ seed });
+    const wallet = await createPlathoWallet({ mnemonic });
     const funder = await blockchain.treasury('platho-wallet-multi-funder');
     const recipients = await Promise.all(
       Array.from({ length: 9 }, (_, index) => blockchain.treasury(`platho-wallet-multi-recipient-${index}`)),
@@ -124,7 +144,7 @@ describe('embedded Platho wallet', () => {
   });
 
   it('PLATHO-WALLET-04C: splits more than 255 capsules into sequential v5r1 transfers', async () => {
-    const wallet = await createPlathoWallet({ seed });
+    const wallet = await createPlathoWallet({ mnemonic });
     let seqno = 42;
     const sent: any[] = [];
     const messages = Array.from({ length: PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER + 5 }, (_, index) => ({
@@ -155,9 +175,36 @@ describe('embedded Platho wallet', () => {
     expect(result.batches.map((batch: any) => batch.messageCount)).toEqual([255, 5]);
   });
 
-  it('PLATHO-WALLET-05: encrypts to a recipient Vault key record derived from their wallet seed', async () => {
-    const alice = await createPlathoWallet({ seed });
-    const bob = await createPlathoWallet({ seed: Uint8Array.from({ length: 32 }, (_, index) => 255 - index) });
+  it('PLATHO-WALLET-04D: fails closed when RPC seqno cannot be read before signing', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const message = {
+      address: `0:${'22'.repeat(32)}`,
+      amount: '1000000',
+      payload: null,
+    };
+    let sent = false;
+    const transport = {
+      async runGetMethod() {
+        throw new Error('rpc down');
+      },
+      async sendBoc() {
+        sent = true;
+        return { ok: true };
+      },
+    };
+
+    await expect(getPlathoWalletSeqno(wallet, transport)).rejects.toThrow(/seqno read failed|fallback seqno 0/i);
+    await expect(buildPlathoWalletExternalBoc(wallet, message, { transport })).rejects.toThrow(/seqno read failed|fallback seqno 0/i);
+    await expect(sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, {
+      transport,
+    })).rejects.toThrow(/seqno read failed|fallback seqno 0/i);
+    await expect(getPlathoWalletSeqno(wallet, transport, { allowSeqnoFallback: true })).resolves.toBe(0);
+    expect(sent).toBe(false);
+  });
+
+  it('PLATHO-WALLET-05: encrypts to a recipient Vault key record derived from their wallet recovery phrase', async () => {
+    const alice = await createPlathoWallet({ mnemonic });
+    const bob = await createPlathoWallet({ mnemonic: bobMnemonic });
     const aliceIdentity = await deriveMessagingIdentityFromWallet(alice, CRYPTO_SUITES.HYBRID_V1);
     const bobIdentity = await deriveMessagingIdentityFromWallet(bob, CRYPTO_SUITES.HYBRID_V1);
     const bobSignedBundle = await exportSignedPublicKeyBundle(bobIdentity, {

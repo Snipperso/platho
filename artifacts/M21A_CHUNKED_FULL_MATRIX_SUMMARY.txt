@@ -1,3 +1,6 @@
+HISTORICAL ONLY. SUPERSEDED. DO NOT USE AS CURRENT FULL-SUITE RELEASE EVIDENCE.
+Canonical current full-suite evidence is artifacts/CURRENT_FULL_TEST_SUMMARY.json.
+
 M21A chunked full regression matrix
 
 Chunk 1: 8 files / 36 tests / EXIT=0

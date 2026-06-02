@@ -28,6 +28,8 @@ contract ATHMaster {
     treasury_supply_deployed: Bool;
 
     init(treasury_owner: Address, content: Cell) {
+        let treasury_std: StdAddress = parseStdAddress(treasury_owner.asSlice());
+        throwUnless(14104, treasury_std.workchain == 0);
         self.total_supply = ATH_TOTAL_SUPPLY_ATOMIC;
         self.treasury_owner = treasury_owner;
         self.content = content;

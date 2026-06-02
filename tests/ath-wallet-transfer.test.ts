@@ -23,15 +23,18 @@ import {
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
+const ATH_SENDER_KEY_MOD = 1n << 160n;
 const ATH_PENDING_NOTIFICATION_TTL = 86_400;
+const ATH_PRUNE_NOTIFICATION_EXEC_RESERVE = 2_000_000n;
 
-function senderKey(senderOwner: Address): bigint {
+function senderKey(senderOwner: Address, queryId: bigint): bigint {
   return BigInt('0x' + beginCell()
     .storeUint(ATH_TRANSFER_NOTIFY_ID_DOMAIN, 32)
+    .storeUint(queryId, 64)
     .storeAddress(senderOwner)
     .endCell()
     .hash()
-    .toString('hex')) % 4_294_967_296n;
+    .toString('hex')) % ATH_SENDER_KEY_MOD;
 }
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -336,7 +339,7 @@ describe('ATH wallet transfer profile', () => {
     } as ATHTransferRequestWithNotify);
 
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
-    const key = senderKey(sourceOwner.address);
+    const key = senderKey(sourceOwner.address, queryId);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
 
     await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
@@ -347,6 +350,13 @@ describe('ATH wallet transfer profile', () => {
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
 
     blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
+    await recipientWallet.send(pruner.getSender(), { value: ATH_PRUNE_NOTIFICATION_EXEC_RESERVE - 1n }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
     await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
       $$type: 'PruneStaleNotification',
       query_id: queryId,
@@ -377,7 +387,7 @@ describe('ATH wallet transfer profile', () => {
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
   });
 
-  it('ATH-XFER-05B: pruned notification tombstone blocks later reuse of same query and sender-key slot', async () => {
+  it('ATH-XFER-05B: pruned notification tombstone does not block another sender sharing the old 32-bit slot', async () => {
     const blockchain = await Blockchain.create();
     blockchain.now = 1_700_100_000;
     const ownerA = rawFixtureAddress('0:1bfcc4a48a30afb134facb308d9f58389f3cb4b618811901f564cb2c8a95e78c');
@@ -386,8 +396,9 @@ describe('ATH wallet transfer profile', () => {
     const pruner = await blockchain.treasury('ath-transfer-colliding-pruner');
     const master = fixtureAddress('ATH_TRANSFER_COLLIDING_NOTIFY_MASTER');
     const queryId = 515n;
-    const key = senderKey(ownerA);
-    expect(senderKey(ownerB)).toBe(key);
+    const keyA = senderKey(ownerA, queryId);
+    const keyB = senderKey(ownerB, queryId);
+    expect(keyB).not.toBe(keyA);
 
     const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
@@ -413,19 +424,19 @@ describe('ATH wallet transfer profile', () => {
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyA)).exists).toBe(true);
 
     blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
     await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
       $$type: 'PruneStaleNotification',
       query_id: queryId,
-      sender_key: key,
+      sender_key: keyA,
     } as PruneStaleNotification);
 
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyA)).exists).toBe(false);
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
 
-    const collidingReuse = await blockchain.sendMessage(internal({
+    const independentReuse = await blockchain.sendMessage(internal({
       from: sourceAddressB,
       to: recipientAddress,
       value: toNano('0.05'),
@@ -440,26 +451,28 @@ describe('ATH wallet transfer profile', () => {
       } as ATHInternalTransferWithNotify)).endCell(),
     }));
 
-    expect(findTransaction(collidingReuse.transactions, {
+    expect(findTransaction(independentReuse.transactions, {
       from: sourceAddressB,
       to: recipientAddress,
-      success: false,
+      success: true,
     })).toBeDefined();
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(170n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyA)).exists).toBe(false);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyB)).exists).toBe(true);
 
     await recipientWallet.send(recipientOwner.getSender(), { value: toNano('0.05') }, {
       $$type: 'AthTransferNotificationAck',
       query_id: queryId,
       amount: 100n,
-      sender_key: key,
+      sender_key: keyA,
     } as AthTransferNotificationAck);
 
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(170n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyA)).exists).toBe(false);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyB)).exists).toBe(true);
   });
 
-  it('ATH-XFER-05B2: colliding same-query notify reject restores the source wallet balance', async () => {
+  it('ATH-XFER-05B2: independent same-query notify debits source wallet despite old 32-bit slot collision', async () => {
     const blockchain = await Blockchain.create();
     blockchain.now = 1_700_150_000;
     const ownerA = rawFixtureAddress('0:1bfcc4a48a30afb134facb308d9f58389f3cb4b618811901f564cb2c8a95e78c');
@@ -468,8 +481,9 @@ describe('ATH wallet transfer profile', () => {
     const pruner = await blockchain.treasury('ath-transfer-colliding-restore-pruner');
     const master = fixtureAddress('ATH_TRANSFER_COLLIDING_RESTORE_MASTER');
     const queryId = 516n;
-    const key = senderKey(ownerA);
-    expect(senderKey(ownerB)).toBe(key);
+    const keyA = senderKey(ownerA, queryId);
+    const keyB = senderKey(ownerB, queryId);
+    expect(keyB).not.toBe(keyA);
 
     const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
@@ -498,13 +512,13 @@ describe('ATH wallet transfer profile', () => {
     await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
       $$type: 'PruneStaleNotification',
       query_id: queryId,
-      sender_key: key,
+      sender_key: keyA,
     } as PruneStaleNotification);
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyA)).exists).toBe(false);
 
-    const collidingOwnerRequest = await blockchain.sendMessage(internal({
+    const independentOwnerRequest = await blockchain.sendMessage(internal({
       from: ownerB,
       to: sourceWalletB.address,
       value: toNano('0.3'),
@@ -519,14 +533,15 @@ describe('ATH wallet transfer profile', () => {
       } as ATHTransferRequestWithNotify)).endCell(),
     }));
 
-    expect(findTransaction(collidingOwnerRequest.transactions, {
+    expect(findTransaction(independentOwnerRequest.transactions, {
       from: sourceWalletB.address,
       to: recipientAddress,
-      success: false,
+      success: true,
     })).toBeDefined();
-    expect((await sourceWalletB.getGetWalletData()).balance).toBe(1_000n);
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await sourceWalletB.getGetWalletData()).balance).toBe(930n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(170n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyA)).exists).toBe(false);
+    expect((await recipientWallet.getGetPendingNotification(queryId, keyB)).exists).toBe(true);
   });
 
   it('ATH-XFER-05C: processed notify tombstone is shared by username and profile-avatar variants', async () => {
@@ -537,7 +552,7 @@ describe('ATH wallet transfer profile', () => {
     const pruner = await blockchain.treasury('ath-transfer-shared-domain-pruner');
     const master = fixtureAddress('ATH_TRANSFER_SHARED_NOTIFY_DOMAIN_MASTER');
     const queryId = 525n;
-    const key = senderKey(sourceOwner.address);
+    const key = senderKey(sourceOwner.address, queryId);
 
     const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
     const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
@@ -622,7 +637,7 @@ describe('ATH wallet transfer profile', () => {
 
     const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 0n);
     const recipientWallet = await deployWallet(blockchain, recipientOwner.address, master, 0n);
-    const key = senderKey(sourceOwner.address);
+    const key = senderKey(sourceOwner.address, queryId);
 
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
@@ -657,8 +672,8 @@ describe('ATH wallet transfer profile', () => {
         .storeUint(0xffffffff, 32)
         .storeUint(0xA11A7001, 32)
         .storeUint(queryId, 64)
+        .storeUint(key, 160)
         .storeUint(amount, 128)
-        .storeUint(key, 32)
         .endCell(),
     }));
 
@@ -689,7 +704,7 @@ describe('ATH wallet transfer profile', () => {
       balance: toNano('1'),
       workchain: otherRecipientWalletAddress.workChain,
     }));
-    const key = senderKey(sourceOwner.address);
+    const key = senderKey(sourceOwner.address, queryId);
 
     await recipientWallet.send(recipientOwner.getSender(), { value: toNano('0.2') }, {
       $$type: 'ATHTransferRequest',
@@ -733,8 +748,8 @@ describe('ATH wallet transfer profile', () => {
         .storeUint(0xffffffff, 32)
         .storeUint(0xA11A7001, 32)
         .storeUint(queryId, 64)
+        .storeUint(key, 160)
         .storeUint(amount, 128)
-        .storeUint(key, 32)
         .endCell(),
     }));
 
@@ -783,7 +798,7 @@ describe('ATH wallet transfer profile', () => {
       balance: toNano('1'),
       workchain: sourceWalletAddress.workChain,
     }));
-    const key = senderKey(sourceOwner.address);
+    const key = senderKey(sourceOwner.address, queryId);
 
     await recipientWallet.send(recipientOwner.getSender(), { value: toNano('0.2') }, {
       $$type: 'ATHTransferRequest',
@@ -827,8 +842,8 @@ describe('ATH wallet transfer profile', () => {
         .storeUint(0xffffffff, 32)
         .storeUint(0xA11A7001, 32)
         .storeUint(queryId, 64)
+        .storeUint(key, 160)
         .storeUint(amount, 128)
-        .storeUint(key, 32)
         .endCell(),
     }));
 
@@ -868,7 +883,6 @@ describe('ATH wallet transfer profile', () => {
     const attacker = await blockchain.treasury('ath-transfer-forged-notify-attacker');
     const master = fixtureAddress('ATH_TRANSFER_FORGED_NOTIFY_MASTER');
     const amount = 100n;
-    const key = senderKey(sourceOwner.address);
     const username = Buffer.from('platho', 'ascii');
 
     const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 0n);
@@ -931,6 +945,7 @@ describe('ATH wallet transfer profile', () => {
     ];
 
     for (const { op, queryId } of forgedNotifications) {
+      const key = senderKey(sourceOwner.address, queryId);
       await blockchain.sendMessage(internal({
         from: attacker.address,
         to: recipientWallet.address,
@@ -941,17 +956,17 @@ describe('ATH wallet transfer profile', () => {
           .storeUint(0xffffffff, 32)
           .storeUint(op, 32)
           .storeUint(queryId, 64)
+          .storeUint(key, 160)
           .storeUint(amount, 128)
-          .storeUint(key, 32)
           .endCell(),
       }));
     }
 
     expect((await sourceWallet.getGetWalletData()).balance).toBe(0n);
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount * 3n);
-    expect((await recipientWallet.getGetPendingNotification(551n, key)).exists).toBe(true);
-    expect((await recipientWallet.getGetPendingNotification(552n, key)).exists).toBe(true);
-    expect((await recipientWallet.getGetPendingNotification(553n, key)).exists).toBe(true);
+    expect((await recipientWallet.getGetPendingNotification(551n, senderKey(sourceOwner.address, 551n))).exists).toBe(true);
+    expect((await recipientWallet.getGetPendingNotification(552n, senderKey(sourceOwner.address, 552n))).exists).toBe(true);
+    expect((await recipientWallet.getGetPendingNotification(553n, senderKey(sourceOwner.address, 553n))).exists).toBe(true);
   });
 
   it('ATH-XFER-06: low-value bounced notify does not debit before refund hop can be funded', async () => {
@@ -976,7 +991,7 @@ describe('ATH wallet transfer profile', () => {
     } as ATHTransferRequestWithNotify);
 
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
-    const key = senderKey(sourceOwner.address);
+    const key = senderKey(sourceOwner.address, queryId);
     expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);

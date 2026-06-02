@@ -639,6 +639,42 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.last_terminal_query_id).toBe(0n);
   });
 
+  it('BUYBACK-04K: treats the frozen route quote/minOut as a fixed execution floor, not a live dynamic quote', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+
+    for (const [quoteOut, dexMinOut] of [
+      [94_000n, 94_000n],
+      [150_000n, 142_500n],
+    ] as const) {
+      const result = await env.buyback.send(env.attacker.getSender(), { value: toNano('0.1') }, {
+        $$type: 'ExecuteBuybackChunk',
+        query_id: 1n,
+        quote_out_atomic_ath: quoteOut,
+        dex_min_out_atomic_ath: dexMinOut,
+      } as ExecuteBuybackChunk);
+
+      expect(findTransaction(result.transactions, {
+        from: env.buyback.address,
+        to: env.stonfiPtonWallet.address,
+        op: OP_PTON_TON_TRANSFER,
+      })).toBeUndefined();
+
+      const state = await env.buyback.getGetBuybackBurnState();
+      expect(state.phase).toBe(PHASE_IDLE);
+      expect(state.reserve_due_ton).toBe(ENVELOPE);
+      expect(state.pending_query_id).toBe(0n);
+      expect(state.last_terminal_query_id).toBe(0n);
+    }
+
+    await executeBuyback(env, 1n);
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
+    expect(state.pending_query_id).toBe(1n);
+    expect(state.pending_dex_min_out_atomic_ath).toBe(95_000n);
+  });
+
   it('BUYBACK-04I: uses a contract-computed route deadline for permissionless execution', async () => {
     const env = await setup();
     await freezeAndSeal(env);
@@ -971,6 +1007,39 @@ describe('Production BuybackBurn candidate', () => {
       expect(totals.burned_ath_total_atomic).toBe(expectedExecutedCount === 0n ? 0n : 100_000n);
       expect((await officialWallet.getGetWalletData()).balance).toBe(expectedRetryDue);
     }
+  });
+
+  it('BUYBACK-05E: ordinary ATH sent to the official BuybackBurn ATH wallet is untracked and not burn-due', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+
+    const beforeState = await env.buyback.getGetBuybackBurnState();
+    const beforeTotals = await env.buyback.getGetBuybackBurnTotals();
+
+    const stonfiSourceWallet = await sendStandardStonfiAthOutput(
+      env,
+      77n,
+      123_000n,
+      0n,
+      200_000n,
+    );
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    const totals = await env.buyback.getGetBuybackBurnTotals();
+    const officialWallet = env.blockchain.openContract(new ATHWallet(env.officialAthWallet));
+    const jetton = await env.athMaster.getGetJettonData();
+
+    expect(state.phase).toBe(beforeState.phase);
+    expect(state.reserve_due_ton).toBe(beforeState.reserve_due_ton);
+    expect(state.pending_query_id).toBe(beforeState.pending_query_id);
+    expect(state.route_refund_due_ton).toBe(beforeState.route_refund_due_ton);
+    expect(state.ath_burn_retry_due_atomic).toBe(beforeState.ath_burn_retry_due_atomic);
+    expect(totals.accepted_reserve_count).toBe(beforeTotals.accepted_reserve_count);
+    expect(totals.executed_buyback_count).toBe(beforeTotals.executed_buyback_count);
+    expect(totals.burned_ath_total_atomic).toBe(beforeTotals.burned_ath_total_atomic);
+    expect(jetton.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(123_000n);
+    expect((await stonfiSourceWallet.getGetWalletData()).balance).toBe(77_000n);
   });
 
   it('BUYBACK-06: authenticated burn failure becomes retry-due and can be finalized later', async () => {

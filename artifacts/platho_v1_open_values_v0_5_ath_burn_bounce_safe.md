@@ -171,12 +171,12 @@ All other enum combinations are rejected before `accept_message`.
 
 ## 4. Protocol Fees
 
-Base PLATO protocol fees:
+Historical superseded PLATO protocol-fee constants:
 
 ```text
-PLATO_PRIVATE_STANDARD_FEE_TON = 0.005 TON = 5_000_000 nanotons
-PLATO_PRIVATE_LONG_TERM_FEE_TON = 0.010 TON = 10_000_000 nanotons
-PLATO_PUBLIC_POST_FEE_TON = 0.005 TON = 5_000_000 nanotons
+This v0.5 draft used obsolete fee constants and is not the current release source of truth.
+Current final v1 pricing uses 0.010 TON Platho protocol fee for public and private publishes,
+and ATH can discount the full Platho protocol-fee component after unlock.
 ```
 
 ATH full discount threshold:
@@ -349,7 +349,7 @@ Superseded by the M27 interface decision: CapsuleHub v1 uses separate private an
 ```text
 MAX_CHARGE_PRIVATE_STANDARD(owner) =
   VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
-  + discounted_fee(owner, PLATO_PRIVATE_STANDARD_FEE_TON)
+  + discounted_fee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON)
   + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
   + CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE
   + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT

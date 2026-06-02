@@ -8,6 +8,12 @@
   "orientation": "portrait",
   "theme_color": "#0b0d0f",
   "background_color": "#0b0d0f",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://platho.app/manifest.webmanifest"
+    }
+  ],
   "icons": [
     {
       "src": "./assets/platho-icon-192.png?v=3",

@@ -12,6 +12,8 @@
       "message": "Supply a post-pool MarketStabilitySeller getter snapshot input."
     }
   ],
+  "warning_codes": [],
+  "warnings": [],
   "checked_manifest_hash": null,
   "reserve_allocation_atomic": null,
   "base_tranche_price_nanotons": null

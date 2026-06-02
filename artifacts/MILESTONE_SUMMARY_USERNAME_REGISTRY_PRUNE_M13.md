@@ -4,9 +4,9 @@ Implemented:
 
 - `UsernameRegistry.PrunePendingUsernameMint`.
 - `USERNAME_PENDING_MINT_STALE_TTL = 86_400 seconds`.
-- Stale `PendingUsernameMint` deletion.
-- Exact `price_paid` recovery into `ath_refunds_due[owner_wallet]`.
-- Late `UsernameItemDeployedAck` rejection after prune.
+- Non-destructive stale `PendingUsernameMint` probe.
+- No timeout-based `price_paid` recovery into `ath_refunds_due[owner_wallet]`.
+- Late `UsernameItemDeployedAck` / `UsernameNFTItem.ResendDeployedAck` recovery remains valid after a stale probe.
 - `UsernameNFTItem` ACK reserve raised to `0.003 TON` to keep sequential mint ACK paths green after registry state growth.
 
 Not implemented:
@@ -27,7 +27,7 @@ npm test -- --reporter=verbose --testTimeout=30000: 19 files / 87 tests passed
 New tests:
 
 ```text
-USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected
+USERNAME-REG-M13-01: stale PendingUsernameMint probe is non-destructive and does not create refund due
 USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending
 ```
 

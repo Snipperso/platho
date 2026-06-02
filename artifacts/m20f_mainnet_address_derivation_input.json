@@ -1,0 +1,12 @@
+{
+  "document": "PLATHO.V1.M20F_MAINNET_ADDRESS_DERIVATION_INPUT",
+  "network": "mainnet",
+  "status": "FINAL_MAINNET_ADDRESS_INPUT",
+  "genesisControllerAddress": "UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
+  "athMasterAddress": "EQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9vxL-",
+  "proofRefs": {
+    "finalGenesisControllerProof": "artifacts/mainnet_genesis_verify_input.json#manifest.addresses.genesis_controller_one_shot=UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
+    "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=7b75b181b3e472373e7bffe03d04ec9d1ded914941ca5efba83ce5436f606355",
+    "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2"
+  }
+}

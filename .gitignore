@@ -19,18 +19,24 @@ artifacts/m20t_live_testnet_run.local.json
 artifacts/m20t_wallet_private.local.json
 artifacts/platho-web-static-*/
 artifacts/local/
+artifacts/edge-*/
 artifacts/logo.*
 artifacts/platho_njalla_ed25519.pub.txt
 artifacts/platho_external_audit*.zip
 artifacts/platho_external_audit*.zip.sha256
 artifacts/platho_external_audit*.zip.sha256.txt
 artifacts/platho_external_audit*.contents.txt
+artifacts/platho_larisa_audit*.zip
+artifacts/platho_larisa_audit*.zip.sha256
+artifacts/platho_larisa_audit*.zip.sha256.txt
+artifacts/platho_larisa_audit*.contents.txt
 artifacts/platho_release_checkpoint*.zip
 artifacts/*_RU_DRAFT.md
 artifacts/cdp-*.mjs
 artifacts/platho-static-*.mjs
 artifacts/edge-*-profile/
 artifacts/vault-fresh-*.png
+artifacts/live-platho-shot*.png
 
 # Browser smoke-test profiles and local runtime state
 .edge-smoke/
@@ -44,6 +50,8 @@ node_modules/
 coverage/
 .cache/
 .vite/
+__pycache__/
+*.pyc
 
 # Logs and OS/editor noise
 *.log

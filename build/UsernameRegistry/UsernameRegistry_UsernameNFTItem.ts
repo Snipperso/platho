@@ -609,6 +609,65 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
     }
 }
 
+export type InitializeUsernameItem = {
+    $$type: 'InitializeUsernameItem';
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeInitializeUsernameItem(src: InitializeUsernameItem) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431193934, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeBuilder(src.username.asBuilder());
+    };
+}
+
+export function loadInitializeUsernameItem(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431193934) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0;
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleInitializeUsernameItem(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleInitializeUsernameItem(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleInitializeUsernameItem(source: InitializeUsernameItem) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserInitializeUsernameItem(): DictionaryValue<InitializeUsernameItem> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeInitializeUsernameItem(src)).endCell());
+        },
+        parse: (src) => {
+            return loadInitializeUsernameItem(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ResendDeployedAck = {
     $$type: 'ResendDeployedAck';
 }
@@ -744,49 +803,259 @@ export function dictValueParserUsernameItemDeployedAck(): DictionaryValue<Userna
     }
 }
 
+export type NftTransfer = {
+    $$type: 'NftTransfer';
+    query_id: bigint;
+    new_owner: Address;
+    response_destination: Address;
+    custom_payload: Cell | null;
+    forward_amount: bigint;
+    forward_payload: Slice;
+}
+
+export function storeNftTransfer(src: NftTransfer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1607220500, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.new_owner);
+        b_0.storeAddress(src.response_destination);
+        if (src.custom_payload !== null && src.custom_payload !== undefined) { b_0.storeBit(true).storeRef(src.custom_payload); } else { b_0.storeBit(false); }
+        b_0.storeCoins(src.forward_amount);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadNftTransfer(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1607220500) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _new_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _custom_payload = sc_0.loadBit() ? sc_0.loadRef() : null;
+    const _forward_amount = sc_0.loadCoins();
+    const _forward_payload = sc_0;
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+}
+
+export function loadTupleNftTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _new_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _custom_payload = source.readCellOpt();
+    const _forward_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleNftTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _new_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _custom_payload = source.readCellOpt();
+    const _forward_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+}
+
+export function storeTupleNftTransfer(source: NftTransfer) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.new_owner);
+    builder.writeAddress(source.response_destination);
+    builder.writeCell(source.custom_payload);
+    builder.writeNumber(source.forward_amount);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserNftTransfer(): DictionaryValue<NftTransfer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeNftTransfer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadNftTransfer(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type NftOwnershipAssigned = {
+    $$type: 'NftOwnershipAssigned';
+    query_id: bigint;
+    previous_owner: Address;
+    forward_payload: Slice;
+}
+
+export function storeNftOwnershipAssigned(src: NftOwnershipAssigned) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(85167505, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.previous_owner);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadNftOwnershipAssigned(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 85167505) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _previous_owner = sc_0.loadAddress();
+    const _forward_payload = sc_0;
+    return { $$type: 'NftOwnershipAssigned' as const, query_id: _query_id, previous_owner: _previous_owner, forward_payload: _forward_payload };
+}
+
+export function loadTupleNftOwnershipAssigned(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _previous_owner = source.readAddress();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftOwnershipAssigned' as const, query_id: _query_id, previous_owner: _previous_owner, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleNftOwnershipAssigned(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _previous_owner = source.readAddress();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftOwnershipAssigned' as const, query_id: _query_id, previous_owner: _previous_owner, forward_payload: _forward_payload };
+}
+
+export function storeTupleNftOwnershipAssigned(source: NftOwnershipAssigned) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.previous_owner);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserNftOwnershipAssigned(): DictionaryValue<NftOwnershipAssigned> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeNftOwnershipAssigned(src)).endCell());
+        },
+        parse: (src) => {
+            return loadNftOwnershipAssigned(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type NftExcesses = {
+    $$type: 'NftExcesses';
+    query_id: bigint;
+}
+
+export function storeNftExcesses(src: NftExcesses) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(3576854235, 32);
+        b_0.storeUint(src.query_id, 64);
+    };
+}
+
+export function loadNftExcesses(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 3576854235) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    return { $$type: 'NftExcesses' as const, query_id: _query_id };
+}
+
+export function loadTupleNftExcesses(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'NftExcesses' as const, query_id: _query_id };
+}
+
+export function loadGetterTupleNftExcesses(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'NftExcesses' as const, query_id: _query_id };
+}
+
+export function storeTupleNftExcesses(source: NftExcesses) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    return builder.build();
+}
+
+export function dictValueParserNftExcesses(): DictionaryValue<NftExcesses> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeNftExcesses(src)).endCell());
+        },
+        parse: (src) => {
+            return loadNftExcesses(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameNFTItemStateView = {
     $$type: 'UsernameNFTItemStateView';
+    initialized: boolean;
     owner_wallet: Address;
     username_registry_address: Address;
     name_hash: bigint;
+    username_len: bigint;
+    username: Cell;
+    tier: bigint;
 }
 
 export function storeUsernameNFTItemStateView(src: UsernameNFTItemStateView) {
     return (builder: Builder) => {
         const b_0 = builder;
+        b_0.storeBit(src.initialized);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeAddress(src.username_registry_address);
         b_0.storeInt(src.name_hash, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.username_len, 257);
+        b_1.storeRef(src.username);
+        b_1.storeInt(src.tier, 257);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
 export function loadUsernameNFTItemStateView(slice: Slice) {
     const sc_0 = slice;
+    const _initialized = sc_0.loadBit();
     const _owner_wallet = sc_0.loadAddress();
     const _username_registry_address = sc_0.loadAddress();
     const _name_hash = sc_0.loadIntBig(257);
-    return { $$type: 'UsernameNFTItemStateView' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _username_len = sc_1.loadIntBig(257);
+    const _username = sc_1.loadRef();
+    const _tier = sc_1.loadIntBig(257);
+    return { $$type: 'UsernameNFTItemStateView' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username, tier: _tier };
 }
 
 export function loadTupleUsernameNFTItemStateView(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItemStateView' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    const _tier = source.readBigNumber();
+    return { $$type: 'UsernameNFTItemStateView' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username, tier: _tier };
 }
 
 export function loadGetterTupleUsernameNFTItemStateView(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItemStateView' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    const _tier = source.readBigNumber();
+    return { $$type: 'UsernameNFTItemStateView' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username, tier: _tier };
 }
 
 export function storeTupleUsernameNFTItemStateView(source: UsernameNFTItemStateView) {
     const builder = new TupleBuilder();
+    builder.writeBoolean(source.initialized);
     builder.writeAddress(source.owner_wallet);
     builder.writeAddress(source.username_registry_address);
     builder.writeNumber(source.name_hash);
+    builder.writeNumber(source.username_len);
+    builder.writeCell(source.username);
+    builder.writeNumber(source.tier);
     return builder.build();
 }
 
@@ -801,49 +1070,187 @@ export function dictValueParserUsernameNFTItemStateView(): DictionaryValue<Usern
     }
 }
 
+export type UsernameNftDataView = {
+    $$type: 'UsernameNftDataView';
+    initialized: boolean;
+    index: bigint;
+    collection_address: Address;
+    owner_address: Address;
+    individual_content: Cell;
+}
+
+export function storeUsernameNftDataView(src: UsernameNftDataView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.initialized);
+        b_0.storeInt(src.index, 257);
+        b_0.storeAddress(src.collection_address);
+        b_0.storeAddress(src.owner_address);
+        b_0.storeRef(src.individual_content);
+    };
+}
+
+export function loadUsernameNftDataView(slice: Slice) {
+    const sc_0 = slice;
+    const _initialized = sc_0.loadBit();
+    const _index = sc_0.loadIntBig(257);
+    const _collection_address = sc_0.loadAddress();
+    const _owner_address = sc_0.loadAddress();
+    const _individual_content = sc_0.loadRef();
+    return { $$type: 'UsernameNftDataView' as const, initialized: _initialized, index: _index, collection_address: _collection_address, owner_address: _owner_address, individual_content: _individual_content };
+}
+
+export function loadTupleUsernameNftDataView(source: TupleReader) {
+    const _initialized = source.readBoolean();
+    const _index = source.readBigNumber();
+    const _collection_address = source.readAddress();
+    const _owner_address = source.readAddress();
+    const _individual_content = source.readCell();
+    return { $$type: 'UsernameNftDataView' as const, initialized: _initialized, index: _index, collection_address: _collection_address, owner_address: _owner_address, individual_content: _individual_content };
+}
+
+export function loadGetterTupleUsernameNftDataView(source: TupleReader) {
+    const _initialized = source.readBoolean();
+    const _index = source.readBigNumber();
+    const _collection_address = source.readAddress();
+    const _owner_address = source.readAddress();
+    const _individual_content = source.readCell();
+    return { $$type: 'UsernameNftDataView' as const, initialized: _initialized, index: _index, collection_address: _collection_address, owner_address: _owner_address, individual_content: _individual_content };
+}
+
+export function storeTupleUsernameNftDataView(source: UsernameNftDataView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.initialized);
+    builder.writeNumber(source.index);
+    builder.writeAddress(source.collection_address);
+    builder.writeAddress(source.owner_address);
+    builder.writeCell(source.individual_content);
+    return builder.build();
+}
+
+export function dictValueParserUsernameNftDataView(): DictionaryValue<UsernameNftDataView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameNftDataView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameNftDataView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type UsernameNftOnchainContent = {
+    $$type: 'UsernameNftOnchainContent';
+    marker: bigint;
+    metadata: Dictionary<bigint, Cell>;
+}
+
+export function storeUsernameNftOnchainContent(src: UsernameNftOnchainContent) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.marker, 8);
+        b_0.storeDict(src.metadata, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+    };
+}
+
+export function loadUsernameNftOnchainContent(slice: Slice) {
+    const sc_0 = slice;
+    const _marker = sc_0.loadUintBig(8);
+    const _metadata = Dictionary.load(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), sc_0);
+    return { $$type: 'UsernameNftOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function loadTupleUsernameNftOnchainContent(source: TupleReader) {
+    const _marker = source.readBigNumber();
+    const _metadata = Dictionary.loadDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), source.readCellOpt());
+    return { $$type: 'UsernameNftOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function loadGetterTupleUsernameNftOnchainContent(source: TupleReader) {
+    const _marker = source.readBigNumber();
+    const _metadata = Dictionary.loadDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), source.readCellOpt());
+    return { $$type: 'UsernameNftOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function storeTupleUsernameNftOnchainContent(source: UsernameNftOnchainContent) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.marker);
+    builder.writeCell(source.metadata.size > 0 ? beginCell().storeDictDirect(source.metadata, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell()).endCell() : null);
+    return builder.build();
+}
+
+export function dictValueParserUsernameNftOnchainContent(): DictionaryValue<UsernameNftOnchainContent> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameNftOnchainContent(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameNftOnchainContent(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameNFTItem$Data = {
     $$type: 'UsernameNFTItem$Data';
+    initialized: boolean;
     owner_wallet: Address;
     username_registry_address: Address;
     name_hash: bigint;
+    username_len: bigint;
+    username: Cell;
 }
 
 export function storeUsernameNFTItem$Data(src: UsernameNFTItem$Data) {
     return (builder: Builder) => {
         const b_0 = builder;
+        b_0.storeBit(src.initialized);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeAddress(src.username_registry_address);
         b_0.storeUint(src.name_hash, 256);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeRef(src.username);
     };
 }
 
 export function loadUsernameNFTItem$Data(slice: Slice) {
     const sc_0 = slice;
+    const _initialized = sc_0.loadBit();
     const _owner_wallet = sc_0.loadAddress();
     const _username_registry_address = sc_0.loadAddress();
     const _name_hash = sc_0.loadUintBig(256);
-    return { $$type: 'UsernameNFTItem$Data' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0.loadRef();
+    return { $$type: 'UsernameNFTItem$Data' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username };
 }
 
 export function loadTupleUsernameNFTItem$Data(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItem$Data' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    return { $$type: 'UsernameNFTItem$Data' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username };
 }
 
 export function loadGetterTupleUsernameNFTItem$Data(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItem$Data' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    return { $$type: 'UsernameNFTItem$Data' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username };
 }
 
 export function storeTupleUsernameNFTItem$Data(source: UsernameNFTItem$Data) {
     const builder = new TupleBuilder();
+    builder.writeBoolean(source.initialized);
     builder.writeAddress(source.owner_wallet);
     builder.writeAddress(source.username_registry_address);
     builder.writeNumber(source.name_hash);
+    builder.writeNumber(source.username_len);
+    builder.writeCell(source.username);
     return builder.build();
 }
 
@@ -1215,8 +1622,8 @@ export function dictValueParserATHGenesisSupplyAck(): DictionaryValue<ATHGenesis
 export type AthTransferNotification = {
     $$type: 'AthTransferNotification';
     query_id: bigint;
-    amount: bigint;
     sender_key: bigint;
+    amount: bigint;
     sender_wallet: Address;
 }
 
@@ -1225,8 +1632,8 @@ export function storeAthTransferNotification(src: AthTransferNotification) {
         const b_0 = builder;
         b_0.storeUint(1194171773, 32);
         b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.sender_key, 32);
         b_0.storeAddress(src.sender_wallet);
     };
 }
@@ -1235,33 +1642,33 @@ export function loadAthTransferNotification(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1194171773) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
     const _amount = sc_0.loadUintBig(128);
-    const _sender_key = sc_0.loadUintBig(32);
     const _sender_wallet = sc_0.loadAddress();
-    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, sender_wallet: _sender_wallet };
+    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, sender_wallet: _sender_wallet };
 }
 
 export function loadTupleAthTransferNotification(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _sender_wallet = source.readAddress();
-    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, sender_wallet: _sender_wallet };
+    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, sender_wallet: _sender_wallet };
 }
 
 export function loadGetterTupleAthTransferNotification(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _sender_wallet = source.readAddress();
-    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, sender_wallet: _sender_wallet };
+    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, sender_wallet: _sender_wallet };
 }
 
 export function storeTupleAthTransferNotification(source: AthTransferNotification) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
     builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
     builder.writeAddress(source.sender_wallet);
     return builder.build();
 }
@@ -1290,7 +1697,7 @@ export function storeAthTransferNotificationAck(src: AthTransferNotificationAck)
         b_0.storeUint(1194171774, 32);
         b_0.storeUint(src.query_id, 64);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.sender_key, 32);
+        b_0.storeUint(src.sender_key, 160);
     };
 }
 
@@ -1299,7 +1706,7 @@ export function loadAthTransferNotificationAck(slice: Slice) {
     if (sc_0.loadUint(32) !== 1194171774) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
     const _amount = sc_0.loadUintBig(128);
-    const _sender_key = sc_0.loadUintBig(32);
+    const _sender_key = sc_0.loadUintBig(160);
     return { $$type: 'AthTransferNotificationAck' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
 }
 
@@ -1336,6 +1743,65 @@ export function dictValueParserAthTransferNotificationAck(): DictionaryValue<Ath
     }
 }
 
+export type AthTransferNotificationRefund = {
+    $$type: 'AthTransferNotificationRefund';
+    query_id: bigint;
+    amount: bigint;
+    sender_key: bigint;
+}
+
+export function storeAthTransferNotificationRefund(src: AthTransferNotificationRefund) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042526, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeUint(src.sender_key, 160);
+    };
+}
+
+export function loadAthTransferNotificationRefund(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042526) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _sender_key = sc_0.loadUintBig(160);
+    return { $$type: 'AthTransferNotificationRefund' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
+}
+
+export function loadTupleAthTransferNotificationRefund(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationRefund' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
+}
+
+export function loadGetterTupleAthTransferNotificationRefund(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationRefund' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
+}
+
+export function storeTupleAthTransferNotificationRefund(source: AthTransferNotificationRefund) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeNumber(source.sender_key);
+    return builder.build();
+}
+
+export function dictValueParserAthTransferNotificationRefund(): DictionaryValue<AthTransferNotificationRefund> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAthTransferNotificationRefund(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAthTransferNotificationRefund(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type PruneStaleNotification = {
     $$type: 'PruneStaleNotification';
     query_id: bigint;
@@ -1347,7 +1813,7 @@ export function storePruneStaleNotification(src: PruneStaleNotification) {
         const b_0 = builder;
         b_0.storeUint(1347309650, 32);
         b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.sender_key, 32);
+        b_0.storeUint(src.sender_key, 160);
     };
 }
 
@@ -1355,7 +1821,7 @@ export function loadPruneStaleNotification(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1347309650) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
-    const _sender_key = sc_0.loadUintBig(32);
+    const _sender_key = sc_0.loadUintBig(160);
     return { $$type: 'PruneStaleNotification' as const, query_id: _query_id, sender_key: _sender_key };
 }
 
@@ -1392,8 +1858,8 @@ export function dictValueParserPruneStaleNotification(): DictionaryValue<PruneSt
 export type AthTransferNotificationMintUsername = {
     $$type: 'AthTransferNotificationMintUsername';
     query_id: bigint;
-    amount: bigint;
     sender_key: bigint;
+    amount: bigint;
     owner_wallet: Address;
     username_len: bigint;
     username: Slice;
@@ -1404,8 +1870,8 @@ export function storeAthTransferNotificationMintUsername(src: AthTransferNotific
         const b_0 = builder;
         b_0.storeUint(2299698527, 32);
         b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.sender_key, 32);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeUint(src.username_len, 8);
         b_0.storeBuilder(src.username.asBuilder());
@@ -1416,39 +1882,39 @@ export function loadAthTransferNotificationMintUsername(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2299698527) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
     const _amount = sc_0.loadUintBig(128);
-    const _sender_key = sc_0.loadUintBig(32);
     const _owner_wallet = sc_0.loadAddress();
     const _username_len = sc_0.loadUintBig(8);
     const _username = sc_0;
-    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
 export function loadTupleAthTransferNotificationMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
 export function loadGetterTupleAthTransferNotificationMintUsername(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _username_len = source.readBigNumber();
     const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
 }
 
 export function storeTupleAthTransferNotificationMintUsername(source: AthTransferNotificationMintUsername) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
     builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
     builder.writeAddress(source.owner_wallet);
     builder.writeNumber(source.username_len);
     builder.writeSlice(source.username.asCell());
@@ -1466,11 +1932,94 @@ export function dictValueParserAthTransferNotificationMintUsername(): Dictionary
     }
 }
 
+export type AthTransferNotificationVaultMintUsername = {
+    $$type: 'AthTransferNotificationVaultMintUsername';
+    query_id: bigint;
+    sender_key: bigint;
+    amount: bigint;
+    payer_wallet: Address;
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeAthTransferNotificationVaultMintUsername(src: AthTransferNotificationVaultMintUsername) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2299698528, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.payer_wallet);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeBuilder(src.username.asBuilder());
+    };
+}
+
+export function loadAthTransferNotificationVaultMintUsername(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2299698528) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
+    const _amount = sc_0.loadUintBig(128);
+    const _payer_wallet = sc_0.loadAddress();
+    const _owner_wallet = sc_0.loadAddress();
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0;
+    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleAthTransferNotificationVaultMintUsername(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _payer_wallet = source.readAddress();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleAthTransferNotificationVaultMintUsername(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _payer_wallet = source.readAddress();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'AthTransferNotificationVaultMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleAthTransferNotificationVaultMintUsername(source: AthTransferNotificationVaultMintUsername) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.payer_wallet);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserAthTransferNotificationVaultMintUsername(): DictionaryValue<AthTransferNotificationVaultMintUsername> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAthTransferNotificationVaultMintUsername(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAthTransferNotificationVaultMintUsername(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AthTransferNotificationProfileAvatar = {
     $$type: 'AthTransferNotificationProfileAvatar';
     query_id: bigint;
-    amount: bigint;
     sender_key: bigint;
+    amount: bigint;
     owner_wallet: Address;
     avatar_hash: bigint;
     avatar_entry_id: bigint;
@@ -1484,14 +2033,16 @@ export function storeAthTransferNotificationProfileAvatar(src: AthTransferNotifi
         const b_0 = builder;
         b_0.storeUint(2702864385, 32);
         b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.sender_key, 32);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeUint(src.avatar_hash, 256);
         b_0.storeUint(src.avatar_entry_id, 64);
-        b_0.storeUint(src.avatar_stream_id, 128);
-        b_0.storeUint(src.avatar_part_count, 16);
-        b_0.storeUint(src.media_format, 8);
+        const b_1 = new Builder();
+        b_1.storeUint(src.avatar_stream_id, 128);
+        b_1.storeUint(src.avatar_part_count, 16);
+        b_1.storeUint(src.media_format, 8);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -1499,48 +2050,49 @@ export function loadAthTransferNotificationProfileAvatar(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2702864385) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
     const _amount = sc_0.loadUintBig(128);
-    const _sender_key = sc_0.loadUintBig(32);
     const _owner_wallet = sc_0.loadAddress();
     const _avatar_hash = sc_0.loadUintBig(256);
     const _avatar_entry_id = sc_0.loadUintBig(64);
-    const _avatar_stream_id = sc_0.loadUintBig(128);
-    const _avatar_part_count = sc_0.loadUintBig(16);
-    const _media_format = sc_0.loadUintBig(8);
-    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _avatar_stream_id = sc_1.loadUintBig(128);
+    const _avatar_part_count = sc_1.loadUintBig(16);
+    const _media_format = sc_1.loadUintBig(8);
+    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
 export function loadTupleAthTransferNotificationProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _avatar_hash = source.readBigNumber();
     const _avatar_entry_id = source.readBigNumber();
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
 export function loadGetterTupleAthTransferNotificationProfileAvatar(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _avatar_hash = source.readBigNumber();
     const _avatar_entry_id = source.readBigNumber();
     const _avatar_stream_id = source.readBigNumber();
     const _avatar_part_count = source.readBigNumber();
     const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
 }
 
 export function storeTupleAthTransferNotificationProfileAvatar(source: AthTransferNotificationProfileAvatar) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
     builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
     builder.writeAddress(source.owner_wallet);
     builder.writeNumber(source.avatar_hash);
     builder.writeNumber(source.avatar_entry_id);
@@ -1557,6 +2109,110 @@ export function dictValueParserAthTransferNotificationProfileAvatar(): Dictionar
         },
         parse: (src) => {
             return loadAthTransferNotificationProfileAvatar(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type AthTransferNotificationVaultProfileAvatar = {
+    $$type: 'AthTransferNotificationVaultProfileAvatar';
+    query_id: bigint;
+    sender_key: bigint;
+    amount: bigint;
+    payer_wallet: Address;
+    owner_wallet: Address;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeAthTransferNotificationVaultProfileAvatar(src: AthTransferNotificationVaultProfileAvatar) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2702864386, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.payer_wallet);
+        b_0.storeAddress(src.owner_wallet);
+        const b_1 = new Builder();
+        b_1.storeUint(src.avatar_hash, 256);
+        b_1.storeUint(src.avatar_entry_id, 64);
+        b_1.storeUint(src.avatar_stream_id, 128);
+        b_1.storeUint(src.avatar_part_count, 16);
+        b_1.storeUint(src.media_format, 8);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadAthTransferNotificationVaultProfileAvatar(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2702864386) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
+    const _amount = sc_0.loadUintBig(128);
+    const _payer_wallet = sc_0.loadAddress();
+    const _owner_wallet = sc_0.loadAddress();
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _avatar_hash = sc_1.loadUintBig(256);
+    const _avatar_entry_id = sc_1.loadUintBig(64);
+    const _avatar_stream_id = sc_1.loadUintBig(128);
+    const _avatar_part_count = sc_1.loadUintBig(16);
+    const _media_format = sc_1.loadUintBig(8);
+    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleAthTransferNotificationVaultProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _payer_wallet = source.readAddress();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleAthTransferNotificationVaultProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _payer_wallet = source.readAddress();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationVaultProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, payer_wallet: _payer_wallet, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleAthTransferNotificationVaultProfileAvatar(source: AthTransferNotificationVaultProfileAvatar) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.payer_wallet);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserAthTransferNotificationVaultProfileAvatar(): DictionaryValue<AthTransferNotificationVaultProfileAvatar> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAthTransferNotificationVaultProfileAvatar(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAthTransferNotificationVaultProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
@@ -1893,6 +2549,208 @@ export function dictValueParserATHTransferRequestProfileAvatar(): DictionaryValu
     }
 }
 
+export type ATHTransferRequestVaultProfileAvatar = {
+    $$type: 'ATHTransferRequestVaultProfileAvatar';
+    query_id: bigint;
+    amount: bigint;
+    recipient: Address;
+    response_destination: Address;
+    notify_value: bigint;
+    owner_wallet: Address;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeATHTransferRequestVaultProfileAvatar(src: ATHTransferRequestVaultProfileAvatar) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042522, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.recipient);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.notify_value, 128);
+        const b_1 = new Builder();
+        b_1.storeAddress(src.owner_wallet);
+        b_1.storeUint(src.avatar_hash, 256);
+        b_1.storeUint(src.avatar_entry_id, 64);
+        b_1.storeUint(src.avatar_stream_id, 128);
+        b_1.storeUint(src.avatar_part_count, 16);
+        b_1.storeUint(src.media_format, 8);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadATHTransferRequestVaultProfileAvatar(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042522) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _recipient = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _notify_value = sc_0.loadUintBig(128);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _owner_wallet = sc_1.loadAddress();
+    const _avatar_hash = sc_1.loadUintBig(256);
+    const _avatar_entry_id = sc_1.loadUintBig(64);
+    const _avatar_stream_id = sc_1.loadUintBig(128);
+    const _avatar_part_count = sc_1.loadUintBig(16);
+    const _media_format = sc_1.loadUintBig(8);
+    return { $$type: 'ATHTransferRequestVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleATHTransferRequestVaultProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _recipient = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHTransferRequestVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleATHTransferRequestVaultProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _recipient = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHTransferRequestVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleATHTransferRequestVaultProfileAvatar(source: ATHTransferRequestVaultProfileAvatar) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.recipient);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.notify_value);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserATHTransferRequestVaultProfileAvatar(): DictionaryValue<ATHTransferRequestVaultProfileAvatar> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHTransferRequestVaultProfileAvatar(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHTransferRequestVaultProfileAvatar(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHTransferRequestVaultMintUsername = {
+    $$type: 'ATHTransferRequestVaultMintUsername';
+    query_id: bigint;
+    amount: bigint;
+    recipient: Address;
+    response_destination: Address;
+    notify_value: bigint;
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeATHTransferRequestVaultMintUsername(src: ATHTransferRequestVaultMintUsername) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042524, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.recipient);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.notify_value, 128);
+        const b_1 = new Builder();
+        b_1.storeAddress(src.owner_wallet);
+        b_1.storeUint(src.username_len, 8);
+        b_1.storeBuilder(src.username.asBuilder());
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadATHTransferRequestVaultMintUsername(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042524) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _recipient = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _notify_value = sc_0.loadUintBig(128);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _owner_wallet = sc_1.loadAddress();
+    const _username_len = sc_1.loadUintBig(8);
+    const _username = sc_1;
+    return { $$type: 'ATHTransferRequestVaultMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleATHTransferRequestVaultMintUsername(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _recipient = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'ATHTransferRequestVaultMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleATHTransferRequestVaultMintUsername(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _recipient = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'ATHTransferRequestVaultMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleATHTransferRequestVaultMintUsername(source: ATHTransferRequestVaultMintUsername) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.recipient);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.notify_value);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserATHTransferRequestVaultMintUsername(): DictionaryValue<ATHTransferRequestVaultMintUsername> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHTransferRequestVaultMintUsername(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHTransferRequestVaultMintUsername(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHInternalTransfer = {
     $$type: 'ATHInternalTransfer';
     query_id: bigint;
@@ -2221,6 +3079,208 @@ export function dictValueParserATHInternalTransferProfileAvatar(): DictionaryVal
         },
         parse: (src) => {
             return loadATHInternalTransferProfileAvatar(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHInternalTransferVaultProfileAvatar = {
+    $$type: 'ATHInternalTransferVaultProfileAvatar';
+    query_id: bigint;
+    amount: bigint;
+    sender_owner: Address;
+    response_destination: Address;
+    notify_value: bigint;
+    owner_wallet: Address;
+    avatar_hash: bigint;
+    avatar_entry_id: bigint;
+    avatar_stream_id: bigint;
+    avatar_part_count: bigint;
+    media_format: bigint;
+}
+
+export function storeATHInternalTransferVaultProfileAvatar(src: ATHInternalTransferVaultProfileAvatar) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042523, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.sender_owner);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.notify_value, 128);
+        const b_1 = new Builder();
+        b_1.storeAddress(src.owner_wallet);
+        b_1.storeUint(src.avatar_hash, 256);
+        b_1.storeUint(src.avatar_entry_id, 64);
+        b_1.storeUint(src.avatar_stream_id, 128);
+        b_1.storeUint(src.avatar_part_count, 16);
+        b_1.storeUint(src.media_format, 8);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadATHInternalTransferVaultProfileAvatar(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042523) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _sender_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _notify_value = sc_0.loadUintBig(128);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _owner_wallet = sc_1.loadAddress();
+    const _avatar_hash = sc_1.loadUintBig(256);
+    const _avatar_entry_id = sc_1.loadUintBig(64);
+    const _avatar_stream_id = sc_1.loadUintBig(128);
+    const _avatar_part_count = sc_1.loadUintBig(16);
+    const _media_format = sc_1.loadUintBig(8);
+    return { $$type: 'ATHInternalTransferVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadTupleATHInternalTransferVaultProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHInternalTransferVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function loadGetterTupleATHInternalTransferVaultProfileAvatar(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _avatar_hash = source.readBigNumber();
+    const _avatar_entry_id = source.readBigNumber();
+    const _avatar_stream_id = source.readBigNumber();
+    const _avatar_part_count = source.readBigNumber();
+    const _media_format = source.readBigNumber();
+    return { $$type: 'ATHInternalTransferVaultProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
+}
+
+export function storeTupleATHInternalTransferVaultProfileAvatar(source: ATHInternalTransferVaultProfileAvatar) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.sender_owner);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.notify_value);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.avatar_hash);
+    builder.writeNumber(source.avatar_entry_id);
+    builder.writeNumber(source.avatar_stream_id);
+    builder.writeNumber(source.avatar_part_count);
+    builder.writeNumber(source.media_format);
+    return builder.build();
+}
+
+export function dictValueParserATHInternalTransferVaultProfileAvatar(): DictionaryValue<ATHInternalTransferVaultProfileAvatar> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHInternalTransferVaultProfileAvatar(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHInternalTransferVaultProfileAvatar(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ATHInternalTransferVaultMintUsername = {
+    $$type: 'ATHInternalTransferVaultMintUsername';
+    query_id: bigint;
+    amount: bigint;
+    sender_owner: Address;
+    response_destination: Address;
+    notify_value: bigint;
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeATHInternalTransferVaultMintUsername(src: ATHInternalTransferVaultMintUsername) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042525, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeAddress(src.sender_owner);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.notify_value, 128);
+        const b_1 = new Builder();
+        b_1.storeAddress(src.owner_wallet);
+        b_1.storeUint(src.username_len, 8);
+        b_1.storeBuilder(src.username.asBuilder());
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadATHInternalTransferVaultMintUsername(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042525) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _sender_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _notify_value = sc_0.loadUintBig(128);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _owner_wallet = sc_1.loadAddress();
+    const _username_len = sc_1.loadUintBig(8);
+    const _username = sc_1;
+    return { $$type: 'ATHInternalTransferVaultMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleATHInternalTransferVaultMintUsername(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'ATHInternalTransferVaultMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleATHInternalTransferVaultMintUsername(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _notify_value = source.readBigNumber();
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'ATHInternalTransferVaultMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleATHInternalTransferVaultMintUsername(source: ATHInternalTransferVaultMintUsername) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeAddress(source.sender_owner);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.notify_value);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserATHInternalTransferVaultMintUsername(): DictionaryValue<ATHInternalTransferVaultMintUsername> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHInternalTransferVaultMintUsername(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHInternalTransferVaultMintUsername(src.loadRef().beginParse());
         }
     }
 }
@@ -2664,6 +3724,7 @@ export type PendingAthTransferNotificationView = {
     $$type: 'PendingAthTransferNotificationView';
     exists: boolean;
     sender_owner: Address;
+    response_destination: Address;
     amount: bigint;
     created_at: bigint;
 }
@@ -2673,8 +3734,11 @@ export function storePendingAthTransferNotificationView(src: PendingAthTransferN
         const b_0 = builder;
         b_0.storeBit(src.exists);
         b_0.storeAddress(src.sender_owner);
+        b_0.storeAddress(src.response_destination);
         b_0.storeInt(src.amount, 257);
-        b_0.storeInt(src.created_at, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.created_at, 257);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -2682,31 +3746,36 @@ export function loadPendingAthTransferNotificationView(slice: Slice) {
     const sc_0 = slice;
     const _exists = sc_0.loadBit();
     const _sender_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
     const _amount = sc_0.loadIntBig(257);
-    const _created_at = sc_0.loadIntBig(257);
-    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _created_at = sc_1.loadIntBig(257);
+    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, response_destination: _response_destination, amount: _amount, created_at: _created_at };
 }
 
 export function loadTuplePendingAthTransferNotificationView(source: TupleReader) {
     const _exists = source.readBoolean();
     const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
     const _amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, response_destination: _response_destination, amount: _amount, created_at: _created_at };
 }
 
 export function loadGetterTuplePendingAthTransferNotificationView(source: TupleReader) {
     const _exists = source.readBoolean();
     const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
     const _amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthTransferNotificationView' as const, exists: _exists, sender_owner: _sender_owner, response_destination: _response_destination, amount: _amount, created_at: _created_at };
 }
 
 export function storeTuplePendingAthTransferNotificationView(source: PendingAthTransferNotificationView) {
     const builder = new TupleBuilder();
     builder.writeBoolean(source.exists);
     builder.writeAddress(source.sender_owner);
+    builder.writeAddress(source.response_destination);
     builder.writeNumber(source.amount);
     builder.writeNumber(source.created_at);
     return builder.build();
@@ -2726,6 +3795,8 @@ export function dictValueParserPendingAthTransferNotificationView(): DictionaryV
 export type PendingAthTransferNotification = {
     $$type: 'PendingAthTransferNotification';
     sender_owner: Address;
+    response_destination: Address;
+    response_ack_value: bigint;
     amount: bigint;
     created_at: bigint;
 }
@@ -2734,6 +3805,8 @@ export function storePendingAthTransferNotification(src: PendingAthTransferNotif
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeAddress(src.sender_owner);
+        b_0.storeAddress(src.response_destination);
+        b_0.storeUint(src.response_ack_value, 64);
         b_0.storeUint(src.amount, 128);
         b_0.storeUint(src.created_at, 32);
     };
@@ -2742,28 +3815,36 @@ export function storePendingAthTransferNotification(src: PendingAthTransferNotif
 export function loadPendingAthTransferNotification(slice: Slice) {
     const sc_0 = slice;
     const _sender_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _response_ack_value = sc_0.loadUintBig(64);
     const _amount = sc_0.loadUintBig(128);
     const _created_at = sc_0.loadUintBig(32);
-    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, response_destination: _response_destination, response_ack_value: _response_ack_value, amount: _amount, created_at: _created_at };
 }
 
 export function loadTuplePendingAthTransferNotification(source: TupleReader) {
     const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _response_ack_value = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, response_destination: _response_destination, response_ack_value: _response_ack_value, amount: _amount, created_at: _created_at };
 }
 
 export function loadGetterTuplePendingAthTransferNotification(source: TupleReader) {
     const _sender_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _response_ack_value = source.readBigNumber();
     const _amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, amount: _amount, created_at: _created_at };
+    return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, response_destination: _response_destination, response_ack_value: _response_ack_value, amount: _amount, created_at: _created_at };
 }
 
 export function storeTuplePendingAthTransferNotification(source: PendingAthTransferNotification) {
     const builder = new TupleBuilder();
     builder.writeAddress(source.sender_owner);
+    builder.writeAddress(source.response_destination);
+    builder.writeNumber(source.response_ack_value);
     builder.writeNumber(source.amount);
     builder.writeNumber(source.created_at);
     return builder.build();
@@ -2850,7 +3931,6 @@ export type ATHWallet$Data = {
     ath_master_address: Address;
     pending_notifications: Dictionary<bigint, PendingAthTransferNotification>;
     processed_notifications: Dictionary<bigint, bigint>;
-    pruned_notification_acks: Dictionary<bigint, bigint>;
     pending_outgoing_transfers: Dictionary<bigint, PendingAthOutgoingTransfer>;
 }
 
@@ -2862,10 +3942,7 @@ export function storeATHWallet$Data(src: ATHWallet$Data) {
         b_0.storeAddress(src.ath_master_address);
         b_0.storeDict(src.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification());
         b_0.storeDict(src.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
-        const b_1 = new Builder();
-        b_1.storeDict(src.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
-        b_1.storeDict(src.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer());
-        b_0.storeRef(b_1.endCell());
+        b_0.storeDict(src.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer());
     };
 }
 
@@ -2876,10 +3953,8 @@ export function loadATHWallet$Data(slice: Slice) {
     const _ath_master_address = sc_0.loadAddress();
     const _pending_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), sc_0);
     const _processed_notifications = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_0);
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _pruned_notification_acks = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_1);
-    const _pending_outgoing_transfers = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), sc_1);
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks, pending_outgoing_transfers: _pending_outgoing_transfers };
+    const _pending_outgoing_transfers = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), sc_0);
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function loadTupleATHWallet$Data(source: TupleReader) {
@@ -2888,9 +3963,8 @@ export function loadTupleATHWallet$Data(source: TupleReader) {
     const _ath_master_address = source.readAddress();
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
     const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _pruned_notification_acks = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_outgoing_transfers = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks, pending_outgoing_transfers: _pending_outgoing_transfers };
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function loadGetterTupleATHWallet$Data(source: TupleReader) {
@@ -2899,9 +3973,8 @@ export function loadGetterTupleATHWallet$Data(source: TupleReader) {
     const _ath_master_address = source.readAddress();
     const _pending_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification(), source.readCellOpt());
     const _processed_notifications = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _pruned_notification_acks = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_outgoing_transfers = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer(), source.readCellOpt());
-    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pruned_notification_acks: _pruned_notification_acks, pending_outgoing_transfers: _pending_outgoing_transfers };
+    return { $$type: 'ATHWallet$Data' as const, balance: _balance, owner_address: _owner_address, ath_master_address: _ath_master_address, pending_notifications: _pending_notifications, processed_notifications: _processed_notifications, pending_outgoing_transfers: _pending_outgoing_transfers };
 }
 
 export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
@@ -2911,7 +3984,6 @@ export function storeTupleATHWallet$Data(source: ATHWallet$Data) {
     builder.writeAddress(source.ath_master_address);
     builder.writeCell(source.pending_notifications.size > 0 ? beginCell().storeDictDirect(source.pending_notifications, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTransferNotification()).endCell() : null);
     builder.writeCell(source.processed_notifications.size > 0 ? beginCell().storeDictDirect(source.processed_notifications, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
-    builder.writeCell(source.pruned_notification_acks.size > 0 ? beginCell().storeDictDirect(source.pruned_notification_acks, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
     builder.writeCell(source.pending_outgoing_transfers.size > 0 ? beginCell().storeDictDirect(source.pending_outgoing_transfers, Dictionary.Keys.BigInt(257), dictValueParserPendingAthOutgoingTransfer()).endCell() : null);
     return builder.build();
 }
@@ -2976,6 +4048,59 @@ export function dictValueParserBindOfficialAthWallet(): DictionaryValue<BindOffi
         },
         parse: (src) => {
             return loadBindOfficialAthWallet(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type BindUsernameVault = {
+    $$type: 'BindUsernameVault';
+    deployment_manifest_hash: bigint;
+    vault_address: Address;
+}
+
+export function storeBindUsernameVault(src: BindUsernameVault) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1621496068, 32);
+        b_0.storeUint(src.deployment_manifest_hash, 256);
+        b_0.storeAddress(src.vault_address);
+    };
+}
+
+export function loadBindUsernameVault(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1621496068) { throw Error('Invalid prefix'); }
+    const _deployment_manifest_hash = sc_0.loadUintBig(256);
+    const _vault_address = sc_0.loadAddress();
+    return { $$type: 'BindUsernameVault' as const, deployment_manifest_hash: _deployment_manifest_hash, vault_address: _vault_address };
+}
+
+export function loadTupleBindUsernameVault(source: TupleReader) {
+    const _deployment_manifest_hash = source.readBigNumber();
+    const _vault_address = source.readAddress();
+    return { $$type: 'BindUsernameVault' as const, deployment_manifest_hash: _deployment_manifest_hash, vault_address: _vault_address };
+}
+
+export function loadGetterTupleBindUsernameVault(source: TupleReader) {
+    const _deployment_manifest_hash = source.readBigNumber();
+    const _vault_address = source.readAddress();
+    return { $$type: 'BindUsernameVault' as const, deployment_manifest_hash: _deployment_manifest_hash, vault_address: _vault_address };
+}
+
+export function storeTupleBindUsernameVault(source: BindUsernameVault) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.deployment_manifest_hash);
+    builder.writeAddress(source.vault_address);
+    return builder.build();
+}
+
+export function dictValueParserBindUsernameVault(): DictionaryValue<BindUsernameVault> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeBindUsernameVault(src)).endCell());
+        },
+        parse: (src) => {
+            return loadBindUsernameVault(src.loadRef().beginParse());
         }
     }
 }
@@ -3264,68 +4389,86 @@ export function dictValueParserUsernameRegistryTopUpStorageReserve(): Dictionary
 
 export type PendingUsernameMint = {
     $$type: 'PendingUsernameMint';
+    query_id: bigint;
+    sender_key: bigint;
     owner_wallet: Address;
     name_hash: bigint;
     price_paid: bigint;
     item_address: Address;
     item_deploy_value: bigint;
     created_at: bigint;
+    vault_funded: boolean;
 }
 
 export function storePendingUsernameMint(src: PendingUsernameMint) {
     return (builder: Builder) => {
         const b_0 = builder;
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeUint(src.name_hash, 256);
         b_0.storeUint(src.price_paid, 128);
-        b_0.storeAddress(src.item_address);
         const b_1 = new Builder();
+        b_1.storeAddress(src.item_address);
         b_1.storeUint(src.item_deploy_value, 128);
         b_1.storeUint(src.created_at, 32);
+        b_1.storeBit(src.vault_funded);
         b_0.storeRef(b_1.endCell());
     };
 }
 
 export function loadPendingUsernameMint(slice: Slice) {
     const sc_0 = slice;
+    const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
     const _owner_wallet = sc_0.loadAddress();
     const _name_hash = sc_0.loadUintBig(256);
     const _price_paid = sc_0.loadUintBig(128);
-    const _item_address = sc_0.loadAddress();
     const sc_1 = sc_0.loadRef().beginParse();
+    const _item_address = sc_1.loadAddress();
     const _item_deploy_value = sc_1.loadUintBig(128);
     const _created_at = sc_1.loadUintBig(32);
-    return { $$type: 'PendingUsernameMint' as const, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
+    const _vault_funded = sc_1.loadBit();
+    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
 }
 
 export function loadTuplePendingUsernameMint(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _name_hash = source.readBigNumber();
     const _price_paid = source.readBigNumber();
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingUsernameMint' as const, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
+    const _vault_funded = source.readBoolean();
+    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
 }
 
 export function loadGetterTuplePendingUsernameMint(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _name_hash = source.readBigNumber();
     const _price_paid = source.readBigNumber();
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingUsernameMint' as const, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
+    const _vault_funded = source.readBoolean();
+    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
 }
 
 export function storeTuplePendingUsernameMint(source: PendingUsernameMint) {
     const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
     builder.writeAddress(source.owner_wallet);
     builder.writeNumber(source.name_hash);
     builder.writeNumber(source.price_paid);
     builder.writeAddress(source.item_address);
     builder.writeNumber(source.item_deploy_value);
     builder.writeNumber(source.created_at);
+    builder.writeBoolean(source.vault_funded);
     return builder.build();
 }
 
@@ -3401,9 +4544,11 @@ export type UsernameRegistryGlobalView = {
     $$type: 'UsernameRegistryGlobalView';
     sealed: boolean;
     official_ath_wallet_bound: boolean;
+    vault_bound: boolean;
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
     official_ath_wallet_address: Address;
+    vault_address: Address;
     genesis_controller_address: Address;
     name_record_count: bigint;
     pending_mint_count: bigint;
@@ -3421,22 +4566,24 @@ export function storeUsernameRegistryGlobalView(src: UsernameRegistryGlobalView)
         const b_0 = builder;
         b_0.storeBit(src.sealed);
         b_0.storeBit(src.official_ath_wallet_bound);
+        b_0.storeBit(src.vault_bound);
         b_0.storeInt(src.deployment_manifest_hash, 257);
         b_0.storeInt(src.genesis_config_hash, 257);
         b_0.storeAddress(src.official_ath_wallet_address);
         const b_1 = new Builder();
+        b_1.storeAddress(src.vault_address);
         b_1.storeAddress(src.genesis_controller_address);
         b_1.storeInt(src.name_record_count, 257);
-        b_1.storeInt(src.pending_mint_count, 257);
         const b_2 = new Builder();
+        b_2.storeInt(src.pending_mint_count, 257);
         b_2.storeInt(src.refund_due_count, 257);
         b_2.storeInt(src.treasury_due_ath, 257);
-        b_2.storeInt(src.burn_due_ath, 257);
         const b_3 = new Builder();
+        b_3.storeInt(src.burn_due_ath, 257);
         b_3.storeInt(src.pending_refund_flush_count, 257);
         b_3.storeInt(src.pending_treasury_flush_count, 257);
-        b_3.storeInt(src.pending_burn_flush_count, 257);
         const b_4 = new Builder();
+        b_4.storeInt(src.pending_burn_flush_count, 257);
         b_4.storeInt(src.pending_mint_stale_ttl, 257);
         b_3.storeRef(b_4.endCell());
         b_2.storeRef(b_3.endCell());
@@ -3449,32 +4596,36 @@ export function loadUsernameRegistryGlobalView(slice: Slice) {
     const sc_0 = slice;
     const _sealed = sc_0.loadBit();
     const _official_ath_wallet_bound = sc_0.loadBit();
+    const _vault_bound = sc_0.loadBit();
     const _deployment_manifest_hash = sc_0.loadIntBig(257);
     const _genesis_config_hash = sc_0.loadIntBig(257);
     const _official_ath_wallet_address = sc_0.loadAddress();
     const sc_1 = sc_0.loadRef().beginParse();
+    const _vault_address = sc_1.loadAddress();
     const _genesis_controller_address = sc_1.loadAddress();
     const _name_record_count = sc_1.loadIntBig(257);
-    const _pending_mint_count = sc_1.loadIntBig(257);
     const sc_2 = sc_1.loadRef().beginParse();
+    const _pending_mint_count = sc_2.loadIntBig(257);
     const _refund_due_count = sc_2.loadIntBig(257);
     const _treasury_due_ath = sc_2.loadIntBig(257);
-    const _burn_due_ath = sc_2.loadIntBig(257);
     const sc_3 = sc_2.loadRef().beginParse();
+    const _burn_due_ath = sc_3.loadIntBig(257);
     const _pending_refund_flush_count = sc_3.loadIntBig(257);
     const _pending_treasury_flush_count = sc_3.loadIntBig(257);
-    const _pending_burn_flush_count = sc_3.loadIntBig(257);
     const sc_4 = sc_3.loadRef().beginParse();
+    const _pending_burn_flush_count = sc_4.loadIntBig(257);
     const _pending_mint_stale_ttl = sc_4.loadIntBig(257);
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function loadTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _sealed = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
+    const _vault_bound = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
     const _official_ath_wallet_address = source.readAddress();
+    const _vault_address = source.readAddress();
     const _genesis_controller_address = source.readAddress();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
@@ -3482,18 +4633,21 @@ export function loadTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
     const _pending_refund_flush_count = source.readBigNumber();
+    source = source.readTuple();
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
     const _pending_mint_stale_ttl = source.readBigNumber();
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function loadGetterTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _sealed = source.readBoolean();
     const _official_ath_wallet_bound = source.readBoolean();
+    const _vault_bound = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
     const _official_ath_wallet_address = source.readAddress();
+    const _vault_address = source.readAddress();
     const _genesis_controller_address = source.readAddress();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
@@ -3504,16 +4658,18 @@ export function loadGetterTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
     const _pending_mint_stale_ttl = source.readBigNumber();
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function storeTupleUsernameRegistryGlobalView(source: UsernameRegistryGlobalView) {
     const builder = new TupleBuilder();
     builder.writeBoolean(source.sealed);
     builder.writeBoolean(source.official_ath_wallet_bound);
+    builder.writeBoolean(source.vault_bound);
     builder.writeNumber(source.deployment_manifest_hash);
     builder.writeNumber(source.genesis_config_hash);
     builder.writeAddress(source.official_ath_wallet_address);
+    builder.writeAddress(source.vault_address);
     builder.writeAddress(source.genesis_controller_address);
     builder.writeNumber(source.name_record_count);
     builder.writeNumber(source.pending_mint_count);
@@ -3655,25 +4811,33 @@ export function dictValueParserUsernameNameRecordView(): DictionaryValue<Usernam
 export type PendingUsernameMintView = {
     $$type: 'PendingUsernameMintView';
     exists: boolean;
+    query_id: bigint;
+    sender_key: bigint;
     owner_wallet: Address;
     name_hash: bigint;
     price_paid: bigint;
     item_address: Address;
     item_deploy_value: bigint;
     created_at: bigint;
+    vault_funded: boolean;
 }
 
 export function storePendingUsernameMintView(src: PendingUsernameMintView) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeBit(src.exists);
+        b_0.storeInt(src.query_id, 257);
+        b_0.storeInt(src.sender_key, 257);
         b_0.storeAddress(src.owner_wallet);
-        b_0.storeInt(src.name_hash, 257);
-        b_0.storeInt(src.price_paid, 257);
         const b_1 = new Builder();
+        b_1.storeInt(src.name_hash, 257);
+        b_1.storeInt(src.price_paid, 257);
         b_1.storeAddress(src.item_address);
-        b_1.storeInt(src.item_deploy_value, 257);
-        b_1.storeInt(src.created_at, 257);
+        const b_2 = new Builder();
+        b_2.storeInt(src.item_deploy_value, 257);
+        b_2.storeInt(src.created_at, 257);
+        b_2.storeBit(src.vault_funded);
+        b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -3681,47 +4845,60 @@ export function storePendingUsernameMintView(src: PendingUsernameMintView) {
 export function loadPendingUsernameMintView(slice: Slice) {
     const sc_0 = slice;
     const _exists = sc_0.loadBit();
+    const _query_id = sc_0.loadIntBig(257);
+    const _sender_key = sc_0.loadIntBig(257);
     const _owner_wallet = sc_0.loadAddress();
-    const _name_hash = sc_0.loadIntBig(257);
-    const _price_paid = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _name_hash = sc_1.loadIntBig(257);
+    const _price_paid = sc_1.loadIntBig(257);
     const _item_address = sc_1.loadAddress();
-    const _item_deploy_value = sc_1.loadIntBig(257);
-    const _created_at = sc_1.loadIntBig(257);
-    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
+    const sc_2 = sc_1.loadRef().beginParse();
+    const _item_deploy_value = sc_2.loadIntBig(257);
+    const _created_at = sc_2.loadIntBig(257);
+    const _vault_funded = sc_2.loadBit();
+    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
 }
 
 export function loadTuplePendingUsernameMintView(source: TupleReader) {
     const _exists = source.readBoolean();
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _name_hash = source.readBigNumber();
     const _price_paid = source.readBigNumber();
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
+    const _vault_funded = source.readBoolean();
+    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
 }
 
 export function loadGetterTuplePendingUsernameMintView(source: TupleReader) {
     const _exists = source.readBoolean();
+    const _query_id = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
     const _owner_wallet = source.readAddress();
     const _name_hash = source.readBigNumber();
     const _price_paid = source.readBigNumber();
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
+    const _vault_funded = source.readBoolean();
+    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
 }
 
 export function storeTuplePendingUsernameMintView(source: PendingUsernameMintView) {
     const builder = new TupleBuilder();
     builder.writeBoolean(source.exists);
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.sender_key);
     builder.writeAddress(source.owner_wallet);
     builder.writeNumber(source.name_hash);
     builder.writeNumber(source.price_paid);
     builder.writeAddress(source.item_address);
     builder.writeNumber(source.item_deploy_value);
     builder.writeNumber(source.created_at);
+    builder.writeBoolean(source.vault_funded);
     return builder.build();
 }
 
@@ -4099,12 +5276,122 @@ export function dictValueParserPendingAthBurnFlushView(): DictionaryValue<Pendin
     }
 }
 
+export type UsernameCollectionDataView = {
+    $$type: 'UsernameCollectionDataView';
+    next_item_index: bigint;
+    collection_content: Cell;
+    owner_address: Address;
+}
+
+export function storeUsernameCollectionDataView(src: UsernameCollectionDataView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeInt(src.next_item_index, 257);
+        b_0.storeRef(src.collection_content);
+        b_0.storeAddress(src.owner_address);
+    };
+}
+
+export function loadUsernameCollectionDataView(slice: Slice) {
+    const sc_0 = slice;
+    const _next_item_index = sc_0.loadIntBig(257);
+    const _collection_content = sc_0.loadRef();
+    const _owner_address = sc_0.loadAddress();
+    return { $$type: 'UsernameCollectionDataView' as const, next_item_index: _next_item_index, collection_content: _collection_content, owner_address: _owner_address };
+}
+
+export function loadTupleUsernameCollectionDataView(source: TupleReader) {
+    const _next_item_index = source.readBigNumber();
+    const _collection_content = source.readCell();
+    const _owner_address = source.readAddress();
+    return { $$type: 'UsernameCollectionDataView' as const, next_item_index: _next_item_index, collection_content: _collection_content, owner_address: _owner_address };
+}
+
+export function loadGetterTupleUsernameCollectionDataView(source: TupleReader) {
+    const _next_item_index = source.readBigNumber();
+    const _collection_content = source.readCell();
+    const _owner_address = source.readAddress();
+    return { $$type: 'UsernameCollectionDataView' as const, next_item_index: _next_item_index, collection_content: _collection_content, owner_address: _owner_address };
+}
+
+export function storeTupleUsernameCollectionDataView(source: UsernameCollectionDataView) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.next_item_index);
+    builder.writeCell(source.collection_content);
+    builder.writeAddress(source.owner_address);
+    return builder.build();
+}
+
+export function dictValueParserUsernameCollectionDataView(): DictionaryValue<UsernameCollectionDataView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameCollectionDataView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameCollectionDataView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type UsernameCollectionOnchainContent = {
+    $$type: 'UsernameCollectionOnchainContent';
+    marker: bigint;
+    metadata: Dictionary<bigint, Cell>;
+}
+
+export function storeUsernameCollectionOnchainContent(src: UsernameCollectionOnchainContent) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.marker, 8);
+        b_0.storeDict(src.metadata, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+    };
+}
+
+export function loadUsernameCollectionOnchainContent(slice: Slice) {
+    const sc_0 = slice;
+    const _marker = sc_0.loadUintBig(8);
+    const _metadata = Dictionary.load(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), sc_0);
+    return { $$type: 'UsernameCollectionOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function loadTupleUsernameCollectionOnchainContent(source: TupleReader) {
+    const _marker = source.readBigNumber();
+    const _metadata = Dictionary.loadDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), source.readCellOpt());
+    return { $$type: 'UsernameCollectionOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function loadGetterTupleUsernameCollectionOnchainContent(source: TupleReader) {
+    const _marker = source.readBigNumber();
+    const _metadata = Dictionary.loadDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), source.readCellOpt());
+    return { $$type: 'UsernameCollectionOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function storeTupleUsernameCollectionOnchainContent(source: UsernameCollectionOnchainContent) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.marker);
+    builder.writeCell(source.metadata.size > 0 ? beginCell().storeDictDirect(source.metadata, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell()).endCell() : null);
+    return builder.build();
+}
+
+export function dictValueParserUsernameCollectionOnchainContent(): DictionaryValue<UsernameCollectionOnchainContent> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameCollectionOnchainContent(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameCollectionOnchainContent(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameRegistry$Data = {
     $$type: 'UsernameRegistry$Data';
     official_ath_wallet_address: Address;
+    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     official_ath_wallet_bound: boolean;
+    vault_bound: boolean;
     sealed: boolean;
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
@@ -4130,30 +5417,34 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeAddress(src.official_ath_wallet_address);
+        b_0.storeAddress(src.vault_address);
         b_0.storeAddress(src.ath_master_address);
-        b_0.storeAddress(src.treasury_ath_receiver_address);
-        b_0.storeBit(src.official_ath_wallet_bound);
-        b_0.storeBit(src.sealed);
         const b_1 = new Builder();
+        b_1.storeAddress(src.treasury_ath_receiver_address);
+        b_1.storeBit(src.official_ath_wallet_bound);
+        b_1.storeBit(src.vault_bound);
+        b_1.storeBit(src.sealed);
         b_1.storeUint(src.deployment_manifest_hash, 256);
         b_1.storeUint(src.genesis_config_hash, 256);
         b_1.storeUint(src.name_record_count, 64);
         b_1.storeUint(src.pending_mint_count, 64);
         b_1.storeUint(src.refund_due_count, 64);
-        b_1.storeUint(src.treasury_due_ath, 128);
-        b_1.storeUint(src.burn_due_ath, 128);
-        b_1.storeDict(src.name_records, Dictionary.Keys.BigInt(257), dictValueParserNameRecord());
-        b_1.storeDict(src.pending_mints, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint());
-        b_1.storeDict(src.pending_item_to_name_hash, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
         const b_2 = new Builder();
-        b_2.storeDict(src.ath_refunds_due, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
-        b_2.storeDict(src.pending_refund_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush());
-        b_2.storeUint(src.pending_refund_flush_count, 64);
-        b_2.storeDict(src.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush());
-        b_2.storeUint(src.pending_treasury_flush_count, 64);
-        b_2.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush());
-        b_2.storeUint(src.pending_burn_flush_count, 64);
-        b_2.storeAddress(src.genesis_controller_address);
+        b_2.storeUint(src.treasury_due_ath, 128);
+        b_2.storeUint(src.burn_due_ath, 128);
+        b_2.storeDict(src.name_records, Dictionary.Keys.BigInt(257), dictValueParserNameRecord());
+        b_2.storeDict(src.pending_mints, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint());
+        b_2.storeDict(src.pending_item_to_name_hash, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
+        const b_3 = new Builder();
+        b_3.storeDict(src.ath_refunds_due, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
+        b_3.storeDict(src.pending_refund_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush());
+        b_3.storeUint(src.pending_refund_flush_count, 64);
+        b_3.storeDict(src.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush());
+        b_3.storeUint(src.pending_treasury_flush_count, 64);
+        b_3.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush());
+        b_3.storeUint(src.pending_burn_flush_count, 64);
+        b_3.storeAddress(src.genesis_controller_address);
+        b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
@@ -4162,38 +5453,43 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
 export function loadUsernameRegistry$Data(slice: Slice) {
     const sc_0 = slice;
     const _official_ath_wallet_address = sc_0.loadAddress();
+    const _vault_address = sc_0.loadAddress();
     const _ath_master_address = sc_0.loadAddress();
-    const _treasury_ath_receiver_address = sc_0.loadAddress();
-    const _official_ath_wallet_bound = sc_0.loadBit();
-    const _sealed = sc_0.loadBit();
     const sc_1 = sc_0.loadRef().beginParse();
+    const _treasury_ath_receiver_address = sc_1.loadAddress();
+    const _official_ath_wallet_bound = sc_1.loadBit();
+    const _vault_bound = sc_1.loadBit();
+    const _sealed = sc_1.loadBit();
     const _deployment_manifest_hash = sc_1.loadUintBig(256);
     const _genesis_config_hash = sc_1.loadUintBig(256);
     const _name_record_count = sc_1.loadUintBig(64);
     const _pending_mint_count = sc_1.loadUintBig(64);
     const _refund_due_count = sc_1.loadUintBig(64);
-    const _treasury_due_ath = sc_1.loadUintBig(128);
-    const _burn_due_ath = sc_1.loadUintBig(128);
-    const _name_records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), sc_1);
-    const _pending_mints = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), sc_1);
-    const _pending_item_to_name_hash = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_1);
     const sc_2 = sc_1.loadRef().beginParse();
-    const _ath_refunds_due = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_2);
-    const _pending_refund_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush(), sc_2);
-    const _pending_refund_flush_count = sc_2.loadUintBig(64);
-    const _pending_treasury_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), sc_2);
-    const _pending_treasury_flush_count = sc_2.loadUintBig(64);
-    const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), sc_2);
-    const _pending_burn_flush_count = sc_2.loadUintBig(64);
-    const _genesis_controller_address = sc_2.loadAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    const _treasury_due_ath = sc_2.loadUintBig(128);
+    const _burn_due_ath = sc_2.loadUintBig(128);
+    const _name_records = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), sc_2);
+    const _pending_mints = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), sc_2);
+    const _pending_item_to_name_hash = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_2);
+    const sc_3 = sc_2.loadRef().beginParse();
+    const _ath_refunds_due = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_3);
+    const _pending_refund_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush(), sc_3);
+    const _pending_refund_flush_count = sc_3.loadUintBig(64);
+    const _pending_treasury_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), sc_3);
+    const _pending_treasury_flush_count = sc_3.loadUintBig(64);
+    const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), sc_3);
+    const _pending_burn_flush_count = sc_3.loadUintBig(64);
+    const _genesis_controller_address = sc_3.loadAddress();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
 }
 
 export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _official_ath_wallet_address = source.readAddress();
+    const _vault_address = source.readAddress();
     const _ath_master_address = source.readAddress();
     const _treasury_ath_receiver_address = source.readAddress();
     const _official_ath_wallet_bound = source.readBoolean();
+    const _vault_bound = source.readBoolean();
     const _sealed = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
@@ -4202,9 +5498,9 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _refund_due_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
+    source = source.readTuple();
     const _name_records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), source.readCellOpt());
     const _pending_mints = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), source.readCellOpt());
-    source = source.readTuple();
     const _pending_item_to_name_hash = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _ath_refunds_due = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_refund_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush(), source.readCellOpt());
@@ -4214,14 +5510,16 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
 }
 
 export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _official_ath_wallet_address = source.readAddress();
+    const _vault_address = source.readAddress();
     const _ath_master_address = source.readAddress();
     const _treasury_ath_receiver_address = source.readAddress();
     const _official_ath_wallet_bound = source.readBoolean();
+    const _vault_bound = source.readBoolean();
     const _sealed = source.readBoolean();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
@@ -4241,15 +5539,17 @@ export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
 }
 
 export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
     const builder = new TupleBuilder();
     builder.writeAddress(source.official_ath_wallet_address);
+    builder.writeAddress(source.vault_address);
     builder.writeAddress(source.ath_master_address);
     builder.writeAddress(source.treasury_ath_receiver_address);
     builder.writeBoolean(source.official_ath_wallet_bound);
+    builder.writeBoolean(source.vault_bound);
     builder.writeBoolean(source.sealed);
     builder.writeNumber(source.deployment_manifest_hash);
     builder.writeNumber(source.genesis_config_hash);
@@ -4285,7 +5585,6 @@ export function dictValueParserUsernameRegistry$Data(): DictionaryValue<Username
 
  type UsernameNFTItem_init_args = {
     $$type: 'UsernameNFTItem_init_args';
-    owner_wallet: Address;
     username_registry_address: Address;
     name_hash: bigint;
 }
@@ -4293,17 +5592,16 @@ export function dictValueParserUsernameRegistry$Data(): DictionaryValue<Username
 function initUsernameNFTItem_init_args(src: UsernameNFTItem_init_args) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeAddress(src.owner_wallet);
         b_0.storeAddress(src.username_registry_address);
         b_0.storeInt(src.name_hash, 257);
     };
 }
 
-async function UsernameNFTItem_init(owner_wallet: Address, username_registry_address: Address, name_hash: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241020801000164000114ff00f4a413f4bcf2c80b01020162020603f2d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40fa40d3ff55206c138e16fa40fa40810101d700552003d15881465121c300f2f4e204925f04e07023d74920c21f953103d31f309134e2208210639cfc6cbae30220821027acdf8bbae302c00003c12113b0e3025f03f2c08203040500d83032814652f8416f24135f0382083d0900bef2f4814653f8416f24135f038209312d00bbf2f482082dc6c07f715353c8598210bba3ec195003cb1fcbffcec92555304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002c87f01ca0055205023cececbffc9ed540026303202c87f01ca0055205023cececbffc9ed54002c8146b3f2f002c87f01ca0055205023cececbffc9ed540161a0a75bda89a1a4000335f481f481a7feaa40d8271c2df481f481020203ae00aa4007a2b1028ca2438601e5e9c5b678d86707000654721038462d62');
+async function UsernameNFTItem_init(username_registry_address: Address, name_hash: bigint) {
+    const __code = Cell.fromHex('b5ee9c7241021a0100053c000114ff00f4a413f4bcf2c80b01020162021003f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019fd200fa40fa40d3ffd307d455506c168e1cfa40810101d7005902d10181465121c300f2f4702270c8c910351024e207925f07e07026d74920c21f953106d31f07de218210554e494ebae302218210639cfc6cbae3022182105fcc3d14ba03080a04c05b05fa40d30781465af84226c705f2f481465b27b3f2f410465e32505781465c5197db3c1af2f481465d543968db3c1af2f481465e5198db3c355b335112ba16f2f481465ff8416f24135f0382083d0900bef2f47fc85005cf16c910451034120c04060701deeda2edfb555127db3c936c2670e126d74928aa02bd936c2670e026c702936c2670e170935308b98e3907d30721c2609321c17b9170e222c22f9322c13a9170e223c02d92337f9303c05fe20192327f9102e292317f9101e296306c2670db31e107a4e8303705c7001046103544301205001420c20392c111923070e20020c88210c5cc7cd601cb1f01cf16c9f9000130db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed540901905b3581466424f2f4814665f8416f24135f0382083d0900bef2f4814666f8416f24135f038209312d00bbf2f410355512db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed5409006a82082dc6c07f715357c8598210bba3ec195003cb1fcbffcec92755304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001b0e3023720821027acdf8bba8e1c303510355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e0c00006c12116b08e1f8146b3f2f010355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e05f06f2c0820b04fe5b05d33ffa40fa40f40431fa0081466e29f2f481466ff84229c705f2f410481037465981467051b8db3c1cf2f481467151b7db3c1cf2f481467226c2fff2f4814673f8416f24135f0382081e848028a08208989680a0bef2f45375c20095102a343730e30df8416f24135f0382081e84805005a08208989680a0820186a0a00c0c0d0f000afa4430c000018a1045431371502c700cdb3c544b88c85520821005138d915004cb1f12cb3fcecec927104a4d1350cc441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004108050e001820c700973070c8ca00c9d0e000a814be8e337080407008c8018210d53276db58cb1fcb3fc91046413018441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013923334e2034445c87f01ca0055505056ca0013cececbffcb07ccc9ed5402012011140177be9d6f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3633c1201285475435475435555db3c106c105b104a1039487013001a21c0049171e021c0059172e0730177bc7e7f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3632c150130547523271059104810374698db3c104810374a90106a10591603f655226d8307507682f082a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce8906db3c10394870206e953059f45b30944133f417e28307507682f0c9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd10406db3c10394870206e953059f45b30944133f417e270011718190026c87001cb0721d0cf1682102e61746801cb1fc90034c87001cb078268506c6174686f20757365726e616d6501cb77c90018c85902cb07f400c91036454092d17cdf');
     const builder = beginCell();
     builder.storeUint(0, 1);
-    initUsernameNFTItem_init_args({ $$type: 'UsernameNFTItem_init_args', owner_wallet, username_registry_address, name_hash })(builder);
+    initUsernameNFTItem_init_args({ $$type: 'UsernameNFTItem_init_args', username_registry_address, name_hash })(builder);
     const __data = builder.endCell();
     return { code: __code, data: __data };
 }
@@ -4397,30 +5695,43 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
+    {"name":"InitializeUsernameItem","header":1431193934,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"UsernameNFTItemStateView","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"UsernameNFTItem$Data","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"new_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"NftOwnershipAssigned","header":85167505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"previous_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"NftExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"UsernameNFTItemStateView","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}},{"name":"tier","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"UsernameNftDataView","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"individual_content","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"UsernameNftOnchainContent","header":null,"fields":[{"name":"marker","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"metadata","type":{"kind":"dict","key":"uint","keyFormat":256,"value":"cell","valueFormat":"ref"}}]},
+    {"name":"UsernameNFTItem$Data","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"ATHBurn","header":1096042497,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnNotification","header":1096042498,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnFinalized","header":1096042499,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHBurnFailed","header":1096042500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHGenesisSupplyCredit","header":1096042501,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHGenesisSupplyAck","header":1096042502,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"PruneStaleNotification","header":1347309650,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"AthTransferNotificationMintUsername","header":2299698527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
-    {"name":"AthTransferNotificationProfileAvatar","header":2702864385,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
+    {"name":"AthTransferNotificationRefund","header":1096042526,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
+    {"name":"PruneStaleNotification","header":1347309650,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
+    {"name":"AthTransferNotificationMintUsername","header":2299698527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"AthTransferNotificationVaultMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"AthTransferNotificationProfileAvatar","header":2702864385,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"AthTransferNotificationVaultProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHTransferRequestWithNotify","header":1096042516,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferRequestMintUsername","header":1096042518,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHTransferRequestProfileAvatar","header":1096042520,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"ATHTransferRequestVaultProfileAvatar","header":1096042522,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"ATHTransferRequestVaultMintUsername","header":1096042524,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHInternalTransfer","header":1096042514,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHInternalTransferWithNotify","header":1096042517,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHInternalTransferMintUsername","header":1096042519,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHInternalTransferProfileAvatar","header":1096042521,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"ATHInternalTransferVaultProfileAvatar","header":1096042523,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
+    {"name":"ATHInternalTransferVaultMintUsername","header":1096042525,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"ATHTransferFailed","header":1096042515,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"JettonTransfer","header":260734629,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
@@ -4428,36 +5739,43 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"JettonTransferNotification","header":1935855772,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"sender","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pruned_notification_acks","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
+    {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
     {"name":"BindOfficialAthWallet","header":1715335229,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"BindUsernameVault","header":1621496068,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushTreasuryAthDue","header":1621736923,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"FlushBurnAthDue","header":3919758027,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"FlushAthRefundDue","header":1804766023,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PrunePendingUsernameMint","header":932634413,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"UsernameRegistryTopUpStorageReserve","header":179986205,"fields":[]},
-    {"name":"PendingUsernameMint","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"vault_funded","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"NameRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"refund_due_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_refund_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"refund_due_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_refund_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernamePriceView","header":null,"fields":[{"name":"valid_length","type":{"kind":"simple","type":"bool","optional":false}},{"name":"price_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameNameRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"vault_funded","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"PendingAthRefundFlush","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthRefundFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTreasuryFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthBurnFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthTreasuryFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthBurnFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"refund_due_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"ath_refunds_due","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_refund_flushes","type":{"kind":"dict","key":"int","value":"PendingAthRefundFlush","valueFormat":"ref"}},{"name":"pending_refund_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"UsernameCollectionDataView","header":null,"fields":[{"name":"next_item_index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"UsernameCollectionOnchainContent","header":null,"fields":[{"name":"marker","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"metadata","type":{"kind":"dict","key":"uint","keyFormat":256,"value":"cell","valueFormat":"ref"}}]},
+    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"refund_due_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"ath_refunds_due","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_refund_flushes","type":{"kind":"dict","key":"int","value":"PendingAthRefundFlush","valueFormat":"ref"}},{"name":"pending_refund_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}}]},
 ]
 
 const UsernameNFTItem_opcodes = {
+    "InitializeUsernameItem": 1431193934,
     "ResendDeployedAck": 1671232620,
     "TopUpStorageReserve": 665640843,
     "UsernameItemDeployedAck": 3148082201,
+    "NftTransfer": 1607220500,
+    "NftOwnershipAssigned": 85167505,
+    "NftExcesses": 3576854235,
     "ATHBurn": 1096042497,
     "ATHBurnNotification": 1096042498,
     "ATHBurnFinalized": 1096042499,
@@ -4466,17 +5784,24 @@ const UsernameNFTItem_opcodes = {
     "ATHGenesisSupplyAck": 1096042502,
     "AthTransferNotification": 1194171773,
     "AthTransferNotificationAck": 1194171774,
+    "AthTransferNotificationRefund": 1096042526,
     "PruneStaleNotification": 1347309650,
     "AthTransferNotificationMintUsername": 2299698527,
+    "AthTransferNotificationVaultMintUsername": 2299698528,
     "AthTransferNotificationProfileAvatar": 2702864385,
+    "AthTransferNotificationVaultProfileAvatar": 2702864386,
     "ATHTransferRequest": 1096042512,
     "ATHTransferRequestWithNotify": 1096042516,
     "ATHTransferRequestMintUsername": 1096042518,
     "ATHTransferRequestProfileAvatar": 1096042520,
+    "ATHTransferRequestVaultProfileAvatar": 1096042522,
+    "ATHTransferRequestVaultMintUsername": 1096042524,
     "ATHInternalTransfer": 1096042514,
     "ATHInternalTransferWithNotify": 1096042517,
     "ATHInternalTransferMintUsername": 1096042519,
     "ATHInternalTransferProfileAvatar": 1096042521,
+    "ATHInternalTransferVaultProfileAvatar": 1096042523,
+    "ATHInternalTransferVaultMintUsername": 1096042525,
     "ATHTransferAck": 1096042513,
     "ATHTransferFailed": 1096042515,
     "JettonTransfer": 260734629,
@@ -4484,6 +5809,7 @@ const UsernameNFTItem_opcodes = {
     "JettonTransferNotification": 1935855772,
     "JettonExcesses": 3576854235,
     "BindOfficialAthWallet": 1715335229,
+    "BindUsernameVault": 1621496068,
     "SealGenesis": 974311853,
     "FlushTreasuryAthDue": 1621736923,
     "FlushBurnAthDue": 3919758027,
@@ -4494,14 +5820,18 @@ const UsernameNFTItem_opcodes = {
 
 const UsernameNFTItem_getters: ABIGetter[] = [
     {"name":"get_state","methodId":86957,"arguments":[],"returnType":{"kind":"simple","type":"UsernameNFTItemStateView","optional":false}},
+    {"name":"get_nft_data","methodId":102351,"arguments":[],"returnType":{"kind":"simple","type":"UsernameNftDataView","optional":false}},
 ]
 
 export const UsernameNFTItem_getterMapping: { [key: string]: string } = {
     'get_state': 'getGetState',
+    'get_nft_data': 'getGetNftData',
 }
 
 const UsernameNFTItem_receivers: ABIReceiver[] = [
+    {"receiver":"internal","message":{"kind":"typed","type":"InitializeUsernameItem"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ResendDeployedAck"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"NftTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
@@ -4509,15 +5839,25 @@ const UsernameNFTItem_receivers: ABIReceiver[] = [
 export const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3000000n;
 export const USERNAME_ITEM_ACK_EXEC_RESERVE = 1000000n;
 export const USERNAME_ITEM_ACK_MAX_RESEND_VALUE = 20000000n;
+export const USERNAME_ITEM_TRANSFER_EXEC_RESERVE = 2000000n;
+export const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE = 10000000n;
+export const USERNAME_ITEM_EXCESSES_MIN_VALUE = 100000n;
+export const USERNAME_ITEM_MAX_LENGTH = 16n;
+export const USERNAME_ITEM_NAME_HASH_DOMAIN = 3318512854n;
+export const USERNAME_ITEM_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
+export const USERNAME_ITEM_METADATA_KEY_DESCRIPTION = 90922719342317012409671596374183159143637506542604000676488204638996496437508n;
 export const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1000000n;
+export const ATH_VAULT_RESPONSE_ACK_VALUE = 3000000n;
 export const ATH_INTERNAL_TRANSFER_ACK_VALUE = 3000000n;
 export const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1000000n;
 export const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE = 21000000n;
+export const ATH_VAULT_PROFILE_AVATAR_FWD_FEE_ALLOWANCE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
 export const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2000000n;
 export const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2000000n;
 export const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7000000n;
+export const ATH_PRUNE_NOTIFICATION_EXEC_RESERVE = 2000000n;
 export const ATH_OWNER_REQUEST_EXEC_RESERVE = 2000000n;
 export const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE = 10000000n;
 export const ATH_OWNER_EXCESS_REFUND_MIN_VALUE = 100000n;
@@ -4526,8 +5866,8 @@ export const ATH_GENESIS_SUPPLY_ACK_VALUE = 1000000n;
 export const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 1096044105n;
 export const ATH_OUTGOING_TRANSFER_ID_DOMAIN = 1096044359n;
 export const ATH_NOTIFY_REFUND_QUERY_DOMAIN = 1096045126n;
-export const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD = 4294967296n;
 export const ATH_QUERY_ID_MOD = 18446744073709551616n;
+export const ATH_SENDER_KEY_MOD = 1461501637330902918203684832716283019655932542976n;
 export const ATH_PENDING_NOTIFICATION_TTL = 86400n;
 export const JETTON_EXCESSES_VALUE = 1000000n;
 export const USERNAME_PRICE_4_CHARS = 10000000000000n;
@@ -4535,22 +5875,27 @@ export const USERNAME_PRICE_5_CHARS = 1000000000000n;
 export const USERNAME_PRICE_6_PLUS_CHARS = 100000000000n;
 export const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6000000n;
 export const USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT = 4000000n;
-export const USERNAME_STATE_GROWTH_EXEC_RESERVE = 2000000n;
-export const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 20000000n;
+export const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4000000n;
+export const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 21000000n;
 export const USERNAME_ATH_TRANSFER_EXEC_RESERVE = 30000000n;
 export const USERNAME_ATH_BURN_EXEC_RESERVE = 5000000n;
 export const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE = 2000000n;
 export const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE = 2000000n;
 export const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
+export const USERNAME_ATH_NOTIFICATION_REFUND_VALUE = 12000000n;
 export const USERNAME_MINT_EXCESS_REFUND_MIN_VALUE = 100000n;
+export const USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE = 500000n;
 export const USERNAME_PENDING_MINT_STALE_TTL = 86400n;
-export const USERNAME_MAX_LENGTH = 32n;
+export const USERNAME_MAX_LENGTH = 16n;
 export const USERNAME_SPLIT_BASE_BPS = 10000n;
 export const USERNAME_TREASURY_SHARE_BPS = 5000n;
 export const USERNAME_NAME_HASH_DOMAIN = 3318512854n;
 export const USERNAME_REFUND_FLUSH_ID_DOMAIN = 1380337988n;
+export const USERNAME_COLLECTION_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
+export const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX = -1n;
 export const UINT64_MOD = 18446744073709551616n;
 export const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET = 1715335229n;
+export const OP_USERNAME_BIND_VAULT = 1621496068n;
 export const OP_SEAL_GENESIS = 974311853n;
 
 export class UsernameNFTItem implements Contract {
@@ -4559,12 +5904,12 @@ export class UsernameNFTItem implements Contract {
     public static readonly errors = UsernameNFTItem_errors_backward;
     public static readonly opcodes = UsernameNFTItem_opcodes;
     
-    static async init(owner_wallet: Address, username_registry_address: Address, name_hash: bigint) {
-        return await UsernameNFTItem_init(owner_wallet, username_registry_address, name_hash);
+    static async init(username_registry_address: Address, name_hash: bigint) {
+        return await UsernameNFTItem_init(username_registry_address, name_hash);
     }
     
-    static async fromInit(owner_wallet: Address, username_registry_address: Address, name_hash: bigint) {
-        const __gen_init = await UsernameNFTItem_init(owner_wallet, username_registry_address, name_hash);
+    static async fromInit(username_registry_address: Address, name_hash: bigint) {
+        const __gen_init = await UsernameNFTItem_init(username_registry_address, name_hash);
         const address = contractAddress(0, __gen_init);
         return new UsernameNFTItem(address, __gen_init);
     }
@@ -4587,11 +5932,17 @@ export class UsernameNFTItem implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ResendDeployedAck | TopUpStorageReserve | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: InitializeUsernameItem | ResendDeployedAck | NftTransfer | TopUpStorageReserve | null) {
         
         let body: Cell | null = null;
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'InitializeUsernameItem') {
+            body = beginCell().store(storeInitializeUsernameItem(message)).endCell();
+        }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ResendDeployedAck') {
             body = beginCell().store(storeResendDeployedAck(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'NftTransfer') {
+            body = beginCell().store(storeNftTransfer(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TopUpStorageReserve') {
             body = beginCell().store(storeTopUpStorageReserve(message)).endCell();
@@ -4609,6 +5960,13 @@ export class UsernameNFTItem implements Contract {
         const builder = new TupleBuilder();
         const source = (await provider.get('get_state', builder.build())).stack;
         const result = loadGetterTupleUsernameNFTItemStateView(source);
+        return result;
+    }
+    
+    async getGetNftData(provider: ContractProvider) {
+        const builder = new TupleBuilder();
+        const source = (await provider.get('get_nft_data', builder.build())).stack;
+        const result = loadGetterTupleUsernameNftDataView(source);
         return result;
     }
     

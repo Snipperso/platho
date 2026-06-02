@@ -6,12 +6,19 @@ import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_Use
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
+const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
+
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
 }
 
 function nameHash(name: string): bigint {
-  return BigInt(`0x${createHash('sha256').update(`PLATHO.V1.USERNAME.${name}`).digest('hex')}`);
+  return BigInt('0x' + beginCell()
+    .storeUint(NAME_HASH_DOMAIN, 32)
+    .storeBuffer(Buffer.from(name, 'ascii'))
+    .endCell()
+    .hash()
+    .toString('hex'));
 }
 
 function codeHash(path: string): string {
@@ -21,16 +28,16 @@ function codeHash(path: string): string {
 
 async function itemVector(name: string, owner: Address, registryAddress: Address) {
   const h = nameHash(name);
-  const init = await UsernameNFTItem.init(owner, registryAddress, h);
+  const init = await UsernameNFTItem.init(registryAddress, h);
   const stateInitHash = beginCell().store(storeStateInit(init)).endCell().hash().toString('hex');
   return {
     name,
-    owner_wallet: owner.toString(),
-    owner_workchain: owner.workChain,
+    initial_owner_wallet: owner.toString(),
+    item_workchain: registryAddress.workChain,
     name_hash: h.toString(16).padStart(64, '0'),
     username_item_data_cell_hash: init.data.hash().toString('hex'),
     username_item_state_init_hash: stateInitHash,
-    derived_item_address: contractAddress(owner.workChain, init).toString(),
+    derived_item_address: contractAddress(registryAddress.workChain, init).toString(),
   };
 }
 
@@ -62,6 +69,8 @@ async function main() {
       { name_len: 5, valid_length: true, price_ath_atomic: '1000000000000' },
       { name_len: 6, valid_length: true, price_ath_atomic: '100000000000' },
       { name_len: 12, valid_length: true, price_ath_atomic: '100000000000' },
+      { name_len: 16, valid_length: true, price_ath_atomic: '100000000000' },
+      { name_len: 17, valid_length: false, price_ath_atomic: '0' },
     ],
     item_vectors: [
       await itemVector('platho', fixtureAddress('USERNAME_REGISTRY_ITEM_OWNER'), registryAddress),

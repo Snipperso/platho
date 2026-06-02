@@ -107,7 +107,7 @@ done
   readlink -f /srv/platho/current || true
   echo
   echo "== releases =="
-  find /srv/platho/releases -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort || true
+  sudo find /srv/platho/releases -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort || true
   echo
   echo "== packages =="
   dpkg-query -W -f="\${binary:Package}\t\${Version}\n" | sort

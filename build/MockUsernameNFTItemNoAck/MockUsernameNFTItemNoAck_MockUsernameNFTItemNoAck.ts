@@ -609,6 +609,65 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
     }
 }
 
+export type InitializeUsernameItem = {
+    $$type: 'InitializeUsernameItem';
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeInitializeUsernameItem(src: InitializeUsernameItem) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431193934, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeBuilder(src.username.asBuilder());
+    };
+}
+
+export function loadInitializeUsernameItem(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431193934) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0;
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleInitializeUsernameItem(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleInitializeUsernameItem(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleInitializeUsernameItem(source: InitializeUsernameItem) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserInitializeUsernameItem(): DictionaryValue<InitializeUsernameItem> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeInitializeUsernameItem(src)).endCell());
+        },
+        parse: (src) => {
+            return loadInitializeUsernameItem(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ResendDeployedAck = {
     $$type: 'ResendDeployedAck';
 }
@@ -747,7 +806,7 @@ function initMockUsernameNFTItemNoAck_init_args(src: MockUsernameNFTItemNoAck_in
 }
 
 async function MockUsernameNFTItemNoAck_init() {
-    const __code = Cell.fromHex('b5ee9c724101060100b9000114ff00f4a413f4bcf2c80b01020162020401ecd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d2000194d33f0131923070e202915be07021d74920c21f953101d31f309132e2208210639cfc6cba9e5ba4c87f01ca000101cb3fc9ed54e020821027acdf8bba9d5bc87f01ca000101cb3fc9ed54e0c00001c121b0e30230f2c082030022814a36f2f0c87f01ca000101cb3fc9ed540129a15535da89a1a4000329a67e02632460e1c5b678630500022046de25d5');
+    const __code = Cell.fromHex('b5ee9c724101070100d5000114ff00f4a413f4bcf2c80b01020162020502f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d2000194d33f0131923070e202915be07021d74920c21f953101d31f309132e2208210554e494eba9e5ba4c87f01ca000101cb3fc9ed54e0208210639cfc6cba9e5ba4c87f01ca000101cb3fc9ed54e020821027acdf8bbae302c00001c121b00304001a5bc87f01ca000101cb3fc9ed5400308e11814a36f2f0c87f01ca000101cb3fc9ed54e030f2c0820129a15535da89a1a4000329a67e02632460e1c5b67863060002208aa99adc');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initMockUsernameNFTItemNoAck_init_args({ $$type: 'MockUsernameNFTItemNoAck_init_args' })(builder);
@@ -844,12 +903,14 @@ const MockUsernameNFTItemNoAck_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
+    {"name":"InitializeUsernameItem","header":1431193934,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
     {"name":"MockUsernameNFTItemNoAck$Data","header":null,"fields":[{"name":"accepted_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
 
 const MockUsernameNFTItemNoAck_opcodes = {
+    "InitializeUsernameItem": 1431193934,
     "ResendDeployedAck": 1671232620,
     "TopUpStorageReserve": 665640843,
 }
@@ -863,6 +924,7 @@ export const MockUsernameNFTItemNoAck_getterMapping: { [key: string]: string } =
 }
 
 const MockUsernameNFTItemNoAck_receivers: ABIReceiver[] = [
+    {"receiver":"internal","message":{"kind":"typed","type":"InitializeUsernameItem"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ResendDeployedAck"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
     {"receiver":"internal","message":{"kind":"empty"}},
@@ -903,9 +965,12 @@ export class MockUsernameNFTItemNoAck implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ResendDeployedAck | TopUpStorageReserve | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: InitializeUsernameItem | ResendDeployedAck | TopUpStorageReserve | null) {
         
         let body: Cell | null = null;
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'InitializeUsernameItem') {
+            body = beginCell().store(storeInitializeUsernameItem(message)).endCell();
+        }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ResendDeployedAck') {
             body = beginCell().store(storeResendDeployedAck(message)).endCell();
         }

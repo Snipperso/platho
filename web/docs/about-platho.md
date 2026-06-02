@@ -8,13 +8,13 @@ Platho is built against that model.
 
 Core actions in Platho are anchored by the user's wallet and executed through open smart contracts. The wallet remains the root of control, while routine app activity can run through the Vault and signed commands instead of exposing the wallet directly every time. That does not make the system perfect. It removes the central defect of ordinary platforms: the hidden ability to rewrite the rules, cut off access, or take control of what should belong to the user.
 
-Private messages are published as encrypted fragments. They can be recovered from the blockchain, but they cannot be read without the keys of the participants. Public messages, profiles, and names live in verifiable contract state instead of a closed database. That reduces dependence on a server, an operator, and whatever policy happens to be convenient this week.
+Private messages are anchored on-chain as encrypted capsule entries. The heavy encrypted body is carried in the accepted TON transaction body, recovered from accepted TON transaction history, and verified against CapsuleHub hashes, so availability depends on provider history coverage and the user's local encrypted cache. Public messages, profiles, and names use verifiable contract state instead of a closed database. That reduces dependence on a server, an operator, and whatever policy happens to be convenient this week.
 
-Platho does not hide the cost of this architecture. The blockchain is public. Operations cost money. User mistakes can be irreversible. A lost seed phrase cannot be recovered through support, and a published message stays on-chain without deletion or editing. This is a hard model.
+Platho does not hide the cost of this architecture. The blockchain is public. Operations cost money. User mistakes can be irreversible. A lost seed phrase cannot be recovered through support, and Platho is not a permanent archive: compact capsule entries can be pruned after the retention window, while old body retrieval depends on provider history or the user's local cache. This is a hard model.
 
 The personal wallet and the Vault are separated. The wallet remains the root of control: it deposits and withdraws funds, and it controls keys. The Vault is a protective contract layer between the wallet and the public network. The user moves a limited amount of TON/ATH into the Vault, and publishing, protocol payments, and other app operations run through internal balances and signed commands. This reduces direct wallet exposure on-chain and limits how much value is exposed to routine app activity.
 
-ATH is the protocol utility token. It is used for usernames, avatar updates, and transaction discounts. Its role is tied to actual use inside the app.
+ATH is the protocol utility token. It is used for usernames, avatar updates, and post-airdrop protocol-fee discounts. Its role is tied to actual use inside the app.
 
 ATH is designed for system participants. A meaningful share of the supply is distributed through user activity rather than through a closed allocation to early addresses. That makes the economy less dependent on a narrow holder set and more connected to real network usage.
 

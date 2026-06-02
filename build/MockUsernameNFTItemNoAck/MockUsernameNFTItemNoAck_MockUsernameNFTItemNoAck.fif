@@ -88,6 +88,14 @@ PROGRAM{
       s2 POP
     }>
     DUP
+    1431193934 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      INC
+      $MockUsernameNFTItemNoAck$_contract_store INLINECALLDICT
+    }>
+    DUP
     1671232620 PUSHINT
     EQUAL
     IFJMP:<{

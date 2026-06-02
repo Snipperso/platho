@@ -1,6 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config.mjs';
+import {
+  PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
+  PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
+  publicCapsuleBaseHoldNanotons,
+  publicCapsuleBaseNetPriceNanotons,
+} from '../web/message-pricing-policy.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
@@ -13,8 +20,8 @@ const checks = [
   },
   {
     id: 'CRYPTO_PROD_REMAINING_WORK',
-    file: 'web/CRYPTO_PROTOCOL.md',
-    pattern: /Before production private messaging|external cryptographic review/,
+    files: ['web/CRYPTO_PROTOCOL.md', 'web/docs/crypto-protocol.md'],
+    pattern: /Remaining production work|prototype currently proves|Before production private messaging|external cryptographic review/,
     message: 'Crypto protocol still documents production blockers.',
   },
   {
@@ -34,16 +41,363 @@ const envChecks = [
 ];
 
 const failures = validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => ({ ...finding }));
+const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
+  ATHMASTER_CODE_HASH: 'ath_master',
+  ATHVESTING_CODE_HASH: 'ath_vesting',
+  ATH_WALLET_CODE_HASH: 'ath_wallet',
+  BUYBACKBURN_CODE_HASH: 'buyback_burn',
+  MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
+  CAPSULEHUB_CODE_HASH: 'capsulehub',
+  FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
+  PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
+  USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
+  USERNAME_REGISTRY_CODE_HASH: 'username_registry',
+  VAULT_CODE_HASH: 'vault',
+};
+
+function readTextIfExists(file) {
+  const path = join(ROOT, file);
+  return existsSync(path) ? readFileSync(path, 'utf8') : null;
+}
+
+function readJsonIfExists(file) {
+  const text = readTextIfExists(file);
+  return text ? JSON.parse(text) : null;
+}
+
+function parseKeyValueLines(text) {
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx < 0) continue;
+    out[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+  }
+  return out;
+}
+
+function sha256Hex(text) {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+function sha256Base64(text) {
+  return createHash('sha256').update(text).digest('base64');
+}
+
+function unique(items) {
+  return Array.from(new Set(items));
+}
+
+function computeInlineImportMapCspHashes() {
+  const html = readTextIfExists('web/index.html');
+  if (!html) return null;
+  const match = html.match(/<script\s+type="importmap">([\s\S]*?)<\/script>/);
+  if (!match) return null;
+  const importMap = match[1];
+  const canonicalLfImportMap = importMap.replace(/\r\n/g, '\n');
+  return unique([
+    `sha256-${sha256Base64(importMap)}`,
+    `sha256-${sha256Base64(canonicalLfImportMap)}`,
+  ]);
+}
+
+function normalizeHash(value) {
+  return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
+}
+
+function validateCurrentCodeHashesMatchFinalManifest(input) {
+  const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
+  if (!currentText) {
+    failures.push({
+      id: 'CURRENT_CODE_HASHES_MISSING',
+      file: 'artifacts/CURRENT_CODE_HASHES.txt',
+      message: 'Final genesis verification requires current build code hashes in the release archive.',
+    });
+    return;
+  }
+
+  const currentCodeHashes = parseKeyValueLines(currentText);
+  const mismatches = [];
+  for (const [currentKey, manifestKey] of Object.entries(CURRENT_CODE_HASH_TO_MANIFEST_KEY)) {
+    const currentHash = normalizeHash(currentCodeHashes[currentKey]);
+    const manifestHash = normalizeHash(input?.manifest?.code_hashes?.[manifestKey]);
+    if (!currentHash || !manifestHash || currentHash !== manifestHash) {
+      mismatches.push(`${manifestKey}: current=${currentHash || 'missing'}, manifest=${manifestHash || 'missing'}`);
+    }
+  }
+
+  if (mismatches.length > 0) {
+    failures.push({
+      id: 'MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH',
+      file: 'artifacts/mainnet_genesis_verify_input.json',
+      message: `MAINNET_GENESIS_VERIFIED=true must match the current local build code hashes: ${mismatches.join('; ')}.`,
+    });
+  }
+}
+
+function validatePwaConfigMatchesFinalManifest(input) {
+  const manifest = input?.manifest;
+  const manifestHash = normalizeHash(manifest?.manifest_hash_hex);
+  if (normalizeHash(PLATHO_APP_CONFIG?.vault?.deploymentManifestHash) !== manifestHash) {
+    failures.push({
+      id: 'PWA_FINAL_MANIFEST_HASH_MISMATCH',
+      file: 'web/platho-config.mjs',
+      message: 'PWA vault.deploymentManifestHash must match the verified final genesis manifest hash.',
+    });
+  }
+
+  const addressChecks = [
+    ['PWA_VAULT_ADDRESS_MISMATCH', 'vault.address', PLATHO_APP_CONFIG?.vault?.address, manifest?.addresses?.vault],
+    ['PWA_CAPSULEHUB_ADDRESS_MISMATCH', 'capsuleHub.address', PLATHO_APP_CONFIG?.capsuleHub?.address, manifest?.addresses?.capsulehub],
+    ['PWA_ATH_MASTER_ADDRESS_MISMATCH', 'ath.masterAddress', PLATHO_APP_CONFIG?.ath?.masterAddress, manifest?.addresses?.ath_master],
+    ['PWA_USERNAME_REGISTRY_ADDRESS_MISMATCH', 'usernameRegistry.address', PLATHO_APP_CONFIG?.usernameRegistry?.address, manifest?.addresses?.username_registry],
+    ['PWA_PROFILE_REGISTRY_ADDRESS_MISMATCH', 'profileRegistry.address', PLATHO_APP_CONFIG?.profileRegistry?.address, manifest?.addresses?.profile_registry],
+  ];
+
+  for (const [id, field, actual, expected] of addressChecks) {
+    if (!actual || !expected || actual !== expected) {
+      failures.push({
+        id,
+        file: 'web/platho-config.mjs',
+        message: `PWA ${field} must match the verified final genesis manifest address.`,
+      });
+    }
+  }
+}
+
+function validateSingleDeployTruthSource() {
+  const implementedManifest = readJsonIfExists('artifacts/deployment_manifest_implemented_subset_m15.json');
+  if (implementedManifest?.status && implementedManifest.status !== 'FINAL_GENESIS') {
+    failures.push({
+      id: 'RELEASE_TRUTH_SPLIT_NON_FINAL_MANIFEST',
+      file: 'artifacts/deployment_manifest_implemented_subset_m15.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true cannot coexist with a current non-final implemented-subset deployment manifest.',
+    });
+  }
+}
+
+function validateMainnetGenesisEvidence() {
+  const verifiedText = readTextIfExists('artifacts/MAINNET_GENESIS_VERIFIED.txt');
+  if (verifiedText?.trim().toLowerCase() !== 'true') {
+    failures.push({
+      id: 'MAINNET_GENESIS_NOT_VERIFIED',
+      file: 'artifacts/MAINNET_GENESIS_VERIFIED.txt',
+      message: 'Current release candidate has no verified final mainnet genesis evidence.',
+    });
+    return;
+  }
+
+  const inputText = readTextIfExists('artifacts/mainnet_genesis_verify_input.json');
+  const input = inputText ? JSON.parse(inputText) : null;
+  const report = readJsonIfExists('artifacts/mainnet_genesis_verify_report.json');
+
+  if (!inputText) {
+    failures.push({
+      id: 'MAINNET_GENESIS_VERIFY_INPUT_MISSING',
+      file: 'artifacts/mainnet_genesis_verify_input.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true requires the final verifier input snapshot in the release archive.',
+    });
+  }
+
+  if (!report) {
+    failures.push({
+      id: 'MAINNET_GENESIS_VERIFY_REPORT_MISSING',
+      file: 'artifacts/mainnet_genesis_verify_report.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true requires the verifier report in the release archive.',
+    });
+    return;
+  }
+
+  if (report.status !== 'MAINNET_GENESIS_VERIFIED' || report.mainnet_genesis_verified !== true) {
+    failures.push({
+      id: 'MAINNET_GENESIS_VERIFY_REPORT_NOT_PASS',
+      file: 'artifacts/mainnet_genesis_verify_report.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true disagrees with the stored verifier report.',
+    });
+  }
+
+  if (inputText) {
+    const inputSha256 = sha256Hex(inputText);
+    if (report.input_sha256 !== inputSha256) {
+      failures.push({
+        id: 'MAINNET_GENESIS_VERIFY_INPUT_HASH_MISMATCH',
+        file: 'artifacts/mainnet_genesis_verify_report.json',
+        message: 'Stored verifier report input_sha256 does not match artifacts/mainnet_genesis_verify_input.json.',
+      });
+    }
+    if (report.input_source !== 'artifacts/mainnet_genesis_verify_input.json') {
+      failures.push({
+        id: 'MAINNET_GENESIS_VERIFY_INPUT_SOURCE_MISMATCH',
+        file: 'artifacts/mainnet_genesis_verify_report.json',
+        message: 'Stored verifier report must name artifacts/mainnet_genesis_verify_input.json as input_source.',
+      });
+    }
+  }
+
+  if (!report.evidence_refs) {
+    failures.push({
+      id: 'MAINNET_GENESIS_VERIFY_EVIDENCE_REFS_MISSING',
+      file: 'artifacts/mainnet_genesis_verify_report.json',
+      message: 'Stored verifier report must include evidence_refs copied from the input snapshot.',
+    });
+  }
+
+  if (input) {
+    validateCurrentCodeHashesMatchFinalManifest(input);
+    validatePwaConfigMatchesFinalManifest(input);
+    validateSingleDeployTruthSource();
+  }
+}
+
+function validateCspImportMapHash() {
+  const expectedHashes = computeInlineImportMapCspHashes();
+  if (!expectedHashes) {
+    failures.push({
+      id: 'PWA_CSP_IMPORTMAP_MISSING',
+      file: 'web/index.html',
+      message: 'web/index.html must contain the inline importmap used by the CSP hash guard.',
+    });
+    return;
+  }
+
+  for (const file of ['deploy/Caddyfile', 'deploy/nginx-platho.app.conf', 'deploy/README.md', 'scripts/server/Caddyfile', 'PRODUCTION_READINESS.md']) {
+    const text = readTextIfExists(file);
+    if (!text) {
+      failures.push({ id: 'PWA_CSP_CONFIG_MISSING', file, message: 'Required CSP documentation/config is missing.' });
+      continue;
+    }
+    for (const expectedHash of expectedHashes) {
+      if (!text.includes(expectedHash)) {
+        failures.push({
+          id: 'PWA_CSP_IMPORTMAP_HASH_MISMATCH',
+          file,
+          message: `CSP importmap hash must match web/index.html, including line-ending-safe hash: ${expectedHash}.`,
+        });
+      }
+    }
+  }
+}
+
+function validatePublishReservePricingArtifact() {
+  const report = readJsonIfExists('artifacts/publish_reserve_pricing_report.json');
+  if (!report) {
+    failures.push({
+      id: 'PUBLISH_RESERVE_PRICING_REPORT_MISSING',
+      file: 'artifacts/publish_reserve_pricing_report.json',
+      message: 'Production deploy requires a publish reserve pricing report generated for the final code and TON fee config snapshot.',
+    });
+    return;
+  }
+  if (report.profile !== 'PLATHO.V1.PUBLISH_RESERVE_PRICING' || report.status !== 'PASS') {
+    failures.push({
+      id: 'PUBLISH_RESERVE_PRICING_REPORT_NOT_PASS',
+      file: 'artifacts/publish_reserve_pricing_report.json',
+      message: 'Publish reserve pricing report must have status PASS.',
+    });
+  }
+
+  const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
+  const currentCodeHashes = currentText ? parseKeyValueLines(currentText) : {};
+  const codeChecks = [
+    ['vault', 'VAULT_CODE_HASH'],
+    ['capsulehub', 'CAPSULEHUB_CODE_HASH'],
+    ['ath_wallet', 'ATH_WALLET_CODE_HASH'],
+  ];
+  for (const [reportKey, currentKey] of codeChecks) {
+    const reportHash = normalizeHash(report.code_hashes?.[reportKey]);
+    const currentHash = normalizeHash(currentCodeHashes[currentKey]);
+    if (!reportHash || !currentHash || reportHash !== currentHash) {
+      failures.push({
+        id: 'PUBLISH_RESERVE_PRICING_CODE_HASH_MISMATCH',
+        file: 'artifacts/publish_reserve_pricing_report.json',
+        message: `Publish reserve pricing report ${reportKey} code hash must match artifacts/CURRENT_CODE_HASHES.txt.`,
+      });
+    }
+  }
+
+  const expectedCaseIds = [
+    'public_post',
+    'private_hybrid_1k',
+    'private_hybrid_2k',
+    'private_hybrid_4k',
+    'private_hybrid_8k',
+    'private_hybrid_16k',
+    'private_hybrid_32k',
+  ];
+  const actualCaseIds = (report.cases ?? []).map((item) => item?.id);
+  for (const caseId of expectedCaseIds) {
+    if (!actualCaseIds.includes(caseId)) {
+      failures.push({
+        id: 'PUBLISH_RESERVE_PRICING_CASE_MISSING',
+        file: 'artifacts/publish_reserve_pricing_report.json',
+        message: `Publish reserve pricing report must cover ${caseId}.`,
+      });
+    }
+  }
+
+  const expectedFeeConfig = {
+    config_18_latest_utime_since: '1777500000',
+    config_18_latest_bit_price_ps: '0',
+    config_18_latest_cell_price_ps: '135',
+    config_21_flat_gas_price: '6667',
+    config_21_gas_price: '4369067',
+    config_25_lump_price: '66667',
+    config_25_bit_price: '4369067',
+    config_25_cell_price: '436906667',
+  };
+  for (const [key, expected] of Object.entries(expectedFeeConfig)) {
+    if (String(report.fee_config_snapshot?.[key] ?? '') !== expected) {
+      failures.push({
+        id: 'PUBLISH_RESERVE_PRICING_FEE_CONFIG_STALE',
+        file: 'artifacts/publish_reserve_pricing_report.json',
+        message: `Publish reserve pricing report fee_config_snapshot.${key} must match the audited TON mainnet value ${expected}.`,
+      });
+    }
+  }
+
+  const caseById = new Map((report.cases ?? []).map((item) => [item?.id, item]));
+  const expectedPwaCases = [
+    {
+      id: 'public_post',
+      hold: publicCapsuleBaseHoldNanotons(),
+      net: publicCapsuleBaseNetPriceNanotons(),
+    },
+    ...Object.entries(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).map(([sizeClass, hold]) => ({
+      id: `private_hybrid_${sizeClass}k`,
+      hold,
+      net: PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[sizeClass],
+    })),
+  ];
+
+  for (const expectedCase of expectedPwaCases) {
+    const actual = caseById.get(expectedCase.id);
+    if (
+      String(actual?.canonical_max_charge_nanotons ?? '') !== expectedCase.hold.toString()
+      || String(actual?.user_net_debit_nanotons ?? '') !== expectedCase.net.toString()
+      || String(actual?.protocol_fee_nanotons ?? '') !== '10000000'
+    ) {
+      failures.push({
+        id: 'PUBLISH_RESERVE_PRICING_PWA_TABLE_MISMATCH',
+        file: 'artifacts/publish_reserve_pricing_report.json',
+        message: `Publish reserve pricing report ${expectedCase.id} must match the PWA hold/net table and 0.010 TON protocol fee.`,
+      });
+    }
+  }
+}
 
 for (const check of checks) {
-  const path = join(ROOT, check.file);
-  if (!existsSync(path)) {
-    failures.push({ id: check.id, file: check.file, message: 'Required file is missing.' });
-    continue;
-  }
-  const text = readFileSync(path, 'utf8');
-  if (check.pattern.test(text)) {
-    failures.push({ id: check.id, file: check.file, message: check.message });
+  const files = check.files ?? [check.file];
+  for (const file of files) {
+    const path = join(ROOT, file);
+    if (!existsSync(path)) {
+      failures.push({ id: check.id, file, message: 'Required file is missing.' });
+      continue;
+    }
+    const text = readFileSync(path, 'utf8');
+    if (check.pattern.test(text)) {
+      failures.push({ id: check.id, file, message: check.message });
+    }
   }
 }
 
@@ -52,6 +406,10 @@ for (const check of envChecks) {
     failures.push({ id: check.id, file: check.file, message: check.message });
   }
 }
+
+validateMainnetGenesisEvidence();
+validateCspImportMapHash();
+validatePublishReservePricingArtifact();
 
 if (failures.length > 0) {
   console.error('PREPROD_GUARD_BLOCKED');

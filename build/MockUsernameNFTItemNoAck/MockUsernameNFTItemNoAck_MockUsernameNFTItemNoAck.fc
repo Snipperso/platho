@@ -123,6 +123,16 @@ _ %get_accepted_count() method_id(109210) {
     if (in_msg_length >= 32) {
         op = in_msg~load_uint(32);
     }
+    ;; Receive InitializeUsernameItem message
+    if (op == 0x554e494e) {
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        var $msg'username_len = in_msg~load_uint(8);
+        var $msg'username = in_msg;
+        $self'accepted_count = $self'accepted_count + 1;
+        $MockUsernameNFTItemNoAck$_contract_store(($self'accepted_count));
+        return ();
+    }
+    
     ;; Receive ResendDeployedAck message
     if (op == 0x639cfc6c) {
         var $msg = empty_tuple();

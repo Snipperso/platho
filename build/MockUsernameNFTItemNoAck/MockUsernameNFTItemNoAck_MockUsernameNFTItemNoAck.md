@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: MockUsernameNFTItemNoAck
-BoC Size: 196 bytes
+BoC Size: 224 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 13
+Total structures: 14
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -44,6 +44,10 @@ Signature: `VarAddress{workchain:int32,address:^slice}`
 ### BasechainAddress
 TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
+
+### InitializeUsernameItem
+TL-B: `initialize_username_item#554e494e owner_wallet:address username_len:uint8 username:remainder<slice> = InitializeUsernameItem`
+Signature: `InitializeUsernameItem{owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### ResendDeployedAck
 TL-B: `resend_deployed_ack#639cfc6c  = ResendDeployedAck`

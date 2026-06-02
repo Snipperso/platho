@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { contractAddress, toNano } from '@ton/core';
+import { Address, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
+  AthTransferNotification,
   DepositTon,
   CreateReceiveIntent,
   ClaimReceiveIntent,
   CancelReceiveIntent,
 } from '../build/Vault/Vault_Vault';
+
+const ASSET_TON = 1n;
+const ASSET_ATH = 2n;
 
 async function setup() {
   const blockchain = await Blockchain.create();
@@ -35,7 +39,7 @@ async function setup() {
   );
 
   const vault = blockchain.openContract(new Vault(address, init));
-  return { blockchain, vault, sender, recipient, attacker };
+  return { blockchain, vault, sender, recipient, attacker, athWallet };
 }
 
 async function deposit(vault: any, user: any, amount: bigint) {
@@ -46,7 +50,7 @@ async function deposit(vault: any, user: any, amount: bigint) {
 }
 
 async function computeIntent(vault: any, sender: any, recipient: any, amount: bigint, clientNonce = 1n, secret = 0x1234n) {
-  const intentId = await vault.getGetReceiveIntentId(sender.address, recipient.address, 1n, amount, clientNonce);
+  const intentId = await vault.getGetReceiveIntentId(sender.address, recipient.address, ASSET_TON, amount, clientNonce);
   const commitment = await vault.getGetReceiveIntentCommitment(intentId, recipient.address, secret);
   return { intentId, commitment, clientNonce, secret };
 }
@@ -55,13 +59,23 @@ async function createTonIntent(vault: any, sender: any, recipient: any, amount: 
   const { intentId, commitment } = await computeIntent(vault, sender, recipient, amount, clientNonce, secret);
   await vault.send(sender.getSender(), { value: toNano('0.1') }, {
     $$type: 'CreateReceiveIntent',
-    asset: 1n,
+    asset: ASSET_TON,
     amount,
     recipient_wallet: recipient.address,
     commitment,
     client_nonce: clientNonce,
   } as CreateReceiveIntent);
   return { intentId, commitment, secret };
+}
+
+async function depositAth(vault: any, officialAthWallet: any, user: any, amount: bigint, queryId = 100n) {
+  await vault.send(officialAthWallet.getSender(), { value: toNano('0.1') }, {
+    $$type: 'AthTransferNotification',
+    query_id: queryId,
+    amount,
+    sender_key: 0n,
+    sender_wallet: user.address,
+  } as AthTransferNotification);
 }
 
 describe('Vault milestone 3: ReceiveIntent', () => {
@@ -148,7 +162,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
 
     await vault.send(sender.getSender(), { value: toNano('0.1') }, {
       $$type: 'CreateReceiveIntent',
-      asset: 1n,
+      asset: ASSET_TON,
       amount,
       recipient_wallet: recipient.address,
       commitment,
@@ -157,7 +171,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
 
     await vault.send(sender.getSender(), { value: toNano('0.1') }, {
       $$type: 'CreateReceiveIntent',
-      asset: 1n,
+      asset: ASSET_TON,
       amount,
       recipient_wallet: recipient.address,
       commitment,
@@ -172,7 +186,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     const bad = await computeIntent(vault, sender, recipient, tooMuch, 8n, 0x8888n);
     await vault.send(sender.getSender(), { value: toNano('0.1') }, {
       $$type: 'CreateReceiveIntent',
-      asset: 1n,
+      asset: ASSET_TON,
       amount: tooMuch,
       recipient_wallet: recipient.address,
       commitment: bad.commitment,
@@ -181,6 +195,33 @@ describe('Vault milestone 3: ReceiveIntent', () => {
 
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(1n);
     expect((await vault.getGetUser(sender.address)).ton_balance).toBe(toNano('0.8'));
+  });
+
+  it('VAULT-REJECT: ATH receive intent cannot target a non-basechain recipient', async () => {
+    const { vault, sender, athWallet } = await setup();
+    const nonBasechainRecipient = new Address(-1, Buffer.alloc(32, 0x44));
+    const amount = 500n;
+    const clientNonce = 21n;
+    const secret = 0x2121n;
+
+    await depositAth(vault, athWallet, sender, 1_000n, 21n);
+    const before = await vault.getGetUser(sender.address);
+    const intentId = await vault.getGetReceiveIntentId(sender.address, nonBasechainRecipient, ASSET_ATH, amount, clientNonce);
+    const commitment = await vault.getGetReceiveIntentCommitment(intentId, nonBasechainRecipient, secret);
+
+    await vault.send(sender.getSender(), { value: toNano('0.1') }, {
+      $$type: 'CreateReceiveIntent',
+      asset: ASSET_ATH,
+      amount,
+      recipient_wallet: nonBasechainRecipient,
+      commitment,
+      client_nonce: clientNonce,
+    } as CreateReceiveIntent);
+
+    const after = await vault.getGetUser(sender.address);
+    expect(after.ath_balance).toBe(before.ath_balance);
+    expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
   });
 
   it('VAULT-HAPPY: payment check has no expiry and can be claimed later', async () => {
@@ -209,7 +250,7 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     const attackerIntent = await computeIntent(vault, attacker, recipient, amount, 10n, 0x10n);
     await vault.send(attacker.getSender(), { value: toNano('0.1') }, {
       $$type: 'CreateReceiveIntent',
-      asset: 1n,
+      asset: ASSET_TON,
       amount,
       recipient_wallet: recipient.address,
       commitment: attackerIntent.commitment,

@@ -13,28 +13,38 @@ const USERNAME_PRICE_5_CHARS: Int = 1000000000000;       // 1,000 ATH atomic uni
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
 const USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT: Int = 4000000;
-const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
-const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 20000000;
+const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
+const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 21000000;
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 30000000;
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
+const USERNAME_ATH_NOTIFICATION_REFUND_VALUE: Int = 12000000;
 const USERNAME_MINT_EXCESS_REFUND_MIN_VALUE: Int = 100000;
+const USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE: Int = 500000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
-const USERNAME_MAX_LENGTH: Int = 32;
+const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_SPLIT_BASE_BPS: Int = 10000;
 const USERNAME_TREASURY_SHARE_BPS: Int = 5000;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
 const USERNAME_REFUND_FLUSH_ID_DOMAIN: Int = 0x52464944; // "RFID"
+const USERNAME_COLLECTION_METADATA_KEY_NAME: Int = 0x82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89;
+const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX: Int = -1;
 const UINT64_MOD: Int = 18446744073709551616;
 
 const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET: Int = 0x663DF03D;
+const OP_USERNAME_BIND_VAULT: Int = 0x60A61104;
 const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
 
 message(0x663DF03D) BindOfficialAthWallet {
     deployment_manifest_hash: Int as uint256;
     official_ath_wallet_address: Address;
+}
+
+message(0x60A61104) BindUsernameVault {
+    deployment_manifest_hash: Int as uint256;
+    vault_address: Address;
 }
 
 message(0x3A12D1AD) SealGenesis {
@@ -61,12 +71,15 @@ message(0x3796DF2D) PrunePendingUsernameMint {
 message(0x0ABA5F1D) UsernameRegistryTopUpStorageReserve {}
 
 struct PendingUsernameMint {
+    query_id: Int as uint64;
+    sender_key: Int as uint160;
     owner_wallet: Address;
     name_hash: Int as uint256;
     price_paid: Int as uint128;
     item_address: Address;
     item_deploy_value: Int as uint128;
     created_at: Int as uint32;
+    vault_funded: Bool;
 }
 
 struct NameRecord {
@@ -78,9 +91,11 @@ struct NameRecord {
 struct UsernameRegistryGlobalView {
     sealed: Bool;
     official_ath_wallet_bound: Bool;
+    vault_bound: Bool;
     deployment_manifest_hash: Int;
     genesis_config_hash: Int;
     official_ath_wallet_address: Address;
+    vault_address: Address;
     genesis_controller_address: Address;
     name_record_count: Int;
     pending_mint_count: Int;
@@ -107,12 +122,15 @@ struct UsernameNameRecordView {
 
 struct PendingUsernameMintView {
     exists: Bool;
+    query_id: Int;
+    sender_key: Int;
     owner_wallet: Address;
     name_hash: Int;
     price_paid: Int;
     item_address: Address;
     item_deploy_value: Int;
     created_at: Int;
+    vault_funded: Bool;
 }
 
 struct PendingAthRefundFlush {
@@ -154,11 +172,24 @@ struct PendingAthBurnFlushView {
     created_at: Int;
 }
 
+struct UsernameCollectionDataView {
+    next_item_index: Int;
+    collection_content: Cell;
+    owner_address: Address;
+}
+
+struct UsernameCollectionOnchainContent {
+    marker: Int as uint8;
+    metadata: map<Int as uint256, Cell>;
+}
+
 contract UsernameRegistry {
     official_ath_wallet_address: Address;
+    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     official_ath_wallet_bound: Bool;
+    vault_bound: Bool;
     sealed: Bool;
     deployment_manifest_hash: Int as uint256;
     genesis_config_hash: Int as uint256;
@@ -181,9 +212,11 @@ contract UsernameRegistry {
 
     init(official_ath_wallet_address: Address, ath_master_address: Address, treasury_ath_receiver_address: Address, sealed: Bool, deployment_manifest_hash: Int, genesis_config_hash: Int, genesis_controller_address: Address) {
         self.official_ath_wallet_address = official_ath_wallet_address;
+        self.vault_address = official_ath_wallet_address;
         self.ath_master_address = ath_master_address;
         self.treasury_ath_receiver_address = treasury_ath_receiver_address;
         self.official_ath_wallet_bound = false;
+        self.vault_bound = false;
         self.sealed = sealed;
         self.genesis_controller_address = genesis_controller_address;
         self.deployment_manifest_hash = deployment_manifest_hash;
@@ -243,7 +276,8 @@ contract UsernameRegistry {
             let ch: Int = cursor.loadUint(8);
             let lower: Bool = (ch >= 97) && (ch <= 122);
             let digit: Bool = (ch >= 48) && (ch <= 57);
-            if (!(lower || digit)) {
+            let separator: Bool = (ch == 45) || (ch == 95);
+            if (!(lower || digit || separator)) {
                 return false;
             }
             i += 1;
@@ -259,11 +293,27 @@ contract UsernameRegistry {
             .hash();
     }
 
-    fun deriveItemAddress(owner_wallet: Address, name_hash: Int): Address {
-        throwUnless(19020, name_hash != 0);
-        let owner_std: StdAddress = parseStdAddress(owner_wallet.asSlice());
-        let item_init: StateInit = initOf UsernameNFTItem(owner_wallet, myAddress(), name_hash);
-        return contractAddressExt(owner_std.workchain, item_init.code, item_init.data);
+    fun collectionNameCell(): Cell {
+        return beginCell()
+            .storeUint(0, 8)
+            .storeUint(0x506c6174686f20757365726e616d6573, 128) // "Platho usernames"
+            .endCell();
+    }
+
+    fun collectionContent(): Cell {
+        let metadata: map<Int as uint256, Cell> = emptyMap();
+        metadata.set(USERNAME_COLLECTION_METADATA_KEY_NAME, self.collectionNameCell());
+        return UsernameCollectionOnchainContent {
+            marker: 0,
+            metadata: metadata
+        }.toCell();
+    }
+
+    fun deriveItemAddress(name_hash: Int): Address {
+        throwUnless(19020, name_hash > 0);
+        let registry_std: StdAddress = parseStdAddress(myAddress().asSlice());
+        let item_init: StateInit = initOf UsernameNFTItem(myAddress(), name_hash);
+        return contractAddressExt(registry_std.workchain, item_init.code, item_init.data);
     }
 
     fun deriveAthWalletAddress(owner_wallet: Address): Address {
@@ -302,9 +352,9 @@ contract UsernameRegistry {
         }
     }
 
-    fun sendAthNotificationAck(query_id: Int, sender_key: Int, amount: Int) {
+    fun sendAthNotificationAck(destination: Address, query_id: Int, sender_key: Int, amount: Int) {
         message(MessageParameters {
-            to: sender(),
+            to: destination,
             value: USERNAME_ATH_NOTIFICATION_ACK_VALUE,
             bounce: false,
             mode: SendDefaultMode,
@@ -316,8 +366,23 @@ contract UsernameRegistry {
         });
     }
 
+    fun sendAthNotificationRefund(query_id: Int, sender_key: Int, amount: Int) {
+        message(MessageParameters {
+            to: self.official_ath_wallet_address,
+            value: USERNAME_ATH_NOTIFICATION_REFUND_VALUE,
+            bounce: true,
+            mode: SendPayFwdFeesSeparately,
+            body: AthTransferNotificationRefund {
+                query_id: query_id,
+                sender_key: sender_key,
+                amount: amount
+            }.toCell()
+        });
+    }
+
     fun refundRejectedMintExcess(owner_wallet: Address, retained_value: Int) {
-        let excess: Int = context().value - retained_value;
+        let retained_with_forward_reserve: Int = retained_value + USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE;
+        let excess: Int = context().value - retained_with_forward_reserve;
         if (excess < USERNAME_MINT_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
@@ -394,6 +459,83 @@ contract UsernameRegistry {
         return pending;
     }
 
+    fun rejectMintOrBounceToVault(vault_funded: Bool, owner_wallet: Address, amount: Int, query_id: Int, sender_key: Int, error_code: Int) {
+        if (vault_funded) {
+            throw(error_code);
+        }
+        let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(owner_wallet);
+        self.addRefundDue(owner_wallet, amount);
+        self.sendAthNotificationAck(sender(), query_id, sender_key, amount);
+        self.refundRejectedMintExcess(owner_wallet, retainedValue);
+    }
+
+    fun acceptUsernameMint(query_id: Int, sender_key: Int, amount: Int, owner_wallet: Address, username_len: Int, username: Slice, vault_funded: Bool) {
+        throwUnless(19121, amount > 0);
+        throwUnless(19126, self.isBasechainAddress(owner_wallet));
+
+        if (!self.isValidUsernameBytes(username_len, username)) {
+            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19170);
+            return;
+        }
+
+        let name_hash: Int = self.computeNameHash(username);
+        let price: Int = self.priceForLength(username_len);
+
+        if (amount != price) {
+            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19171);
+            return;
+        }
+
+        if (self.name_records.exists(name_hash)) {
+            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19172);
+            return;
+        }
+
+        if (self.pending_mints.exists(name_hash)) {
+            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19173);
+            return;
+        }
+
+        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
+        throwUnless(19122, context().value >= retainedValue);
+
+        let item_address: Address = self.deriveItemAddress(name_hash);
+        throwUnless(19123, !self.pending_item_to_name_hash.exists(item_address));
+
+        self.pending_mints.set(name_hash, PendingUsernameMint {
+            query_id: query_id,
+            sender_key: sender_key,
+            owner_wallet: owner_wallet,
+            name_hash: name_hash,
+            price_paid: amount,
+            item_address: item_address,
+            item_deploy_value: USERNAME_NFT_ITEM_DEPLOY_RESERVE,
+            created_at: now(),
+            vault_funded: vault_funded
+        });
+        self.pending_item_to_name_hash.set(item_address, name_hash);
+        self.pending_mint_count += 1;
+
+        let item_init: StateInit = initOf UsernameNFTItem(myAddress(), name_hash);
+        send(SendParameters {
+            to: item_address,
+            value: USERNAME_NFT_ITEM_DEPLOY_RESERVE,
+            bounce: true,
+            mode: SendPayFwdFeesSeparately,
+            code: item_init.code,
+            data: item_init.data,
+            body: InitializeUsernameItem {
+                owner_wallet: owner_wallet,
+                username_len: username_len,
+                username: username
+            }.toCell()
+        });
+
+        if (!vault_funded) {
+            self.refundRejectedMintExcess(owner_wallet, retainedValue);
+        }
+    }
+
     receive(msg: BindOfficialAthWallet) {
         self.requireUnsealed();
         self.requireGenesisController();
@@ -408,6 +550,18 @@ contract UsernameRegistry {
         self.official_ath_wallet_bound = true;
     }
 
+    receive(msg: BindUsernameVault) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(19036, msg.deployment_manifest_hash > 1);
+        throwUnless(19037, !self.vault_bound);
+        throwUnless(19038, self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(19039, self.isBasechainAddress(msg.vault_address));
+        throwUnless(19046, msg.vault_address != myAddress());
+        self.vault_address = msg.vault_address;
+        self.vault_bound = true;
+    }
+
     receive(msg: SealGenesis) {
         self.requireUnsealed();
         self.requireGenesisController();
@@ -416,6 +570,13 @@ contract UsernameRegistry {
         throwUnless(19042, self.official_ath_wallet_bound);
         throwUnless(19043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
         throwUnless(19044, self.isBasechainAddress(self.treasury_ath_receiver_address));
+        throwUnless(19045, self.vault_bound);
+        throwUnless(19047, self.isBasechainAddress(self.vault_address));
+        throwUnless(19048, self.vault_address != myAddress());
+        throwUnless(19049, self.treasury_ath_receiver_address != myAddress());
+        throwUnless(19050, self.treasury_ath_receiver_address != self.official_ath_wallet_address);
+        throwUnless(19051, self.treasury_ath_receiver_address != self.vault_address);
+        throwUnless(19052, self.treasury_ath_receiver_address != self.ath_master_address);
         self.genesis_config_hash = msg.deployment_manifest_hash;
         self.sealed = true;
     }
@@ -423,74 +584,15 @@ contract UsernameRegistry {
     receive(msg: AthTransferNotificationMintUsername) {
         self.requireSealed();
         throwUnless(19120, sender() == self.official_ath_wallet_address);
-        throwUnless(19121, msg.amount > 0);
-        throwUnless(19126, self.isBasechainAddress(msg.owner_wallet));
+        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username, false);
+    }
 
-        if (!self.isValidUsernameBytes(msg.username_len, msg.username)) {
-            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
-            self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
-            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
-            return;
-        }
-
-        let name_hash: Int = self.computeNameHash(msg.username);
-        let price: Int = self.priceForLength(msg.username_len);
-
-        if (msg.amount != price) {
-            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
-            self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
-            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
-            return;
-        }
-
-        if (self.name_records.exists(name_hash)) {
-            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
-            self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
-            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
-            return;
-        }
-
-        if (self.pending_mints.exists(name_hash)) {
-            let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(msg.owner_wallet);
-            self.addRefundDue(msg.owner_wallet, msg.amount);
-            self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
-            self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
-            return;
-        }
-
-        let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
-        throwUnless(19122, context().value >= retainedValue);
-
-        let item_address: Address = self.deriveItemAddress(msg.owner_wallet, name_hash);
-        throwUnless(19123, !self.pending_item_to_name_hash.exists(item_address));
-
-        self.pending_mints.set(name_hash, PendingUsernameMint {
-            owner_wallet: msg.owner_wallet,
-            name_hash: name_hash,
-            price_paid: msg.amount,
-            item_address: item_address,
-            item_deploy_value: USERNAME_NFT_ITEM_DEPLOY_RESERVE,
-            created_at: now()
-        });
-        self.pending_item_to_name_hash.set(item_address, name_hash);
-        self.pending_mint_count += 1;
-
-        let item_init: StateInit = initOf UsernameNFTItem(msg.owner_wallet, myAddress(), name_hash);
-        send(SendParameters {
-            to: item_address,
-            value: USERNAME_NFT_ITEM_DEPLOY_RESERVE,
-            bounce: true,
-            mode: SendPayFwdFeesSeparately,
-            code: item_init.code,
-            data: item_init.data,
-            body: ResendDeployedAck {}.toCell()
-        });
-
-        self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
-        self.refundRejectedMintExcess(msg.owner_wallet, retainedValue);
+    receive(msg: AthTransferNotificationVaultMintUsername) {
+        self.requireSealed();
+        throwUnless(19180, sender() == self.official_ath_wallet_address);
+        throwUnless(19181, self.vault_bound);
+        throwUnless(19182, msg.payer_wallet == self.vault_address);
+        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username, true);
     }
 
     receive(msg: UsernameItemDeployedAck) {
@@ -502,9 +604,10 @@ contract UsernameRegistry {
         let pendingOpt: PendingUsernameMint? = self.pending_mints.get(msg.name_hash);
         throwUnless(19132, pendingOpt != null);
         let pending: PendingUsernameMint = pendingOpt!!;
-        throwUnless(19133, pending.owner_wallet == msg.owner_wallet);
+        throwUnless(19133, self.isBasechainAddress(msg.owner_wallet));
         throwUnless(19134, pending.item_address == sender());
         throwUnless(19135, !self.name_records.exists(msg.name_hash));
+        throwUnless(19136, msg.owner_wallet == pending.owner_wallet);
 
         let pendingToFinalize: PendingUsernameMint = self.clearPendingMint(msg.name_hash);
 
@@ -519,9 +622,10 @@ contract UsernameRegistry {
         let burn_amount: Int = pendingToFinalize.price_paid - treasury_amount;
         self.treasury_due_ath += treasury_amount;
         self.burn_due_ath += burn_amount;
+        self.sendAthNotificationAck(self.official_ath_wallet_address, pendingToFinalize.query_id, pendingToFinalize.sender_key, pendingToFinalize.price_paid);
     }
 
-    bounced(msg: bounced<ResendDeployedAck>) {
+    bounced(msg: bounced<InitializeUsernameItem>) {
         self.requireSealed();
         let nameFromItem: Int? = self.pending_item_to_name_hash.get(sender());
         throwUnless(19140, nameFromItem != null);
@@ -529,12 +633,7 @@ contract UsernameRegistry {
         throwUnless(19141, pendingOpt != null);
 
         let cleared: PendingUsernameMint = self.clearPendingMint(nameFromItem!!);
-        let retainedValue: Int = USERNAME_STATE_GROWTH_EXEC_RESERVE;
-        if (!self.ath_refunds_due.exists(cleared.owner_wallet)) {
-            retainedValue += USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT;
-        }
-        self.addRefundDue(cleared.owner_wallet, cleared.price_paid);
-        self.refundRejectedMintExcess(cleared.owner_wallet, retainedValue);
+        self.sendAthNotificationRefund(cleared.query_id, cleared.sender_key, cleared.price_paid);
     }
 
     receive(msg: FlushTreasuryAthDue) {
@@ -724,12 +823,7 @@ contract UsernameRegistry {
         let pending: PendingUsernameMint = pendingOpt!!;
         throwUnless(19303, now() >= pending.created_at + USERNAME_PENDING_MINT_STALE_TTL);
         throwUnless(19304, !self.name_records.exists(msg.name_hash));
-        if (!self.ath_refunds_due.exists(pending.owner_wallet)) {
-            throwUnless(19306, context().value >= USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE + USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT);
-        }
-
-        let cleared: PendingUsernameMint = self.clearPendingMint(msg.name_hash);
-        self.restoreRefundDue(cleared.owner_wallet, cleared.price_paid);
+        throw(19307);
     }
 
     receive(msg: UsernameRegistryTopUpStorageReserve) {
@@ -743,8 +837,24 @@ contract UsernameRegistry {
         return UsernamePriceView { valid_length: true, price_ath_atomic: self.priceForLength(name_len) };
     }
 
-    get fun get_username_item_address(owner_wallet: Address, name_hash: Int): Address {
-        return self.deriveItemAddress(owner_wallet, name_hash);
+    get fun get_username_item_address(name_hash: Int): Address {
+        return self.deriveItemAddress(name_hash);
+    }
+
+    get fun get_nft_address_by_index(index: Int): Address {
+        return self.deriveItemAddress(index);
+    }
+
+    get fun get_nft_content(index: Int, individual_content: Cell): Cell {
+        return individual_content;
+    }
+
+    get fun get_collection_data(): UsernameCollectionDataView {
+        return UsernameCollectionDataView {
+            next_item_index: USERNAME_COLLECTION_UNORDERED_NEXT_INDEX,
+            collection_content: self.collectionContent(),
+            owner_address: self.treasury_ath_receiver_address
+        };
     }
 
     get fun get_name_record(name_hash: Int): UsernameNameRecordView {
@@ -771,23 +881,29 @@ contract UsernameRegistry {
         if (pendingOpt == null) {
             return PendingUsernameMintView {
                 exists: false,
+                query_id: 0,
+                sender_key: 0,
                 owner_wallet: self.official_ath_wallet_address,
                 name_hash: 0,
                 price_paid: 0,
                 item_address: self.official_ath_wallet_address,
                 item_deploy_value: 0,
-                created_at: 0
+                created_at: 0,
+                vault_funded: false
             };
         }
         let pending: PendingUsernameMint = pendingOpt!!;
         return PendingUsernameMintView {
             exists: true,
+            query_id: pending.query_id,
+            sender_key: pending.sender_key,
             owner_wallet: pending.owner_wallet,
             name_hash: pending.name_hash,
             price_paid: pending.price_paid,
             item_address: pending.item_address,
             item_deploy_value: pending.item_deploy_value,
-            created_at: pending.created_at
+            created_at: pending.created_at,
+            vault_funded: pending.vault_funded
         };
     }
 
@@ -872,9 +988,11 @@ contract UsernameRegistry {
         return UsernameRegistryGlobalView {
             sealed: self.sealed,
             official_ath_wallet_bound: self.official_ath_wallet_bound,
+            vault_bound: self.vault_bound,
             deployment_manifest_hash: self.deployment_manifest_hash,
             genesis_config_hash: self.genesis_config_hash,
             official_ath_wallet_address: self.official_ath_wallet_address,
+            vault_address: self.vault_address,
             genesis_controller_address: self.genesis_controller_address,
             name_record_count: self.name_record_count,
             pending_mint_count: self.pending_mint_count,

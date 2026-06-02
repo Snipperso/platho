@@ -14,10 +14,15 @@ describe('M18 artifact integrity and reproducibility lock', () => {
     expect(Object.values(report.vector_checks).every(Boolean)).toBe(true);
     expect(report.code_hashes.MARKET_STABILITY_SELLER_CODE_HASH.match).toBe(true);
     expect(report.manifest.match).toBe(true);
-    expect(report.manifest.status).toBe('IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS');
-    expect(report.manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
-    expect(report.manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
-    expect(report.manifest.blockers_before_final_genesis.join('\n')).not.toMatch(/STONFI/);
+    expect(['FINAL_GENESIS', 'IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS']).toContain(report.manifest.status);
+    if (report.manifest.status === 'FINAL_GENESIS') {
+      expect(readFileSync('artifacts/MAINNET_GENESIS_VERIFIED.txt', 'utf8').trim().toLowerCase()).toBe('true');
+      expect(report.manifest.blockers_before_final_genesis).toEqual([]);
+    } else {
+      expect(report.manifest.blockers_before_final_genesis).toContain('ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT');
+      expect(report.manifest.blockers_before_final_genesis).toContain('VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS');
+      expect(report.manifest.blockers_before_final_genesis.join('\n')).not.toMatch(/STONFI/);
+    }
 
     expect(storedReport.status).toBe(report.status);
     expect(storedReport.manifest.stored_hash).toBe(report.manifest.stored_hash);

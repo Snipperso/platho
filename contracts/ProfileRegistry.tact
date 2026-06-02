@@ -8,9 +8,11 @@ import "./ATHWallet.tact";
 const PROFILE_AVATAR_PRICE_ATH: Int = 100000000000; // 100 ATH atomic units
 const PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT: Int = 6000000;
 const PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT: Int = 3000000;
-const PROFILE_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
+const PROFILE_STATE_GROWTH_EXEC_RESERVE: Int = 3000000;
 const PROFILE_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE: Int = 100000;
+const PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
+const PROFILE_EXCESS_REFUND_FORWARD_RESERVE: Int = 200000;
 const PROFILE_ATH_TRANSFER_EXEC_RESERVE: Int = 30000000;
 const PROFILE_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const PROFILE_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
@@ -23,6 +25,11 @@ const PROFILE_AVATAR_RECORD_ID_DOMAIN: Int = 0x50524156; // "PRAV"
 message(0x50A61101) BindProfileOfficialAthWallet {
     deployment_manifest_hash: Int as uint256;
     official_ath_wallet_address: Address;
+}
+
+message(0x50A61102) BindProfileVault {
+    deployment_manifest_hash: Int as uint256;
+    vault_address: Address;
 }
 
 message(0x3A12D1AD) SealGenesis {
@@ -38,6 +45,12 @@ message(0x50A61111) FlushProfileBurnAthDue {
 }
 
 message(0x50A61120) ProfileRegistryTopUpStorageReserve {}
+
+message(0x50A61121) ProfileAvatarTonExcessRefund {
+    query_id: Int as uint64;
+    owner_wallet: Address;
+    amount: Int as uint128;
+}
 
 struct ProfileAvatarRecord {
     owner_wallet: Address;
@@ -73,12 +86,27 @@ struct PendingProfileBurnFlush {
     created_at: Int as uint32;
 }
 
+struct PendingProfileTreasuryFlushView {
+    exists: Bool;
+    amount: Int;
+    recipient_ath_wallet: Address;
+    created_at: Int;
+}
+
+struct PendingProfileBurnFlushView {
+    exists: Bool;
+    amount: Int;
+    created_at: Int;
+}
+
 struct ProfileRegistryGlobalView {
     sealed: Bool;
     official_ath_wallet_bound: Bool;
+    vault_bound: Bool;
     deployment_manifest_hash: Int;
     genesis_config_hash: Int;
     official_ath_wallet_address: Address;
+    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     genesis_controller_address: Address;
@@ -92,9 +120,11 @@ struct ProfileRegistryGlobalView {
 
 contract ProfileRegistry {
     official_ath_wallet_address: Address;
+    vault_address: Address;
     ath_master_address: Address;
     treasury_ath_receiver_address: Address;
     official_ath_wallet_bound: Bool;
+    vault_bound: Bool;
     sealed: Bool;
     deployment_manifest_hash: Int as uint256;
     genesis_config_hash: Int as uint256;
@@ -112,9 +142,11 @@ contract ProfileRegistry {
 
     init(official_ath_wallet_address: Address, ath_master_address: Address, treasury_ath_receiver_address: Address, sealed: Bool, deployment_manifest_hash: Int, genesis_config_hash: Int, genesis_controller_address: Address) {
         self.official_ath_wallet_address = official_ath_wallet_address;
+        self.vault_address = official_ath_wallet_address;
         self.ath_master_address = ath_master_address;
         self.treasury_ath_receiver_address = treasury_ath_receiver_address;
         self.official_ath_wallet_bound = false;
+        self.vault_bound = false;
         self.sealed = sealed;
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
@@ -163,13 +195,17 @@ contract ProfileRegistry {
             .hash();
     }
 
+    fun requireValidAvatarPointerFields(owner_wallet: Address, avatar_hash: Int, avatar_stream_id: Int, avatar_part_count: Int, media_format: Int) {
+        throwUnless(21120, self.isBasechainAddress(owner_wallet));
+        throwUnless(21121, avatar_hash != 0);
+        throwUnless(21122, avatar_stream_id != 0);
+        throwUnless(21123, avatar_part_count > 0);
+        throwUnless(21124, avatar_part_count <= PROFILE_AVATAR_MAX_PARTS);
+        throwUnless(21125, media_format == PROFILE_AVATAR_MEDIA_FORMAT_WEBP);
+    }
+
     fun requireValidAvatarPointer(msg: AthTransferNotificationProfileAvatar) {
-        throwUnless(21120, self.isBasechainAddress(msg.owner_wallet));
-        throwUnless(21121, msg.avatar_hash != 0);
-        throwUnless(21122, msg.avatar_stream_id != 0);
-        throwUnless(21123, msg.avatar_part_count > 0);
-        throwUnless(21124, msg.avatar_part_count <= PROFILE_AVATAR_MAX_PARTS);
-        throwUnless(21125, msg.media_format == PROFILE_AVATAR_MEDIA_FORMAT_WEBP);
+        self.requireValidAvatarPointerFields(msg.owner_wallet, msg.avatar_hash, msg.avatar_stream_id, msg.avatar_part_count, msg.media_format);
     }
 
     fun sendAthNotificationAck(query_id: Int, sender_key: Int, amount: Int) {
@@ -186,15 +222,45 @@ contract ProfileRegistry {
         });
     }
 
-    fun refundAvatarExcess(owner_wallet: Address, retained_value: Int) {
+    fun refundAvatarExcess(query_id: Int, owner_wallet: Address, retained_value: Int, vault_funded: Bool) {
         let excess: Int = context().value - retained_value;
         if (excess < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
 
+        if (vault_funded) {
+            if (excess <= PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE + PROFILE_EXCESS_REFUND_FORWARD_RESERVE) {
+                return;
+            }
+            let refundValue: Int = excess - PROFILE_EXCESS_REFUND_FORWARD_RESERVE;
+            let creditAmount: Int = refundValue - PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE;
+            if (creditAmount < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
+                return;
+            }
+            message(MessageParameters {
+                to: self.vault_address,
+                value: refundValue,
+                bounce: false,
+                mode: SendDefaultMode,
+                body: ProfileAvatarTonExcessRefund {
+                    query_id: query_id,
+                    owner_wallet: owner_wallet,
+                    amount: creditAmount
+                }.toCell()
+            });
+            return;
+        }
+
+        if (excess <= PROFILE_EXCESS_REFUND_FORWARD_RESERVE) {
+            return;
+        }
+        let refundValue: Int = excess - PROFILE_EXCESS_REFUND_FORWARD_RESERVE;
+        if (refundValue < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
+            return;
+        }
         message(MessageParameters {
             to: owner_wallet,
-            value: excess,
+            value: refundValue,
             bounce: false,
             mode: SendDefaultMode,
             body: null
@@ -234,39 +300,11 @@ contract ProfileRegistry {
         return pending;
     }
 
-    receive(msg: BindProfileOfficialAthWallet) {
-        self.requireUnsealed();
-        self.requireGenesisController();
-        throwUnless(21031, msg.deployment_manifest_hash > 1);
-        throwUnless(21032, !self.official_ath_wallet_bound);
-        throwUnless(21033, self.genesis_config_hash == 0);
-        throwUnless(21034, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
-        throwUnless(21035, msg.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
-        self.deployment_manifest_hash = msg.deployment_manifest_hash;
-        self.genesis_config_hash = 1;
-        self.official_ath_wallet_address = msg.official_ath_wallet_address;
-        self.official_ath_wallet_bound = true;
-    }
+    fun acceptAvatarPayment(query_id: Int, sender_key: Int, amount: Int, owner_wallet: Address, avatar_hash: Int, avatar_entry_id: Int, avatar_stream_id: Int, avatar_part_count: Int, media_format: Int, vault_funded: Bool) {
+        throwUnless(21111, amount == PROFILE_AVATAR_PRICE_ATH);
+        self.requireValidAvatarPointerFields(owner_wallet, avatar_hash, avatar_stream_id, avatar_part_count, media_format);
 
-    receive(msg: SealGenesis) {
-        self.requireUnsealed();
-        self.requireGenesisController();
-        throwUnless(21040, msg.deployment_manifest_hash > 1);
-        throwUnless(21041, self.deployment_manifest_hash == msg.deployment_manifest_hash);
-        throwUnless(21042, self.official_ath_wallet_bound);
-        throwUnless(21043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
-        throwUnless(21044, self.isBasechainAddress(self.treasury_ath_receiver_address));
-        self.genesis_config_hash = msg.deployment_manifest_hash;
-        self.sealed = true;
-    }
-
-    receive(msg: AthTransferNotificationProfileAvatar) {
-        self.requireSealed();
-        throwUnless(21110, sender() == self.official_ath_wallet_address);
-        throwUnless(21111, msg.amount == PROFILE_AVATAR_PRICE_ATH);
-        self.requireValidAvatarPointer(msg);
-
-        let currentVersionOpt: Int? = self.current_avatar_versions.get(msg.owner_wallet);
+        let currentVersionOpt: Int? = self.current_avatar_versions.get(owner_wallet);
         let retainedValue: Int = PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT + PROFILE_ATH_NOTIFICATION_ACK_VALUE + PROFILE_STATE_GROWTH_EXEC_RESERVE;
         if (currentVersionOpt == null) {
             retainedValue += PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT;
@@ -281,28 +319,109 @@ contract ProfileRegistry {
             self.profile_count += 1;
         }
 
-        let recordId: Int = self.computeAvatarRecordId(msg.owner_wallet, nextVersion);
+        let recordId: Int = self.computeAvatarRecordId(owner_wallet, nextVersion);
         throwUnless(21114, !self.avatar_records.exists(recordId));
         self.avatar_records.set(recordId, ProfileAvatarRecord {
-            owner_wallet: msg.owner_wallet,
+            owner_wallet: owner_wallet,
             version: nextVersion,
-            avatar_hash: msg.avatar_hash,
-            avatar_entry_id: msg.avatar_entry_id,
-            avatar_stream_id: msg.avatar_stream_id,
-            avatar_part_count: msg.avatar_part_count,
-            media_format: msg.media_format,
+            avatar_hash: avatar_hash,
+            avatar_entry_id: avatar_entry_id,
+            avatar_stream_id: avatar_stream_id,
+            avatar_part_count: avatar_part_count,
+            media_format: media_format,
             updated_at: now()
         });
-        self.current_avatar_versions.set(msg.owner_wallet, nextVersion);
+        self.current_avatar_versions.set(owner_wallet, nextVersion);
         self.avatar_record_count += 1;
 
-        let treasury_amount: Int = (msg.amount * PROFILE_TREASURY_SHARE_BPS) / PROFILE_SPLIT_BASE_BPS;
-        let burn_amount: Int = msg.amount - treasury_amount;
+        let treasury_amount: Int = (amount * PROFILE_TREASURY_SHARE_BPS) / PROFILE_SPLIT_BASE_BPS;
+        let burn_amount: Int = amount - treasury_amount;
         self.treasury_due_ath += treasury_amount;
         self.burn_due_ath += burn_amount;
 
-        self.sendAthNotificationAck(msg.query_id, msg.sender_key, msg.amount);
-        self.refundAvatarExcess(msg.owner_wallet, retainedValue);
+        self.sendAthNotificationAck(query_id, sender_key, amount);
+        self.refundAvatarExcess(query_id, owner_wallet, retainedValue, vault_funded);
+    }
+
+    receive(msg: BindProfileOfficialAthWallet) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(21031, msg.deployment_manifest_hash > 1);
+        throwUnless(21032, !self.official_ath_wallet_bound);
+        throwUnless(21033, self.genesis_config_hash == 0);
+        throwUnless(21034, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(21035, msg.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
+        self.deployment_manifest_hash = msg.deployment_manifest_hash;
+        self.genesis_config_hash = 1;
+        self.official_ath_wallet_address = msg.official_ath_wallet_address;
+        self.official_ath_wallet_bound = true;
+    }
+
+    receive(msg: BindProfileVault) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(21036, msg.deployment_manifest_hash > 1);
+        throwUnless(21037, !self.vault_bound);
+        throwUnless(21038, self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(21039, self.isBasechainAddress(msg.vault_address));
+        throwUnless(21045, msg.vault_address != myAddress());
+        self.vault_address = msg.vault_address;
+        self.vault_bound = true;
+    }
+
+    receive(msg: SealGenesis) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(21040, msg.deployment_manifest_hash > 1);
+        throwUnless(21041, self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(21042, self.official_ath_wallet_bound);
+        throwUnless(21043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
+        throwUnless(21044, self.isBasechainAddress(self.treasury_ath_receiver_address));
+        throwUnless(21046, self.vault_bound);
+        throwUnless(21047, self.isBasechainAddress(self.vault_address));
+        throwUnless(21048, self.vault_address != myAddress());
+        throwUnless(21049, self.treasury_ath_receiver_address != myAddress());
+        throwUnless(21050, self.treasury_ath_receiver_address != self.official_ath_wallet_address);
+        throwUnless(21051, self.treasury_ath_receiver_address != self.vault_address);
+        throwUnless(21052, self.treasury_ath_receiver_address != self.ath_master_address);
+        self.genesis_config_hash = msg.deployment_manifest_hash;
+        self.sealed = true;
+    }
+
+    receive(msg: AthTransferNotificationProfileAvatar) {
+        self.requireSealed();
+        throwUnless(21110, sender() == self.official_ath_wallet_address);
+        self.acceptAvatarPayment(
+            msg.query_id,
+            msg.sender_key,
+            msg.amount,
+            msg.owner_wallet,
+            msg.avatar_hash,
+            msg.avatar_entry_id,
+            msg.avatar_stream_id,
+            msg.avatar_part_count,
+            msg.media_format,
+            false
+        );
+    }
+
+    receive(msg: AthTransferNotificationVaultProfileAvatar) {
+        self.requireSealed();
+        throwUnless(21160, sender() == self.official_ath_wallet_address);
+        throwUnless(21162, self.vault_bound);
+        throwUnless(21161, msg.payer_wallet == self.vault_address);
+        self.acceptAvatarPayment(
+            msg.query_id,
+            msg.sender_key,
+            msg.amount,
+            msg.owner_wallet,
+            msg.avatar_hash,
+            msg.avatar_entry_id,
+            msg.avatar_stream_id,
+            msg.avatar_part_count,
+            msg.media_format,
+            true
+        );
     }
 
     receive(msg: FlushProfileTreasuryAthDue) {
@@ -425,9 +544,11 @@ contract ProfileRegistry {
         return ProfileRegistryGlobalView {
             sealed: self.sealed,
             official_ath_wallet_bound: self.official_ath_wallet_bound,
+            vault_bound: self.vault_bound,
             deployment_manifest_hash: self.deployment_manifest_hash,
             genesis_config_hash: self.genesis_config_hash,
             official_ath_wallet_address: self.official_ath_wallet_address,
+            vault_address: self.vault_address,
             ath_master_address: self.ath_master_address,
             treasury_ath_receiver_address: self.treasury_ath_receiver_address,
             genesis_controller_address: self.genesis_controller_address,
@@ -490,5 +611,41 @@ contract ProfileRegistry {
 
     get fun get_ath_wallet_address(owner_wallet: Address): Address {
         return self.deriveAthWalletAddress(owner_wallet);
+    }
+
+    get fun get_pending_treasury_flush(query_id: Int): PendingProfileTreasuryFlushView {
+        let pendingOpt: PendingProfileTreasuryFlush? = self.pending_treasury_flushes.get(query_id);
+        if (pendingOpt == null) {
+            return PendingProfileTreasuryFlushView {
+                exists: false,
+                amount: 0,
+                recipient_ath_wallet: self.treasury_ath_receiver_address,
+                created_at: 0
+            };
+        }
+        let pending: PendingProfileTreasuryFlush = pendingOpt!!;
+        return PendingProfileTreasuryFlushView {
+            exists: true,
+            amount: pending.amount,
+            recipient_ath_wallet: pending.recipient_ath_wallet,
+            created_at: pending.created_at
+        };
+    }
+
+    get fun get_pending_burn_flush(query_id: Int): PendingProfileBurnFlushView {
+        let pendingOpt: PendingProfileBurnFlush? = self.pending_burn_flushes.get(query_id);
+        if (pendingOpt == null) {
+            return PendingProfileBurnFlushView {
+                exists: false,
+                amount: 0,
+                created_at: 0
+            };
+        }
+        let pending: PendingProfileBurnFlush = pendingOpt!!;
+        return PendingProfileBurnFlushView {
+            exists: true,
+            amount: pending.amount,
+            created_at: pending.created_at
+        };
     }
 }

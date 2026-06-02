@@ -1,34 +1,34 @@
 {
   "profile": "PLATHO.V1.USERNAME_NFT_ITEM_V1",
-  "username_nft_item_code_hash": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
-  "derivation_formula": "addr_std(owner_workchain, cell_hash(StateInit{code=USERNAME_NFT_ITEM_CODE_CELL,data=UsernameNFTItemDataV1(owner_wallet,username_registry_address,name_hash)}))",
+  "username_nft_item_code_hash": "3ad1c971f6b04e67e8dafcb0624aa794e996761420500cdf10d4edc77a2037ce",
+  "derivation_formula": "addr_std(registry_workchain, cell_hash(StateInit{code=USERNAME_NFT_ITEM_CODE_CELL,data=UsernameNFTItemDataV1(username_registry_address,name_hash)})); current owner is set by InitializeUsernameItem and then NftTransfer",
   "items": [
     {
       "name": "platho",
-      "owner_wallet": "EQDSzTL9T7TUnsXfRSFOfMpCFuofQISYZKfmQz1DDjsLT4UD",
+      "initial_owner_wallet": "EQDSzTL9T7TUnsXfRSFOfMpCFuofQISYZKfmQz1DDjsLT4UD",
       "username_registry_address": "EQC2D5I2jhg3Puip6OfkDTCp6-TV5pxm_cs9uhV0UTblmSLn",
-      "name_hash": "0x6e4bc608c66b0c4c5ff6dc247619526b193faac5d937b88c2608420796fa8bb3",
-      "data_cell_hash": "8283685566be6a6341f57a82d1352df3a0ede462734b2ac8d6328d5cde715a50",
-      "state_init_hash": "9d0cfced48a2887f4e8ac8376d0c17ad33dd571847970df60728b14f8a17263a",
-      "derived_item_address": "EQCdDPztSKKIf06KyDdtDBetM91XGEeXDfYHKLFPihcmOmEM"
+      "name_hash": "0x3fdf7a869dfd5cea86cb3a58aaca0cae9918c12f6755c94f4b7abcd2dc83501f",
+      "data_cell_hash": "ec4561b67beabd79c73668784d635788cf97ee410a4af919bd689434872f2bca",
+      "state_init_hash": "07f2978e233909c05dc1d76ae4db1c0d65ea113d80c14ea92304f1c66b1d8372",
+      "derived_item_address": "EQAH8peOIzkJwF3B12rk2xwNZeoRPYDBTqkjBPHGax2DcsU0"
     },
     {
       "name": "larisa",
-      "owner_wallet": "EQAmw3MiBsQyn6W6bePssGs7RMAsTJfdSQS4hNuuEB1ZchbT",
+      "initial_owner_wallet": "EQAmw3MiBsQyn6W6bePssGs7RMAsTJfdSQS4hNuuEB1ZchbT",
       "username_registry_address": "EQC2D5I2jhg3Puip6OfkDTCp6-TV5pxm_cs9uhV0UTblmSLn",
-      "name_hash": "0x432558c4322c9af1cb3cf1b5b3f1fc4472ad3622ce08591f6c7f8785c1dc073b",
-      "data_cell_hash": "4bca91d34eb390c670bc6ac4e3ddde2a5cba5f2859a714a9f977bbdbc3d48e15",
-      "state_init_hash": "dd73d92f988f1c34872c17e3eb7929e82c94da50e3e038ff7762b0323b0d1f47",
-      "derived_item_address": "EQDdc9kvmI8cNIcsF-PreSnoLJTaUOPgOP93YrAyOw0fRzlP"
+      "name_hash": "0x87f78a9d99d475e6e3d3f8eb625fc3f3947f99da394b8e90d73b9fa444c9ae8b",
+      "data_cell_hash": "0ef84c10f31703eb45441073571e1dc13bcef92763e42947c524ee40b2bdf99a",
+      "state_init_hash": "7390d62b717bc180c1b0e13e930787f71ca9d4759d058fc53241e01be7d73103",
+      "derived_item_address": "EQBzkNYrcXvBgMGw4T6TB4f3HKnUdZ0Fj8UyQeAb59cxA1Ns"
     },
     {
       "name": "testname",
-      "owner_wallet": "Ef8WGfkwBIGbhkMsEGt9Pl10OGgQ4o_sGpRnlRzl5IfXB3Cw",
+      "initial_owner_wallet": "Ef8WGfkwBIGbhkMsEGt9Pl10OGgQ4o_sGpRnlRzl5IfXB3Cw",
       "username_registry_address": "Ef_7HxOMngim2TZVNBcHtPlwvgSWQC2R0sy6dK0lESpdT6m5",
-      "name_hash": "0xc677904cab36d96d9f97826a1939b176dfa0c8d36be652522a32814d973debeb",
-      "data_cell_hash": "e26719fb0c8475ac8b68a44f16cadaba46c5233d24ea1944b8019a275be3473e",
-      "state_init_hash": "cb09ebd14b2c28a2ecf1bc55dcf0701314001cb0e90df40703af7b0e8c9add89",
-      "derived_item_address": "Ef_LCevRSywoouzxvFXc8HATFAAcsOkN9AcDr3sOjJrdiQpj"
+      "name_hash": "0x07a804d6688b58a10e5646b22c287c1704bf54a2e23c04b1357df699a3ba9a33",
+      "data_cell_hash": "1a6d5e3915b7dcb6b38b0f685872010678276dd40813ba75a9b92b6f6398fedc",
+      "state_init_hash": "0b786696fbda9a6149d6f045e9af25d83f6c117d2f3c739e5e462e6661c09abb",
+      "derived_item_address": "Ef8LeGaW-9qaYUnW8EXpryXYP2wRfS88c55eRi5mYcCau_bx"
     }
   ]
 }

@@ -16,7 +16,7 @@ import {
 } from './helpers/capsule-cells';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
-const PRIVATE_FEE = 5_000_000n;
+const PRIVATE_FEE = 10_000_000n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(`PLATHO.V1.CAPSULE.AUTH.${label}`).digest('hex'));
@@ -75,16 +75,18 @@ async function setup(options?: { sealed?: boolean; vaultBound?: boolean }) {
 }
 
 function vaultPrivate(overrides?: Partial<PublishPrivateFromVault>): PublishPrivateFromVault {
+  const sizeClass = overrides?.size_class ?? 1n;
+  const cryptoSuite = overrides?.crypto_suite ?? 2n;
   const header_0 = overrides?.header_0 ?? finalPrivateHeader0Cell(0x76);
   const header_1 = overrides?.header_1 ?? finalPrivateHeader1Cell(0x77);
-  const body = overrides?.body ?? finalPrivateBodyCell(1, 0x78);
+  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x78, cryptoSuite);
   return {
     $$type: 'PublishPrivateFromVault',
     bounce_id: 7001n,
     bounce_tag: 7001n,
     publish_id: hash256('vault-private'),
-    size_class: 1n,
-    crypto_suite: 1n,
+    size_class: sizeClass,
+    crypto_suite: cryptoSuite,
     header_0_hash: cellHash(header_0),
     header_1_hash: cellHash(header_1),
     body_hash: cellHash(body),
@@ -113,6 +115,12 @@ describe('CapsuleHub negative authorization matrix', () => {
       counterpart_address: mockVaultAddress,
     } as BindDeploymentManifest);
     expect((await capsule.getGetState()).vault_bound).toBe(true);
+
+    await capsule.send(controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: 0n,
+    } as SealGenesis);
+    expect((await capsule.getGetState()).sealed).toBe(false);
 
     await capsule.send(attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',

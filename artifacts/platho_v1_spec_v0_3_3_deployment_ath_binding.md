@@ -1,5 +1,10 @@
 # Platho v1 Protocol Specification
 
+> HISTORICAL ONLY. SUPERSEDED. DO NOT USE AS THE CURRENT V1 SOURCE OF TRUTH.
+> This milestone document still contains the removed Vault message-budget/session publish model. Current v1 uses Vault
+> signed external publish, no `message_budget_ton`, no `SetSession` / `RevokeSession`, and no session publish ABI. The
+> active capsule layout and off-state body model are in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+
 **Document status:** clean rebuild for implementation handoff; Vault M6 external publish and M7 deployment ATH binding aligned  
 **Version:** v0.3.3-deployment-ath-binding  
 **Scope:** immutable TON-based Platho v1 contracts and official client rules  
@@ -7,13 +12,13 @@
 
 **BuybackBurn ABI note, 2026-05-20:** this v0.3.3 table is superseded for active BuybackBurn ABI by `artifacts/M29_BUYBACKBURN_ABI_AND_EVIDENCE_REVIEW.md`. The production source of truth is the BY* table implemented in `contracts/BuybackBurn.tact` and exported by `build/BuybackBurn/BuybackBurn_BuybackBurn.ts`; older `ExecuteBuyback` / `BuybackBounceRecovery` / `PruneStuckBuyback` names below are historical milestone context only.
 
-**CapsuleHub final note, 2026-05-22:** this document is superseded for CapsuleHub message storage, binary capsule layout, and publish pricing by `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores retrievable payload cells and removed the separate page-storage reserve; page counters are metadata-only.
+**CapsuleHub final note, 2026-05-22:** this document is superseded for CapsuleHub message storage, binary capsule layout, and publish pricing by `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores compact authenticated entry state, retrieves heavy body cells from accepted publish transaction history, and removed the separate page-storage reserve; page counters are metadata-only.
 
 ---
 
 ## 0. Core Philosophy
 
-Platho v1 is an immutable protocol for encrypted wallet-to-wallet messaging, public posts, message-budget no-popup publishing, protocol fees, ATH utility token accounting, username NFTs, buyback/burn, and receive-intent transfers.
+Platho v1 is an immutable protocol for encrypted wallet-to-wallet messaging, public posts, signed Vault publishing, protocol fees, ATH utility token accounting, username NFTs, buyback/burn, and receive-intent transfers.
 
 After deployment and seal, v1 contracts do not evolve.
 
@@ -336,7 +341,7 @@ header_1_cell = PH1B binary header, exactly 30 bytes
 body_cell     = platho.byte-layout.v1 encrypted body
 ```
 
-The encrypted body plaintext uses the final `PCP1` slot defined in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`: encrypted metadata plus exactly one 1024-byte user payload slot. Standard and postquantum capsules expose the same useful capacity per capsule. Smaller messages are padded inside the encrypted plaintext. Long text/images use multiple capsules with encrypted `stream_id`, `part_index`, and `part_count`; a single capsule must not contain multiple 1024-byte slots. Exact body sizes are: standard = 1,140 bytes; postquantum = 2,228 bytes.
+The encrypted body plaintext uses the final `PCP1` slot defined in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`: encrypted metadata plus exactly one user payload slot selected from the 1, 2, 4, 8, 16, or 32 KiB hybrid size classes. Smaller messages are padded inside the selected encrypted plaintext slot. Long text/images use multiple independent capsules with encrypted `stream_id`, `part_index`, and `part_count`; a single capsule must not mix unrelated payload units. Exact hybrid body sizes are listed in the final capsule spec.
 
 It does not parse private payload semantics, recipient identity, private conversation state, wallet balances, ATH discount ownership, or receive-intent secrets.
 
@@ -836,9 +841,8 @@ No unhandled throw/revert is allowed between accept and debit.
 Post-accept failures are controlled invalid signed requests:
 
 ```text
-charge INVALID_SESSION_REQUEST_CHARGE_TON
-refund max_charge - INVALID_SESSION_REQUEST_CHARGE_TON to message_budget_ton
 nonce remains consumed
+only the size-class local execution reserve remains spent
 no CapsuleHub publish
 no PLATO fee
 ```
@@ -848,24 +852,27 @@ no PLATO fee
 Max charge uses current ATH discount only after the activity-distribution gate:
 
 ```text
-message_discount_unlocked = airdrop_remaining_ath <= 15_000_000 ATH
+message_discount_unlocked = airdrop_remaining_ath == 0 ATH
 ```
 
 Before this condition is true, `discounted_fee(owner, full_fee) = full_fee`
 for public and private message publishes.
+After unlock, ATH reduces only the protocol-fee component. This historical draft used a nonzero floor, but that rule is superseded.
+Current final v1 pricing uses a `0.010 TON` Platho protocol fee for public and private publishes, and the ATH threshold can discount the full protocol-fee component.
 
 ```text
-MAX_CHARGE_PRIVATE_STANDARD(owner_wallet)
-MAX_CHARGE_PRIVATE_LONG_TERM(owner_wallet)
+MAX_CHARGE_PRIVATE_HYBRID(owner_wallet, size_class)
 MAX_CHARGE_PUBLIC(owner_wallet)
 ```
 
 Each includes:
 
 ```text
-VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
-+ CapsuleHub call value with discounted PLATO fee
-+ possible CapsuleHub page storage endowment
+Vault local execution reserve for the selected publish kind/size class
++ discounted PLATO fee after ATH discount unlock
++ CapsuleHub execution reserve
++ CapsuleHub compact index/header storage endowment
++ CapsuleHub ACK forward reserve
 ```
 
 ATH discount applies only to PLATO fee, not execution/storage/state endowment.
@@ -1332,7 +1339,8 @@ Late ACK after pending deleted/refunded is rejected.
 
 ### 11.5 Ownership
 
-NFT item owner is source of truth.
+Superseded for final username ownership semantics: the registry name record is the name-to-item anchor, and the current
+owner is read from the exact `UsernameNFTItem` pointed to by that record. Item-only ownership is non-authoritative.
 
 No seize, revoke, force-transfer, admin transfer.
 

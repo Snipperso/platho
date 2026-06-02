@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { Address } from '@ton/core';
 
 type Draft = {
   document: string;
@@ -13,7 +14,15 @@ type Draft = {
     constants: Record<string, string>;
   };
   role_summary: Record<string, { label: string; normalized_address: string }>;
-  initial_state_init: Record<string, { address: string; raw_address: string; state_init_hash: string }>;
+  initial_state_init: Record<string, {
+    address: string;
+    raw_address: string;
+    state_init_hash: string;
+    sealed?: boolean;
+    deployment_manifest_hash?: unknown;
+    binding_flags?: unknown;
+    [key: string]: unknown;
+  }>;
   official_ath_wallets: Record<string, string>;
   derived_ath_wallets: Record<string, { address: string; owner_address: string; ath_master_address: string; state_init_hash: string; note: string }>;
   funding_checklist: Array<{
@@ -74,7 +83,224 @@ function codeHash(draft: Draft, key: string): string {
   return value;
 }
 
+function sameAddressString(left: string, right: string): boolean {
+  try {
+    return Address.parse(left).equals(Address.parse(right));
+  } catch {
+    return left === right;
+  }
+}
+
+function optionalAddress(draft: Draft, key: string): string | null {
+  return draft.manifest.addresses[key] ?? null;
+}
+
+function protocolRoleDenylist(draft: Draft): Array<[string, string]> {
+  const keys = [
+    'ath_master',
+    'ath_long_term_vesting',
+    'ath_long_term_vesting_official_ath_wallet',
+    'ath_treasury_owner_ath_wallet',
+    'buyback_burn',
+    'buyback_burn_initial_genesis_controller',
+    'buyback_burn_launch_controller',
+    'buyback_burn_official_ath_wallet',
+    'capsulehub',
+    'capsulehub_initial_vault_placeholder',
+    'fee_accumulator',
+    'genesis_controller_one_shot',
+    'market_stability_seller',
+    'market_stability_seller_initial_genesis_controller',
+    'market_stability_seller_launch_controller',
+    'market_stability_seller_official_ath_wallet',
+    'profile_registry',
+    'profile_registry_initial_ath_wallet_placeholder',
+    'profile_registry_official_ath_wallet',
+    'username_registry',
+    'username_registry_initial_ath_wallet_placeholder',
+    'username_registry_official_ath_wallet',
+    'vault',
+    'vault_initial_capsulehub_placeholder',
+    'vault_official_ath_wallet',
+  ];
+  return keys
+    .map((key): [string, string | null] => [key, optionalAddress(draft, key)])
+    .filter((entry): entry is [string, string] => Boolean(entry[1]));
+}
+
+function validateTreasuryReceiverNotProtocolOwned(draft: Draft, receiverKey: string, label: string) {
+  const receiver = address(draft, receiverKey);
+  for (const [forbiddenKey, forbidden] of protocolRoleDenylist(draft)) {
+    if (sameAddressString(receiver, forbidden)) {
+      throw new Error(`${label} must not equal protocol role ${forbiddenKey}: ${receiver}`);
+    }
+  }
+}
+
+function validateDistinctManifestAddresses(draft: Draft) {
+  const keys = ['vault', 'capsulehub', 'profile_registry', 'username_registry'];
+  for (let i = 0; i < keys.length; i += 1) {
+    for (let j = i + 1; j < keys.length; j += 1) {
+      const leftKey = keys[i];
+      const rightKey = keys[j];
+      const left = address(draft, leftKey);
+      const right = address(draft, rightKey);
+      if (sameAddressString(left, right)) {
+        throw new Error(`Manifest core role address collision: ${leftKey} and ${rightKey} both resolve to ${left}`);
+      }
+    }
+  }
+
+  const profileTreasury = address(draft, 'profile_registry_treasury_ath_receiver');
+  for (const forbiddenKey of ['profile_registry', 'profile_registry_official_ath_wallet', 'vault', 'ath_master']) {
+    const forbidden = address(draft, forbiddenKey);
+    if (sameAddressString(profileTreasury, forbidden)) {
+      throw new Error(`ProfileRegistry treasury receiver must not equal ${forbiddenKey}: ${profileTreasury}`);
+    }
+  }
+
+  const usernameTreasury = address(draft, 'treasury_ath_receiver');
+  for (const forbiddenKey of ['username_registry', 'username_registry_official_ath_wallet', 'vault', 'ath_master']) {
+    const forbidden = address(draft, forbiddenKey);
+    if (sameAddressString(usernameTreasury, forbidden)) {
+      throw new Error(`UsernameRegistry treasury receiver must not equal ${forbiddenKey}: ${usernameTreasury}`);
+    }
+  }
+
+  validateTreasuryReceiverNotProtocolOwned(draft, 'profile_registry_treasury_ath_receiver', 'ProfileRegistry treasury receiver');
+  validateTreasuryReceiverNotProtocolOwned(draft, 'treasury_ath_receiver', 'UsernameRegistry treasury receiver');
+  validateTreasuryReceiverNotProtocolOwned(draft, 'fee_accumulator_ton_treasury_receiver', 'FeeAccumulator TON treasury receiver');
+  validateTreasuryReceiverNotProtocolOwned(draft, 'market_stability_ton_treasury_receiver', 'MarketStabilitySeller TON treasury receiver');
+  validateTreasuryReceiverNotProtocolOwned(draft, 'market_stability_reserve_funder', 'MarketStabilitySeller reserve funder');
+}
+
+function requiredInitialStateEntries(): Array<[string, string, string]> {
+  return [
+    ['ath_master', 'ath_master', 'ath_master'],
+    ['ath_long_term_vesting', 'ath_long_term_vesting', 'ath_long_term_vesting_initial'],
+    ['buyback_burn', 'buyback_burn', 'buyback_burn_initial'],
+    ['market_stability_seller', 'market_stability_seller', 'market_stability_seller_initial'],
+    ['fee_accumulator', 'fee_accumulator', 'fee_accumulator'],
+    ['vault', 'vault', 'vault_initial'],
+    ['capsulehub', 'capsulehub', 'capsulehub_initial'],
+    ['username_registry', 'username_registry', 'username_registry_initial'],
+    ['profile_registry', 'profile_registry', 'profile_registry_initial'],
+  ];
+}
+
+const STAGED_BIND_SEAL_INITIAL_STATE: Record<string, string> = {
+  buyback_burn: 'bind FeeAccumulator and official ATH wallet before SealBuybackBurnGenesis',
+  market_stability_seller: 'bind reserve funder, official ATH wallet, and treasury before SealMarketStabilityGenesis',
+  vault: 'bind CapsuleHub, official ATH wallet, ProfileRegistry, and UsernameRegistry before SealGenesis',
+  capsulehub: 'bind Vault before SealGenesis',
+  username_registry: 'bind official ATH wallet and Vault before SealGenesis',
+  profile_registry: 'bind official ATH wallet and Vault before SealGenesis',
+};
+
+function isNonZeroInitialScalar(value: unknown): boolean {
+  if (value === undefined || value === null || value === false || value === '') return false;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'bigint') return value !== 0n;
+  if (typeof value !== 'string') return true;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '' || normalized === '0') return false;
+  if (/^0x0+$/.test(normalized)) return false;
+  if (/^0+$/.test(normalized)) return false;
+  return true;
+}
+
+function validateInitialStateInit(draft: Draft) {
+  for (const [entryKey, addressKey, stateKey] of requiredInitialStateEntries()) {
+    const entry = draft.initial_state_init?.[entryKey];
+    if (!entry) throw new Error(`Missing initial StateInit entry ${entryKey}`);
+
+    const expectedAddress = address(draft, addressKey);
+    if (!sameAddressString(entry.address, expectedAddress)) {
+      throw new Error(`Initial StateInit ${entryKey} address mismatch: expected ${expectedAddress}, got ${entry.address}`);
+    }
+
+    const expectedStateHash = stateHash(draft, stateKey);
+    if ((entry.state_init_hash ?? '').toLowerCase() !== expectedStateHash.toLowerCase()) {
+      throw new Error(`Initial StateInit ${entryKey} hash mismatch: expected ${expectedStateHash}, got ${entry.state_init_hash}`);
+    }
+
+    const stagedBindSealReason = STAGED_BIND_SEAL_INITIAL_STATE[entryKey];
+    if (stagedBindSealReason && entry.sealed === true) {
+      throw new Error(`Initial StateInit ${entryKey} must be unsealed; ${stagedBindSealReason}.`);
+    }
+    if (stagedBindSealReason) {
+      const preboundFields = Object.entries(entry)
+        .filter(([field, value]) => field.endsWith('_bound') && value === true)
+        .map(([field]) => field);
+      if (preboundFields.length > 0 || isNonZeroInitialScalar(entry.binding_flags)) {
+        throw new Error(`Initial StateInit ${entryKey} must start unbound before staged bind/seal; found ${preboundFields.concat(isNonZeroInitialScalar(entry.binding_flags) ? ['binding_flags'] : []).join(', ')}.`);
+      }
+      if (isNonZeroInitialScalar(entry.deployment_manifest_hash)) {
+        throw new Error(`Initial StateInit ${entryKey} must not carry deployment_manifest_hash before staged bind/seal.`);
+      }
+    }
+  }
+}
+
+function requiredPreSealBindings(draft: Draft): Array<[string, string]> {
+  return [
+    ['BuybackBurn.BindBuybackFeeAccumulator', address(draft, 'fee_accumulator')],
+    ['BuybackBurn.BindBuybackOfficialAthWallet', address(draft, 'buyback_burn_official_ath_wallet')],
+    ['MarketStabilitySeller.BindMarketStabilityReserveFunder', address(draft, 'market_stability_reserve_funder')],
+    ['MarketStabilitySeller.BindMarketStabilityOfficialAthWallet', address(draft, 'market_stability_seller_official_ath_wallet')],
+    ['MarketStabilitySeller.BindMarketStabilityTreasury', address(draft, 'market_stability_ton_treasury_receiver')],
+    ['Vault.BindDeploymentManifest.counterpart', address(draft, 'capsulehub')],
+    ['Vault.BindOfficialAthWallet', address(draft, 'vault_official_ath_wallet')],
+    ['Vault.BindProfileRegistry', address(draft, 'profile_registry')],
+    ['Vault.BindUsernameRegistry', address(draft, 'username_registry')],
+    ['CapsuleHub.BindDeploymentManifest.counterpart', address(draft, 'vault')],
+    ['UsernameRegistry.BindOfficialAthWallet', address(draft, 'username_registry_official_ath_wallet')],
+    ['UsernameRegistry.BindUsernameVault', address(draft, 'vault')],
+    ['ProfileRegistry.BindProfileOfficialAthWallet', address(draft, 'profile_registry_official_ath_wallet')],
+    ['ProfileRegistry.BindProfileVault', address(draft, 'vault')],
+  ];
+}
+
+function bindingOwnerAddress(draft: Draft, message: string): string | null {
+  if (message.startsWith('Vault.')) return address(draft, 'vault');
+  if (message.startsWith('CapsuleHub.')) return address(draft, 'capsulehub');
+  if (message.startsWith('UsernameRegistry.')) return address(draft, 'username_registry');
+  if (message.startsWith('ProfileRegistry.')) return address(draft, 'profile_registry');
+  if (message.startsWith('BuybackBurn.')) return address(draft, 'buyback_burn');
+  if (message.startsWith('MarketStabilitySeller.')) return address(draft, 'market_stability_seller');
+  return null;
+}
+
+function validatePreSealBindings(draft: Draft) {
+  const required = requiredPreSealBindings(draft);
+  const requiredByMessage = new Map(required);
+  const seen = new Map<string, string>();
+
+  for (const [message, value] of draft.pre_seal_bindings) {
+    if (seen.has(message)) throw new Error(`Duplicate pre-seal binding ${message}`);
+    seen.set(message, value);
+
+    const expected = requiredByMessage.get(message);
+    if (!expected) throw new Error(`Unexpected pre-seal binding ${message}`);
+    if (!sameAddressString(value, expected)) {
+      throw new Error(`Pre-seal binding ${message} target mismatch: expected ${expected}, got ${value}`);
+    }
+
+    const ownerAddress = bindingOwnerAddress(draft, message);
+    if (ownerAddress && sameAddressString(value, ownerAddress)) {
+      throw new Error(`Pre-seal binding ${message} self-binds ${value}`);
+    }
+  }
+
+  for (const [message, expected] of required) {
+    if (!seen.has(message)) throw new Error(`Missing required pre-seal binding ${message} -> ${expected}`);
+  }
+}
+
 export function buildPacket(draft: Draft) {
+  validateDistinctManifestAddresses(draft);
+  validateInitialStateInit(draft);
+  validatePreSealBindings(draft);
   const manifestHash = draft.manifest.manifest_hash_hex;
   const deploymentSteps = [
     {
@@ -248,34 +474,37 @@ export function buildPacket(draft: Draft) {
     derived_ath_wallets: draft.derived_ath_wallets,
     phase_1_deploy_contracts: deploymentSteps,
     phase_2_pre_seal_bindings: bindingSteps,
-    phase_3_seal_contracts: sealSteps,
-    phase_4_final_genesis_funding: fundingSteps,
+    phase_3_pre_seal_funding: fundingSteps,
+    phase_4_seal_contracts: sealSteps,
     phase_5_final_genesis_verification: {
       template: 'artifacts/mainnet_genesis_verify_input_template.json',
       command: 'npm.cmd run mainnet:genesis:verify',
       must_pass_before: [
-        'public PWA mainnet config release',
+        'production PWA mainnet config release',
+        '15M activity airdrop distribution through Vault',
         'initial liquidity pool launch',
         'MarketStability pricing freeze',
         'Buyback route freeze',
         'EnableBuybackSplit',
       ],
     },
-    post_pool_not_in_this_packet: [
-      'Open 15M ATH / 100,000 TON liquidity pool.',
+    post_genesis_not_in_this_packet: [
+      'Release production PWA/mainnet config only after preprod and crypto gates pass.',
+      'Distribute the 15M ATH activity airdrop through Vault until airdrop_remaining_ath is zero.',
+      'Open 15M ATH / 100,000 TON liquidity pool only after the activity airdrop is fully distributed.',
       'Collect STON.fi route evidence and run M20F route preflights.',
       'Freeze BuybackBurn route.',
       'Freeze MarketStabilitySeller pricing.',
       'Fund 60M ATH seller reserve through official reserve notify flow.',
       'Run market_stability_seller_readiness.',
-      'Run enable_buyback_split_preflight only after airdrop is fully distributed.',
+      'Run enable_buyback_split_preflight only after activity airdrop distribution, route freeze, and seller readiness gates are clean.',
       'Enable FeeAccumulator buyback split.',
     ],
     hard_stops: [
       'Stop on any address mismatch between this packet, Tonkeeper transaction preview, and live getter.',
       'Stop if a wallet asks for seed phrase in a browser page.',
       'Stop if final manifest hash changes after funding begins.',
-      'Stop if any official ATHWallet balance is overfunded or underfunded at final genesis.',
+      'Stop if Vault or ATHVesting official ATHWallet is not active with exact funding, or if zero-balance official ATHWallets are active with non-zero ATH. Username/Profile/Buyback/MSS official ATHWallets may still be uninit at their deterministic StateInit addresses.',
       'Stop if any post-seal binding still succeeds.',
     ],
   };
@@ -314,14 +543,14 @@ function markdown(packet: ReturnType<typeof buildPacket>): string {
     lines.push(`| ${step.id} | ${step.message} | ${step.value} | ${step.stop_check} |`);
   }
 
-  lines.push('', '## Phase 3: Seal Contracts', '', '| Step | Message | Target | Stop Check |', '| --- | --- | --- | --- |');
-  for (const step of packet.phase_3_seal_contracts) {
-    lines.push(`| ${step.id} | ${step.message} | ${step.target_address} | ${step.stop_check} |`);
+  lines.push('', '## Phase 3: Pre-Seal Genesis Funding', '', '| Step | Signer | Action | Target | Recipient Owner | Expected Official Wallet | Amount Atomic | Stop Check |', '| --- | --- | --- | --- | --- | --- | ---: | --- |');
+  for (const step of packet.phase_3_pre_seal_funding) {
+    lines.push(`| ${step.id} | ${step.signer_role} | ${step.action} | ${step.target_address} | ${step.recipient_owner_address} | ${step.expected_recipient_ath_wallet} | ${step.amount_atomic} | ${step.stop_check} |`);
   }
 
-  lines.push('', '## Phase 4: Final Genesis Funding', '', '| Step | Signer | Action | Target | Recipient Owner | Expected Official Wallet | Amount Atomic | Stop Check |', '| --- | --- | --- | --- | --- | --- | ---: | --- |');
-  for (const step of packet.phase_4_final_genesis_funding) {
-    lines.push(`| ${step.id} | ${step.signer_role} | ${step.action} | ${step.target_address} | ${step.recipient_owner_address} | ${step.expected_recipient_ath_wallet} | ${step.amount_atomic} | ${step.stop_check} |`);
+  lines.push('', '## Phase 4: Seal Contracts', '', '| Step | Message | Target | Stop Check |', '| --- | --- | --- | --- |');
+  for (const step of packet.phase_4_seal_contracts) {
+    lines.push(`| ${step.id} | ${step.message} | ${step.target_address} | ${step.stop_check} |`);
   }
 
   lines.push('', '## Phase 5: Final Genesis Verification', '');
@@ -332,8 +561,8 @@ function markdown(packet: ReturnType<typeof buildPacket>): string {
     lines.push(`  - ${item}`);
   }
 
-  lines.push('', '## Post-Pool Tasks Not In This Packet', '');
-  for (const item of packet.post_pool_not_in_this_packet) {
+  lines.push('', '## Post-Genesis Tasks Not In This Packet', '');
+  for (const item of packet.post_genesis_not_in_this_packet) {
     lines.push(`- ${item}`);
   }
 
@@ -359,8 +588,8 @@ function main() {
     manifestHash: packet.manifest_hash_hex,
     deploySteps: packet.phase_1_deploy_contracts.length,
     bindingSteps: packet.phase_2_pre_seal_bindings.length,
-    sealSteps: packet.phase_3_seal_contracts.length,
-    fundingSteps: packet.phase_4_final_genesis_funding.length,
+    fundingSteps: packet.phase_3_pre_seal_funding.length,
+    sealSteps: packet.phase_4_seal_contracts.length,
   }, null, 2));
 }
 

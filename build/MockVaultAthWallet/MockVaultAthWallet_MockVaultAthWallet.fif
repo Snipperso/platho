@@ -21,8 +21,8 @@ PROGRAM{
     32 STU
     s1 s3 XCHG
     64 STU
+    160 STU
     128 STU
-    32 STU
     STSLICE
   }>
   $AthTransferNotification$_store_cell PROCINLINE:<{
@@ -57,17 +57,18 @@ PROGRAM{
     1096044105 PUSHINT
     SWAP
     32 STU
+    s1 s2 XCHG
+    64 STU
     SWAP
         STSLICER
         ENDC
         HASHCU
-    32 MODPOW2#
+    160 MODPOW2#
   }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
   $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet PROCINLINE:<{
-    s1 s2 XCHG
   }>
   $VaultAthTransferAck$_constructor_query_id_amount PROCINLINE:<{
   }>
@@ -115,7 +116,7 @@ PROGRAM{
       0 PUSHINT
       TRUE
       64 PUSHINT
-      s7 s4 XCPU
+      s7 s6 s4 XCPU2
       $MockVaultAthWallet$_fun_compute_sender_key INLINECALLDICT
       NIP
       s3 s6 XCHG

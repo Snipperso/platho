@@ -1,16 +1,82 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=14';
 
 export class VaultTonRpcProviderError extends Error {
-  constructor(message) {
+  constructor(message, options = {}) {
     super(message);
     this.name = 'VaultTonRpcProviderError';
+    if (options.status !== undefined) this.status = options.status;
+    if (options.code !== undefined) this.code = options.code;
+    if (options.retryAfterMs !== undefined) this.retryAfterMs = options.retryAfterMs;
   }
 }
 
 const BOC_MAGIC = [0xb5, 0xee, 0x9c, 0x72];
 const ADDRESS_SLICE_BITS = 267;
 const ADDRESS_CELL_DATA_BYTES = 34;
+const TONCENTER_REQUEST_SPACING_MS = 1_500;
+const TONCENTER_RATE_LIMIT_BACKOFF_MS = 60_000;
+const TONCENTER_MAX_RETRY_AFTER_MS = 120_000;
+const TONCENTER_RATE_LIMIT_RETRIES = 0;
+const TONCENTER_RUN_GET_METHOD_CACHE_TTL_MS = 15_000;
+const TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES = 512;
+const TONCENTER_MESSAGES_CACHE_TTL_MS = 300_000;
+const TONCENTER_MESSAGES_CACHE_MAX_ENTRIES = 128;
+const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
+const TON_RPC_CRITICAL_METHODS = Object.freeze([
+  'get_global',
+  'get_state',
+  'get_user',
+  'get_key_record',
+  'get_canonical_publish_charge',
+  'get_name_record',
+  'get_avatar',
+  'get_username_price',
+]);
+const TONCENTER_RUN_GET_METHOD_CACHE_TTLS_MS = Object.freeze({
+  get_global: 10_000,
+  get_state: 10_000,
+  get_user: 10_000,
+  get_wallet_data: 10_000,
+  get_key_record: 300_000,
+  get_receive_intent: 120_000,
+  get_receive_intent_id: 120_000,
+  get_receive_intent_commitment: 120_000,
+  get_ath_withdrawal_id: 120_000,
+  get_pending_ath_withdrawal_for: 10_000,
+  get_canonical_publish_charge: 60_000,
+  get_private_entry: 300_000,
+  get_public_entry: 300_000,
+  get_jetton_data: 300_000,
+  get_wallet_address: 300_000,
+  get_username_price: 300_000,
+  get_name_record: 120_000,
+  get_avatar: 120_000,
+});
+const TONCENTER_RUN_GET_METHOD_PRIORITIES = Object.freeze({
+  get_private_entry: 'messages',
+  get_public_entry: 'messages',
+  get_global: 'messages',
+  get_state: 'messages',
+  get_user: 'wallet',
+  get_wallet_data: 'wallet',
+  get_pending_ath_withdrawal_for: 'wallet',
+  get_key_record: 'profile',
+  get_name_record: 'profile',
+  get_avatar: 'profile',
+});
+const TONCENTER_REQUEST_PRIORITY_WEIGHTS = Object.freeze({
+  critical: 0,
+  messages: 1,
+  wallet: 2,
+  profile: 3,
+  background: 4,
+});
+const toncenterRequestStates = new Map();
+const toncenterRunGetMethodInFlight = new Map();
+const toncenterRunGetMethodCache = new Map();
+const toncenterMessagesInFlight = new Map();
+const toncenterMessagesCache = new Map();
 
 function assertString(value, name) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -48,6 +114,413 @@ function hexToBytes(value) {
 
 function bytesToHex(bytes) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function finiteNonNegativeMs(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return fallback;
+  return Math.floor(number);
+}
+
+function finitePositiveInteger(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 1) return fallback;
+  return Math.floor(number);
+}
+
+function retryAfterMs(response) {
+  const header = response?.headers?.get?.('retry-after');
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(Math.floor(seconds * 1000), TONCENTER_MAX_RETRY_AFTER_MS);
+  }
+  const dateMs = Date.parse(header);
+  if (Number.isFinite(dateMs)) {
+    return Math.min(Math.max(0, dateMs - Date.now()), TONCENTER_MAX_RETRY_AFTER_MS);
+  }
+  return null;
+}
+
+function tonRpcTimeoutError(timeoutMs) {
+  return new VaultTonRpcProviderError(`TON RPC request timed out after ${timeoutMs} ms`, {
+    code: 'TIMEOUT',
+  });
+}
+
+function resolveTonRpcRequestTimeoutMs(requestOptions, transportOptions) {
+  return finiteNonNegativeMs(
+    requestOptions?.requestTimeoutMs
+      ?? requestOptions?.timeoutMs
+      ?? transportOptions.requestTimeoutMs,
+    TON_RPC_REQUEST_TIMEOUT_MS,
+  );
+}
+
+async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
+  const resolvedTimeoutMs = finiteNonNegativeMs(timeoutMs, TON_RPC_REQUEST_TIMEOUT_MS);
+  if (resolvedTimeoutMs <= 0) return fetchImpl(url, init);
+
+  let timeoutId = null;
+  let timedOut = false;
+  let controller = null;
+  let requestInit = init;
+  if (typeof AbortController !== 'undefined') {
+    controller = new AbortController();
+    requestInit = { ...init, signal: controller.signal };
+  }
+  const timeout = new Promise((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      try {
+        controller?.abort?.();
+      } catch {
+        // Ignore abort wiring failures and still reject with a typed timeout.
+      }
+      reject(tonRpcTimeoutError(resolvedTimeoutMs));
+    }, resolvedTimeoutMs);
+  });
+  const request = Promise.resolve()
+    .then(() => fetchImpl(url, requestInit))
+    .catch((error) => {
+      if (timedOut || String(error?.name ?? '') === 'AbortError') {
+        throw tonRpcTimeoutError(resolvedTimeoutMs);
+      }
+      throw error;
+    });
+  try {
+    return await Promise.race([request, timeout]);
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  }
+}
+
+function toncenterLimiterKey(endpoint, apiKey, explicitKey) {
+  if (explicitKey) return String(explicitKey);
+  try {
+    return `${new URL(endpoint).origin}|${apiKey ? 'api-key' : 'public'}`;
+  } catch {
+    return `${endpoint}|${apiKey ? 'api-key' : 'public'}`;
+  }
+}
+
+function stableJsonString(value) {
+  const seen = new WeakSet();
+  return JSON.stringify(value, (_key, item) => {
+    if (typeof item === 'bigint') return { __type: 'bigint', value: item.toString() };
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    if (seen.has(item)) throw new Error('TON RPC cache key cannot contain circular values');
+    seen.add(item);
+    const sorted = {};
+    for (const key of Object.keys(item).sort()) sorted[key] = item[key];
+    return sorted;
+  });
+}
+
+function toncenterRunGetMethodScopeKey(endpoint, apiKey, explicitKey) {
+  return `${toncenterLimiterKey(endpoint, apiKey, explicitKey)}|${endpoint}|${apiKey ? 'api-key' : 'public'}`;
+}
+
+function toncenterRunGetMethodCacheKey(endpoint, apiKey, explicitKey, call) {
+  return [
+    toncenterRunGetMethodScopeKey(endpoint, apiKey, explicitKey),
+    call.address,
+    call.method,
+    stableJsonString(call.stack ?? []),
+  ].join('|');
+}
+
+function stableQueryObject(params = {}) {
+  const out = {};
+  for (const key of Object.keys(params).sort()) {
+    const value = params[key];
+    if (value === undefined || value === null || value === '') continue;
+    out[key] = Array.isArray(value) ? value.map(String) : String(value);
+  }
+  return out;
+}
+
+function toncenterMessagesScopeKey(endpoint, apiKey, explicitKey) {
+  return `${toncenterLimiterKey(endpoint, apiKey, explicitKey)}|${endpoint}|${apiKey ? 'api-key' : 'public'}|messages`;
+}
+
+function toncenterMessagesCacheKey(endpoint, apiKey, explicitKey, params) {
+  return [
+    toncenterMessagesScopeKey(endpoint, apiKey, explicitKey),
+    stableJsonString(stableQueryObject(params)),
+  ].join('|');
+}
+
+function mergeRunGetMethodCacheTtls(overrides) {
+  if (!overrides || typeof overrides !== 'object') return TONCENTER_RUN_GET_METHOD_CACHE_TTLS_MS;
+  return { ...TONCENTER_RUN_GET_METHOD_CACHE_TTLS_MS, ...overrides };
+}
+
+function mergeRunGetMethodPriorities(overrides) {
+  if (!overrides || typeof overrides !== 'object') return TONCENTER_RUN_GET_METHOD_PRIORITIES;
+  return { ...TONCENTER_RUN_GET_METHOD_PRIORITIES, ...overrides };
+}
+
+function resolveRunGetMethodCacheTtlMs(method, callOptions, transportOptions) {
+  const explicit = callOptions?.cacheTtlMs ?? callOptions?.ttlMs;
+  if (explicit !== undefined && explicit !== null) return finiteNonNegativeMs(explicit, 0);
+  const baseTtl = finiteNonNegativeMs(
+    transportOptions.runGetMethodCacheTtlMs,
+    TONCENTER_RUN_GET_METHOD_CACHE_TTL_MS,
+  );
+  if (baseTtl === 0) return 0;
+  const ttlByMethod = mergeRunGetMethodCacheTtls(transportOptions.runGetMethodCacheTtls);
+  return finiteNonNegativeMs(ttlByMethod[method], baseTtl);
+}
+
+function tonRpcInFlightKey(cacheKey, cacheTtlMs) {
+  return `${cacheKey}|${cacheTtlMs === 0 ? 'fresh' : 'cached'}`;
+}
+
+function resolveRunGetMethodPriority(method, callOptions, transportOptions) {
+  const priorities = mergeRunGetMethodPriorities(transportOptions.runGetMethodPriorities);
+  return String(callOptions?.priority ?? priorities[method] ?? 'background');
+}
+
+function toncenterPriorityWeight(priority) {
+  return TONCENTER_REQUEST_PRIORITY_WEIGHTS[priority] ?? TONCENTER_REQUEST_PRIORITY_WEIGHTS.background;
+}
+
+function pruneExpiredRunGetMethodCache(now = Date.now()) {
+  for (const [key, entry] of toncenterRunGetMethodCache) {
+    if (entry.expiresAt <= now) toncenterRunGetMethodCache.delete(key);
+  }
+}
+
+function writeRunGetMethodCache(key, value, ttlMs, maxEntries) {
+  if (ttlMs <= 0) return;
+  pruneExpiredRunGetMethodCache();
+  while (toncenterRunGetMethodCache.size >= maxEntries) {
+    const oldestKey = toncenterRunGetMethodCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    toncenterRunGetMethodCache.delete(oldestKey);
+  }
+  toncenterRunGetMethodCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+function readRunGetMethodCache(key) {
+  const entry = toncenterRunGetMethodCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    toncenterRunGetMethodCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function pruneExpiredMessagesCache(now = Date.now()) {
+  for (const [key, entry] of toncenterMessagesCache) {
+    if (entry.expiresAt <= now) toncenterMessagesCache.delete(key);
+  }
+}
+
+function writeMessagesCache(key, value, ttlMs, maxEntries) {
+  if (ttlMs <= 0) return;
+  pruneExpiredMessagesCache();
+  while (toncenterMessagesCache.size >= maxEntries) {
+    const oldestKey = toncenterMessagesCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    toncenterMessagesCache.delete(oldestKey);
+  }
+  toncenterMessagesCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+function readMessagesCache(key) {
+  const entry = toncenterMessagesCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    toncenterMessagesCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+export function clearToncenterRunGetMethodCache(options = {}) {
+  if (!options?.endpoint) {
+    const count = toncenterRunGetMethodCache.size;
+    toncenterRunGetMethodCache.clear();
+    return count;
+  }
+  const prefix = `${toncenterRunGetMethodScopeKey(
+    options.endpoint,
+    options.apiKey ?? null,
+    options.rateLimitKey,
+  )}|`;
+  let count = 0;
+  for (const key of [...toncenterRunGetMethodCache.keys()]) {
+    if (key.startsWith(prefix)) {
+      toncenterRunGetMethodCache.delete(key);
+      count += 1;
+    }
+  }
+  return count;
+}
+
+export function clearToncenterMessagesCache() {
+  const count = toncenterMessagesCache.size;
+  toncenterMessagesCache.clear();
+  return count;
+}
+
+function toncenterRequestState(key) {
+  const existing = toncenterRequestStates.get(key);
+  if (existing) return existing;
+  const state = {
+    pending: [],
+    processing: false,
+    sequence: 0,
+    nextAt: 0,
+    backoffUntil: 0,
+  };
+  toncenterRequestStates.set(key, state);
+  return state;
+}
+
+function takeNextToncenterTask(state) {
+  let bestIndex = 0;
+  for (let index = 1; index < state.pending.length; index += 1) {
+    const candidate = state.pending[index];
+    const best = state.pending[bestIndex];
+    if (
+      candidate.priorityWeight < best.priorityWeight
+      || (candidate.priorityWeight === best.priorityWeight && candidate.sequence < best.sequence)
+    ) {
+      bestIndex = index;
+    }
+  }
+  return state.pending.splice(bestIndex, 1)[0];
+}
+
+async function drainToncenterRequestQueue(state) {
+  try {
+    while (state.pending.length > 0) {
+      const task = takeNextToncenterTask(state);
+      try {
+        const spacingMs = finiteNonNegativeMs(task.options.spacingMs, TONCENTER_REQUEST_SPACING_MS);
+        const now = Date.now();
+        if (task.options.skipIfRateLimited === true && state.backoffUntil > now) {
+          throw toncenterBackoffError(state.backoffUntil - now);
+        }
+        const waitUntil = Math.max(
+          state.nextAt,
+          task.options.skipIfRateLimited === true ? 0 : state.backoffUntil,
+        );
+        const waitMs = waitUntil - Date.now();
+        if (waitMs > 0) await delay(waitMs);
+        const response = await task.request();
+        state.nextAt = Date.now() + spacingMs;
+        if (response?.status === 429) {
+          const backoff = retryAfterMs(response) ?? finiteNonNegativeMs(
+            task.options.rateLimitBackoffMs,
+            TONCENTER_RATE_LIMIT_BACKOFF_MS,
+          );
+          state.backoffUntil = Date.now() + backoff;
+        }
+        task.resolve(response);
+      } catch (error) {
+        task.reject(error);
+      }
+    }
+  } finally {
+    state.processing = false;
+    if (state.pending.length > 0) {
+      state.processing = true;
+      void drainToncenterRequestQueue(state);
+    }
+  }
+}
+
+async function scheduleToncenterRequest(key, request, options = {}) {
+  const state = toncenterRequestState(key);
+  return new Promise((resolve, reject) => {
+    state.pending.push({
+      request,
+      options,
+      resolve,
+      reject,
+      priorityWeight: toncenterPriorityWeight(options.priority),
+      sequence: state.sequence,
+    });
+    state.sequence += 1;
+    if (!state.processing) {
+      state.processing = true;
+      void drainToncenterRequestQueue(state);
+    }
+  });
+}
+
+function toncenterBackoffError(retryAfterMs) {
+  return new VaultTonRpcProviderError('TON RPC rate limit backoff active', {
+    status: 429,
+    code: 'RATE_LIMITED',
+    retryAfterMs,
+  });
+}
+
+function toncenterHttpError(label, response) {
+  const retryMs = response?.status === 429 ? retryAfterMs(response) ?? TONCENTER_RATE_LIMIT_BACKOFF_MS : undefined;
+  return new VaultTonRpcProviderError(`${label} HTTP ${response.status}`, {
+    status: response.status,
+    code: response.status === 429 ? 'RATE_LIMITED' : 'HTTP_ERROR',
+    retryAfterMs: retryMs,
+  });
+}
+
+function deriveToncenterV3Endpoint(endpoint, leaf) {
+  const url = new URL(assertString(endpoint, 'TON RPC endpoint'));
+  const parts = url.pathname.split('/');
+  if (parts.length === 0 || parts[parts.length - 1] === '') {
+    parts.push(leaf);
+  } else {
+    parts[parts.length - 1] = leaf;
+  }
+  url.pathname = parts.join('/');
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
+function appendQueryParams(endpoint, params = {}) {
+  const url = new URL(assertString(endpoint, 'TON RPC endpoint'));
+  for (const [key, value] of Object.entries(stableQueryObject(params))) {
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(key, item);
+    } else {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.toString();
+}
+
+export async function scheduleToncenterHttpRequest(endpoint, apiKey, request, options = {}) {
+  const limiterKey = toncenterLimiterKey(endpoint, apiKey, options.rateLimitKey);
+  const requestSpacingMs = finiteNonNegativeMs(options.requestSpacingMs, TONCENTER_REQUEST_SPACING_MS);
+  const rateLimitBackoffMs = finiteNonNegativeMs(options.rateLimitBackoffMs, TONCENTER_RATE_LIMIT_BACKOFF_MS);
+  const rateLimitRetries = finiteNonNegativeMs(options.rateLimitRetries, TONCENTER_RATE_LIMIT_RETRIES);
+  let response = null;
+  for (let attempt = 0; attempt <= rateLimitRetries; attempt += 1) {
+    response = await scheduleToncenterRequest(
+      limiterKey,
+      request,
+      {
+        spacingMs: requestSpacingMs,
+        rateLimitBackoffMs,
+        skipIfRateLimited: options.skipIfRateLimited,
+        priority: options.priority,
+      },
+    );
+    if (response?.status !== 429) return response;
+  }
+  return response;
 }
 
 function writeBit(bytes, bitOffset, bit) {
@@ -305,11 +778,69 @@ export function decodeVaultPendingAthWithdrawalViewStack(result) {
 
 export function decodeVaultGlobalViewStack(result) {
   const stack = extractStack(result);
+  if (stack.length >= 23) {
+    return {
+      sealed: readStackBool(stack, 0, 'Vault global sealed'),
+      capsule_hub_bound: readStackBool(stack, 1, 'Vault global capsule_hub_bound'),
+      profile_registry_bound: readStackBool(stack, 2, 'Vault global profile_registry_bound'),
+      username_registry_bound: readStackBool(stack, 3, 'Vault global username_registry_bound'),
+      deployment_manifest_hash: readStackInt(stack, 4, 'Vault global deployment_manifest_hash'),
+      capsule_hub_address: readStackAddress(stack, 5, 'Vault global capsule_hub_address'),
+      profile_registry_address: readStackAddress(stack, 6, 'Vault global profile_registry_address'),
+      username_registry_address: readStackAddress(stack, 7, 'Vault global username_registry_address'),
+      vault_ath_wallet_address: readStackAddress(stack, 8, 'Vault global vault_ath_wallet_address'),
+      ath_master_address: readStackAddress(stack, 9, 'Vault global ath_master_address'),
+      user_count: readStackInt(stack, 10, 'Vault global user_count'),
+      key_record_count: readStackInt(stack, 11, 'Vault global key_record_count'),
+      receive_intent_count: readStackInt(stack, 12, 'Vault global receive_intent_count'),
+      pending_ath_withdrawal_count: readStackInt(stack, 13, 'Vault global pending_ath_withdrawal_count'),
+      pending_publish_count: readStackInt(stack, 14, 'Vault global pending_publish_count'),
+      pending_profile_avatar_payment_count: readStackInt(stack, 15, 'Vault global pending_profile_avatar_payment_count'),
+      pending_username_mint_payment_count: readStackInt(stack, 16, 'Vault global pending_username_mint_payment_count'),
+      processed_ath_deposit_count: readStackInt(stack, 17, 'Vault global processed_ath_deposit_count'),
+      pending_publish_stale_ttl: readStackInt(stack, 18, 'Vault global pending_publish_stale_ttl'),
+      airdrop_remaining_ath: readStackInt(stack, 19, 'Vault global airdrop_remaining_ath'),
+      airdrop_distributed_ath: readStackInt(stack, 20, 'Vault global airdrop_distributed_ath'),
+      airdrop_reward_per_message_ath: readStackInt(stack, 21, 'Vault global airdrop_reward_per_message_ath'),
+      airdrop_total_allocation_ath: readStackInt(stack, 22, 'Vault global airdrop_total_allocation_ath'),
+    };
+  }
+  if (stack.length >= 20) {
+    return {
+      sealed: readStackBool(stack, 0, 'Vault global sealed'),
+      capsule_hub_bound: readStackBool(stack, 1, 'Vault global capsule_hub_bound'),
+      profile_registry_bound: readStackBool(stack, 2, 'Vault global profile_registry_bound'),
+      username_registry_bound: false,
+      deployment_manifest_hash: readStackInt(stack, 3, 'Vault global deployment_manifest_hash'),
+      capsule_hub_address: readStackAddress(stack, 4, 'Vault global capsule_hub_address'),
+      profile_registry_address: readStackAddress(stack, 5, 'Vault global profile_registry_address'),
+      username_registry_address: null,
+      vault_ath_wallet_address: readStackAddress(stack, 6, 'Vault global vault_ath_wallet_address'),
+      ath_master_address: readStackAddress(stack, 7, 'Vault global ath_master_address'),
+      user_count: readStackInt(stack, 8, 'Vault global user_count'),
+      key_record_count: readStackInt(stack, 9, 'Vault global key_record_count'),
+      receive_intent_count: readStackInt(stack, 10, 'Vault global receive_intent_count'),
+      pending_ath_withdrawal_count: readStackInt(stack, 11, 'Vault global pending_ath_withdrawal_count'),
+      pending_publish_count: readStackInt(stack, 12, 'Vault global pending_publish_count'),
+      pending_profile_avatar_payment_count: readStackInt(stack, 13, 'Vault global pending_profile_avatar_payment_count'),
+      pending_username_mint_payment_count: 0n,
+      processed_ath_deposit_count: readStackInt(stack, 14, 'Vault global processed_ath_deposit_count'),
+      pending_publish_stale_ttl: readStackInt(stack, 15, 'Vault global pending_publish_stale_ttl'),
+      airdrop_remaining_ath: readStackInt(stack, 16, 'Vault global airdrop_remaining_ath'),
+      airdrop_distributed_ath: readStackInt(stack, 17, 'Vault global airdrop_distributed_ath'),
+      airdrop_reward_per_message_ath: readStackInt(stack, 18, 'Vault global airdrop_reward_per_message_ath'),
+      airdrop_total_allocation_ath: readStackInt(stack, 19, 'Vault global airdrop_total_allocation_ath'),
+    };
+  }
   return {
     sealed: readStackBool(stack, 0, 'Vault global sealed'),
     capsule_hub_bound: readStackBool(stack, 1, 'Vault global capsule_hub_bound'),
+    profile_registry_bound: false,
+    username_registry_bound: false,
     deployment_manifest_hash: readStackInt(stack, 2, 'Vault global deployment_manifest_hash'),
     capsule_hub_address: readStackAddress(stack, 3, 'Vault global capsule_hub_address'),
+    profile_registry_address: null,
+    username_registry_address: null,
     vault_ath_wallet_address: readStackAddress(stack, 4, 'Vault global vault_ath_wallet_address'),
     ath_master_address: readStackAddress(stack, 5, 'Vault global ath_master_address'),
     user_count: readStackInt(stack, 6, 'Vault global user_count'),
@@ -317,6 +848,8 @@ export function decodeVaultGlobalViewStack(result) {
     receive_intent_count: readStackInt(stack, 8, 'Vault global receive_intent_count'),
     pending_ath_withdrawal_count: readStackInt(stack, 9, 'Vault global pending_ath_withdrawal_count'),
     pending_publish_count: readStackInt(stack, 10, 'Vault global pending_publish_count'),
+    pending_profile_avatar_payment_count: 0n,
+    pending_username_mint_payment_count: 0n,
     processed_ath_deposit_count: readStackInt(stack, 11, 'Vault global processed_ath_deposit_count'),
     pending_publish_stale_ttl: readStackInt(stack, 12, 'Vault global pending_publish_stale_ttl'),
     airdrop_remaining_ath: readStackInt(stack, 13, 'Vault global airdrop_remaining_ath'),
@@ -328,31 +861,99 @@ export function decodeVaultGlobalViewStack(result) {
 
 export function createTonCenterV3VaultTransport(options = {}) {
   const endpoint = assertString(options.endpoint, 'TON RPC endpoint');
+  const messagesEndpoint = options.messagesEndpoint === false
+    ? null
+    : options.messagesEndpoint
+    ?? globalThis.plathoTonMessagesEndpoint
+    ?? globalThis.PLATHO_TON_MESSAGES_ENDPOINT
+    ?? deriveToncenterV3Endpoint(endpoint, 'messages');
+  const accountEndpoint = options.accountEndpoint
+    ?? options.walletBalanceEndpoint
+    ?? globalThis.plathoWalletBalanceEndpoint
+    ?? globalThis.PLATHO_WALLET_BALANCE_ENDPOINT
+    ?? null;
   const sendBocEndpoint = options.sendBocEndpoint
     ?? globalThis.plathoTonSendBocEndpoint
     ?? globalThis.PLATHO_TON_SEND_BOC_ENDPOINT
     ?? null;
   const fetchImpl = options.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new VaultTonRpcProviderError('fetch is unavailable');
+  const apiKey = options.apiKey ?? null;
+  const requestSpacingMs = finiteNonNegativeMs(options.requestSpacingMs, TONCENTER_REQUEST_SPACING_MS);
+  const rateLimitBackoffMs = finiteNonNegativeMs(options.rateLimitBackoffMs, TONCENTER_RATE_LIMIT_BACKOFF_MS);
+  const rateLimitRetries = finiteNonNegativeMs(options.rateLimitRetries, TONCENTER_RATE_LIMIT_RETRIES);
+  const runGetMethodCacheMaxEntries = finitePositiveInteger(
+    options.runGetMethodCacheMaxEntries,
+    TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES,
+  );
+  const messagesCacheMaxEntries = finitePositiveInteger(
+    options.messagesCacheMaxEntries,
+    TONCENTER_MESSAGES_CACHE_MAX_ENTRIES,
+  );
   return {
     kind: 'toncenter-v3',
-    async runGetMethod({ address, method, stack }) {
+    supportsMessageHistory: Boolean(messagesEndpoint),
+    async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, requestTimeoutMs, timeoutMs }) {
+      const call = {
+        address: assertString(address, 'TON RPC address'),
+        method: assertString(method, 'TON RPC method'),
+        stack: Array.isArray(stack) ? stack : [],
+      };
+      const cacheKey = toncenterRunGetMethodCacheKey(endpoint, apiKey, options.rateLimitKey, call);
+      const resolvedPriority = resolveRunGetMethodPriority(call.method, { priority }, options);
+      const resolvedCacheTtlMs = resolveRunGetMethodCacheTtlMs(call.method, { cacheTtlMs, ttlMs }, options);
+      const bypassCache = resolvedCacheTtlMs === 0;
+      if (!bypassCache) {
+        const cached = readRunGetMethodCache(cacheKey);
+        if (cached) return cached;
+      }
+      const inFlightKey = tonRpcInFlightKey(cacheKey, resolvedCacheTtlMs);
+      const existing = toncenterRunGetMethodInFlight.get(inFlightKey);
+      if (existing) return existing;
+      const resolvedRequestTimeoutMs = resolveTonRpcRequestTimeoutMs({
+        cacheTtlMs,
+        ttlMs,
+        priority,
+        requestTimeoutMs,
+        timeoutMs,
+      }, options);
       const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
-      if (options.apiKey) headers['X-API-Key'] = options.apiKey;
-      const response = await fetchImpl(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ address, method, stack }),
-      });
-      if (!response.ok) {
-        throw new VaultTonRpcProviderError(`TON RPC get-method HTTP ${response.status}`);
-      }
-      const json = await response.json();
-      const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
-      if (Number(exitCode) !== 0) {
-        throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`);
-      }
-      return json;
+      if (apiKey) headers['X-API-Key'] = apiKey;
+      const promise = (async () => {
+        try {
+          const response = await scheduleToncenterHttpRequest(
+            endpoint,
+            apiKey,
+            () => fetchWithTonRpcTimeout(fetchImpl, endpoint, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(call),
+            }, resolvedRequestTimeoutMs),
+            {
+              rateLimitKey: options.rateLimitKey,
+              requestSpacingMs,
+              rateLimitBackoffMs,
+              rateLimitRetries,
+              skipIfRateLimited: options.skipRateLimitedGetMethods ?? true,
+              priority: resolvedPriority,
+            },
+          );
+          if (!response.ok) {
+            throw toncenterHttpError('TON RPC get-method', response);
+          }
+          const json = await response.json();
+          const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
+          if (Number(exitCode) !== 0) {
+            throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`);
+          }
+          writeRunGetMethodCache(cacheKey, json, resolvedCacheTtlMs, runGetMethodCacheMaxEntries);
+          return json;
+        } finally {
+          toncenterRunGetMethodInFlight.delete(inFlightKey);
+        }
+      })();
+      toncenterRunGetMethodInFlight.set(inFlightKey, promise);
+      return promise;
     },
     async sendBoc({ boc }) {
       const endpointForSend = sendBocEndpoint;
@@ -360,21 +961,385 @@ export function createTonCenterV3VaultTransport(options = {}) {
         throw new VaultTonRpcProviderError('TON sendBoc endpoint is not configured');
       }
       const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
-      if (options.apiKey) headers['X-API-Key'] = options.apiKey;
-      const response = await fetchImpl(endpointForSend, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ boc }),
+      if (apiKey) headers['X-API-Key'] = apiKey;
+      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs({ priority: 'critical' }, {
+        ...options,
+        requestTimeoutMs: options.sendBocRequestTimeoutMs ?? options.requestTimeoutMs,
       });
+      const response = await scheduleToncenterHttpRequest(
+        endpointForSend,
+        apiKey,
+        () => fetchWithTonRpcTimeout(fetchImpl, endpointForSend, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ boc }),
+        }, requestTimeoutMs),
+        {
+          rateLimitKey: options.rateLimitKey,
+          requestSpacingMs,
+          rateLimitBackoffMs,
+          rateLimitRetries: finiteNonNegativeMs(options.sendBocRateLimitRetries, Math.max(rateLimitRetries, 1)),
+          skipIfRateLimited: false,
+          priority: 'critical',
+        },
+      );
       if (!response.ok) {
-        throw new VaultTonRpcProviderError(`TON RPC sendBoc HTTP ${response.status}`);
+        throw toncenterHttpError('TON RPC sendBoc', response);
       }
       const json = await response.json();
       const ok = json.ok ?? json.result?.ok ?? true;
       if (ok === false) throw new VaultTonRpcProviderError('TON RPC sendBoc rejected message');
+      clearToncenterRunGetMethodCache({ endpoint, apiKey, rateLimitKey: options.rateLimitKey });
+      clearToncenterMessagesCache();
       return json;
     },
+    async getAccountState(input, requestOptions = {}) {
+      if (!accountEndpoint) {
+        throw new VaultTonRpcProviderError('TON account state endpoint is not configured');
+      }
+      const address = typeof input === 'string' ? input : input?.address;
+      const url = appendQueryParams(accountEndpoint, { address: assertString(address, 'TON account address') });
+      const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
+      if (apiKey) headers['X-API-Key'] = apiKey;
+      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
+      const response = await scheduleToncenterHttpRequest(
+        accountEndpoint,
+        apiKey,
+        () => fetchWithTonRpcTimeout(fetchImpl, url, {
+          method: 'GET',
+          headers,
+          cache: 'no-store',
+        }, requestTimeoutMs),
+        {
+          rateLimitKey: options.rateLimitKey,
+          requestSpacingMs,
+          rateLimitBackoffMs,
+          rateLimitRetries,
+          skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
+          priority: requestOptions.priority ?? 'wallet',
+        },
+      );
+      if (!response.ok) {
+        throw toncenterHttpError('TON RPC account state', response);
+      }
+      return response.json();
+    },
+    async getAccountBalance(address, requestOptions = {}) {
+      const state = await this.getAccountState({ address }, requestOptions);
+      const value = state?.balance
+        ?? state?.result?.balance
+        ?? state?.account?.balance
+        ?? state?.result?.account?.balance;
+      if (value === undefined || value === null) {
+        throw new VaultTonRpcProviderError('TON account state did not include a balance');
+      }
+      return value;
+    },
+    async getMessages(params = {}, requestOptions = {}) {
+      const query = stableQueryObject(params);
+      const cacheKey = toncenterMessagesCacheKey(messagesEndpoint, apiKey, options.rateLimitKey, query);
+      const resolvedCacheTtlMs = finiteNonNegativeMs(
+        requestOptions.cacheTtlMs ?? requestOptions.ttlMs,
+        TONCENTER_MESSAGES_CACHE_TTL_MS,
+      );
+      const bypassCache = resolvedCacheTtlMs === 0;
+      if (!bypassCache) {
+        const cached = readMessagesCache(cacheKey);
+        if (cached) return cached;
+      }
+      const inFlightKey = tonRpcInFlightKey(cacheKey, resolvedCacheTtlMs);
+      const existing = toncenterMessagesInFlight.get(inFlightKey);
+      if (existing) return existing;
+      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
+      const headers = { ...(options.headers ?? {}) };
+      if (apiKey) headers['X-API-Key'] = apiKey;
+      const url = appendQueryParams(messagesEndpoint, query);
+      const promise = (async () => {
+        try {
+          const response = await scheduleToncenterHttpRequest(
+            messagesEndpoint,
+            apiKey,
+            () => fetchWithTonRpcTimeout(fetchImpl, url, { method: 'GET', headers }, requestTimeoutMs),
+            {
+              rateLimitKey: options.rateLimitKey,
+              requestSpacingMs,
+              rateLimitBackoffMs,
+              rateLimitRetries,
+              skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
+              priority: requestOptions.priority ?? 'messages',
+            },
+          );
+          if (!response.ok) {
+            throw toncenterHttpError('TON RPC messages', response);
+          }
+          const json = await response.json();
+          writeMessagesCache(cacheKey, json, resolvedCacheTtlMs, messagesCacheMaxEntries);
+          return json;
+        } finally {
+          toncenterMessagesInFlight.delete(inFlightKey);
+        }
+      })();
+      toncenterMessagesInFlight.set(inFlightKey, promise);
+      return promise;
+    },
   };
+}
+
+function isRetryableTonRpcError(error) {
+  const status = Number(error?.status ?? error?.response?.status ?? 0);
+  const code = String(error?.code ?? '').toUpperCase();
+  const name = String(error?.name ?? '');
+  return status === 429
+    || status >= 500
+    || code === 'RATE_LIMITED'
+    || code === 'TIMEOUT'
+    || code === 'NETWORK_ERROR'
+    || name === 'TypeError'
+    || /rate limit|timeout|network|failed to fetch/i.test(String(error?.message ?? error ?? ''));
+}
+
+function tryParseStackBigIntValue(value) {
+  try {
+    return parseStackBigIntValue(value, 'TON RPC compare value');
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTonRpcGenericForCompare(value) {
+  if (typeof value === 'bigint') return { type: 'int', value: value.toString() };
+  if (Array.isArray(value)) return value.map((item) => normalizeTonRpcGenericForCompare(item));
+  if (!value || typeof value !== 'object') return value;
+  const out = {};
+  for (const key of Object.keys(value).sort()) {
+    out[key] = normalizeTonRpcGenericForCompare(value[key]);
+  }
+  return out;
+}
+
+function normalizeTonRpcStackItemForCompare(item) {
+  const type = stackItemType(item);
+  const value = stackItemValue(item);
+  const typedInt = tryParseStackBigIntValue(value);
+  if (type.includes('bool')) {
+    return { type: 'bool', value: typedInt !== null ? typedInt !== 0n : Boolean(value) };
+  }
+  if (
+    typedInt !== null
+    && (
+      type.includes('num')
+      || type.includes('int')
+      || type === 'number'
+      || typeof value === 'bigint'
+      || typeof value === 'number'
+    )
+  ) {
+    return { type: 'int', value: typedInt.toString() };
+  }
+  if (typeof value === 'boolean') {
+    return { type: 'bool', value };
+  }
+  if (typeof value === 'string') {
+    if (type.includes('addr') || /^-?\d+:[0-9a-fA-F]{64}$/.test(value.trim())) {
+      try {
+        return { type: 'address', value: parseTonAddress(value).raw };
+      } catch {
+        // Fall through to slice/cell normalization.
+      }
+    }
+    if (type.includes('slice')) {
+      try {
+        return { type: 'address', value: decodeTonAddressSliceBoc(value) };
+      } catch {
+        return { type: 'slice', value };
+      }
+    }
+    if (type.includes('cell')) return { type: 'cell', value };
+  }
+  if (Array.isArray(value)) {
+    return { type: type || 'tuple', value: value.map((nested) => normalizeTonRpcStackItemForCompare(nested)) };
+  }
+  return normalizeTonRpcGenericForCompare(item);
+}
+
+function normalizeTonRpcResultForCompare(result) {
+  const stack = result?.stack ?? result?.result?.stack;
+  if (Array.isArray(stack)) {
+    return stableJsonString(stack.map((item) => normalizeTonRpcStackItemForCompare(item)));
+  }
+  return stableJsonString(normalizeTonRpcGenericForCompare(result));
+}
+
+function tonRpcDisagreementError(method, primaryKind, verifierKind) {
+  return new VaultTonRpcProviderError(`TON RPC disagreement for ${method}`, {
+    code: 'RPC_DISAGREEMENT',
+    primaryKind,
+    verifierKind,
+  });
+}
+
+function configuredProviderList(config = {}) {
+  const providers = Array.isArray(config.providers) && config.providers.length > 0
+    ? [...config.providers]
+    : [config];
+  const byId = new Map(providers.map((provider, index) => [String(provider?.id ?? index), provider]));
+  const ordered = [];
+  const pushId = (id) => {
+    if (id === undefined || id === null) return;
+    const provider = byId.get(String(id));
+    if (provider && !ordered.includes(provider)) ordered.push(provider);
+  };
+  pushId(config.primaryProviderId ?? config.primaryProvider);
+  for (const id of config.fallbackProviderIds ?? config.fallbackProviders ?? []) pushId(id);
+  for (const provider of providers) {
+    if (!ordered.includes(provider)) ordered.push(provider);
+  }
+  return ordered;
+}
+
+export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
+  if (provider?.runGetMethod || provider?.sendBoc || provider?.getMessages) return provider;
+  if (provider?.globalName && globalThis[provider.globalName]) return globalThis[provider.globalName];
+  const kind = String(provider?.kind ?? provider?.type ?? 'toncenter-v3').toLowerCase();
+  if ((kind === 'custom' || kind === 'user' || kind === 'external') && provider?.globalName) {
+    return null;
+  }
+  const endpoint = provider?.runGetMethodEndpoint
+    ?? provider?.endpoint
+    ?? defaults.runGetMethodEndpoint
+    ?? defaults.endpoint;
+  if (!endpoint) return null;
+  if (!['toncenter-v3', 'toncenter', 'platho-rpc', 'json-rpc-compatible'].includes(kind)) {
+    throw new VaultTonRpcProviderError(`Unsupported TON RPC provider kind: ${kind}`);
+  }
+  return createTonCenterV3VaultTransport({
+    endpoint,
+    messagesEndpoint: provider?.messagesEndpoint ?? defaults.messagesEndpoint,
+    sendBocEndpoint: provider?.sendBocEndpoint ?? defaults.sendBocEndpoint,
+    accountEndpoint: provider?.accountEndpoint ?? provider?.walletBalanceEndpoint ?? defaults.accountEndpoint ?? defaults.walletBalanceEndpoint,
+    apiKey: provider?.apiKey ?? defaults.apiKey ?? null,
+    headers: provider?.headers ?? defaults.headers,
+    fetch: provider?.fetch ?? defaults.fetch,
+    requestSpacingMs: provider?.requestSpacingMs ?? defaults.requestSpacingMs,
+    rateLimitBackoffMs: provider?.rateLimitBackoffMs ?? defaults.rateLimitBackoffMs,
+    rateLimitRetries: provider?.rateLimitRetries ?? defaults.rateLimitRetries,
+    sendBocRateLimitRetries: provider?.sendBocRateLimitRetries ?? defaults.sendBocRateLimitRetries,
+    requestTimeoutMs: provider?.requestTimeoutMs ?? defaults.requestTimeoutMs,
+    sendBocRequestTimeoutMs: provider?.sendBocRequestTimeoutMs ?? defaults.sendBocRequestTimeoutMs,
+    skipRateLimitedGetMethods: provider?.skipRateLimitedGetMethods ?? defaults.skipRateLimitedGetMethods,
+    runGetMethodCacheTtlMs: provider?.runGetMethodCacheTtlMs ?? defaults.runGetMethodCacheTtlMs,
+    runGetMethodCacheMaxEntries: provider?.runGetMethodCacheMaxEntries ?? defaults.runGetMethodCacheMaxEntries,
+    runGetMethodCacheTtls: provider?.runGetMethodCacheTtls ?? defaults.runGetMethodCacheTtls,
+    runGetMethodPriorities: provider?.runGetMethodPriorities ?? defaults.runGetMethodPriorities,
+    messagesCacheMaxEntries: provider?.messagesCacheMaxEntries ?? defaults.messagesCacheMaxEntries,
+    rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? defaults.rateLimitKey,
+  });
+}
+
+export function createFallbackTonRpcTransport(options = {}) {
+  const transports = (options.transports ?? [])
+    .map((transport) => transport?.transport ?? transport)
+    .filter(Boolean);
+  if (transports.length === 0) return null;
+  const criticalMethods = new Set((options.criticalMethods ?? TON_RPC_CRITICAL_METHODS).map(String));
+  const verifyCriticalReads = options.verifyCriticalReads === true;
+  const kind = options.kind ?? `fallback(${transports.map((transport) => transport.kind ?? 'ton-rpc').join(',')})`;
+
+  async function callRead(methodName, args, requestOptions = {}) {
+    let primaryResult = null;
+    let primaryTransport = null;
+    let lastError = null;
+    for (const transport of transports) {
+      if (typeof transport?.[methodName] !== 'function') continue;
+      try {
+        primaryResult = await transport[methodName](...args);
+        primaryTransport = transport;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!primaryTransport) throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
+    const call = args[0] ?? {};
+    const method = call?.method ?? methodName;
+    const mustVerify = requestOptions.verify === true
+      || call?.verify === true
+      || (verifyCriticalReads && criticalMethods.has(String(method)));
+    if (!mustVerify) return primaryResult;
+    const primaryComparable = normalizeTonRpcResultForCompare(primaryResult);
+    let verified = false;
+    let verifyError = null;
+    for (const transport of transports) {
+      if (transport === primaryTransport || typeof transport?.[methodName] !== 'function') continue;
+      try {
+        const verifierResult = await transport[methodName](...args);
+        verified = true;
+        if (normalizeTonRpcResultForCompare(verifierResult) !== primaryComparable) {
+          throw tonRpcDisagreementError(method, primaryTransport.kind, transport.kind);
+        }
+        break;
+      } catch (error) {
+        verifyError = error;
+        if (error?.code === 'RPC_DISAGREEMENT') throw error;
+      }
+    }
+    if (mustVerify && !verified) {
+      throw new VaultTonRpcProviderError(`TON RPC verification unavailable for ${method}`, {
+        code: 'RPC_VERIFICATION_UNAVAILABLE',
+        cause: verifyError,
+      });
+    }
+    return primaryResult;
+  }
+
+  async function callSend(methodName, args) {
+    let lastError = null;
+    for (const transport of transports) {
+      if (typeof transport?.[methodName] !== 'function') continue;
+      try {
+        const result = await transport[methodName](...args);
+        clearToncenterRunGetMethodCache();
+        clearToncenterMessagesCache();
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableTonRpcError(error)) throw error;
+      }
+    }
+    throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
+  }
+
+  return {
+    kind,
+    transports,
+    async runGetMethod(call) {
+      return callRead('runGetMethod', [call], call ?? {});
+    },
+    async getMessages(params = {}, requestOptions = {}) {
+      return callRead('getMessages', [params, requestOptions], requestOptions);
+    },
+    async getAccountState(input, requestOptions = {}) {
+      return callRead('getAccountState', [input, requestOptions], requestOptions);
+    },
+    async getAccountBalance(address, requestOptions = {}) {
+      return callRead('getAccountBalance', [address, requestOptions], requestOptions);
+    },
+    async sendBoc(input) {
+      return callSend('sendBoc', [input]);
+    },
+  };
+}
+
+export function createTonRpcTransport(config = {}, options = {}) {
+  const providerConfigs = configuredProviderList(config);
+  const transports = providerConfigs
+    .map((provider) => createTonRpcTransportFromConfig(provider, { ...config, ...options }))
+    .filter(Boolean);
+  return createFallbackTonRpcTransport({
+    transports,
+    verifyCriticalReads: config.verifyCriticalReads,
+    criticalMethods: config.criticalMethods,
+  });
 }
 
 function resolveTransport(options) {
@@ -407,6 +1372,14 @@ function stackNumber(value) {
   return { type: 'num', value: toStackNumber(value) };
 }
 
+function runGetCallOptions(callOptions = {}) {
+  const out = {};
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+    if (callOptions[key] !== undefined) out[key] = callOptions[key];
+  }
+  return out;
+}
+
 export function createVaultTonRpcProvider(options = {}) {
   return {
     kind: options.kind ?? options.transport?.kind ?? 'ton-rpc',
@@ -418,6 +1391,7 @@ export function createVaultTonRpcProvider(options = {}) {
         address: vaultAddress,
         method: 'get_user',
         stack: [stackAddress(ownerWallet)],
+        ...runGetCallOptions(callOptions),
       }));
     },
     async getKeyRecord(keyId, callOptions = {}) {
@@ -428,6 +1402,7 @@ export function createVaultTonRpcProvider(options = {}) {
         address: vaultAddress,
         method: 'get_key_record',
         stack: [stackNumber(keyId)],
+        ...runGetCallOptions(callOptions),
       }));
     },
     async getReceiveIntent(intentId, callOptions = {}) {
@@ -438,6 +1413,7 @@ export function createVaultTonRpcProvider(options = {}) {
         address: vaultAddress,
         method: 'get_receive_intent',
         stack: [stackNumber(intentId)],
+        ...runGetCallOptions(callOptions),
       }));
     },
     async getReceiveIntentId(senderWallet, recipientWallet, asset, amount, clientNonce, callOptions = {}) {
@@ -454,6 +1430,7 @@ export function createVaultTonRpcProvider(options = {}) {
           stackNumber(amount),
           stackNumber(clientNonce),
         ],
+        ...runGetCallOptions(callOptions),
       });
       return readStackInt(extractStack(result), 0, 'Vault receive intent id');
     },
@@ -469,6 +1446,7 @@ export function createVaultTonRpcProvider(options = {}) {
           stackAddress(recipientWallet),
           stackNumber(secret32),
         ],
+        ...runGetCallOptions(callOptions),
       });
       return readStackInt(extractStack(result), 0, 'Vault receive intent commitment');
     },
@@ -480,6 +1458,7 @@ export function createVaultTonRpcProvider(options = {}) {
         address: vaultAddress,
         method: 'get_ath_withdrawal_id',
         stack: [stackAddress(ownerWallet), stackNumber(queryId)],
+        ...runGetCallOptions(callOptions),
       });
       return readStackInt(extractStack(result), 0, 'Vault ATH withdrawal id');
     },
@@ -491,6 +1470,7 @@ export function createVaultTonRpcProvider(options = {}) {
         address: vaultAddress,
         method: 'get_pending_ath_withdrawal_for',
         stack: [stackAddress(ownerWallet), stackNumber(queryId)],
+        ...runGetCallOptions(callOptions),
       }));
     },
     async getCanonicalPublishCharge(ownerWallet, publishKind, sizeClass, cryptoSuite, callOptions = {}) {
@@ -506,6 +1486,7 @@ export function createVaultTonRpcProvider(options = {}) {
           stackNumber(sizeClass),
           stackNumber(cryptoSuite),
         ],
+        ...runGetCallOptions(callOptions),
       });
       return readStackInt(extractStack(result), 0, 'Vault canonical publish charge');
     },
@@ -517,6 +1498,7 @@ export function createVaultTonRpcProvider(options = {}) {
         address: vaultAddress,
         method: 'get_global',
         stack: [],
+        ...runGetCallOptions(callOptions),
       }));
     },
   };

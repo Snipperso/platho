@@ -1,3 +1,6 @@
+DEPRECATED_HISTORICAL_ARTIFACT=DO_NOT_USE_AS_CURRENT_RELEASE_EVIDENCE
+SUPERSEDED_BY=artifacts/CURRENT_FULL_TEST_SUMMARY.json
+
 file:///mnt/data/platho_m15_work/node_modules/vitest/dist/chunks/cac.CVxlyDFd.js:406
           throw new CACError(`Unknown option \`${name.length > 1 ? `--${name}` : `-${name}`}\``);
                 ^

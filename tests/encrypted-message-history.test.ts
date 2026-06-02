@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_MESSAGE_HISTORY_MAX_RECORDS,
   createMemoryEncryptedMessageHistoryStore,
   openMessageHistoryRecord,
   sealMessageHistoryRecord,
@@ -101,5 +102,15 @@ describe('encrypted local message history', () => {
 
     expect(restored.map((record) => record.message.text)).toEqual(['middle', 'newest']);
     expect(JSON.stringify(store.dumpEncryptedRecords())).not.toContain('oldest');
+    expect(store.maxRecords).toBe(2);
+    expect(store.persistent).toBe(false);
+  });
+
+  it('HISTORY-05: exposes the default local history retention envelope', async () => {
+    const store = await createMemoryEncryptedMessageHistoryStore();
+
+    expect(DEFAULT_MESSAGE_HISTORY_MAX_RECORDS).toBe(500);
+    expect(store.maxRecords).toBe(500);
+    expect(store.persistent).toBe(false);
   });
 });

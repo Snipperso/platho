@@ -30,6 +30,9 @@ function completeInput(overrides: Partial<BuybackFlushPreflightInput> = {}): Buy
       fee_bound: true,
       fee_accumulator_address: FEE_ACCUMULATOR,
     },
+    routeEvidence: {
+      m20f_route_freeze_ready: true,
+    },
   };
 
   return {
@@ -42,6 +45,10 @@ function completeInput(overrides: Partial<BuybackFlushPreflightInput> = {}): Buy
     buybackBurnConfig: {
       ...base.buybackBurnConfig,
       ...(overrides.buybackBurnConfig ?? {}),
+    },
+    routeEvidence: {
+      ...base.routeEvidence,
+      ...(overrides.routeEvidence ?? {}),
     },
   };
 }
@@ -83,6 +90,33 @@ describe('BuybackBurn flush preflight guard', () => {
 
     expect(report.ok).toBe(false);
     expect(report.blockers).toContain('BUYBACKBURN_ROUTE_NOT_FROZEN');
+  });
+
+  it('M40-03B: blocks reserve flush when M20F route evidence is still not accepted', () => {
+    const report = createBuybackFlushPreflight(completeInput({
+      buybackBurnConfig: {
+        sealed: true,
+        route_frozen: true,
+        fee_bound: true,
+        fee_accumulator_address: FEE_ACCUMULATOR,
+      },
+      routeEvidence: {
+        m20f_route_freeze_ready: false,
+      },
+    }));
+
+    expect(report.ok).toBe(false);
+    expect(report.blockers).toContain('M20F_ROUTE_FREEZE_EVIDENCE_NOT_READY');
+  });
+
+  it('M40-03C: treats missing M20F route evidence as blocked, even if route_frozen is true', () => {
+    const input = completeInput() as any;
+    delete input.routeEvidence;
+
+    const report = createBuybackFlushPreflight(input);
+
+    expect(report.ok).toBe(false);
+    expect(report.blockers).toContain('M20F_ROUTE_FREEZE_EVIDENCE_NOT_READY');
   });
 
   it('M40-04: blocks mismatched FeeAccumulator binding in both contracts', () => {

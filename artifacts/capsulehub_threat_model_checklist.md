@@ -27,8 +27,8 @@ Date: 2026-05-22
 - Sandbox gas and forwarding behavior is a proxy, not final mainnet gas proof.
 - `CAPSULEHUB_ACK_FORWARD_RESERVE = 0.030 TON` is locally validated but should be remeasured on testnet/mainnet.
 - CapsuleHub final v1 has no direct user publish ABI. Public and private publishes are Vault-only so ATH discounts apply consistently; storage top-up remains an explicit separate operation.
-- CapsuleHub v1 must store retrievable encrypted payload cells on-chain. Counter-only, anchor-only, hash-only, off-chain package, local cache, IPFS/Ton Storage pointer, or static mirror semantics are not valid v1 message records.
-- Private capsule on-chain payload cells use the final binary layout in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`, not JSON: `PH0B` header0 is 140 bytes, `PH1B` header1 is 30 bytes, and each capsule body carries exactly one encrypted 1024-byte user payload slot. Standard body bytes are 1,140; postquantum body bytes are 2,228. Public publish stores a compact `PPH1` header cell plus a raw public body cell; both public posts and comments get a full 1..1024 UTF-8 text bytes, with post/comment metadata in the header. Public bodies are not padded to private capsule size. Long private text/images use multiple capsules, not multiple slots inside one capsule.
+- CapsuleHub v1 must retain compact authenticated entry state and accept retrievable publish payload cells in TON transaction history. Counter-only anchors, local-cache-only delivery, IPFS/Ton Storage pointers, or static mirror semantics are not valid v1 message records.
+- Private capsule publish payload cells use the final binary layout in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`, not JSON: `PH0B` header0 is 140 bytes, `PH1B` header1 is 30 bytes, and each hybrid capsule body carries exactly one encrypted user payload slot selected from the 1, 2, 4, 8, 16, or 32 KiB size classes. CapsuleHub state stores compact headers/indexes, `created_at = now()`, and `body_hash`; the heavy body remains in the accepted publish transaction body and is verified by hash, with availability depending on TON message-history provider coverage and local cache. Public publish stores compact `PPH1` header/index state plus a raw public body in transaction history; both public posts and comments get a full 1..1024 UTF-8 text bytes, with post/comment metadata in the header. Public bodies are not padded to private capsule size. Long private text/images use multiple independent capsules, not multiple unrelated payloads inside one capsule.
 - CapsuleHub v1 does not expose page-map retrieval as the primary interface; clients retrieve accepted messages by entry id and use counters/latest ids for discovery.
 - No independent human audit has reviewed this hardening pass.
 - No formal model checker has proven all reachable states.
@@ -37,5 +37,5 @@ Date: 2026-05-22
 
 - Independent Tact/security review focused on async ACK/bounce value backing and fee flush authority.
 - Testnet/mainnet gas envelope measurement for Vault publish ACK and fee flush bounce.
-- Testnet/mainnet storage-rent measurement for CapsuleHub encrypted payload cell, counter, and metadata growth.
+- Testnet/mainnet storage-rent measurement for CapsuleHub compact index/header metadata growth and prune cadence.
 - Keep CapsuleHub frozen only while the focused CapsuleHub/Vault suite, full suite, and artifact checks remain green.

@@ -15,7 +15,7 @@ Direct CapsuleHub publish paths accepted any value greater than or equal to the 
 Vault-mediated publish was not changed in this pass. Later final v1 Vault-balance publish still allows the PWA to sign
 `maxCharge > canonical_max_charge` as a network-fee surcharge. CapsuleHub success ACK returns only the fixed publish ACK
 reserve of `30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly
-`28,000,000` nanotons in internal Vault TON balance. Surcharge above the canonical required value is retained in
+`25,800,000` nanotons in internal Vault TON balance. Surcharge above the canonical required value is retained in
 CapsuleHub as network/storage reserve overage, not returned to Vault and not counted as `accrued_plato_fee_ton`.
 
 ## Code Change

@@ -4,7 +4,7 @@
 
 Platho is a no-backend encrypted messenger PWA and TON smart-contract suite.
 
-The project is designed around a hard constraint: the messenger must remain usable as a static application without a proprietary server. The PWA uses an embedded Platho wallet seed as the single user secret; wallet keys and messaging keys are derived from that seed. Identity, key publication, and protocol mechanics are anchored in TON contracts; private messages are encrypted client-side and published as CapsuleHub payload cells.
+The project is designed around a hard constraint: the messenger must remain usable as a static application without a proprietary server. The PWA uses a normal 24-word TON recovery phrase as the single user secret; wallet keys and messaging keys are derived from that phrase. Identity, key publication, and protocol mechanics are anchored in TON contracts; private messages are encrypted client-side and published as CapsuleHub payload cells.
 
 ## Status
 
@@ -60,8 +60,8 @@ The production command is intentionally blocked until the readiness gates pass.
 
 ## Security notes
 
-- Never commit `.env.testnet.local`, wallet seed phrases, private keys, browser profiles, or faucet/testnet scratch files.
-- Message encryption includes classical and hybrid post-quantum suites; see [web/CRYPTO_PROTOCOL.md](web/CRYPTO_PROTOCOL.md).
+- Never commit `.env.testnet.local`, wallet recovery phrases, private keys, browser profiles, or faucet/testnet scratch files.
+- Final v1 private publish uses the hybrid X25519 + ML-KEM-768 suite; see [web/CRYPTO_PROTOCOL.md](web/CRYPTO_PROTOCOL.md).
 - The no-backend architecture and on-chain delivery rules are documented in [web/NO_BACKEND_ARCHITECTURE.md](web/NO_BACKEND_ARCHITECTURE.md).
 - Production use requires external review of the contracts, the PWA crypto layer, and the release bundle.
 

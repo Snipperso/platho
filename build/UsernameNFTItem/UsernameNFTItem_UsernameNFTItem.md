@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: UsernameNFTItem
-BoC Size: 368 bytes
+BoC Size: 1352 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 15
+Total structures: 21
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -45,6 +45,10 @@ Signature: `VarAddress{workchain:int32,address:^slice}`
 TL-B: `_ hash:Maybe int257 = BasechainAddress`
 Signature: `BasechainAddress{hash:Maybe int257}`
 
+### InitializeUsernameItem
+TL-B: `initialize_username_item#554e494e owner_wallet:address username_len:uint8 username:remainder<slice> = InitializeUsernameItem`
+Signature: `InitializeUsernameItem{owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+
 ### ResendDeployedAck
 TL-B: `resend_deployed_ack#639cfc6c  = ResendDeployedAck`
 Signature: `ResendDeployedAck{}`
@@ -57,18 +61,41 @@ Signature: `TopUpStorageReserve{}`
 TL-B: `username_item_deployed_ack#bba3ec19 name_hash:uint256 owner_wallet:address = UsernameItemDeployedAck`
 Signature: `UsernameItemDeployedAck{name_hash:uint256,owner_wallet:address}`
 
+### NftTransfer
+TL-B: `nft_transfer#5fcc3d14 query_id:uint64 new_owner:address response_destination:address custom_payload:Maybe ^cell forward_amount:coins forward_payload:remainder<slice> = NftTransfer`
+Signature: `NftTransfer{query_id:uint64,new_owner:address,response_destination:address,custom_payload:Maybe ^cell,forward_amount:coins,forward_payload:remainder<slice>}`
+
+### NftOwnershipAssigned
+TL-B: `nft_ownership_assigned#05138d91 query_id:uint64 previous_owner:address forward_payload:remainder<slice> = NftOwnershipAssigned`
+Signature: `NftOwnershipAssigned{query_id:uint64,previous_owner:address,forward_payload:remainder<slice>}`
+
+### NftExcesses
+TL-B: `nft_excesses#d53276db query_id:uint64 = NftExcesses`
+Signature: `NftExcesses{query_id:uint64}`
+
 ### UsernameNFTItemStateView
-TL-B: `_ owner_wallet:address username_registry_address:address name_hash:int257 = UsernameNFTItemStateView`
-Signature: `UsernameNFTItemStateView{owner_wallet:address,username_registry_address:address,name_hash:int257}`
+TL-B: `_ initialized:bool owner_wallet:address username_registry_address:address name_hash:int257 username_len:int257 username:^cell tier:int257 = UsernameNFTItemStateView`
+Signature: `UsernameNFTItemStateView{initialized:bool,owner_wallet:address,username_registry_address:address,name_hash:int257,username_len:int257,username:^cell,tier:int257}`
+
+### UsernameNftDataView
+TL-B: `_ initialized:bool index:int257 collection_address:address owner_address:address individual_content:^cell = UsernameNftDataView`
+Signature: `UsernameNftDataView{initialized:bool,index:int257,collection_address:address,owner_address:address,individual_content:^cell}`
+
+### UsernameNftOnchainContent
+TL-B: `_ marker:uint8 metadata:dict<uint256, ^cell> = UsernameNftOnchainContent`
+Signature: `UsernameNftOnchainContent{marker:uint8,metadata:dict<uint256, ^cell>}`
 
 ### UsernameNFTItem$Data
-TL-B: `_ owner_wallet:address username_registry_address:address name_hash:uint256 = UsernameNFTItem`
-Signature: `UsernameNFTItem{owner_wallet:address,username_registry_address:address,name_hash:uint256}`
+TL-B: `_ initialized:bool owner_wallet:address username_registry_address:address name_hash:uint256 username_len:uint8 username:^cell = UsernameNFTItem`
+Signature: `UsernameNFTItem{initialized:bool,owner_wallet:address,username_registry_address:address,name_hash:uint256,username_len:uint8,username:^cell}`
 
 ## Get methods
-Total get methods: 1
+Total get methods: 2
 
 ## get_state
+No arguments
+
+## get_nft_data
 No arguments
 
 ## Exit codes

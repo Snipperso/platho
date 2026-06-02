@@ -10,3 +10,7 @@ Status: BLOCKED_MISSING_INPUT
 ## Issues
 
 - MISSING_INPUT: Supply a post-pool MarketStabilitySeller getter snapshot input.
+
+## Warnings
+
+- none

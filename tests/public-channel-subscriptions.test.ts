@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 import {
+  DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,
   DEFAULT_PUBLIC_CHANNEL_ID,
+  PUBLIC_CHANNEL_FEED_CACHE_KEY,
   createDefaultPublicChannelSubscriptions,
   normalizePublicChannelFeed,
   normalizePublicChannelSubscriptions,
   publicChannelThreadsToFeedItems,
   publicChannelSubscriptionsToThreads,
+  readPublicChannelFeedCache,
   publicChannelThreadId,
   subscribedPublicChannels,
+  writePublicChannelFeedCache,
 } from '../web/public-channel-subscriptions.mjs';
 
 describe('PWA public channel subscriptions', () => {
@@ -28,11 +32,12 @@ describe('PWA public channel subscriptions', () => {
     });
   });
 
-  it('PUBLIC-SUB-02: config declares channel sources, not bundled channel messages', () => {
+  it('PUBLIC-SUB-02: config declares chain channel authors, not bundled channel messages', () => {
     expect(PLATHO_APP_CONFIG.publicChannels?.[0]).toMatchObject({
       id: 'platho.app',
-      sourceUrl: './channels/platho.app/feed.json',
+      authorWallet: DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,
     });
+    expect(PLATHO_APP_CONFIG.publicChannels?.[0]).not.toHaveProperty('sourceUrl');
     expect(PLATHO_APP_CONFIG.ui.publicFeed).toBeUndefined();
   });
 
@@ -55,6 +60,8 @@ describe('PWA public channel subscriptions', () => {
           text: 'Readable without connecting a wallet.',
           entryId: '7',
           bodyHash: `0x${'aa'.repeat(32)}`,
+          publishStatus: 'public publish submitted',
+          publishState: { partCount: 1, submittedCount: 1 },
           commentsAllowed: false,
           comments: [
             {
@@ -95,6 +102,8 @@ describe('PWA public channel subscriptions', () => {
         publicAvatarImageUrl: 'data:image/webp;base64,AAAA',
         publicEntryId: '7',
         publicBodyHash: `0x${'aa'.repeat(32)}`,
+        publicPublishStatus: 'public publish submitted',
+        publicPublishState: { partCount: 1, submittedCount: 1 },
         publicCommentsAllowed: false,
         publicComments: [
           expect.objectContaining({
@@ -114,6 +123,8 @@ describe('PWA public channel subscriptions', () => {
         profileVersion: 3,
         avatarHash: `0x${'12'.repeat(32)}`,
         avatarImageUrl: 'data:image/webp;base64,AAAA',
+        publishStatus: 'public publish submitted',
+        publishState: { partCount: 1, submittedCount: 1 },
         commentsAllowed: false,
         comments: [
           expect.objectContaining({
@@ -124,6 +135,52 @@ describe('PWA public channel subscriptions', () => {
       }),
     ]);
     expect(publicChannelThreadsToFeedItems(threads)[0]).not.toHaveProperty('threadId');
+  });
+
+  it('PUBLIC-CACHE-HASH-01: stored public cache loses chain-verified status until chain revalidation', () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
+    };
+    const cached = {
+      'platho.app': {
+        feed: {
+          version: 1,
+          channelId: 'platho.app',
+          posts: [
+            {
+              id: 'post-1',
+              entryId: '7',
+              bodyHash: `0x${'aa'.repeat(32)}`,
+              entryUid: 'abc123',
+              chainVerified: true,
+              text: 'Tampered local cache text',
+              comments: [
+                {
+                  id: 'comment-1',
+                  entryId: '8',
+                  bodyHash: `0x${'bb'.repeat(32)}`,
+                  entryUid: 'def456',
+                  chainVerified: true,
+                  text: 'Cached comment',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+
+    writePublicChannelFeedCache(storage, cached);
+    expect(JSON.parse(store.get(PUBLIC_CHANNEL_FEED_CACHE_KEY) ?? '{}')['platho.app'].feed.posts[0].chainVerified).toBe(true);
+
+    const loaded = readPublicChannelFeedCache(storage);
+    const post = loaded['platho.app'].feed.posts[0];
+    expect(post.chainVerified).toBe(false);
+    expect(post.comments[0].chainVerified).toBe(false);
   });
 
   it('PUBLIC-SUB-04: stored unsubscribe is preserved and not re-seeded on every reload', () => {

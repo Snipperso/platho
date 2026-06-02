@@ -22,7 +22,7 @@ export const RECIPIENT_IDENTITY_META = Object.freeze({
 const FRIENDLY_TON_ADDRESS_RE = /^[A-Za-z0-9_-]{48}$/;
 const RAW_TON_ADDRESS_RE = /^-?\d+:[0-9a-fA-F]{64}$/;
 const TON_DNS_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ton$/;
-const PLATHO_NFT_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.ath$/;
+const PLATHO_NFT_RE = /^[a-z0-9_-]{4,16}\.ath$/;
 
 function normalizeInput(value) {
   return String(value ?? '').trim();

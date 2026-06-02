@@ -5,6 +5,8 @@ import { createHash } from 'crypto';
 import {
   Vault,
   BindOfficialAthWallet,
+  BindProfileRegistry,
+  BindUsernameRegistry,
   SealGenesis,
   WithdrawAth,
   CreateReceiveIntent,
@@ -95,6 +97,16 @@ async function setup(userCount = 3) {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialVaultAthWallet,
   } as BindOfficialAthWallet);
+  await vault.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileRegistry',
+    deployment_manifest_hash: MANIFEST_HASH,
+    profile_registry_address: fixtureAddress('VAULT_INV_PROFILE_REGISTRY'),
+  } as BindProfileRegistry);
+  await vault.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameRegistry',
+    deployment_manifest_hash: MANIFEST_HASH,
+    username_registry_address: fixtureAddress('VAULT_INV_USERNAME_REGISTRY'),
+  } as BindUsernameRegistry);
   await vault.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

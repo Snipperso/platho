@@ -6,7 +6,7 @@ This prototype is designed around a hard constraint: the app must keep working w
 
 - Static app files: HTML, CSS, JavaScript, manifest, service worker, icons.
 - User-controlled wallet connection.
-- Public TON RPC endpoints chosen or replaceable by the user.
+- Public TON RPC endpoints chosen by the production bundle or host integration. User-selectable RPC requires an explicit settings UI; the current static bundle treats custom transports as a host/config hook.
 - Smart contracts as the shared state and settlement layer.
 - Local device storage for drafts, UI state, cached messages, and key material that never leaves the device unencrypted.
 - Optional static mirrors for the same immutable app bundle.
@@ -24,22 +24,22 @@ This prototype is designed around a hard constraint: the app must keep working w
 - The first screen must be the usable messenger, not a landing page.
 - Identity should be wallet/account based, with local aliases as convenience only.
 - Sensitive content must be encrypted before it touches any transport or shared storage.
-- Any public or auditable state should be reconstructable from contracts and signed events.
+- Any public or auditable state should be verifiable from contracts and signed events. Heavy message bodies are recovered from TON transaction history and checked against contract hashes, so provider history coverage affects availability.
 - If a feature cannot be implemented without a centralized backend, it should be marked as blocked instead of quietly adding one.
 
 ## On-chain message delivery
 
-The PWA does not use manual signed JSON packages as the v1 delivery layer. Accepted messages are reconstructed from retrievable encrypted binary payload cells stored by `CapsuleHub`.
+The PWA does not use manual signed JSON packages as the v1 delivery layer. Accepted messages are reconstructed from accepted Vault -> CapsuleHub publish transaction bodies, authenticated by the compact `CapsuleHub` entry state (`body_hash`, headers, `entry_id`, and contract `created_at`).
 
-Public recipient keys are registered in `Vault` key records. Private key material is derived from the embedded Platho wallet seed; exporting/importing that seed is the only supported account recovery path.
+Public recipient keys are registered in `Vault` key records. Private key material is derived from the user's 24-word TON recovery phrase; exporting/importing that phrase is the only supported account recovery path.
 
-Private capsule on-chain cells use the final binary layout in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`: `PH0B` header0 is 140 bytes, `PH1B` header1 is 30 bytes, and each `platho.byte-layout.v1` body carries exactly one encrypted 1024-byte user payload slot for both standard and postquantum capsules.
+Private capsule publish bodies use the final binary layout in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`: `PH0B` header0 is 140 bytes, `PH1B` header1 is 30 bytes, and each `platho.byte-layout.v1` body carries exactly one encrypted user payload slot selected from the 1, 2, 4, 8, 16, or 32 KiB hybrid size classes. CapsuleHub stores the compact authenticated index/header state and body hash, not the heavy encrypted body cell; the PWA retrieves that body through replaceable TON message-history providers and verifies the hash before decrypting.
 
 The UI must not expose manual public-key bundle exchange, QR package sharing, raw package JSON paste, or encrypted-capsule file import/export as production flows.
 
 ## Wallet avatars
 
-Avatars are also backend-free. The image bytes are compressed to WebP and published as public `CapsuleHub` avatar capsules. `ProfileRegistry` stores the paid wallet-level pointer and ATH accounting state. The PWA may cache reconstructed data URLs locally, but display must remain reconstructable from `ProfileRegistry` getters plus `CapsuleHub` public entries. No CDN or profile API is part of v1 delivery.
+Avatars are also backend-free. The image bytes are compressed to WebP and published as public `CapsuleHub` avatar capsules. `ProfileRegistry` stores the paid wallet-level pointer and ATH accounting state. The PWA may cache reconstructed data URLs locally, but display must verify the reconstructed bytes against the `ProfileRegistry` avatar hash. If the public capsule body is pruned, missing from RPC history, or absent from local cache, the avatar is unavailable rather than trusted from an unverified source. No CDN or profile API is part of v1 delivery.
 
 ## Local encrypted history
 
@@ -55,7 +55,7 @@ Production key trust must be anchored to Vault contract state, not to a local UI
 - `get_key_record(current_key_id)` is called with the current key id returned by Vault.
 - Returned stack values are decoded into the same `VaultUserView` and `VaultKeyRecordView` shapes used by the client verifier.
 
-The provider can use a configured `globalThis.plathoTonRpcTransport` or a TON Center v3 compatible endpoint. If the transport, Vault address, getter response, or record binding is missing or malformed, the PWA stays fail-closed.
+The provider can use a configured `globalThis.plathoTonRpcTransport` or TON Center v3 compatible endpoints. In production, critical reads require enough concrete configured providers for cross-checking; a missing host custom transport is not the same thing as a user-selected RPC. If the transport, Vault address, getter response, or record binding is missing or malformed, the PWA stays fail-closed.
 
 ## TON DNS recipient lookup
 

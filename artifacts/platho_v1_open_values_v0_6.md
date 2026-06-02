@@ -1,5 +1,10 @@
 # Platho v1 Open Values Profile
 
+> HISTORICAL ONLY. SUPERSEDED. DO NOT USE AS THE CURRENT V1 SOURCE OF TRUTH.
+> This milestone profile still contains the removed Vault message-budget/session publish model. Current v1 uses Vault
+> signed external publish, no `message_budget_ton`, no `budget_epoch`, no `SetSession` / `RevokeSession`, and no session publish ABI. Current capsule
+> pricing, byte layout, and off-state body rules live in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+
 **Document status:** freeze-candidate values; ATH wallet and Vault M6 external publish aligned  
 **Version:** v0.6-open-values  
 **Companion spec:** `platho_v1_spec_v0_3_1_smoke_clean.md`  
@@ -158,9 +163,9 @@ All other enum combinations are rejected before `accept_message`.
 Base PLATO protocol fees:
 
 ```text
-PLATO_PRIVATE_STANDARD_FEE_TON = 0.005 TON = 5_000_000 nanotons
 PLATO_PRIVATE_LONG_TERM_FEE_TON = 0.010 TON = 10_000_000 nanotons
-PLATO_PUBLIC_POST_FEE_TON = 0.005 TON = 5_000_000 nanotons
+PLATO_PUBLIC_POST_FEE_TON = 0.010 TON = 10_000_000 nanotons
+PLATO_MIN_PROTOCOL_FEE_TON = 0 TON = 0 nanotons
 ```
 
 ATH full discount threshold:
@@ -174,17 +179,18 @@ Discount formula:
 ```text
 discount_base = 10_000 ATH
 user_ath = min(user_ath_balance, discount_base)
-discounted_fee = ceil(full_fee * (discount_base - user_ath) / discount_base)
+raw_discounted_fee = ceil(full_fee * (discount_base - user_ath) / discount_base)
+discounted_fee = raw_discounted_fee
 ```
 
 Examples:
 
 ```text
-0 ATH       -> 100% PLATO fee
-1,000 ATH   -> 90% PLATO fee
-5,000 ATH   -> 50% PLATO fee
-10,000 ATH  -> 0% PLATO fee
->10,000 ATH -> 0% PLATO fee
+0 ATH       -> full 0.010 TON protocol fee
+1,000 ATH   -> 90% raw curve
+5,000 ATH   -> 50% raw curve
+10,000 ATH  -> full protocol-fee discount
+>10,000 ATH -> full protocol-fee discount
 ```
 
 ATH discount applies only to PLATO protocol fee, never to network execution, forwarding, storage, state endowments, or reserves.
@@ -255,11 +261,16 @@ These are conservative implementation-start values. They must be validated by ga
 ### 7.1 Vault
 
 ```text
-VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE = 0.003 TON = 3_000_000 nanotons
-INVALID_SESSION_REQUEST_CHARGE_TON = 0.002 TON = 2_000_000 nanotons
 VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT = 0.003 TON = 3_000_000 nanotons
+VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE = 0.0042 TON = 4_200_000 nanotons
+VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE = 0.0087 TON = 8_700_000 nanotons
+VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE = 0.0120 TON = 12_000_000 nanotons
+VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE = 0.0138 TON = 13_800_000 nanotons
+VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE = 0.0173 TON = 17_300_000 nanotons
+VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE = 0.0244 TON = 24_400_000 nanotons
+VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE = 0.0389 TON = 38_900_000 nanotons
+VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE = 0.0676 TON = 67_600_000 nanotons
 VAULT_USER_STATE_STORAGE_ENDOWMENT = 0.010 TON = 10_000_000 nanotons
-VAULT_SESSION_STATE_STORAGE_ENDOWMENT = 0.005 TON = 5_000_000 nanotons
 VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT = 0.005 TON = 5_000_000 nanotons
 VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 0.005 TON = 5_000_000 nanotons
 VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT = 0.030 TON = 30_000_000 nanotons
@@ -268,16 +279,19 @@ VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT = 0.030 TON = 30_000_000 nanotons
 ### 7.2 CapsuleHub
 
 ```text
-CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE = 0.003 TON = 3_000_000 nanotons
-CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE = 0.004 TON = 4_000_000 nanotons
-CAPSULEHUB_PUBLIC_EXEC_RESERVE = 0.003 TON = 3_000_000 nanotons
+CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE = 0.0042 TON = 4_200_000 nanotons
+CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE = 0.0043 TON = 4_300_000 nanotons
+CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE = 0.0045 TON = 4_500_000 nanotons
+CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE = 0.0050 TON = 5_000_000 nanotons
+CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE = 0.0058 TON = 5_800_000 nanotons
+CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE = 0.0076 TON = 7_600_000 nanotons
+CAPSULEHUB_PUBLIC_EXEC_RESERVE = 0.0024 TON = 2_400_000 nanotons
 
-CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE = 0.001 TON = 1_000_000 nanotons
-CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE = 0.001 TON = 1_000_000 nanotons
+CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE = 0.001 TON = 1_000_000 nanotons
 CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE = 0.001 TON = 1_000_000 nanotons
 
-CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 0.004 TON = 4_000_000 nanotons
-CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 0.003 TON = 3_000_000 nanotons
+CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 0.0033 TON = 3_300_000 nanotons
+CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 0.0074 TON = 7_400_000 nanotons
 CAPSULEHUB_ACK_FORWARD_RESERVE = 0.030 TON = 30_000_000 nanotons
 ```
 
@@ -341,24 +355,16 @@ Superseded by the M27 interface decision: CapsuleHub v1 uses separate private an
 ## 9. Canonical Max-Charge Formulas
 
 ```text
-MAX_CHARGE_PRIVATE_STANDARD(owner) =
-  VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
-  + discounted_fee(owner, PLATO_PRIVATE_STANDARD_FEE_TON)
-  + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
-  + CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE
-  + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
-  + CAPSULEHUB_ACK_FORWARD_RESERVE
-
-MAX_CHARGE_PRIVATE_LONG_TERM(owner) =
-  VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+MAX_CHARGE_PRIVATE_HYBRID(owner, size_class) =
+  VAULT_PUBLISH_PRIVATE_HYBRID_${size_class}_LOCAL_EXEC_RESERVE
   + discounted_fee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON)
-  + CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE
-  + CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE
+  + CAPSULEHUB_PRIVATE_HYBRID_${size_class}_EXEC_RESERVE
+  + CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE
   + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
   + CAPSULEHUB_ACK_FORWARD_RESERVE
 
 MAX_CHARGE_PUBLIC(owner) =
-  VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
+  VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE
   + discounted_fee(owner, PLATO_PUBLIC_POST_FEE_TON)
   + CAPSULEHUB_PUBLIC_EXEC_RESERVE
   + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
@@ -366,7 +372,7 @@ MAX_CHARGE_PUBLIC(owner) =
   + CAPSULEHUB_ACK_FORWARD_RESERVE
 ```
 
-CapsuleHub MUST retain the protocol-fee backing, execution/storage reserves, and keepalive value for accepted Vault publishes. A success ACK carries only `CAPSULEHUB_ACK_FORWARD_RESERVE = 30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance. Later final v1 PWA surcharge above canonical required value is retained by CapsuleHub as network/storage reserve overage, not returned to Vault.
+CapsuleHub MUST retain the protocol-fee backing, execution/storage reserves, and keepalive value for accepted Vault publishes. A success ACK carries only `CAPSULEHUB_ACK_FORWARD_RESERVE = 30,000,000` nanotons (`0.030 TON`); after Vault processes that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault TON balance. Later final v1 PWA surcharge above canonical required value is retained by CapsuleHub as network/storage reserve overage, not returned to Vault.
 
 Vault ATH deposit is supported only through the user's ATHWallet `ATHTransferRequestWithNotify` notify-flow into Vault.
 Manual ordinary ATH transfer to the official Vault ATHWallet is unsupported: raw official wallet balance can change
@@ -797,7 +803,7 @@ Returned value is capped to `pending.refundable_budget_amount`.
 CapsuleHub ACK value is not allowed to drain protocol-fee backing from
 `CapsuleHub.accrued_plato_fee_ton`; accepted Vault publishes return only the fixed
 publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes
-that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON
+that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault TON
 balance. Later final v1 PWA surcharge above canonical required value is retained
 by CapsuleHub as network/storage reserve overage, not returned to Vault.
 

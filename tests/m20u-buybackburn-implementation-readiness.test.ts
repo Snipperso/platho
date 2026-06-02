@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { toNano } from '@ton/core';
+import { readFileSync } from 'fs';
 import { createBuybackBurnImplementationReadinessM20U } from '../scripts/buybackburn_contract_readiness_m20u';
+
+function currentCodeHashes(): Record<string, string> {
+  return Object.fromEntries(readFileSync('artifacts/CURRENT_CODE_HASHES.txt', 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && line.includes('='))
+    .map((line) => {
+      const [key, value] = line.split('=', 2);
+      return [key, value];
+    }));
+}
 
 describe('M20U BuybackBurn implementation readiness gate', () => {
   it('keeps production BuybackBurn blocked while testnet probe and mainnet route freeze are missing', () => {
@@ -52,6 +64,9 @@ describe('M20U BuybackBurn implementation readiness gate', () => {
     expect(report.pinnedRouteIndependentValues.buybackOfferAmountNanotons).toBe(toNano('50').toString());
     expect(report.pinnedRouteIndependentValues.routeTotalFundingEnvelopeNanotons).toBe(toNano('51.05').toString());
     expect(report.pinnedRouteIndependentValues.feeAccumulatorFlushAmountNanotons).toBe(toNano('51.05').toString());
+    expect(report.requiredBeforeProductionImplementation).toContain('fixed-floor frozen quote and dex_min_out policy');
+    expect(report.implementationAcceptanceMatrix.some((item) => item.label.includes('fixed floor'))).toBe(true);
+    expect(report.implementationAcceptanceMatrix.some((item) => item.label.includes('official BuybackBurn ATH wallet'))).toBe(true);
   });
 
   it('carries explicit Codex guardrails against secret leaks and testnet/mainnet mixing', () => {
@@ -62,5 +77,15 @@ describe('M20U BuybackBurn implementation readiness gate', () => {
     expect(report.codexGuardrails.some((line) => line.includes('route_frozen=false'))).toBe(true);
     expect(report.codexGuardrails.some((line) => line.includes('testnet manifests and mainnet route-freeze manifests separate'))).toBe(true);
     expect(report.forbidden).toContain('turning testnet proof into mainnet route freeze');
+    expect(report.forbidden).toContain('treating the frozen BuybackBurn minOut as a dynamic fair-market quote');
+    expect(report.forbidden).toContain('using the official BuybackBurn ATH wallet as a deposit or surplus-burn address');
+  });
+
+  it('keeps the BuybackBurn threat checklist tied to the current code hash', () => {
+    const checklist = readFileSync('artifacts/buybackburn_threat_model_checklist.md', 'utf8');
+    const current = currentCodeHashes().BUYBACKBURN_CODE_HASH;
+
+    expect(checklist).toContain(`Current code hash: \`${current}\``);
+    expect(checklist).not.toMatch(/Frozen code hash: `[^`]+`/);
   });
 });

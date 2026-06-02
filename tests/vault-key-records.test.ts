@@ -53,18 +53,17 @@ function snakeCell(byteLength: number, fill = 0x5a): Cell {
   return tail ?? beginCell().endCell();
 }
 
-const EMPTY_PQ_CELL = beginCell().endCell();
 const PQ_CELL = snakeCell(1184);
 
-async function registerClassical(vault: any, user: any, value = toNano('0.1')) {
+async function registerHybrid(vault: any, user: any, value = toNano('0.1')) {
   await vault.send(user.getSender(), { value }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: ENC_0,
     sign_pubkey: SIG_0,
-    pq_kem_pubkey_hash: 0n,
-    pq_kem_pubkey_len: 0n,
-    pq_kem_pubkey: EMPTY_PQ_CELL,
-    crypto_suite_mask: 1n,
+    pq_kem_pubkey_hash: PQ_HASH,
+    pq_kem_pubkey_len: 1184n,
+    pq_kem_pubkey: PQ_CELL,
+    crypto_suite_mask: 2n,
   } as RegisterMessagingKeys);
 }
 
@@ -84,7 +83,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
   it('VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record', async () => {
     const { vault, user } = await setup();
 
-    await registerClassical(vault, user);
+    await registerHybrid(vault, user);
 
     const userState = await vault.getGetUser(user.address);
     expect(userState.exists).toBe(true);
@@ -98,18 +97,17 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect(record.key_generation).toBe(0n);
     expect(record.enc_pubkey).toBe(ENC_0);
     expect(record.sign_pubkey).toBe(SIG_0);
-    expect(record.crypto_suite_mask).toBe(1n);
-    expect(record.pq_kem_pubkey_hash).toBe(0n);
-    expect(record.pq_kem_pubkey_len).toBe(0n);
-    expect(record.pq_kem_pubkey.bits.length).toBe(0);
-    expect(record.pq_kem_pubkey.refs).toHaveLength(0);
+    expect(record.crypto_suite_mask).toBe(2n);
+    expect(record.pq_kem_pubkey_hash).toBe(PQ_HASH);
+    expect(record.pq_kem_pubkey_len).toBe(1184n);
+    expect(record.pq_kem_pubkey.hash().toString('hex')).toBe(PQ_CELL.hash().toString('hex'));
     expect(record.revoked_lt).toBe(0n);
   });
 
   it('VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1', async () => {
     const { vault, user } = await setup();
 
-    await registerClassical(vault, user);
+    await registerHybrid(vault, user);
     const oldKeyId = (await vault.getGetUser(user.address)).current_key_id;
     const oldRecordBefore = await vault.getGetKeyRecord(oldKeyId);
 
@@ -146,9 +144,9 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     await replaceHybrid(vault, attacker);
     expect((await vault.getGetUser(attacker.address)).exists).toBe(false);
 
-    await registerClassical(vault, user);
+    await registerHybrid(vault, user);
     const firstKeyId = (await vault.getGetUser(user.address)).current_key_id;
-    await registerClassical(vault, user);
+    await registerHybrid(vault, user);
     expect((await vault.getGetUser(user.address)).current_key_id).toBe(firstKeyId);
     expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
   });
@@ -167,7 +165,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     } as RegisterMessagingKeys);
     expect((await vault.getGetUser(user.address)).exists).toBe(false);
 
-    await registerClassical(vault, user);
+    await registerHybrid(vault, user);
     const keyId = (await vault.getGetUser(user.address)).current_key_id;
 
     await vault.send(user.getSender(), { value: toNano('0.1') }, {
@@ -176,7 +174,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
       sign_pubkey: SIG_1,
       pq_kem_pubkey_hash: 0n,
       pq_kem_pubkey_len: 0n,
-      pq_kem_pubkey: EMPTY_PQ_CELL,
+      pq_kem_pubkey: beginCell().endCell(),
       crypto_suite_mask: 2n,
     } as ReplaceMessagingKeys);
 

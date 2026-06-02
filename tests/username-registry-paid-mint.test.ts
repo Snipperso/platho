@@ -6,10 +6,12 @@ import { createHash } from 'crypto';
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
+  BindUsernameVault,
   SealGenesis,
   AthTransferNotificationMintUsername,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
+  NftTransfer,
   ResendDeployedAck,
   UsernameNFTItem,
 } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
@@ -21,7 +23,8 @@ const PRICE_4 = 10_000_000_000_000n;
 const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
-const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 20_000_000n + 1_000_000n + 2_000_000n;
+const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
+const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 21_000_000n + 1_000_000n + 4_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -29,6 +32,10 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 function usernameSlice(name: string) {
   return beginCell().storeBuffer(Buffer.from(name, 'ascii')).endCell().beginParse();
+}
+
+function emptySlice() {
+  return beginCell().endCell().beginParse();
 }
 
 function nameHash(name: string): bigint {
@@ -53,6 +60,7 @@ async function deploySealedRegistry() {
   const placeholderAthWallet = fixtureAddress('USERNAME_REGISTRY_PLACEHOLDER_ATH_WALLET');
   const athMasterAddress = fixtureAddress('USERNAME_REGISTRY_ATH_MASTER');
   const treasuryAthReceiver = fixtureAddress('USERNAME_REGISTRY_TREASURY_ATH_RECEIVER');
+  const vaultAddress = fixtureAddress('USERNAME_REGISTRY_VAULT');
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
@@ -72,6 +80,11 @@ async function deploySealedRegistry() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
@@ -98,7 +111,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_OWNER');
     const hash = nameHash('platho');
-    const itemAddress = await registry.getGetUsernameItemAddress(ownerWallet, hash);
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'platho', PRICE_6_PLUS);
 
@@ -122,12 +135,44 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(itemState.name_hash).toBe(hash);
   });
 
+  it('USERNAME-REG-M10-01D: canonical usernames allow lowercase letters, digits, underscores, and hyphens only', async () => {
+    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const ownerWallet = fixtureAddress('USERNAME_M10_CANONICAL_CHARS_OWNER');
+    const hash = nameHash('platho_1-x');
+
+    await sendMint(registry, officialAthWallet, ownerWallet, 'platho_1-x', PRICE_6_PLUS);
+
+    const record = await registry.getGetNameRecord(hash);
+    const global = await registry.getGetGlobal();
+
+    expect(record.exists).toBe(true);
+    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(global.name_record_count).toBe(1n);
+    expect(global.refund_due_count).toBe(0n);
+  });
+
+  it('USERNAME-REG-M10-01E: v1 separator policy intentionally permits edge separator names', async () => {
+    const { registry, officialAthWallet } = await deploySealedRegistry();
+    const ownerWallet = fixtureAddress('USERNAME_M10_SEPARATOR_POLICY_OWNER');
+    const hash = nameHash('----');
+
+    await sendMint(registry, officialAthWallet, ownerWallet, '----', PRICE_4);
+
+    const record = await registry.getGetNameRecord(hash);
+    const global = await registry.getGetGlobal();
+
+    expect(record.exists).toBe(true);
+    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(global.name_record_count).toBe(1n);
+    expect(global.refund_due_count).toBe(0n);
+  });
+
   it('USERNAME-REG-M10-01B: repeated item resend after finalization cannot mutate record or split due again', async () => {
     const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const caller = await blockchain.treasury('username-registry-repeat-resend-caller');
     const ownerWallet = fixtureAddress('USERNAME_M10_REPEAT_RESEND_OWNER');
     const hash = nameHash('repeat');
-    const itemAddress = await registry.getGetUsernameItemAddress(ownerWallet, hash);
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'repeat', PRICE_6_PLUS);
 
@@ -150,6 +195,33 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(afterGlobal.pending_mint_count).toBe(0n);
     expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
     expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
+  });
+
+  it('USERNAME-REG-M10-01C: username item transfer changes NFT owner while registry keeps the same authoritative item address', async () => {
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
+    const ownerA = fixtureAddress('USERNAME_M10_TRANSFER_OWNER_A');
+    const ownerB = fixtureAddress('USERNAME_M10_TRANSFER_OWNER_B');
+    const hash = nameHash('moveme');
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
+
+    await sendMint(registry, officialAthWallet, ownerA, 'moveme', PRICE_6_PLUS);
+
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
+    await item.send(blockchain.sender(ownerA), { value: 14_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 901n,
+      new_owner: ownerB,
+      response_destination: ownerA,
+      custom_payload: null,
+      forward_amount: 0n,
+      forward_payload: emptySlice(),
+    } as NftTransfer);
+
+    const record = await registry.getGetNameRecord(hash);
+    const itemState = await item.getGetState();
+    expect(record.exists).toBe(true);
+    expect(record.item_address.equals(itemAddress)).toBe(true);
+    expect(itemState.owner_wallet.equals(ownerB)).toBe(true);
   });
 
   it('USERNAME-REG-M10-06: accepted official mint notification sends ATH notification ACK back to official wallet', async () => {
@@ -233,11 +305,11 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(global.refund_due_count).toBe(0n);
   });
 
-  it('USERNAME-REG-M10-11: bounced item deploy records ATH refund due and returns deploy reserve excess', async () => {
+  it('USERNAME-REG-M10-11: bounced item deploy asks the official ATH wallet to refund the pending notification', async () => {
     const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const owner = await blockchain.treasury('username-registry-bounced-item-owner');
     const hash = nameHash('bounce');
-    const itemAddress = await registry.getGetUsernameItemAddress(owner.address, hash);
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
     const rejectInit = await MockAthWalletNoAck.init();
     await blockchain.setShardAccount(itemAddress, createShardAccount({
       address: itemAddress,
@@ -258,10 +330,11 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
-    expect(await registry.getGetRefundDue(owner.address)).toBe(PRICE_6_PLUS);
+    expect(await registry.getGetRefundDue(owner.address)).toBe(0n);
     expect(findTransaction(result.transactions, {
       from: registry.address,
-      to: owner.address,
+      to: officialAthWallet.address,
+      op: OP_ATH_TRANSFER_NOTIFICATION_REFUND,
     })).toBeDefined();
   });
 

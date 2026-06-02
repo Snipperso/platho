@@ -24,7 +24,12 @@ const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
 const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
 const RECEIVE_INTENT_COMMITMENT_DOMAIN: Int = 0x5243434d; // "RCCM"
-const CRYPTO_SUITE_CLASSICAL: Int = 1;
+const VAULT_PENDING_PUBLISH_COUNT_UNIT: Int = 1;
+const VAULT_PENDING_PROFILE_COUNT_UNIT: Int = 4294967296;
+const VAULT_PENDING_USERNAME_COUNT_UNIT: Int = 281474976710656;
+const VAULT_PENDING_PROFILE_COUNT_MOD: Int = 65536;
+const VAULT_PENDING_PROFILE_COUNT_MAX: Int = 65535;
+const VAULT_PENDING_USERNAME_COUNT_MAX: Int = 65535;
 const CRYPTO_SUITE_HYBRID: Int = 2;
 const MLKEM768_PUBKEY_LEN: Int = 1184;
 const MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES: Int = 127;
@@ -42,27 +47,45 @@ const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
 const PUBLISH_KIND_PRIVATE: Int = 1;
 const PUBLISH_KIND_PUBLIC: Int = 2;
 const VAULT_PUBLISH_SIGNING_DOMAIN: Int = 0x56504231; // "VPB1"
-const SIZE_CLASS_STANDARD: Int = 1;
-const SIZE_CLASS_LONG_TERM: Int = 2;
+const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN: Int = 0x56504131; // "VPA1"
+const VAULT_PROFILE_AVATAR_PAYMENT_ID_DOMAIN: Int = 0x56504149; // "VPAI"
+const VAULT_USERNAME_MINT_SIGNING_DOMAIN: Int = 0x56554E31; // "VUN1"
+const VAULT_USERNAME_MINT_PAYMENT_ID_DOMAIN: Int = 0x56554E49; // "VUNI"
+const SIZE_CLASS_1K: Int = 1;
+const SIZE_CLASS_2K: Int = 2;
+const SIZE_CLASS_4K: Int = 4;
+const SIZE_CLASS_8K: Int = 8;
+const SIZE_CLASS_16K: Int = 16;
+const SIZE_CLASS_32K: Int = 32;
+const SIZE_CLASS_STANDARD: Int = SIZE_CLASS_1K;
 const CRYPTO_SUITE_PUBLIC_NONE: Int = 0;
-const PLATO_PRIVATE_STANDARD_FEE_TON: Int = 5000000;
 const PLATO_PRIVATE_LONG_TERM_FEE_TON: Int = 10000000;
-const PLATO_PUBLIC_POST_FEE_TON: Int = 5000000;
+const PLATO_PUBLIC_POST_FEE_TON: Int = 10000000;
+const PLATO_MIN_PROTOCOL_FEE_TON: Int = 0;
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
 const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 15000000000000000;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH: Int = 0;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
-const VAULT_PUBLISH_LOCAL_EXEC_RESERVE: Int = 6000000;
-const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 2000000;
-const CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE: Int = 3000000;
-const CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE: Int = 4000000;
-const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 3000000;
-const CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
-const CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
+const VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE: Int = 8700000;
+const VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE: Int = 12000000;
+const VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE: Int = 13800000;
+const VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE: Int = 17300000;
+const VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE: Int = 24400000;
+const VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE: Int = 38900000;
+const VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE: Int = 67600000;
+const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 4200000;
+const CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE: Int = 4200000;
+const CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE: Int = 4300000;
+const CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE: Int = 4500000;
+const CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE: Int = 5000000;
+const CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE: Int = 5800000;
+const CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE: Int = 7600000;
+const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 2400000;
+const CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
-const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 4000000;
-const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 1000000;
+const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
+const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 7400000;
 const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
 const CAPSULEHUB_PRIVATE_HEADER0_BITS: Int = 1120;
 const CAPSULEHUB_PRIVATE_HEADER1_BITS: Int = 240;
@@ -70,20 +93,35 @@ const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 2;
 const CAPSULEHUB_PRIVATE_HEADER0_REFS: Int = 1;
 const CAPSULEHUB_PRIVATE_HEADER1_CELLS: Int = 1;
 const CAPSULEHUB_PRIVATE_HEADER1_REFS: Int = 0;
-const CAPSULEHUB_PRIVATE_STANDARD_BODY_BITS: Int = 9120;
-const CAPSULEHUB_PRIVATE_LONG_TERM_BODY_BITS: Int = 17824;
-const CAPSULEHUB_PRIVATE_STANDARD_BODY_CELLS: Int = 9;
-const CAPSULEHUB_PRIVATE_LONG_TERM_BODY_CELLS: Int = 18;
-const CAPSULEHUB_PRIVATE_STANDARD_BODY_REFS: Int = 8;
-const CAPSULEHUB_PRIVATE_LONG_TERM_BODY_REFS: Int = 17;
+const CAPSULEHUB_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES: Int = 1204;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
 const CAPSULEHUB_PUBLIC_BODY_MAX_BITS: Int = 8192;
 const CAPSULEHUB_PUBLIC_BODY_MAX_CELLS: Int = 9;
 const CAPSULEHUB_PUBLIC_BODY_MAX_REFS: Int = 8;
+const PROFILE_AVATAR_PRICE_ATH: Int = 100000000000;
+const PROFILE_AVATAR_NOTIFY_VALUE: Int = 30000000;
+const PROFILE_AVATAR_MAX_PARTS: Int = 16;
+const PROFILE_AVATAR_MEDIA_FORMAT_WEBP: Int = 1;
+const VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE: Int = 6000000;
+const VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE: Int = 55000000;
+const VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
+const USERNAME_PRICE_4_CHARS: Int = 10000000000000;
+const USERNAME_PRICE_5_CHARS: Int = 1000000000000;
+const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;
+const USERNAME_NOTIFY_VALUE: Int = 32000000;
+const USERNAME_MAX_LENGTH: Int = 16;
+const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
+const VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE: Int = 6000000;
+const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 57000000;
+const VAULT_BINDING_CAPSULE_HUB: Int = 1;
+const VAULT_BINDING_PROFILE_REGISTRY: Int = 2;
+const VAULT_BINDING_USERNAME_REGISTRY: Int = 4;
 const OP_BIND_DEPLOYMENT_MANIFEST: Int = 0x90E2E0CB;
 const OP_BIND_OFFICIAL_ATH_WALLET: Int = 0x18DB2CCB;
+const OP_BIND_PROFILE_REGISTRY: Int = 0x50A61103;
+const OP_BIND_USERNAME_REGISTRY: Int = 0x50A61104;
 const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
 
 
@@ -95,6 +133,16 @@ message(0x90E2E0CB) BindDeploymentManifest {
 message(0x18DB2CCB) BindOfficialAthWallet {
     deployment_manifest_hash: Int as uint256;
     official_ath_wallet_address: Address;
+}
+
+message(0x50A61103) BindProfileRegistry {
+    deployment_manifest_hash: Int as uint256;
+    profile_registry_address: Address;
+}
+
+message(0x50A61104) BindUsernameRegistry {
+    deployment_manifest_hash: Int as uint256;
+    username_registry_address: Address;
 }
 
 message(0x3A12D1AD) SealGenesis {
@@ -163,6 +211,18 @@ message(0x7E1F5032) PublishPublicFromVaultBalance {
     signed_payload: Cell;
 }
 
+message(0x7E1F5033) SetProfileAvatarFromVaultBalance {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
+}
+
+message(0x7E1F5034) MintUsernameFromVaultBalance {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
+}
+
 message(0xA4F862C0) PublishPrivateFromVault {
     bounce_id: Int as uint64;
     bounce_tag: Int as uint160;
@@ -203,6 +263,12 @@ message(0x720BDD6D) PrunePendingPublish {
 
 message(0x3215B5FD) TopUpStorageReserve {}
 
+message(0x50A61121) ProfileAvatarTonExcessRefund {
+    query_id: Int as uint64;
+    owner_wallet: Address;
+    amount: Int as uint128;
+}
+
 
 struct PendingAthWithdrawal {
     owner_wallet: Address;
@@ -221,6 +287,18 @@ struct PendingPublish {
     publish_kind: Int as uint8;
     body_hash: Int as uint256;
     refundable_amount: Int as uint128;
+    created_at: Int as uint32;
+}
+
+struct PendingProfileAvatarPayment {
+    owner_wallet: Address;
+    amount: Int as uint128;
+    created_at: Int as uint32;
+}
+
+struct PendingUsernameMintPayment {
+    owner_wallet: Address;
+    amount: Int as uint128;
     created_at: Int as uint32;
 }
 
@@ -307,8 +385,12 @@ struct VaultPendingAthWithdrawalView {
 struct VaultGlobalView {
     sealed: Bool;
     capsule_hub_bound: Bool;
+    profile_registry_bound: Bool;
+    username_registry_bound: Bool;
     deployment_manifest_hash: Int;
     capsule_hub_address: Address;
+    profile_registry_address: Address;
+    username_registry_address: Address;
     vault_ath_wallet_address: Address;
     ath_master_address: Address;
     user_count: Int;
@@ -316,6 +398,8 @@ struct VaultGlobalView {
     receive_intent_count: Int;
     pending_ath_withdrawal_count: Int;
     pending_publish_count: Int;
+    pending_profile_avatar_payment_count: Int;
+    pending_username_mint_payment_count: Int;
     processed_ath_deposit_count: Int;
     pending_publish_stale_ttl: Int;
     airdrop_remaining_ath: Int;
@@ -328,7 +412,9 @@ contract Vault {
     vault_ath_wallet_address: Address;
     ath_master_address: Address;
     capsule_hub_address: Address;
-    capsule_hub_bound: Bool;
+    profile_registry_address: Address;
+    username_registry_address: Address;
+    binding_flags: Int as uint8;
     sealed: Bool;
     deployment_manifest_hash: Int as uint256;
     // Pre-seal: hash(genesis_controller_address). Post-seal: remaining community activity airdrop ATH.
@@ -340,18 +426,26 @@ contract Vault {
     processed_ath_deposits: map<Int, Int>;
     pending_ath_withdrawals: map<Int, PendingAthWithdrawal>;
     pending_publishes: map<Int, PendingPublish>;
+    pending_profile_avatar_payments: map<Int, PendingProfileAvatarPayment>;
+    pending_username_mint_payments: map<Int, PendingUsernameMintPayment>;
     user_count: Int as uint64;
     key_record_count: Int as uint64;
     receive_intent_count: Int as uint64;
     processed_ath_deposit_count: Int as uint64;
     pending_ath_withdrawal_count: Int as uint64;
+    // Packed pending counters: low 32 bits = publish, next 16 = profile avatar, next 16 = username mint.
     pending_publish_count: Int as uint64;
 
     init(vault_ath_wallet_address: Address, ath_master_address: Address, capsule_hub_address: Address, genesis_config_hash: Int, capsule_hub_bound: Bool, sealed: Bool, deployment_manifest_hash: Int) {
         self.vault_ath_wallet_address = vault_ath_wallet_address;
         self.ath_master_address = ath_master_address;
         self.capsule_hub_address = capsule_hub_address;
-        self.capsule_hub_bound = capsule_hub_bound;
+        self.profile_registry_address = capsule_hub_address;
+        self.username_registry_address = capsule_hub_address;
+        self.binding_flags = 0;
+        if (capsule_hub_bound) {
+            self.binding_flags = VAULT_BINDING_CAPSULE_HUB;
+        }
         self.sealed = sealed;
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
@@ -367,6 +461,8 @@ contract Vault {
         self.processed_ath_deposits = emptyMap();
         self.pending_ath_withdrawals = emptyMap();
         self.pending_publishes = emptyMap();
+        self.pending_profile_avatar_payments = emptyMap();
+        self.pending_username_mint_payments = emptyMap();
         self.user_count = 0;
         self.key_record_count = 0;
         self.receive_intent_count = 0;
@@ -381,6 +477,22 @@ contract Vault {
 
     fun requireUnsealed() {
         throwUnless(15001, !self.sealed);
+    }
+
+    fun isBindingSet(mask: Int): Bool {
+        return ((self.binding_flags / mask) % 2) == 1;
+    }
+
+    fun isCapsuleHubBound(): Bool {
+        return self.isBindingSet(VAULT_BINDING_CAPSULE_HUB);
+    }
+
+    fun isProfileRegistryBound(): Bool {
+        return self.isBindingSet(VAULT_BINDING_PROFILE_REGISTRY);
+    }
+
+    fun isUsernameRegistryBound(): Bool {
+        return self.isBindingSet(VAULT_BINDING_USERNAME_REGISTRY);
     }
 
     fun requireGenesisController() {
@@ -413,8 +525,46 @@ contract Vault {
     }
 
     fun isBasechainAddress(owner: Address): Bool {
-        let owner_std: StdAddress = parseStdAddress(owner.asSlice());
-        return owner_std.workchain == 0;
+        let ownerSlice: Slice = owner.asSlice();
+        return ownerSlice.loadUint(11) == 1024;
+    }
+
+    fun pendingPublishCount(): Int {
+        return self.pending_publish_count % VAULT_PENDING_PROFILE_COUNT_UNIT;
+    }
+
+    fun pendingProfileAvatarPaymentCount(): Int {
+        return (self.pending_publish_count / VAULT_PENDING_PROFILE_COUNT_UNIT) % VAULT_PENDING_PROFILE_COUNT_MOD;
+    }
+
+    fun pendingUsernameMintPaymentCount(): Int {
+        return self.pending_publish_count / VAULT_PENDING_USERNAME_COUNT_UNIT;
+    }
+
+    fun incrementPendingPublishCount() {
+        self.pending_publish_count += VAULT_PENDING_PUBLISH_COUNT_UNIT;
+    }
+
+    fun decrementPendingPublishCount() {
+        self.pending_publish_count -= VAULT_PENDING_PUBLISH_COUNT_UNIT;
+    }
+
+    fun incrementPendingProfileAvatarPaymentCount() {
+        throwUnless(16690, self.pendingProfileAvatarPaymentCount() < VAULT_PENDING_PROFILE_COUNT_MAX);
+        self.pending_publish_count += VAULT_PENDING_PROFILE_COUNT_UNIT;
+    }
+
+    fun decrementPendingProfileAvatarPaymentCount() {
+        self.pending_publish_count -= VAULT_PENDING_PROFILE_COUNT_UNIT;
+    }
+
+    fun incrementPendingUsernameMintPaymentCount() {
+        throwUnless(16790, self.pendingUsernameMintPaymentCount() < VAULT_PENDING_USERNAME_COUNT_MAX);
+        self.pending_publish_count += VAULT_PENDING_USERNAME_COUNT_UNIT;
+    }
+
+    fun decrementPendingUsernameMintPaymentCount() {
+        self.pending_publish_count -= VAULT_PENDING_USERNAME_COUNT_UNIT;
     }
 
     fun computeAthDepositId(senderWallet: Address, queryId: Int): Int {
@@ -435,6 +585,97 @@ contract Vault {
             .hash() % UINT64_MOD;
     }
 
+    fun computeProfileAvatarPaymentId(ownerWallet: Address, clientNonce: Int, avatarHash: Int): Int {
+        return beginCell()
+            .storeUint(VAULT_PROFILE_AVATAR_PAYMENT_ID_DOMAIN, 32)
+            .storeAddress(ownerWallet)
+            .storeUint(clientNonce, 64)
+            .storeUint(avatarHash, 256)
+            .endCell()
+            .hash() % UINT64_MOD;
+    }
+
+    fun computeUsernameNameHash(username: Slice): Int {
+        return beginCell()
+            .storeUint(USERNAME_NAME_HASH_DOMAIN, 32)
+            .storeSlice(username)
+            .endCell()
+            .hash();
+    }
+
+    fun computeUsernameMintPaymentId(ownerWallet: Address, clientNonce: Int, nameHash: Int): Int {
+        return beginCell()
+            .storeUint(VAULT_USERNAME_MINT_PAYMENT_ID_DOMAIN, 32)
+            .storeAddress(ownerWallet)
+            .storeUint(clientNonce, 64)
+            .storeUint(nameHash, 256)
+            .endCell()
+            .hash() % UINT64_MOD;
+    }
+
+    fun profileRegistryAthWalletAddress(): Address {
+        return self.deriveAthWalletAddress(self.profile_registry_address);
+    }
+
+    fun usernameRegistryAthWalletAddress(): Address {
+        return self.deriveAthWalletAddress(self.username_registry_address);
+    }
+
+    fun profileAvatarTonCharge(): Int {
+        return VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE + VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE;
+    }
+
+    fun usernameMintTonCharge(): Int {
+        return VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE + VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE;
+    }
+
+    fun usernamePriceForLength(nameLen: Int): Int {
+        throwUnless(16650, nameLen >= 4);
+        throwUnless(16651, nameLen <= USERNAME_MAX_LENGTH);
+        if (nameLen == 4) {
+            return USERNAME_PRICE_4_CHARS;
+        }
+        if (nameLen == 5) {
+            return USERNAME_PRICE_5_CHARS;
+        }
+        return USERNAME_PRICE_6_PLUS_CHARS;
+    }
+
+    fun isValidUsernameBytes(nameLen: Int, username: Slice): Bool {
+        if ((nameLen < 4) || (nameLen > USERNAME_MAX_LENGTH)) {
+            return false;
+        }
+        if (username.bits() != (nameLen * 8)) {
+            return false;
+        }
+        if (!username.refsEmpty()) {
+            return false;
+        }
+
+        let cursor: Slice = username;
+        let i: Int = 0;
+        while (i < nameLen) {
+            let ch: Int = cursor.loadUint(8);
+            let lower: Bool = (ch >= 97) && (ch <= 122);
+            let digit: Bool = (ch >= 48) && (ch <= 57);
+            let separator: Bool = (ch == 45) || (ch == 95);
+            if (!(lower || digit || separator)) {
+                return false;
+            }
+            i += 1;
+        }
+        return cursor.empty();
+    }
+
+    fun requireValidProfileAvatarPointer(ownerWallet: Address, avatarHash: Int, avatarStreamId: Int, avatarPartCount: Int, mediaFormat: Int) {
+        throwUnless(16640, self.isBasechainAddress(ownerWallet));
+        throwUnless(16641, avatarHash != 0);
+        throwUnless(16642, avatarStreamId != 0);
+        throwUnless(16643, avatarPartCount > 0);
+        throwUnless(16644, avatarPartCount <= PROFILE_AVATAR_MAX_PARTS);
+        throwUnless(16645, mediaFormat == PROFILE_AVATAR_MEDIA_FORMAT_WEBP);
+    }
+
 
     fun discountedFee(owner: Address, fullFee: Int): Int {
         if (!self.sealed) {
@@ -443,25 +684,28 @@ contract Vault {
         if (self.genesis_config_hash > VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH) {
             return fullFee;
         }
+        let minFee: Int = PLATO_MIN_PROTOCOL_FEE_TON;
+        if (fullFee < minFee) {
+            minFee = fullFee;
+        }
         let user: UserState = self.getUserOrEmpty(owner);
         if (user.ath_balance >= ATH_FULL_DISCOUNT_AMOUNT) {
-            return 0;
+            return minFee;
         }
         let remaining: Int = ATH_FULL_DISCOUNT_AMOUNT - user.ath_balance;
-        return ((fullFee * remaining) + ATH_FULL_DISCOUNT_AMOUNT - 1) / ATH_FULL_DISCOUNT_AMOUNT;
+        let fee: Int = ((fullFee * remaining) + ATH_FULL_DISCOUNT_AMOUNT - 1) / ATH_FULL_DISCOUNT_AMOUNT;
+        if (fee < minFee) {
+            return minFee;
+        }
+        return fee;
     }
 
     fun isPublishProfileValid(publishKind: Int, sizeClass: Int, cryptoSuite: Int, header0: Int, header1: Int): Bool {
         if (publishKind == PUBLISH_KIND_PRIVATE) {
             if (header0 == 0) { return false; }
             if (header1 == 0) { return false; }
-            if (sizeClass == SIZE_CLASS_STANDARD) {
-                return cryptoSuite == CRYPTO_SUITE_CLASSICAL;
-            }
-            if (sizeClass == SIZE_CLASS_LONG_TERM) {
-                return cryptoSuite == CRYPTO_SUITE_HYBRID;
-            }
-            return false;
+            if (!self.isAllowedPrivateSizeClass(sizeClass)) { return false; }
+            return cryptoSuite == CRYPTO_SUITE_HYBRID;
         }
         if (publishKind == PUBLISH_KIND_PUBLIC) {
             if (sizeClass != SIZE_CLASS_STANDARD) { return false; }
@@ -473,25 +717,39 @@ contract Vault {
         return false;
     }
 
-    fun privateBodyBits(sizeClass: Int): Int {
-        if (sizeClass == SIZE_CLASS_LONG_TERM) {
-            return CAPSULEHUB_PRIVATE_LONG_TERM_BODY_BITS;
-        }
-        return CAPSULEHUB_PRIVATE_STANDARD_BODY_BITS;
+    fun isAllowedPrivateSizeClass(sizeClass: Int): Bool {
+        return sizeClass == SIZE_CLASS_1K
+            || sizeClass == SIZE_CLASS_2K
+            || sizeClass == SIZE_CLASS_4K
+            || sizeClass == SIZE_CLASS_8K
+            || sizeClass == SIZE_CLASS_16K
+            || sizeClass == SIZE_CLASS_32K;
     }
 
-    fun privateBodyCells(sizeClass: Int): Int {
-        if (sizeClass == SIZE_CLASS_LONG_TERM) {
-            return CAPSULEHUB_PRIVATE_LONG_TERM_BODY_CELLS;
-        }
-        return CAPSULEHUB_PRIVATE_STANDARD_BODY_CELLS;
+    fun privateUsefulBytes(sizeClass: Int): Int {
+        throwUnless(16326, self.isAllowedPrivateSizeClass(sizeClass));
+        return sizeClass * 1024;
     }
 
-    fun privateBodyRefs(sizeClass: Int): Int {
-        if (sizeClass == SIZE_CLASS_LONG_TERM) {
-            return CAPSULEHUB_PRIVATE_LONG_TERM_BODY_REFS;
-        }
-        return CAPSULEHUB_PRIVATE_STANDARD_BODY_REFS;
+    fun privateBodyOverheadBytes(cryptoSuite: Int): Int {
+        throwUnless(16327, cryptoSuite == CRYPTO_SUITE_HYBRID);
+        return CAPSULEHUB_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES;
+    }
+
+    fun privateBodyBytes(sizeClass: Int, cryptoSuite: Int): Int {
+        return self.privateBodyOverheadBytes(cryptoSuite) + self.privateUsefulBytes(sizeClass);
+    }
+
+    fun privateBodyBits(sizeClass: Int, cryptoSuite: Int): Int {
+        return self.privateBodyBytes(sizeClass, cryptoSuite) * 8;
+    }
+
+    fun privateBodyCells(sizeClass: Int, cryptoSuite: Int): Int {
+        return (self.privateBodyBytes(sizeClass, cryptoSuite) + 126) / 127;
+    }
+
+    fun privateBodyRefs(sizeClass: Int, cryptoSuite: Int): Int {
+        return self.privateBodyCells(sizeClass, cryptoSuite) - 1;
     }
 
     fun isExactCapsuleCell(cell: Cell, expectedCells: Int, expectedBits: Int, expectedRefs: Int): Bool {
@@ -517,50 +775,70 @@ contract Vault {
         }
     }
 
-    fun isPrivateCapsuleShapeValid(sizeClass: Int, header0: Cell, header1: Cell, body: Cell): Bool {
+    fun isPrivateCapsuleShapeValid(sizeClass: Int, cryptoSuite: Int, header0: Cell, header1: Cell, body: Cell): Bool {
         if (!self.isExactCapsuleCell(header0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS)) {
             return false;
         }
         if (!self.isExactCapsuleCell(header1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS)) {
             return false;
         }
-        return self.isExactCapsuleCell(body, self.privateBodyCells(sizeClass), self.privateBodyBits(sizeClass), self.privateBodyRefs(sizeClass));
+        return self.isExactCapsuleCell(body, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite));
     }
 
     fun isPublicCapsuleShapeValid(header: Cell, body: Cell): Bool {
         if (!self.isPublicCapsuleCell(header, CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS, CAPSULEHUB_PUBLIC_HEADER_MAX_BITS, CAPSULEHUB_PUBLIC_HEADER_MAX_REFS, true)) {
             return false;
         }
-        return self.isPublicCapsuleCell(body, CAPSULEHUB_PUBLIC_BODY_MAX_CELLS, CAPSULEHUB_PUBLIC_BODY_MAX_BITS, CAPSULEHUB_PUBLIC_BODY_MAX_REFS, false);
+        return self.isPublicCapsuleCell(body, CAPSULEHUB_PUBLIC_BODY_MAX_CELLS, CAPSULEHUB_PUBLIC_BODY_MAX_BITS, CAPSULEHUB_PUBLIC_BODY_MAX_REFS, true);
     }
 
-    fun canonicalPublishMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+    fun privatePublishLocalExecReserve(sizeClass: Int, cryptoSuite: Int): Int {
+        throwUnless(16323, self.isAllowedPrivateSizeClass(sizeClass));
+        throwUnless(16324, cryptoSuite == CRYPTO_SUITE_HYBRID);
+        if (sizeClass == SIZE_CLASS_1K) { return VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_2K) { return VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_4K) { return VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_8K) { return VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_16K) { return VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE; }
+        return VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE;
+    }
+
+    fun privateCapsulehubExecReserve(sizeClass: Int, cryptoSuite: Int): Int {
+        throwUnless(16329, self.isAllowedPrivateSizeClass(sizeClass));
+        throwUnless(16325, cryptoSuite == CRYPTO_SUITE_HYBRID);
+        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE; }
+        return CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE;
+    }
+
+    fun publishLocalExecReserve(publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
         if (publishKind == PUBLISH_KIND_PUBLIC) {
             throwUnless(16320, sizeClass == SIZE_CLASS_STANDARD);
             throwUnless(16321, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
-            return VAULT_PUBLISH_LOCAL_EXEC_RESERVE
+            return VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE;
+        }
+        throwUnless(16322, publishKind == PUBLISH_KIND_PRIVATE);
+        return self.privatePublishLocalExecReserve(sizeClass, cryptoSuite);
+    }
+
+    fun canonicalPublishMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
+        let localExecReserve: Int = self.publishLocalExecReserve(publishKind, sizeClass, cryptoSuite);
+        if (publishKind == PUBLISH_KIND_PUBLIC) {
+            return localExecReserve
                 + self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON)
                 + CAPSULEHUB_PUBLIC_EXEC_RESERVE
                 + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
                 + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
                 + CAPSULEHUB_ACK_FORWARD_RESERVE;
         }
-        throwUnless(16322, publishKind == PUBLISH_KIND_PRIVATE);
-        if (sizeClass == SIZE_CLASS_STANDARD) {
-            throwUnless(16323, cryptoSuite == CRYPTO_SUITE_CLASSICAL);
-            return VAULT_PUBLISH_LOCAL_EXEC_RESERVE
-                + self.discountedFee(owner, PLATO_PRIVATE_STANDARD_FEE_TON)
-                + CAPSULEHUB_PRIVATE_STANDARD_EXEC_RESERVE
-                + CAPSULEHUB_PRIVATE_STANDARD_STORAGE_KEEPALIVE_RESERVE
-                + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
-                + CAPSULEHUB_ACK_FORWARD_RESERVE;
-        }
-        throwUnless(16324, sizeClass == SIZE_CLASS_LONG_TERM);
-        throwUnless(16325, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        return VAULT_PUBLISH_LOCAL_EXEC_RESERVE
+        throwUnless(16328, cryptoSuite == CRYPTO_SUITE_HYBRID);
+        return localExecReserve
             + self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON)
-            + CAPSULEHUB_PRIVATE_LONG_TERM_EXEC_RESERVE
-            + CAPSULEHUB_PRIVATE_LONG_TERM_STORAGE_KEEPALIVE_RESERVE
+            + self.privateCapsulehubExecReserve(sizeClass, cryptoSuite)
+            + CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE
             + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
             + CAPSULEHUB_ACK_FORWARD_RESERVE;
     }
@@ -576,9 +854,9 @@ contract Vault {
             .hash();
     }
 
-    fun capsulehubCallValue(maxCharge: Int): Int {
-        throwUnless(16340, maxCharge >= VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
-        return maxCharge - VAULT_PUBLISH_LOCAL_EXEC_RESERVE;
+    fun capsulehubCallValue(maxCharge: Int, localExecReserve: Int): Int {
+        throwUnless(16340, maxCharge >= localExecReserve);
+        return maxCharge - localExecReserve;
     }
 
     fun computePublishBounceId(publishId: Int): Int {
@@ -599,11 +877,7 @@ contract Vault {
             return self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON);
         }
         throwUnless(16352, publishKind == PUBLISH_KIND_PRIVATE);
-        if (sizeClass == SIZE_CLASS_STANDARD) {
-            throwUnless(16353, cryptoSuite == CRYPTO_SUITE_CLASSICAL);
-            return self.discountedFee(owner, PLATO_PRIVATE_STANDARD_FEE_TON);
-        }
-        throwUnless(16354, sizeClass == SIZE_CLASS_LONG_TERM);
+        throwUnless(16353, self.isAllowedPrivateSizeClass(sizeClass));
         throwUnless(16355, cryptoSuite == CRYPTO_SUITE_HYBRID);
         return self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON);
     }
@@ -664,6 +938,22 @@ contract Vault {
         self.users.set(pending.owner_wallet, user);
     }
 
+    fun restorePendingProfileAvatarPayment(queryId: Int, pending: PendingProfileAvatarPayment) {
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        user.ath_balance += pending.amount;
+        self.users.set(pending.owner_wallet, user);
+        self.pending_profile_avatar_payments.del(queryId);
+        self.decrementPendingProfileAvatarPaymentCount();
+    }
+
+    fun restorePendingUsernameMintPayment(queryId: Int, pending: PendingUsernameMintPayment) {
+        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
+        user.ath_balance += pending.amount;
+        self.users.set(pending.owner_wallet, user);
+        self.pending_username_mint_payments.del(queryId);
+        self.decrementPendingUsernameMintPaymentCount();
+    }
+
     fun creditActivityAirdrop(owner: Address) {
         if (self.genesis_config_hash <= 0) {
             return;
@@ -683,66 +973,46 @@ contract Vault {
 
 
     fun keyRecordStorageEndowment(cryptoSuiteMask: Int): Int {
-        throwUnless(16100, (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) || (cryptoSuiteMask == CRYPTO_SUITE_HYBRID));
-        if (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) {
-            return VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT;
-        }
+        throwUnless(16100, cryptoSuiteMask == CRYPTO_SUITE_HYBRID);
         return VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT;
     }
 
     fun validatePqPubkeyCell(pqLen: Int, cryptoSuiteMask: Int, pqPubkey: Cell) {
-        if (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) {
-            let empty: Slice = pqPubkey.beginParse();
-            throwUnless(16108, empty.bits() == 0);
-            throwUnless(16109, empty.refs() == 0);
-            return;
-        }
-        if (cryptoSuiteMask == CRYPTO_SUITE_HYBRID) {
-            let size: DataSize = pqPubkey.computeDataSize(MLKEM768_PUBKEY_SNAKE_CELLS);
-            throwUnless(16108, size.cells == MLKEM768_PUBKEY_SNAKE_CELLS);
-            throwUnless(16109, size.bits == MLKEM768_PUBKEY_SNAKE_BITS);
-            throwUnless(16113, size.refs == MLKEM768_PUBKEY_SNAKE_REFS);
+        throwUnless(16107, cryptoSuiteMask == CRYPTO_SUITE_HYBRID);
+        let size: DataSize = pqPubkey.computeDataSize(MLKEM768_PUBKEY_SNAKE_CELLS);
+        throwUnless(16108, size.cells == MLKEM768_PUBKEY_SNAKE_CELLS);
+        throwUnless(16109, size.bits == MLKEM768_PUBKEY_SNAKE_BITS);
+        throwUnless(16113, size.refs == MLKEM768_PUBKEY_SNAKE_REFS);
 
-            let cursor: Cell = pqPubkey;
-            let remaining: Int = pqLen;
-            while (remaining > 0) {
-                let chunkBytes: Int = MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES;
-                if (remaining == MLKEM768_PUBKEY_LEN) {
-                    chunkBytes = MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES;
-                } else {
-                    if (remaining < chunkBytes) {
-                        chunkBytes = remaining;
-                    }
+        let cursor: Cell = pqPubkey;
+        let remaining: Int = pqLen;
+        while (remaining > 0) {
+            let chunkBytes: Int = MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES;
+            if (remaining == MLKEM768_PUBKEY_LEN) {
+                chunkBytes = MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES;
+            } else {
+                if (remaining < chunkBytes) {
+                    chunkBytes = remaining;
                 }
-                let cursorSlice: Slice = cursor.beginParse();
-                throwUnless(16114, cursorSlice.bits() == (chunkBytes * 8));
-                if (remaining > chunkBytes) {
-                    throwUnless(16115, cursorSlice.refs() == 1);
-                    cursor = cursorSlice.loadRef();
-                } else {
-                    throwUnless(16116, cursorSlice.refs() == 0);
-                }
-                remaining -= chunkBytes;
             }
-            return;
+            let cursorSlice: Slice = cursor.beginParse();
+            throwUnless(16114, cursorSlice.bits() == (chunkBytes * 8));
+            if (remaining > chunkBytes) {
+                throwUnless(16115, cursorSlice.refs() == 1);
+                cursor = cursorSlice.loadRef();
+            } else {
+                throwUnless(16116, cursorSlice.refs() == 0);
+            }
+            remaining -= chunkBytes;
         }
-        throw(16107);
     }
 
     fun validateKeyProfile(encPubkey: Int, signPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int) {
         throwUnless(16101, encPubkey != 0);
         throwUnless(16102, signPubkey != 0);
-        if (cryptoSuiteMask == CRYPTO_SUITE_CLASSICAL) {
-            throwUnless(16103, pqHash == 0);
-            throwUnless(16104, pqLen == 0);
-        } else {
-            if (cryptoSuiteMask == CRYPTO_SUITE_HYBRID) {
-                throwUnless(16105, pqHash != 0);
-                throwUnless(16106, pqLen == MLKEM768_PUBKEY_LEN);
-            } else {
-                throw(16107);
-            }
-        }
+        throwUnless(16107, cryptoSuiteMask == CRYPTO_SUITE_HYBRID);
+        throwUnless(16105, pqHash != 0);
+        throwUnless(16106, pqLen == MLKEM768_PUBKEY_LEN);
         self.validatePqPubkeyCell(pqLen, cryptoSuiteMask, pqPubkey);
     }
 
@@ -794,12 +1064,14 @@ contract Vault {
     receive(msg: BindDeploymentManifest) {
         self.requireUnsealed();
         self.requireGenesisController();
-        throwUnless(15010, !self.capsule_hub_bound);
+        throwUnless(15010, !self.isCapsuleHubBound());
         throwUnless(15011, msg.deployment_manifest_hash != 0);
         throwUnless(15012, self.deployment_manifest_hash == 0 || self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(15018, self.isBasechainAddress(msg.counterpart_address));
+        throwUnless(15019, msg.counterpart_address != myAddress());
         self.deployment_manifest_hash = msg.deployment_manifest_hash;
         self.capsule_hub_address = msg.counterpart_address;
-        self.capsule_hub_bound = true;
+        self.binding_flags += VAULT_BINDING_CAPSULE_HUB;
     }
 
     receive(msg: BindOfficialAthWallet) {
@@ -814,14 +1086,44 @@ contract Vault {
         self.vault_ath_wallet_address = msg.official_ath_wallet_address;
     }
 
+    receive(msg: BindProfileRegistry) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(15025, msg.deployment_manifest_hash > 1);
+        throwUnless(15026, !self.isProfileRegistryBound());
+        throwUnless(15027, self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(15028, self.isBasechainAddress(msg.profile_registry_address));
+        throwUnless(15029, msg.profile_registry_address != myAddress());
+        self.profile_registry_address = msg.profile_registry_address;
+        self.binding_flags += VAULT_BINDING_PROFILE_REGISTRY;
+    }
+
+    receive(msg: BindUsernameRegistry) {
+        self.requireUnsealed();
+        self.requireGenesisController();
+        throwUnless(15032, msg.deployment_manifest_hash > 1);
+        throwUnless(15033, !self.isUsernameRegistryBound());
+        throwUnless(15034, self.deployment_manifest_hash == msg.deployment_manifest_hash);
+        throwUnless(15035, self.isBasechainAddress(msg.username_registry_address));
+        throwUnless(15036, msg.username_registry_address != myAddress());
+        self.username_registry_address = msg.username_registry_address;
+        self.binding_flags += VAULT_BINDING_USERNAME_REGISTRY;
+    }
+
     receive(msg: SealGenesis) {
         self.requireUnsealed();
         self.requireGenesisController();
         throwUnless(15020, msg.deployment_manifest_hash > 1);
         throwUnless(15021, self.deployment_manifest_hash == msg.deployment_manifest_hash);
-        throwUnless(15022, self.capsule_hub_bound);
+        throwUnless(15022, self.isCapsuleHubBound());
         throwUnless(15023, self.vault_ath_wallet_address != sender());
         throwUnless(15024, self.vault_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
+        throwUnless(15037, self.isProfileRegistryBound());
+        throwUnless(15038, self.isUsernameRegistryBound());
+        throwUnless(15039, self.isBasechainAddress(self.profile_registry_address));
+        throwUnless(15040, self.isBasechainAddress(self.username_registry_address));
+        throwUnless(15041, self.profile_registry_address != myAddress());
+        throwUnless(15042, self.username_registry_address != myAddress());
         self.genesis_config_hash = VAULT_ACTIVITY_AIRDROP_TOTAL_ATH;
         self.sealed = true;
     }
@@ -956,6 +1258,38 @@ contract Vault {
 
     receive(msg: ATHTransferAck) {
         self.requireSealed();
+        let pendingUsernameOpt: PendingUsernameMintPayment? = self.pending_username_mint_payments.get(msg.query_id);
+        if (pendingUsernameOpt != null) {
+            let pendingUsername: PendingUsernameMintPayment = pendingUsernameOpt!!;
+            throwUnless(16660, pendingUsername.amount == msg.amount);
+            if (sender() == self.usernameRegistryAthWalletAddress()) {
+                self.pending_username_mint_payments.del(msg.query_id);
+                self.decrementPendingUsernameMintPaymentCount();
+            } else {
+                throwUnless(16661, sender() == self.vault_ath_wallet_address);
+                self.restorePendingUsernameMintPayment(msg.query_id, pendingUsername);
+            }
+            return;
+        }
+
+        let pendingProfileOpt: PendingProfileAvatarPayment? = self.pending_profile_avatar_payments.get(msg.query_id);
+        if (pendingProfileOpt != null) {
+            let pendingProfile: PendingProfileAvatarPayment = pendingProfileOpt!!;
+            throwUnless(16620, pendingProfile.amount == msg.amount);
+            if (sender() == self.profileRegistryAthWalletAddress()) {
+                self.pending_profile_avatar_payments.del(msg.query_id);
+                self.decrementPendingProfileAvatarPaymentCount();
+            } else {
+                throwUnless(16621, sender() == self.vault_ath_wallet_address);
+                self.restorePendingProfileAvatarPayment(msg.query_id, pendingProfile);
+            }
+            return;
+        }
+
+        if (sender() == self.vault_ath_wallet_address) {
+            return;
+        }
+
         let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(msg.query_id);
         throwUnless(16028, pendingOpt != null);
         let pending: PendingAthWithdrawal = pendingOpt!!;
@@ -968,6 +1302,24 @@ contract Vault {
 
     receive(msg: ATHTransferFailed) {
         self.requireSealed();
+        let pendingUsernameOpt: PendingUsernameMintPayment? = self.pending_username_mint_payments.get(msg.query_id);
+        if (pendingUsernameOpt != null) {
+            let pendingUsername: PendingUsernameMintPayment = pendingUsernameOpt!!;
+            throwUnless(16670, pendingUsername.amount == msg.amount);
+            throwUnless(16671, sender() == self.vault_ath_wallet_address);
+            self.restorePendingUsernameMintPayment(msg.query_id, pendingUsername);
+            return;
+        }
+
+        let pendingProfileOpt: PendingProfileAvatarPayment? = self.pending_profile_avatar_payments.get(msg.query_id);
+        if (pendingProfileOpt != null) {
+            let pendingProfile: PendingProfileAvatarPayment = pendingProfileOpt!!;
+            throwUnless(16630, pendingProfile.amount == msg.amount);
+            throwUnless(16631, sender() == self.vault_ath_wallet_address);
+            self.restorePendingProfileAvatarPayment(msg.query_id, pendingProfile);
+            return;
+        }
+
         throwUnless(16070, sender() == self.vault_ath_wallet_address);
         throwUnless(16071, msg.amount > 0);
         let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(msg.query_id);
@@ -996,6 +1348,51 @@ contract Vault {
         self.refundPendingAthWithdrawalTon(pending, context().value);
         self.pending_ath_withdrawals.del(msg.query_id);
         self.pending_ath_withdrawal_count -= 1;
+    }
+
+    bounced(msg: bounced<ATHTransferRequestVaultProfileAvatar>) {
+        self.requireSealed();
+        throwUnless(16635, sender() == self.vault_ath_wallet_address);
+        throwUnless(16636, msg.amount > 0);
+        let pendingProfileOpt: PendingProfileAvatarPayment? = self.pending_profile_avatar_payments.get(msg.query_id);
+        throwUnless(16637, pendingProfileOpt != null);
+        let pendingProfile: PendingProfileAvatarPayment = pendingProfileOpt!!;
+        throwUnless(16638, pendingProfile.amount == msg.amount);
+        self.restorePendingProfileAvatarPayment(msg.query_id, pendingProfile);
+    }
+
+    bounced(msg: bounced<ATHTransferRequestVaultMintUsername>) {
+        self.requireSealed();
+        throwUnless(16675, sender() == self.vault_ath_wallet_address);
+        throwUnless(16676, msg.amount > 0);
+        let pendingUsernameOpt: PendingUsernameMintPayment? = self.pending_username_mint_payments.get(msg.query_id);
+        throwUnless(16677, pendingUsernameOpt != null);
+        let pendingUsername: PendingUsernameMintPayment = pendingUsernameOpt!!;
+        throwUnless(16678, pendingUsername.amount == msg.amount);
+        self.restorePendingUsernameMintPayment(msg.query_id, pendingUsername);
+    }
+
+    receive(msg: ProfileAvatarTonExcessRefund) {
+        self.requireSealed();
+        throwUnless(16680, self.isProfileRegistryBound());
+        throwUnless(16681, sender() == self.profile_registry_address);
+        throwUnless(16682, self.isBasechainAddress(msg.owner_wallet));
+        throwUnless(16683, msg.amount > 0);
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16684, userOpt != null);
+        if (context().value <= VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE) {
+            return;
+        }
+        let creditAmount: Int = context().value - VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE;
+        if (creditAmount > msg.amount) {
+            creditAmount = msg.amount;
+        }
+        if (creditAmount <= 0) {
+            return;
+        }
+        let user: UserState = userOpt!!;
+        user.ton_balance += creditAmount;
+        self.users.set(msg.owner_wallet, user);
     }
 
     receive(msg: TopUpStorageReserve) {
@@ -1109,6 +1506,8 @@ contract Vault {
             throwUnless(16215, user.ton_balance >= msg.amount);
             user.ton_balance -= msg.amount;
         } else {
+            throwUnless(16219, self.isBasechainAddress(sender()));
+            throwUnless(16220, self.isBasechainAddress(msg.recipient_wallet));
             throwUnless(16216, user.ath_balance >= msg.amount);
             user.ath_balance -= msg.amount;
         }
@@ -1138,6 +1537,9 @@ contract Vault {
         let intent: ReceiveIntent = intentOpt!!;
         throwUnless(16231, !intent.claimed);
         throwUnless(16232, sender() == intent.recipient_wallet);
+        if (intent.asset == ASSET_ATH) {
+            throwUnless(16236, self.isBasechainAddress(sender()));
+        }
         let expected: Int = self.computeReceiveIntentCommitment(msg.intent_id, sender(), msg.secret32);
         throwUnless(16234, expected == intent.commitment);
 
@@ -1191,37 +1593,73 @@ contract Vault {
         throwUnless(16464, signedDomain == VAULT_PUBLISH_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16465, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16466, signedVaultAddress == myAddress());
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        throwUnless(16466, vaultAddressSlice.loadUint(11) == 1024);
+        throwUnless(16466, signedVaultHash == vaultAddressSlice.loadUint(256));
         let signedPublishKind: Int = signedPayload.loadUint(8);
         throwUnless(16467, signedPublishKind == PUBLISH_KIND_PRIVATE);
-        let signedOwner: Address = signedPayload.loadAddress();
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxCharge: Int = signedPayload.loadUint(128);
-        let payloadCell: Cell = signedPayload.loadRef();
-        throwUnless(16468, signedPayload.bits() == 0);
-        throwUnless(16469, signedPayload.refs() == 0);
-        throwUnless(16470, signedOwner == msg.owner_wallet);
+        let signedSizeClass: Int = signedPayload.loadUint(8);
+        let signedCryptoSuite: Int = signedPayload.loadUint(8);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16450, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16470, signedOwnerHash == ownerPrefix.loadUint(256));
         throwUnless(16453, clientNonce == user.publish_nonce);
-        throwUnless(16462, maxCharge >= VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        throwUnless(16472, signedCryptoSuite == CRYPTO_SUITE_HYBRID);
+        let localExecReserve: Int = 0;
+        if (signedSizeClass == SIZE_CLASS_1K) {
+            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE;
+        } else if (signedSizeClass == SIZE_CLASS_2K) {
+            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE;
+        } else if (signedSizeClass == SIZE_CLASS_4K) {
+            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE;
+        } else if (signedSizeClass == SIZE_CLASS_8K) {
+            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE;
+        } else if (signedSizeClass == SIZE_CLASS_16K) {
+            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE;
+        } else if (signedSizeClass == SIZE_CLASS_32K) {
+            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE;
+        }
+        throwUnless(16471, localExecReserve > 0);
+        throwUnless(16462, maxCharge >= localExecReserve);
         throwUnless(16463, user.ton_balance >= maxCharge);
-        throwUnless(16450, self.isBasechainAddress(msg.owner_wallet));
-        throwUnless(16452, user.current_key_id != 0);
-
-        let payloadPreview: Slice = payloadCell.beginParse();
-        throwUnless(16471, payloadPreview.bits() == 784);
-        throwUnless(16472, payloadPreview.refs() == 3);
-
         acceptMessage();
 
-        user.ton_balance -= VAULT_PUBLISH_LOCAL_EXEC_RESERVE;
+        user.ton_balance -= localExecReserve;
         user.publish_nonce += 1;
         self.users.set(msg.owner_wallet, user);
         commit();
 
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let payloadCell: Cell = signedPayload.loadRef();
+
+        let payloadPreview: Slice = payloadCell.beginParse();
+        if (!(payloadPreview.bits() == 784)) {
+            return;
+        }
+        if (!(payloadPreview.refs() == 3)) {
+            return;
+        }
+
         let payload: Slice = payloadCell.beginParse();
-        let sizeClass: Int = payload.loadUint(8);
-        let cryptoSuite: Int = payload.loadUint(8);
+        let parsedSizeClass: Int = payload.loadUint(8);
+        let parsedCryptoSuite: Int = payload.loadUint(8);
+        if (!(parsedSizeClass == signedSizeClass)) {
+            return;
+        }
+        if (!(parsedCryptoSuite == signedCryptoSuite)) {
+            return;
+        }
+        let sizeClass: Int = parsedSizeClass;
+        let cryptoSuite: Int = parsedCryptoSuite;
         let header0Hash: Int = payload.loadUint(256);
         let header1Hash: Int = payload.loadUint(256);
         let bodyHash: Int = payload.loadUint(256);
@@ -1247,7 +1685,7 @@ contract Vault {
         if (!(body.hash() == bodyHash)) {
             return;
         }
-        if (!self.isPrivateCapsuleShapeValid(sizeClass, header0, header1, body)) {
+        if (!self.isPrivateCapsuleShapeValid(sizeClass, cryptoSuite, header0, header1, body)) {
             return;
         }
 
@@ -1257,7 +1695,7 @@ contract Vault {
         }
 
         let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
-        let callValue: Int = self.capsulehubCallValue(maxCharge);
+        let callValue: Int = self.capsulehubCallValue(maxCharge, localExecReserve);
         let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PRIVATE);
         if (!(publishId != 0)) {
             return;
@@ -1268,7 +1706,7 @@ contract Vault {
             return;
         }
 
-        user.ton_balance -= (maxCharge - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        user.ton_balance -= (maxCharge - localExecReserve);
         self.users.set(msg.owner_wallet, user);
 
         self.pending_publishes.set(bounceId, PendingPublish {
@@ -1281,7 +1719,7 @@ contract Vault {
             refundable_amount: callValue,
             created_at: now()
         });
-        self.pending_publish_count += 1;
+        self.incrementPendingPublishCount();
         commit();
 
         message(MessageParameters {
@@ -1326,26 +1764,35 @@ contract Vault {
         let signedOwner: Address = signedPayload.loadAddress();
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxCharge: Int = signedPayload.loadUint(128);
-        let payloadCell: Cell = signedPayload.loadRef();
-        throwUnless(16497, signedPayload.bits() == 0);
-        throwUnless(16498, signedPayload.refs() == 0);
         throwUnless(16499, signedOwner == msg.owner_wallet);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16480, ownerPrefix.loadUint(11) == 1024);
         throwUnless(16483, clientNonce == user.publish_nonce);
-        throwUnless(16491, maxCharge >= VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        let localExecReserve: Int = VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE;
+        throwUnless(16491, maxCharge >= localExecReserve);
         throwUnless(16492, user.ton_balance >= maxCharge);
-        throwUnless(16480, self.isBasechainAddress(msg.owner_wallet));
-        throwUnless(16482, user.current_key_id != 0);
-
-        let payloadPreview: Slice = payloadCell.beginParse();
-        throwUnless(16504, payloadPreview.bits() == 512);
-        throwUnless(16505, payloadPreview.refs() == 2);
-
         acceptMessage();
 
-        user.ton_balance -= VAULT_PUBLISH_LOCAL_EXEC_RESERVE;
+        user.ton_balance -= localExecReserve;
         user.publish_nonce += 1;
         self.users.set(msg.owner_wallet, user);
         commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let payloadCell: Cell = signedPayload.loadRef();
+
+        let payloadPreview: Slice = payloadCell.beginParse();
+        if (!(payloadPreview.bits() == 512)) {
+            return;
+        }
+        if (!(payloadPreview.refs() == 2)) {
+            return;
+        }
 
         let payload: Slice = payloadCell.beginParse();
         let headerHash: Int = payload.loadUint(256);
@@ -1378,7 +1825,7 @@ contract Vault {
         }
 
         let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
-        let callValue: Int = self.capsulehubCallValue(maxCharge);
+        let callValue: Int = self.capsulehubCallValue(maxCharge, localExecReserve);
         let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PUBLIC);
         if (!(publishId != 0)) {
             return;
@@ -1389,7 +1836,7 @@ contract Vault {
             return;
         }
 
-        user.ton_balance -= (maxCharge - VAULT_PUBLISH_LOCAL_EXEC_RESERVE);
+        user.ton_balance -= (maxCharge - localExecReserve);
         self.users.set(msg.owner_wallet, user);
 
         self.pending_publishes.set(bounceId, PendingPublish {
@@ -1402,7 +1849,7 @@ contract Vault {
             refundable_amount: callValue,
             created_at: now()
         });
-        self.pending_publish_count += 1;
+        self.incrementPendingPublishCount();
         commit();
 
         message(MessageParameters {
@@ -1425,6 +1872,222 @@ contract Vault {
         });
     }
 
+    external(msg: SetProfileAvatarFromVaultBalance) {
+        self.requireSealed();
+        throwUnless(16600, self.isProfileRegistryBound());
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16601, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16602, user.current_sign_pubkey != 0);
+        throwUnless(16604, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16605, signedDomain == VAULT_PROFILE_AVATAR_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16606, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16607, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        let clientNonce: Int = signedPayload.loadUint(64);
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        throwUnless(16610, signedOwner == msg.owner_wallet);
+        throwUnless(16611, clientNonce == user.publish_nonce);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16612, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16613, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
+        throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
+        acceptMessage();
+
+        user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let avatarPayloadCell: Cell = signedPayload.loadRef();
+
+        let avatarPayloadPreview: Slice = avatarPayloadCell.beginParse();
+        if (!(avatarPayloadPreview.bits() == 739)) {
+            return;
+        }
+        if (!(avatarPayloadPreview.refs() == 0)) {
+            return;
+        }
+
+        let avatarPayload: Slice = avatarPayloadCell.beginParse();
+        let signedProfileRegistry: Address = avatarPayload.loadAddress();
+        let avatarHash: Int = avatarPayload.loadUint(256);
+        let avatarEntryId: Int = avatarPayload.loadUint(64);
+        let avatarStreamId: Int = avatarPayload.loadUint(128);
+        let avatarPartCount: Int = avatarPayload.loadUint(16);
+        let mediaFormat: Int = avatarPayload.loadUint(8);
+        if (!(signedProfileRegistry == self.profile_registry_address)) {
+            return;
+        }
+        self.requireValidProfileAvatarPointer(msg.owner_wallet, avatarHash, avatarStreamId, avatarPartCount, mediaFormat);
+
+        let tonCharge: Int = self.profileAvatarTonCharge();
+        if (!(maxTonCharge >= tonCharge)) {
+            return;
+        }
+        let remainingTonCharge: Int = tonCharge - VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
+        if (!(user.ton_balance >= remainingTonCharge)) {
+            return;
+        }
+        if (!(user.ath_balance >= PROFILE_AVATAR_PRICE_ATH)) {
+            return;
+        }
+
+        let queryId: Int = self.computeProfileAvatarPaymentId(msg.owner_wallet, clientNonce, avatarHash);
+        if (self.pending_profile_avatar_payments.exists(queryId)) {
+            return;
+        }
+
+        user.ton_balance -= remainingTonCharge;
+        user.ath_balance -= PROFILE_AVATAR_PRICE_ATH;
+        self.users.set(msg.owner_wallet, user);
+        self.pending_profile_avatar_payments.set(queryId, PendingProfileAvatarPayment {
+            owner_wallet: msg.owner_wallet,
+            amount: PROFILE_AVATAR_PRICE_ATH,
+            created_at: now()
+        });
+        self.incrementPendingProfileAvatarPaymentCount();
+        commit();
+
+        message(MessageParameters {
+            to: self.vault_ath_wallet_address,
+            value: VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: ATHTransferRequestVaultProfileAvatar {
+                query_id: queryId,
+                amount: PROFILE_AVATAR_PRICE_ATH,
+                recipient: self.profile_registry_address,
+                response_destination: myAddress(),
+                notify_value: PROFILE_AVATAR_NOTIFY_VALUE,
+                owner_wallet: msg.owner_wallet,
+                avatar_hash: avatarHash,
+                avatar_entry_id: avatarEntryId,
+                avatar_stream_id: avatarStreamId,
+                avatar_part_count: avatarPartCount,
+                media_format: mediaFormat
+            }.toCell()
+        });
+    }
+
+    external(msg: MintUsernameFromVaultBalance) {
+        self.requireSealed();
+        throwUnless(16700, self.isUsernameRegistryBound());
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16701, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16702, user.current_sign_pubkey != 0);
+        throwUnless(16704, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16705, signedDomain == VAULT_USERNAME_MINT_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16706, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16707, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        let clientNonce: Int = signedPayload.loadUint(64);
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        throwUnless(16710, signedOwner == msg.owner_wallet);
+        throwUnless(16711, clientNonce == user.publish_nonce);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16712, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16713, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
+        throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
+        acceptMessage();
+
+        user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let usernamePayloadCell: Cell = signedPayload.loadRef();
+
+        let usernamePayloadPreview: Slice = usernamePayloadCell.beginParse();
+        if (!(usernamePayloadPreview.bits() >= 275)) {
+            return;
+        }
+        if (!(usernamePayloadPreview.refs() == 0)) {
+            return;
+        }
+
+        let usernamePayload: Slice = usernamePayloadCell.beginParse();
+        let signedUsernameRegistry: Address = usernamePayload.loadAddress();
+        let usernameLen: Int = usernamePayload.loadUint(8);
+        let username: Slice = usernamePayload;
+        if (!(signedUsernameRegistry == self.username_registry_address)) {
+            return;
+        }
+        if (!self.isValidUsernameBytes(usernameLen, username)) {
+            return;
+        }
+
+        let price: Int = self.usernamePriceForLength(usernameLen);
+        let tonCharge: Int = self.usernameMintTonCharge();
+        if (!(maxTonCharge >= tonCharge)) {
+            return;
+        }
+        let remainingTonCharge: Int = tonCharge - VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
+        if (!(user.ton_balance >= remainingTonCharge)) {
+            return;
+        }
+        if (!(user.ath_balance >= price)) {
+            return;
+        }
+
+        let nameHash: Int = self.computeUsernameNameHash(username);
+        let queryId: Int = self.computeUsernameMintPaymentId(msg.owner_wallet, clientNonce, nameHash);
+        if (self.pending_username_mint_payments.exists(queryId)) {
+            return;
+        }
+
+        user.ton_balance -= remainingTonCharge;
+        user.ath_balance -= price;
+        self.users.set(msg.owner_wallet, user);
+        self.pending_username_mint_payments.set(queryId, PendingUsernameMintPayment {
+            owner_wallet: msg.owner_wallet,
+            amount: price,
+            created_at: now()
+        });
+        self.incrementPendingUsernameMintPaymentCount();
+        commit();
+
+        message(MessageParameters {
+            to: self.vault_ath_wallet_address,
+            value: VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE,
+            bounce: true,
+            mode: SendPayGasSeparately,
+            body: ATHTransferRequestVaultMintUsername {
+                query_id: queryId,
+                amount: price,
+                recipient: self.username_registry_address,
+                response_destination: myAddress(),
+                notify_value: USERNAME_NOTIFY_VALUE,
+                owner_wallet: msg.owner_wallet,
+                username_len: usernameLen,
+                username: username
+            }.toCell()
+        });
+    }
+
     receive(msg: CapsuleHubPublishAck) {
         self.requireSealed();
         throwUnless(16500, sender() == self.capsule_hub_address);
@@ -1443,7 +2106,7 @@ contract Vault {
             self.refundPendingPublish(pending, context().value);
             self.creditActivityAirdrop(pending.owner_wallet);
             self.pending_publishes.del(bounceId);
-            self.pending_publish_count -= 1;
+            self.decrementPendingPublishCount();
         }
     }
 
@@ -1463,7 +2126,7 @@ contract Vault {
         } else {
             self.refundPendingPublish(pending, context().value);
             self.pending_publishes.del(msg.bounce_id);
-            self.pending_publish_count -= 1;
+            self.decrementPendingPublishCount();
         }
     }
 
@@ -1483,7 +2146,7 @@ contract Vault {
         } else {
             self.refundPendingPublish(pending, context().value);
             self.pending_publishes.del(msg.bounce_id);
-            self.pending_publish_count -= 1;
+            self.decrementPendingPublishCount();
         }
     }
 
@@ -1516,7 +2179,7 @@ contract Vault {
             refundable_amount: pending.refundable_amount,
             created_at: tombstoneExpiresAt
         });
-        self.pending_publish_count -= 1;
+        self.decrementPendingPublishCount();
     }
 
     get fun get_user(owner: Address): VaultUserView {
@@ -1662,16 +2325,22 @@ contract Vault {
         }
         return VaultGlobalView {
             sealed: self.sealed,
-            capsule_hub_bound: self.capsule_hub_bound,
+            capsule_hub_bound: self.isCapsuleHubBound(),
+            profile_registry_bound: self.isProfileRegistryBound(),
+            username_registry_bound: self.isUsernameRegistryBound(),
             deployment_manifest_hash: self.deployment_manifest_hash,
             capsule_hub_address: self.capsule_hub_address,
+            profile_registry_address: self.profile_registry_address,
+            username_registry_address: self.username_registry_address,
             vault_ath_wallet_address: self.vault_ath_wallet_address,
             ath_master_address: self.ath_master_address,
             user_count: self.user_count,
             key_record_count: self.key_record_count,
             receive_intent_count: self.receive_intent_count,
             pending_ath_withdrawal_count: self.pending_ath_withdrawal_count,
-            pending_publish_count: self.pending_publish_count,
+            pending_publish_count: self.pendingPublishCount(),
+            pending_profile_avatar_payment_count: self.pendingProfileAvatarPaymentCount(),
+            pending_username_mint_payment_count: self.pendingUsernameMintPaymentCount(),
             processed_ath_deposit_count: self.processed_ath_deposit_count,
             pending_publish_stale_ttl: VAULT_PENDING_PUBLISH_STALE_TTL,
             airdrop_remaining_ath: airdropRemaining,
