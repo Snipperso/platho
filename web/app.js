@@ -5366,6 +5366,22 @@ function assertNetworkFeeSurchargeWithinCap() {
   throw new Error(`Network surcharge ${formatTonNanotons(rawSurcharge)} TON exceeds the production cap ${formatTonNanotons(maxSurcharge)} TON. Try another RPC/network estimate before sending.`);
 }
 
+function shortUiErrorText(error, fallback = 'Blocked') {
+  const text = String(error?.message ?? error ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return fallback;
+  return text.length > 180 ? `${text.slice(0, 177)}...` : text;
+}
+
+function privateSendPreflightStatusText(error) {
+  const message = shortUiErrorText(error, 'Send blocked');
+  if (/not enough vault ton/i.test(message)) return message;
+  if (/activate messaging before publishing/i.test(message)) return 'Activate messaging before sending';
+  if (/network surcharge .* exceeds the production cap/i.test(message)) return message;
+  if (/RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message)) return 'RPC verification unavailable';
+  if (/Vault chain provider|TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
+  return message;
+}
+
 function messageDiscountUnlocked() {
   const remaining = vaultProtocolState?.airdrop_remaining_ath;
   if (remaining === null || remaining === undefined) return false;
@@ -7187,7 +7203,7 @@ composer?.addEventListener('submit', async (event) => {
     if (privateComposerCostStatus) {
       privateComposerCostStatus.textContent = rateLimited
         ? TON_RPC_CONNECTING_STATUS
-        : (/not enough vault ton/i.test(messageText) ? messageText : 'Send blocked');
+        : privateSendPreflightStatusText(error);
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshPrivateSendButtonState();

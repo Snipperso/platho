@@ -757,6 +757,25 @@ describe('PWA runtime config guard', () => {
     expect(prepareSource).not.toMatch(/sendVaultExternalBoc/);
   });
 
+  it('PWA-SEND-01B: private preflight shows actionable blocked reasons instead of generic send blocked', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const helperSource = app.slice(
+      app.indexOf('function privateSendPreflightStatusText'),
+      app.indexOf('function messageDiscountUnlocked'),
+    );
+    const submitStart = app.indexOf("composer?.addEventListener('submit'");
+    const submitSource = app.slice(
+      submitStart,
+      app.indexOf('const message = {', submitStart),
+    );
+
+    expect(helperSource).toMatch(/Activate messaging before sending/);
+    expect(helperSource).toMatch(/network surcharge .* exceeds the production cap/i);
+    expect(helperSource).toMatch(/RPC verification unavailable/);
+    expect(submitSource).toMatch(/privateSendPreflightStatusText\(error\)/);
+    expect(submitSource).not.toMatch(/\? messageText : 'Send blocked'/);
+  });
+
   it('PWA-SEND-02: prepared multi-capsule send waits for nonce before the next BOC and preserves partial state', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const sendSource = app.slice(
@@ -1553,11 +1572,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v299/);
+    expect(sw).toMatch(/platho-pwa-prototype-v300/);
     expect(sw).toMatch(/\.\/styles\.css\?v=122/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=239/);
+    expect(sw).toMatch(/\.\/app\.js\?v=240/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
