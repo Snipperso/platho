@@ -251,8 +251,6 @@ const attachmentControls = [
   ...document.querySelectorAll('[data-requires-wallet="true"], #attachButton, .attachment-button'),
 ];
 const encryptionStatus = document.querySelector('#encryptionStatus');
-const keySuiteStatus = document.querySelector('#keySuiteStatus');
-const keySuiteSelect = document.querySelector('#keySuiteSelect');
 const keyAuthStatus = document.querySelector('#keyAuthStatus');
 const vaultDraftStatus = document.querySelector('#vaultDraftStatus');
 const capsulePolicyStatus = document.querySelector('#capsulePolicyStatus');
@@ -405,7 +403,6 @@ let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
 const tonWalletBalanceCache = new Map();
 const tonWalletBalanceInFlight = new Map();
-const KEY_SUITE_PREF_KEY = 'platho.crypto.suite.v1';
 const VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES.HYBRID_V1;
 const PLATHO_WALLET_STORAGE_KEY = 'platho.wallet.encrypted.v1';
 const PLATHO_WALLET_STORAGE_KIND = 'platho.wallet.encrypted.mnemonic.v1';
@@ -4794,24 +4791,8 @@ function normalizeCryptoSuite(value) {
   return CRYPTO_SUITES.HYBRID_V1;
 }
 
-function readPreferredCryptoSuite() {
-  try {
-    return normalizeCryptoSuite(localStorageOrNull()?.getItem(KEY_SUITE_PREF_KEY));
-  } catch {
-    return CRYPTO_SUITES.HYBRID_V1;
-  }
-}
-
-function writePreferredCryptoSuite(suite) {
-  try {
-    localStorageOrNull()?.setItem(KEY_SUITE_PREF_KEY, normalizeCryptoSuite(suite));
-  } catch {
-    // Non-persistent mode still uses the current select value for this session.
-  }
-}
-
 function currentOutgoingPrivateSuite() {
-  return normalizeCryptoSuite(keySuiteSelect?.value ?? readPreferredCryptoSuite());
+  return CRYPTO_SUITES.HYBRID_V1;
 }
 
 function walletStorageCrypto() {
@@ -5252,19 +5233,6 @@ function currentNetworkFeeEstimateNanotons() {
       ?? appConfig.messaging?.networkFeeEstimateNanotons,
     INCLUDED_NETWORK_FEE_NANOTONS,
   );
-}
-
-function updateKeySuiteUi(suite) {
-  const normalized = normalizeCryptoSuite(suite);
-  if (keySuiteSelect) {
-    keySuiteSelect.value = normalized;
-    keySuiteSelect.disabled = true;
-  }
-  if (keySuiteStatus) {
-    keySuiteStatus.hidden = true;
-    keySuiteStatus.textContent = '';
-  }
-  refreshComposerCostStatus();
 }
 
 function currentVaultUserSource() {
@@ -6986,15 +6954,6 @@ registerVaultKeysButton?.addEventListener('click', async () => {
   } finally {
     registerVaultKeysButton.disabled = false;
   }
-});
-
-keySuiteSelect?.addEventListener('change', () => {
-  const suite = normalizeCryptoSuite(keySuiteSelect.value);
-  writePreferredCryptoSuite(suite);
-  updateKeySuiteUi(suite);
-  setText(encryptionStatus, 'postquantum only');
-  refreshMessagingControls();
-  refreshComposerPublishPolicy();
 });
 
 messageInput?.addEventListener('input', () => {
@@ -10686,8 +10645,6 @@ async function refreshVaultActivationStatus(options = {}) {
 
 async function bootCrypto() {
   try {
-    const preferredSuite = readPreferredCryptoSuite();
-    updateKeySuiteUi(preferredSuite);
     if (!plathoWallet) {
       const hasStoredWallet = hasStoredPlathoWalletRecord();
       const requiredStatus = hasStoredWallet ? 'unlock required' : 'wallet required';
@@ -10705,7 +10662,6 @@ async function bootCrypto() {
       setText(messageSyncStatus, requiredStatus);
       setText(vaultRotateStatus, requiredStatus);
       localProfileAvatarPointer = null;
-      updateKeySuiteUi(preferredSuite);
       refreshComposerPublishPolicy();
       return null;
     }
@@ -10724,7 +10680,6 @@ async function bootCrypto() {
     globalThis.plathoRefreshVaultActivation = async (provider) => refreshVaultActivationStatus({ provider });
     const result = await runPlathoCryptoSelfTest();
     setText(encryptionStatus, result.hybrid.aadTamperRejected ? 'hybrid passed' : 'review');
-    updateKeySuiteUi(preferredSuite);
     setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? 'signed bundle' : 'review');
     vaultDraftStatus.textContent = 'ready';
     setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
@@ -10754,7 +10709,6 @@ async function bootCrypto() {
     }
   } catch (error) {
     setText(encryptionStatus, 'unavailable');
-    setText(keySuiteStatus, '');
     setText(keyAuthStatus, 'blocked');
     vaultDraftStatus.textContent = 'blocked';
     setText(capsulePolicyStatus, 'blocked');

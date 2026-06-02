@@ -220,14 +220,16 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/aria-label="Choose display name"/);
   });
 
-  it('PWA-CONFIG-01C: profile exposes encryption suite choice with useful payload capacity', () => {
+  it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
     const html = readFileSync('web/index.html', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
     const manifest = readFileSync('web/manifest.webmanifest', 'utf8');
 
-    expect(html).toMatch(/id="keySuiteSelect"/);
-    expect(html).toMatch(/Encryption/);
+    expect(html).not.toMatch(/id="keySuiteSelect"/);
+    expect(html).not.toMatch(/Private message encryption type/);
+    expect(html).not.toMatch(/Postquantum - from 0\.0347 TON/);
+    expect(app).not.toMatch(/keySuiteSelect|keySuiteStatus|KEY_SUITE_PREF_KEY/);
     expect(html).toMatch(/id="actionDialog"/);
     expect(html).toMatch(/id="createWalletButton"/);
     expect(html).toMatch(/id="createWalletStatus"/);
@@ -436,7 +438,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
     expect(html).toMatch(/<h2>Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="registerVaultKeysButton"/);
-    expect(html).toMatch(/<h2>Messages<\/h2>[\s\S]*id="keySuiteSelect"[\s\S]*id="syncMessagesButton"/);
+    expect(html).toMatch(/<h2>Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).toMatch(/Sync messages[\s\S]*tap to sync/);
     expect(html).toMatch(/Replace message keys[\s\S]*activate first/);
     expect(app).toMatch(/up to date/);
@@ -446,7 +448,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/vaultDraftStatus\.textContent = 'ready'/);
     expect(app).toMatch(/VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES\.HYBRID_V1/);
     expect(app).toMatch(/loadMessagingIdentityFromWallet\(VAULT_RECEIVE_CRYPTO_SUITE\)/);
-    expect(app).toMatch(/postquantum only/);
+    expect(app).not.toMatch(/postquantum only/);
     expect(app).not.toContain('crypto_suite_mask} / ${localVaultDraft.json.pq_kem_pubkey_len}b');
     expect(html).toMatch(/id="setAvatarButton"/);
     expect(html).toMatch(/id="profileAvatarInput"/);
@@ -598,7 +600,7 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/window\.prompt|window\.alert/);
     expect(html).not.toMatch(/Messaging key backup|exportMessagingKeyBackupButton|importMessagingKeyBackupButton|messagingKeyBackupInput/);
     expect(html).not.toMatch(/Transport|QR key|Copy key|Save key|Share capsule|Save capsule|Open file|Paste package JSON/);
-    expect(html).toMatch(/<option value="hybrid-v1">Postquantum . from 0\.0347 TON<\/option>/);
+    expect(html).not.toMatch(/<option value="hybrid-v1">Postquantum . from 0\.0347 TON<\/option>/);
     expect(html).not.toMatch(/value="classical-v1"/);
     expect(app).toMatch(/return CRYPTO_SUITES\.HYBRID_V1/);
   });
@@ -1589,11 +1591,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v301/);
+    expect(sw).toMatch(/platho-pwa-prototype-v302/);
     expect(sw).toMatch(/\.\/styles\.css\?v=122/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=241/);
+    expect(sw).toMatch(/\.\/app\.js\?v=242/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
