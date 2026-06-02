@@ -5,13 +5,14 @@ import { createHash } from 'crypto';
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
+  BindUsernameVault,
   SealGenesis,
   AthTransferNotificationMintUsername,
   FlushAthRefundDue,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
-import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
+import { InitializeUsernameItem, UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
@@ -24,9 +25,9 @@ const HALF_PRICE = 50_000_000_000n;
 
 const REFUND_DUE_STORAGE = 4_000_000n;
 const PENDING_MINT_STORAGE = 6_000_000n;
-const NFT_ITEM_DEPLOY_RESERVE = 20_000_000n;
+const NFT_ITEM_DEPLOY_RESERVE = 21_000_000n;
 const ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
-const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
+const STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
 const ATH_TRANSFER_EXEC_RESERVE = 30_000_000n;
 const ATH_BURN_EXEC_RESERVE = 5_000_000n;
 const DUE_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
@@ -62,6 +63,7 @@ async function deploySealedRegistryWithTreasuryOfficial() {
   const placeholderAthWallet = fixtureAddress('PLACEHOLDER_ATH_WALLET');
   const athMasterAddress = fixtureAddress('ATH_MASTER');
   const treasuryAthReceiver = fixtureAddress('TREASURY_ATH_RECEIVER');
+  const vaultAddress = fixtureAddress('USERNAME_BOUNDARY_VAULT');
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
@@ -82,6 +84,11 @@ async function deploySealedRegistryWithTreasuryOfficial() {
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
@@ -96,6 +103,7 @@ async function deployUnsealedRegistryWithTreasuryReceiver(workchain: number) {
   const placeholderAthWallet = fixtureAddress('WORKCHAIN_PLACEHOLDER_ATH_WALLET');
   const athMasterAddress = fixtureAddress('WORKCHAIN_ATH_MASTER');
   const treasuryAthReceiver = fixtureAddress('WORKCHAIN_TREASURY_ATH_RECEIVER', workchain);
+  const vaultAddress = fixtureAddress('WORKCHAIN_VAULT');
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
@@ -114,6 +122,11 @@ async function deployUnsealedRegistryWithTreasuryReceiver(workchain: number) {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
 
   return { registry, deployer };
 }
@@ -126,6 +139,7 @@ async function deployRegistryWithAthSystem(officialWalletBalance: bigint) {
   const placeholderAthWallet = fixtureAddress('ATH_PLACEHOLDER');
   const treasuryAthReceiver = fixtureAddress('ATH_TREASURY_RECEIVER');
   const masterTreasuryOwner = fixtureAddress('ATH_MASTER_TREASURY');
+  const vaultAddress = fixtureAddress('ATH_VAULT');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
 
   const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
@@ -168,6 +182,11 @@ async function deployRegistryWithAthSystem(officialWalletBalance: bigint) {
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
@@ -183,6 +202,7 @@ async function deployRegistryWithNoAckOfficial() {
   const placeholderAthWallet = fixtureAddress('NOACK_PLACEHOLDER');
   const athMasterAddress = fixtureAddress('NOACK_ATH_MASTER');
   const treasuryAthReceiver = fixtureAddress('NOACK_TREASURY_RECEIVER');
+  const vaultAddress = fixtureAddress('NOACK_VAULT');
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
@@ -210,6 +230,11 @@ async function deployRegistryWithNoAckOfficial() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
@@ -295,8 +320,8 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     const { blockchain, registry, caller } = await deploySealedRegistryWithTreasuryOfficial();
     const ownerWallet = fixtureAddress('ITEM_OWNER');
     const hash = nameHash('itemok');
-    const itemInit = await UsernameNFTItem.init(ownerWallet, registry.address, hash);
-    const itemAddress = contractAddress(0, itemInit);
+    const itemInit = await UsernameNFTItem.init(registry.address, hash);
+    const itemAddress = contractAddress(registry.address.workChain, itemInit);
     await blockchain.setShardAccount(itemAddress, createShardAccount({
       address: itemAddress,
       code: itemInit.code,
@@ -305,6 +330,12 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       workchain: itemAddress.workChain,
     }));
     const item = blockchain.openContract(new UsernameNFTItem(itemAddress, itemInit));
+    await item.send(blockchain.sender(registry.address), { value: ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE }, {
+      $$type: 'InitializeUsernameItem',
+      owner_wallet: ownerWallet,
+      username_len: 6n,
+      username: usernameSlice('itemok'),
+    } as InitializeUsernameItem);
 
     const itemAckResendReserve = ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE;
     await item.send(caller.getSender(), { value: itemAckResendReserve - 1n }, { $$type: 'ResendDeployedAck' });

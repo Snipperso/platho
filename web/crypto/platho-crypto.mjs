@@ -12,8 +12,13 @@ export const CONTRACT_CRYPTO_SUITE = Object.freeze({
 });
 
 export const CAPSULE_SIZE_CLASS = Object.freeze({
+  KIB_1: 1,
+  KIB_2: 2,
+  KIB_4: 4,
+  KIB_8: 8,
+  KIB_16: 16,
+  KIB_32: 32,
   STANDARD: 1,
-  LONG_TERM: 2,
 });
 
 export const CAPSULE_PUBLISH_KIND = Object.freeze({
@@ -31,10 +36,11 @@ export const AES_GCM_NONCE_BYTES = 12;
 export const PLATHO_COMPACT_BODY_LAYOUT = 'platho.byte-layout.v1';
 export const PLATHO_COMPACT_TEXT_BLOCK_BYTES = 1024;
 export const PLATHO_COMPACT_MAX_CHUNKS = 1;
+export const PLATHO_CAPSULE_USEFUL_SIZE_CLASSES = Object.freeze([1024, 2048, 4096, 8192, 16384, 32768]);
 export const PLATHO_ONCHAIN_CELL_LAYOUT = 'ton-snake-byte-cell.v1';
 export const PLATHO_ONCHAIN_CELL_DATA_BYTES = 127;
 export const PLATHO_ONCHAIN_HEADER_MAX_BYTES = 4096;
-export const PLATHO_ONCHAIN_BODY_MAX_BYTES = 16384;
+export const PLATHO_ONCHAIN_BODY_MAX_BYTES = 40 * 1024;
 export const PLATHO_BINARY_HEADER0_BYTES = 140;
 export const PLATHO_BINARY_HEADER1_BYTES = 30;
 export const PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES = 32;
@@ -331,13 +337,14 @@ function parseOrdinaryByteCellBoc(bocLike, name = 'TON cell BOC') {
   const hasIndex = (flagsByte & 0x80) !== 0;
   const hasCrc32c = (flagsByte & 0x40) !== 0;
   const hasCacheBits = (flagsByte & 0x20) !== 0;
+  const bocFlags = (flagsByte >> 3) & 0x03;
   const sizeBytes = flagsByte & 0x07;
-  if (hasIndex || hasCrc32c || hasCacheBits || sizeBytes <= 0) {
+  if (hasCacheBits || bocFlags !== 0 || sizeBytes <= 0 || sizeBytes > 4) {
     throw new Error(`${name} uses unsupported BOC flags`);
   }
   const offsetBytes = bytes[cursor.offset];
   cursor.offset += 1;
-  if (offsetBytes <= 0) throw new Error(`${name} has invalid offset size`);
+  if (offsetBytes <= 0 || offsetBytes > 4) throw new Error(`${name} has invalid offset size`);
   const cellsCount = readBocUint(bytes, cursor, sizeBytes, `${name} cells count`);
   const rootsCount = readBocUint(bytes, cursor, sizeBytes, `${name} roots count`);
   const absentCount = readBocUint(bytes, cursor, sizeBytes, `${name} absent count`);
@@ -347,8 +354,14 @@ function parseOrdinaryByteCellBoc(bocLike, name = 'TON cell BOC') {
   }
   const rootIndex = readBocUint(bytes, cursor, sizeBytes, `${name} root index`);
   if (rootIndex < 0 || rootIndex >= cellsCount) throw new Error(`${name} root index is out of range`);
+  if (hasIndex) {
+    const indexBytes = cellsCount * offsetBytes;
+    if (cursor.offset + indexBytes > bytes.length) throw new Error(`${name} BOC index table is truncated`);
+    cursor.offset += indexBytes;
+  }
   const cellsEnd = cursor.offset + totalCellsSize;
-  if (cellsEnd > bytes.length) throw new Error(`${name} cell payload is truncated`);
+  const trailerBytes = hasCrc32c ? 4 : 0;
+  if (cellsEnd + trailerBytes > bytes.length) throw new Error(`${name} cell payload is truncated`);
 
   const parsed = [];
   for (let i = 0; i < cellsCount; i += 1) {
@@ -374,8 +387,7 @@ function parseOrdinaryByteCellBoc(bocLike, name = 'TON cell BOC') {
     parsed.push({ data, refIndexes });
   }
   if (cursor.offset !== cellsEnd) throw new Error(`${name} has trailing cell bytes`);
-  if (hasCrc32c && bytes.length !== cellsEnd + 4) throw new Error(`${name} has invalid crc length`);
-  if (!hasCrc32c && bytes.length !== cellsEnd) throw new Error(`${name} has trailing bytes`);
+  if (bytes.length !== cellsEnd + trailerBytes) throw new Error(`${name} has trailing bytes`);
 
   const built = parsed.map((cell) => ({ data: cell.data, refs: [] }));
   for (let i = 0; i < parsed.length; i += 1) {
@@ -731,16 +743,38 @@ async function stableJsonHashId(value) {
   return base64urlEncode(await sha256(utf8(PRIVATE_CAPSULE_ID_DOMAIN), utf8(stableStringify(value))));
 }
 
-function sizeClassForSuite(suite) {
-  if (suite === CRYPTO_SUITES.CLASSICAL_V1) return CAPSULE_SIZE_CLASS.STANDARD;
-  if (suite === CRYPTO_SUITES.HYBRID_V1) return CAPSULE_SIZE_CLASS.LONG_TERM;
+function normalizeCapsuleSizeClass(value = CAPSULE_SIZE_CLASS.KIB_1) {
+  const numberValue = Number(value);
+  if (!Number.isSafeInteger(numberValue)) throw new Error('Private capsule size class must be a safe integer');
+  if (!Object.values(CAPSULE_SIZE_CLASS).includes(numberValue)) {
+    throw new Error('Unsupported private capsule size class');
+  }
+  return numberValue;
+}
+
+export function usefulBytesForCapsuleSizeClass(sizeClass = CAPSULE_SIZE_CLASS.KIB_1) {
+  const normalized = normalizeCapsuleSizeClass(sizeClass);
+  return normalized * PLATHO_COMPACT_TEXT_BLOCK_BYTES;
+}
+
+export function sizeClassForPayloadByteLength(byteLength) {
+  const length = safeInteger(byteLength, 'payload byte length');
+  if (length < 0) throw new Error('payload byte length must be non-negative');
+  for (const usefulBytes of PLATHO_CAPSULE_USEFUL_SIZE_CLASSES) {
+    if (length <= usefulBytes) return usefulBytes / PLATHO_COMPACT_TEXT_BLOCK_BYTES;
+  }
+  throw new Error(`Compact payload exceeds largest capsule size: ${length} > ${PLATHO_CAPSULE_USEFUL_SIZE_CLASSES[PLATHO_CAPSULE_USEFUL_SIZE_CLASSES.length - 1]}`);
+}
+
+function assertSupportedPrivateSuite(suite) {
+  if (suite === CRYPTO_SUITES.CLASSICAL_V1 || suite === CRYPTO_SUITES.HYBRID_V1) return suite;
   throw new Error(`Unsupported Platho capsule suite: ${suite}`);
 }
 
 function assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite) {
-  const standard = sizeClass === CAPSULE_SIZE_CLASS.STANDARD && cryptoSuite === CONTRACT_CRYPTO_SUITE.CLASSICAL;
-  const longTerm = sizeClass === CAPSULE_SIZE_CLASS.LONG_TERM && cryptoSuite === CONTRACT_CRYPTO_SUITE.HYBRID;
-  if (!standard && !longTerm) {
+  const validSize = Object.values(CAPSULE_SIZE_CLASS).includes(Number(sizeClass));
+  const validSuite = cryptoSuite === CONTRACT_CRYPTO_SUITE.HYBRID;
+  if (!validSize || !validSuite) {
     throw new Error('Private capsule size class and crypto suite do not match CapsuleHub rules');
   }
 }
@@ -767,28 +801,32 @@ function compactBodyPrefixBytesForSuite(suite) {
   return COMPACT_BODY_BASE_PREFIX_BYTES + (suite === CRYPTO_SUITES.HYBRID_V1 ? MLKEM768_CIPHERTEXT_BYTES : 0);
 }
 
-function compactBodyBytesForPayloadBlocks(suite, blocks) {
+function compactBodyBytesForUsefulBytes(suite, usefulBytes) {
   return compactBodyPrefixBytesForSuite(suite)
     + PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES
-    + (blocks * PLATHO_COMPACT_TEXT_BLOCK_BYTES)
+    + usefulBytes
     + COMPACT_BODY_TAG_BYTES;
 }
 
+function compactBodyBytesForPayloadBlocks(suite, blocks) {
+  return compactBodyBytesForUsefulBytes(suite, blocks * PLATHO_COMPACT_TEXT_BLOCK_BYTES);
+}
+
 export function getCompactCapsuleCapacity(suite, options = {}) {
-  const maxChunks = options.maxChunks ?? PLATHO_COMPACT_MAX_CHUNKS;
-  if (!Number.isInteger(maxChunks) || maxChunks <= 0 || maxChunks > PLATHO_COMPACT_MAX_CHUNKS) {
-    throw new Error('maxChunks must be between 1 and PLATHO_COMPACT_MAX_CHUNKS');
-  }
+  assertSupportedPrivateSuite(suite);
+  const sizeClass = normalizeCapsuleSizeClass(options.sizeClass ?? options.size_class ?? CAPSULE_SIZE_CLASS.KIB_1);
+  const maxChunks = usefulBytesForCapsuleSizeClass(sizeClass) / PLATHO_COMPACT_TEXT_BLOCK_BYTES;
   const maxChunkWireBytes = compactMaxChunkWireBytesForSuite(suite);
   const onChainBodyCapBytes = options.maxOnChainBodyBytes ?? PLATHO_ONCHAIN_BODY_MAX_BYTES;
-  const maxUsefulPayloadBytes = maxChunks * PLATHO_COMPACT_TEXT_BLOCK_BYTES;
+  const maxUsefulPayloadBytes = usefulBytesForCapsuleSizeClass(sizeClass);
   const maxEncryptedPayloadBytes = PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + maxUsefulPayloadBytes;
-  const maxBodyBytes = compactBodyBytesForPayloadBlocks(suite, maxChunks);
+  const maxBodyBytes = compactBodyBytesForUsefulBytes(suite, maxUsefulPayloadBytes);
   if (maxBodyBytes > onChainBodyCapBytes) {
     throw new Error('Compact capsule capacity exceeds on-chain body cap');
   }
   return {
     suite,
+    sizeClass,
     maxChunks,
     maxChunkWireBytes,
     chunkHeaderBytes: COMPACT_CHUNK_HEADER_BYTES,
@@ -827,7 +865,21 @@ function assertCapsuleTimestampPolicy(header1, options = {}) {
   }
 }
 
-function assertEnvelopeMatchesRecipient(envelope, recipientKeyPair) {
+function normalizeRequestedSuite(value) {
+  if (value === undefined || value === null) return null;
+  if (value === CRYPTO_SUITES.CLASSICAL_V1 || value === CRYPTO_SUITES.HYBRID_V1) return value;
+  throw new Error(`Unsupported requested Platho crypto suite: ${value}`);
+}
+
+async function recipientKeyIdForSuite(recipientKeyPair, suite) {
+  if (recipientKeyPair.suite === suite) return recipientKeyPair.keyId;
+  if (recipientKeyPair.suite === CRYPTO_SUITES.HYBRID_V1 && suite === CRYPTO_SUITES.CLASSICAL_V1) {
+    return computeClassicalKeyId(assertBytes('recipient.x25519PublicKey', recipientKeyPair.x25519PublicKey, X25519_PUBLIC_KEY_BYTES));
+  }
+  throw new Error(`Recipient key suite ${recipientKeyPair.suite} cannot decrypt ${suite}`);
+}
+
+async function assertEnvelopeMatchesRecipient(envelope, recipientKeyPair) {
   if (!envelope || envelope.version !== PROTOCOL_VERSION) throw new Error('Invalid Platho envelope');
   const config = suiteConfig(envelope.suite);
   if (envelope.contractSuite !== config.contractSuite) {
@@ -836,13 +888,8 @@ function assertEnvelopeMatchesRecipient(envelope, recipientKeyPair) {
   assertCanonicalAlg(envelope.suite, envelope.alg);
   assertBytes('envelope.nonce', base64urlDecode(envelope.nonce), AES_GCM_NONCE_BYTES);
 
-  if (recipientKeyPair.suite !== envelope.suite) {
-    throw new Error(`Recipient key suite ${recipientKeyPair.suite} cannot decrypt ${envelope.suite}`);
-  }
-  if (recipientKeyPair.contractSuite !== envelope.contractSuite) {
-    throw new Error('Recipient contract suite does not match envelope contract suite');
-  }
-  if (recipientKeyPair.keyId && envelope.recipientKeyId !== recipientKeyPair.keyId) {
+  const expectedRecipientKeyId = await recipientKeyIdForSuite(recipientKeyPair, envelope.suite);
+  if (expectedRecipientKeyId && envelope.recipientKeyId !== expectedRecipientKeyId) {
     throw new Error('Envelope recipient key id does not match recipient key pair');
   }
 
@@ -927,20 +974,25 @@ function compactHashBytes(hashHex, name) {
   return hexToBytes(assertHashHex(name, hashHex), 32, name);
 }
 
-function compactPayloadBlockCount(contentLength) {
+function compactPayloadUsefulBytes(contentLength, options = {}) {
   if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
     throw new Error('Compact payload content length is invalid');
   }
-  if (contentLength > PLATHO_COMPACT_TEXT_BLOCK_BYTES) {
-    throw new Error(`Compact payload exceeds on-chain payload cap: ${contentLength} > ${PLATHO_COMPACT_MAX_CHUNKS * PLATHO_COMPACT_TEXT_BLOCK_BYTES}`);
+  const requestedSizeClass = options.sizeClass ?? options.size_class;
+  const sizeClass = requestedSizeClass === undefined
+    ? sizeClassForPayloadByteLength(contentLength)
+    : normalizeCapsuleSizeClass(requestedSizeClass);
+  const usefulBytes = usefulBytesForCapsuleSizeClass(sizeClass);
+  if (contentLength > usefulBytes) {
+    throw new Error(`Compact payload exceeds selected capsule size: ${contentLength} > ${usefulBytes}`);
   }
-  return 1;
+  return { sizeClass, usefulBytes, blocks: usefulBytes / PLATHO_COMPACT_TEXT_BLOCK_BYTES };
 }
 
 function encodeFixedCompactPayload(type, flags, content, options = {}) {
   const contentBytes = toUint8Array(content);
-  const blocks = compactPayloadBlockCount(contentBytes.length);
-  const out = new Uint8Array(PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + (blocks * PLATHO_COMPACT_TEXT_BLOCK_BYTES));
+  const { usefulBytes } = compactPayloadUsefulBytes(contentBytes.length, options);
+  const out = new Uint8Array(PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + usefulBytes);
   const streamId = options.streamId
     ? assertBytes('compact payload stream id', options.streamId, 16)
     : randomBytes(16);
@@ -959,8 +1011,9 @@ function encodeFixedCompactPayload(type, flags, content, options = {}) {
 
 function compactPayloadContent(bytesLike) {
   const bytes = toUint8Array(bytesLike);
-  if (bytes.length !== PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + PLATHO_COMPACT_TEXT_BLOCK_BYTES) {
-    throw new Error('Compact payload must be exactly one 1024-byte useful slot');
+  const usefulBytes = bytes.length - PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES;
+  if (!PLATHO_CAPSULE_USEFUL_SIZE_CLASSES.includes(usefulBytes)) {
+    throw new Error('Compact payload must use a supported useful slot size');
   }
   assertCompactMagic(bytes, 0, COMPACT_PAYLOAD_MAGIC, 'payload');
   if (bytes[4] !== PROTOCOL_VERSION) throw new Error('Unsupported compact payload version');
@@ -973,7 +1026,8 @@ function compactPayloadContent(bytesLike) {
   const contentLength = readUint16(bytes, 28, 'compact payload content length');
   if (partCount <= 0 || partIndex >= partCount) throw new Error('Compact payload part index mismatch');
   if (bytes[30] !== 0 || bytes[31] !== 0) throw new Error('Compact payload reserved bytes must be zero');
-  const blocks = 1;
+  const blocks = usefulBytes / PLATHO_COMPACT_TEXT_BLOCK_BYTES;
+  const sizeClass = usefulBytes / PLATHO_COMPACT_TEXT_BLOCK_BYTES;
   const contentStart = PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES;
   const contentEnd = contentStart + contentLength;
   if (contentEnd > bytes.length) throw new Error('Compact payload content is truncated');
@@ -988,25 +1042,32 @@ function compactPayloadContent(bytesLike) {
     partIndex,
     partCount,
     content: bytes.subarray(contentStart, contentEnd),
+    sizeClass,
+    usefulBytes,
     blocks,
   };
 }
 
-function assertCompactPayloadBytes(bytesLike) {
+function assertCompactPayloadBytes(bytesLike, options = {}) {
   const bytes = toUint8Array(bytesLike);
-  compactPayloadContent(bytes);
+  const payload = compactPayloadContent(bytes);
+  const requestedSizeClass = options.sizeClass ?? options.size_class;
+  if (requestedSizeClass !== undefined && payload.sizeClass !== normalizeCapsuleSizeClass(requestedSizeClass)) {
+    throw new Error('Compact payload size class mismatch');
+  }
   return bytes;
 }
 
-export function encodeCompactPayload(input) {
+export function encodeCompactPayload(input, options = {}) {
   const payload = typeof input === 'string' ? { type: 'text', text: input } : (input ?? {});
+  const payloadOptions = { ...payload, ...options };
   if (payload.type === 'text' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.TEXT) {
-    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.TEXT, 0, utf8(payload.text ?? ''), payload);
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.TEXT, 0, utf8(payload.text ?? ''), payloadOptions);
   }
   if (payload.type === 'image' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.IMAGE) {
     const bytes = toUint8Array(payload.bytes ?? payload.imageBytes ?? new Uint8Array());
     return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.IMAGE, 0, bytes, {
-      ...payload,
+      ...payloadOptions,
       mediaFormat: payload.format ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
     });
   }
@@ -1017,7 +1078,7 @@ export function encodeCompactPayload(input) {
       assertBytes('payment intent id', payload.intentId ?? payload.intent_id, 32),
       assertBytes('payment secret', payload.secret ?? payload.secret32, 32),
     );
-    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, 0, content, payload);
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, 0, content, payloadOptions);
   }
   throw new Error('Unsupported Platho compact payload type');
 }
@@ -1134,8 +1195,8 @@ function inspectCompactBodyBytes(bodyBytesLike) {
 async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes) {
   const bodyBytes = toUint8Array(bodyBytesLike);
   const info = inspectCompactBodyBytes(bodyBytes);
-  if (recipientKeyPair?.suite !== info.suite) throw new Error('Compact body recipient suite mismatch');
-  if (recipientKeyPair?.keyId && hashes.recipientKeyId && recipientKeyPair.keyId !== hashes.recipientKeyId) {
+  const expectedRecipientKeyId = await recipientKeyIdForSuite(recipientKeyPair, info.suite);
+  if (expectedRecipientKeyId && hashes.recipientKeyId && expectedRecipientKeyId !== hashes.recipientKeyId) {
     throw new Error('Compact body recipient key mismatch');
   }
   const sharedParts = [deriveX25519SharedSecret(recipientKeyPair.x25519SecretKey, info.ephemeralPublicKey)];
@@ -1227,6 +1288,15 @@ function compactBodyBytesFromCapsuleBody(body) {
   if (!body || body.version !== PROTOCOL_VERSION || body.kind !== 'private' || body.layout !== PLATHO_COMPACT_BODY_LAYOUT) {
     throw new Error('Invalid Platho compact private capsule body');
   }
+  const encodedBodyBytes = body.bodyBytes ?? body.body_bytes;
+  if (encodedBodyBytes !== undefined) {
+    const bodyBytes = base64urlDecode(encodedBodyBytes);
+    const info = inspectCompactBodyBytes(bodyBytes);
+    if (body.suite !== info.suite) throw new Error('Compact body suite mismatch');
+    if (body.messageId !== base64urlEncode(info.messageId)) throw new Error('Compact body message id mismatch');
+    if (body.byteLength !== bodyBytes.length) throw new Error('Compact body byte length mismatch');
+    return bodyBytes;
+  }
   const chunks = (body.chunks ?? []).map((chunk) => base64urlDecode(chunk));
   if (body.chunkCount !== chunks.length) throw new Error('Compact body chunk count mismatch');
   const bodyBytes = assembleCompactBodyChunks(chunks);
@@ -1239,7 +1309,6 @@ function compactBodyBytesFromCapsuleBody(body) {
 
 function compactBodyObjectFromBytes(bodyBytes) {
   const info = inspectCompactBodyBytes(bodyBytes);
-  const chunks = splitCompactBodyBytes(bodyBytes);
   return {
     version: PROTOCOL_VERSION,
     kind: 'private',
@@ -1247,9 +1316,8 @@ function compactBodyObjectFromBytes(bodyBytes) {
     suite: info.suite,
     messageId: base64urlEncode(info.messageId),
     byteLength: bodyBytes.length,
-    chunkCount: chunks.length,
-    maxChunkWireBytes: compactMaxChunkWireBytesForSuite(info.suite),
-    chunks: chunks.map((chunk) => base64urlEncode(chunk)),
+    encoding: 'base64url',
+    bodyBytes: base64urlEncode(bodyBytes),
   };
 }
 
@@ -1459,6 +1527,7 @@ export async function verifySignedPublicKeyBundle(signedBundle, options = {}) {
 
 export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {}) {
   if (!keyRecord || keyRecord.exists !== true) throw new Error('Vault key record does not exist');
+  const requestedSuite = normalizeRequestedSuite(options.suite ?? options.requestedSuite);
   if (options.ownerWallet !== undefined && options.ownerWallet !== null) {
     const recordOwner = recordField(keyRecord, 'owner_wallet', 'ownerWallet');
     if (!compareAddressLike(recordOwner, options.ownerWallet)) {
@@ -1488,6 +1557,9 @@ export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {})
   );
 
   if (cryptoSuiteMask === BigInt(CONTRACT_CRYPTO_SUITE.CLASSICAL)) {
+    if (requestedSuite === CRYPTO_SUITES.HYBRID_V1) {
+      throw new Error('Recipient has not activated postquantum receive keys');
+    }
     if (pqLen !== 0 || pqHash !== 0n) throw new Error('classical-v1 Vault key record must not carry ML-KEM fields');
     const emptyPq = recordPqKemPubkeyBytes(keyRecord, 0);
     if (emptyPq.length !== 0) throw new Error('classical-v1 Vault key record pq_kem_pubkey must be empty');
@@ -1506,6 +1578,15 @@ export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {})
     const computedHash = await sha256(pqPubkey);
     if (bytesToBigInt(computedHash) !== pqHash) {
       throw new Error('Vault key record pq_kem_pubkey hash does not match key material');
+    }
+    if (requestedSuite === CRYPTO_SUITES.CLASSICAL_V1) {
+      return {
+        version: PROTOCOL_VERSION,
+        suite: CRYPTO_SUITES.CLASSICAL_V1,
+        contractSuite: CONTRACT_CRYPTO_SUITE.CLASSICAL,
+        keyId: await computeClassicalKeyId(encPublicKey),
+        x25519PublicKey: base64urlEncode(encPublicKey),
+      };
     }
     return {
       version: PROTOCOL_VERSION,
@@ -1592,6 +1673,9 @@ export function parseTonAddress(address) {
 
 export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKey) {
   const bundle = await normalizeRecipientBundle(publicBundle);
+  if (bundle.suite !== CRYPTO_SUITES.HYBRID_V1) {
+    throw new Error('Platho v1 messaging keys require hybrid-v1');
+  }
   const signPublicKey = assertBytes('signingPublicKey', signingPublicKey, ED25519_PUBLIC_KEY_BYTES);
   const encPublicKey = assertBytes('x25519PublicKey', bundle.x25519PublicKey, X25519_PUBLIC_KEY_BYTES);
   const pqHash = bundle.suite === CRYPTO_SUITES.HYBRID_V1
@@ -1781,7 +1865,6 @@ function privateCapsuleHeader0ObjectFromBytes(bytesLike) {
   const cryptoSuite = bytes[7];
   assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
   const suite = suiteForByte(cryptoSuite);
-  if (sizeClassForSuite(suite) !== sizeClass) throw new Error('Private capsule header0 suite mismatch');
   return {
     version,
     kind: 'private',
@@ -1823,6 +1906,23 @@ function privateCapsuleBodyBytes(body) {
     throw new Error('Private capsule body must use platho.byte-layout.v1');
   }
   return compactBodyBytesFromCapsuleBody(body);
+}
+
+function expectedPrivateBodyBytes(sizeClass, cryptoSuite) {
+  const suite = suiteForByte(cryptoSuite);
+  return compactBodyBytesForUsefulBytes(suite, usefulBytesForCapsuleSizeClass(sizeClass));
+}
+
+function assertPrivateBodyMatchesHeader(header0, bodyBytes) {
+  const bytes = toUint8Array(bodyBytes);
+  const expectedBytes = expectedPrivateBodyBytes(header0.sizeClass, header0.cryptoSuite);
+  if (bytes.length !== expectedBytes) {
+    throw new Error(`Private capsule body size mismatch: ${bytes.length} != ${expectedBytes}`);
+  }
+  const info = inspectCompactBodyBytes(bytes);
+  if (info.suite !== header0.suite || suiteByteForSuite(info.suite) !== header0.cryptoSuite) {
+    throw new Error('Private capsule compact body suite mismatch');
+  }
 }
 
 async function computePrivateCapsuleChainCells(header0, header1, body) {
@@ -1940,9 +2040,14 @@ export async function createEncryptedPrivateCapsuleFromPublicBundle(plaintext, r
 
 async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, recipient, senderIdentity, options = {}) {
   const now = options.now ?? Date.now();
-  const suite = recipient.suite;
-  const sizeClass = sizeClassForSuite(suite);
+  const suite = assertSupportedPrivateSuite(recipient.suite);
   const cryptoSuite = recipient.contractSuite;
+  const payloadBytes = options.payloadBytes
+    ? assertCompactPayloadBytes(options.payloadBytes, options)
+    : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext }, options);
+  const payloadInfo = compactPayloadContent(payloadBytes);
+  const sizeClass = normalizeCapsuleSizeClass(options.sizeClass ?? options.size_class ?? payloadInfo.sizeClass);
+  if (payloadInfo.sizeClass !== sizeClass) throw new Error('Private capsule payload size class mismatch');
   assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
 
   const requestedCreatedAt = options.createdAt ?? now;
@@ -1979,13 +2084,11 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
   assertCapsuleTimestampPolicy(header1, { ...options, now });
 
   const partialHashes = await computePrivateCapsuleHeaderHashes(header0, header1);
-  const payloadBytes = options.payloadBytes
-    ? assertCompactPayloadBytes(options.payloadBytes)
-    : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext });
   const bodyBytes = await encryptCompactPayloadBytes(payloadBytes, recipient.bundle, {
     hashes: partialHashes,
     messageId: options.messageId,
   });
+  assertPrivateBodyMatchesHeader(header0, bodyBytes);
   const body = {
     version: PROTOCOL_VERSION,
     kind: 'private',
@@ -2026,10 +2129,9 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
     throw new Error('Invalid Platho private capsule header1');
   }
   assertAllowedPrivateCapsulePair(capsule.header0.sizeClass, capsule.header0.cryptoSuite);
-  const expectedSizeClass = sizeClassForSuite(capsule.header0.suite);
   const expectedContractSuite = suiteConfig(capsule.header0.suite).contractSuite;
-  if (capsule.header0.sizeClass !== expectedSizeClass || capsule.header0.cryptoSuite !== expectedContractSuite) {
-    throw new Error('Private capsule header suite does not match size class');
+  if (capsule.header0.cryptoSuite !== expectedContractSuite) {
+    throw new Error('Private capsule header suite does not match crypto suite');
   }
   assertCapsuleTimestampPolicy(capsule.header1, options);
 
@@ -2051,10 +2153,7 @@ export async function verifyEncryptedPrivateCapsule(capsule, options = {}) {
   if (capsule.id !== expectedId) throw new Error('Private capsule id mismatch');
 
   const bodyBytes = compactBodyBytesFromCapsuleBody(capsule.body);
-  const bodyInfo = inspectCompactBodyBytes(bodyBytes);
-  if (bodyInfo.suite !== capsule.header0.suite || suiteByteForSuite(bodyInfo.suite) !== capsule.header0.cryptoSuite) {
-    throw new Error('Private capsule compact body suite mismatch');
-  }
+  assertPrivateBodyMatchesHeader(capsule.header0, bodyBytes);
 
   const senderSigningPublicKey = assertBytes(
     'capsule.header0.senderSigningPublicKey',
@@ -2123,10 +2222,7 @@ export async function privateCapsuleFromChainEntry(entry, options = {}) {
     ...options,
     enforceExpiry: options.enforceExpiry ?? false,
   });
-  const bodyInfo = inspectCompactBodyBytes(bodyBytes);
-  if (bodyInfo.suite !== header0.suite || suiteByteForSuite(bodyInfo.suite) !== header0.cryptoSuite) {
-    throw new Error('CapsuleHub private body suite mismatch');
-  }
+  assertPrivateBodyMatchesHeader(header0, bodyBytes);
   const chainCells = await computePrivateCapsuleChainCells(header0, header1, body);
   const hashes = privateCapsuleHashesFromChainCells(chainCells);
   const expectedHeader0Hash = entryHashHex(entry, 'header_0_hash');
@@ -2238,7 +2334,7 @@ export async function encryptText(plaintext, recipientPublicBundle, options = {}
 }
 
 export async function decryptText(envelope, recipientKeyPair) {
-  assertEnvelopeMatchesRecipient(envelope, recipientKeyPair);
+  await assertEnvelopeMatchesRecipient(envelope, recipientKeyPair);
   const ephemeralPublicKey = assertBytes(
     'envelope.kem.x25519EphemeralPublicKey',
     base64urlDecode(envelope.kem?.x25519EphemeralPublicKey),
@@ -2345,7 +2441,7 @@ export async function runPlathoCryptoSelfTest() {
   if (openedCapsule.plaintext !== 'capsule sealed message') {
     throw new Error('private capsule open failed');
   }
-  if (openedCapsule.publish.size_class !== CAPSULE_SIZE_CLASS.LONG_TERM) {
+  if (openedCapsule.publish.size_class !== CAPSULE_SIZE_CLASS.STANDARD) {
     throw new Error('private capsule size class draft failed');
   }
   if (openedCapsule.publish.crypto_suite !== CONTRACT_CRYPTO_SUITE.HYBRID) {
@@ -2434,9 +2530,9 @@ export async function runPlathoCryptoSelfTest() {
   }));
 
   const capsuleBodyTampered = structuredClone(capsule);
-  const capsuleBodyTamperedChunk = base64urlDecode(capsuleBodyTampered.body.chunks[0]);
-  capsuleBodyTamperedChunk[capsuleBodyTamperedChunk.length - 1] ^= 1;
-  capsuleBodyTampered.body.chunks[0] = base64urlEncode(capsuleBodyTamperedChunk);
+  const capsuleBodyTamperedBytes = base64urlDecode(capsuleBodyTampered.body.bodyBytes);
+  capsuleBodyTamperedBytes[capsuleBodyTamperedBytes.length - 1] ^= 1;
+  capsuleBodyTampered.body.bodyBytes = base64urlEncode(capsuleBodyTamperedBytes);
   await expectReject('private capsule body tamper', () => verifyEncryptedPrivateCapsule(capsuleBodyTampered, {
     now: 1_700_000_004_000,
   }));
@@ -2483,8 +2579,13 @@ export async function runPlathoCryptoSelfTest() {
     keyId: await computeClassicalKeyId(bobHybrid.x25519PublicKey),
     x25519PublicKey: bobHybrid.x25519PublicKey,
   });
-  const downgradeEnvelope = await encryptText('downgrade attempt', hybridAsClassicalBundle);
-  await expectReject('classical-v1 downgrade into hybrid key pair', () => decryptText(downgradeEnvelope, bobHybrid));
+  const standardToHybridCapableEnvelope = await encryptText('standard message', hybridAsClassicalBundle);
+  if (await decryptText(standardToHybridCapableEnvelope, bobHybrid) !== 'standard message') {
+    throw new Error('hybrid-capable key pair failed to decrypt standard message');
+  }
+  const wrongRecipientIdEnvelope = structuredClone(standardToHybridCapableEnvelope);
+  wrongRecipientIdEnvelope.recipientKeyId = bobHybrid.keyId;
+  await expectReject('classical-v1 message with hybrid recipient key id', () => decryptText(wrongRecipientIdEnvelope, bobHybrid));
 
   const classicalWithKem = structuredClone(classicalEnvelope);
   classicalWithKem.kem.mlKem768Ciphertext = hybridEnvelope.kem.mlKem768Ciphertext;

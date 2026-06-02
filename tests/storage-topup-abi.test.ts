@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import { Vault, TopUpStorageReserve as VaultTopUpStorageReserve } from '../build/Vault/Vault_Vault';
@@ -42,6 +42,9 @@ function normalizeState(value: unknown): unknown {
   if (value instanceof Address) {
     return value.toString();
   }
+  if (value instanceof Cell) {
+    return value.toBoc().toString('base64');
+  }
   if (Array.isArray(value)) {
     return value.map((item) => normalizeState(item));
   }
@@ -61,6 +64,7 @@ describe('Storage top-up ABI coverage', () => {
     const capsuleVault = fixtureAddress('CAPSULE_VAULT');
     const treasury = fixtureAddress('TREASURY');
     const buyback = fixtureAddress('BUYBACK');
+    const manifestHash = 0x53544f524147455f544f5055505f4d414e4946455354n;
 
     const vaultInit = await Vault.init(athWallet, athMaster, capsuleVault, 0n, true, true, 0n);
     const vault = await deploy(blockchain, vaultInit, (address, init) => new Vault(address, init));
@@ -72,7 +76,7 @@ describe('Storage top-up ABI coverage', () => {
     expect(normalizeState(await vault.getGetGlobal())).toEqual(normalizeState(vaultBefore));
     expect(await contractBalance(blockchain, vault.address)).toBeGreaterThan(vaultBalanceBefore);
 
-    const capsuleInit = await CapsuleHub.init(treasury, capsuleVault, true, true, 0n, controller.address);
+    const capsuleInit = await CapsuleHub.init(treasury, capsuleVault, true, true, manifestHash, controller.address);
     const capsule = await deploy(blockchain, capsuleInit, (address, init) => new CapsuleHub(address, init));
     const capsuleBefore = await capsule.getGetState();
     const capsuleBalanceBefore = await contractBalance(blockchain, capsule.address);
@@ -130,7 +134,7 @@ describe('Storage top-up ABI coverage', () => {
     expect(normalizeState(await registry.getGetGlobal())).toEqual(normalizeState(registryBefore));
     expect(await contractBalance(blockchain, registry.address)).toBeGreaterThan(registryBalanceBefore);
 
-    const itemInit = await UsernameNFTItem.init(donor.address, registry.address, BigInt('0x' + beginCell().storeAddress(donor.address).endCell().hash().toString('hex')));
+    const itemInit = await UsernameNFTItem.init(registry.address, BigInt('0x' + beginCell().storeAddress(donor.address).endCell().hash().toString('hex')));
     const item = await deploy(blockchain, itemInit, (address, init) => new UsernameNFTItem(address, init));
     const itemBefore = await item.getGetState();
     const itemBalanceBefore = await contractBalance(blockchain, item.address);

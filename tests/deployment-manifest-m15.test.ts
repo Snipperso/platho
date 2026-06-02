@@ -10,9 +10,16 @@ import {
   FreezeMarketStabilityPricing as MarketSellerFreezePricing,
   SealMarketStabilityGenesis as MarketSellerSeal,
 } from '../build/MarketStabilitySeller/MarketStabilitySeller_MarketStabilitySeller';
-import { ProfileRegistry, BindProfileOfficialAthWallet as ProfileBindAth, SealGenesis as ProfileSeal } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
-import { UsernameRegistry, BindOfficialAthWallet as UsernameBindAth, SealGenesis as UsernameSeal } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
-import { Vault, BindDeploymentManifest as VaultBind, BindOfficialAthWallet as VaultBindAth, SealGenesis as VaultSeal } from '../build/Vault/Vault_Vault';
+import { ProfileRegistry, BindProfileOfficialAthWallet as ProfileBindAth, BindProfileVault as ProfileBindVault, SealGenesis as ProfileSeal } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
+import { UsernameRegistry, BindOfficialAthWallet as UsernameBindAth, BindUsernameVault as UsernameBindVault, SealGenesis as UsernameSeal } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import {
+  Vault,
+  BindDeploymentManifest as VaultBind,
+  BindOfficialAthWallet as VaultBindAth,
+  BindProfileRegistry as VaultBindProfile,
+  BindUsernameRegistry as VaultBindUsername,
+  SealGenesis as VaultSeal,
+} from '../build/Vault/Vault_Vault';
 import { assertFinalGenesisReady, buildImplementedSubsetManifest, computeManifestCell } from '../scripts/deployment_manifest_m15';
 
 async function deployCellContract(blockchain: Blockchain, address: Address, init: { code: any; data: any }, balance = toNano('2')) {
@@ -123,6 +130,16 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
       deployment_manifest_hash: manifestHash,
       official_ath_wallet_address: parsed.vaultOfficialAthWalletAddress,
     } as VaultBindAth);
+    await vault.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindProfileRegistry',
+      deployment_manifest_hash: manifestHash,
+      profile_registry_address: parsed.profileRegistryAddress,
+    } as VaultBindProfile);
+    await vault.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindUsernameRegistry',
+      deployment_manifest_hash: manifestHash,
+      username_registry_address: parsed.usernameRegistryAddress,
+    } as VaultBindUsername);
     await capsuleHub.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'BindDeploymentManifest',
       deployment_manifest_hash: manifestHash,
@@ -133,11 +150,21 @@ describe('Deployment manifest M15 implemented-subset profile', () => {
       deployment_manifest_hash: manifestHash,
       official_ath_wallet_address: parsed.usernameRegistryOfficialAthWalletAddress,
     } as UsernameBindAth);
+    await usernameRegistry.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindUsernameVault',
+      deployment_manifest_hash: manifestHash,
+      vault_address: parsed.vaultAddress,
+    } as UsernameBindVault);
     await profileRegistry.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'BindProfileOfficialAthWallet',
       deployment_manifest_hash: manifestHash,
       official_ath_wallet_address: parsed.profileRegistryOfficialAthWalletAddress,
     } as ProfileBindAth);
+    await profileRegistry.send(genesisController, { value: toNano('0.05') }, {
+      $$type: 'BindProfileVault',
+      deployment_manifest_hash: manifestHash,
+      vault_address: parsed.vaultAddress,
+    } as ProfileBindVault);
     await marketSeller.send(genesisController, { value: toNano('0.05') }, {
       $$type: 'BindMarketStabilityReserveFunder',
       deployment_manifest_hash: manifestHash,

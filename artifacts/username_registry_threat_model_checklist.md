@@ -9,14 +9,14 @@ Date: 2026-05-17
 - Official ATH wallet binding and seal flow.
 - Paid username mint from authenticated official ATH wallet notification.
 - Raw username byte validation, exact price tiers, duplicate finalized names, duplicate pending names.
-- ATH notification ACK after pending mint or refund-due state is recorded.
+- ATH notification ACK only after successful UsernameNFTItem finalization, or refund request after positive item deploy bounce.
 - Underfunded paid-mint notifications reject without partial registry state.
 - Deterministic UsernameNFTItem deploy and registry ACK finalization.
 - Permissionless UsernameNFTItem ACK resend with caller-funded reserve.
 - Refund due accounting and refund flush success/bounce/failure restoration.
 - Treasury due flush success/failure restoration.
 - Burn due flush finalized/failed restoration.
-- Stale pending mint prune and late ACK rejection.
+- Stale pending mint prune is non-destructive and preserves late ACK / ResendDeployedAck recovery.
 - Forged mint notifications, item ACKs, transfer callbacks, and burn callbacks from unauthorized senders.
 - Min-1 and exact-min boundaries for paid mint, invalid refund due, item ACK resend, refund flush, treasury flush, and burn flush.
 - Deterministic state-machine walks for records, pending mints, refund due, treasury due, and burn due.
@@ -27,7 +27,7 @@ Date: 2026-05-17
 - `pending_mint_count` equals modeled pending username mints.
 - `refund_due_count` equals owners with positive modeled refund due.
 - `treasury_due_ath` and `burn_due_ath` equal modeled post-ACK accounting.
-- Stale prune moves pending price back to owner refund due and does not create a name record.
+- Stale prune never moves pending price into refund due without positive failure proof.
 - Forged callbacks do not clear pending flushes or mutate due buckets.
 
 ## Residual Assumptions

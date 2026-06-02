@@ -120,6 +120,18 @@ function requireSameAddress(left: Address, right: Address, leftLabel: string, ri
   }
 }
 
+function requireDifferentAddress(left: Address, right: Address, leftLabel: string, rightLabel: string) {
+  if (left.equals(right)) {
+    throw new Error(`${leftLabel} must not equal ${rightLabel}.`);
+  }
+}
+
+function requireNotProtocolRole(receiver: Address, receiverLabel: string, forbiddenRoles: Array<[string, Address]>) {
+  for (const [roleLabel, roleAddress] of forbiddenRoles) {
+    requireDifferentAddress(receiver, roleAddress, receiverLabel, roleLabel);
+  }
+}
+
 function readAthContentCell(): { cell: Cell; contentHashHex: string; bocSha256Hex: string } {
   const artifact = JSON.parse(readFileSync(ATH_METADATA_PATH, 'utf8')) as {
     contentBocBase64: string;
@@ -217,8 +229,18 @@ async function buildDraft(rolesPath: string) {
   const usernameRegistryOfficialAthWallet = await ATHWallet.init(0n, usernameRegistryAddress, athMasterAddress);
   const usernameRegistryOfficialAthWalletAddress = contractAddress(usernameRegistryAddress.workChain, usernameRegistryOfficialAthWallet);
 
+  requireDifferentAddress(treasuryAthReceiver, usernameRegistryAddress, 'manual_roles.treasury_ath_receiver.address', 'derived username_registry address');
+  requireDifferentAddress(treasuryAthReceiver, usernameRegistryOfficialAthWalletAddress, 'manual_roles.treasury_ath_receiver.address', 'derived username_registry_official_ath_wallet address');
+  requireDifferentAddress(treasuryAthReceiver, vaultAddress, 'manual_roles.treasury_ath_receiver.address', 'derived vault address');
+  requireDifferentAddress(treasuryAthReceiver, athMasterAddress, 'manual_roles.treasury_ath_receiver.address', 'derived ath_master address');
+
   const profileRegistryOfficialAthWallet = await ATHWallet.init(0n, profileRegistryAddress, athMasterAddress);
   const profileRegistryOfficialAthWalletAddress = contractAddress(profileRegistryAddress.workChain, profileRegistryOfficialAthWallet);
+
+  requireDifferentAddress(profileTreasuryAthReceiver, profileRegistryAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived profile_registry address');
+  requireDifferentAddress(profileTreasuryAthReceiver, profileRegistryOfficialAthWalletAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived profile_registry_official_ath_wallet address');
+  requireDifferentAddress(profileTreasuryAthReceiver, vaultAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived vault address');
+  requireDifferentAddress(profileTreasuryAthReceiver, athMasterAddress, 'manual_roles.profile_registry_treasury_ath_receiver.address', 'derived ath_master address');
 
   const buybackBurnOfficialAthWallet = await ATHWallet.init(0n, buybackBurnAddress, athMasterAddress);
   const buybackBurnOfficialAthWalletAddress = contractAddress(buybackBurnAddress.workChain, buybackBurnOfficialAthWallet);
@@ -229,12 +251,44 @@ async function buildDraft(rolesPath: string) {
   const marketStabilitySellerOfficialAthWallet = await ATHWallet.init(0n, marketStabilitySellerAddress, athMasterAddress);
   const marketStabilitySellerOfficialAthWalletAddress = contractAddress(marketStabilitySellerAddress.workChain, marketStabilitySellerOfficialAthWallet);
 
+  const protocolOwnedTreasuryDenylist: Array<[string, Address]> = [
+    ['derived ath_master address', athMasterAddress],
+    ['derived ath_treasury_owner_ath_wallet address', treasuryOwnerAthWalletAddress],
+    ['derived ath_long_term_vesting address', athLongTermVestingAddress],
+    ['derived ath_long_term_vesting_official_ath_wallet address', athLongTermVestingOfficialAthWalletAddress],
+    ['derived buyback_burn address', buybackBurnAddress],
+    ['derived buyback_burn_official_ath_wallet address', buybackBurnOfficialAthWalletAddress],
+    ['derived market_stability_seller address', marketStabilitySellerAddress],
+    ['derived market_stability_seller_official_ath_wallet address', marketStabilitySellerOfficialAthWalletAddress],
+    ['derived capsulehub address', capsuleHubAddress],
+    ['derived fee_accumulator address', feeAccumulatorAddress],
+    ['derived profile_registry address', profileRegistryAddress],
+    ['derived profile_registry_official_ath_wallet address', profileRegistryOfficialAthWalletAddress],
+    ['derived username_registry address', usernameRegistryAddress],
+    ['derived username_registry_official_ath_wallet address', usernameRegistryOfficialAthWalletAddress],
+    ['derived vault address', vaultAddress],
+    ['derived vault_official_ath_wallet address', vaultOfficialAthWalletAddress],
+    ['placeholder vault_initial_capsulehub address', vaultCapsulePlaceholder],
+    ['placeholder capsulehub_initial_vault address', capsuleVaultPlaceholder],
+    ['placeholder username_registry_initial_ath_wallet address', usernameAthPlaceholder],
+    ['placeholder profile_registry_initial_ath_wallet address', profileAthPlaceholder],
+    ['manual_roles.genesis_controller_one_shot.address', genesisController],
+    ['manual_roles.buyback_launch_controller.address', buybackLaunchController],
+    ['manual_roles.market_stability_launch_controller.address', marketStabilityLaunchController],
+  ];
+  requireNotProtocolRole(tonTreasuryReceiver, 'manual_roles.ton_treasury_receiver.address', protocolOwnedTreasuryDenylist);
+  requireNotProtocolRole(treasuryAthReceiver, 'manual_roles.treasury_ath_receiver.address', protocolOwnedTreasuryDenylist);
+  requireNotProtocolRole(profileTreasuryAthReceiver, 'manual_roles.profile_registry_treasury_ath_receiver.address', protocolOwnedTreasuryDenylist);
+  requireNotProtocolRole(marketTonTreasuryReceiver, 'manual_roles.market_stability_ton_treasury_receiver.address', protocolOwnedTreasuryDenylist);
+  requireNotProtocolRole(marketReserveFunder, 'manual_roles.market_stability_reserve_funder.address', protocolOwnedTreasuryDenylist);
+
   const addresses: AddressMap = {
     ath_master: friendly(athMasterAddress),
     ath_long_term_vesting: friendly(athLongTermVestingAddress),
     ath_long_term_vesting_beneficiary: friendly(vestingBeneficiary),
     ath_long_term_vesting_official_ath_wallet: friendly(athLongTermVestingOfficialAthWalletAddress),
     ath_treasury_owner: friendly(athTreasuryOwner),
+    ath_treasury_owner_ath_wallet: friendly(treasuryOwnerAthWalletAddress),
     buyback_burn: friendly(buybackBurnAddress),
     buyback_burn_initial_genesis_controller: friendly(genesisController),
     buyback_burn_launch_controller: friendly(buybackLaunchController),
@@ -283,6 +337,7 @@ async function buildDraft(rolesPath: string) {
 
   const state_init_hashes: HashMap = {
     ath_master: stateInitHash(athMaster),
+    ath_treasury_owner_ath_wallet: stateInitHash(treasuryOwnerAthWallet),
     ath_long_term_vesting_initial: stateInitHash(athLongTermVesting),
     ath_long_term_vesting_official_ath_wallet: stateInitHash(athLongTermVestingOfficialAthWallet),
     buyback_burn_initial: stateInitHash(buybackBurn),
@@ -439,9 +494,13 @@ async function buildDraft(rolesPath: string) {
       ['MarketStabilitySeller.BindMarketStabilityTreasury', friendly(marketTonTreasuryReceiver)],
       ['Vault.BindDeploymentManifest.counterpart', friendly(capsuleHubAddress)],
       ['Vault.BindOfficialAthWallet', friendly(vaultOfficialAthWalletAddress)],
+      ['Vault.BindProfileRegistry', friendly(profileRegistryAddress)],
+      ['Vault.BindUsernameRegistry', friendly(usernameRegistryAddress)],
       ['CapsuleHub.BindDeploymentManifest.counterpart', friendly(vaultAddress)],
       ['UsernameRegistry.BindOfficialAthWallet', friendly(usernameRegistryOfficialAthWalletAddress)],
+      ['UsernameRegistry.BindUsernameVault', friendly(vaultAddress)],
       ['ProfileRegistry.BindProfileOfficialAthWallet', friendly(profileRegistryOfficialAthWalletAddress)],
+      ['ProfileRegistry.BindProfileVault', friendly(vaultAddress)],
     ],
     warnings: [
       'This is a local ignored draft. It is not a live getter snapshot and does not prove production deployment.',

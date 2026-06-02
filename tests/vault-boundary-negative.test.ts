@@ -3,9 +3,12 @@ import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { findTransaction } from '@ton/test-utils';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
 import {
   Vault,
   BindOfficialAthWallet,
+  BindProfileRegistry,
+  BindUsernameRegistry,
   SealGenesis,
   DepositTon,
   WithdrawTon,
@@ -19,6 +22,7 @@ import {
   ATHWallet,
   ATHTransferRequestWithNotify,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -26,7 +30,7 @@ const USER_STATE_STORAGE_ENDOWMENT = 10_000_000n;
 const DEPOSIT_TON_EXEC_RESERVE = 2_000_000n;
 const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
-const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 5_000_000n;
+const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 30_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
 const VAULT_ATH_WITHDRAW_MIN_VALUE = 40_000_000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
@@ -119,6 +123,16 @@ async function setupAth() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialVaultAthWallet,
   } as BindOfficialAthWallet);
+  await vault.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindProfileRegistry',
+    deployment_manifest_hash: MANIFEST_HASH,
+    profile_registry_address: fixtureAddress('VAULT_BOUNDARY_PROFILE_REGISTRY'),
+  } as BindProfileRegistry);
+  await vault.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameRegistry',
+    deployment_manifest_hash: MANIFEST_HASH,
+    username_registry_address: fixtureAddress('VAULT_BOUNDARY_USERNAME_REGISTRY'),
+  } as BindUsernameRegistry);
   await vault.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
@@ -272,12 +286,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     const keyRequired = USER_STATE_STORAGE_ENDOWMENT + KEY_RECORD_STANDARD_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
     await lowKeys.vault.send(lowKeys.user.getSender(), { value: keyRequired - 1n }, {
       $$type: 'RegisterMessagingKeys',
-      enc_pubkey: ENC,
-      sign_pubkey: SIG,
-      pq_kem_pubkey_hash: 0n,
-      pq_kem_pubkey_len: 0n,
-      pq_kem_pubkey: beginCell().endCell(),
-      crypto_suite_mask: 1n,
+      ...hybridMessagingKeyFields(ENC, SIG),
     } as RegisterMessagingKeys);
     expect((await lowKeys.vault.getGetGlobal()).key_record_count).toBe(0n);
     expect((await lowKeys.vault.getGetUser(lowKeys.user.address)).exists).toBe(false);
@@ -285,12 +294,7 @@ describe('Vault value/storage boundary negative matrix', () => {
     const exactKeys = await setupPlain();
     await exactKeys.vault.send(exactKeys.user.getSender(), { value: keyRequired }, {
       $$type: 'RegisterMessagingKeys',
-      enc_pubkey: ENC,
-      sign_pubkey: SIG,
-      pq_kem_pubkey_hash: 0n,
-      pq_kem_pubkey_len: 0n,
-      pq_kem_pubkey: beginCell().endCell(),
-      crypto_suite_mask: 1n,
+      ...hybridMessagingKeyFields(ENC, SIG),
     } as RegisterMessagingKeys);
     expect((await exactKeys.vault.getGetGlobal()).key_record_count).toBe(1n);
     expect((await exactKeys.vault.getGetUser(exactKeys.user.address)).current_key_id).not.toBe(0n);
@@ -467,5 +471,14 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect(pending1.owner_wallet.toString()).toBe(user.address.toString());
     expect(pending2.owner_wallet.toString()).toBe(user2.address.toString());
     expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(2n);
+  });
+
+  it('VAULT-BND-06: packed profile/username pending counters are capped before lane overflow', () => {
+    const source = readFileSync('contracts/Vault.tact', 'utf8').replace(/\s+/g, ' ');
+
+    expect(source).toContain('const VAULT_PENDING_PROFILE_COUNT_MAX: Int = 65535;');
+    expect(source).toContain('const VAULT_PENDING_USERNAME_COUNT_MAX: Int = 65535;');
+    expect(source).toMatch(/fun incrementPendingProfileAvatarPaymentCount\(\) \{ throwUnless\(16690, self\.pendingProfileAvatarPaymentCount\(\) < VAULT_PENDING_PROFILE_COUNT_MAX\); self\.pending_publish_count \+= VAULT_PENDING_PROFILE_COUNT_UNIT; \}/);
+    expect(source).toMatch(/fun incrementPendingUsernameMintPaymentCount\(\) \{ throwUnless\(16790, self\.pendingUsernameMintPaymentCount\(\) < VAULT_PENDING_USERNAME_COUNT_MAX\); self\.pending_publish_count \+= VAULT_PENDING_USERNAME_COUNT_UNIT; \}/);
   });
 });

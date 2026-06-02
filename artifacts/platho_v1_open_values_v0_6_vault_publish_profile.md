@@ -254,7 +254,7 @@ CapsuleHub ACK value MUST retain CapsuleHub-side backing for accepted publishes:
 protocol fee, execution/storage reserves, keepalive, entry storage, and any page
 storage actually charged stay in CapsuleHub. A success ACK returns only the fixed
 publish ACK reserve of `30,000,000` nanotons (`0.030 TON`); after Vault processes
-that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON
+that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault TON
 balance. Later final v1 PWA surcharge above canonical required value is retained
 by CapsuleHub as network/storage reserve overage, not returned to Vault.
 

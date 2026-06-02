@@ -1,42 +1,35 @@
 {
   "document": "PLATHO.V1.MAINNET_ATH_MASTER_DERIVATION",
-  "status": "BLOCKED_MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS",
+  "status": "DERIVED_MAINNET_ATH_MASTER_ADDRESS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
-  "ath_master_derivation_ready": false,
+  "ath_master_derivation_ready": true,
   "production_deploy_executed": false,
   "inputSource": "C:/platho/artifacts/mainnet_ath_master_derivation_input.json",
-  "blockers": [
-    "MISSING_FINAL_MAINNET_ATH_MASTER_INPUTS"
-  ],
-  "missingInputs": [
-    "FINAL_MAINNET_ATH_MASTER_INPUT_STATUS",
-    "treasuryOwnerAddress",
-    "proofRefs.treasuryOwnerProof",
-    "proofRefs.athMasterBuildArtifact"
-  ],
+  "blockers": [],
+  "missingInputs": [],
   "rejectedNonProdInputs": [],
   "invalidInputs": [],
   "inputs": {
-    "treasuryOwnerAddress": "REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+    "treasuryOwnerAddress": "EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC",
     "contentBocBase64": "te6cckEBDAEA8QABAwDAAQIBWAIHAgEgAwUBQb9FRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwQAFgBQbGF0aG8gQVRIAUG/btT5QqeEjOLLBmt3oRKMah/4xD9Dii3OJGErqf+riwMGAAgAQVRIAgEgCAoBQb9SCN70b1odT53OZqswn0qFEwXxZvke952SPvWONPmiCQkAaABVdGlsaXR5IHRva2VuIG9mIHRoZSBQbGF0aG8gY29tbXVuaWNhdGlvbiBwcm90b2NvbC4BQb9dAfpePAaQHEUEbGst3Opa92T+oO7XKhDUBPIxLOskfQsABAA5r2Mc4g==",
     "contentHash": "3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea"
   },
   "derived": {
-    "athMasterAddress": null,
-    "athMasterRawAddress": null,
-    "athMasterStateInitHash": null,
-    "athMasterCodeHash": null,
-    "athMasterDataHash": null,
-    "treasuryOwnerAthWalletAddress": null,
-    "treasuryOwnerAthWalletRawAddress": null,
-    "treasuryOwnerAthWalletStateInitHash": null,
-    "athWalletCodeHash": null
+    "athMasterAddress": "EQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9vxL-",
+    "athMasterRawAddress": "0:58b4ae3fb314f0d99edba7c0eecd0d8dcf4f4c594ee799c1e63f3a2fb1437dbf",
+    "athMasterStateInitHash": "58b4ae3fb314f0d99edba7c0eecd0d8dcf4f4c594ee799c1e63f3a2fb1437dbf",
+    "athMasterCodeHash": "1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88",
+    "athMasterDataHash": "f8a92c631215d2005f29a89a354b438c1d1c031c2d5715250dafe17e38fa3f31",
+    "treasuryOwnerAthWalletAddress": "EQDa464U-R8o-bT-Y1-2F6JBfxZCEOJclTILQxF8GHejQwrC",
+    "treasuryOwnerAthWalletRawAddress": "0:dae3ae14f91f28f9b4fe635fb617a2417f164210e25c95320b43117c1877a343",
+    "treasuryOwnerAthWalletStateInitHash": "dae3ae14f91f28f9b4fe635fb617a2417f164210e25c95320b43117c1877a343",
+    "athWalletCodeHash": "4c90b0f1b65eea96df7992409e1819b73f63f1ae2ecb9f651c42174c85f7b88d"
   },
   "treasurySupplyDeployment": {
     "required": true,
     "messageType": "DeployTreasurySupply",
-    "senderAddress": "REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
-    "recipientAthWalletAddress": null,
+    "senderAddress": "EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC",
+    "recipientAthWalletAddress": "EQDa464U-R8o-bT-Y1-2F6JBfxZCEOJclTILQxF8GHejQwrC",
     "amountAtomic": "100000000000000000",
     "requiredValueNanotons": "5000000",
     "downstreamWalletValueNanotons": "3000000",
@@ -44,13 +37,13 @@
     "proofRequired": "required: post-deploy transaction plus official treasury ATH wallet balance proof"
   },
   "nextM20FInputs": {
-    "athMasterAddress": null,
-    "athMasterCodeHash": null,
-    "athDeploymentManifest": null
+    "athMasterAddress": "EQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9vxL-",
+    "athMasterCodeHash": "1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88",
+    "athDeploymentManifest": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88"
   },
   "proofRefs": {
-    "treasuryOwnerProof": "required: immutable treasury owner proof path/hash",
+    "treasuryOwnerProof": "artifacts/mainnet_genesis_verify_input.json#manifest.addresses.ath_treasury_owner=UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH",
     "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea",
-    "athMasterBuildArtifact": "required: immutable ATHMaster build artifact path/hash"
+    "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88"
   }
 }

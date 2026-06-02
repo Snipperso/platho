@@ -1,4 +1,4 @@
-import { Address, beginCell, contractAddress, storeStateInit } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, storeStateInit } from '@ton/core';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -83,6 +83,19 @@ function hasNonProdMarker(value: string): boolean {
   return /\b(testnet|fixture|preview|mock|template|placeholder)\b/i.test(value);
 }
 
+function currentBuybackBurnCodeHash(): string {
+  return Cell.fromBoc(readFileSync(join(process.cwd(), 'build', 'BuybackBurn', 'BuybackBurn_BuybackBurn.code.boc')))[0]
+    .hash()
+    .toString('hex');
+}
+
+function explicitBuybackBurnHash(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const manifestMatch = value.match(/code_hashes\.buyback_burn=([0-9a-f]{64})/i);
+  if (manifestMatch) return manifestMatch[1].toLowerCase();
+  return null;
+}
+
 function parseAddress(value: string): Address | null {
   try {
     return Address.parse(value);
@@ -163,6 +176,11 @@ function collectFindings(input: M20FMainnetAddressDerivationInput | null) {
   for (const [key, value] of Object.entries(input.proofRefs ?? {})) {
     if (isPlaceholder(value)) missingInputs.push(`proofRefs.${key}`);
     if (typeof value === 'string' && hasNonProdMarker(value)) rejectedNonProdInputs.push(`proofRefs.${key}`);
+  }
+
+  const explicitBuildHash = explicitBuybackBurnHash(input.proofRefs?.buybackBurnBuildArtifact);
+  if (explicitBuildHash && explicitBuildHash !== currentBuybackBurnCodeHash()) {
+    invalidInputs.push('proofRefs.buybackBurnBuildArtifact.code_hash');
   }
 
   return { missingInputs, rejectedNonProdInputs, invalidInputs };

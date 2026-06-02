@@ -7,6 +7,8 @@ import {
   CapsuleHub,
   DepositProtocolFee,
   FlushFees,
+  PruneCapsuleEntry,
+  SweepExcessReserve,
   storeDepositProtocolFee,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
@@ -23,12 +25,19 @@ import {
   finalPublicHeaderCell,
 } from './helpers/capsule-cells';
 
-const PLATO_PRIVATE_STANDARD_FEE = 5_000_000n;
-const PLATO_PUBLIC_FEE = 5_000_000n;
+const PLATO_PRIVATE_HYBRID_FEE = 10_000_000n;
+const PLATO_PUBLIC_FEE = 10_000_000n;
 const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
+const CAPSULEHUB_SWEEP_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
 const CAPSULEHUB_ACK_FORWARD_RESERVE = 30_000_000n;
+const CAPSULEHUB_INDEX_RETENTION_SECONDS = 31_536_000;
+const CAPSULEHUB_MIN_PROTECTED_RESERVE = 100_000_000_000n;
+const CAPSULEHUB_PRIVATE_INDEX_1Y = 4_300_000n;
+const CAPSULEHUB_PUBLIC_INDEX_1Y = 8_400_000n;
+const CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE = 2_000_000n;
+const MANIFEST_HASH = hash256('capsulehub-test-manifest');
 const OP_DEPOSIT_PROTOCOL_FEE = 0xff775609;
 const OP_CAPSULEHUB_PUBLISH_ACK = 0x874e576a;
 const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
@@ -47,6 +56,7 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 async function setup(options?: { feeAccumulatorDeployed?: boolean; capsuleBalance?: bigint }) {
   const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
   const author = await blockchain.treasury('author');
   const attacker = await blockchain.treasury('attacker');
   const operator = await blockchain.treasury('operator');
@@ -89,7 +99,7 @@ async function setup(options?: { feeAccumulatorDeployed?: boolean; capsuleBalanc
   );
   const mockVault = blockchain.openContract(new MockVaultAckSink(mockVaultAddress, mockVaultInit));
 
-  const init = await CapsuleHub.init(feeAccumulatorAddress, mockVaultAddress, true, true, 0n, fixtureAddress('GENESIS_CONTROLLER'));
+  const init = await CapsuleHub.init(feeAccumulatorAddress, mockVaultAddress, true, true, MANIFEST_HASH, fixtureAddress('GENESIS_CONTROLLER'));
   const address = contractAddress(0, init);
 
   await blockchain.setShardAccount(
@@ -119,9 +129,10 @@ function inboundValue(tx: any): bigint {
 
 function forwardVaultPrivate(capsuleAddress: Address, overrides?: Partial<ForwardVaultPrivate>): ForwardVaultPrivate {
   const sizeClass = overrides?.size_class ?? 1n;
+  const cryptoSuite = overrides?.crypto_suite ?? 2n;
   const header_0 = overrides?.header_0 ?? finalPrivateHeader0Cell(0x76);
   const header_1 = overrides?.header_1 ?? finalPrivateHeader1Cell(0x77);
-  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x78);
+  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x78, cryptoSuite);
   return {
     $$type: 'ForwardVaultPrivate',
     capsule_hub_address: capsuleAddress,
@@ -129,14 +140,14 @@ function forwardVaultPrivate(capsuleAddress: Address, overrides?: Partial<Forwar
     bounce_tag: 1n,
     publish_id: hash256('vault-private-publish-id'),
     size_class: sizeClass,
-    crypto_suite: 1n,
+    crypto_suite: cryptoSuite,
     header_0_hash: cellHash(header_0),
     header_1_hash: cellHash(header_1),
     body_hash: cellHash(body),
     header_0,
     header_1,
     body,
-    protocol_fee_paid: PLATO_PRIVATE_STANDARD_FEE,
+    protocol_fee_paid: PLATO_PRIVATE_HYBRID_FEE,
     value_to_capsule: 100_000_000n,
     ...overrides,
   } as ForwardVaultPrivate;
@@ -281,14 +292,15 @@ describe('CapsuleHub v1 milestone 1', () => {
   });
 
   it('CAPSULE-04/CAPSULE-ID-04: Vault private publish from immutable Vault creates entry and ACKs', async () => {
-    const { capsule, mockVault, operator } = await setup();
+    const { blockchain, capsule, mockVault, operator } = await setup();
 
     const forwarded = forwardVaultPrivate(capsule.address);
     const result = await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwarded);
 
     const hubState = await capsule.getGetState();
     expect(hubState.private_latest_id).toBe(1n);
-    expect(hubState.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE);
+    expect(hubState.private_live_count).toBe(1n);
+    expect(hubState.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_HYBRID_FEE);
 
     const vaultState = await mockVault.getGetState();
     expect(vaultState.ack_count).toBe(1n);
@@ -298,7 +310,20 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(stored.exists).toBe(true);
     expect(vaultState.last_entry_uid).toBe(stored.entry_uid);
     expect(stored.publish_id).toBe(forwarded.publish_id);
-    expect(stored.body.hash().toString('hex')).toBe(forwarded.body.hash().toString('hex'));
+    expect(stored.header_0.hash().toString('hex')).toBe(forwarded.header_0.hash().toString('hex'));
+    expect(stored.header_1.hash().toString('hex')).toBe(forwarded.header_1.hash().toString('hex'));
+    expect(stored.body_hash).toBe(forwarded.body_hash);
+    expect(stored.page_id).toBe(0n);
+    expect(stored.page_offset).toBe(0n);
+    expect(stored.created_at).toBe(BigInt(blockchain.now!));
+    expect((await capsule.getGetPrivatePage(0n))).toMatchObject({
+      exists: true,
+      first_entry_id: 0n,
+      next_entry_id: 1n,
+      entry_count: 1n,
+      opened_at: 0n,
+      updated_at: 0n,
+    });
 
     const ackTx = findTransaction(result.transactions, {
       from: capsule.address,
@@ -318,18 +343,92 @@ describe('CapsuleHub v1 milestone 1', () => {
 
     const state = await capsule.getGetState();
     expect(state.private_latest_id).toBe(1n);
-    expect(state.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_STANDARD_FEE);
-    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThanOrEqual(PLATO_PRIVATE_STANDARD_FEE);
+    expect(state.private_live_count).toBe(1n);
+    expect(state.accrued_plato_fee_ton).toBe(PLATO_PRIVATE_HYBRID_FEE);
+    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThanOrEqual(PLATO_PRIVATE_HYBRID_FEE);
+  });
+
+  it('CAPSULE-RESERVE-01: SweepExcessReserve protects accrued fees plus 1.25x live-index reserve and sends only surplus to FeeAccumulator', async () => {
+    const { blockchain, capsule, mockVault, operator, author, feeAccumulator } = await setup({
+      feeAccumulatorDeployed: true,
+      capsuleBalance: toNano('101'),
+    });
+
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPrivate(capsule.address));
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
+
+    const state = await capsule.getGetState();
+    expect(state.private_live_count).toBe(1n);
+    expect(state.public_live_count).toBe(1n);
+    expect(state.index_storage_reserve_ton).toBe(((CAPSULEHUB_PRIVATE_INDEX_1Y + CAPSULEHUB_PUBLIC_INDEX_1Y) * 125n) / 100n);
+    expect(state.reserve_floor_ton).toBe(CAPSULEHUB_MIN_PROTECTED_RESERVE);
+    expect(state.protected_reserve_ton).toBe(CAPSULEHUB_MIN_PROTECTED_RESERVE + state.accrued_plato_fee_ton);
+    expect(state.reserve_buffer_numerator).toBe(125n);
+    expect(state.reserve_buffer_denominator).toBe(100n);
+
+    const tooMuch = await capsule.send(operator.getSender(), { value: CAPSULEHUB_SWEEP_CALLER_RESERVE }, {
+      $$type: 'SweepExcessReserve',
+      amount: toNano('2'),
+    } as SweepExcessReserve);
+    expect(findTransaction(tooMuch.transactions, {
+      from: capsule.address,
+      to: feeAccumulator!.address,
+      op: OP_DEPOSIT_PROTOCOL_FEE,
+    })).toBeUndefined();
+    expect((await feeAccumulator!.getGetState()).accumulated_ton).toBe(0n);
+
+    const sweepAmount = toNano('0.5');
+    const sweep = await capsule.send(operator.getSender(), { value: CAPSULEHUB_SWEEP_CALLER_RESERVE }, {
+      $$type: 'SweepExcessReserve',
+      amount: sweepAmount,
+    } as SweepExcessReserve);
+
+    const depositTx = findTransaction(sweep.transactions, {
+      from: capsule.address,
+      to: feeAccumulator!.address,
+      op: OP_DEPOSIT_PROTOCOL_FEE,
+      success: true,
+    });
+    expect(depositTx).toBeDefined();
+    expect(inboundValue(depositTx)).toBe(sweepAmount + CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE);
+    expect((await feeAccumulator!.getGetState()).accumulated_ton).toBe(sweepAmount);
+    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThan(state.protected_reserve_ton - toNano('0.01'));
+  });
+
+  it('CAPSULE-RESERVE-01B: bounced reserve sweep is reclassified as backed accrued fee due', async () => {
+    const { capsule, mockVault, operator, author } = await setup({
+      feeAccumulatorDeployed: false,
+      capsuleBalance: toNano('101'),
+    });
+
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPrivate(capsule.address));
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
+
+    const before = await capsule.getGetState();
+    const sweepAmount = toNano('0.5');
+    const sweep = await capsule.send(operator.getSender(), { value: CAPSULEHUB_SWEEP_CALLER_RESERVE }, {
+      $$type: 'SweepExcessReserve',
+      amount: sweepAmount,
+    } as SweepExcessReserve);
+
+    expect(findTransaction(sweep.transactions, {
+      from: capsule.address,
+      op: OP_DEPOSIT_PROTOCOL_FEE,
+    })).toBeDefined();
+    const after = await capsule.getGetState();
+    expect(after.accrued_plato_fee_ton).toBe(before.accrued_plato_fee_ton + sweepAmount);
+    expect(after.protected_reserve_ton).toBe(before.protected_reserve_ton + sweepAmount);
   });
 
   it('CAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs', async () => {
-    const { capsule, mockVault, operator, author } = await setup();
+    const { blockchain, capsule, mockVault, operator, author } = await setup();
 
     const forwarded = forwardVaultPublic(capsule.address, author.address);
     const result = await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwarded);
 
     const hubState = await capsule.getGetState();
     expect(hubState.public_latest_id).toBe(1n);
+    expect(hubState.public_live_count).toBe(1n);
     expect(hubState.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
 
     const vaultState = await mockVault.getGetState();
@@ -339,7 +438,19 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(stored.exists).toBe(true);
     expect(vaultState.last_entry_uid).toBe(stored.entry_uid);
     expect(stored.author_wallet.toString()).toBe(author.address.toString());
-    expect(stored.body.hash().toString('hex')).toBe(forwarded.body.hash().toString('hex'));
+    expect(stored.header.hash().toString('hex')).toBe(forwarded.header.hash().toString('hex'));
+    expect(stored.body_hash).toBe(forwarded.body_hash);
+    expect(stored.page_id).toBe(0n);
+    expect(stored.page_offset).toBe(0n);
+    expect(stored.created_at).toBe(BigInt(blockchain.now!));
+    expect((await capsule.getGetPublicPage(0n))).toMatchObject({
+      exists: true,
+      first_entry_id: 0n,
+      next_entry_id: 1n,
+      entry_count: 1n,
+      opened_at: 0n,
+      updated_at: 0n,
+    });
 
     const ackTx = findTransaction(result.transactions, {
       from: capsule.address,
@@ -385,6 +496,110 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(hubState.public_latest_id).toBe(0n);
     expect(hubState.accrued_plato_fee_ton).toBe(0n);
     expect(vaultState.ack_count).toBe(0n);
+  });
+
+  it('CAPSULE-RETENTION-01: compact private/public entries can be pruned only after retention window', async () => {
+    const { blockchain, capsule, mockVault, operator, author } = await setup();
+
+    const privateForwarded = forwardVaultPrivate(capsule.address);
+    const publicForwarded = forwardVaultPublic(capsule.address, author.address);
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, privateForwarded);
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, publicForwarded);
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 1n,
+      entry_id: 0n,
+      publish_id: privateForwarded.publish_id,
+    } as PruneCapsuleEntry);
+    expect((await capsule.getGetPrivateEntry(0n)).exists).toBe(true);
+
+    blockchain.now = 1_700_000_000 + CAPSULEHUB_INDEX_RETENTION_SECONDS;
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 1n,
+      entry_id: 0n,
+      publish_id: privateForwarded.publish_id,
+    } as PruneCapsuleEntry);
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 2n,
+      entry_id: 0n,
+      publish_id: publicForwarded.publish_id,
+    } as PruneCapsuleEntry);
+
+    expect((await capsule.getGetPrivateEntry(0n)).exists).toBe(false);
+    expect((await capsule.getGetPublicEntry(0n)).exists).toBe(false);
+    const state = await capsule.getGetState();
+    expect(state.private_latest_id).toBe(1n);
+    expect(state.public_latest_id).toBe(1n);
+    expect(state.private_live_count).toBe(0n);
+    expect(state.public_live_count).toBe(0n);
+    expect((await capsule.getGetPrivatePage(0n))).toMatchObject({
+      exists: true,
+      first_entry_id: 0n,
+      next_entry_id: 1n,
+      entry_count: 1n,
+      opened_at: 0n,
+      updated_at: 0n,
+    });
+  });
+
+  it('CAPSULE-RETENTION-01B: underfunded prune cannot delete retained entries', async () => {
+    const { blockchain, capsule, mockVault, operator, author } = await setup();
+
+    const privateForwarded = forwardVaultPrivate(capsule.address);
+    const publicForwarded = forwardVaultPublic(capsule.address, author.address);
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, privateForwarded);
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, publicForwarded);
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE - 1n }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 1n,
+      entry_id: 0n,
+      publish_id: privateForwarded.publish_id,
+    } as PruneCapsuleEntry);
+    expect((await capsule.getGetPrivateEntry(0n)).exists).toBe(true);
+    expect((await capsule.getGetState()).private_live_count).toBe(1n);
+
+    blockchain.now = 1_700_000_000 + CAPSULEHUB_INDEX_RETENTION_SECONDS;
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE - 1n }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 1n,
+      entry_id: 0n,
+      publish_id: privateForwarded.publish_id,
+    } as PruneCapsuleEntry);
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE - 1n }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 2n,
+      entry_id: 0n,
+      publish_id: publicForwarded.publish_id,
+    } as PruneCapsuleEntry);
+
+    expect((await capsule.getGetPrivateEntry(0n)).exists).toBe(true);
+    expect((await capsule.getGetPublicEntry(0n)).exists).toBe(true);
+    const state = await capsule.getGetState();
+    expect(state.private_live_count).toBe(1n);
+    expect(state.public_live_count).toBe(1n);
+  });
+
+  it('CAPSULE-RETENTION-02: prune authenticates publish id before deleting an entry', async () => {
+    const { blockchain, capsule, mockVault, operator } = await setup();
+
+    const forwarded = forwardVaultPrivate(capsule.address);
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwarded);
+    blockchain.now = 1_700_000_000 + CAPSULEHUB_INDEX_RETENTION_SECONDS;
+
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 1n,
+      entry_id: 0n,
+      publish_id: hash256('wrong-publish-id'),
+    } as PruneCapsuleEntry);
+
+    expect((await capsule.getGetPrivateEntry(0n)).exists).toBe(true);
   });
 
   it('NO-ADMIN: empty fallback rejected and cannot mutate state', async () => {

@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildImplementedSubsetManifest, computeManifestCell } from './deployment_manifest_m15';
+import { computeFinalGenesisManifestHashHex } from './mainnet_genesis_verify';
 
 const M18_PROFILE = 'PLATHO.V1.M18.ARTIFACT_INTEGRITY_AND_REPRODUCIBILITY_LOCK';
 
@@ -180,21 +181,33 @@ export async function runM18ArtifactIntegrity(writeArtifacts = true): Promise<M1
     m17_gas_report_passes: m17Report.status === 'PASS' && m17Report.scenarios.every((s: any) => s.status === 'ok'),
   };
 
-  const { manifest } = await buildImplementedSubsetManifest();
   const storedManifest = readJson('artifacts/deployment_manifest_implemented_subset_m15.json');
   const storedHash = readText('artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt').trim();
-  const rebuiltHash = computeManifestCell({
-    addresses: manifest.addresses,
-    code_hashes: manifest.code_hashes,
-    state_init_hashes: manifest.state_init_hashes,
-    constants: manifest.constants,
-    blockers_before_final_genesis: manifest.blockers_before_final_genesis,
-  }).hash().toString('hex');
+  const finalGenesisVerified = existsSync('artifacts/MAINNET_GENESIS_VERIFIED.txt')
+    && readText('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim().toLowerCase() === 'true';
+  const finalGenesisInput = existsSync('artifacts/mainnet_genesis_verify_input.json')
+    ? readJson('artifacts/mainnet_genesis_verify_input.json')
+    : null;
+  const { manifest: implementedSubsetManifest } = await buildImplementedSubsetManifest();
+  const manifest = storedManifest.status === 'FINAL_GENESIS' && finalGenesisVerified && finalGenesisInput?.manifest
+    ? finalGenesisInput.manifest
+    : implementedSubsetManifest;
+  const rebuiltHash = manifest.status === 'FINAL_GENESIS'
+    ? computeFinalGenesisManifestHashHex(manifest)
+    : computeManifestCell({
+        addresses: manifest.addresses,
+        code_hashes: manifest.code_hashes,
+        state_init_hashes: manifest.state_init_hashes,
+        constants: manifest.constants,
+        blockers_before_final_genesis: manifest.blockers_before_final_genesis,
+      }).hash().toString('hex');
 
   const manifestChecks = {
     stored_json_equals_rebuilt_manifest: stableStringify(storedManifest) === stableStringify(manifest),
     stored_hash_matches_rebuilt_hash: storedHash === rebuiltHash && manifest.manifest_hash_hex === rebuiltHash,
-    manifest_remains_non_final_with_blockers: manifest.status === 'IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS' && manifest.blockers_before_final_genesis.length > 0,
+    manifest_is_current_release_truth:
+      (manifest.status === 'FINAL_GENESIS' && finalGenesisVerified && manifest.blockers_before_final_genesis.length === 0) ||
+      (manifest.status === 'IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS' && !finalGenesisVerified && manifest.blockers_before_final_genesis.length > 0),
     manifest_code_hashes_match_build: codeHashChecks.filter((x) => x.manifestKey).every((x) => manifest.code_hashes[x.manifestKey!] === codeHashes[x.key].built),
   };
 
@@ -247,7 +260,7 @@ export async function runM18ArtifactIntegrity(writeArtifacts = true): Promise<M1
       'M50 adds the MarketStabilitySeller contract and refreshes the implemented-subset artifact lock accordingly.',
       'MarketStabilitySeller post-pool readiness artifacts are locked so the x2..x21 seller cannot be treated as operational without frozen pricing and reserve-funding evidence.',
       'JSON artifact hashes are normalized by replacing generated_at/generated_at_utc with DETERMINISTIC_ARTIFACT and sorting object keys.',
-      'This is an implemented-subset artifact integrity lock, not a final genesis manifest.',
+      'Before final genesis this locks the implemented-subset manifest; after MAINNET_GENESIS_VERIFIED=true it locks the verified final genesis manifest promoted into the current deployment manifest artifact.',
     ],
   };
 

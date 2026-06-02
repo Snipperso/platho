@@ -1,0 +1,19 @@
+[Unit]
+Description=Platho read-only TON RPC gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/platho
+EnvironmentFile=/etc/platho/rpc-gateway.env
+ExecStart=/usr/bin/python3 /opt/platho/platho-rpc-gateway.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

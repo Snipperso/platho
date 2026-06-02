@@ -5,7 +5,7 @@ const DEFAULT_KEY_ID = 'device-history-key-v1';
 const MESSAGE_HISTORY_VERSION = 1;
 const MESSAGE_HISTORY_DOMAIN = 'PLATHO.LOCAL.MESSAGE_HISTORY.V1';
 const AES_GCM_NONCE_BYTES = 12;
-const DEFAULT_MAX_RECORDS = 500;
+export const DEFAULT_MESSAGE_HISTORY_MAX_RECORDS = 500;
 
 function assertObject(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -250,7 +250,7 @@ async function pruneIndexedDbMessages(db, maxRecords) {
 export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) {
   const db = await openHistoryDb(options.dbName ?? DEFAULT_DB_NAME);
   const key = await getOrCreateStoredKey(db);
-  const maxRecords = options.maxRecords ?? DEFAULT_MAX_RECORDS;
+  const maxRecords = options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_RECORDS;
 
   return {
     async putMessage(input) {
@@ -275,13 +275,19 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
     get type() {
       return 'indexeddb';
     },
+    get maxRecords() {
+      return maxRecords;
+    },
+    get persistent() {
+      return true;
+    },
   };
 }
 
 export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
   const key = options.key ?? await createHistoryKey();
   const records = new Map();
-  const maxRecords = options.maxRecords ?? DEFAULT_MAX_RECORDS;
+  const maxRecords = options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_RECORDS;
 
   function prune() {
     const ordered = [...records.values()].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
@@ -308,6 +314,12 @@ export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
     },
     get type() {
       return 'memory';
+    },
+    get maxRecords() {
+      return maxRecords;
+    },
+    get persistent() {
+      return false;
     },
   };
 }

@@ -1,47 +1,79 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HIGH_NETWORK_FEE_SURCHARGE_CONFIRM_NANOTONS,
   INCLUDED_NETWORK_FEE_NANOTONS,
+  MANUAL_NETWORK_FEE_SURCHARGE_OVERRIDE_NANOTONS,
+  MAX_NETWORK_FEE_SURCHARGE_NANOTONS,
   MESSAGE_PRICE_SUITES,
+  PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
+  PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
   PUBLIC_MESSAGE_BASE_PRICE_NANOTONS,
   formatTonAmount,
+  highNetworkFeeSurchargeConfirmThresholdNanotons,
+  maxNetworkFeeSurchargeNanotons,
   messagePriceLabel,
   messagePriceNanotons,
   networkFeeSurchargeNanotons,
+  networkFeeSurchargeExceedsMax,
+  privateCapsuleBaseHoldNanotons,
+  privateCapsuleBaseNetPriceNanotons,
+  publicCapsuleBaseHoldNanotons,
+  publicCapsuleBaseNetPriceNanotons,
+  rawNetworkFeeSurchargeNanotons,
+  requiresHighNetworkFeeSurchargeConfirmation,
+  requiresManualNetworkFeeSurchargeOverride,
   resolveNetworkFeeEstimateNanotons,
   valueWithNetworkFeeSurchargeNanotons,
 } from '../web/message-pricing-policy.mjs';
 
 describe('PWA message pricing policy', () => {
-  it('PWA-MSG-PRICE-01: keeps beautiful base prices while the fee estimate fits the included allowance', () => {
+  it('PWA-MSG-PRICE-01: exposes current net base prices while the fee estimate fits the included allowance', () => {
     expect(INCLUDED_NETWORK_FEE_NANOTONS).toBe(5_000_000n);
-    expect(PUBLIC_MESSAGE_BASE_PRICE_NANOTONS).toBe(10_000_000n);
-    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.PUBLIC_V1)).toBe(10_000_000n);
-    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.CLASSICAL_V1)).toBe(10_000_000n);
-    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.HYBRID_V1)).toBe(20_000_000n);
-    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.CLASSICAL_V1, {
+    expect(MAX_NETWORK_FEE_SURCHARGE_NANOTONS).toBe(50_000_000n);
+    expect(HIGH_NETWORK_FEE_SURCHARGE_CONFIRM_NANOTONS).toBe(10_000_000n);
+    expect(MANUAL_NETWORK_FEE_SURCHARGE_OVERRIDE_NANOTONS).toBe(50_000_000n);
+    expect(PUBLIC_MESSAGE_BASE_PRICE_NANOTONS).toBe(33_700_000n);
+    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.PUBLIC_V1)).toBe(33_700_000n);
+    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.HYBRID_V1)).toBe(34_700_000n);
+    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.HYBRID_V1, {
       estimatedNetworkFeeNanotons: 5_000_000n,
-    })).toBe(10_000_000n);
+    })).toBe(34_700_000n);
+    expect(() => messagePriceNanotons('classical-v1')).toThrow(/Unsupported message price suite/);
   });
 
   it('PWA-MSG-PRICE-02: rounds fee overage upward to clean 0.001 TON steps', () => {
     expect(networkFeeSurchargeNanotons(5_000_001n)).toBe(1_000_000n);
     expect(networkFeeSurchargeNanotons(6_500_000n)).toBe(2_000_000n);
-    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.CLASSICAL_V1, {
-      estimatedNetworkFeeNanotons: 6_500_000n,
-    })).toBe(12_000_000n);
     expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.HYBRID_V1, {
       estimatedNetworkFeeNanotons: 6_500_000n,
-    })).toBe(22_000_000n);
+    })).toBe(36_700_000n);
   });
 
-  it('PWA-MSG-PRICE-03: covers severe fee growth without operating below cost', () => {
-    expect(networkFeeSurchargeNanotons(65_000_000n)).toBe(60_000_000n);
-    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.CLASSICAL_V1, {
-      estimatedNetworkFeeNanotons: 65_000_000n,
-    })).toBe(70_000_000n);
+  it('PWA-MSG-PRICE-03: caps severe fee growth and exposes hard-cap overflow separately', () => {
+    expect(rawNetworkFeeSurchargeNanotons(65_000_000n)).toBe(60_000_000n);
+    expect(networkFeeSurchargeNanotons(65_000_000n)).toBe(50_000_000n);
     expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.HYBRID_V1, {
       estimatedNetworkFeeNanotons: 65_000_000n,
-    })).toBe(80_000_000n);
+    })).toBe(84_700_000n);
+    expect(rawNetworkFeeSurchargeNanotons(5_000_000_000n)).toBe(4_995_000_000n);
+    expect(networkFeeSurchargeNanotons(5_000_000_000n)).toBe(50_000_000n);
+    expect(messagePriceNanotons(MESSAGE_PRICE_SUITES.PUBLIC_V1, {
+      estimatedNetworkFeeNanotons: 5_000_000_000n,
+    })).toBe(83_700_000n);
+    expect(networkFeeSurchargeNanotons(5_000_000_000n, {
+      maxNetworkFeeSurchargeNanotons: 60_000_000n,
+    })).toBe(60_000_000n);
+    expect(maxNetworkFeeSurchargeNanotons()).toBe(50_000_000n);
+    expect(networkFeeSurchargeExceedsMax(55_000_000n)).toBe(false);
+    expect(networkFeeSurchargeExceedsMax(56_000_000n)).toBe(true);
+    expect(networkFeeSurchargeExceedsMax(5_000_000_000n)).toBe(true);
+    expect(requiresHighNetworkFeeSurchargeConfirmation(11_000_000n)).toBe(true);
+    expect(requiresHighNetworkFeeSurchargeConfirmation(10_000_000n)).toBe(false);
+    expect(requiresManualNetworkFeeSurchargeOverride(51_000_000n)).toBe(true);
+    expect(requiresManualNetworkFeeSurchargeOverride(50_000_000n)).toBe(false);
+    expect(highNetworkFeeSurchargeConfirmThresholdNanotons({
+      highNetworkFeeSurchargeConfirmNanotons: '12000000',
+    })).toBe(12_000_000n);
   });
 
   it('PWA-MSG-PRICE-04: resolves config-shaped estimates and formats TON labels', () => {
@@ -52,8 +84,10 @@ describe('PWA message pricing policy', () => {
     };
 
     expect(resolveNetworkFeeEstimateNanotons(config)).toBe(6_500_000n);
-    expect(formatTonAmount(messagePriceNanotons(MESSAGE_PRICE_SUITES.CLASSICAL_V1, config))).toBe('0.012');
-    expect(messagePriceLabel(MESSAGE_PRICE_SUITES.HYBRID_V1, config)).toBe('0.022 TON');
+    expect(formatTonAmount(messagePriceNanotons(MESSAGE_PRICE_SUITES.PUBLIC_V1))).toBe('0.0337');
+    expect(messagePriceLabel(MESSAGE_PRICE_SUITES.HYBRID_V1)).toBe('0.0347 TON');
+    expect(formatTonAmount(messagePriceNanotons(MESSAGE_PRICE_SUITES.PUBLIC_V1, config))).toBe('0.0357');
+    expect(messagePriceLabel(MESSAGE_PRICE_SUITES.HYBRID_V1, config)).toBe('0.0367 TON');
   });
 
   it('PWA-MSG-PRICE-05: applies the same surcharge to canonical contract values', () => {
@@ -63,5 +97,31 @@ describe('PWA message pricing policy', () => {
     expect(valueWithNetworkFeeSurchargeNanotons('13000000', {
       estimatedNetworkFeeNanotons: 5_000_000n,
     })).toBe(13_000_000n);
+  });
+
+  it('PWA-MSG-PRICE-06: exposes size-aware private capsule hold and net prices', () => {
+    expect(publicCapsuleBaseHoldNanotons()).toBe(59_500_000n);
+    expect(publicCapsuleBaseNetPriceNanotons()).toBe(33_700_000n);
+    expect(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).toEqual({
+      1: 60_500_000n,
+      2: 62_400_000n,
+      4: 66_100_000n,
+      8: 73_700_000n,
+      16: 89_000_000n,
+      32: 119_500_000n,
+    });
+    expect(PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS).toEqual({
+      1: 34_700_000n,
+      2: 36_600_000n,
+      4: 40_300_000n,
+      8: 47_900_000n,
+      16: 63_200_000n,
+      32: 93_700_000n,
+    });
+    for (const [sizeClass, hold] of Object.entries(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS)) {
+      expect(privateCapsuleBaseHoldNanotons(sizeClass)).toBe(hold);
+      expect(privateCapsuleBaseNetPriceNanotons(sizeClass)).toBe(PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[sizeClass]);
+    }
+    expect(() => privateCapsuleBaseHoldNanotons(3)).toThrow(/Unsupported private capsule size class/);
   });
 });

@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=15';
 
 export class ProfileRegistryTonRpcProviderError extends Error {
   constructor(message) {
@@ -15,13 +15,16 @@ function toStackNumber(value) {
 
 function readStackInt(stack, index, name) {
   const item = stack[index];
-  const raw = item?.value ?? item?.num ?? item;
+  const raw = stackItemValue(item);
   if (typeof raw === 'bigint') return raw;
   if (typeof raw === 'number' && Number.isSafeInteger(raw)) return BigInt(raw);
+  if (typeof raw === 'boolean') return raw ? -1n : 0n;
   if (typeof raw === 'string') {
-    if (raw.startsWith('-0x')) return -BigInt(`0x${raw.slice(3)}`);
-    if (raw.startsWith('0x')) return BigInt(raw);
-    if (/^-?[0-9]+$/.test(raw)) return BigInt(raw);
+    const text = raw.trim();
+    if (/^-?0x[0-9a-fA-F]+$/.test(text)) {
+      return text.startsWith('-') ? -BigInt(`0x${text.slice(3)}`) : BigInt(text);
+    }
+    if (/^-?[0-9]+$/.test(text)) return BigInt(text);
   }
   throw new ProfileRegistryTonRpcProviderError(`${name} is not an integer stack item`);
 }
@@ -32,12 +35,35 @@ function readStackBool(stack, index, name) {
 
 function readStackAddress(stack, index, name) {
   const item = stack[index];
-  if (item?.type === 'slice' && typeof item.value === 'string') {
-    return decodeTonAddressSliceBoc(item.value);
-  }
+  const value = stackItemValue(item);
+  const type = stackItemType(item);
   if (typeof item?.address === 'string') return parseTonAddress(item.address).raw;
-  if (typeof item?.value === 'string' && /^-?[0-9]+:/.test(item.value)) return parseTonAddress(item.value).raw;
+  if (typeof value === 'string') {
+    try {
+      return parseTonAddress(value).raw;
+    } catch {
+      if (type.includes('slice') || type === 'cell' || /^[A-Za-z0-9+/=_-]+$/.test(value)) {
+        return decodeTonAddressSliceBoc(value);
+      }
+    }
+  }
   throw new ProfileRegistryTonRpcProviderError(`${name} is not an address stack item`);
+}
+
+function stackItemValue(item) {
+  if (Array.isArray(item)) return item[1];
+  if (item && typeof item === 'object' && 'value' in item) return item.value;
+  if (item && typeof item === 'object' && 'num' in item) return item.num;
+  if (item && typeof item === 'object' && 'boc' in item) return item.boc;
+  if (item && typeof item === 'object' && 'cell' in item) return item.cell;
+  if (item && typeof item === 'object' && 'bytes' in item) return item.bytes;
+  return item;
+}
+
+function stackItemType(item) {
+  if (Array.isArray(item)) return String(item[0] ?? '').toLowerCase();
+  if (item && typeof item === 'object' && 'type' in item) return String(item.type ?? '').toLowerCase();
+  return typeof item;
 }
 
 function extractStack(result) {
@@ -70,6 +96,14 @@ function stackNumber(value) {
   return { type: 'num', value: toStackNumber(value) };
 }
 
+function criticalCallOptions(callOptions = {}) {
+  const out = {};
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+    if (callOptions[key] !== undefined) out[key] = callOptions[key];
+  }
+  return out;
+}
+
 export function decodeProfileAvatarStack(result) {
   const stack = extractStack(result);
   return {
@@ -87,21 +121,26 @@ export function decodeProfileAvatarStack(result) {
 
 export function decodeProfileRegistryGlobalStack(result) {
   const stack = extractStack(result);
+  if (stack.length !== 16) {
+    throw new ProfileRegistryTonRpcProviderError(`ProfileRegistry get_global ABI mismatch: expected 16 stack items, got ${stack.length}`);
+  }
   return {
     sealed: readStackBool(stack, 0, 'ProfileRegistry sealed'),
     official_ath_wallet_bound: readStackBool(stack, 1, 'ProfileRegistry official wallet bound'),
-    deployment_manifest_hash: readStackInt(stack, 2, 'ProfileRegistry manifest hash'),
-    genesis_config_hash: readStackInt(stack, 3, 'ProfileRegistry genesis config hash'),
-    official_ath_wallet_address: readStackAddress(stack, 4, 'ProfileRegistry official ATH wallet'),
-    ath_master_address: readStackAddress(stack, 5, 'ProfileRegistry ATHMaster'),
-    treasury_ath_receiver_address: readStackAddress(stack, 6, 'ProfileRegistry treasury ATH receiver'),
-    genesis_controller_address: readStackAddress(stack, 7, 'ProfileRegistry genesis controller'),
-    profile_count: readStackInt(stack, 8, 'ProfileRegistry profile count'),
-    avatar_record_count: readStackInt(stack, 9, 'ProfileRegistry avatar record count'),
-    treasury_due_ath: readStackInt(stack, 10, 'ProfileRegistry treasury due'),
-    burn_due_ath: readStackInt(stack, 11, 'ProfileRegistry burn due'),
-    pending_treasury_flush_count: readStackInt(stack, 12, 'ProfileRegistry pending treasury flush count'),
-    pending_burn_flush_count: readStackInt(stack, 13, 'ProfileRegistry pending burn flush count'),
+    vault_bound: readStackBool(stack, 2, 'ProfileRegistry vault bound'),
+    deployment_manifest_hash: readStackInt(stack, 3, 'ProfileRegistry manifest hash'),
+    genesis_config_hash: readStackInt(stack, 4, 'ProfileRegistry genesis config hash'),
+    official_ath_wallet_address: readStackAddress(stack, 5, 'ProfileRegistry official ATH wallet'),
+    vault_address: readStackAddress(stack, 6, 'ProfileRegistry Vault'),
+    ath_master_address: readStackAddress(stack, 7, 'ProfileRegistry ATHMaster'),
+    treasury_ath_receiver_address: readStackAddress(stack, 8, 'ProfileRegistry treasury ATH receiver'),
+    genesis_controller_address: readStackAddress(stack, 9, 'ProfileRegistry genesis controller'),
+    profile_count: readStackInt(stack, 10, 'ProfileRegistry profile count'),
+    avatar_record_count: readStackInt(stack, 11, 'ProfileRegistry avatar record count'),
+    treasury_due_ath: readStackInt(stack, 12, 'ProfileRegistry treasury due'),
+    burn_due_ath: readStackInt(stack, 13, 'ProfileRegistry burn due'),
+    pending_treasury_flush_count: readStackInt(stack, 14, 'ProfileRegistry pending treasury flush count'),
+    pending_burn_flush_count: readStackInt(stack, 15, 'ProfileRegistry pending burn flush count'),
   };
 }
 
@@ -115,6 +154,7 @@ export function createProfileRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_avatar',
         stack: [stackAddress(ownerWallet)],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getAvatarVersion(ownerWallet, version, callOptions = {}) {
@@ -124,6 +164,7 @@ export function createProfileRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_avatar_version',
         stack: [stackAddress(ownerWallet), stackNumber(version)],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getAthWalletAddress(ownerWallet, callOptions = {}) {
@@ -133,6 +174,7 @@ export function createProfileRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_ath_wallet_address',
         stack: [stackAddress(ownerWallet)],
+        ...criticalCallOptions(callOptions),
       });
       return readStackAddress(extractStack(result), 0, 'ProfileRegistry ATH wallet address');
     },
@@ -143,6 +185,7 @@ export function createProfileRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_global',
         stack: [],
+        ...criticalCallOptions(callOptions),
       }));
     },
   };

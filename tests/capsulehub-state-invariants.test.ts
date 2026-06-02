@@ -17,14 +17,16 @@ import {
   finalPublicHeaderCell,
 } from './helpers/capsule-cells';
 
-const PRIVATE_STANDARD_FEE = 5_000_000n;
-const PUBLIC_FEE = 5_000_000n;
-const PRIVATE_REQUIRED = 5_000_000n + 3_000_000n + 1_000_000n + 4_000_000n;
-const PUBLIC_REQUIRED = 5_000_000n + 3_000_000n + 1_000_000n + 1_000_000n;
+const PRIVATE_HYBRID_FEE = 10_000_000n;
+const PUBLIC_FEE = 10_000_000n;
+const PRIVATE_REQUIRED = 10_000_000n + 4_200_000n + 1_000_000n + 3_300_000n;
+const PUBLIC_REQUIRED = 10_000_000n + 2_400_000n + 1_000_000n + 7_400_000n;
+const PAGE_STORAGE = 0n;
 const ACK_RESERVE = 30_000_000n;
 const FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const VAULT_PRIVATE_REQUIRED = PRIVATE_REQUIRED + ACK_RESERVE;
 const VAULT_PUBLIC_REQUIRED = PUBLIC_REQUIRED + ACK_RESERVE;
+const MANIFEST_HASH = hash256('capsulehub-state-invariants-manifest');
 const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
@@ -67,7 +69,7 @@ async function setup() {
   }));
   const mockVault = blockchain.openContract(new MockVaultAckSink(mockVaultAddress, mockVaultInit));
 
-  const init = await CapsuleHub.init(fixtureAddress('MISSING_FEE_ACCUMULATOR'), mockVaultAddress, true, true, 0n, fixtureAddress('GENESIS_CONTROLLER'));
+  const init = await CapsuleHub.init(fixtureAddress('MISSING_FEE_ACCUMULATOR'), mockVaultAddress, true, true, MANIFEST_HASH, fixtureAddress('GENESIS_CONTROLLER'));
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({
     address,
@@ -80,23 +82,25 @@ async function setup() {
 }
 
 function vaultPrivate(step: number, overrides?: Partial<PublishPrivateFromVault>): PublishPrivateFromVault {
+  const sizeClass = overrides?.size_class ?? 1n;
+  const cryptoSuite = overrides?.crypto_suite ?? 2n;
   const header_0 = overrides?.header_0 ?? finalPrivateHeader0Cell(0x60 + (step % 16));
   const header_1 = overrides?.header_1 ?? finalPrivateHeader1Cell(0x70 + (step % 16));
-  const body = overrides?.body ?? finalPrivateBodyCell(1, 0x80 + (step % 16));
+  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x80 + (step % 16), cryptoSuite);
   return {
     $$type: 'PublishPrivateFromVault',
     bounce_id: BigInt(10_000 + step),
     bounce_tag: BigInt(30_000 + step),
     publish_id: hash256(`vault-private-${step}`),
-    size_class: 1n,
-    crypto_suite: 1n,
+    size_class: sizeClass,
+    crypto_suite: cryptoSuite,
     header_0_hash: cellHash(header_0),
     header_1_hash: cellHash(header_1),
     body_hash: cellHash(body),
     header_0,
     header_1,
     body,
-    protocol_fee_paid: PRIVATE_STANDARD_FEE,
+    protocol_fee_paid: PRIVATE_HYBRID_FEE,
     ...overrides,
   } as PublishPrivateFromVault;
 }
@@ -127,6 +131,8 @@ describe('CapsuleHub state-machine invariants', () => {
       const rng = makeRng(seed);
       let privateLatest = 0n;
       let publicLatest = 0n;
+      let privatePages = 0n;
+      let publicPages = 0n;
       let accrued = 0n;
       let ackCount = 0n;
       let debugContext = `seed ${seed} initial`;
@@ -135,16 +141,22 @@ describe('CapsuleHub state-machine invariants', () => {
         const state = await capsule.getGetState();
         expect(state.private_latest_id, `${debugContext}: private_latest`).toBe(privateLatest);
         expect(state.public_latest_id, `${debugContext}: public_latest`).toBe(publicLatest);
+        expect(state.private_live_count, `${debugContext}: private_live`).toBe(privateLatest);
+        expect(state.public_live_count, `${debugContext}: public_live`).toBe(publicLatest);
+        expect(state.private_page_count, `${debugContext}: private_page_count`).toBe(privatePages);
+        expect(state.public_page_count, `${debugContext}: public_page_count`).toBe(publicPages);
         expect(state.accrued_plato_fee_ton, `${debugContext}: accrued`).toBe(accrued);
         expect((await mockVault.getGetState()).ack_count, `${debugContext}: ack_count`).toBe(ackCount);
       }
 
       function notePrivateSuccess(fee: bigint) {
+        if ((privateLatest % 256n) === 0n) privatePages += 1n;
         privateLatest += 1n;
         accrued += fee;
       }
 
       function notePublicSuccess(fee: bigint) {
+        if ((publicLatest % 256n) === 0n) publicPages += 1n;
         publicLatest += 1n;
         accrued += fee;
       }
@@ -153,16 +165,16 @@ describe('CapsuleHub state-machine invariants', () => {
         const op = rng() % 5;
         if (op === 0) {
           const underfunded = (rng() % 5) === 0;
-          const required = VAULT_PRIVATE_REQUIRED;
+          const required = VAULT_PRIVATE_REQUIRED + ((privateLatest % 256n) === 0n ? PAGE_STORAGE : 0n);
           debugContext = `seed ${seed} step ${step} vault-private underfunded=${underfunded}`;
           await capsule.send(blockchain.sender(mockVaultAddress), { value: underfunded ? required - 1n : required }, vaultPrivate(step));
           if (!underfunded) {
-            notePrivateSuccess(PRIVATE_STANDARD_FEE);
+            notePrivateSuccess(PRIVATE_HYBRID_FEE);
             ackCount += 1n;
           }
         } else if (op === 1) {
           const underfunded = (rng() % 5) === 0;
-          const required = VAULT_PUBLIC_REQUIRED;
+          const required = VAULT_PUBLIC_REQUIRED + ((publicLatest % 256n) === 0n ? PAGE_STORAGE : 0n);
           debugContext = `seed ${seed} step ${step} vault-public underfunded=${underfunded}`;
           await capsule.send(blockchain.sender(mockVaultAddress), { value: underfunded ? required - 1n : required }, vaultPublic(author.address, step));
           if (!underfunded) {

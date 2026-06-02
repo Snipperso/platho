@@ -2,8 +2,8 @@
 
 ## Changed
 
-- Community activity airdrop allocation increased from 15% to 15% of fixed ATH supply.
-- Vault activity airdrop global cap increased from `15,000,000 ATH` to `15,000,000 ATH`.
+- Community activity airdrop allocation is fixed at 15% of fixed ATH supply.
+- Vault activity airdrop global cap is fixed at `15,000,000 ATH`.
 - Maximum rewarded publish count is `1,500,000`.
 - Market stability reserve added as the explicit release valve for post-launch price expansion.
 - Final distribution table fixed as:

@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=15';
 
 export class AthTonRpcProviderError extends Error {
   constructor(message) {
@@ -32,11 +32,11 @@ function readStackBool(stack, index, name) {
 
 function readStackAddress(stack, index, name) {
   const item = stack[index];
-  if (item?.type === 'slice' && typeof item.value === 'string') {
-    return decodeTonAddressSliceBoc(item.value);
-  }
+  const value = item?.value ?? item?.boc ?? item?.cell;
+  const type = String(item?.type ?? '').toLowerCase();
+  if ((type === 'slice' || type === 'cell') && typeof value === 'string') return decodeTonAddressSliceBoc(value);
   if (typeof item?.address === 'string') return parseTonAddress(item.address).raw;
-  if (typeof item?.value === 'string' && /^-?[0-9]+:/.test(item.value)) return parseTonAddress(item.value).raw;
+  if (typeof value === 'string' && /^-?[0-9]+:/.test(value)) return parseTonAddress(value).raw;
   throw new AthTonRpcProviderError(`${name} is not an address stack item`);
 }
 
@@ -124,6 +124,9 @@ export function createAthMasterTonRpcProvider(options = {}) {
         address,
         method: 'get_wallet_address',
         stack: [stackAddress(ownerAddress)],
+        verify: callOptions.verify,
+        priority: callOptions.priority,
+        cacheTtlMs: callOptions.cacheTtlMs,
       });
       return readStackAddress(extractStack(result), 0, 'ATH wallet address');
     },

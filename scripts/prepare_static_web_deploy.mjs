@@ -30,6 +30,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'encrypted-message-store.mjs',
   'pwa-contract-transactions.mjs',
   'platho-wallet.mjs',
+  'ton-mnemonic-wordlist.mjs',
   'vault-ton-rpc-provider.mjs',
   'ton-dns-provider.mjs',
   'capsulehub-ton-rpc-provider.mjs',
@@ -40,6 +41,8 @@ const ROOT_RUNTIME_FILES = new Set([
   'manifest.webmanifest',
   'replay-store.mjs',
   'vault-chain-provider.mjs',
+  'webp-encoder.mjs',
+  'qr-code.mjs',
 ]);
 
 const PRODUCTION_CHECKS = [
@@ -51,8 +54,8 @@ const PRODUCTION_CHECKS = [
   },
   {
     id: 'CRYPTO_PROD_REMAINING_WORK',
-    file: 'web/CRYPTO_PROTOCOL.md',
-    pattern: /Before production private messaging|external cryptographic review/,
+    files: ['web/CRYPTO_PROTOCOL.md', 'web/docs/crypto-protocol.md'],
+    pattern: /Remaining production work|prototype currently proves|Before production private messaging|external cryptographic review/,
     message: 'Crypto protocol still documents production blockers.',
   },
   {
@@ -62,6 +65,19 @@ const PRODUCTION_CHECKS = [
     message: 'Production readiness checklist still has open hard blockers.',
   },
 ];
+const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
+  ATHMASTER_CODE_HASH: 'ath_master',
+  ATHVESTING_CODE_HASH: 'ath_vesting',
+  ATH_WALLET_CODE_HASH: 'ath_wallet',
+  BUYBACKBURN_CODE_HASH: 'buyback_burn',
+  MARKET_STABILITY_SELLER_CODE_HASH: 'market_stability_seller',
+  CAPSULEHUB_CODE_HASH: 'capsulehub',
+  FEEACCUMULATOR_CODE_HASH: 'fee_accumulator',
+  PROFILE_REGISTRY_CODE_HASH: 'profile_registry',
+  USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
+  USERNAME_REGISTRY_CODE_HASH: 'username_registry',
+  VAULT_CODE_HASH: 'vault',
+};
 
 function toPosix(path) {
   return path.split(sep).join('/');
@@ -130,7 +146,7 @@ export function shouldIncludeWebRuntimeFile(relativePath) {
   if (first === 'crypto') return ext === '.mjs';
   if (first !== 'vendor') return false;
 
-  return ext === '.js' || name === 'LICENSE' || name === 'package.json';
+  return ext === '.js' || ext === '.wasm' || name === 'LICENSE' || name === 'package.json' || name === 'LICENSE.codec.md';
 }
 
 function walkFiles(root, dir = root) {
@@ -150,26 +166,129 @@ export function selectStaticWebRuntimeFiles(allWebFiles) {
   return allWebFiles.filter(shouldIncludeWebRuntimeFile).sort();
 }
 
-function scanProductionFindings(root = ROOT) {
+function readTextFileIfExists(path) {
+  return existsSync(path) ? readFileSync(path, 'utf8') : null;
+}
+
+function readJsonArtifactIfExists(path) {
+  const text = readTextFileIfExists(path);
+  if (!text) return null;
+  return JSON.parse(text);
+}
+
+function parseKeyValueLines(text) {
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx < 0) continue;
+    out[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+  }
+  return out;
+}
+
+function normalizeHash(value) {
+  return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
+}
+
+function scanMainnetGenesisFindings(root = ROOT) {
+  const findings = [];
+  const verifiedText = readTextFileIfExists(join(root, 'artifacts', 'MAINNET_GENESIS_VERIFIED.txt'));
+  if (verifiedText?.trim().toLowerCase() !== 'true') {
+    findings.push({
+      id: 'MAINNET_GENESIS_NOT_VERIFIED',
+      file: 'artifacts/MAINNET_GENESIS_VERIFIED.txt',
+      message: 'Current release candidate has no verified final mainnet genesis evidence.',
+    });
+    return findings;
+  }
+
+  const input = readJsonArtifactIfExists(join(root, 'artifacts', 'mainnet_genesis_verify_input.json'));
+  const report = readJsonArtifactIfExists(join(root, 'artifacts', 'mainnet_genesis_verify_report.json'));
+  if (!input) {
+    findings.push({
+      id: 'MAINNET_GENESIS_VERIFY_INPUT_MISSING',
+      file: 'artifacts/mainnet_genesis_verify_input.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true requires the final verifier input snapshot.',
+    });
+  }
+  if (!report || report.status !== 'MAINNET_GENESIS_VERIFIED' || report.mainnet_genesis_verified !== true) {
+    findings.push({
+      id: 'MAINNET_GENESIS_VERIFY_REPORT_NOT_PASS',
+      file: 'artifacts/mainnet_genesis_verify_report.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true disagrees with the stored verifier report.',
+    });
+  }
+  if (!input) return findings;
+
+  const currentText = readTextFileIfExists(join(root, 'artifacts', 'CURRENT_CODE_HASHES.txt'));
+  if (!currentText) {
+    findings.push({
+      id: 'CURRENT_CODE_HASHES_MISSING',
+      file: 'artifacts/CURRENT_CODE_HASHES.txt',
+      message: 'Final genesis verification requires current build code hashes.',
+    });
+  } else {
+    const currentCodeHashes = parseKeyValueLines(currentText);
+    const mismatches = [];
+    for (const [currentKey, manifestKey] of Object.entries(CURRENT_CODE_HASH_TO_MANIFEST_KEY)) {
+      const currentHash = normalizeHash(currentCodeHashes[currentKey]);
+      const manifestHash = normalizeHash(input?.manifest?.code_hashes?.[manifestKey]);
+      if (!currentHash || !manifestHash || currentHash !== manifestHash) mismatches.push(manifestKey);
+    }
+    if (mismatches.length > 0) {
+      findings.push({
+        id: 'MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH',
+        file: 'artifacts/mainnet_genesis_verify_input.json',
+        message: `MAINNET_GENESIS_VERIFIED=true must match current build code hashes: ${mismatches.join(', ')}.`,
+      });
+    }
+  }
+
+  if (normalizeHash(PLATHO_APP_CONFIG?.vault?.deploymentManifestHash) !== normalizeHash(input?.manifest?.manifest_hash_hex)) {
+    findings.push({
+      id: 'PWA_FINAL_MANIFEST_HASH_MISMATCH',
+      file: 'web/platho-config.mjs',
+      message: 'PWA vault.deploymentManifestHash must match the verified final genesis manifest hash.',
+    });
+  }
+
+  const implementedManifest = readJsonArtifactIfExists(join(root, 'artifacts', 'deployment_manifest_implemented_subset_m15.json'));
+  if (implementedManifest?.status && implementedManifest.status !== 'FINAL_GENESIS') {
+    findings.push({
+      id: 'RELEASE_TRUTH_SPLIT_NON_FINAL_MANIFEST',
+      file: 'artifacts/deployment_manifest_implemented_subset_m15.json',
+      message: 'MAINNET_GENESIS_VERIFIED=true cannot coexist with a current non-final implemented-subset deployment manifest.',
+    });
+  }
+
+  return findings;
+}
+
+export function scanProductionFindings(root = ROOT) {
   const findings = validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => ({ ...finding }));
 
   for (const check of PRODUCTION_CHECKS) {
-    const filePath = join(root, check.file);
-    if (!existsSync(filePath)) {
-      findings.push({
-        id: check.id,
-        file: check.file,
-        message: 'Required file is missing.',
-      });
-      continue;
-    }
-    const text = readFileSync(filePath, 'utf8');
-    if (check.pattern.test(text)) {
-      findings.push({
-        id: check.id,
-        file: check.file,
-        message: check.message,
-      });
+    const files = check.files ?? [check.file];
+    for (const file of files) {
+      const filePath = join(root, file);
+      if (!existsSync(filePath)) {
+        findings.push({
+          id: check.id,
+          file,
+          message: 'Required file is missing.',
+        });
+        continue;
+      }
+      const text = readFileSync(filePath, 'utf8');
+      if (check.pattern.test(text)) {
+        findings.push({
+          id: check.id,
+          file,
+          message: check.message,
+        });
+      }
     }
   }
 
@@ -180,6 +299,8 @@ function scanProductionFindings(root = ROOT) {
       message: 'Testnet env file is present. Production deploy must not run from this workspace/config.',
     });
   }
+
+  findings.push(...scanMainnetGenesisFindings(root));
 
   return findings;
 }
@@ -212,7 +333,7 @@ function createBundleHash(fileRecords) {
 }
 
 export function createStaticWebDeployReport(input) {
-  const productionFindingIds = input.productionFindings.map((finding) => finding.id);
+  const productionFindingIds = Array.from(new Set(input.productionFindings.map((finding) => finding.id)));
   const blockers = input.mode === 'production' ? productionFindingIds : [];
   const warnings = input.mode === 'preview'
     ? ['STATIC_PACKAGE_IS_NON_PRODUCTION', ...productionFindingIds]

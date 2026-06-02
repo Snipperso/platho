@@ -2,8 +2,8 @@ import { beginCell, Cell } from '@ton/core';
 
 export const FINAL_PRIVATE_HEADER0_BYTES = 140;
 export const FINAL_PRIVATE_HEADER1_BYTES = 30;
-export const FINAL_PRIVATE_STANDARD_BODY_BYTES = 1140;
-export const FINAL_PRIVATE_HYBRID_BODY_BYTES = 2228;
+export const FINAL_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES = 1204;
+export const FINAL_PRIVATE_HYBRID_BODY_BYTES = FINAL_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES + 1024;
 export const FINAL_PUBLIC_HEADER_MAX_BYTES = 72;
 export const FINAL_PUBLIC_BODY_MAX_BYTES = 1024;
 
@@ -28,9 +28,15 @@ export function finalPrivateHeader1Cell(fill = 0x31): Cell {
   return snakeCell(FINAL_PRIVATE_HEADER1_BYTES, fill);
 }
 
-export function finalPrivateBodyCell(sizeClass: bigint | number = 1, fill = 0x62): Cell {
+export function finalPrivateBodyBytes(sizeClass: bigint | number = 1, cryptoSuite: bigint | number = 2): number {
   const size = typeof sizeClass === 'bigint' ? Number(sizeClass) : sizeClass;
-  return snakeCell(size === 2 ? FINAL_PRIVATE_HYBRID_BODY_BYTES : FINAL_PRIVATE_STANDARD_BODY_BYTES, fill);
+  const suite = typeof cryptoSuite === 'bigint' ? Number(cryptoSuite) : cryptoSuite;
+  if (suite !== 2) throw new RangeError(`Unsupported private capsule suite ${suite}`);
+  return FINAL_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES + (size * 1024);
+}
+
+export function finalPrivateBodyCell(sizeClass: bigint | number = 1, fill = 0x62, cryptoSuite: bigint | number = 2): Cell {
+  return snakeCell(finalPrivateBodyBytes(sizeClass, cryptoSuite), fill);
 }
 
 export function finalPublicBodyCell(fill = 0x70, byteLength = FINAL_PUBLIC_BODY_MAX_BYTES): Cell {

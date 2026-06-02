@@ -13,8 +13,8 @@ Implemented now:
 ```text
 UsernameRegistry.PrunePendingUsernameMint
 stale PendingUsernameMint TTL
-price_paid recovery into ath_refunds_due
-late UsernameNFTItem ACK rejection after prune
+non-destructive stale pending mint probe
+late UsernameNFTItem ACK / ResendDeployedAck recovery after stale probe
 UsernameNFTItem ACK forward reserve validation update
 ```
 
@@ -45,7 +45,7 @@ Rationale:
 ```text
 UsernameNFTItem deploy + deployed ACK should complete immediately in normal message flow.
 A pending mint that remains unfinalized for 24 hours is stale for v1 purposes.
-The TTL is long enough to avoid pruning during ordinary async message settlement and short enough to avoid name lock griefing.
+The TTL is long enough to avoid probing during ordinary async message settlement. The V1 probe is intentionally non-destructive because timeout alone does not prove item deployment failed.
 ```
 
 This TTL applies only to `UsernameRegistry.PendingUsernameMint`.
@@ -89,39 +89,33 @@ name_records[name_hash] MUST NOT exist
 Effects:
 
 ```text
-pending = pending_mints[name_hash]
-delete pending_mints[name_hash]
-delete pending_item_to_name_hash[pending.item_address]
-pending_mint_count -= 1
-ath_refunds_due[pending.owner_wallet] += pending.price_paid
+throw; no pending state is deleted
+no NameRecord is created
+no refund due is created
 ```
 
 Refund semantics:
 
 ```text
-Only pending.price_paid is moved into ath_refunds_due.
-USERNAME_PENDING_MINT_STORAGE_ENDOWMENT is not refunded.
-Freed pending state/storage reserve remains with UsernameRegistry as contract storage reserve.
+PrunePendingUsernameMint is intentionally non-destructive in V1.
+It cannot move pending.price_paid into refund due because timeout alone does not prove item deployment failed.
+Refund is requested only after a positive item deploy bounce.
 ```
 
 Permission model:
 
 ```text
 PrunePendingUsernameMint is permissionless.
-Caller gains no authority and cannot choose refund recipient.
-Refund recipient is pending.owner_wallet from stored state.
+Caller gains no authority and cannot choose refund recipient or destroy recovery state.
 ```
 
 Late ACK after prune:
 
 ```text
-Any UsernameNFTItem ACK arriving after the pending mint was pruned MUST be rejected.
-It MUST NOT recreate the pending mint.
-It MUST NOT create a NameRecord.
-It MUST NOT debit or mutate ath_refunds_due.
+Because prune is non-destructive, a late UsernameNFTItem ACK or UsernameNFTItem.ResendDeployedAck can still finalize the pending mint.
 ```
 
-No ignored-error money send is used because prune does not perform an outbound ATH transfer. It only moves already-accounted ATH value from pending mint accounting into a bounce-safe refund-due bucket.
+No ignored-error money send is used because prune does not perform an outbound ATH transfer or any state mutation.
 
 ---
 
@@ -156,7 +150,7 @@ This value is validated by the M13 full suite and must not be silently lowered.
 Required tests:
 
 ```text
-USERNAME-REG-M13-01: stale PendingUsernameMint can be pruned, refunds exact price, and late ACK is rejected
+USERNAME-REG-M13-01: stale PendingUsernameMint probe is non-destructive and does not create refund due
 USERNAME-REG-M13-02: non-stale PendingUsernameMint cannot be pruned and remains pending
 REGRESSION-M10: valid paid mints still finalize after ACK after reserve update
 REGRESSION-M12: treasury/burn due flush still passes after reserve update
@@ -171,7 +165,7 @@ Unblocked and implemented:
 ```text
 UsernameRegistry.PrunePendingUsernameMint
 Username pending mint stale TTL
-late ACK rejection after prune
+late ACK / ResendDeployedAck recovery after stale probe
 ```
 
 Still blocked:

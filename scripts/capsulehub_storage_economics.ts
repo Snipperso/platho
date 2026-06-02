@@ -14,24 +14,33 @@ import { MockVaultAckSink } from '../build/MockVaultAckSink/MockVaultAckSink_Moc
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
-const PRIVATE_STANDARD_FEE = 5_000_000n;
 const PRIVATE_HYBRID_FEE = 10_000_000n;
-const PUBLIC_FEE = 5_000_000n;
-const PRIVATE_STANDARD_EXEC = 3_000_000n;
-const PRIVATE_HYBRID_EXEC = 4_000_000n;
-const PUBLIC_EXEC = 3_000_000n;
+const PUBLIC_FEE = 10_000_000n;
+const PUBLIC_EXEC = 2_400_000n;
+const PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS = new Map<PrivateSizeClass, bigint>([
+  [1n, 4_200_000n],
+  [2n, 4_300_000n],
+  [4n, 4_500_000n],
+  [8n, 5_000_000n],
+  [16n, 5_800_000n],
+  [32n, 7_600_000n],
+]);
+const PRIVATE_SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 const KEEPALIVE = 1_000_000n;
-const PRIVATE_ENTRY_STORAGE = 4_000_000n;
-const PUBLIC_ENTRY_STORAGE = 1_000_000n;
+const PRIVATE_ENTRY_STORAGE = 3_300_000n;
+const PUBLIC_ENTRY_STORAGE = 7_400_000n;
+const PAGE_STORAGE = 0n;
 const ACK_RESERVE = 30_000_000n;
 
 const HEADER0_BYTES = 140;
 const HEADER1_BYTES = 30;
-const STANDARD_BODY_BYTES = 1140;
 const HYBRID_BODY_BYTES = 2228;
 const PUBLIC_HEADER_BYTES = 68;
 const PUBLIC_HEADER_MAX_BYTES = 72;
 const PUBLIC_BODY_MAX_BYTES = 1024;
+const MINIMUM_RETAINED_MARGIN_NANOTONS = 1_000_000n;
+
+type PrivateSizeClass = typeof PRIVATE_SIZE_CLASSES[number];
 
 export type CapsuleHubStorageCase = {
   label: string;
@@ -49,18 +58,26 @@ export type CapsuleHubStorageEconomicsReport = {
   profile: 'PLATHO.V1.CAPSULEHUB_STORAGE_ECONOMICS';
   status: 'PASS';
   generated_at: 'DETERMINISTIC_ARTIFACT';
+  code_hashes: {
+    capsulehub: string;
+  };
   note: string;
+  minimum_retained_margin_nanotons: string;
   canonical_capsule_cells: {
     header0_bytes: number;
     header1_bytes: number;
-    standard_body_bytes: number;
     hybrid_body_bytes: number;
+    hybrid_body_bytes_by_size_class: Record<string, number>;
     public_header_max_bytes: number;
     public_body_max_bytes: number;
   };
   cases: CapsuleHubStorageCase[];
   worst_margin_nanotons: string;
 };
+
+function codeHash(relPath: string): string {
+  return Cell.fromBoc(fs.readFileSync(relPath))[0].hash().toString('hex');
+}
 
 function snakeCell(byteLength: number, fill = 0x61): Cell {
   const bytes = Buffer.alloc(byteLength, fill);
@@ -126,24 +143,37 @@ async function balanceOf(blockchain: Blockchain, address: Address): Promise<bigi
   return (await blockchain.getContract(address)).balance;
 }
 
-function privateVault(sizeClass: 1n | 2n, fill: number): PublishPrivateFromVault {
+function privateBodyBytes(sizeClass: bigint, cryptoSuite: bigint): number {
+  if (cryptoSuite !== 2n) {
+    throw new Error(`unsupported private crypto suite ${cryptoSuite}`);
+  }
+  return 1204 + (Number(sizeClass) * 1024);
+}
+
+function privateExecReserve(sizeClass: PrivateSizeClass): bigint {
+  const value = PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS.get(sizeClass);
+  if (value === undefined) throw new Error(`missing private exec reserve for ${sizeClass}K`);
+  return value;
+}
+
+function privateVault(sizeClass: PrivateSizeClass, cryptoSuite: 2n, fill: number): PublishPrivateFromVault {
   const header0 = snakeCell(HEADER0_BYTES, fill);
   const header1 = snakeCell(HEADER1_BYTES, fill + 1);
-  const body = snakeCell(sizeClass === 2n ? HYBRID_BODY_BYTES : STANDARD_BODY_BYTES, fill + 2);
+  const body = snakeCell(privateBodyBytes(sizeClass, cryptoSuite), fill + 2);
   return {
     $$type: 'PublishPrivateFromVault',
     bounce_id: BigInt(10_000 + fill),
     bounce_tag: BigInt(30_000 + fill),
     publish_id: hash256(`vault-private-${fill}`),
     size_class: sizeClass,
-    crypto_suite: sizeClass,
+    crypto_suite: cryptoSuite,
     header_0_hash: cellHash(header0),
     header_1_hash: cellHash(header1),
     body_hash: cellHash(body),
     header_0: header0,
     header_1: header1,
     body,
-    protocol_fee_paid: sizeClass === 2n ? PRIVATE_HYBRID_FEE : PRIVATE_STANDARD_FEE,
+    protocol_fee_paid: PRIVATE_HYBRID_FEE,
   };
 }
 
@@ -202,43 +232,49 @@ async function measure(
 }
 
 export async function runCapsuleHubStorageEconomics(writeArtifacts = true): Promise<CapsuleHubStorageEconomicsReport> {
+  const privateCases = await Promise.all(PRIVATE_SIZE_CLASSES.map((sizeClass, index) => {
+    const inbound = PRIVATE_HYBRID_FEE + privateExecReserve(sizeClass) + KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
+    return measure(
+      `VAULT_PRIVATE_HYBRID_${sizeClass}K`,
+      inbound,
+      KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE,
+      (ctx) => ctx.capsule.send(ctx.blockchain.sender(ctx.mockVaultAddress), {
+        value: inbound,
+      }, privateVault(sizeClass, 2n, 0x70 + index)),
+    );
+  }));
   const cases = [
+    ...privateCases,
     await measure(
-      'VAULT_PRIVATE_STANDARD',
-      PRIVATE_STANDARD_FEE + PRIVATE_STANDARD_EXEC + KEEPALIVE + PRIVATE_ENTRY_STORAGE + ACK_RESERVE,
-      KEEPALIVE + PRIVATE_ENTRY_STORAGE,
+      'VAULT_PUBLIC_POST',
+      PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE,
+      KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE,
       (ctx) => ctx.capsule.send(ctx.blockchain.sender(ctx.mockVaultAddress), {
-        value: PRIVATE_STANDARD_FEE + PRIVATE_STANDARD_EXEC + KEEPALIVE + PRIVATE_ENTRY_STORAGE + ACK_RESERVE,
-      }, privateVault(1n, 0x60)),
-    ),
-    await measure(
-      'VAULT_PRIVATE_HYBRID',
-      PRIVATE_HYBRID_FEE + PRIVATE_HYBRID_EXEC + KEEPALIVE + PRIVATE_ENTRY_STORAGE + ACK_RESERVE,
-      KEEPALIVE + PRIVATE_ENTRY_STORAGE,
-      (ctx) => ctx.capsule.send(ctx.blockchain.sender(ctx.mockVaultAddress), {
-        value: PRIVATE_HYBRID_FEE + PRIVATE_HYBRID_EXEC + KEEPALIVE + PRIVATE_ENTRY_STORAGE + ACK_RESERVE,
-      }, privateVault(2n, 0x70)),
-    ),
-    await measure(
-      'VAULT_PUBLIC_STANDARD',
-      PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + ACK_RESERVE,
-      KEEPALIVE + PUBLIC_ENTRY_STORAGE,
-      (ctx) => ctx.capsule.send(ctx.blockchain.sender(ctx.mockVaultAddress), {
-        value: PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + ACK_RESERVE,
+        value: PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE,
       }, publicVault(0x80, ctx.author.address)),
     ),
   ];
   const worst = cases.map((c) => BigInt(c.retained_margin_nanotons)).reduce((a, b) => a < b ? a : b);
+  if (worst < MINIMUM_RETAINED_MARGIN_NANOTONS) {
+    throw new Error(`CapsuleHub retained margin ${worst} is below gate ${MINIMUM_RETAINED_MARGIN_NANOTONS}`);
+  }
   const report: CapsuleHubStorageEconomicsReport = {
     profile: 'PLATHO.V1.CAPSULEHUB_STORAGE_ECONOMICS',
     status: 'PASS',
     generated_at: 'DETERMINISTIC_ARTIFACT',
-    note: 'Sandbox evidence for canonical final CapsuleHub cells. Page boundaries are metadata-only and do not change publish price. This proves current v1 private fixed-size payloads and bounded public payloads retain the configured non-fee entry reserve after transaction fees; it is not a mainnet storage-rent oracle.',
+    code_hashes: {
+      capsulehub: codeHash(path.join('build', 'CapsuleHub', 'CapsuleHub_CapsuleHub.code.boc')),
+    },
+    note: 'Sandbox evidence for canonical final CapsuleHub index cells. Body payload cells are validated in the publish transaction and authenticated by stored hashes, but only compact headers/indexes remain in CapsuleHub state. Pages are virtual ranges derived from entry ids; this is not a mainnet storage-rent oracle.',
+    minimum_retained_margin_nanotons: String(MINIMUM_RETAINED_MARGIN_NANOTONS),
     canonical_capsule_cells: {
       header0_bytes: HEADER0_BYTES,
       header1_bytes: HEADER1_BYTES,
-      standard_body_bytes: STANDARD_BODY_BYTES,
       hybrid_body_bytes: HYBRID_BODY_BYTES,
+      hybrid_body_bytes_by_size_class: Object.fromEntries(PRIVATE_SIZE_CLASSES.map((sizeClass) => [
+        `${sizeClass}K`,
+        privateBodyBytes(sizeClass, 2n),
+      ])),
       public_header_max_bytes: PUBLIC_HEADER_MAX_BYTES,
       public_body_max_bytes: PUBLIC_BODY_MAX_BYTES,
     },
@@ -260,6 +296,9 @@ function renderMarkdown(report: CapsuleHubStorageEconomicsReport): string {
   lines.push(`Status: **${report.status}**`);
   lines.push('');
   lines.push(report.note);
+  lines.push('');
+  lines.push(`CapsuleHub code hash: \`${report.code_hashes.capsulehub}\``);
+  lines.push(`Minimum retained margin gate: **${report.minimum_retained_margin_nanotons} nanotons**.`);
   lines.push('');
   lines.push('| Case | Inbound | Fee delta | Balance delta | Retained non-fee | Required storage | Margin |');
   lines.push('|---|---:|---:|---:|---:|---:|---:|');

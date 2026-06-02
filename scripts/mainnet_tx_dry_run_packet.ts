@@ -27,10 +27,12 @@ import {
 import {
   ProfileRegistry,
   storeBindProfileOfficialAthWallet,
+  storeBindProfileVault,
   storeSealGenesis as storeProfileSealGenesis,
 } from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
 import {
   UsernameRegistry,
+  storeBindUsernameVault,
   storeBindOfficialAthWallet as storeUsernameBindOfficialAthWallet,
   storeSealGenesis as storeUsernameSealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -38,6 +40,8 @@ import {
   Vault,
   storeBindDeploymentManifest as storeVaultBindDeploymentManifest,
   storeBindOfficialAthWallet as storeVaultBindOfficialAthWallet,
+  storeBindProfileRegistry as storeVaultBindProfileRegistry,
+  storeBindUsernameRegistry as storeVaultBindUsernameRegistry,
   storeSealGenesis as storeVaultSealGenesis,
 } from '../build/Vault/Vault_Vault';
 
@@ -241,6 +245,18 @@ async function deriveState(draft: Draft) {
   const treasuryOwnerAthWallet = await ATHWallet.init(0n, athTreasuryOwner, athMasterAddress);
   const treasuryOwnerAthWalletAddress = contractAddress(0, treasuryOwnerAthWallet);
 
+  const buybackBurnOfficialAthWallet = await ATHWallet.init(0n, buybackBurnAddress, athMasterAddress);
+  const buybackBurnOfficialAthWalletAddress = contractAddress(buybackBurnAddress.workChain, buybackBurnOfficialAthWallet);
+
+  const marketStabilitySellerOfficialAthWallet = await ATHWallet.init(0n, marketStabilitySellerAddress, athMasterAddress);
+  const marketStabilitySellerOfficialAthWalletAddress = contractAddress(marketStabilitySellerAddress.workChain, marketStabilitySellerOfficialAthWallet);
+
+  const usernameRegistryOfficialAthWallet = await ATHWallet.init(0n, usernameRegistryAddress, athMasterAddress);
+  const usernameRegistryOfficialAthWalletAddress = contractAddress(usernameRegistryAddress.workChain, usernameRegistryOfficialAthWallet);
+
+  const profileRegistryOfficialAthWallet = await ATHWallet.init(0n, profileRegistryAddress, athMasterAddress);
+  const profileRegistryOfficialAthWalletAddress = contractAddress(profileRegistryAddress.workChain, profileRegistryOfficialAthWallet);
+
   const initial = {
     ath_master: { init: athMaster, address: athMasterAddress, manifestKey: 'ath_master', stateKey: 'ath_master' },
     ath_long_term_vesting: { init: athLongTermVesting, address: athLongTermVestingAddress, manifestKey: 'ath_long_term_vesting', stateKey: 'ath_long_term_vesting_initial' },
@@ -264,6 +280,16 @@ async function deriveState(draft: Draft) {
   assertStateHash('vault official ATH wallet', stateInitCell(vaultOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.vault_official_ath_wallet);
   assertAddress('ATHVesting official ATH wallet', athLongTermVestingOfficialAthWalletAddress, manifestAddress(draft, 'ath_long_term_vesting_official_ath_wallet'));
   assertStateHash('ATHVesting official ATH wallet', stateInitCell(athLongTermVestingOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.ath_long_term_vesting_official_ath_wallet);
+  assertAddress('Treasury Owner ATH wallet', treasuryOwnerAthWalletAddress, manifestAddress(draft, 'ath_treasury_owner_ath_wallet'));
+  assertStateHash('Treasury Owner ATH wallet', stateInitCell(treasuryOwnerAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.ath_treasury_owner_ath_wallet);
+  assertAddress('BuybackBurn official ATH wallet', buybackBurnOfficialAthWalletAddress, manifestAddress(draft, 'buyback_burn_official_ath_wallet'));
+  assertStateHash('BuybackBurn official ATH wallet', stateInitCell(buybackBurnOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.buyback_burn_official_ath_wallet);
+  assertAddress('MarketStabilitySeller official ATH wallet', marketStabilitySellerOfficialAthWalletAddress, manifestAddress(draft, 'market_stability_seller_official_ath_wallet'));
+  assertStateHash('MarketStabilitySeller official ATH wallet', stateInitCell(marketStabilitySellerOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.market_stability_seller_official_ath_wallet);
+  assertAddress('UsernameRegistry official ATH wallet', usernameRegistryOfficialAthWalletAddress, manifestAddress(draft, 'username_registry_official_ath_wallet'));
+  assertStateHash('UsernameRegistry official ATH wallet', stateInitCell(usernameRegistryOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.username_registry_official_ath_wallet);
+  assertAddress('ProfileRegistry official ATH wallet', profileRegistryOfficialAthWalletAddress, manifestAddress(draft, 'profile_registry_official_ath_wallet'));
+  assertStateHash('ProfileRegistry official ATH wallet', stateInitCell(profileRegistryOfficialAthWallet).hash().toString('hex'), draft.manifest.state_init_hashes.profile_registry_official_ath_wallet);
 
   return {
     addresses: {
@@ -281,12 +307,20 @@ async function deriveState(draft: Draft) {
       vaultOfficialAthWallet: vaultOfficialAthWalletAddress,
       athLongTermVestingOfficialAthWallet: athLongTermVestingOfficialAthWalletAddress,
       treasuryOwnerAthWallet: treasuryOwnerAthWalletAddress,
+      buybackBurnOfficialAthWallet: buybackBurnOfficialAthWalletAddress,
+      marketStabilitySellerOfficialAthWallet: marketStabilitySellerOfficialAthWalletAddress,
+      usernameRegistryOfficialAthWallet: usernameRegistryOfficialAthWalletAddress,
+      profileRegistryOfficialAthWallet: profileRegistryOfficialAthWalletAddress,
     },
     initial,
     officialWalletStateInits: {
-      vault_official_ath_wallet: { address: vaultOfficialAthWalletAddress, init: vaultOfficialAthWallet },
-      ath_long_term_vesting_official_ath_wallet: { address: athLongTermVestingOfficialAthWalletAddress, init: athLongTermVestingOfficialAthWallet },
-      treasury_owner_ath_wallet: { address: treasuryOwnerAthWalletAddress, init: treasuryOwnerAthWallet },
+      ath_treasury_owner_ath_wallet: { address: treasuryOwnerAthWalletAddress, init: treasuryOwnerAthWallet, owner: athTreasuryOwner, athMaster: athMasterAddress },
+      ath_long_term_vesting_official_ath_wallet: { address: athLongTermVestingOfficialAthWalletAddress, init: athLongTermVestingOfficialAthWallet, owner: athLongTermVestingAddress, athMaster: athMasterAddress },
+      vault_official_ath_wallet: { address: vaultOfficialAthWalletAddress, init: vaultOfficialAthWallet, owner: vaultAddress, athMaster: athMasterAddress },
+      buyback_burn_official_ath_wallet: { address: buybackBurnOfficialAthWalletAddress, init: buybackBurnOfficialAthWallet, owner: buybackBurnAddress, athMaster: athMasterAddress },
+      market_stability_seller_official_ath_wallet: { address: marketStabilitySellerOfficialAthWalletAddress, init: marketStabilitySellerOfficialAthWallet, owner: marketStabilitySellerAddress, athMaster: athMasterAddress },
+      username_registry_official_ath_wallet: { address: usernameRegistryOfficialAthWalletAddress, init: usernameRegistryOfficialAthWallet, owner: usernameRegistryAddress, athMaster: athMasterAddress },
+      profile_registry_official_ath_wallet: { address: profileRegistryOfficialAthWalletAddress, init: profileRegistryOfficialAthWallet, owner: profileRegistryAddress, athMaster: athMasterAddress },
     },
   };
 }
@@ -475,6 +509,40 @@ async function buildDryRunPacket(draft: Draft) {
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
+      target_address: friendly(derived.addresses.vault),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'Vault.BindProfileRegistry',
+        bodyCell(storeVaultBindProfileRegistry({
+          $$type: 'BindProfileRegistry',
+          deployment_manifest_hash: manifestHash,
+          profile_registry_address: derived.addresses.profileRegistry,
+        })),
+        { deployment_manifest_hash_hex: mh, profile_registry_address: friendly(derived.addresses.profileRegistry) },
+      ),
+    },
+    {
+      id: 'B09',
+      phase: 'pre_seal_binding',
+      signer_role: 'genesis_controller_one_shot',
+      signer_address: friendly(derived.addresses.genesisController),
+      target_address: friendly(derived.addresses.vault),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'Vault.BindUsernameRegistry',
+        bodyCell(storeVaultBindUsernameRegistry({
+          $$type: 'BindUsernameRegistry',
+          deployment_manifest_hash: manifestHash,
+          username_registry_address: derived.addresses.usernameRegistry,
+        })),
+        { deployment_manifest_hash_hex: mh, username_registry_address: friendly(derived.addresses.usernameRegistry) },
+      ),
+    },
+    {
+      id: 'B10',
+      phase: 'pre_seal_binding',
+      signer_role: 'genesis_controller_one_shot',
+      signer_address: friendly(derived.addresses.genesisController),
       target_address: friendly(derived.addresses.capsuleHub),
       value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
       body: txBody(
@@ -488,7 +556,7 @@ async function buildDryRunPacket(draft: Draft) {
       ),
     },
     {
-      id: 'B09',
+      id: 'B11',
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -505,7 +573,24 @@ async function buildDryRunPacket(draft: Draft) {
       ),
     },
     {
-      id: 'B10',
+      id: 'B12',
+      phase: 'pre_seal_binding',
+      signer_role: 'genesis_controller_one_shot',
+      signer_address: friendly(derived.addresses.genesisController),
+      target_address: friendly(derived.addresses.usernameRegistry),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'UsernameRegistry.BindUsernameVault',
+        bodyCell(storeBindUsernameVault({
+          $$type: 'BindUsernameVault',
+          deployment_manifest_hash: manifestHash,
+          vault_address: derived.addresses.vault,
+        })),
+        { deployment_manifest_hash_hex: mh, vault_address: friendly(derived.addresses.vault) },
+      ),
+    },
+    {
+      id: 'B13',
       phase: 'pre_seal_binding',
       signer_role: 'genesis_controller_one_shot',
       signer_address: friendly(derived.addresses.genesisController),
@@ -519,6 +604,23 @@ async function buildDryRunPacket(draft: Draft) {
           official_ath_wallet_address: manifestAddress(draft, 'profile_registry_official_ath_wallet'),
         })),
         { deployment_manifest_hash_hex: mh, official_ath_wallet_address: draft.manifest.addresses.profile_registry_official_ath_wallet },
+      ),
+    },
+    {
+      id: 'B14',
+      phase: 'pre_seal_binding',
+      signer_role: 'genesis_controller_one_shot',
+      signer_address: friendly(derived.addresses.genesisController),
+      target_address: friendly(derived.addresses.profileRegistry),
+      value_nanotons_recommended: CONTROL_VALUE_RECOMMENDED_NANOTONS,
+      body: txBody(
+        'ProfileRegistry.BindProfileVault',
+        bodyCell(storeBindProfileVault({
+          $$type: 'BindProfileVault',
+          deployment_manifest_hash: manifestHash,
+          vault_address: derived.addresses.vault,
+        })),
+        { deployment_manifest_hash_hex: mh, vault_address: friendly(derived.addresses.vault) },
       ),
     },
     {
@@ -631,7 +733,7 @@ async function buildDryRunPacket(draft: Draft) {
     treasury_owner_ath_wallet: {
       address: friendly(derived.addresses.treasuryOwnerAthWallet),
       raw_address: raw(derived.addresses.treasuryOwnerAthWallet),
-      state_init: stateInitArtifact(derived.officialWalletStateInits.treasury_owner_ath_wallet.init),
+      state_init: stateInitArtifact(derived.officialWalletStateInits.ath_treasury_owner_ath_wallet.init),
       note: 'This wallet receives the 100M ATH genesis supply after ATHMaster.DeployTreasurySupply and is the target for later ATHTransferRequest funding messages.',
     },
     deploy_contracts: deploys,
@@ -643,6 +745,8 @@ async function buildDryRunPacket(draft: Draft) {
         {
           address: friendly(value.address),
           raw_address: raw(value.address),
+          owner_address: friendly(value.owner),
+          ath_master_address: friendly(value.athMaster),
           state_init: stateInitArtifact(value.init),
         },
       ]),
@@ -669,11 +773,23 @@ function markdown(packet: Awaited<ReturnType<typeof buildDryRunPacket>>): string
     `- StateInit hash: ${packet.treasury_owner_ath_wallet.state_init.cell_hash_hex}`,
     `- Note: ${packet.treasury_owner_ath_wallet.note}`,
     '',
+    '## Official ATHWallet StateInit Artifacts',
+    '',
+    '| Key | Address | Owner | StateInit hash |',
+    '| --- | --- | --- | --- |',
+  ];
+
+  for (const [key, wallet] of Object.entries(packet.official_wallet_state_inits)) {
+    lines.push(`| ${key} | ${wallet.address} | ${wallet.owner_address} | ${wallet.state_init.cell_hash_hex} |`);
+  }
+
+  lines.push(
+    '',
     '## Deploy Contracts',
     '',
     '| Step | Contract | Target | StateInit hash | Value Recommended |',
     '| --- | --- | --- | --- | ---: |',
-  ];
+  );
 
   for (const step of packet.deploy_contracts) {
     lines.push(`| ${step.id} | ${step.contract} | ${step.target_address} | ${step.state_init.cell_hash_hex} | ${step.value_nanotons_recommended} |`);

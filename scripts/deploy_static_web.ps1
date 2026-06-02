@@ -3,6 +3,8 @@ param(
     [string] $RemoteUser = "platho-deploy",
     [string] $DeployKey = "$HOME\.ssh\platho_deploy_ed25519",
     [string] $KnownHosts = "artifacts\local\njalla_known_hosts",
+    [ValidateSet("preview", "production")]
+    [string] $Mode = "production",
     [switch] $SkipPrepare
 )
 
@@ -30,7 +32,7 @@ function Quote-ProcessArgument {
 }
 
 if (-not $SkipPrepare) {
-    Run-Checked -File "node" -ArgumentList @("scripts\prepare_static_web_deploy.mjs", "--clean")
+    Run-Checked -File "node" -ArgumentList @("scripts\prepare_static_web_deploy.mjs", "--mode", $Mode, "--clean")
 }
 
 if (-not (Test-Path -LiteralPath $DeployKey)) {
@@ -41,6 +43,13 @@ if (-not (Test-Path -LiteralPath $KnownHosts)) {
 }
 
 $prep = Get-Content -LiteralPath "artifacts\web_static_deploy_prep.json" -Raw | ConvertFrom-Json
+if ($prep.mode -ne $Mode) {
+    throw "Static deploy prep mode mismatch: expected $Mode, got $($prep.mode)"
+}
+if ($Mode -eq "production" -and $prep.productionReady -ne $true) {
+    $blockers = @($prep.blockers) -join ", "
+    throw "Production static deploy prep is not ready. Blockers: $blockers"
+}
 $bundleHash = $prep.runtime.bundleSha256
 if (-not $bundleHash) {
     throw "Missing runtime.bundleSha256 in artifacts\web_static_deploy_prep.json"

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   messagePartCount,
   messagePartCountForBytes,
+  MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
   singleCapsuleMessageFits,
+  splitBytesToCapsuleParts,
   splitBytesToParts,
+  splitUtf8ToCapsuleParts,
   splitUtf8ToParts,
   truncateUtf8ToBytes,
   utf8ByteLength,
@@ -50,5 +55,36 @@ describe('PWA capsule part policy', () => {
     expect(byteParts[0]).toHaveLength(1024);
     expect(byteParts[8]).toHaveLength(17);
     expect(parts[1]).toBe('\ud83d\ude80b');
+  });
+
+  it('PWA-CAPSULE-PART-06: Vault publish uses independent 1-32 KiB capsule sizes', () => {
+    expect(MAX_CAPSULE_USEFUL_BYTES).toBe(32 * 1024);
+
+    const tinyText = splitUtf8ToCapsuleParts('a'.repeat(1024));
+    expect(tinyText).toHaveLength(1);
+    expect(tinyText[0]).toMatchObject({ sizeClass: 1, usefulBytes: 1024 });
+
+    const text2 = splitUtf8ToCapsuleParts('a'.repeat(2 * 1024));
+    expect(text2).toHaveLength(1);
+    expect(text2[0]).toMatchObject({ sizeClass: 2, usefulBytes: 2 * 1024 });
+
+    const text32 = splitUtf8ToCapsuleParts('a'.repeat(32 * 1024));
+    expect(text32).toHaveLength(1);
+    expect(text32[0]).toMatchObject({ sizeClass: 32, usefulBytes: 32 * 1024 });
+
+    const text33 = splitUtf8ToCapsuleParts('a'.repeat((32 * 1024) + 1));
+    expect(text33.map((part) => part.sizeClass)).toEqual([32, 1]);
+
+    const image33 = splitBytesToCapsuleParts(new Uint8Array((32 * 1024) + 1).fill(1));
+    expect(image33.map((part) => part.sizeClass)).toEqual([32, 1]);
+    expect(image33.map((part) => part.bytes.length)).toEqual([32 * 1024, 1]);
+  });
+
+  it('PWA-CAPSULE-PART-07: private composer text path cannot fall back to legacy 1 KiB splitting', () => {
+    const appSource = readFileSync(join(process.cwd(), 'web', 'app.js'), 'utf8');
+    expect(appSource.match(/function privateTextCapsulePartsForSend\s*\(/g) ?? []).toHaveLength(1);
+    expect(appSource).not.toMatch(/function privateTextPartsForSend\s*\(/);
+    expect(appSource).toMatch(/function privateTextCapsulePartsForSend\s*\([^)]*\)\s*\{\s*return splitUtf8ToCapsuleParts\(text, MAX_CAPSULE_USEFUL_BYTES\);/);
+    expect(appSource).toMatch(/createPrivateComposerCapsules[\s\S]*privateTextCapsulePartsForSend\(text\)/);
   });
 });

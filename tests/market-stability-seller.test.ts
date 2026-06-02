@@ -30,18 +30,21 @@ const NOTIFY_VALUE = 80_000_000n;
 const BUY_TRANSFER_REQUEST_VALUE = 30_000_000n;
 const BUY_EXEC_RESERVE = 2_000_000n;
 const FUNDING_NOTIFY_VALUE = toNano('0.2');
+const ATH_SENDER_KEY_MOD = 1n << 160n;
+const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE = 2_000_000n;
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
 }
 
-function senderKey(owner: Address): bigint {
+function senderKey(owner: Address, queryId: bigint): bigint {
   return BigInt('0x' + beginCell()
     .storeUint(0x41544e49, 32)
+    .storeUint(queryId, 64)
     .storeAddress(owner)
     .endCell()
     .hash()
-    .toString('hex')) % 4_294_967_296n;
+    .toString('hex')) % ATH_SENDER_KEY_MOD;
 }
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -240,7 +243,7 @@ describe('MarketStabilitySeller', () => {
 
     const officialWallet = env.blockchain.openContract(new ATHWallet(env.officialAthWallet, await ATHWallet.init(0n, env.seller.address, env.athMaster)));
     expect((await officialWallet.getGetWalletData()).balance).toBe(TRANCHE * 2n);
-    const pending = await officialWallet.getGetPendingNotification(1n, senderKey(env.reserveFunder.address));
+    const pending = await officialWallet.getGetPendingNotification(1n, senderKey(env.reserveFunder.address, 1n));
     expect(pending.exists).toBe(false);
   });
 
@@ -259,7 +262,7 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(0n);
     expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderInitialAth);
     expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(0n);
-    expect((await (await officialSellerAthWallet(env)).getGetPendingNotification(1n, senderKey(env.reserveFunder.address))).exists).toBe(false);
+    expect((await (await officialSellerAthWallet(env)).getGetPendingNotification(1n, senderKey(env.reserveFunder.address, 1n))).exists).toBe(false);
 
     await freezePricing(env);
     config = await env.seller.getGetMarketStabilitySellerConfig();
@@ -277,7 +280,7 @@ describe('MarketStabilitySeller', () => {
     await env.seller.send(env.attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'AthTransferNotification',
       query_id: 710n,
-      sender_key: senderKey(env.reserveFunder.address),
+      sender_key: senderKey(env.reserveFunder.address, 1n),
       amount: TRANCHE,
       sender_wallet: env.reserveFunder.address,
     } as AthTransferNotification);
@@ -296,7 +299,7 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerTotals()).reserve_funded_total_ath).toBe(0n);
     expect((await wrongFunderAthWallet.getGetWalletData()).balance).toBe(wrongFunderInitialAth);
     expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
-    expect((await officialWallet.getGetPendingNotification(711n, senderKey(wrongFunder.address))).exists).toBe(false);
+    expect((await officialWallet.getGetPendingNotification(711n, senderKey(wrongFunder.address, 711n))).exists).toBe(false);
   });
 
   it('MSTAB-01C: rejects launch evidence mismatch in both pricing directions before freezing', async () => {
@@ -377,9 +380,27 @@ describe('MarketStabilitySeller', () => {
     expect(state.treasury_due_ton).toBe(x2Price);
     expect((await env.seller.getGetMarketStabilitySellerTotals()).treasury_flushed_ton_total).toBe(0n);
 
+    const dustTail = MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE - 1n;
     await env.seller.send(env.flusher.getSender(), { value: toNano('0.01') }, {
       $$type: 'FlushMarketStabilityTreasuryTon',
-      amount: x2Price,
+      amount: dustTail,
+    } as FlushMarketStabilityTreasuryTon);
+    state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.treasury_due_ton).toBe(x2Price);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).treasury_flushed_ton_total).toBe(0n);
+
+    const largePartialFlush = x2Price - dustTail;
+    await env.seller.send(env.flusher.getSender(), { value: toNano('0.01') }, {
+      $$type: 'FlushMarketStabilityTreasuryTon',
+      amount: largePartialFlush,
+    } as FlushMarketStabilityTreasuryTon);
+    state = await env.seller.getGetMarketStabilitySellerState();
+    expect(state.treasury_due_ton).toBe(dustTail);
+    expect((await env.seller.getGetMarketStabilitySellerTotals()).treasury_flushed_ton_total).toBe(largePartialFlush);
+
+    await env.seller.send(env.flusher.getSender(), { value: toNano('0.01') }, {
+      $$type: 'FlushMarketStabilityTreasuryTon',
+      amount: dustTail,
     } as FlushMarketStabilityTreasuryTon);
     state = await env.seller.getGetMarketStabilitySellerState();
     expect(state.treasury_due_ton).toBe(0n);
@@ -524,7 +545,7 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerState()).reserve_due_ath).toBe(TOTAL_RESERVE);
     expect((await env.reserveFunderAthWallet.getGetWalletData()).balance).toBe(reserveFunderBeforeOverCap);
     expect((await officialWallet.getGetWalletData()).balance).toBe(officialBeforeOverCap);
-    expect((await officialWallet.getGetPendingNotification(2n, senderKey(env.reserveFunder.address))).exists).toBe(false);
+    expect((await officialWallet.getGetPendingNotification(2n, senderKey(env.reserveFunder.address, 2n))).exists).toBe(false);
 
     const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
     await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE + toNano('1') }, {

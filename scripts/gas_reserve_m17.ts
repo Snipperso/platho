@@ -12,6 +12,7 @@ import { FeeAccumulator, DepositProtocolFee, EnableBuybackSplit, SplitAccumulate
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
+  BindUsernameVault,
   SealGenesis,
   AthTransferNotificationMintUsername,
   FlushAthRefundDue,
@@ -23,6 +24,8 @@ import {
   Vault,
   BindDeploymentManifest as VaultBind,
   BindOfficialAthWallet as VaultBindAth,
+  BindProfileRegistry as VaultBindProfile,
+  BindUsernameRegistry as VaultBindUsername,
   SealGenesis as VaultSeal,
   RegisterMessagingKeys,
 } from '../build/Vault/Vault_Vault';
@@ -39,7 +42,7 @@ const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 
 const KIND_PRIVATE = 1n;
 const SIZE_STANDARD = 1n;
-const SUITE_CLASSICAL = 1n;
+const SUITE_HYBRID = 2n;
 
 function snakeCell(byteLength: number, fill = 0x61): Cell {
   const bytes = Buffer.alloc(byteLength, fill);
@@ -54,10 +57,10 @@ function snakeCell(byteLength: number, fill = 0x61): Cell {
   return tail ?? beginCell().endCell();
 }
 
-const BODY_CELL = snakeCell(1140, 0x62);
-const HEADER0_CELL = snakeCell(104, 0x30);
+const BODY_CELL = snakeCell(2228, 0x62);
+const HEADER0_CELL = snakeCell(140, 0x30);
 const HEADER1_CELL = snakeCell(30, 0x31);
-const CAPSULE_PRIVATE_BODY_CELL = snakeCell(1140, 0x64);
+const CAPSULE_PRIVATE_BODY_CELL = snakeCell(2228, 0x64);
 const CAPSULE_PRIVATE_HEADER0_CELL = snakeCell(140, 0x32);
 const CAPSULE_PRIVATE_HEADER1_CELL = snakeCell(30, 0x33);
 const CAPSULE_PUBLIC_HEADER_CELL = snakeCell(68, 0x50);
@@ -118,6 +121,13 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
+}
+
+function compactAddressHash(address: Address): bigint {
+  if (address.workChain !== 0) {
+    throw new Error(`Expected basechain address, got workchain ${address.workChain}`);
+  }
+  return BigInt('0x' + address.hash.toString('hex'));
 }
 
 function usernameSlice(name: string) {
@@ -272,8 +282,8 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({ address, code: init.code, data: init.data, balance: toNano('2'), workchain: address.workChain }));
   const capsule = blockchain.openContract(new CapsuleHub(address, init));
-  const privateValue = 43_000_000n;
-  const publicValue = 40_000_000n;
+  const privateValue = 48_500_000n;
+  const publicValue = 50_800_000n;
   const flushValue = toNano('0.05');
   const privateRes = await capsule.send(blockchain.sender(vaultAddress), { value: privateValue }, {
     $$type: 'PublishPrivateFromVault',
@@ -281,14 +291,14 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
     bounce_tag: 17_101n,
     publish_id: GENESIS_HASH,
     size_class: 1n,
-    crypto_suite: 1n,
+    crypto_suite: SUITE_HYBRID,
     header_0_hash: BigInt(`0x${CAPSULE_PRIVATE_HEADER0_CELL.hash().toString('hex')}`),
     header_1_hash: BigInt(`0x${CAPSULE_PRIVATE_HEADER1_CELL.hash().toString('hex')}`),
     body_hash: BigInt(`0x${CAPSULE_PRIVATE_BODY_CELL.hash().toString('hex')}`),
     header_0: CAPSULE_PRIVATE_HEADER0_CELL,
     header_1: CAPSULE_PRIVATE_HEADER1_CELL,
     body: CAPSULE_PRIVATE_BODY_CELL,
-    protocol_fee_paid: 5_000_000n,
+    protocol_fee_paid: 10_000_000n,
   } as PublishPrivateFromVault);
   const publicRes = await capsule.send(blockchain.sender(vaultAddress), { value: publicValue }, {
     $$type: 'PublishPublicFromVault',
@@ -301,7 +311,7 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
     body_hash: BigInt(`0x${CAPSULE_PUBLIC_BODY_CELL.hash().toString('hex')}`),
     header: CAPSULE_PUBLIC_HEADER_CELL,
     body: CAPSULE_PUBLIC_BODY_CELL,
-    protocol_fee_paid: 5_000_000n,
+    protocol_fee_paid: 10_000_000n,
   } as PublishPublicFromVault);
   const state = await capsule.getGetState();
   if (state.private_latest_id !== 1n || state.public_latest_id !== 1n) {
@@ -310,7 +320,7 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   // No FeeAccumulator contract is deployed here; this measures CapsuleHub send path and bounce recovery.
   const flushRes = await capsule.send(deployer.getSender(), { value: flushValue }, {
     $$type: 'FlushFees',
-    amount: 5_000_000n,
+    amount: 10_000_000n,
   } as any);
   return scenario('CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE', [
     opMetric('private_vault_publish', privateValue, privateRes),
@@ -368,6 +378,7 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
   const flusher = await blockchain.treasury('m17-registry-flusher');
   const placeholderAthWallet = fixtureAddress('M17_REGISTRY_PLACEHOLDER_ATH_WALLET');
   const treasuryAthReceiver = fixtureAddress('M17_REGISTRY_TREASURY_ATH_RECEIVER');
+  const vaultAddress = fixtureAddress('M17_REGISTRY_VAULT');
   const masterTreasuryOwner = fixtureAddress('M17_REGISTRY_ATH_MASTER_TREASURY');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
   const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
@@ -393,6 +404,11 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
     deployment_manifest_hash: USERNAME_MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: USERNAME_MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: USERNAME_MANIFEST_HASH,
@@ -465,7 +481,7 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
   const stuckName = 'stuckx';
   const stuckHash = nameHash(stuckName);
   const noAckItemInit = await (await import('../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck')).MockUsernameNFTItemNoAck.init();
-  const itemAddress = await ctxPrune.registry.getGetUsernameItemAddress(ownerPrune, stuckHash);
+  const itemAddress = await ctxPrune.registry.getGetUsernameItemAddress(stuckHash);
   await ctxPrune.blockchain.setShardAccount(itemAddress, createShardAccount({
     address: itemAddress,
     code: noAckItemInit.code,
@@ -495,14 +511,15 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
 async function activateVaultWallet(vault: any, user: any, seed: bigint) {
   const seedByte = Number(seed & 0xffn);
   const keyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const pqKemPubkey = snakeCell(1184, 0x5a);
   await vault.send(user.getSender(), { value: toNano('0.1') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: seed,
     sign_pubkey: BigInt(`0x${keyPair.publicKey.toString('hex')}`),
-    pq_kem_pubkey_hash: 0n,
-    pq_kem_pubkey_len: 0n,
-    pq_kem_pubkey: beginCell().endCell(),
-    crypto_suite_mask: 1n,
+    pq_kem_pubkey_hash: BigInt(`0x${pqKemPubkey.hash().toString('hex')}`),
+    pq_kem_pubkey_len: 1184n,
+    pq_kem_pubkey: pqKemPubkey,
+    crypto_suite_mask: SUITE_HYBRID,
   } as RegisterMessagingKeys);
   return keyPair;
 }
@@ -517,7 +534,7 @@ async function depositVaultTon(vault: any, user: any, amount: bigint) {
 function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address): Cell {
   const payload = beginCell()
     .storeUint(SIZE_STANDARD, 8)
-    .storeUint(SUITE_CLASSICAL, 8)
+    .storeUint(SUITE_HYBRID, 8)
     .storeUint(HEADER0, 256)
     .storeUint(HEADER1, 256)
     .storeUint(BODY_HASH, 256)
@@ -528,11 +545,13 @@ function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: 
   const signedPayload = beginCell()
     .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(MANIFEST_HASH, 256)
-    .storeAddress(vaultAddress)
+    .storeUint(compactAddressHash(vaultAddress), 256)
     .storeUint(KIND_PRIVATE, 8)
-    .storeAddress(owner)
+    .storeUint(compactAddressHash(owner), 256)
     .storeUint(clientNonce, 64)
     .storeUint(maxCharge, 128)
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_HYBRID, 8)
     .storeRef(payload)
     .endCell();
   return beginCell()
@@ -562,11 +581,13 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST_HASH, counterpart_address: capsuleAddress } as VaultBind);
   await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST_HASH, counterpart_address: vaultAddress } as CapsuleBind);
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindOfficialAthWallet', deployment_manifest_hash: MANIFEST_HASH, official_ath_wallet_address: officialAthWallet } as VaultBindAth);
+  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindProfileRegistry', deployment_manifest_hash: MANIFEST_HASH, profile_registry_address: fixtureAddress('M17_PROFILE_REGISTRY') } as VaultBindProfile);
+  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindUsernameRegistry', deployment_manifest_hash: MANIFEST_HASH, username_registry_address: fixtureAddress('M17_USERNAME_REGISTRY') } as VaultBindUsername);
   await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as VaultSeal);
   await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as CapsuleSeal);
 
   const keyPair = await activateVaultWallet(vault, user, 91n);
-  const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+  const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
   await depositVaultTon(vault, user, maxCharge * 2n);
   const userState = await vault.getGetUser(user.address);
   const publishRes = await blockchain.sendMessage(external({
@@ -581,7 +602,7 @@ async function vaultScenario(): Promise<M17ScenarioMetric> {
   await blockchain.setShardAccount(vault2Address, createShardAccount({ address: vault2Address, code: vault2Init.code, data: vault2Init.data, balance: toNano('3'), workchain: vault2Address.workChain }));
   const vault2 = blockchain.openContract(new Vault(vault2Address, vault2Init));
   const keyPair2 = await activateVaultWallet(vault2, user, 92n);
-  const maxCharge2 = await vault2.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_CLASSICAL);
+  const maxCharge2 = await vault2.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
   await depositVaultTon(vault2, user, maxCharge2 * 2n);
   const userState2 = await vault2.getGetUser(user.address);
   const pendingRes = await blockchain.sendMessage(external({

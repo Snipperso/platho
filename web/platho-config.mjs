@@ -7,6 +7,23 @@ export const PLATHO_APP_MODES = Object.freeze({
 const PRODUCTION_MODE = PLATHO_APP_MODES.PRODUCTION;
 const VALID_MODES = new Set(Object.values(PLATHO_APP_MODES));
 
+export const REQUIRED_TON_RPC_CRITICAL_METHODS = Object.freeze([
+  'get_global',
+  'get_state',
+  'get_private_entry',
+  'get_public_entry',
+  'get_user',
+  'get_key_record',
+  'get_canonical_publish_charge',
+  'get_name_record',
+  'get_username_item_address',
+  'get_avatar',
+  'get_avatar_version',
+  'get_username_price',
+  'dnsresolve',
+  'get_wallet_address',
+]);
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.freeze(value);
@@ -15,54 +32,91 @@ function deepFreeze(value) {
 }
 
 export const PLATHO_APP_CONFIG = deepFreeze({
-  mode: PLATHO_APP_MODES.PREVIEW,
+  mode: PLATHO_APP_MODES.PRODUCTION,
   domain: 'platho.app',
   network: {
-    chain: 'testnet',
-    label: 'testnet',
+    chain: 'mainnet',
+    label: 'mainnet',
+    tonRpc: {
+      primaryProviderId: 'user-custom',
+      fallbackProviderIds: ['toncenter-mainnet', 'platho-rpc-mainnet'],
+      verifyCriticalReads: true,
+      criticalMethods: [...REQUIRED_TON_RPC_CRITICAL_METHODS],
+      providers: [
+        {
+          id: 'user-custom',
+          kind: 'custom',
+          globalName: 'plathoCustomTonRpcTransport',
+        },
+        {
+          id: 'toncenter-mainnet',
+          kind: 'toncenter-v3',
+          runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.com/api/v3/message',
+          messagesEndpoint: 'https://toncenter.com/api/v3/messages',
+          walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
+        },
+        {
+          id: 'platho-rpc-mainnet',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.app/api/v3/runGetMethod',
+          messagesEndpoint: false,
+          walletBalanceEndpoint: 'https://rpc.platho.app/api/v2/getAddressInformation',
+        },
+      ],
+      requestSpacingMs: 1500,
+      rateLimitBackoffMs: 60000,
+      rateLimitRetries: 0,
+      requestTimeoutMs: 15000,
+      runGetMethodCacheTtlMs: 15000,
+      runGetMethodCacheMaxEntries: 512,
+    },
   },
   vault: {
-    address: null,
-    deploymentManifestHash: null,
+    address: 'UQDjCu9J-a50z8pwgBp9AWpuD9MDQufKiKHPi-1VHRWpQbvc',
+    deploymentManifestHash: 'a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: null,
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=15',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
     },
   },
   tonDns: {
-    rootAddress: null,
+    rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: null,
+      moduleUrl: './ton-dns-provider.mjs?v=7',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
     },
   },
   capsuleHub: {
-    address: null,
-    publicReadLimit: 50,
+    address: 'UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG',
+    publicReadLimit: 128,
   },
   ath: {
-    masterAddress: null,
+    masterAddress: 'UQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9v087',
   },
   usernameRegistry: {
-    address: null,
+    address: 'UQBT1BIkKWCHrqL6tXKw5aUMXJjFbDNrcEVzpzCRxJ8Cf3ls',
   },
   profileRegistry: {
-    address: null,
+    address: 'UQC4ncVFmD7s4xX7Q-lsjE9hyvaOrtXlNfi_Gha97NDQwUN0',
   },
   crypto: {
-    signedBundlePurpose: 'pwa-preview',
+    signedBundlePurpose: 'pwa-mainnet-production',
   },
   messaging: {
     pricing: {
       estimatedNetworkFeeNanotons: '5000000',
       includedNetworkFeeNanotons: '5000000',
       roundingStepNanotons: '1000000',
+      maxNetworkFeeSurchargeNanotons: '50000000',
+      highNetworkFeeSurchargeConfirmNanotons: '10000000',
+      manualNetworkFeeSurchargeOverrideNanotons: '50000000',
     },
   },
   publicChannels: [
@@ -71,11 +125,11 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       name: 'platho.app',
       avatar: 'P',
       subtitle: 'official read-only channel',
-      sourceUrl: './channels/platho.app/feed.json',
+      authorWallet: 'UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH',
     },
   ],
   ui: {
-    brandNetworkLabel: 'testnet',
+    brandNetworkLabel: 'mainnet',
     chatCountLabel: 'Private chats',
     publicSubtitle: 'Public channels',
     vaultSubtitle: 'Vault',
@@ -86,8 +140,8 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       { type: 'platho_nft', value: 'platho.ath', label: 'platho.ath' },
       { type: 'ton_dns', value: 'platho.ton', label: 'platho.ton' },
     ],
-    walletLabel: 'v5r1 testnet',
-    networkLabel: 'testnet',
+    walletLabel: 'v5r1 mainnet',
+    networkLabel: 'mainnet',
     localStateLabel: 'device only',
     vaultCards: [],
     vaultActions: [],
@@ -116,6 +170,22 @@ function collectMatchingStrings(value, pattern, path = 'config', out = []) {
     collectMatchingStrings(item, pattern, `${path}.${key}`, out);
   }
   return out;
+}
+
+function hasConcreteTonRpcReadProvider(provider) {
+  return Boolean(provider?.runGetMethodEndpoint || provider?.endpoint);
+}
+
+function hasConcreteTonRpcMessageHistoryProvider(provider) {
+  return Boolean(provider?.messagesEndpoint);
+}
+
+function hasTonRpcReadProvider(provider) {
+  return Boolean(provider?.globalName || hasConcreteTonRpcReadProvider(provider));
+}
+
+function hasTonRpcSendProvider(provider) {
+  return Boolean(provider?.globalName || provider?.sendBocEndpoint);
 }
 
 export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
@@ -148,6 +218,52 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         'Production PWA config must name a static Vault chain provider module.',
       );
     }
+    const tonRpcProviders = config?.network?.tonRpc?.providers;
+    if (!Array.isArray(tonRpcProviders) || tonRpcProviders.length < 2) {
+      addFinding(
+        findings,
+        'PWA_TON_RPC_REPLACEABLE_PROVIDER_LIST_REQUIRED',
+        'Production PWA config must define replaceable TON RPC providers with at least one fallback.',
+      );
+    } else {
+      const hasReadProvider = tonRpcProviders.some(hasTonRpcReadProvider);
+      const hasSendProvider = tonRpcProviders.some(hasTonRpcSendProvider);
+      if (!hasReadProvider || !hasSendProvider) {
+        addFinding(
+          findings,
+          'PWA_TON_RPC_PROVIDER_REQUIRED',
+          'Production PWA config must define TON RPC read and send transports.',
+        );
+      }
+      const concreteReadProviders = tonRpcProviders.filter(hasConcreteTonRpcReadProvider);
+      if (config?.network?.tonRpc?.verifyCriticalReads !== false && concreteReadProviders.length < 2) {
+        addFinding(
+          findings,
+          'PWA_TON_RPC_TWO_CONCRETE_PROVIDERS_REQUIRED',
+          'Production PWA config must include at least two concrete TON RPC read providers for critical-read verification.',
+        );
+      }
+      const concreteMessageHistoryProviders = tonRpcProviders.filter(hasConcreteTonRpcMessageHistoryProvider);
+      if (concreteMessageHistoryProviders.length < 1) {
+        addFinding(
+          findings,
+          'PWA_TON_RPC_MESSAGE_HISTORY_PROVIDER_REQUIRED',
+          'Production PWA config must include a concrete TON RPC message-history provider for CapsuleHub body retrieval.',
+        );
+      }
+    }
+    if (config?.network?.tonRpc?.verifyCriticalReads !== false) {
+      const criticalMethods = new Set(config?.network?.tonRpc?.criticalMethods ?? []);
+      for (const method of REQUIRED_TON_RPC_CRITICAL_METHODS) {
+        if (!criticalMethods.has(method)) {
+          addFinding(
+            findings,
+            'PWA_TON_RPC_CRITICAL_METHOD_REQUIRED',
+            `Production PWA config must mark ${method} as a critical verified read.`,
+          );
+        }
+      }
+    }
     const tonDnsProvider = config?.tonDns?.provider ?? {};
     if (
       tonDnsProvider.requiredInProduction !== false
@@ -172,6 +288,14 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         findings,
         'PWA_VAULT_DEPLOYMENT_MANIFEST_HASH_REQUIRED',
         'Production PWA config must set Vault deploymentManifestHash for domain-separated signed publishes.',
+      );
+    }
+    const pricing = config?.messaging?.pricing ?? {};
+    if (!pricing.maxNetworkFeeSurchargeNanotons) {
+      addFinding(
+        findings,
+        'PWA_NETWORK_SURCHARGE_GUARD_REQUIRED',
+        'Production PWA config must set a hard max network fee surcharge.',
       );
     }
   }

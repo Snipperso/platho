@@ -1,5 +1,6 @@
 import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/core';
 import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
@@ -18,6 +19,17 @@ function contentBocBase64(label = 'ATH') {
 
 function stateInitHash(init: { code: Cell; data: Cell }) {
   return beginCell().store(storeStateInit(init)).endCell().hash().toString('hex');
+}
+
+function currentCodeHashes(): Record<string, string> {
+  return Object.fromEntries(readFileSync('artifacts/CURRENT_CODE_HASHES.txt', 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && line.includes('='))
+    .map((line) => {
+      const [key, value] = line.split('=', 2);
+      return [key, value];
+    }));
 }
 
 function baseInput(): MainnetAthMasterDerivationInput {
@@ -121,5 +133,14 @@ describe('Mainnet ATH Master derivation', () => {
     expect(report.treasurySupplyDeployment.ownerFirstHopExecReserveNanotons).toBe('2000000');
     expect(report.nextM20FInputs.athMasterAddress).toBe(report.derived.athMasterAddress);
     expect(report.nextM20FInputs.athMasterCodeHash).toBe(report.derived.athMasterCodeHash);
+  });
+
+  it('keeps the committed ATH Master derivation artifact tied to current ATH code hashes', () => {
+    const report = JSON.parse(readFileSync('artifacts/mainnet_ath_master_derivation.json', 'utf8'));
+    const current = currentCodeHashes();
+
+    expect(report.derived.athMasterCodeHash).toBe(current.ATHMASTER_CODE_HASH);
+    expect(report.derived.athWalletCodeHash).toBe(current.ATH_WALLET_CODE_HASH);
+    expect(report.proofRefs.athMasterBuildArtifact).toContain(current.ATHMASTER_CODE_HASH);
   });
 });

@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { Address, contractAddress, toNano } from '@ton/core';
+import { Address, beginCell, contractAddress, Dictionary, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
+  BindUsernameVault,
   SealGenesis,
   UsernameRegistryTopUpStorageReserve,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
+import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
 
@@ -17,7 +19,22 @@ function fixtureAddress(label: string, workchain = 0): Address {
 }
 
 function nameHash(name: string): bigint {
-  return BigInt(`0x${createHash('sha256').update(`PLATHO.V1.USERNAME.${name}`).digest('hex')}`);
+  return BigInt('0x' + beginCell()
+    .storeUint(0xC5CC7CD6, 32)
+    .storeBuffer(Buffer.from(name, 'ascii'))
+    .endCell()
+    .hash()
+    .toString('hex'));
+}
+
+function metadataKey(field: string): bigint {
+  return BigInt('0x' + createHash('sha256').update(field).digest('hex'));
+}
+
+function readSnakeText(cell: any): string {
+  const slice = cell.beginParse();
+  expect(slice.loadUint(8)).toBe(0);
+  return slice.loadBuffer(Math.floor(slice.remainingBits / 8)).toString('utf8');
 }
 
 async function deployRegistry() {
@@ -41,7 +58,54 @@ async function deployRegistry() {
   }));
   const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
 
-  return { blockchain, deployer, caller, registry, registryAddress, placeholderAthWallet };
+  return { blockchain, deployer, caller, registry, registryAddress, placeholderAthWallet, treasuryAthReceiver };
+}
+
+async function deployRegistryReadyToSeal(options: {
+  treasuryAthReceiver: Address;
+  vaultAddress?: Address;
+  athMasterAddress?: Address;
+  forcedRegistryAddress?: Address;
+}) {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+  const deployer = await blockchain.treasury('username-registry-seal-deployer');
+  const placeholderAthWallet = fixtureAddress('USERNAME_REGISTRY_SEAL_PLACEHOLDER');
+  const athMasterAddress = options.athMasterAddress ?? fixtureAddress('USERNAME_REGISTRY_SEAL_ATH_MASTER');
+  const vaultAddress = options.vaultAddress ?? fixtureAddress('USERNAME_REGISTRY_SEAL_VAULT');
+
+  const registryInit = await UsernameRegistry.init(
+    placeholderAthWallet,
+    athMasterAddress,
+    options.treasuryAthReceiver,
+    false,
+    0n,
+    0n,
+    deployer.address,
+  );
+  const registryAddress = options.forcedRegistryAddress ?? contractAddress(0, registryInit);
+  await blockchain.setShardAccount(registryAddress, createShardAccount({
+    address: registryAddress,
+    code: registryInit.code,
+    data: registryInit.data,
+    balance: toNano('2'),
+    workchain: registryAddress.workChain,
+  }));
+  const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
+  const officialAthWallet = await registry.getGetAthWalletAddress(registryAddress);
+
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindOfficialAthWallet',
+    deployment_manifest_hash: MANIFEST_HASH,
+    official_ath_wallet_address: officialAthWallet,
+  } as BindOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
+
+  return { registry, deployer, registryAddress, officialAthWallet, athMasterAddress, vaultAddress };
 }
 
 describe('UsernameRegistry foundation milestone', () => {
@@ -54,47 +118,72 @@ describe('UsernameRegistry foundation milestone', () => {
     const p5 = await registry.getGetUsernamePrice(5n);
     const p6 = await registry.getGetUsernamePrice(6n);
     const p12 = await registry.getGetUsernamePrice(12n);
+    const p16 = await registry.getGetUsernamePrice(16n);
+    const p17 = await registry.getGetUsernamePrice(17n);
 
     expect(p1.valid_length).toBe(false);
     expect(p3.valid_length).toBe(false);
+    expect(p17.valid_length).toBe(false);
     expect(p1.price_ath_atomic).toBe(0n);
     expect(p3.price_ath_atomic).toBe(0n);
+    expect(p17.price_ath_atomic).toBe(0n);
     expect(p4.valid_length).toBe(true);
+    expect(p16.valid_length).toBe(true);
     expect(p4.price_ath_atomic).toBe(10_000_000_000_000n);
     expect(p5.price_ath_atomic).toBe(1_000_000_000_000n);
     expect(p6.price_ath_atomic).toBe(100_000_000_000n);
     expect(p12.price_ath_atomic).toBe(100_000_000_000n);
+    expect(p16.price_ath_atomic).toBe(100_000_000_000n);
   });
 
   it('USERNAME-REG-M9-02: get_username_item_address equals local UsernameNFTItem StateInit derivation', async () => {
     const { registry, registryAddress } = await deployRegistry();
-    const ownerWallet = fixtureAddress('USERNAME_REGISTRY_ITEM_OWNER');
     const usernameHash = nameHash('platho');
 
-    const fromGetter = await registry.getGetUsernameItemAddress(ownerWallet, usernameHash);
-    const itemInit = await UsernameNFTItem.init(ownerWallet, registryAddress, usernameHash);
-    const local = contractAddress(ownerWallet.workChain, itemInit);
+    const fromGetter = await registry.getGetUsernameItemAddress(usernameHash);
+    const itemInit = await UsernameNFTItem.init(registryAddress, usernameHash);
+    const local = contractAddress(registryAddress.workChain, itemInit);
 
     expect(fromGetter.equals(local)).toBe(true);
   });
 
-  it('USERNAME-REG-M9-03: item derivation follows owner workchain, including masterchain owner fixture', async () => {
+  it('USERNAME-REG-M9-03: item derivation is stable for a username hash and does not take an owner wallet', async () => {
     const { registry, registryAddress } = await deployRegistry();
-    const ownerWallet = fixtureAddress('USERNAME_REGISTRY_MASTERCHAIN_OWNER', -1);
     const usernameHash = nameHash('larisa');
 
-    const fromGetter = await registry.getGetUsernameItemAddress(ownerWallet, usernameHash);
-    const itemInit = await UsernameNFTItem.init(ownerWallet, registryAddress, usernameHash);
-    const local = contractAddress(ownerWallet.workChain, itemInit);
+    const fromGetter = await registry.getGetUsernameItemAddress(usernameHash);
+    const itemInit = await UsernameNFTItem.init(registryAddress, usernameHash);
+    const local = contractAddress(registryAddress.workChain, itemInit);
 
-    expect(fromGetter.workChain).toBe(-1);
+    expect(fromGetter.workChain).toBe(registryAddress.workChain);
     expect(fromGetter.equals(local)).toBe(true);
+  });
+
+  it('USERNAME-REG-M9-03A: collection getter exposes TEP-64 on-chain collection metadata', async () => {
+    const { registry, treasuryAthReceiver } = await deployRegistry();
+
+    const collection = await registry.getGetCollectionData();
+    const content = collection.collection_content.beginParse();
+    expect(content.loadUint(8)).toBe(0);
+    const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+
+    expect(collection.next_item_index).toBe(-1n);
+    expect(collection.owner_address.equals(treasuryAthReceiver)).toBe(true);
+    expect(readSnakeText(metadata.get(metadataKey('name')))).toBe('Platho usernames');
+  });
+
+  it('USERNAME-REG-M9-03B: unordered collection sentinel is not accepted as an item index', async () => {
+    const { registry } = await deployRegistry();
+
+    await expect(registry.getGetNftAddressByIndex(-1n)).rejects.toThrow();
+    await expect(registry.getGetNftAddressByIndex(0n)).rejects.toThrow();
   });
 
   it('USERNAME-REG-M9-04: official ATH wallet binds before seal and cannot be changed after seal', async () => {
     const { deployer, registry, registryAddress } = await deployRegistry();
     const officialAthWallet = await registry.getGetAthWalletAddress(registryAddress);
     const attackerWallet = fixtureAddress('USERNAME_REGISTRY_ATTACKER_ATH_WALLET');
+    const vaultAddress = fixtureAddress('USERNAME_REGISTRY_BOUND_VAULT');
 
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
@@ -115,8 +204,23 @@ describe('UsernameRegistry foundation milestone', () => {
     } as SealGenesis);
 
     state = await registry.getGetGlobal();
+    expect(state.sealed).toBe(false);
+
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindUsernameVault',
+      deployment_manifest_hash: MANIFEST_HASH,
+      vault_address: vaultAddress,
+    } as BindUsernameVault);
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+
+    state = await registry.getGetGlobal();
     expect(state.sealed).toBe(true);
     expect(state.genesis_config_hash).toBe(MANIFEST_HASH);
+    expect(state.vault_bound).toBe(true);
+    expect(state.vault_address.equals(vaultAddress)).toBe(true);
 
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'BindOfficialAthWallet',
@@ -127,6 +231,56 @@ describe('UsernameRegistry foundation milestone', () => {
     state = await registry.getGetGlobal();
     expect(state.official_ath_wallet_address.equals(officialAthWallet)).toBe(true);
     expect(state.official_ath_wallet_address.equals(attackerWallet)).toBe(false);
+  });
+
+  it('USERNAME-REG-M9-04B: SealGenesis rejects protocol-owned treasury ATH receivers', async () => {
+    const forcedSelfAddress = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_SELF');
+    const selfTreasury = await deployRegistryReadyToSeal({
+      treasuryAthReceiver: forcedSelfAddress,
+      forcedRegistryAddress: forcedSelfAddress,
+    });
+    await selfTreasury.registry.send(selfTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await selfTreasury.registry.getGetGlobal()).sealed).toBe(false);
+
+    const forcedOfficialOwner = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_OFFICIAL_OWNER');
+    const officialMaster = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_OFFICIAL_MASTER');
+    const officialWalletInit = await ATHWallet.init(0n, forcedOfficialOwner, officialMaster);
+    const officialTreasuryReceiver = contractAddress(forcedOfficialOwner.workChain, officialWalletInit);
+    const officialTreasury = await deployRegistryReadyToSeal({
+      treasuryAthReceiver: officialTreasuryReceiver,
+      athMasterAddress: officialMaster,
+      forcedRegistryAddress: forcedOfficialOwner,
+    });
+    await officialTreasury.registry.send(officialTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await officialTreasury.registry.getGetGlobal()).sealed).toBe(false);
+
+    const vaultAddress = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_AS_VAULT');
+    const vaultTreasury = await deployRegistryReadyToSeal({
+      treasuryAthReceiver: vaultAddress,
+      vaultAddress,
+    });
+    await vaultTreasury.registry.send(vaultTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await vaultTreasury.registry.getGetGlobal()).sealed).toBe(false);
+
+    const athMasterAddress = fixtureAddress('USERNAME_REGISTRY_SEAL_TREASURY_AS_ATH_MASTER');
+    const masterTreasury = await deployRegistryReadyToSeal({
+      treasuryAthReceiver: athMasterAddress,
+      athMasterAddress,
+    });
+    await masterTreasury.registry.send(masterTreasury.deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealGenesis);
+    expect((await masterTreasury.registry.getGetGlobal()).sealed).toBe(false);
   });
 
   it('USERNAME-REG-M9-04A: pre-seal binding rejects a non-derived official ATH wallet', async () => {

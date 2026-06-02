@@ -57,7 +57,7 @@ builder $AthTransferNotification$_store(builder build_0, (int, int, int, slice) 
 cell $AthTransferNotification$_store_cell((int, int, int, slice) v, builder b) inline;
 
 ;; $AthTransferNotification$_load_bounced
-(slice, ((int, int, int))) $AthTransferNotification$_load_bounced(slice sc_0) inline;
+(slice, ((int, int))) $AthTransferNotification$_load_bounced(slice sc_0) inline;
 
 ;; $AthTransferNotificationMintUsername$_store
 builder $AthTransferNotificationMintUsername$_store(builder build_0, (int, int, int, slice, int, slice) v) inline;
@@ -66,7 +66,16 @@ builder $AthTransferNotificationMintUsername$_store(builder build_0, (int, int, 
 cell $AthTransferNotificationMintUsername$_store_cell((int, int, int, slice, int, slice) v, builder b) inline;
 
 ;; $AthTransferNotificationMintUsername$_load_bounced
-(slice, ((int, int, int))) $AthTransferNotificationMintUsername$_load_bounced(slice sc_0) inline;
+(slice, ((int, int))) $AthTransferNotificationMintUsername$_load_bounced(slice sc_0) inline;
+
+;; $AthTransferNotificationVaultMintUsername$_store
+builder $AthTransferNotificationVaultMintUsername$_store(builder build_0, (int, int, int, slice, slice, int, slice) v) inline;
+
+;; $AthTransferNotificationVaultMintUsername$_store_cell
+cell $AthTransferNotificationVaultMintUsername$_store_cell((int, int, int, slice, slice, int, slice) v, builder b) inline;
+
+;; $AthTransferNotificationVaultMintUsername$_load_bounced
+(slice, ((int, int))) $AthTransferNotificationVaultMintUsername$_load_bounced(slice sc_0) inline;
 
 ;; $AthTransferNotificationProfileAvatar$_store
 builder $AthTransferNotificationProfileAvatar$_store(builder build_0, (int, int, int, slice, int, int, int, int, int) v) inline;
@@ -75,7 +84,16 @@ builder $AthTransferNotificationProfileAvatar$_store(builder build_0, (int, int,
 cell $AthTransferNotificationProfileAvatar$_store_cell((int, int, int, slice, int, int, int, int, int) v, builder b) inline;
 
 ;; $AthTransferNotificationProfileAvatar$_load_bounced
-(slice, ((int, int, int))) $AthTransferNotificationProfileAvatar$_load_bounced(slice sc_0) inline;
+(slice, ((int, int))) $AthTransferNotificationProfileAvatar$_load_bounced(slice sc_0) inline;
+
+;; $AthTransferNotificationVaultProfileAvatar$_store
+builder $AthTransferNotificationVaultProfileAvatar$_store(builder build_0, (int, int, int, slice, slice, int, int, int, int, int) v) inline;
+
+;; $AthTransferNotificationVaultProfileAvatar$_store_cell
+cell $AthTransferNotificationVaultProfileAvatar$_store_cell((int, int, int, slice, slice, int, int, int, int, int) v, builder b) inline;
+
+;; $AthTransferNotificationVaultProfileAvatar$_load_bounced
+(slice, ((int, int))) $AthTransferNotificationVaultProfileAvatar$_load_bounced(slice sc_0) inline;
 
 ;; $ATHInternalTransfer$_store
 builder $ATHInternalTransfer$_store(builder build_0, (int, int, slice, slice) v) inline;
@@ -113,6 +131,24 @@ cell $ATHInternalTransferProfileAvatar$_store_cell((int, int, slice, slice, int,
 ;; $ATHInternalTransferProfileAvatar$_load_bounced
 (slice, ((int, int))) $ATHInternalTransferProfileAvatar$_load_bounced(slice sc_0) inline;
 
+;; $ATHInternalTransferVaultProfileAvatar$_store
+builder $ATHInternalTransferVaultProfileAvatar$_store(builder build_0, (int, int, slice, slice, int, slice, int, int, int, int, int) v) inline_ref;
+
+;; $ATHInternalTransferVaultProfileAvatar$_store_cell
+cell $ATHInternalTransferVaultProfileAvatar$_store_cell((int, int, slice, slice, int, slice, int, int, int, int, int) v, builder b) inline;
+
+;; $ATHInternalTransferVaultProfileAvatar$_load_bounced
+(slice, ((int, int))) $ATHInternalTransferVaultProfileAvatar$_load_bounced(slice sc_0) inline;
+
+;; $ATHInternalTransferVaultMintUsername$_store
+builder $ATHInternalTransferVaultMintUsername$_store(builder build_0, (int, int, slice, slice, int, slice, int, slice) v) inline;
+
+;; $ATHInternalTransferVaultMintUsername$_store_cell
+cell $ATHInternalTransferVaultMintUsername$_store_cell((int, int, slice, slice, int, slice, int, slice) v, builder b) inline;
+
+;; $ATHInternalTransferVaultMintUsername$_load_bounced
+(slice, ((int, int))) $ATHInternalTransferVaultMintUsername$_load_bounced(slice sc_0) inline;
+
 ;; $ATHTransferAck$_store
 builder $ATHTransferAck$_store(builder build_0, (int, int) v) inline;
 
@@ -141,16 +177,16 @@ builder $JettonExcesses$_store(builder build_0, (int) v) inline;
 cell $JettonExcesses$_store_cell((int) v, builder b) inline;
 
 ;; $PendingAthTransferNotification$_store
-builder $PendingAthTransferNotification$_store(builder build_0, (slice, int, int) v) inline;
+builder $PendingAthTransferNotification$_store(builder build_0, (slice, slice, int, int, int) v) inline;
 
 ;; $PendingAthTransferNotification$_store_cell
-cell $PendingAthTransferNotification$_store_cell((slice, int, int) v, builder b) inline;
+cell $PendingAthTransferNotification$_store_cell((slice, slice, int, int, int) v, builder b) inline;
 
 ;; $PendingAthTransferNotification$_load
-(slice, ((slice, int, int))) $PendingAthTransferNotification$_load(slice sc_0) inline;
+(slice, ((slice, slice, int, int, int))) $PendingAthTransferNotification$_load(slice sc_0) inline;
 
 ;; $PendingAthTransferNotification$_as_optional
-tuple $PendingAthTransferNotification$_as_optional((slice, int, int) v) inline;
+tuple $PendingAthTransferNotification$_as_optional((slice, slice, int, int, int) v) inline;
 
 ;; $PendingAthTransferNotification$_load_opt
 tuple $PendingAthTransferNotification$_load_opt(cell cl) inline;
@@ -171,10 +207,10 @@ tuple $PendingAthOutgoingTransfer$_as_optional((slice, slice, int, int) v) inlin
 tuple $PendingAthOutgoingTransfer$_load_opt(cell cl) inline;
 
 ;; $ATHWallet$_store
-builder $ATHWallet$_store(builder build_0, (int, slice, slice, cell, cell, cell, cell) v) inline;
+builder $ATHWallet$_store(builder build_0, (int, slice, slice, cell, cell, cell) v) inline;
 
 ;; $ATHWallet$_load
-(slice, ((int, slice, slice, cell, cell, cell, cell))) $ATHWallet$_load(slice sc_0) inline;
+(slice, ((int, slice, slice, cell, cell, cell))) $ATHWallet$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
@@ -183,10 +219,10 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 (int, slice, slice) $ATHWalletDataView$_to_external(((int, slice, slice)) v) inline;
 
 ;; $PendingAthTransferNotificationView$_to_external
-(int, slice, int, int) $PendingAthTransferNotificationView$_to_external(((int, slice, int, int)) v) inline;
+(int, slice, slice, int, int) $PendingAthTransferNotificationView$_to_external(((int, slice, slice, int, int)) v) inline;
 
 ;; $PendingAthTransferNotification$_not_null
-((slice, int, int)) $PendingAthTransferNotification$_not_null(tuple v) inline;
+((slice, slice, int, int, int)) $PendingAthTransferNotification$_not_null(tuple v) inline;
 
 ;; $PendingAthOutgoingTransfer$_not_null
 ((slice, slice, int, int)) $PendingAthOutgoingTransfer$_not_null(tuple v) inline;
@@ -198,13 +234,13 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline;
 (slice, ((int, slice, slice))) $ATHWallet$init$_load(slice sc_0) inline;
 
 ;; $ATHWallet$_contract_init
-(int, slice, slice, cell, cell, cell, cell) $ATHWallet$_contract_init(int $balance, slice $owner_address, slice $ath_master_address) impure inline;
+(int, slice, slice, cell, cell, cell) $ATHWallet$_contract_init(int $balance, slice $owner_address, slice $ath_master_address) impure inline;
 
 ;; $ATHWallet$_contract_load
-(int, slice, slice, cell, cell, cell, cell) $ATHWallet$_contract_load() impure inline;
+(int, slice, slice, cell, cell, cell) $ATHWallet$_contract_load() impure inline;
 
 ;; $ATHWallet$_contract_store
-() $ATHWallet$_contract_store((int, slice, slice, cell, cell, cell, cell) v) impure inline;
+() $ATHWallet$_contract_store((int, slice, slice, cell, cell, cell) v) impure inline;
 
 ;; $Cell$_fun_asSlice
 slice $Cell$_fun_asSlice(cell $self) impure inline;
@@ -219,34 +255,37 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 (cell, cell) $ATHWallet$_init_child(int $balance, slice $owner_address, slice $ath_master_address) inline_ref;
 
 ;; $ATHWallet$_fun_derive_wallet_address
-((int, slice, slice, cell, cell, cell, cell), slice) $ATHWallet$_fun_derive_wallet_address((int, slice, slice, cell, cell, cell, cell) $self, slice $owner) impure inline_ref;
+((int, slice, slice, cell, cell, cell), slice) $ATHWallet$_fun_derive_wallet_address((int, slice, slice, cell, cell, cell) $self, slice $owner) impure inline_ref;
 
 ;; $ATHWallet$_fun_is_basechain_address
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_is_basechain_address((int, slice, slice, cell, cell, cell, cell) $self, slice $owner) impure inline_ref;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_is_basechain_address((int, slice, slice, cell, cell, cell) $self, slice $owner) impure inline_ref;
 
 ;; $ATHWallet$_fun_require_basechain_owner_path
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_require_basechain_owner_path((int, slice, slice, cell, cell, cell, cell) $self, slice $recipient, slice $response_destination) impure inline_ref;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_require_basechain_owner_path((int, slice, slice, cell, cell, cell) $self, slice $recipient, slice $response_destination) impure inline_ref;
 
 ;; $ATHWallet$_fun_compute_sender_key
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_sender_key((int, slice, slice, cell, cell, cell, cell) $self, slice $sender_owner) impure inline_ref;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_sender_key((int, slice, slice, cell, cell, cell) $self, int $query_id, slice $sender_owner) impure inline_ref;
 
 ;; $ATHWallet$_fun_compute_pending_notification_key
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_notification_key((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_notification_key((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref;
 
 ;; $ATHWallet$_fun_compute_pending_outgoing_key
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_outgoing_key((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, slice $recipient_wallet) impure inline_ref;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_outgoing_key((int, slice, slice, cell, cell, cell) $self, int $query_id, slice $recipient_wallet) impure inline_ref;
 
 ;; $ATHWallet$_fun_compute_notify_refund_query_id
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_notify_refund_query_id((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key, slice $refund_wallet) impure inline_ref;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_notify_refund_query_id((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key, slice $refund_wallet) impure inline_ref;
 
 ;; $ATHWallet$_fun_notify_transfer_value
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_notify_transfer_value((int, slice, slice, cell, cell, cell, cell) $self, int $notify_value) impure inline_ref;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_notify_transfer_value((int, slice, slice, cell, cell, cell) $self, int $notify_value) impure inline_ref;
+
+;; $ATHWallet$_fun_vault_notify_transfer_value
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_vault_notify_transfer_value((int, slice, slice, cell, cell, cell) $self, int $notify_value) impure inline_ref;
 
 ;; $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at
 ((slice, slice, int, int)) $PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at(slice $recipient_wallet, slice $response_destination, int $amount, int $created_at) inline;
 
 ;; $ATHWallet$_fun_store_pending_outgoing
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_store_pending_outgoing((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $amount, slice $recipient_wallet, slice $response_destination) impure inline_ref;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_store_pending_outgoing((int, slice, slice, cell, cell, cell) $self, int $query_id, int $amount, slice $recipient_wallet, slice $response_destination) impure inline_ref;
 
 ;; $MessageParameters$_constructor_to_value_mode_bounce_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline;
@@ -255,19 +294,19 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ((int, int)) $ATHTransferFailed$_constructor_query_id_amount(int $query_id, int $amount) inline;
 
 ;; $ATHWallet$_fun_restore_bounced_outgoing
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_restore_bounced_outgoing((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $amount) impure inline_ref;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_restore_bounced_outgoing((int, slice, slice, cell, cell, cell) $self, int $query_id, int $amount) impure inline_ref;
 
 ;; $ATHTransferAck$_constructor_query_id_amount
 ((int, int)) $ATHTransferAck$_constructor_query_id_amount(int $query_id, int $amount) inline;
 
 ;; $ATHWallet$_fun_send_source_wallet_ack
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_send_source_wallet_ack((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $amount, slice $source_wallet) impure inline_ref;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_send_source_wallet_ack((int, slice, slice, cell, cell, cell) $self, int $query_id, int $amount, slice $source_wallet) impure inline_ref;
 
 ;; $MessageParameters$_constructor_to_value_bounce_mode_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
 
 ;; $ATHWallet$_fun_refund_owner_excess
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_refund_owner_excess((int, slice, slice, cell, cell, cell, cell) $self, slice $destination, int $amount) impure inline_ref;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_owner_excess((int, slice, slice, cell, cell, cell) $self, slice $destination, int $amount) impure inline_ref;
 
 ;; $SendParameters$_constructor_to_value_bounce_mode_code_data_body
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_bounce_mode_code_data_body(slice $to, int $value, int $bounce, int $mode, cell $code, cell $data, cell $body) inline;
@@ -275,20 +314,23 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
 ((int, int, slice, slice)) $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination(int $query_id, int $amount, slice $sender_owner, slice $response_destination) inline;
 
+;; $ATHWallet$_fun_refund_pending_notification
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_pending_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key, int $amount) impure inline_ref;
+
 ;; $ATHWallet$_fun_refund_bounced_notification
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_refund_bounced_notification((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key, int $amount) impure inline_ref;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_bounced_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref;
 
 ;; $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address
 ((int, slice, slice)) $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address(int $balance, slice $owner_address, slice $ath_master_address) inline;
 
 ;; $ATHWallet$_fun_get_wallet_data
-((int, slice, slice, cell, cell, cell, cell), (int, slice, slice)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell, cell) $self) impure inline_ref;
+((int, slice, slice, cell, cell, cell), (int, slice, slice)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell) $self) impure inline_ref;
 
-;; $PendingAthTransferNotificationView$_constructor_exists_sender_owner_amount_created_at
-((int, slice, int, int)) $PendingAthTransferNotificationView$_constructor_exists_sender_owner_amount_created_at(int $exists, slice $sender_owner, int $amount, int $created_at) inline;
+;; $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at
+((int, slice, slice, int, int)) $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at(int $exists, slice $sender_owner, slice $response_destination, int $amount, int $created_at) inline;
 
 ;; $ATHWallet$_fun_get_pending_notification
-((int, slice, slice, cell, cell, cell, cell), (int, slice, int, int)) $ATHWallet$_fun_get_pending_notification((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref;
+((int, slice, slice, cell, cell, cell), (int, slice, slice, int, int)) $ATHWallet$_fun_get_pending_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref;
 
 ;; $ATHBurnFailed$_constructor_query_id_amount
 ((int, int)) $ATHBurnFailed$_constructor_query_id_amount(int $query_id, int $amount) inline;
@@ -305,14 +347,20 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username
 ((int, int, slice, slice, int, int, slice)) $ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username(int $query_id, int $amount, slice $sender_owner, slice $response_destination, int $notify_value, int $username_len, slice $username) inline;
 
+;; $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username
+((int, int, slice, slice, int, slice, int, slice)) $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username(int $query_id, int $amount, slice $sender_owner, slice $response_destination, int $notify_value, slice $owner_wallet, int $username_len, slice $username) inline;
+
 ;; $ATHInternalTransferProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
 ((int, int, slice, slice, int, int, int, int, int, int)) $ATHInternalTransferProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $amount, slice $sender_owner, slice $response_destination, int $notify_value, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline;
+
+;; $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
+((int, int, slice, slice, int, slice, int, int, int, int, int)) $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $amount, slice $sender_owner, slice $response_destination, int $notify_value, slice $owner_wallet, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline;
 
 ;; $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
 ((int, int, slice, slice, int, slice)) $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload(int $query_id, int $amount, slice $from, slice $response_address, int $forward_ton_amount, slice $forward_payload) inline;
 
-;; $PendingAthTransferNotification$_constructor_sender_owner_amount_created_at
-((slice, int, int)) $PendingAthTransferNotification$_constructor_sender_owner_amount_created_at(slice $sender_owner, int $amount, int $created_at) inline;
+;; $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at
+((slice, slice, int, int, int)) $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at(slice $sender_owner, slice $response_destination, int $response_ack_value, int $amount, int $created_at) inline;
 
 ;; $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet
 ((int, int, int, slice)) $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet(int $query_id, int $sender_key, int $amount, slice $sender_wallet) inline;
@@ -323,8 +371,14 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ;; $AthTransferNotificationMintUsername$_constructor_query_id_sender_key_amount_owner_wallet_username_len_username
 ((int, int, int, slice, int, slice)) $AthTransferNotificationMintUsername$_constructor_query_id_sender_key_amount_owner_wallet_username_len_username(int $query_id, int $sender_key, int $amount, slice $owner_wallet, int $username_len, slice $username) inline;
 
+;; $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username
+((int, int, int, slice, slice, int, slice)) $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username(int $query_id, int $sender_key, int $amount, slice $payer_wallet, slice $owner_wallet, int $username_len, slice $username) inline;
+
 ;; $AthTransferNotificationProfileAvatar$_constructor_query_id_sender_key_amount_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
 ((int, int, int, slice, int, int, int, int, int)) $AthTransferNotificationProfileAvatar$_constructor_query_id_sender_key_amount_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $sender_key, int $amount, slice $owner_wallet, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline;
+
+;; $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
+((int, int, int, slice, slice, int, int, int, int, int)) $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $sender_key, int $amount, slice $payer_wallet, slice $owner_wallet, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline;
 
 
 ;; MarketStabilitySeller_ATHWallet.stdlib.fc
@@ -345,20 +399,20 @@ slice __tact_context_get_sender() inline {
     return __tact_context_sender;
 }
 
-forall X0, X1, X2 -> tuple __tact_tuple_create_3((X0, X1, X2) v) asm """
-    3 TUPLE
-""";
-
-forall X0, X1, X2 -> (X0, X1, X2) __tact_tuple_destroy_3(tuple v) asm """
-    3 UNTUPLE
-""";
-
 forall X0, X1, X2, X3 -> tuple __tact_tuple_create_4((X0, X1, X2, X3) v) asm """
     4 TUPLE
 """;
 
 forall X0, X1, X2, X3 -> (X0, X1, X2, X3) __tact_tuple_destroy_4(tuple v) asm """
     4 UNTUPLE
+""";
+
+forall X0, X1, X2, X3, X4 -> tuple __tact_tuple_create_5((X0, X1, X2, X3, X4) v) asm """
+    5 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4 -> (X0, X1, X2, X3, X4) __tact_tuple_destroy_5(tuple v) asm """
+    5 UNTUPLE
 """;
 
 int __tact_dict_get_int_int(cell d, int kl, int k, int vl) inline {
@@ -450,6 +504,10 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
     int $hash = $global_contractHash($code, $data);
     return $global_newAddress($chain, $hash);
 }
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
 
 () $global_message((int, cell, int, slice, int) $params) impure asm """
     NEWC
@@ -675,15 +733,15 @@ cell $ATHGenesisSupplyAck$_store_cell((int, int, slice) v, builder b) inline {
 ;;
 ;; Type: AthTransferNotification
 ;; Header: 0x472d9d7d
-;; TLB: ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_key:uint32 sender_wallet:address = AthTransferNotification
+;; TLB: ath_transfer_notification#472d9d7d query_id:uint64 sender_key:uint160 amount:uint128 sender_wallet:address = AthTransferNotification
 ;;
 
 builder $AthTransferNotification$_store(builder build_0, (int, int, int, slice) v) inline {
-    var (v'query_id, v'amount, v'sender_key, v'sender_wallet) = v;
+    var (v'query_id, v'sender_key, v'amount, v'sender_wallet) = v;
     build_0 = store_uint(build_0, 1194171773, 32);
     build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'sender_key, 160);
     build_0 = build_0.store_uint(v'amount, 128);
-    build_0 = build_0.store_uint(v'sender_key, 32);
     build_0 = build_0.store_slice(v'sender_wallet);
     return build_0;
 }
@@ -692,29 +750,28 @@ cell $AthTransferNotification$_store_cell((int, int, int, slice) v, builder b) i
     return $AthTransferNotification$_store(b, v).end_cell();
 }
 
-(slice, ((int, int, int))) $AthTransferNotification$_load_bounced(slice sc_0) inline {
+(slice, ((int, int))) $AthTransferNotification$_load_bounced(slice sc_0) inline {
     var v'query_id = sc_0~load_uint(64);
-    var v'amount = sc_0~load_uint(128);
-    var v'sender_key = sc_0~load_uint(32);
-    return (sc_0, (v'query_id, v'amount, v'sender_key));
+    var v'sender_key = sc_0~load_uint(160);
+    return (sc_0, (v'query_id, v'sender_key));
 }
 
 ((int, int, int, slice)) $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet(int $query_id, int $sender_key, int $amount, slice $sender_wallet) inline {
-    return ($query_id, $amount, $sender_key, $sender_wallet);
+    return ($query_id, $sender_key, $amount, $sender_wallet);
 }
 
 ;;
 ;; Type: AthTransferNotificationMintUsername
 ;; Header: 0x89129d5f
-;; TLB: ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername
+;; TLB: ath_transfer_notification_mint_username#89129d5f query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername
 ;;
 
 builder $AthTransferNotificationMintUsername$_store(builder build_0, (int, int, int, slice, int, slice) v) inline {
-    var (v'query_id, v'amount, v'sender_key, v'owner_wallet, v'username_len, v'username) = v;
+    var (v'query_id, v'sender_key, v'amount, v'owner_wallet, v'username_len, v'username) = v;
     build_0 = store_uint(build_0, 2299698527, 32);
     build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'sender_key, 160);
     build_0 = build_0.store_uint(v'amount, 128);
-    build_0 = build_0.store_uint(v'sender_key, 32);
     build_0 = build_0.store_slice(v'owner_wallet);
     build_0 = build_0.store_uint(v'username_len, 8);
     build_0 = build_0.store_slice(v'username);
@@ -725,35 +782,69 @@ cell $AthTransferNotificationMintUsername$_store_cell((int, int, int, slice, int
     return $AthTransferNotificationMintUsername$_store(b, v).end_cell();
 }
 
-(slice, ((int, int, int))) $AthTransferNotificationMintUsername$_load_bounced(slice sc_0) inline {
+(slice, ((int, int))) $AthTransferNotificationMintUsername$_load_bounced(slice sc_0) inline {
     var v'query_id = sc_0~load_uint(64);
-    var v'amount = sc_0~load_uint(128);
-    var v'sender_key = sc_0~load_uint(32);
-    return (sc_0, (v'query_id, v'amount, v'sender_key));
+    var v'sender_key = sc_0~load_uint(160);
+    return (sc_0, (v'query_id, v'sender_key));
 }
 
 ((int, int, int, slice, int, slice)) $AthTransferNotificationMintUsername$_constructor_query_id_sender_key_amount_owner_wallet_username_len_username(int $query_id, int $sender_key, int $amount, slice $owner_wallet, int $username_len, slice $username) inline {
-    return ($query_id, $amount, $sender_key, $owner_wallet, $username_len, $username);
+    return ($query_id, $sender_key, $amount, $owner_wallet, $username_len, $username);
+}
+
+;;
+;; Type: AthTransferNotificationVaultMintUsername
+;; Header: 0x89129d60
+;; TLB: ath_transfer_notification_vault_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationVaultMintUsername
+;;
+
+builder $AthTransferNotificationVaultMintUsername$_store(builder build_0, (int, int, int, slice, slice, int, slice) v) inline {
+    var (v'query_id, v'sender_key, v'amount, v'payer_wallet, v'owner_wallet, v'username_len, v'username) = v;
+    build_0 = store_uint(build_0, 2299698528, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'sender_key, 160);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'payer_wallet);
+    build_0 = build_0.store_slice(v'owner_wallet);
+    build_0 = build_0.store_uint(v'username_len, 8);
+    build_0 = build_0.store_slice(v'username);
+    return build_0;
+}
+
+cell $AthTransferNotificationVaultMintUsername$_store_cell((int, int, int, slice, slice, int, slice) v, builder b) inline {
+    return $AthTransferNotificationVaultMintUsername$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $AthTransferNotificationVaultMintUsername$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'sender_key = sc_0~load_uint(160);
+    return (sc_0, (v'query_id, v'sender_key));
+}
+
+((int, int, int, slice, slice, int, slice)) $AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username(int $query_id, int $sender_key, int $amount, slice $payer_wallet, slice $owner_wallet, int $username_len, slice $username) inline {
+    return ($query_id, $sender_key, $amount, $payer_wallet, $owner_wallet, $username_len, $username);
 }
 
 ;;
 ;; Type: AthTransferNotificationProfileAvatar
 ;; Header: 0xa11a7001
-;; TLB: ath_transfer_notification_profile_avatar#a11a7001 query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationProfileAvatar
+;; TLB: ath_transfer_notification_profile_avatar#a11a7001 query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationProfileAvatar
 ;;
 
 builder $AthTransferNotificationProfileAvatar$_store(builder build_0, (int, int, int, slice, int, int, int, int, int) v) inline {
-    var (v'query_id, v'amount, v'sender_key, v'owner_wallet, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format) = v;
+    var (v'query_id, v'sender_key, v'amount, v'owner_wallet, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format) = v;
     build_0 = store_uint(build_0, 2702864385, 32);
     build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'sender_key, 160);
     build_0 = build_0.store_uint(v'amount, 128);
-    build_0 = build_0.store_uint(v'sender_key, 32);
     build_0 = build_0.store_slice(v'owner_wallet);
     build_0 = build_0.store_uint(v'avatar_hash, 256);
     build_0 = build_0.store_uint(v'avatar_entry_id, 64);
-    build_0 = build_0.store_uint(v'avatar_stream_id, 128);
-    build_0 = build_0.store_uint(v'avatar_part_count, 16);
-    build_0 = build_0.store_uint(v'media_format, 8);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'avatar_stream_id, 128);
+    build_1 = build_1.store_uint(v'avatar_part_count, 16);
+    build_1 = build_1.store_uint(v'media_format, 8);
+    build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
@@ -761,15 +852,52 @@ cell $AthTransferNotificationProfileAvatar$_store_cell((int, int, int, slice, in
     return $AthTransferNotificationProfileAvatar$_store(b, v).end_cell();
 }
 
-(slice, ((int, int, int))) $AthTransferNotificationProfileAvatar$_load_bounced(slice sc_0) inline {
+(slice, ((int, int))) $AthTransferNotificationProfileAvatar$_load_bounced(slice sc_0) inline {
     var v'query_id = sc_0~load_uint(64);
-    var v'amount = sc_0~load_uint(128);
-    var v'sender_key = sc_0~load_uint(32);
-    return (sc_0, (v'query_id, v'amount, v'sender_key));
+    var v'sender_key = sc_0~load_uint(160);
+    return (sc_0, (v'query_id, v'sender_key));
 }
 
 ((int, int, int, slice, int, int, int, int, int)) $AthTransferNotificationProfileAvatar$_constructor_query_id_sender_key_amount_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $sender_key, int $amount, slice $owner_wallet, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline {
-    return ($query_id, $amount, $sender_key, $owner_wallet, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format);
+    return ($query_id, $sender_key, $amount, $owner_wallet, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format);
+}
+
+;;
+;; Type: AthTransferNotificationVaultProfileAvatar
+;; Header: 0xa11a7002
+;; TLB: ath_transfer_notification_vault_profile_avatar#a11a7002 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationVaultProfileAvatar
+;;
+
+builder $AthTransferNotificationVaultProfileAvatar$_store(builder build_0, (int, int, int, slice, slice, int, int, int, int, int) v) inline {
+    var (v'query_id, v'sender_key, v'amount, v'payer_wallet, v'owner_wallet, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format) = v;
+    build_0 = store_uint(build_0, 2702864386, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'sender_key, 160);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'payer_wallet);
+    build_0 = build_0.store_slice(v'owner_wallet);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'avatar_hash, 256);
+    build_1 = build_1.store_uint(v'avatar_entry_id, 64);
+    build_1 = build_1.store_uint(v'avatar_stream_id, 128);
+    build_1 = build_1.store_uint(v'avatar_part_count, 16);
+    build_1 = build_1.store_uint(v'media_format, 8);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $AthTransferNotificationVaultProfileAvatar$_store_cell((int, int, int, slice, slice, int, int, int, int, int) v, builder b) inline {
+    return $AthTransferNotificationVaultProfileAvatar$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $AthTransferNotificationVaultProfileAvatar$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'sender_key = sc_0~load_uint(160);
+    return (sc_0, (v'query_id, v'sender_key));
+}
+
+((int, int, int, slice, slice, int, int, int, int, int)) $AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $sender_key, int $amount, slice $payer_wallet, slice $owner_wallet, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline {
+    return ($query_id, $sender_key, $amount, $payer_wallet, $owner_wallet, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format);
 }
 
 ;;
@@ -908,6 +1036,81 @@ cell $ATHInternalTransferProfileAvatar$_store_cell((int, int, slice, slice, int,
 }
 
 ;;
+;; Type: ATHInternalTransferVaultProfileAvatar
+;; Header: 0x4154481b
+;; TLB: ath_internal_transfer_vault_profile_avatar#4154481b query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHInternalTransferVaultProfileAvatar
+;;
+
+builder $ATHInternalTransferVaultProfileAvatar$_store(builder build_0, (int, int, slice, slice, int, slice, int, int, int, int, int) v) inline_ref {
+    var (v'query_id, v'amount, v'sender_owner, v'response_destination, v'notify_value, v'owner_wallet, v'avatar_hash, v'avatar_entry_id, v'avatar_stream_id, v'avatar_part_count, v'media_format) = v;
+    build_0 = store_uint(build_0, 1096042523, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'sender_owner);
+    build_0 = build_0.store_slice(v'response_destination);
+    build_0 = build_0.store_uint(v'notify_value, 128);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_slice(v'owner_wallet);
+    build_1 = build_1.store_uint(v'avatar_hash, 256);
+    build_1 = build_1.store_uint(v'avatar_entry_id, 64);
+    build_1 = build_1.store_uint(v'avatar_stream_id, 128);
+    build_1 = build_1.store_uint(v'avatar_part_count, 16);
+    build_1 = build_1.store_uint(v'media_format, 8);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $ATHInternalTransferVaultProfileAvatar$_store_cell((int, int, slice, slice, int, slice, int, int, int, int, int) v, builder b) inline {
+    return $ATHInternalTransferVaultProfileAvatar$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $ATHInternalTransferVaultProfileAvatar$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'query_id, v'amount));
+}
+
+((int, int, slice, slice, int, slice, int, int, int, int, int)) $ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format(int $query_id, int $amount, slice $sender_owner, slice $response_destination, int $notify_value, slice $owner_wallet, int $avatar_hash, int $avatar_entry_id, int $avatar_stream_id, int $avatar_part_count, int $media_format) inline {
+    return ($query_id, $amount, $sender_owner, $response_destination, $notify_value, $owner_wallet, $avatar_hash, $avatar_entry_id, $avatar_stream_id, $avatar_part_count, $media_format);
+}
+
+;;
+;; Type: ATHInternalTransferVaultMintUsername
+;; Header: 0x4154481d
+;; TLB: ath_internal_transfer_vault_mint_username#4154481d query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = ATHInternalTransferVaultMintUsername
+;;
+
+builder $ATHInternalTransferVaultMintUsername$_store(builder build_0, (int, int, slice, slice, int, slice, int, slice) v) inline {
+    var (v'query_id, v'amount, v'sender_owner, v'response_destination, v'notify_value, v'owner_wallet, v'username_len, v'username) = v;
+    build_0 = store_uint(build_0, 1096042525, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'amount, 128);
+    build_0 = build_0.store_slice(v'sender_owner);
+    build_0 = build_0.store_slice(v'response_destination);
+    build_0 = build_0.store_uint(v'notify_value, 128);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_slice(v'owner_wallet);
+    build_1 = build_1.store_uint(v'username_len, 8);
+    build_1 = build_1.store_slice(v'username);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $ATHInternalTransferVaultMintUsername$_store_cell((int, int, slice, slice, int, slice, int, slice) v, builder b) inline {
+    return $ATHInternalTransferVaultMintUsername$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $ATHInternalTransferVaultMintUsername$_load_bounced(slice sc_0) inline {
+    var v'query_id = sc_0~load_uint(64);
+    var v'amount = sc_0~load_uint(128);
+    return (sc_0, (v'query_id, v'amount));
+}
+
+((int, int, slice, slice, int, slice, int, slice)) $ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username(int $query_id, int $amount, slice $sender_owner, slice $response_destination, int $notify_value, slice $owner_wallet, int $username_len, slice $username) inline {
+    return ($query_id, $amount, $sender_owner, $response_destination, $notify_value, $owner_wallet, $username_len, $username);
+}
+
+;;
 ;; Type: ATHTransferAck
 ;; Header: 0x41544811
 ;; TLB: ath_transfer_ack#41544811 query_id:uint64 amount:uint128 = ATHTransferAck
@@ -1020,45 +1223,49 @@ cell $JettonExcesses$_store_cell((int) v, builder b) inline {
 
 ;;
 ;; Type: PendingAthTransferNotificationView
-;; TLB: _ exists:bool sender_owner:address amount:int257 created_at:int257 = PendingAthTransferNotificationView
+;; TLB: _ exists:bool sender_owner:address response_destination:address amount:int257 created_at:int257 = PendingAthTransferNotificationView
 ;;
 
-(int, slice, int, int) $PendingAthTransferNotificationView$_to_external(((int, slice, int, int)) v) inline {
-    var (v'exists, v'sender_owner, v'amount, v'created_at) = v; 
-    return (v'exists, v'sender_owner, v'amount, v'created_at);
+(int, slice, slice, int, int) $PendingAthTransferNotificationView$_to_external(((int, slice, slice, int, int)) v) inline {
+    var (v'exists, v'sender_owner, v'response_destination, v'amount, v'created_at) = v; 
+    return (v'exists, v'sender_owner, v'response_destination, v'amount, v'created_at);
 }
 
-((int, slice, int, int)) $PendingAthTransferNotificationView$_constructor_exists_sender_owner_amount_created_at(int $exists, slice $sender_owner, int $amount, int $created_at) inline {
-    return ($exists, $sender_owner, $amount, $created_at);
+((int, slice, slice, int, int)) $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at(int $exists, slice $sender_owner, slice $response_destination, int $amount, int $created_at) inline {
+    return ($exists, $sender_owner, $response_destination, $amount, $created_at);
 }
 
 ;;
 ;; Type: PendingAthTransferNotification
-;; TLB: _ sender_owner:address amount:uint128 created_at:uint32 = PendingAthTransferNotification
+;; TLB: _ sender_owner:address response_destination:address response_ack_value:uint64 amount:uint128 created_at:uint32 = PendingAthTransferNotification
 ;;
 
-builder $PendingAthTransferNotification$_store(builder build_0, (slice, int, int) v) inline {
-    var (v'sender_owner, v'amount, v'created_at) = v;
+builder $PendingAthTransferNotification$_store(builder build_0, (slice, slice, int, int, int) v) inline {
+    var (v'sender_owner, v'response_destination, v'response_ack_value, v'amount, v'created_at) = v;
     build_0 = build_0.store_slice(v'sender_owner);
+    build_0 = build_0.store_slice(v'response_destination);
+    build_0 = build_0.store_uint(v'response_ack_value, 64);
     build_0 = build_0.store_uint(v'amount, 128);
     build_0 = build_0.store_uint(v'created_at, 32);
     return build_0;
 }
 
-cell $PendingAthTransferNotification$_store_cell((slice, int, int) v, builder b) inline {
+cell $PendingAthTransferNotification$_store_cell((slice, slice, int, int, int) v, builder b) inline {
     return $PendingAthTransferNotification$_store(b, v).end_cell();
 }
 
-(slice, ((slice, int, int))) $PendingAthTransferNotification$_load(slice sc_0) inline {
+(slice, ((slice, slice, int, int, int))) $PendingAthTransferNotification$_load(slice sc_0) inline {
     var v'sender_owner = sc_0~load_msg_addr();
+    var v'response_destination = sc_0~load_msg_addr();
+    var v'response_ack_value = sc_0~load_uint(64);
     var v'amount = sc_0~load_uint(128);
     var v'created_at = sc_0~load_uint(32);
-    return (sc_0, (v'sender_owner, v'amount, v'created_at));
+    return (sc_0, (v'sender_owner, v'response_destination, v'response_ack_value, v'amount, v'created_at));
 }
 
-tuple $PendingAthTransferNotification$_as_optional((slice, int, int) v) inline {
-    var (v'sender_owner, v'amount, v'created_at) = v;
-    return __tact_tuple_create_3(v'sender_owner, v'amount, v'created_at);
+tuple $PendingAthTransferNotification$_as_optional((slice, slice, int, int, int) v) inline {
+    var (v'sender_owner, v'response_destination, v'response_ack_value, v'amount, v'created_at) = v;
+    return __tact_tuple_create_5(v'sender_owner, v'response_destination, v'response_ack_value, v'amount, v'created_at);
 }
 
 tuple $PendingAthTransferNotification$_load_opt(cell cl) inline {
@@ -1069,13 +1276,13 @@ tuple $PendingAthTransferNotification$_load_opt(cell cl) inline {
     return $PendingAthTransferNotification$_as_optional(sc~$PendingAthTransferNotification$_load());
 }
 
-((slice, int, int)) $PendingAthTransferNotification$_not_null(tuple v) inline {
-    var (slice vvv'sender_owner, int vvv'amount, int vvv'created_at) = __tact_tuple_destroy_3(v);
-    return (vvv'sender_owner, vvv'amount, vvv'created_at);
+((slice, slice, int, int, int)) $PendingAthTransferNotification$_not_null(tuple v) inline {
+    var (slice vvv'sender_owner, slice vvv'response_destination, int vvv'response_ack_value, int vvv'amount, int vvv'created_at) = __tact_tuple_destroy_5(v);
+    return (vvv'sender_owner, vvv'response_destination, vvv'response_ack_value, vvv'amount, vvv'created_at);
 }
 
-((slice, int, int)) $PendingAthTransferNotification$_constructor_sender_owner_amount_created_at(slice $sender_owner, int $amount, int $created_at) inline {
-    return ($sender_owner, $amount, $created_at);
+((slice, slice, int, int, int)) $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at(slice $sender_owner, slice $response_destination, int $response_ack_value, int $amount, int $created_at) inline {
+    return ($sender_owner, $response_destination, $response_ack_value, $amount, $created_at);
 }
 
 ;;
@@ -1128,33 +1335,31 @@ tuple $PendingAthOutgoingTransfer$_load_opt(cell cl) inline {
 
 ;;
 ;; Type: ATHWallet
-;; TLB: _ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pruned_notification_acks:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}> = ATHWallet
+;; TLB: _ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}> = ATHWallet
 ;;
 
-builder $ATHWallet$_store(builder build_0, (int, slice, slice, cell, cell, cell, cell) v) inline {
-    var (v'balance, v'owner_address, v'ath_master_address, v'pending_notifications, v'processed_notifications, v'pruned_notification_acks, v'pending_outgoing_transfers) = v;
+builder $ATHWallet$_store(builder build_0, (int, slice, slice, cell, cell, cell) v) inline {
+    var (v'balance, v'owner_address, v'ath_master_address, v'pending_notifications, v'processed_notifications, v'pending_outgoing_transfers) = v;
     build_0 = build_0.store_uint(v'balance, 128);
     build_0 = build_0.store_slice(v'owner_address);
     build_0 = build_0.store_slice(v'ath_master_address);
     build_0 = build_0.store_dict(v'pending_notifications);
     var build_1 = begin_cell();
     build_1 = build_1.store_dict(v'processed_notifications);
-    build_1 = build_1.store_dict(v'pruned_notification_acks);
     build_1 = build_1.store_dict(v'pending_outgoing_transfers);
     build_0 = store_builder_ref(build_0, build_1);
     return build_0;
 }
 
-(slice, ((int, slice, slice, cell, cell, cell, cell))) $ATHWallet$_load(slice sc_0) inline {
+(slice, ((int, slice, slice, cell, cell, cell))) $ATHWallet$_load(slice sc_0) inline {
     var v'balance = sc_0~load_uint(128);
     var v'owner_address = sc_0~load_msg_addr();
     var v'ath_master_address = sc_0~load_msg_addr();
     var v'pending_notifications = sc_0~load_dict();
     slice sc_1 = sc_0~load_ref().begin_parse();
     var v'processed_notifications = sc_1~load_dict();
-    var v'pruned_notification_acks = sc_1~load_dict();
     var v'pending_outgoing_transfers = sc_1~load_dict();
-    return (sc_0, (v'balance, v'owner_address, v'ath_master_address, v'pending_notifications, v'processed_notifications, v'pruned_notification_acks, v'pending_outgoing_transfers));
+    return (sc_0, (v'balance, v'owner_address, v'ath_master_address, v'pending_notifications, v'processed_notifications, v'pending_outgoing_transfers));
 }
 
 builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
@@ -1172,7 +1377,7 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
     return (sc_0, (v'balance, v'owner_address, v'ath_master_address));
 }
 
-(int, slice, slice, cell, cell, cell, cell) $ATHWallet$_contract_load() impure inline {
+(int, slice, slice, cell, cell, cell) $ATHWallet$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
@@ -1185,7 +1390,7 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
     }
 }
 
-() $ATHWallet$_contract_store((int, slice, slice, cell, cell, cell, cell) v) impure inline {
+() $ATHWallet$_contract_store((int, slice, slice, cell, cell, cell) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $ATHWallet$_store(b, v);
@@ -1210,83 +1415,88 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
 ;; Contract ATHWallet functions
 ;;
 
-(int, slice, slice, cell, cell, cell, cell) $ATHWallet$_contract_init(int $balance, slice $owner_address, slice $ath_master_address) impure inline {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = (null(), null(), null(), null(), null(), null(), null());
+(int, slice, slice, cell, cell, cell) $ATHWallet$_contract_init(int $balance, slice $owner_address, slice $ath_master_address) impure inline {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = (null(), null(), null(), null(), null(), null());
     $self'balance = $balance;
     $self'owner_address = $owner_address;
     $self'ath_master_address = $ath_master_address;
     $self'pending_notifications = null();
     $self'processed_notifications = null();
-    $self'pruned_notification_acks = null();
     $self'pending_outgoing_transfers = null();
-    return ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers);
+    return ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers);
 }
 
-((int, slice, slice, cell, cell, cell, cell), slice) $ATHWallet$_fun_derive_wallet_address((int, slice, slice, cell, cell, cell, cell) $self, slice $owner) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), slice) $ATHWallet$_fun_derive_wallet_address((int, slice, slice, cell, cell, cell) $self, slice $owner) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     var ($owner_std'workchain, $owner_std'address) = $global_parseStdAddress($Address$_fun_asSlice($owner));
     var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $owner, $self'ath_master_address);
     var $fresh$ret_0 = $global_contractAddressExt($owner_std'workchain, $wallet_init'code, $wallet_init'data);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_0);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_0);
 }
 
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_is_basechain_address((int, slice, slice, cell, cell, cell, cell) $self, slice $owner) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_is_basechain_address((int, slice, slice, cell, cell, cell) $self, slice $owner) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     var ($owner_std'workchain, $owner_std'address) = $global_parseStdAddress($Address$_fun_asSlice($owner));
     var $fresh$ret_1 = ($owner_std'workchain == 0);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_1);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_1);
 }
 
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_require_basechain_owner_path((int, slice, slice, cell, cell, cell, cell) $self, slice $recipient, slice $response_destination) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    throw_unless(14600, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($self'owner_address));
-    throw_unless(14601, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($recipient));
-    throw_unless(14602, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($response_destination));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_require_basechain_owner_path((int, slice, slice, cell, cell, cell) $self, slice $recipient, slice $response_destination) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    throw_unless(14600, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($self'owner_address));
+    throw_unless(14601, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($recipient));
+    throw_unless(14602, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($response_destination));
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_sender_key((int, slice, slice, cell, cell, cell, cell) $self, slice $sender_owner) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    var $fresh$ret_2 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1096044105, 32), $sender_owner))) % 4294967296);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_2);
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_sender_key((int, slice, slice, cell, cell, cell) $self, int $query_id, slice $sender_owner) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    var $fresh$ret_2 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint(store_uint($global_beginCell(), 1096044105, 32), $query_id, 64), $sender_owner))) % 1461501637330902918203684832716283019655932542976);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_2);
 }
 
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_notification_key((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    var $fresh$ret_3 = (($query_id * 4294967296) + $sender_key);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_3);
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_notification_key((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    var $fresh$ret_3 = $sender_key;
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_3);
 }
 
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_outgoing_key((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, slice $recipient_wallet) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_pending_outgoing_key((int, slice, slice, cell, cell, cell) $self, int $query_id, slice $recipient_wallet) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     var $fresh$ret_4 = $Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint(store_uint($global_beginCell(), 1096044359, 32), $query_id, 64), $recipient_wallet)));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_4);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_4);
 }
 
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_compute_notify_refund_query_id((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key, slice $refund_wallet) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    var $fresh$ret_5 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint(store_uint(store_uint($global_beginCell(), 1096045126, 32), $query_id, 64), $sender_key, 32), $refund_wallet))) % 18446744073709551616);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_5);
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_compute_notify_refund_query_id((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key, slice $refund_wallet) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    var $fresh$ret_5 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint(store_uint(store_uint($global_beginCell(), 1096045126, 32), $query_id, 64), $sender_key, 160), $refund_wallet))) % 18446744073709551616);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_5);
 }
 
-((int, slice, slice, cell, cell, cell, cell), int) $ATHWallet$_fun_notify_transfer_value((int, slice, slice, cell, cell, cell, cell) $self, int $notify_value) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_notify_transfer_value((int, slice, slice, cell, cell, cell) $self, int $notify_value) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     var $fresh$ret_6 = (((($notify_value + 1000000) + 1000000) + 7000000) + 2000000);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_6);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_6);
 }
 
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_store_pending_outgoing((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $amount, slice $recipient_wallet, slice $response_destination) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($query_id, $recipient_wallet);
+((int, slice, slice, cell, cell, cell), int) $ATHWallet$_fun_vault_notify_transfer_value((int, slice, slice, cell, cell, cell) $self, int $notify_value) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    var $fresh$ret_7 = ((((($notify_value + 3000000) + 1000000) + 7000000) + 2000000) + 2000000);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_7);
+}
+
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_store_pending_outgoing((int, slice, slice, cell, cell, cell) $self, int $query_id, int $amount, slice $recipient_wallet, slice $response_destination) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($query_id, $recipient_wallet);
     throw_unless(14230, (~ __tact_dict_exists_int($self'pending_outgoing_transfers, 257, $pending_key)));
     $self'pending_outgoing_transfers~__tact_dict_set_int_cell(257, $pending_key, $PendingAthOutgoingTransfer$_store_cell($PendingAthOutgoingTransfer$_constructor_recipient_wallet_response_destination_amount_created_at($recipient_wallet, $response_destination, $amount, $global_now()), begin_cell()));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_restore_bounced_outgoing((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $amount) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_restore_bounced_outgoing((int, slice, slice, cell, cell, cell) $self, int $query_id, int $amount) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     throw_unless(14220, ($amount > 0));
-    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($query_id, __tact_context_get_sender());
+    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($query_id, __tact_context_get_sender());
     tuple $pendingOpt = $PendingAthOutgoingTransfer$_load_opt(__tact_dict_get_int_cell($self'pending_outgoing_transfers, 257, $pending_key));
     throw_unless(14221, (~ null?($pendingOpt)));
     var ($pending'recipient_wallet, $pending'response_destination, $pending'amount, $pending'created_at) = $PendingAthOutgoingTransfer$_not_null($pendingOpt);
@@ -1294,63 +1504,85 @@ builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
     throw_unless(14223, ( equal_slices_bits(__tact_context_get_sender(), $pending'recipient_wallet) ));
     $self'pending_outgoing_transfers~__tact_dict_delete_int(257, $pending_key);
     $self'balance = $self'balance + $amount;
-    $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($pending'response_destination, 0, 64, true, $ATHTransferFailed$_store_cell($ATHTransferFailed$_constructor_query_id_amount($query_id, $amount), begin_cell())));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+    if (( ~ equal_slices_bits($pending'response_destination, $global_myAddress()) )) {
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($pending'response_destination, 0, 64, true, $ATHTransferFailed$_store_cell($ATHTransferFailed$_constructor_query_id_amount($query_id, $amount), begin_cell())));
+    }
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_send_source_wallet_ack((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $amount, slice $source_wallet) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_send_source_wallet_ack((int, slice, slice, cell, cell, cell) $self, int $query_id, int $amount, slice $source_wallet) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($source_wallet, 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($query_id, $amount), begin_cell())));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_refund_owner_excess((int, slice, slice, cell, cell, cell, cell) $self, slice $destination, int $amount) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_owner_excess((int, slice, slice, cell, cell, cell) $self, slice $destination, int $amount) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     if (($amount < 100000)) {
-        return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+        return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
     }
     $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($destination, $amount, false, 0, null()));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), ()) $ATHWallet$_fun_refund_bounced_notification((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key, int $amount) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_pending_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key, int $amount) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
     throw_unless(14330, ($amount > 0));
-    throw_unless(14335, ($Context$_get_value(__tact_context_get()) >= 9000000));
-    throw_unless(14331, ($self'balance >= $amount));
-    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($query_id, $sender_key);
+    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($query_id, $sender_key);
     tuple $pendingOpt = $PendingAthTransferNotification$_load_opt(__tact_dict_get_int_cell($self'pending_notifications, 257, $pending_key));
     throw_unless(14332, (~ null?($pendingOpt)));
-    var ($pending'sender_owner, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
+    var ($pending'sender_owner, $pending'response_destination, $pending'response_ack_value, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
+    throw_unless(14335, ($Context$_get_value(__tact_context_get()) >= (9000000 + $pending'response_ack_value)));
+    throw_unless(14331, ($self'balance >= $amount));
     throw_unless(14333, ($pending'amount == $amount));
-    throw_unless(14334, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($pending'sender_owner) == $sender_key));
+    throw_unless(14334, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($query_id, $pending'sender_owner) == $sender_key));
     $self'balance = $self'balance - $amount;
     $self'pending_notifications~__tact_dict_delete_int(257, $pending_key);
-    slice $refund_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($pending'sender_owner);
+    slice $refund_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($pending'sender_owner);
     var ($refund_init'code, $refund_init'data) = $ATHWallet$_init_child(0, $pending'sender_owner, $self'ath_master_address);
-    int $refund_query_id = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_notify_refund_query_id($query_id, $sender_key, $refund_wallet);
-    ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($refund_query_id, $amount, $refund_wallet, $pending'sender_owner);
-    $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($refund_wallet, 0, true, 64, $refund_init'code, $refund_init'data, $ATHInternalTransfer$_store_cell($ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination($refund_query_id, $amount, $self'owner_address, $pending'sender_owner), begin_cell())));
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), ());
+    int $refund_query_id = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_notify_refund_query_id($query_id, $sender_key, $refund_wallet);
+    slice $refund_response_destination = $pending'sender_owner;
+    slice $outgoing_failure_destination = $pending'sender_owner;
+    if (($pending'response_ack_value == 3000000)) {
+        $refund_query_id = $query_id;
+        $refund_response_destination = $pending'response_destination;
+        $outgoing_failure_destination = $global_myAddress();
+    } else {
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($pending'response_destination, $pending'response_ack_value, 1, false, $ATHTransferFailed$_store_cell($ATHTransferFailed$_constructor_query_id_amount($query_id, $amount), begin_cell())));
+    }
+    ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($refund_query_id, $amount, $refund_wallet, $outgoing_failure_destination);
+    $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($refund_wallet, 0, true, 64, $refund_init'code, $refund_init'data, $ATHInternalTransfer$_store_cell($ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination($refund_query_id, $amount, $self'owner_address, $refund_response_destination), begin_cell())));
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), (int, slice, slice)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell, cell) $self) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    var $fresh$ret_7 = $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address($self'balance, $self'owner_address, $self'ath_master_address);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_7);
+((int, slice, slice, cell, cell, cell), ()) $ATHWallet$_fun_refund_bounced_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($query_id, $sender_key);
+    tuple $pendingOpt = $PendingAthTransferNotification$_load_opt(__tact_dict_get_int_cell($self'pending_notifications, 257, $pending_key));
+    throw_unless(14337, (~ null?($pendingOpt)));
+    var ($pending'sender_owner, $pending'response_destination, $pending'response_ack_value, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
+    throw_unless(14338, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($query_id, $pending'sender_owner) == $sender_key));
+    ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_pending_notification($query_id, $sender_key, $pending'amount);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), ());
 }
 
-((int, slice, slice, cell, cell, cell, cell), (int, slice, int, int)) $ATHWallet$_fun_get_pending_notification((int, slice, slice, cell, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref {
-    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)) = $self;
-    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($query_id, $sender_key);
+((int, slice, slice, cell, cell, cell), (int, slice, slice)) $ATHWallet$_fun_get_wallet_data((int, slice, slice, cell, cell, cell) $self) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    var $fresh$ret_8 = $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address($self'balance, $self'owner_address, $self'ath_master_address);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_8);
+}
+
+((int, slice, slice, cell, cell, cell), (int, slice, slice, int, int)) $ATHWallet$_fun_get_pending_notification((int, slice, slice, cell, cell, cell) $self, int $query_id, int $sender_key) impure inline_ref {
+    var (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)) = $self;
+    int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($query_id, $sender_key);
     tuple $pendingOpt = $PendingAthTransferNotification$_load_opt(__tact_dict_get_int_cell($self'pending_notifications, 257, $pending_key));
     if (null?($pendingOpt)) {
-        var $fresh$ret_8 = $PendingAthTransferNotificationView$_constructor_exists_sender_owner_amount_created_at(false, $self'owner_address, 0, 0);
-        return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_8);
+        var $fresh$ret_9 = $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at(false, $self'owner_address, $self'owner_address, 0, 0);
+        return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_9);
     }
-    var ($pending'sender_owner, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
-    var $fresh$ret_9 = $PendingAthTransferNotificationView$_constructor_exists_sender_owner_amount_created_at(true, $pending'sender_owner, $pending'amount, $pending'created_at);
-    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers), $fresh$ret_9);
+    var ($pending'sender_owner, $pending'response_destination, $pending'response_ack_value, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
+    var $fresh$ret_10 = $PendingAthTransferNotificationView$_constructor_exists_sender_owner_response_destination_amount_created_at(true, $pending'sender_owner, $pending'response_destination, $pending'amount, $pending'created_at);
+    return (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers), $fresh$ret_10);
 }
 
 ;;
@@ -1391,7 +1623,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers) = $ATHWallet$_contract_load();
+    var ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers) = $ATHWallet$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -1408,74 +1640,108 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
             throw_unless(14004, ($msg'amount > 0));
             $self'balance = $self'balance + $msg'amount;
             $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, 0, 64, true, $ATHBurnFailed$_store_cell($ATHBurnFailed$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for ATHInternalTransfer message
         if (op == 0x41544812) {
             var ($msg'query_id, $msg'amount) = in_msg~$ATHInternalTransfer$_load_bounced();
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for ATHInternalTransferWithNotify message
         if (op == 0x41544815) {
             var ($msg'query_id, $msg'amount) = in_msg~$ATHInternalTransferWithNotify$_load_bounced();
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for ATHInternalTransferMintUsername message
         if (op == 0x41544817) {
             var ($msg'query_id, $msg'amount) = in_msg~$ATHInternalTransferMintUsername$_load_bounced();
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+            return ();
+        }
+        
+        ;; Bounced handler for ATHInternalTransferVaultMintUsername message
+        if (op == 0x4154481d) {
+            var ($msg'query_id, $msg'amount) = in_msg~$ATHInternalTransferVaultMintUsername$_load_bounced();
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for ATHInternalTransferProfileAvatar message
         if (op == 0x41544819) {
             var ($msg'query_id, $msg'amount) = in_msg~$ATHInternalTransferProfileAvatar$_load_bounced();
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+            return ();
+        }
+        
+        ;; Bounced handler for ATHInternalTransferVaultProfileAvatar message
+        if (op == 0x4154481b) {
+            var ($msg'query_id, $msg'amount) = in_msg~$ATHInternalTransferVaultProfileAvatar$_load_bounced();
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for JettonInternalTransfer message
         if (op == 0x178d4519) {
             var ($msg'query_id, $msg'amount) = in_msg~$JettonInternalTransfer$_load_bounced();
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_restore_bounced_outgoing($msg'query_id, $msg'amount);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for AthTransferNotification message
         if (op == 0x472d9d7d) {
-            var ($msg'query_id, $msg'amount, $msg'sender_key) = in_msg~$AthTransferNotification$_load_bounced();
+            var ($msg'query_id, $msg'sender_key) = in_msg~$AthTransferNotification$_load_bounced();
             throw_unless(14336, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for AthTransferNotificationMintUsername message
         if (op == 0x89129d5f) {
-            var ($msg'query_id, $msg'amount, $msg'sender_key) = in_msg~$AthTransferNotificationMintUsername$_load_bounced();
+            var ($msg'query_id, $msg'sender_key) = in_msg~$AthTransferNotificationMintUsername$_load_bounced();
             throw_unless(14530, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+            return ();
+        }
+        
+        ;; Bounced handler for AthTransferNotificationVaultMintUsername message
+        if (op == 0x89129d60) {
+            var ($msg'query_id, $msg'sender_key) = in_msg~$AthTransferNotificationVaultMintUsername$_load_bounced();
+            throw_unless(14570, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
         ;; Bounced handler for AthTransferNotificationProfileAvatar message
         if (op == 0xa11a7001) {
-            var ($msg'query_id, $msg'amount, $msg'sender_key) = in_msg~$AthTransferNotificationProfileAvatar$_load_bounced();
+            var ($msg'query_id, $msg'sender_key) = in_msg~$AthTransferNotificationProfileAvatar$_load_bounced();
             throw_unless(14640, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
-            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key, $msg'amount);
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+            return ();
+        }
+        
+        ;; Bounced handler for AthTransferNotificationVaultProfileAvatar message
+        if (op == 0xa11a7002) {
+            var ($msg'query_id, $msg'sender_key) = in_msg~$AthTransferNotificationVaultProfileAvatar$_load_bounced();
+            throw_unless(14670, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
+            ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_bounced_notification($msg'query_id, $msg'sender_key);
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
         
@@ -1500,7 +1766,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 2000000);
         $self'balance = $self'balance - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'ath_master_address, $downstream_value, 1, true, $ATHBurnNotification$_store_cell($ATHBurnNotification$_constructor_query_id_amount_owner_address_response_destination($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1515,7 +1781,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14403, ($Context$_get_value(__tact_context_get()) >= 3000000));
         $self'balance = $self'balance + $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 1000000, 0, false, $ATHGenesisSupplyAck$_store_cell($ATHGenesisSupplyAck$_constructor_query_id_amount_owner_address($msg'query_id, $msg'amount, $self'owner_address), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1527,18 +1793,18 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'response_destination = in_msg~load_msg_addr();
         throw_unless(14200, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
         throw_unless(14201, ( equal_slices_bits($msg'response_destination, $self'owner_address) ));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
         throw_unless(14202, ($msg'amount > 0));
         throw_unless(14203, ($self'balance >= $msg'amount));
         int $required_value = 30000000;
         throw_unless(14204, ($Context$_get_value(__tact_context_get()) >= $required_value));
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 2000000);
-        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
         var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'recipient, $self'ath_master_address);
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
         $self'balance = $self'balance - $msg'amount;
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 0, $recipient_init'code, $recipient_init'data, $ATHInternalTransfer$_store_cell($ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1554,21 +1820,21 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14300, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
         throw_unless(14301, ( equal_slices_bits($msg'response_destination, $self'owner_address) ));
         throw_unless(14302, ( equal_slices_bits($msg'notify_destination, $msg'recipient) ));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
         throw_unless(14303, ($msg'amount > 0));
         throw_unless(14304, ($msg'notify_value > 0));
         throw_unless(14305, ($self'balance >= $msg'amount));
         throw_unless(14306, ($msg'notify_value >= 30000000));
-        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
+        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
         int $required_value = ($downstream_value + 10000000);
         throw_unless(14307, ($Context$_get_value(__tact_context_get()) >= $required_value));
-        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
         var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'recipient, $self'ath_master_address);
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
         $self'balance = $self'balance - $msg'amount;
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 1, $recipient_init'code, $recipient_init'data, $ATHInternalTransferWithNotify$_store_cell($ATHInternalTransferWithNotify$_constructor_query_id_amount_sender_owner_response_destination_notify_destination_notify_value($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination, $msg'notify_destination, $msg'notify_value), begin_cell())));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1583,21 +1849,53 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'username = in_msg;
         throw_unless(14500, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
         throw_unless(14501, ( equal_slices_bits($msg'response_destination, $self'owner_address) ));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
         throw_unless(14502, ($msg'amount > 0));
         throw_unless(14503, ($msg'notify_value > 0));
         throw_unless(14504, ($self'balance >= $msg'amount));
         throw_unless(14505, ($msg'notify_value >= 30000000));
-        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
+        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
         int $required_value = ($downstream_value + 10000000);
         throw_unless(14506, ($Context$_get_value(__tact_context_get()) >= $required_value));
-        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
         var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'recipient, $self'ath_master_address);
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
         $self'balance = $self'balance - $msg'amount;
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 1, $recipient_init'code, $recipient_init'data, $ATHInternalTransferMintUsername$_store_cell($ATHInternalTransferMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_username_len_username($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination, $msg'notify_value, $msg'username_len, $msg'username), begin_cell())));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
+    ;; Receive ATHTransferRequestVaultMintUsername message
+    if (op == 0x4154481c) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'recipient = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        var $msg'notify_value = in_msg~load_uint(128);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'owner_wallet = sc_1~load_msg_addr();
+        var $msg'username_len = sc_1~load_uint(8);
+        var $msg'username = sc_1;
+        throw_unless(14550, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
+        throw_unless(14551, ( equal_slices_bits($msg'response_destination, $self'owner_address) ));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
+        throw_unless(14552, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'owner_wallet));
+        throw_unless(14553, ($msg'amount > 0));
+        throw_unless(14554, ($msg'notify_value > 0));
+        throw_unless(14555, ($self'balance >= $msg'amount));
+        throw_unless(14556, ($msg'notify_value >= 30000000));
+        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_vault_notify_transfer_value($msg'notify_value);
+        int $required_value = ($downstream_value + 10000000);
+        throw_unless(14557, ($Context$_get_value(__tact_context_get()) >= $required_value));
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
+        var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'recipient, $self'ath_master_address);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        $self'balance = $self'balance - $msg'amount;
+        $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 1, $recipient_init'code, $recipient_init'data, $ATHInternalTransferVaultMintUsername$_store_cell($ATHInternalTransferVaultMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination, $msg'notify_value, $msg'owner_wallet, $msg'username_len, $msg'username), begin_cell())));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1616,21 +1914,56 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'media_format = sc_1~load_uint(8);
         throw_unless(14610, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
         throw_unless(14611, ( equal_slices_bits($msg'response_destination, $self'owner_address) ));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
         throw_unless(14612, ($msg'amount > 0));
         throw_unless(14613, ($msg'notify_value > 0));
         throw_unless(14614, ($self'balance >= $msg'amount));
         throw_unless(14615, ($msg'notify_value >= 30000000));
-        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
+        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_notify_transfer_value($msg'notify_value);
         int $required_value = ($downstream_value + 10000000);
         throw_unless(14616, ($Context$_get_value(__tact_context_get()) >= $required_value));
-        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
         var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'recipient, $self'ath_master_address);
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
         $self'balance = $self'balance - $msg'amount;
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 1, $recipient_init'code, $recipient_init'data, $ATHInternalTransferProfileAvatar$_store_cell($ATHInternalTransferProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination, $msg'notify_value, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format), begin_cell())));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
+    ;; Receive ATHTransferRequestVaultProfileAvatar message
+    if (op == 0x4154481a) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'recipient = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        var $msg'notify_value = in_msg~load_uint(128);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'owner_wallet = sc_1~load_msg_addr();
+        var $msg'avatar_hash = sc_1~load_uint(256);
+        var $msg'avatar_entry_id = sc_1~load_uint(64);
+        var $msg'avatar_stream_id = sc_1~load_uint(128);
+        var $msg'avatar_part_count = sc_1~load_uint(16);
+        var $msg'media_format = sc_1~load_uint(8);
+        throw_unless(14650, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
+        throw_unless(14651, ( equal_slices_bits($msg'response_destination, $self'owner_address) ));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
+        throw_unless(14652, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'owner_wallet));
+        throw_unless(14653, ($msg'amount > 0));
+        throw_unless(14654, ($msg'notify_value > 0));
+        throw_unless(14655, ($self'balance >= $msg'amount));
+        throw_unless(14656, ($msg'notify_value >= 30000000));
+        int $downstream_value = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_vault_notify_transfer_value($msg'notify_value);
+        int $required_value = ($downstream_value + 10000000);
+        throw_unless(14657, ($Context$_get_value(__tact_context_get()) >= $required_value));
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
+        var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'recipient, $self'ath_master_address);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        $self'balance = $self'balance - $msg'amount;
+        $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 1, $recipient_init'code, $recipient_init'data, $ATHInternalTransferVaultProfileAvatar$_store_cell($ATHInternalTransferVaultProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination, $msg'notify_value, $msg'owner_wallet, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format), begin_cell())));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_owner_excess($msg'response_destination, ($Context$_get_value(__tact_context_get()) - $required_value));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1644,19 +1977,19 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'forward_ton_amount = in_msg~load_varuint16();
         var $msg'forward_payload = in_msg;
         throw_unless(14700, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'destination, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'destination, $msg'response_destination);
         throw_unless(14701, ($msg'amount > 0));
         throw_unless(14702, ($self'balance >= $msg'amount));
         throw_unless(14703, ( (($msg'forward_ton_amount == 0)) ? (true) : (($msg'forward_ton_amount >= 30000000)) ));
         int $required_value = (((12000000 + $msg'forward_ton_amount) + 21000000) + 2000000);
         throw_unless(14704, ($Context$_get_value(__tact_context_get()) >= $required_value));
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 2000000);
-        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'destination);
+        slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'destination);
         var ($recipient_init'code, $recipient_init'data) = $ATHWallet$_init_child(0, $msg'destination, $self'ath_master_address);
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_store_pending_outgoing($msg'query_id, $msg'amount, $recipient_wallet, $msg'response_destination);
         $self'balance = $self'balance - $msg'amount;
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($recipient_wallet, $downstream_value, true, 0, $recipient_init'code, $recipient_init'data, $JettonInternalTransfer$_store_cell($JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload($msg'query_id, $msg'amount, $self'owner_address, $msg'response_destination, $msg'forward_ton_amount, $msg'forward_payload), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1667,12 +2000,12 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'sender_owner = in_msg~load_msg_addr();
         var $msg'response_destination = in_msg~load_msg_addr();
         throw_unless(14210, ($msg'amount > 0));
-        throw_unless(14211, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
+        throw_unless(14211, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
         throw_unless(14212, ($Context$_get_value(__tact_context_get()) >= 8000000));
         $self'balance = $self'balance + $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 3000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1685,27 +2018,27 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'forward_ton_amount = in_msg~load_varuint16();
         var $msg'forward_payload = in_msg;
         throw_unless(14710, ($msg'amount > 0));
-        throw_unless(14711, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'from)) ));
-        throw_unless(14712, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'from));
+        throw_unless(14711, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'from)) ));
+        throw_unless(14712, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'from));
         if (($msg'forward_ton_amount > 0)) {
             throw_unless(14713, ($msg'forward_ton_amount >= 30000000));
             throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= (((($msg'forward_ton_amount + 1000000) + 1000000) + 7000000) + 2000000)));
-            int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'from);
-            int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
+            int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'from);
+            int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
             throw_unless(14715, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
             throw_unless(14716, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
             $self'balance = $self'balance + $msg'amount;
-            $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_amount_created_at($msg'from, $msg'amount, $global_now()), begin_cell()));
+            $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'from, $msg'response_address, 1000000, $msg'amount, $global_now()), begin_cell()));
             $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'forward_ton_amount, 1, true, $AthTransferNotification$_store_cell($AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet($msg'query_id, $sender_key, $msg'amount, $msg'from), begin_cell())));
         } else {
             throw_unless(14717, ($Context$_get_value(__tact_context_get()) >= 5000000));
             $self'balance = $self'balance + $msg'amount;
         }
-        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_send_source_wallet_ack($msg'query_id, $msg'amount, __tact_context_get_sender());
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_send_source_wallet_ack($msg'query_id, $msg'amount, __tact_context_get_sender());
         if (($Context$_get_value(__tact_context_get()) >= (($msg'forward_ton_amount + 1000000) + 1000000))) {
             $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_address, 1000000, 1, false, $JettonExcesses$_store_cell($JettonExcesses$_constructor_query_id($msg'query_id), begin_cell())));
         }
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1719,21 +2052,21 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'notify_destination = sc_1~load_msg_addr();
         var $msg'notify_value = sc_1~load_uint(128);
         throw_unless(14310, ($msg'amount > 0));
-        throw_unless(14311, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
+        throw_unless(14311, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
         throw_unless(14312, ( equal_slices_bits($msg'notify_destination, $self'owner_address) ));
         throw_unless(14313, ($msg'notify_value > 0));
         throw_unless(14314, ($Context$_get_value(__tact_context_get()) >= (((($msg'notify_value + 1000000) + 1000000) + 7000000) + 2000000)));
-        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'sender_owner);
-        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
+        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14315, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
         throw_unless(14316, ($msg'notify_value >= 30000000));
         throw_unless(14317, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
         $self'balance = $self'balance + $msg'amount;
-        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_amount_created_at($msg'sender_owner, $msg'amount, $global_now()), begin_cell()));
+        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 1000000, $msg'amount, $global_now()), begin_cell()));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'notify_destination, $msg'notify_value, 1, true, $AthTransferNotification$_store_cell($AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 1000000, 0, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1747,20 +2080,49 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'username_len = in_msg~load_uint(8);
         var $msg'username = in_msg;
         throw_unless(14510, ($msg'amount > 0));
-        throw_unless(14511, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
+        throw_unless(14511, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
         throw_unless(14512, ($msg'notify_value > 0));
         throw_unless(14513, ($Context$_get_value(__tact_context_get()) >= (((($msg'notify_value + 1000000) + 1000000) + 7000000) + 2000000)));
-        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'sender_owner);
-        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
+        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14514, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
         throw_unless(14515, ($msg'notify_value >= 30000000));
         throw_unless(14516, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
         $self'balance = $self'balance + $msg'amount;
-        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_amount_created_at($msg'sender_owner, $msg'amount, $global_now()), begin_cell()));
+        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 1000000, $msg'amount, $global_now()), begin_cell()));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'notify_value, 1, true, $AthTransferNotificationMintUsername$_store_cell($AthTransferNotificationMintUsername$_constructor_query_id_sender_key_amount_owner_wallet_username_len_username($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner, $msg'username_len, $msg'username), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 1000000, 0, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
+    ;; Receive ATHInternalTransferVaultMintUsername message
+    if (op == 0x4154481d) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_owner = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        var $msg'notify_value = in_msg~load_uint(128);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'owner_wallet = sc_1~load_msg_addr();
+        var $msg'username_len = sc_1~load_uint(8);
+        var $msg'username = sc_1;
+        throw_unless(14560, ($msg'amount > 0));
+        throw_unless(14561, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
+        throw_unless(14562, ($msg'notify_value > 0));
+        throw_unless(14563, ($Context$_get_value(__tact_context_get()) >= (((($msg'notify_value + 3000000) + 1000000) + 7000000) + 2000000)));
+        throw_unless(14564, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'owner_wallet));
+        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
+        throw_unless(14565, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
+        throw_unless(14566, ($msg'notify_value >= 30000000));
+        throw_unless(14567, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
+        $self'balance = $self'balance + $msg'amount;
+        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 3000000, $msg'amount, $global_now()), begin_cell()));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'notify_value, 1, true, $AthTransferNotificationVaultMintUsername$_store_cell($AthTransferNotificationVaultMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner, $msg'owner_wallet, $msg'username_len, $msg'username), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1778,20 +2140,52 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'avatar_part_count = sc_1~load_uint(16);
         var $msg'media_format = sc_1~load_uint(8);
         throw_unless(14620, ($msg'amount > 0));
-        throw_unless(14621, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
+        throw_unless(14621, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
         throw_unless(14622, ($msg'notify_value > 0));
         throw_unless(14623, ($Context$_get_value(__tact_context_get()) >= (((($msg'notify_value + 1000000) + 1000000) + 7000000) + 2000000)));
-        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'sender_owner);
-        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
+        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
         throw_unless(14624, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
         throw_unless(14625, ($msg'notify_value >= 30000000));
         throw_unless(14626, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
         $self'balance = $self'balance + $msg'amount;
-        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_amount_created_at($msg'sender_owner, $msg'amount, $global_now()), begin_cell()));
+        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 1000000, $msg'amount, $global_now()), begin_cell()));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'notify_value, 1, true, $AthTransferNotificationProfileAvatar$_store_cell($AthTransferNotificationProfileAvatar$_constructor_query_id_sender_key_amount_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 1000000, 0, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
+    ;; Receive ATHInternalTransferVaultProfileAvatar message
+    if (op == 0x4154481b) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_owner = in_msg~load_msg_addr();
+        var $msg'response_destination = in_msg~load_msg_addr();
+        var $msg'notify_value = in_msg~load_uint(128);
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'owner_wallet = sc_1~load_msg_addr();
+        var $msg'avatar_hash = sc_1~load_uint(256);
+        var $msg'avatar_entry_id = sc_1~load_uint(64);
+        var $msg'avatar_stream_id = sc_1~load_uint(128);
+        var $msg'avatar_part_count = sc_1~load_uint(16);
+        var $msg'media_format = sc_1~load_uint(8);
+        throw_unless(14660, ($msg'amount > 0));
+        throw_unless(14661, ( equal_slices_bits(__tact_context_get_sender(), ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'sender_owner)) ));
+        throw_unless(14662, ($msg'notify_value > 0));
+        throw_unless(14663, ($Context$_get_value(__tact_context_get()) >= (((($msg'notify_value + 3000000) + 1000000) + 7000000) + 2000000)));
+        throw_unless(14664, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'owner_wallet));
+        int $sender_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_owner);
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $sender_key);
+        throw_unless(14665, (~ __tact_dict_exists_int($self'pending_notifications, 257, $pending_key)));
+        throw_unless(14666, ($msg'notify_value >= 30000000));
+        throw_unless(14667, (~ __tact_dict_exists_int($self'processed_notifications, 257, $pending_key)));
+        $self'balance = $self'balance + $msg'amount;
+        $self'pending_notifications~__tact_dict_set_int_cell(257, $pending_key, $PendingAthTransferNotification$_store_cell($PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at($msg'sender_owner, $msg'response_destination, 3000000, $msg'amount, $global_now()), begin_cell()));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'notify_value, 1, true, $AthTransferNotificationVaultProfileAvatar$_store_cell($AthTransferNotificationVaultProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format($msg'query_id, $sender_key, $msg'amount, $msg'sender_owner, $msg'owner_wallet, $msg'avatar_hash, $msg'avatar_entry_id, $msg'avatar_stream_id, $msg'avatar_part_count, $msg'media_format), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 1000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1800,14 +2194,14 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         var $msg'query_id = in_msg~load_uint(64);
         var $msg'amount = in_msg~load_uint(128);
         throw_unless(14240, ($msg'amount > 0));
-        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($msg'query_id, __tact_context_get_sender());
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_outgoing_key($msg'query_id, __tact_context_get_sender());
         tuple $pendingOpt = $PendingAthOutgoingTransfer$_load_opt(__tact_dict_get_int_cell($self'pending_outgoing_transfers, 257, $pending_key));
         throw_unless(14241, (~ null?($pendingOpt)));
         var ($pending'recipient_wallet, $pending'response_destination, $pending'amount, $pending'created_at) = $PendingAthOutgoingTransfer$_not_null($pendingOpt);
         throw_unless(14242, ($pending'amount == $msg'amount));
         throw_unless(14243, ( equal_slices_bits(__tact_context_get_sender(), $pending'recipient_wallet) ));
         $self'pending_outgoing_transfers~__tact_dict_delete_int(257, $pending_key);
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
@@ -1815,48 +2209,61 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
     if (op == 0x472d9d7e) {
         var $msg'query_id = in_msg~load_uint(64);
         var $msg'amount = in_msg~load_uint(128);
-        var $msg'sender_key = in_msg~load_uint(32);
+        var $msg'sender_key = in_msg~load_uint(160);
         throw_unless(14340, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
         throw_unless(14341, ($msg'amount > 0));
-        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $msg'sender_key);
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $msg'sender_key);
         tuple $pendingOpt = $PendingAthTransferNotification$_load_opt(__tact_dict_get_int_cell($self'pending_notifications, 257, $pending_key));
         if (null?($pendingOpt)) {
-            int $prunedAmount = __tact_dict_get_int_int($self'pruned_notification_acks, 257, $pending_key, 257);
-            throw_unless(14342, (~ null?($prunedAmount)));
-            throw_unless(14345, ($prunedAmount == $msg'amount));
-            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+            int $processedAmount = __tact_dict_get_int_int($self'processed_notifications, 257, $pending_key, 257);
+            throw_unless(14342, (~ null?($processedAmount)));
+            throw_unless(14345, ($processedAmount == $msg'amount));
+            $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
             return ();
         }
-        var ($pending'sender_owner, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
+        var ($pending'sender_owner, $pending'response_destination, $pending'response_ack_value, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
         throw_unless(14343, ($pending'amount == $msg'amount));
-        throw_unless(14344, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($pending'sender_owner) == $msg'sender_key));
+        throw_unless(14344, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $pending'sender_owner) == $msg'sender_key));
         $self'processed_notifications~__tact_dict_set_int_int(257, $pending_key, $msg'amount, 257);
         $self'pending_notifications~__tact_dict_delete_int(257, $pending_key);
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($pending'response_destination, $pending'response_ack_value, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
+        return ();
+    }
+    
+    ;; Receive AthTransferNotificationRefund message
+    if (op == 0x4154481e) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'sender_key = in_msg~load_uint(160);
+        throw_unless(14346, ( equal_slices_bits(__tact_context_get_sender(), $self'owner_address) ));
+        ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_refund_pending_notification($msg'query_id, $msg'sender_key, $msg'amount);
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
     ;; Receive PruneStaleNotification message
     if (op == 0x504e5052) {
         var $msg'query_id = in_msg~load_uint(64);
-        var $msg'sender_key = in_msg~load_uint(32);
-        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $msg'sender_key);
+        var $msg'sender_key = in_msg~load_uint(160);
+        throw_unless(14349, ($Context$_get_value(__tact_context_get()) >= 2000000));
+        int $pending_key = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_pending_notification_key($msg'query_id, $msg'sender_key);
         tuple $pendingOpt = $PendingAthTransferNotification$_load_opt(__tact_dict_get_int_cell($self'pending_notifications, 257, $pending_key));
         throw_unless(14350, (~ null?($pendingOpt)));
-        var ($pending'sender_owner, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
-        throw_unless(14351, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($pending'sender_owner) == $msg'sender_key));
+        var ($pending'sender_owner, $pending'response_destination, $pending'response_ack_value, $pending'amount, $pending'created_at) = $PendingAthTransferNotification$_not_null($pendingOpt);
+        throw_unless(14351, (($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_compute_sender_key($msg'query_id, $pending'sender_owner) == $msg'sender_key));
         throw_unless(14352, ($global_now() >= ($pending'created_at + 86400)));
+        throw_unless(14353, ($pending'response_ack_value != 3000000));
         $self'processed_notifications~__tact_dict_set_int_int(257, $pending_key, $pending'amount, 257);
-        $self'pruned_notification_acks~__tact_dict_set_int_int(257, $pending_key, $pending'amount, 257);
         $self'pending_notifications~__tact_dict_delete_int(257, $pending_key);
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(13000);
-        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pruned_notification_acks, $self'pending_outgoing_transfers));
+        $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'processed_notifications, $self'pending_outgoing_transfers));
         return ();
     }
     ;; Throw if not handled

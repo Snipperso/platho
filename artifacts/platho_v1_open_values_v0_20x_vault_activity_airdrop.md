@@ -1,6 +1,10 @@
 # Platho v1 Open Values v0.20X — Vault Community Activity Airdrop
 
-Status: implemented and locally verified in targeted regression tests.
+Status: historical / superseded by later final-pricing artifacts.
+
+Current source of truth for message pricing is `PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+The rough `0.01 TON` example in this historical note is not a current PWA or
+contract price.
 
 ## Scope
 
@@ -70,7 +74,11 @@ M20X intentionally uses only a global cap:
 - per-wallet cap: `none`;
 - manifest representation: `vault_activity_airdrop_per_wallet_cap_atomic = 0`.
 
-Reason: every rewarded publish requires a paid protocol action. At roughly `0.01 TON` per message, fully exhausting the `1,500,000` publish reward pool requires about `15,000 TON` of aggregate paid user activity. The airdrop is an activity rebate and early utility bootstrap, not a free claim campaign.
+Reason: every rewarded publish requires a paid protocol action. Current final v1 pricing starts from `0.0337 TON` for
+public capsules and `0.0347 TON` for hybrid private 1 KiB capsules, with larger private capsule blocks costing more.
+Fully exhausting the `1,500,000` publish reward pool therefore requires real
+paid usage rather than free claims. The airdrop is an early activity bonus and utility bootstrap, not a TON refund,
+cashback, reimbursement, investment return, price guarantee, or free claim campaign.
 
 Users may intentionally accumulate ATH for:
 

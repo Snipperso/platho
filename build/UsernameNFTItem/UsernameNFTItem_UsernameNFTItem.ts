@@ -609,6 +609,65 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
     }
 }
 
+export type InitializeUsernameItem = {
+    $$type: 'InitializeUsernameItem';
+    owner_wallet: Address;
+    username_len: bigint;
+    username: Slice;
+}
+
+export function storeInitializeUsernameItem(src: InitializeUsernameItem) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1431193934, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeBuilder(src.username.asBuilder());
+    };
+}
+
+export function loadInitializeUsernameItem(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1431193934) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0;
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadTupleInitializeUsernameItem(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function loadGetterTupleInitializeUsernameItem(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell().asSlice();
+    return { $$type: 'InitializeUsernameItem' as const, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
+}
+
+export function storeTupleInitializeUsernameItem(source: InitializeUsernameItem) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.username_len);
+    builder.writeSlice(source.username.asCell());
+    return builder.build();
+}
+
+export function dictValueParserInitializeUsernameItem(): DictionaryValue<InitializeUsernameItem> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeInitializeUsernameItem(src)).endCell());
+        },
+        parse: (src) => {
+            return loadInitializeUsernameItem(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ResendDeployedAck = {
     $$type: 'ResendDeployedAck';
 }
@@ -744,49 +803,259 @@ export function dictValueParserUsernameItemDeployedAck(): DictionaryValue<Userna
     }
 }
 
+export type NftTransfer = {
+    $$type: 'NftTransfer';
+    query_id: bigint;
+    new_owner: Address;
+    response_destination: Address;
+    custom_payload: Cell | null;
+    forward_amount: bigint;
+    forward_payload: Slice;
+}
+
+export function storeNftTransfer(src: NftTransfer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1607220500, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.new_owner);
+        b_0.storeAddress(src.response_destination);
+        if (src.custom_payload !== null && src.custom_payload !== undefined) { b_0.storeBit(true).storeRef(src.custom_payload); } else { b_0.storeBit(false); }
+        b_0.storeCoins(src.forward_amount);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadNftTransfer(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1607220500) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _new_owner = sc_0.loadAddress();
+    const _response_destination = sc_0.loadAddress();
+    const _custom_payload = sc_0.loadBit() ? sc_0.loadRef() : null;
+    const _forward_amount = sc_0.loadCoins();
+    const _forward_payload = sc_0;
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+}
+
+export function loadTupleNftTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _new_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _custom_payload = source.readCellOpt();
+    const _forward_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleNftTransfer(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _new_owner = source.readAddress();
+    const _response_destination = source.readAddress();
+    const _custom_payload = source.readCellOpt();
+    const _forward_amount = source.readBigNumber();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftTransfer' as const, query_id: _query_id, new_owner: _new_owner, response_destination: _response_destination, custom_payload: _custom_payload, forward_amount: _forward_amount, forward_payload: _forward_payload };
+}
+
+export function storeTupleNftTransfer(source: NftTransfer) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.new_owner);
+    builder.writeAddress(source.response_destination);
+    builder.writeCell(source.custom_payload);
+    builder.writeNumber(source.forward_amount);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserNftTransfer(): DictionaryValue<NftTransfer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeNftTransfer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadNftTransfer(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type NftOwnershipAssigned = {
+    $$type: 'NftOwnershipAssigned';
+    query_id: bigint;
+    previous_owner: Address;
+    forward_payload: Slice;
+}
+
+export function storeNftOwnershipAssigned(src: NftOwnershipAssigned) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(85167505, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeAddress(src.previous_owner);
+        b_0.storeBuilder(src.forward_payload.asBuilder());
+    };
+}
+
+export function loadNftOwnershipAssigned(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 85167505) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _previous_owner = sc_0.loadAddress();
+    const _forward_payload = sc_0;
+    return { $$type: 'NftOwnershipAssigned' as const, query_id: _query_id, previous_owner: _previous_owner, forward_payload: _forward_payload };
+}
+
+export function loadTupleNftOwnershipAssigned(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _previous_owner = source.readAddress();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftOwnershipAssigned' as const, query_id: _query_id, previous_owner: _previous_owner, forward_payload: _forward_payload };
+}
+
+export function loadGetterTupleNftOwnershipAssigned(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _previous_owner = source.readAddress();
+    const _forward_payload = source.readCell().asSlice();
+    return { $$type: 'NftOwnershipAssigned' as const, query_id: _query_id, previous_owner: _previous_owner, forward_payload: _forward_payload };
+}
+
+export function storeTupleNftOwnershipAssigned(source: NftOwnershipAssigned) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeAddress(source.previous_owner);
+    builder.writeSlice(source.forward_payload.asCell());
+    return builder.build();
+}
+
+export function dictValueParserNftOwnershipAssigned(): DictionaryValue<NftOwnershipAssigned> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeNftOwnershipAssigned(src)).endCell());
+        },
+        parse: (src) => {
+            return loadNftOwnershipAssigned(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type NftExcesses = {
+    $$type: 'NftExcesses';
+    query_id: bigint;
+}
+
+export function storeNftExcesses(src: NftExcesses) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(3576854235, 32);
+        b_0.storeUint(src.query_id, 64);
+    };
+}
+
+export function loadNftExcesses(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 3576854235) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    return { $$type: 'NftExcesses' as const, query_id: _query_id };
+}
+
+export function loadTupleNftExcesses(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'NftExcesses' as const, query_id: _query_id };
+}
+
+export function loadGetterTupleNftExcesses(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'NftExcesses' as const, query_id: _query_id };
+}
+
+export function storeTupleNftExcesses(source: NftExcesses) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    return builder.build();
+}
+
+export function dictValueParserNftExcesses(): DictionaryValue<NftExcesses> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeNftExcesses(src)).endCell());
+        },
+        parse: (src) => {
+            return loadNftExcesses(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameNFTItemStateView = {
     $$type: 'UsernameNFTItemStateView';
+    initialized: boolean;
     owner_wallet: Address;
     username_registry_address: Address;
     name_hash: bigint;
+    username_len: bigint;
+    username: Cell;
+    tier: bigint;
 }
 
 export function storeUsernameNFTItemStateView(src: UsernameNFTItemStateView) {
     return (builder: Builder) => {
         const b_0 = builder;
+        b_0.storeBit(src.initialized);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeAddress(src.username_registry_address);
         b_0.storeInt(src.name_hash, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.username_len, 257);
+        b_1.storeRef(src.username);
+        b_1.storeInt(src.tier, 257);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
 export function loadUsernameNFTItemStateView(slice: Slice) {
     const sc_0 = slice;
+    const _initialized = sc_0.loadBit();
     const _owner_wallet = sc_0.loadAddress();
     const _username_registry_address = sc_0.loadAddress();
     const _name_hash = sc_0.loadIntBig(257);
-    return { $$type: 'UsernameNFTItemStateView' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _username_len = sc_1.loadIntBig(257);
+    const _username = sc_1.loadRef();
+    const _tier = sc_1.loadIntBig(257);
+    return { $$type: 'UsernameNFTItemStateView' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username, tier: _tier };
 }
 
 export function loadTupleUsernameNFTItemStateView(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItemStateView' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    const _tier = source.readBigNumber();
+    return { $$type: 'UsernameNFTItemStateView' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username, tier: _tier };
 }
 
 export function loadGetterTupleUsernameNFTItemStateView(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItemStateView' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    const _tier = source.readBigNumber();
+    return { $$type: 'UsernameNFTItemStateView' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username, tier: _tier };
 }
 
 export function storeTupleUsernameNFTItemStateView(source: UsernameNFTItemStateView) {
     const builder = new TupleBuilder();
+    builder.writeBoolean(source.initialized);
     builder.writeAddress(source.owner_wallet);
     builder.writeAddress(source.username_registry_address);
     builder.writeNumber(source.name_hash);
+    builder.writeNumber(source.username_len);
+    builder.writeCell(source.username);
+    builder.writeNumber(source.tier);
     return builder.build();
 }
 
@@ -801,49 +1070,187 @@ export function dictValueParserUsernameNFTItemStateView(): DictionaryValue<Usern
     }
 }
 
+export type UsernameNftDataView = {
+    $$type: 'UsernameNftDataView';
+    initialized: boolean;
+    index: bigint;
+    collection_address: Address;
+    owner_address: Address;
+    individual_content: Cell;
+}
+
+export function storeUsernameNftDataView(src: UsernameNftDataView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.initialized);
+        b_0.storeInt(src.index, 257);
+        b_0.storeAddress(src.collection_address);
+        b_0.storeAddress(src.owner_address);
+        b_0.storeRef(src.individual_content);
+    };
+}
+
+export function loadUsernameNftDataView(slice: Slice) {
+    const sc_0 = slice;
+    const _initialized = sc_0.loadBit();
+    const _index = sc_0.loadIntBig(257);
+    const _collection_address = sc_0.loadAddress();
+    const _owner_address = sc_0.loadAddress();
+    const _individual_content = sc_0.loadRef();
+    return { $$type: 'UsernameNftDataView' as const, initialized: _initialized, index: _index, collection_address: _collection_address, owner_address: _owner_address, individual_content: _individual_content };
+}
+
+export function loadTupleUsernameNftDataView(source: TupleReader) {
+    const _initialized = source.readBoolean();
+    const _index = source.readBigNumber();
+    const _collection_address = source.readAddress();
+    const _owner_address = source.readAddress();
+    const _individual_content = source.readCell();
+    return { $$type: 'UsernameNftDataView' as const, initialized: _initialized, index: _index, collection_address: _collection_address, owner_address: _owner_address, individual_content: _individual_content };
+}
+
+export function loadGetterTupleUsernameNftDataView(source: TupleReader) {
+    const _initialized = source.readBoolean();
+    const _index = source.readBigNumber();
+    const _collection_address = source.readAddress();
+    const _owner_address = source.readAddress();
+    const _individual_content = source.readCell();
+    return { $$type: 'UsernameNftDataView' as const, initialized: _initialized, index: _index, collection_address: _collection_address, owner_address: _owner_address, individual_content: _individual_content };
+}
+
+export function storeTupleUsernameNftDataView(source: UsernameNftDataView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.initialized);
+    builder.writeNumber(source.index);
+    builder.writeAddress(source.collection_address);
+    builder.writeAddress(source.owner_address);
+    builder.writeCell(source.individual_content);
+    return builder.build();
+}
+
+export function dictValueParserUsernameNftDataView(): DictionaryValue<UsernameNftDataView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameNftDataView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameNftDataView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type UsernameNftOnchainContent = {
+    $$type: 'UsernameNftOnchainContent';
+    marker: bigint;
+    metadata: Dictionary<bigint, Cell>;
+}
+
+export function storeUsernameNftOnchainContent(src: UsernameNftOnchainContent) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.marker, 8);
+        b_0.storeDict(src.metadata, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+    };
+}
+
+export function loadUsernameNftOnchainContent(slice: Slice) {
+    const sc_0 = slice;
+    const _marker = sc_0.loadUintBig(8);
+    const _metadata = Dictionary.load(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), sc_0);
+    return { $$type: 'UsernameNftOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function loadTupleUsernameNftOnchainContent(source: TupleReader) {
+    const _marker = source.readBigNumber();
+    const _metadata = Dictionary.loadDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), source.readCellOpt());
+    return { $$type: 'UsernameNftOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function loadGetterTupleUsernameNftOnchainContent(source: TupleReader) {
+    const _marker = source.readBigNumber();
+    const _metadata = Dictionary.loadDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), source.readCellOpt());
+    return { $$type: 'UsernameNftOnchainContent' as const, marker: _marker, metadata: _metadata };
+}
+
+export function storeTupleUsernameNftOnchainContent(source: UsernameNftOnchainContent) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.marker);
+    builder.writeCell(source.metadata.size > 0 ? beginCell().storeDictDirect(source.metadata, Dictionary.Keys.BigUint(256), Dictionary.Values.Cell()).endCell() : null);
+    return builder.build();
+}
+
+export function dictValueParserUsernameNftOnchainContent(): DictionaryValue<UsernameNftOnchainContent> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUsernameNftOnchainContent(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUsernameNftOnchainContent(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameNFTItem$Data = {
     $$type: 'UsernameNFTItem$Data';
+    initialized: boolean;
     owner_wallet: Address;
     username_registry_address: Address;
     name_hash: bigint;
+    username_len: bigint;
+    username: Cell;
 }
 
 export function storeUsernameNFTItem$Data(src: UsernameNFTItem$Data) {
     return (builder: Builder) => {
         const b_0 = builder;
+        b_0.storeBit(src.initialized);
         b_0.storeAddress(src.owner_wallet);
         b_0.storeAddress(src.username_registry_address);
         b_0.storeUint(src.name_hash, 256);
+        b_0.storeUint(src.username_len, 8);
+        b_0.storeRef(src.username);
     };
 }
 
 export function loadUsernameNFTItem$Data(slice: Slice) {
     const sc_0 = slice;
+    const _initialized = sc_0.loadBit();
     const _owner_wallet = sc_0.loadAddress();
     const _username_registry_address = sc_0.loadAddress();
     const _name_hash = sc_0.loadUintBig(256);
-    return { $$type: 'UsernameNFTItem$Data' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = sc_0.loadUintBig(8);
+    const _username = sc_0.loadRef();
+    return { $$type: 'UsernameNFTItem$Data' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username };
 }
 
 export function loadTupleUsernameNFTItem$Data(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItem$Data' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    return { $$type: 'UsernameNFTItem$Data' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username };
 }
 
 export function loadGetterTupleUsernameNFTItem$Data(source: TupleReader) {
+    const _initialized = source.readBoolean();
     const _owner_wallet = source.readAddress();
     const _username_registry_address = source.readAddress();
     const _name_hash = source.readBigNumber();
-    return { $$type: 'UsernameNFTItem$Data' as const, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash };
+    const _username_len = source.readBigNumber();
+    const _username = source.readCell();
+    return { $$type: 'UsernameNFTItem$Data' as const, initialized: _initialized, owner_wallet: _owner_wallet, username_registry_address: _username_registry_address, name_hash: _name_hash, username_len: _username_len, username: _username };
 }
 
 export function storeTupleUsernameNFTItem$Data(source: UsernameNFTItem$Data) {
     const builder = new TupleBuilder();
+    builder.writeBoolean(source.initialized);
     builder.writeAddress(source.owner_wallet);
     builder.writeAddress(source.username_registry_address);
     builder.writeNumber(source.name_hash);
+    builder.writeNumber(source.username_len);
+    builder.writeCell(source.username);
     return builder.build();
 }
 
@@ -860,7 +1267,6 @@ export function dictValueParserUsernameNFTItem$Data(): DictionaryValue<UsernameN
 
  type UsernameNFTItem_init_args = {
     $$type: 'UsernameNFTItem_init_args';
-    owner_wallet: Address;
     username_registry_address: Address;
     name_hash: bigint;
 }
@@ -868,17 +1274,16 @@ export function dictValueParserUsernameNFTItem$Data(): DictionaryValue<UsernameN
 function initUsernameNFTItem_init_args(src: UsernameNFTItem_init_args) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeAddress(src.owner_wallet);
         b_0.storeAddress(src.username_registry_address);
         b_0.storeInt(src.name_hash, 257);
     };
 }
 
-async function UsernameNFTItem_init(owner_wallet: Address, username_registry_address: Address, name_hash: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241020801000164000114ff00f4a413f4bcf2c80b01020162020603f2d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40fa40d3ff55206c138e16fa40fa40810101d700552003d15881465121c300f2f4e204925f04e07023d74920c21f953103d31f309134e2208210639cfc6cbae30220821027acdf8bbae302c00003c12113b0e3025f03f2c08203040500d83032814652f8416f24135f0382083d0900bef2f4814653f8416f24135f038209312d00bbf2f482082dc6c07f715353c8598210bba3ec195003cb1fcbffcec92555304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002c87f01ca0055205023cececbffc9ed540026303202c87f01ca0055205023cececbffc9ed54002c8146b3f2f002c87f01ca0055205023cececbffc9ed540161a0a75bda89a1a4000335f481f481a7feaa40d8271c2df481f481020203ae00aa4007a2b1028ca2438601e5e9c5b678d86707000654721038462d62');
+async function UsernameNFTItem_init(username_registry_address: Address, name_hash: bigint) {
+    const __code = Cell.fromHex('b5ee9c7241021a0100053c000114ff00f4a413f4bcf2c80b01020162021003f8d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019fd200fa40fa40d3ffd307d455506c168e1cfa40810101d7005902d10181465121c300f2f4702270c8c910351024e207925f07e07026d74920c21f953106d31f07de218210554e494ebae302218210639cfc6cbae3022182105fcc3d14ba03080a04c05b05fa40d30781465af84226c705f2f481465b27b3f2f410465e32505781465c5197db3c1af2f481465d543968db3c1af2f481465e5198db3c355b335112ba16f2f481465ff8416f24135f0382083d0900bef2f47fc85005cf16c910451034120c04060701deeda2edfb555127db3c936c2670e126d74928aa02bd936c2670e026c702936c2670e170935308b98e3907d30721c2609321c17b9170e222c22f9322c13a9170e223c02d92337f9303c05fe20192327f9102e292317f9101e296306c2670db31e107a4e8303705c7001046103544301205001420c20392c111923070e20020c88210c5cc7cd601cb1f01cf16c9f9000130db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed540901905b3581466424f2f4814665f8416f24135f0382083d0900bef2f4814666f8416f24135f038209312d00bbf2f410355512db3cc87f01ca0055505056ca0013cececbffcb07ccc9ed5409006a82082dc6c07f715357c8598210bba3ec195003cb1fcbffcec92755304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001b0e3023720821027acdf8bba8e1c303510355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e0c00006c12116b08e1f8146b3f2f010355512c87f01ca0055505056ca0013cececbffcb07ccc9ed54e05f06f2c0820b04fe5b05d33ffa40fa40f40431fa0081466e29f2f481466ff84229c705f2f410481037465981467051b8db3c1cf2f481467151b7db3c1cf2f481467226c2fff2f4814673f8416f24135f0382081e848028a08208989680a0bef2f45375c20095102a343730e30df8416f24135f0382081e84805005a08208989680a0820186a0a00c0c0d0f000afa4430c000018a1045431371502c700cdb3c544b88c85520821005138d915004cb1f12cb3fcecec927104a4d1350cc441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004108050e001820c700973070c8ca00c9d0e000a814be8e337080407008c8018210d53276db58cb1fcb3fc91046413018441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0013923334e2034445c87f01ca0055505056ca0013cececbffcb07ccc9ed5402012011140177be9d6f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3633c1201285475435475435555db3c106c105b104a1039487013001a21c0049171e021c0059172e0730177bc7e7f6a268690000cfe9007d207d2069ffe983ea2aa8360b470e7d20408080eb802c816880c0a32890e180797a3811386464881a8812716d9e3632c150130547523271059104810374698db3c104810374a90106a10591603f655226d8307507682f082a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce8906db3c10394870206e953059f45b30944133f417e28307507682f0c9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd10406db3c10394870206e953059f45b30944133f417e270011718190026c87001cb0721d0cf1682102e61746801cb1fc90034c87001cb078268506c6174686f20757365726e616d6501cb77c90018c85902cb07f400c91036454092d17cdf');
     const builder = beginCell();
     builder.storeUint(0, 1);
-    initUsernameNFTItem_init_args({ $$type: 'UsernameNFTItem_init_args', owner_wallet, username_registry_address, name_hash })(builder);
+    initUsernameNFTItem_init_args({ $$type: 'UsernameNFTItem_init_args', username_registry_address, name_hash })(builder);
     const __data = builder.endCell();
     return { code: __code, data: __data };
 }
@@ -972,29 +1377,43 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
+    {"name":"InitializeUsernameItem","header":1431193934,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"UsernameNFTItemStateView","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"UsernameNFTItem$Data","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"NftTransfer","header":1607220500,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"new_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"custom_payload","type":{"kind":"simple","type":"cell","optional":true}},{"name":"forward_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"NftOwnershipAssigned","header":85167505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"previous_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"NftExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"UsernameNFTItemStateView","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}},{"name":"tier","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"UsernameNftDataView","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"individual_content","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"UsernameNftOnchainContent","header":null,"fields":[{"name":"marker","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"metadata","type":{"kind":"dict","key":"uint","keyFormat":256,"value":"cell","valueFormat":"ref"}}]},
+    {"name":"UsernameNFTItem$Data","header":null,"fields":[{"name":"initialized","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"cell","optional":false}}]},
 ]
 
 const UsernameNFTItem_opcodes = {
+    "InitializeUsernameItem": 1431193934,
     "ResendDeployedAck": 1671232620,
     "TopUpStorageReserve": 665640843,
     "UsernameItemDeployedAck": 3148082201,
+    "NftTransfer": 1607220500,
+    "NftOwnershipAssigned": 85167505,
+    "NftExcesses": 3576854235,
 }
 
 const UsernameNFTItem_getters: ABIGetter[] = [
     {"name":"get_state","methodId":86957,"arguments":[],"returnType":{"kind":"simple","type":"UsernameNFTItemStateView","optional":false}},
+    {"name":"get_nft_data","methodId":102351,"arguments":[],"returnType":{"kind":"simple","type":"UsernameNftDataView","optional":false}},
 ]
 
 export const UsernameNFTItem_getterMapping: { [key: string]: string } = {
     'get_state': 'getGetState',
+    'get_nft_data': 'getGetNftData',
 }
 
 const UsernameNFTItem_receivers: ABIReceiver[] = [
+    {"receiver":"internal","message":{"kind":"typed","type":"InitializeUsernameItem"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ResendDeployedAck"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"NftTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"TopUpStorageReserve"}},
     {"receiver":"internal","message":{"kind":"empty"}},
 ]
@@ -1002,6 +1421,13 @@ const UsernameNFTItem_receivers: ABIReceiver[] = [
 export const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3000000n;
 export const USERNAME_ITEM_ACK_EXEC_RESERVE = 1000000n;
 export const USERNAME_ITEM_ACK_MAX_RESEND_VALUE = 20000000n;
+export const USERNAME_ITEM_TRANSFER_EXEC_RESERVE = 2000000n;
+export const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE = 10000000n;
+export const USERNAME_ITEM_EXCESSES_MIN_VALUE = 100000n;
+export const USERNAME_ITEM_MAX_LENGTH = 16n;
+export const USERNAME_ITEM_NAME_HASH_DOMAIN = 3318512854n;
+export const USERNAME_ITEM_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
+export const USERNAME_ITEM_METADATA_KEY_DESCRIPTION = 90922719342317012409671596374183159143637506542604000676488204638996496437508n;
 
 export class UsernameNFTItem implements Contract {
     
@@ -1009,12 +1435,12 @@ export class UsernameNFTItem implements Contract {
     public static readonly errors = UsernameNFTItem_errors_backward;
     public static readonly opcodes = UsernameNFTItem_opcodes;
     
-    static async init(owner_wallet: Address, username_registry_address: Address, name_hash: bigint) {
-        return await UsernameNFTItem_init(owner_wallet, username_registry_address, name_hash);
+    static async init(username_registry_address: Address, name_hash: bigint) {
+        return await UsernameNFTItem_init(username_registry_address, name_hash);
     }
     
-    static async fromInit(owner_wallet: Address, username_registry_address: Address, name_hash: bigint) {
-        const __gen_init = await UsernameNFTItem_init(owner_wallet, username_registry_address, name_hash);
+    static async fromInit(username_registry_address: Address, name_hash: bigint) {
+        const __gen_init = await UsernameNFTItem_init(username_registry_address, name_hash);
         const address = contractAddress(0, __gen_init);
         return new UsernameNFTItem(address, __gen_init);
     }
@@ -1037,11 +1463,17 @@ export class UsernameNFTItem implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ResendDeployedAck | TopUpStorageReserve | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: InitializeUsernameItem | ResendDeployedAck | NftTransfer | TopUpStorageReserve | null) {
         
         let body: Cell | null = null;
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'InitializeUsernameItem') {
+            body = beginCell().store(storeInitializeUsernameItem(message)).endCell();
+        }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ResendDeployedAck') {
             body = beginCell().store(storeResendDeployedAck(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'NftTransfer') {
+            body = beginCell().store(storeNftTransfer(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'TopUpStorageReserve') {
             body = beginCell().store(storeTopUpStorageReserve(message)).endCell();
@@ -1059,6 +1491,13 @@ export class UsernameNFTItem implements Contract {
         const builder = new TupleBuilder();
         const source = (await provider.get('get_state', builder.build())).stack;
         const result = loadGetterTupleUsernameNFTItemStateView(source);
+        return result;
+    }
+    
+    async getGetNftData(provider: ContractProvider) {
+        const builder = new TupleBuilder();
+        const source = (await provider.get('get_nft_data', builder.build())).stack;
+        const result = loadGetterTupleUsernameNftDataView(source);
         return result;
     }
     

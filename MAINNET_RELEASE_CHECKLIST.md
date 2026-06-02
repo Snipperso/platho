@@ -18,6 +18,9 @@ The canonical ATH allocation for this release is:
 MarketStabilitySeller uses `20` fixed tranches of `3,000,000 ATH`, from `x2` through `x21` of the
 initial pool price. Older lower-reserve notes are obsolete for the current archive.
 
+Activity rewards are `10 ATH` per finalized capsule as an early activity bonus. They are not a refund,
+cashback, reimbursement, investment return, or price guarantee.
+
 ## Non-Negotiable Release Order
 
 The production chain is:
@@ -30,13 +33,15 @@ fresh build and tests
 -> exact final genesis funding
 -> live getter snapshot
 -> mainnet:genesis:verify PASS
+-> production PWA mainnet release for activity airdrop
+-> distribute the 15,000,000 ATH activity airdrop through Vault
+-> verify Vault airdrop_remaining_ath == 0 and airdrop_distributed_ath == 15,000,000 ATH
 -> initial ATH/TON pool launch
 -> BuybackBurn route freeze preflight and route freeze
 -> MarketStabilitySeller pricing freeze
 -> MarketStabilitySeller reserve funding and readiness PASS
 -> EnableBuybackSplit preflight PASS
 -> EnableBuybackSplit
--> production PWA bundle
 ```
 
 Do not swap the order. Do not use M20F route preflight, MarketStabilitySeller readiness, or any
@@ -54,10 +59,10 @@ snapshot must prove this state:
 | `Vault` | `airdrop_remaining_ath == 15,000,000 ATH`, distributed `0`, no users, no pending publish or withdrawal state. |
 | Official `ATHVesting` ATH wallet | Balance exactly `10,000,000 ATH`. |
 | `ATHVesting` | Correct beneficiary/schedule, claimed `0`, idle phase, no pending transfer. |
-| UsernameRegistry official ATH wallet | Balance `0`. |
-| ProfileRegistry official ATH wallet | Balance `0`. |
-| BuybackBurn official ATH wallet | Balance `0`. |
-| MarketStabilitySeller official ATH wallet | Balance `0`. |
+| UsernameRegistry official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
+| ProfileRegistry official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
+| BuybackBurn official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
+| MarketStabilitySeller official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
 | `FeeAccumulator` | Split disabled, all buckets `0`. |
 | `BuybackBurn` | Sealed, route not frozen, launch controller retained, all due/pending/retry/totals `0`. |
 | `MarketStabilitySeller` | Sealed, pricing not frozen, launch controller retained, reserve/sale/tranche/treasury/pending state `0`. |
@@ -68,23 +73,45 @@ The initial liquidity allocation is not a user balance and is not a protocol lia
 Vesting, BuybackBurn, or MarketStabilitySeller at final genesis. It must have its own transaction
 proof when the ATH/TON pool is launched.
 
-## Post-Pool Required State
+Protocol fees collected before the pool launch are not expected to fully fund the TON side of initial
+liquidity. The launch may require project/treasury funding in addition to protocol revenue.
+
+## Post-Genesis Required State
 
 After `mainnet:genesis:verify` passes:
 
 | Step | Required proof |
 | --- | --- |
-| Initial pool launch | `15,000,000 ATH` paired against the target `100,000 TON` reference cap. |
+| Production PWA release | Mainnet config, production bundle, crypto review gate, and hosting headers pass. |
+| Activity airdrop distribution | Vault `airdrop_remaining_ath == 0` and `airdrop_distributed_ath == 15,000,000 ATH`. |
+| Initial pool launch | Only after activity airdrop distribution; `15,000,000 ATH` paired against the target `100,000 TON` reference cap. |
 | Buyback route freeze | M20F evidence from final mainnet STON.fi API/SDK params; no testnet route data. |
 | Buyback route state | `route_frozen == true`, route controller burned, frozen quote/minOut and route actors match evidence. |
 | Pricing freeze | `base_tranche_price_nanotons == evidence_x1_tranche_quote_nanotons`; pricing controller burned. |
 | Seller reserve funding | `reserve_due_ath == 60,000,000 ATH`, `reserve_funded_total_ath == 60,000,000 ATH`. |
-| Seller official ATH wallet | Balance at least `60,000,000 ATH`; excess is a warning, not sellable reserve. |
+| Seller official ATH wallet | Balance at least `60,000,000 ATH`; official seller ATH wallet balance above the reserve is a warning, not sellable reserve, and can remain stuck. |
 | Buyback split enable | Vault airdrop remaining `== 0`, BuybackBurn route frozen and clean, M20F ready, FeeAccumulator split still disabled. |
 
 MarketStabilitySeller may be partially funded at runtime, but partial funding is not release
 readiness. Manual ordinary ATH transfers into the official seller ATH wallet are unsupported and
-do not increase sellable reserve.
+do not increase sellable reserve. For full-launch reserve funding, use one authenticated
+notify-flow transfer for the whole `60,000,000 ATH`; chunked funding is an intentional partial-sale
+mode, not the default release ceremony.
+
+## Username Resolver Invariant
+
+All `.ath` username resolvers, PWA views, bots, explorers, and indexers must resolve ownership as:
+
+```text
+UsernameRegistry.name_records[name_hash].item_address
+-> exact UsernameNFTItem
+-> UsernameNFTItem.owner_wallet
+```
+
+The registry record remains the authoritative name-to-item anchor. `UsernameRegistry.get_name_record.owner_wallet`
+is a registration snapshot for legacy/reporting context, not the current owner after transfer. It must not be used as
+the owner for messaging, payments, profile display, username transfer checks, or wallet identity after the item has
+become transferable.
 
 ## Command Gates
 
@@ -97,6 +124,7 @@ node scripts\hash_codes.js
 $env:TS_NODE_COMPILER_OPTIONS='{ "module": "CommonJS" }'; npx.cmd ts-node scripts\deployment_manifest_m15.ts
 $env:TS_NODE_COMPILER_OPTIONS='{ "module": "CommonJS" }'; npx.cmd ts-node scripts\conformance_m16.ts
 $env:TS_NODE_COMPILER_OPTIONS='{ "module": "CommonJS" }'; npx.cmd ts-node scripts\artifact_integrity_m18.ts
+npm.cmd run audit:archive
 ```
 
 Run these only with final live inputs:
@@ -125,6 +153,20 @@ drain, or arbitrary balance-control levers, but they must stay visible in docs a
 | MarketStabilitySeller launch controller | Freezes the post-pool base tranche price once. |
 | FeeAccumulator treasury receiver | Enables one-way buyback split after preflight. |
 
+In the current contract model, the `buyback_burn_launch_controller` and
+`market_stability_seller_launch_controller` addresses intentionally equal
+`genesis_controller_one_shot`, because both post-pool freeze surfaces use the retained
+`genesis_config_hash`. Do not retire, destroy, lose, or archive this controller key merely after
+genesis seal. It remains a narrow launch authority until both post-pool freezes are complete and
+live getters prove:
+
+```text
+BuybackBurn.route_frozen == true
+BuybackBurn.genesis_config_hash == 0
+MarketStabilitySeller.pricing_frozen == true
+MarketStabilitySeller.genesis_config_hash == 0
+```
+
 ## Stop Conditions
 
 Stop the release immediately if any of these happen:
@@ -138,3 +180,6 @@ Stop the release immediately if any of these happen:
 - A post-pool readiness script is used without a prior `mainnet:genesis:verify` PASS.
 - M20T harness addresses appear as production BuybackBurn addresses.
 - The production PWA bundle contains testnet config, local secrets, SSH keys, or draft Russian docs.
+- The production PWA host does not enforce the checked-in CSP/security headers.
+- The service worker install cache omits runtime vendor crypto modules required by first offline launch.
+- The external audit archive was not produced by `npm.cmd run audit:archive`, or contains browser profiles, cookies, IndexedDB, Local Storage, session data, local env files, seed material, private keys, old zip archives, `node_modules`, or `.git`.

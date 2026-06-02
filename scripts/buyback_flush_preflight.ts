@@ -20,6 +20,9 @@ export interface BuybackFlushPreflightInput {
     fee_bound?: boolean;
     fee_accumulator_address: string;
   };
+  routeEvidence: {
+    m20f_route_freeze_ready: boolean;
+  };
 }
 
 export interface BuybackFlushPreflightFailure {
@@ -137,6 +140,14 @@ export function createBuybackFlushPreflight(input: BuybackFlushPreflightInput): 
 
   if (!input.buybackBurnConfig.route_frozen) {
     addFailure(failures, 'BUYBACKBURN_ROUTE_NOT_FROZEN', 'BuybackBurn route_frozen must be true before accepting buyback reserve.');
+  }
+
+  if (!input.routeEvidence?.m20f_route_freeze_ready) {
+    addFailure(
+      failures,
+      'M20F_ROUTE_FREEZE_EVIDENCE_NOT_READY',
+      'M20F final route-freeze evidence must be accepted before any production buyback reserve flush.',
+    );
   }
 
   if (input.buybackBurnConfig.fee_bound === false) {

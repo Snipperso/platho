@@ -612,8 +612,8 @@ export function dictValueParserBasechainAddress(): DictionaryValue<BasechainAddr
 export type AthTransferNotification = {
     $$type: 'AthTransferNotification';
     query_id: bigint;
-    amount: bigint;
     sender_key: bigint;
+    amount: bigint;
     sender_wallet: Address;
 }
 
@@ -622,8 +622,8 @@ export function storeAthTransferNotification(src: AthTransferNotification) {
         const b_0 = builder;
         b_0.storeUint(1194171773, 32);
         b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.sender_key, 160);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.sender_key, 32);
         b_0.storeAddress(src.sender_wallet);
     };
 }
@@ -632,33 +632,33 @@ export function loadAthTransferNotification(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 1194171773) { throw Error('Invalid prefix'); }
     const _query_id = sc_0.loadUintBig(64);
+    const _sender_key = sc_0.loadUintBig(160);
     const _amount = sc_0.loadUintBig(128);
-    const _sender_key = sc_0.loadUintBig(32);
     const _sender_wallet = sc_0.loadAddress();
-    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, sender_wallet: _sender_wallet };
+    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, sender_wallet: _sender_wallet };
 }
 
 export function loadTupleAthTransferNotification(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _sender_wallet = source.readAddress();
-    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, sender_wallet: _sender_wallet };
+    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, sender_wallet: _sender_wallet };
 }
 
 export function loadGetterTupleAthTransferNotification(source: TupleReader) {
     const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
     const _sender_key = source.readBigNumber();
+    const _amount = source.readBigNumber();
     const _sender_wallet = source.readAddress();
-    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key, sender_wallet: _sender_wallet };
+    return { $$type: 'AthTransferNotification' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, sender_wallet: _sender_wallet };
 }
 
 export function storeTupleAthTransferNotification(source: AthTransferNotification) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
     builder.writeNumber(source.sender_key);
+    builder.writeNumber(source.amount);
     builder.writeAddress(source.sender_wallet);
     return builder.build();
 }
@@ -915,7 +915,7 @@ function initMockVaultAthWallet_init_args(src: MockVaultAthWallet_init_args) {
 }
 
 async function MockVaultAthWallet_init(reject_transfers: boolean) {
-    const __code = Cell.fromHex('b5ee9c7241020501000110000114ff00f4a413f4bcf2c80b0102aed301d072d721d200d200fa4021103450666f04f86102f862ed44d0d200013102915be07021d74920c21f953101d31f02de2182104d415444bae30221821041544810bae3023331c00001c121b095814269f2f0e0f2c082020401945bd33ffa40fa40d37f30707f80405174db3c311036406412c855308210472d9d7d5005cb1f13cb3fcb7fcb1fcec94430124343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00030026c8821041544e4901cb1f01cf16c9f900a9381f00885bd33fd37ffa4031fa40308142685004f2f2707f03804003c8598210415448115003cb1fcb3fcb7fc943304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0073ab2db5');
+    const __code = Cell.fromHex('b5ee9c7241020501000113000114ff00f4a413f4bcf2c80b0102aed301d072d721d200d200fa4021103450666f04f86102f862ed44d0d200013102915be07021d74920c21f953101d31f02de2182104d415444bae30221821041544810bae3023331c00001c121b095814269f2f0e0f2c082020401945bd33ffa40fa40d37f30707f8040543764db3c3110364064c855308210472d9d7d5005cb1f13cb3fcb9fcb7fcec94430124343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003002cc8821041544e4901cb1f12cb3f01cf16c9f900a9389f00885bd33fd37ffa4031fa40308142685004f2f2707f03804003c8598210415448115003cb1fcb3fcb7fc943304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0091abeca4');
     const builder = beginCell();
     initMockVaultAthWallet_init_args({ $$type: 'MockVaultAthWallet_init_args', reject_transfers })(builder);
     const __data = builder.endCell();
@@ -1011,7 +1011,7 @@ const MockVaultAthWallet_types: ABIType[] = [
     {"name":"StdAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":8}},{"name":"address","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
-    {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"VaultAthTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"VaultAthTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"MockSendAthDeposit","header":1296127044,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"vault","type":{"kind":"simple","type":"address","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
@@ -1038,7 +1038,7 @@ const MockVaultAthWallet_receivers: ABIReceiver[] = [
 ]
 
 export const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 1096044105n;
-export const ATH_TRANSFER_NOTIFY_SENDER_KEY_MOD = 4294967296n;
+export const ATH_SENDER_KEY_MOD = 1461501637330902918203684832716283019655932542976n;
 
 export class MockVaultAthWallet implements Contract {
     

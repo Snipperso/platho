@@ -21,9 +21,9 @@ function num(value: bigint | number | string) {
 
 describe('ATH TON RPC providers', () => {
   it('ATH-RPC-01: reads ATHMaster jetton data and derived wallet address', async () => {
-    const calls: Array<{ method: string; address: string; stack: any[] }> = [];
+    const calls: Array<{ method: string; address: string; stack: any[]; verify?: boolean; priority?: string; cacheTtlMs?: number }> = [];
     const transport = {
-      async runGetMethod(call: { method: string; address: string; stack: any[] }) {
+      async runGetMethod(call: { method: string; address: string; stack: any[]; verify?: boolean; priority?: string; cacheTtlMs?: number }) {
         calls.push(call);
         if (call.method === 'get_jetton_data') {
           return {
@@ -37,7 +37,7 @@ describe('ATH TON RPC providers', () => {
           };
         }
         if (call.method === 'get_wallet_address') {
-          return { stack: [{ type: 'slice', value: encodeTonAddressSliceBoc(WALLET) }] };
+          return { stack: [{ type: 'cell', value: encodeTonAddressSliceBoc(WALLET) }] };
         }
         throw new Error(`unexpected method ${call.method}`);
       },
@@ -50,10 +50,15 @@ describe('ATH TON RPC providers', () => {
       admin_address: OWNER,
       jetton_content_boc: CELL_BOC,
     });
-    await expect(provider.getWalletAddress(OWNER)).resolves.toBe(WALLET);
+    await expect(provider.getWalletAddress(OWNER, {
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    })).resolves.toBe(WALLET);
 
     expect(calls.map((call) => call.method)).toEqual(['get_jetton_data', 'get_wallet_address']);
     expect(calls.every((call) => call.address === MASTER)).toBe(true);
+    expect(calls[1]).toMatchObject({ verify: true, priority: 'critical', cacheTtlMs: 0 });
   });
 
   it('ATH-RPC-02: reads ATHWallet balance and pending notification', async () => {

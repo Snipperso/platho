@@ -7,6 +7,7 @@ import {
   UsernameRegistry,
   AthTransferNotificationMintUsername,
   BindOfficialAthWallet,
+  BindUsernameVault,
   SealGenesis,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
@@ -19,9 +20,9 @@ const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_USERNAME_MINT_NOTIFICATION = 0x89129D5F;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
-const USERNAME_MINT_NOTIFY_VALUE = 30_000_000n;
+const USERNAME_MINT_NOTIFY_VALUE = 32_000_000n;
 const USERNAME_MINT_OLD_OWNER_MIN_VALUE = 35_000_000n;
-const USERNAME_MINT_CANONICAL_OWNER_VALUE = 51_000_000n;
+const USERNAME_MINT_CANONICAL_OWNER_VALUE = 53_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -78,6 +79,7 @@ async function setup() {
   const placeholderAthWallet = fixtureAddress('USERNAME_PROD_PATH_PLACEHOLDER_ATH_WALLET');
   const athMaster = fixtureAddress('USERNAME_PROD_PATH_ATH_MASTER');
   const treasuryAthReceiver = fixtureAddress('USERNAME_PROD_PATH_TREASURY');
+  const vaultAddress = fixtureAddress('USERNAME_PROD_PATH_VAULT');
 
   const registryInit = await UsernameRegistry.init(
     placeholderAthWallet,
@@ -105,6 +107,11 @@ async function setup() {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await registry.send(controller.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
   await registry.send(controller.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,

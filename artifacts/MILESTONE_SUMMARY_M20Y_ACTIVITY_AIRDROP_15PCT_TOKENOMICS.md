@@ -15,6 +15,10 @@ M20Y updates the ATH distribution and Vault activity airdrop allocation:
 - market stability reserve: `60,000,000 ATH` split into twenty `3,000,000 ATH` tranches at x2..x21 from the initial pool price;
 - official ATH pool launch target: after approximately `15,000,000 ATH` has been distributed through Vault activity rewards.
 
+The `10 ATH` reward is an activity bonus for real paid usage. It is not a TON refund, cashback, reimbursement,
+investment return, or price guarantee. Protocol fees before pool launch are not expected to fully fund the TON side of
+initial liquidity; launch liquidity may require project/treasury funding in addition to protocol revenue.
+
 ## Contract changes
 
 Changed:
@@ -35,7 +39,7 @@ No changes to reward mechanics:
 Changed:
 
 - `artifacts/platho_v1_open_values_v0_20x_vault_activity_airdrop.md`
-- `artifacts/platho_v1_open_values_v0_20y_activity_airdrop_30pct_tokenomics.md`
+- `artifacts/platho_v1_open_values_v0_20y_activity_airdrop_15pct_tokenomics.md`
 - `scripts/deployment_manifest_m15.ts`
 - `tests/m16-conformance-static.test.ts`
 - `tests/vault-m6-publish.test.ts`

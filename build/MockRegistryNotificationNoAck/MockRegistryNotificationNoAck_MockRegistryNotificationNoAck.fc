@@ -1,0 +1,194 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MockRegistryNotificationNoAck_MockRegistryNotificationNoAck.headers.fc
+;;
+;; Header files for MockRegistryNotificationNoAck
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $MockRegistryNotificationNoAck$_store
+builder $MockRegistryNotificationNoAck$_store(builder build_0, (int, int, int) v) inline;
+
+;; $MockRegistryNotificationNoAck$_load
+(slice, ((int, int, int))) $MockRegistryNotificationNoAck$_load(slice sc_0) inline;
+
+;; $MockRegistryNotificationNoAckStateView$_to_external
+(int, int, int) $MockRegistryNotificationNoAckStateView$_to_external(((int, int, int)) v) inline;
+
+;; $MockRegistryNotificationNoAck$_contract_init
+(int, int, int) $MockRegistryNotificationNoAck$_contract_init() impure inline;
+
+;; $MockRegistryNotificationNoAck$_contract_load
+(int, int, int) $MockRegistryNotificationNoAck$_contract_load() impure inline;
+
+;; $MockRegistryNotificationNoAck$_contract_store
+() $MockRegistryNotificationNoAck$_contract_store((int, int, int) v) impure inline;
+
+;; $MockRegistryNotificationNoAckStateView$_constructor_profile_count_username_count_last_query_id
+((int, int, int)) $MockRegistryNotificationNoAckStateView$_constructor_profile_count_username_count_last_query_id(int $profile_count, int $username_count, int $last_query_id) inline;
+
+;; $MockRegistryNotificationNoAck$_fun_get_state
+((int, int, int), (int, int, int)) $MockRegistryNotificationNoAck$_fun_get_state((int, int, int) $self) impure inline_ref;
+
+
+;; MockRegistryNotificationNoAck_MockRegistryNotificationNoAck.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+;; MockRegistryNotificationNoAck_MockRegistryNotificationNoAck.storage.fc
+;;
+;; Type: MockRegistryNotificationNoAckStateView
+;; TLB: _ profile_count:int257 username_count:int257 last_query_id:int257 = MockRegistryNotificationNoAckStateView
+;;
+
+(int, int, int) $MockRegistryNotificationNoAckStateView$_to_external(((int, int, int)) v) inline {
+    var (v'profile_count, v'username_count, v'last_query_id) = v; 
+    return (v'profile_count, v'username_count, v'last_query_id);
+}
+
+((int, int, int)) $MockRegistryNotificationNoAckStateView$_constructor_profile_count_username_count_last_query_id(int $profile_count, int $username_count, int $last_query_id) inline {
+    return ($profile_count, $username_count, $last_query_id);
+}
+
+;;
+;; Type: MockRegistryNotificationNoAck
+;; TLB: _ profile_count:uint64 username_count:uint64 last_query_id:uint64 = MockRegistryNotificationNoAck
+;;
+
+builder $MockRegistryNotificationNoAck$_store(builder build_0, (int, int, int) v) inline {
+    var (v'profile_count, v'username_count, v'last_query_id) = v;
+    build_0 = build_0.store_uint(v'profile_count, 64);
+    build_0 = build_0.store_uint(v'username_count, 64);
+    build_0 = build_0.store_uint(v'last_query_id, 64);
+    return build_0;
+}
+
+(slice, ((int, int, int))) $MockRegistryNotificationNoAck$_load(slice sc_0) inline {
+    var v'profile_count = sc_0~load_uint(64);
+    var v'username_count = sc_0~load_uint(64);
+    var v'last_query_id = sc_0~load_uint(64);
+    return (sc_0, (v'profile_count, v'username_count, v'last_query_id));
+}
+
+(int, int, int) $MockRegistryNotificationNoAck$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MockRegistryNotificationNoAck$_load();
+    }
+    else {
+        return $MockRegistryNotificationNoAck$_contract_init();
+    }
+}
+
+() $MockRegistryNotificationNoAck$_contract_store((int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MockRegistryNotificationNoAck$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MockRegistryNotificationNoAck functions
+;;
+
+(int, int, int) $MockRegistryNotificationNoAck$_contract_init() impure inline {
+    var (($self'profile_count, $self'username_count, $self'last_query_id)) = (null(), null(), null());
+    $self'profile_count = 0;
+    $self'username_count = 0;
+    $self'last_query_id = 0;
+    return ($self'profile_count, $self'username_count, $self'last_query_id);
+}
+
+((int, int, int), (int, int, int)) $MockRegistryNotificationNoAck$_fun_get_state((int, int, int) $self) impure inline_ref {
+    var (($self'profile_count, $self'username_count, $self'last_query_id)) = $self;
+    var $fresh$ret_0 = $MockRegistryNotificationNoAckStateView$_constructor_profile_count_username_count_last_query_id($self'profile_count, $self'username_count, $self'last_query_id);
+    return (($self'profile_count, $self'username_count, $self'last_query_id), $fresh$ret_0);
+}
+
+;;
+;; Get methods of a Contract MockRegistryNotificationNoAck
+;;
+
+_ %get_state() method_id(86957) {
+    var self = $MockRegistryNotificationNoAck$_contract_load();
+    var res = self~$MockRegistryNotificationNoAck$_fun_get_state();
+    return $MockRegistryNotificationNoAckStateView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract MockRegistryNotificationNoAck
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'profile_count, $self'username_count, $self'last_query_id) = $MockRegistryNotificationNoAck$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive AthTransferNotificationVaultProfileAvatar message
+    if (op == 0xa11a7002) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'sender_key = in_msg~load_uint(160);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'payer_wallet = in_msg~load_msg_addr();
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'avatar_hash = sc_1~load_uint(256);
+        var $msg'avatar_entry_id = sc_1~load_uint(64);
+        var $msg'avatar_stream_id = sc_1~load_uint(128);
+        var $msg'avatar_part_count = sc_1~load_uint(16);
+        var $msg'media_format = sc_1~load_uint(8);
+        $self'profile_count = $self'profile_count + 1;
+        $self'last_query_id = $msg'query_id;
+        $MockRegistryNotificationNoAck$_contract_store(($self'profile_count, $self'username_count, $self'last_query_id));
+        return ();
+    }
+    
+    ;; Receive AthTransferNotificationVaultMintUsername message
+    if (op == 0x89129d60) {
+        var $msg'query_id = in_msg~load_uint(64);
+        var $msg'sender_key = in_msg~load_uint(160);
+        var $msg'amount = in_msg~load_uint(128);
+        var $msg'payer_wallet = in_msg~load_msg_addr();
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        var $msg'username_len = in_msg~load_uint(8);
+        var $msg'username = in_msg;
+        $self'username_count = $self'username_count + 1;
+        $self'last_query_id = $msg'query_id;
+        $MockRegistryNotificationNoAck$_contract_store(($self'profile_count, $self'username_count, $self'last_query_id));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        throw(18777);
+        $MockRegistryNotificationNoAck$_contract_store(($self'profile_count, $self'username_count, $self'last_query_id));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

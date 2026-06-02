@@ -12,6 +12,7 @@
       "ath_long_term_vesting_beneficiary": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_BENEFICIARY_ADDRESS",
       "ath_long_term_vesting_official_ath_wallet": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_treasury_owner": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+      "ath_treasury_owner_ath_wallet": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS",
       "vault": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "vault_official_ath_wallet": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
       "market_stability_seller": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
@@ -39,6 +40,7 @@
       "vault": "required: current Vault code hash",
       "market_stability_seller": "required: current MarketStabilitySeller code hash",
       "capsulehub": "required: current CapsuleHub code hash",
+      "username_nft_item": "required: current UsernameNFTItem code hash",
       "username_registry": "required: current UsernameRegistry code hash",
       "profile_registry": "required: current ProfileRegistry code hash",
       "buyback_burn": "required: current BuybackBurn code hash",
@@ -46,6 +48,7 @@
     },
     "state_init_hashes": {
       "ath_master": "required: 64 lowercase hex ATHMaster StateInit hash",
+      "ath_treasury_owner_ath_wallet": "required: 64 lowercase hex Treasury Owner ATHWallet StateInit hash",
       "ath_long_term_vesting": "required: 64 lowercase hex ATHVesting StateInit hash",
       "ath_long_term_vesting_official_ath_wallet": "required: 64 lowercase hex ATHVesting official ATHWallet StateInit hash",
       "vault": "required: 64 lowercase hex Vault StateInit hash",
@@ -86,7 +89,12 @@
       "code_hash": "required: current contract code hash",
       "sealed": true,
       "deployment_manifest_hash": "required: final manifest hash",
+      "capsule_hub_bound": true,
       "capsule_hub_address": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
+      "profile_registry_bound": true,
+      "profile_registry_address": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
+      "username_registry_bound": true,
+      "username_registry_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
       "vault_ath_wallet_address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "user_count": "0",
@@ -100,10 +108,19 @@
     },
     "vault_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_VAULT_OFFICIAL_ATH_WALLET_ADDRESS",
+      "account_state": "active",
       "code_hash": "required: current ATHWallet code hash",
       "owner_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "balance_atomic": "required: decimal ATH balance from get_wallet_data"
+    },
+    "ath_treasury_owner_ath_wallet": {
+      "address": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ATH_WALLET_ADDRESS",
+      "account_state": "active",
+      "code_hash": "required: current ATHWallet code hash",
+      "owner_address": "REQUIRED_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "required: exact remaining 75M ATH genesis custody balance"
     },
     "ath_long_term_vesting": {
       "address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS",
@@ -118,6 +135,8 @@
       "total_amount": "10000000000000000",
       "phase": "0",
       "claimed_ath": "0",
+      "vested_ath": "0",
+      "claimable_ath": "0",
       "pending_query_id": "0",
       "pending_amount": "0",
       "pending_created_at": "0",
@@ -125,6 +144,7 @@
     },
     "ath_long_term_vesting_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_ADDRESS",
+      "account_state": "active",
       "code_hash": "required: current ATHWallet code hash",
       "owner_address": "REQUIRED_MAINNET_ATH_LONG_TERM_VESTING_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
@@ -156,16 +176,19 @@
     },
     "market_stability_seller_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_ADDRESS",
-      "code_hash": "required: current ATHWallet code hash",
-      "owner_address": "REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
-      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
-      "balance_atomic": "required: decimal ATH balance from get_wallet_data"
+      "account_state": "uninit",
+      "code_hash": "",
+      "owner_address": "optional when uninit; if active, REQUIRED_MAINNET_MARKET_STABILITY_SELLER_ADDRESS",
+      "ath_master_address": "optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "balance_atomic": "0"
     },
     "capsulehub": {
       "address": "REQUIRED_MAINNET_CAPSULEHUB_ADDRESS",
       "code_hash": "required: current contract code hash",
       "sealed": true,
       "deployment_manifest_hash": "required: final manifest hash",
+      "ton_balance": "required: decimal raw account TON balance in nanotons; no genesis reserve prefund is required",
+      "vault_bound": true,
       "vault_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "fee_accumulator_address": "REQUIRED_MAINNET_FEE_ACCUMULATOR_ADDRESS",
       "private_latest_id": "0",
@@ -177,7 +200,10 @@
       "code_hash": "required: current contract code hash",
       "sealed": true,
       "deployment_manifest_hash": "required: final manifest hash",
+      "official_ath_wallet_bound": true,
       "official_ath_wallet_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "vault_bound": true,
+      "vault_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS",
       "name_record_count": "0",
@@ -191,9 +217,10 @@
     },
     "username_registry_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_USERNAME_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
-      "code_hash": "required: current ATHWallet code hash",
-      "owner_address": "REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
-      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "account_state": "uninit",
+      "code_hash": "",
+      "owner_address": "optional when uninit; if active, REQUIRED_MAINNET_USERNAME_REGISTRY_ADDRESS",
+      "ath_master_address": "optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "balance_atomic": "0"
     },
     "profile_registry": {
@@ -201,7 +228,10 @@
       "code_hash": "required: current contract code hash",
       "sealed": true,
       "deployment_manifest_hash": "required: final manifest hash",
+      "official_ath_wallet_bound": true,
       "official_ath_wallet_address": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
+      "vault_bound": true,
+      "vault_address": "REQUIRED_MAINNET_VAULT_ADDRESS",
       "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "treasury_ath_receiver": "REQUIRED_MAINNET_PROFILE_TREASURY_ATH_RECEIVER_ADDRESS",
       "profile_count": "0",
@@ -213,9 +243,10 @@
     },
     "profile_registry_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_PROFILE_REGISTRY_OFFICIAL_ATH_WALLET_ADDRESS",
-      "code_hash": "required: current ATHWallet code hash",
-      "owner_address": "REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
-      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "account_state": "uninit",
+      "code_hash": "",
+      "owner_address": "optional when uninit; if active, REQUIRED_MAINNET_PROFILE_REGISTRY_ADDRESS",
+      "ath_master_address": "optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "balance_atomic": "0"
     },
     "buyback_burn": {
@@ -240,9 +271,10 @@
     },
     "buyback_burn_official_ath_wallet": {
       "address": "REQUIRED_MAINNET_BUYBACKBURN_OFFICIAL_ATH_WALLET_ADDRESS",
-      "code_hash": "required: current ATHWallet code hash",
-      "owner_address": "REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
-      "ath_master_address": "REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
+      "account_state": "uninit",
+      "code_hash": "",
+      "owner_address": "optional when uninit; if active, REQUIRED_MAINNET_BUYBACKBURN_ADDRESS",
+      "ath_master_address": "optional when uninit; if active, REQUIRED_MAINNET_ATH_MASTER_ADDRESS",
       "balance_atomic": "0"
     },
     "fee_accumulator": {

@@ -74,6 +74,8 @@ TON proceeds from executed reserve sales go to the configured TON treasury recei
 
 ## Implementation boundary
 
-M49 fixes allocation policy. M50 implements the separate immutable market-stability seller contract for that policy.
+M49 fixes allocation policy. The current implementation is the immutable MarketStabilitySeller contract for that policy.
 
-Before the reserve is used operationally, final pool-launch pricing evidence, seller code hash, official seller ATH wallet funding proof, and deployment manifest evidence must be archived. Until then, reserve ATH should remain inert in treasury custody and must not be treated as an active protocol mechanism.
+Pricing freeze is a real one-time launch authority. It records the base tranche price from final pool-launch evidence and clears the launch controller hash. After that, the seller cannot change the price schedule, pause sales, rescue balances, or manually release reserve ATH.
+
+Before the reserve is used operationally, final pool-launch pricing evidence, seller code hash, official seller ATH wallet funding proof, and deployment manifest evidence must be archived. Seller readiness requires full `60,000,000 ATH` reserve accounting and official wallet backing. Official seller ATH wallet balance above the required reserve is only an excess-donation warning: it is not tracked reserve, does not increase sellable supply, and can remain stuck.

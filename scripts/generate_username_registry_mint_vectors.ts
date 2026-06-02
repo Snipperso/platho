@@ -8,7 +8,7 @@ import { ATHWallet, storeATHTransferRequestMintUsername } from '../build/ATHWall
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const OP_ATH_TRANSFER_NOTIFICATION_MINT_USERNAME = 0x89129D5Fn;
 const OP_ATH_TRANSFER_REQUEST_MINT_USERNAME = 0x41544816n;
-const USERNAME_MINT_NOTIFY_VALUE_NANOTONS = 30000000n;
+const USERNAME_MINT_NOTIFY_VALUE_NANOTONS = 32000000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -54,19 +54,19 @@ function mintRequestPayload(owner: Address, registryAddress: Address, name: stri
 
 async function itemVector(name: string, owner: Address, registryAddress: Address, amount: bigint) {
   const h = nameHash(name);
-  const init = await UsernameNFTItem.init(owner, registryAddress, h);
+  const init = await UsernameNFTItem.init(registryAddress, h);
   return {
     username: name,
     username_hex: Buffer.from(name, 'ascii').toString('hex'),
-    owner_wallet: owner.toString(),
-    owner_workchain: owner.workChain,
+    initial_owner_wallet: owner.toString(),
+    item_workchain: registryAddress.workChain,
     price_ath_atomic: amount.toString(),
     name_hash: '0x' + h.toString(16).padStart(64, '0'),
     ath_transfer_request_mint_username_boc_base64: mintRequestPayload(owner, registryAddress, name, amount).toBoc().toString('base64'),
     official_wallet_mint_notification_boc_base64: mintPayload(owner, name, amount).toBoc().toString('base64'),
     username_item_data_cell_hash: init.data.hash().toString('hex'),
     username_item_state_init_hash: beginCell().store(storeStateInit(init)).endCell().hash().toString('hex'),
-    derived_item_address: contractAddress(owner.workChain, init).toString(),
+    derived_item_address: contractAddress(registryAddress.workChain, init).toString(),
   };
 }
 
@@ -86,8 +86,8 @@ async function main() {
       ATH_TRANSFER_NOTIFICATION_MINT_USERNAME_OPCODE: `0x${OP_ATH_TRANSFER_NOTIFICATION_MINT_USERNAME.toString(16).toUpperCase()}`,
       USERNAME_MINT_NOTIFY_VALUE_NANOTONS: USERNAME_MINT_NOTIFY_VALUE_NANOTONS.toString(),
       USERNAME_NAME_HASH_DOMAIN: '0xC5CC7CD6',
-      USERNAME_MAX_LENGTH: 32,
-      USERNAME_NFT_ITEM_DEPLOY_RESERVE_NANOTONS: '20000000',
+      USERNAME_MAX_LENGTH: 16,
+      USERNAME_NFT_ITEM_DEPLOY_RESERVE_NANOTONS: '21000000',
       USERNAME_ITEM_ACK_FORWARD_RESERVE_NANOTONS: '3000000',
       USERNAME_ATH_NOTIFICATION_ACK_VALUE_NANOTONS: '1000000',
       USERNAME_TREASURY_SHARE_BPS: 5000,
@@ -111,13 +111,14 @@ async function main() {
       await itemVector('abcde', fixtureAddress('USERNAME_M10_VECTOR_OWNER_5'), registryAddress, 1000000000000n),
       await itemVector('platho', fixtureAddress('USERNAME_M10_VECTOR_OWNER_6'), registryAddress, 100000000000n),
       await itemVector('user123', fixtureAddress('USERNAME_M10_VECTOR_OWNER_DIGITS'), registryAddress, 100000000000n),
+      await itemVector('user_name', fixtureAddress('USERNAME_M10_VECTOR_OWNER_UNDERSCORE'), registryAddress, 100000000000n),
+      await itemVector('user-name', fixtureAddress('USERNAME_M10_VECTOR_OWNER_HYPHEN'), registryAddress, 100000000000n),
     ],
     invalid_examples: [
       { username: 'abc', reason: 'length < 4' },
       { username: 'Larisa', reason: 'uppercase byte' },
-      { username: 'user_name', reason: 'underscore byte' },
-      { username: 'user-name', reason: 'hyphen byte' },
       { username: 'user.name', reason: 'dot byte' },
+      { username: 'abcdefghijklmnopq', reason: 'length > 16' },
       { username: 'плато', reason: 'non-ASCII bytes' },
     ],
   };

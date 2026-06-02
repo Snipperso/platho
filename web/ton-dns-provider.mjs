@@ -1,6 +1,6 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs';
-import { beginCell, tonCell } from './pwa-contract-transactions.mjs';
-import { createTonCenterV3VaultTransport } from './vault-ton-rpc-provider.mjs';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
+import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=14';
+import { createTonCenterV3VaultTransport } from './vault-ton-rpc-provider.mjs?v=15';
 
 export class TonDnsProviderError extends Error {
   constructor(message) {
@@ -271,6 +271,9 @@ export function createTonDnsProvider(options = {}) {
             stackSlice(queryBytes, 'TON DNS query'),
             stackNumber(walletCategory),
           ],
+          verify: callOptions.verify,
+          priority: callOptions.priority,
+          cacheTtlMs: callOptions.cacheTtlMs,
         }));
         if (result.resolvedBits <= 0n) throw new TonDnsProviderError(`${name} does not have a TON DNS wallet record`);
         if (result.resolvedBits % 8n !== 0n) throw new TonDnsProviderError('TON DNS resolver returned non-byte prefix');

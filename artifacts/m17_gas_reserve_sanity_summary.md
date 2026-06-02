@@ -6,12 +6,12 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Scenario | Operations | Total fees, nanotons | Max op fee, nanotons | Max gas used |
 |---|---:|---:|---:|---:|
-| ATH_TRANSFER_SUCCESS | 1 | 4046250 | 4046250 | 15007 |
-| ATH_BURN_SUCCESS | 1 | 1371402 | 1371402 | 7950 |
-| CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 3639069 | 1568023 | 22951 |
+| ATH_TRANSFER_SUCCESS | 1 | 4419600 | 4419600 | 14601 |
+| ATH_BURN_SUCCESS | 1 | 1384469 | 1384469 | 8226 |
+| CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 4233602 | 2136289 | 31475 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
-| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 26956831 | 6304828 | 38299 |
-| VAULT_BALANCE_PUBLISH | 2 | 4819736 | 2409868 | 20939 |
+| USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 7 | 30528085 | 6925245 | 43888 |
+| VAULT_BALANCE_PUBLISH | 2 | 22502481 | 12572108 | 90632 |
 
 ## Operation details
 
@@ -19,21 +19,21 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| owner_to_recipient_wallet | 5 | 4046250 | 2355447 | 15007 | 0 | 0 |
+| owner_to_recipient_wallet | 5 | 4419600 | 2692930 | 14601 | 0 | 0 |
 
 ### ATH_BURN_SUCCESS
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| wallet_to_master_burn_finalized | 4 | 1371402 | 565356 | 7950 | 0 | 0 |
+| wallet_to_master_burn_finalized | 4 | 1384469 | 583756 | 8226 | 0 | 0 |
 
 ### CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| private_vault_publish | 2 | 1568023 | 1568023 | 22951 | 1 | 0 |
-| public_vault_publish | 2 | 1225289 | 1225289 | 17810 | 1 | 0 |
-| flush_fee_to_missing_accumulator_bounce | 3 | 845757 | 554333 | 7895 | 0 | 0 |
+| private_vault_publish | 2 | 2136289 | 2136289 | 31475 | 1 | 0 |
+| public_vault_publish | 2 | 1229956 | 1229956 | 17880 | 1 | 0 |
+| flush_fee_to_missing_accumulator_bounce | 3 | 867357 | 575933 | 8219 | 0 | 0 |
 
 ### FEEACCUMULATOR_SPLIT_FLUSH
 
@@ -51,20 +51,20 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| valid_username_mint_with_item_ack | 5 | 4439689 | 2727509 | 38299 | 2 | 1 |
-| invalid_username_refund_due | 3 | 2095756 | 1763555 | 25668 | 2 | 1 |
-| flush_ath_refund_due | 6 | 6304828 | 2355447 | 22602 | 0 | 0 |
-| flush_treasury_due_ath | 6 | 6016004 | 2370113 | 18134 | 0 | 0 |
-| flush_burn_due_ath | 5 | 3219358 | 1030689 | 14930 | 0 | 0 |
-| stuck_pending_mint_creation_no_ack | 4 | 3201244 | 2727509 | 38299 | 2 | 1 |
-| prune_stale_pending_mint | 2 | 1679952 | 1395558 | 15788 | 0 | 0 |
+| valid_username_mint_with_item_ack | 5 | 6117487 | 3275773 | 43888 | 2 | 1 |
+| invalid_username_refund_due | 3 | 2596290 | 2230222 | 32668 | 2 | 1 |
+| flush_ath_refund_due | 6 | 6925245 | 2692930 | 24634 | 0 | 0 |
+| flush_treasury_due_ath | 6 | 6611622 | 2707063 | 19912 | 0 | 0 |
+| flush_burn_due_ath | 5 | 3458158 | 1134956 | 16494 | 0 | 0 |
+| stuck_pending_mint_creation_no_ack | 3 | 3417307 | 3275773 | 43888 | 1 | 0 |
+| prune_stale_pending_mint | 3 | 1401976 | 1096981 | 9289 | 1 | 1 |
 
 ### VAULT_BALANCE_PUBLISH
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| vault_balance_private_publish_to_capsulehub_ack | 1 | 2409868 | 2409868 | 20939 | 0 | 0 |
-| vault_balance_private_publish_to_missing_capsulehub_bounce | 1 | 2409868 | 2409868 | 20939 | 0 | 0 |
+| vault_balance_private_publish_to_capsulehub_ack | 3 | 12572108 | 8253084 | 90632 | 0 | 0 |
+| vault_balance_private_publish_to_missing_capsulehub_bounce | 3 | 9930373 | 8253084 | 90632 | 1 | 0 |
 
 ## Result
 

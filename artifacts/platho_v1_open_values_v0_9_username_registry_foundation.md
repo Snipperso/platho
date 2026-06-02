@@ -40,7 +40,7 @@ Reason:
 
 ```text
 Full paid mint remains blocked until exact ATH transfer notification payload carrying raw username bytes is pinned.
-A name_hash alone cannot prove lowercase ASCII / no unicode / no separators.
+A name_hash alone cannot prove lowercase canonical bytes / no unicode / no uppercase.
 ```
 
 No admin, owner override, pause, upgrade, governance, rescue, fallback, adapter, migration hook, compatibility path, silent fallback behavior, or ignored-error money send mode is introduced.

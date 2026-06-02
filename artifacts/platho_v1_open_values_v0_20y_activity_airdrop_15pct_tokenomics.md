@@ -1,6 +1,10 @@
 # Platho v1 Open Values v0.20Y - Activity Airdrop Tokenomics
 
-Status: implemented in Vault constants and locally verified by targeted tests.
+Status: historical / superseded by later final-pricing artifacts.
+
+Current source of truth for message pricing is `PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+The rough `0.01 TON` example in this historical note is not a current PWA or
+contract price.
 
 ## Scope
 
@@ -79,9 +83,13 @@ Reward rule:
 - `10,000,000,000` atomic units per reward;
 - maximum global reward count: `1,500,000` rewarded publishes.
 
-There is no per-wallet cap because every reward requires a paid protocol action. At roughly `0.01 TON` per message, fully exhausting the `1,500,000` publish reward pool requires about `15,000 TON` of aggregate paid user activity.
+There is no per-wallet cap because every reward requires a paid protocol action. Current capsule pricing starts from
+`0.030 TON`; larger private capsule blocks cost more. Fully exhausting the `1,500,000` publish reward pool therefore
+requires real paid usage rather than free claims.
 
-The activity airdrop is an early usage rebate and utility bootstrap, not a free claim campaign.
+The activity airdrop is an early activity bonus and utility bootstrap, not a free claim campaign. It is not a TON refund,
+cashback, reimbursement, investment return, or price guarantee. The launch reference value of `10 ATH` can be lower than
+the TON cost of a capsule.
 
 ## Official ATH pool launch target
 
@@ -93,9 +101,9 @@ The official ATH liquidity pool may be launched after approximately:
 
 has been distributed through Vault activity rewards.
 
-That is `15%` of total supply and half of the final `15,000,000 ATH` activity airdrop allocation.
+That is `15%` of total supply and the full `15,000,000 ATH` activity airdrop allocation.
 
-The remaining `15,000,000 ATH` activity airdrop allocation continues after pool launch until the global bucket is exhausted.
+After the activity airdrop bucket is exhausted, no further activity rewards are distributed. Message fee discounts unlock at this same 15% activity-distribution gate.
 
 ## User utility before pool launch
 
@@ -105,7 +113,7 @@ Before the official ATH pool launch, users can still accumulate ATH through paid
 
 This creates ATH ownership through real protocol usage before market trading begins.
 
-Message protocol-fee discounts unlock only after approximately `15,000,000 ATH` has been distributed through Vault activity rewards. Before that threshold, message publish fees use the full protocol fee so early protocol TON can bootstrap liquidity / treasury instead of being immediately discounted away.
+Message protocol-fee discounts unlock only after approximately `15,000,000 ATH` has been distributed through Vault activity rewards. Before that threshold, message publish fees use the full protocol fee so early protocol TON can bootstrap liquidity / treasury instead of being immediately discounted away. Protocol fees are not expected to fully fund the TON side of initial liquidity; launch liquidity may require project/treasury funding in addition to protocol revenue.
 
 ## Vault implementation constants
 

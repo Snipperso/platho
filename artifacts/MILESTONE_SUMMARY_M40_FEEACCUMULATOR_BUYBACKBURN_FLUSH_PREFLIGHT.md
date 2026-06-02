@@ -12,17 +12,23 @@ BuybackBurn reserve flush path.
 - `FeeAccumulator.buyback_burn_address` must match the intended BuybackBurn.
 - BuybackBurn must be sealed.
 - BuybackBurn must have `route_frozen == true`.
+- M20F final mainnet route-freeze evidence must be accepted; `route_frozen`
+  alone is not enough for a production reserve flush.
 - BuybackBurn must be bound to the source FeeAccumulator address.
 
 ## Verification
 
 - Focused seam/preflight tests:
+  `tests\buyback-flush-preflight.test.ts`,
+  `tests\enable-buyback-split-preflight.test.ts`,
+  `tests\m20f-mainnet-route-freeze-preflight.test.ts`,
+  `tests\m20u-buybackburn-implementation-readiness.test.ts`,
+  `tests\buybackburn-production.test.ts`,
+  `tests\buybackburn-auth-negative-matrix.test.ts`,
   `tests\fee-accumulator.test.ts`,
   `tests\fee-accumulator-backing-negative.test.ts`,
   `tests\m19h-buybackburn-funding-envelope.test.ts`,
-  `tests\buybackburn-production.test.ts`,
-  `tests\buybackburn-auth-negative-matrix.test.ts`,
-  `tests\buyback-flush-preflight.test.ts`: 6 files / 39 tests PASS.
+  `tests\m29-buybackburn-abi-freeze.test.ts`: 10 files / 83 tests PASS.
 - `npm.cmd test`: 68 files / 291 tests PASS.
 
 ## Production Note

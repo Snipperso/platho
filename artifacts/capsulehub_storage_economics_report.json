@@ -2,49 +2,104 @@
   "profile": "PLATHO.V1.CAPSULEHUB_STORAGE_ECONOMICS",
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
-  "note": "Sandbox evidence for canonical final CapsuleHub cells. Page boundaries are metadata-only and do not change publish price. This proves current v1 private fixed-size payloads and bounded public payloads retain the configured non-fee entry reserve after transaction fees; it is not a mainnet storage-rent oracle.",
+  "code_hashes": {
+    "capsulehub": "fc0dd2f1b836145e25ccd51c0f7ab8acfc9f9dcf832e86e4c17f04a886789f0e"
+  },
+  "note": "Sandbox evidence for canonical final CapsuleHub index cells. Body payload cells are validated in the publish transaction and authenticated by stored hashes, but only compact headers/indexes remain in CapsuleHub state. Pages are virtual ranges derived from entry ids; this is not a mainnet storage-rent oracle.",
+  "minimum_retained_margin_nanotons": "1000000",
   "canonical_capsule_cells": {
     "header0_bytes": 140,
     "header1_bytes": 30,
-    "standard_body_bytes": 1140,
     "hybrid_body_bytes": 2228,
+    "hybrid_body_bytes_by_size_class": {
+      "1K": 2228,
+      "2K": 3252,
+      "4K": 5300,
+      "8K": 9396,
+      "16K": 17588,
+      "32K": 33972
+    },
     "public_header_max_bytes": 72,
     "public_body_max_bytes": 1024
   },
   "cases": [
     {
-      "label": "VAULT_PRIVATE_STANDARD",
-      "inbound_value_nanotons": "43000000",
-      "protocol_fee_delta_nanotons": "5000000",
-      "balance_delta_nanotons": "11356064",
-      "retained_non_fee_nanotons": "6356064",
-      "required_storage_reserve_nanotons": "5000000",
-      "retained_margin_nanotons": "1356064",
-      "tx_count": 2,
-      "aborted_count": 0
-    },
-    {
-      "label": "VAULT_PRIVATE_HYBRID",
-      "inbound_value_nanotons": "49000000",
+      "label": "VAULT_PRIVATE_HYBRID_1K",
+      "inbound_value_nanotons": "48500000",
       "protocol_fee_delta_nanotons": "10000000",
-      "balance_delta_nanotons": "17283998",
-      "retained_non_fee_nanotons": "7283998",
-      "required_storage_reserve_nanotons": "5000000",
-      "retained_margin_nanotons": "2283998",
+      "balance_delta_nanotons": "16287798",
+      "retained_non_fee_nanotons": "6287798",
+      "required_storage_reserve_nanotons": "4300000",
+      "retained_margin_nanotons": "1987798",
       "tx_count": 2,
       "aborted_count": 0
     },
     {
-      "label": "VAULT_PUBLIC_STANDARD",
-      "inbound_value_nanotons": "40000000",
-      "protocol_fee_delta_nanotons": "5000000",
-      "balance_delta_nanotons": "8700798",
-      "retained_non_fee_nanotons": "3700798",
-      "required_storage_reserve_nanotons": "2000000",
-      "retained_margin_nanotons": "1700798",
+      "label": "VAULT_PRIVATE_HYBRID_2K",
+      "inbound_value_nanotons": "48600000",
+      "protocol_fee_delta_nanotons": "10000000",
+      "balance_delta_nanotons": "16320464",
+      "retained_non_fee_nanotons": "6320464",
+      "required_storage_reserve_nanotons": "4300000",
+      "retained_margin_nanotons": "2020464",
+      "tx_count": 2,
+      "aborted_count": 0
+    },
+    {
+      "label": "VAULT_PRIVATE_HYBRID_4K",
+      "inbound_value_nanotons": "48800000",
+      "protocol_fee_delta_nanotons": "10000000",
+      "balance_delta_nanotons": "16399798",
+      "retained_non_fee_nanotons": "6399798",
+      "required_storage_reserve_nanotons": "4300000",
+      "retained_margin_nanotons": "2099798",
+      "tx_count": 2,
+      "aborted_count": 0
+    },
+    {
+      "label": "VAULT_PRIVATE_HYBRID_8K",
+      "inbound_value_nanotons": "49300000",
+      "protocol_fee_delta_nanotons": "10000000",
+      "balance_delta_nanotons": "16672464",
+      "retained_non_fee_nanotons": "6672464",
+      "required_storage_reserve_nanotons": "4300000",
+      "retained_margin_nanotons": "2372464",
+      "tx_count": 2,
+      "aborted_count": 0
+    },
+    {
+      "label": "VAULT_PRIVATE_HYBRID_16K",
+      "inbound_value_nanotons": "50100000",
+      "protocol_fee_delta_nanotons": "10000000",
+      "balance_delta_nanotons": "17026331",
+      "retained_non_fee_nanotons": "7026331",
+      "required_storage_reserve_nanotons": "4300000",
+      "retained_margin_nanotons": "2726331",
+      "tx_count": 2,
+      "aborted_count": 0
+    },
+    {
+      "label": "VAULT_PRIVATE_HYBRID_32K",
+      "inbound_value_nanotons": "51900000",
+      "protocol_fee_delta_nanotons": "10000000",
+      "balance_delta_nanotons": "17969664",
+      "retained_non_fee_nanotons": "7969664",
+      "required_storage_reserve_nanotons": "4300000",
+      "retained_margin_nanotons": "3669664",
+      "tx_count": 2,
+      "aborted_count": 0
+    },
+    {
+      "label": "VAULT_PUBLIC_POST",
+      "inbound_value_nanotons": "50800000",
+      "protocol_fee_delta_nanotons": "10000000",
+      "balance_delta_nanotons": "19497864",
+      "retained_non_fee_nanotons": "9497864",
+      "required_storage_reserve_nanotons": "8400000",
+      "retained_margin_nanotons": "1097864",
       "tx_count": 2,
       "aborted_count": 0
     }
   ],
-  "worst_margin_nanotons": "1356064"
+  "worst_margin_nanotons": "1097864"
 }

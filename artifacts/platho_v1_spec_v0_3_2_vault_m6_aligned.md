@@ -1,5 +1,10 @@
 # Platho v1 Protocol Specification
 
+> HISTORICAL ONLY. SUPERSEDED. DO NOT USE AS THE CURRENT V1 SOURCE OF TRUTH.
+> This milestone document still contains the removed Vault message-budget/session publish model. Current v1 uses Vault
+> signed external publish, no `message_budget_ton`, no `SetSession` / `RevokeSession`, and no session publish ABI. The
+> active capsule layout and off-state body model are in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+
 **Document status:** clean rebuild for implementation handoff; Vault M6 external publish profile aligned  
 **Version:** v0.3.2-vault-m6-aligned  
 **Scope:** immutable TON-based Platho v1 contracts and official client rules  
@@ -7,13 +12,13 @@
 
 **BuybackBurn ABI note, 2026-05-20:** this v0.3.2 table is superseded for active BuybackBurn ABI by `artifacts/M29_BUYBACKBURN_ABI_AND_EVIDENCE_REVIEW.md`. The production source of truth is the BY* table implemented in `contracts/BuybackBurn.tact` and exported by `build/BuybackBurn/BuybackBurn_BuybackBurn.ts`; older `ExecuteBuyback` / `BuybackBounceRecovery` / `PruneStuckBuyback` names below are historical milestone context only.
 
-**CapsuleHub final note, 2026-05-22:** this document is superseded for CapsuleHub message storage, binary capsule layout, and publish pricing by `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores retrievable payload cells and removed the separate page-storage reserve; page counters are metadata-only.
+**CapsuleHub final note, 2026-05-22:** this document is superseded for CapsuleHub message storage, binary capsule layout, and publish pricing by `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores compact authenticated entry state, retrieves heavy body cells from accepted publish transaction history, and removed the separate page-storage reserve; page counters are metadata-only.
 
 ---
 
 ## 0. Core Philosophy
 
-Platho v1 is an immutable protocol for encrypted wallet-to-wallet messaging, public posts, message-budget no-popup publishing, protocol fees, ATH utility token accounting, username NFTs, buyback/burn, and receive-intent transfers.
+Platho v1 is an immutable protocol for encrypted wallet-to-wallet messaging, public posts, signed Vault publishing, protocol fees, ATH utility token accounting, username NFTs, buyback/burn, and receive-intent transfers.
 
 After deployment and seal, v1 contracts do not evolve.
 
@@ -312,7 +317,7 @@ If none can be implemented, the flush operation is not part of v1.
 
 ### 5.1 Purpose
 
-Superseded note: this v0.3.2 text predates the on-chain payload storage fix. CapsuleHub v1 must store retrievable encrypted payload cells on-chain; counter-only / anchor-only is not sufficient. The final v1 cell format is binary, not JSON: `PH0B` header0 is exactly 140 bytes, `PH1B` header1 is exactly 30 bytes, and each `platho.byte-layout.v1` body plaintext carries exactly one encrypted 1024-byte user payload slot for both standard and postquantum capsules. The canonical byte layout is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
+Superseded note: this v0.3.2 text predates the on-chain payload storage fix. CapsuleHub v1 must store retrievable encrypted payload cells on-chain; counter-only / anchor-only is not sufficient. The final v1 cell format is binary, not JSON: `PH0B` header0 is exactly 140 bytes, `PH1B` header1 is exactly 30 bytes, and each `platho.byte-layout.v1` private body plaintext carries exactly one encrypted user payload slot selected from the 1, 2, 4, 8, 16, or 32 KiB hybrid size classes. The canonical byte layout is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
 
 CapsuleHub anchors private encrypted message entries and public post entries.
 
@@ -824,7 +829,7 @@ Post-accept deterministic validation failures are controlled invalid signed requ
 
 ```text
 nonce remains consumed
-message_budget_ton -= min(message_budget_ton, INVALID_SESSION_REQUEST_CHARGE_TON)
+only the size-class local execution reserve remains spent
 no CapsuleHub publish
 no PLATO fee
 ```
@@ -834,20 +839,22 @@ no PLATO fee
 Max charge uses current ATH discount:
 
 ```text
-MAX_CHARGE_PRIVATE_STANDARD(owner_wallet)
-MAX_CHARGE_PRIVATE_LONG_TERM(owner_wallet)
+MAX_CHARGE_PRIVATE_HYBRID(owner_wallet, size_class)
 MAX_CHARGE_PUBLIC(owner_wallet)
 ```
 
 Each includes:
 
 ```text
-VAULT_EXTERNAL_SESSION_LOCAL_MAX_CHARGE
-+ CapsuleHub call value with discounted PLATO fee
-+ possible CapsuleHub page storage endowment
+Vault local execution reserve for the selected publish kind/size class
++ discounted PLATO fee after ATH discount unlock
++ CapsuleHub execution reserve
++ CapsuleHub compact index/header storage endowment
++ CapsuleHub ACK forward reserve
 ```
 
 ATH discount applies only to PLATO fee, not execution/storage/state endowment.
+This historical draft's old minimum-fee wording is superseded; current final v1 lets ATH discount the full protocol-fee component after unlock.
 
 ### 6.11 PendingPublishV1
 
@@ -913,7 +920,7 @@ else:
 
 Returned/excess value is capped to `pending.refundable_budget_amount`.
 
-CapsuleHub ACK value must represent only the fixed publish ACK forward reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `28,000,000` nanotons in internal Vault TON balance. The ACK must not return the protocol-fee backing, charged storage reserve, or later final v1 PWA surcharge for an accepted publish.
+CapsuleHub ACK value must represent only the fixed publish ACK forward reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault TON balance. The ACK must not return the protocol-fee backing, charged storage reserve, or later final v1 PWA surcharge for an accepted publish.
 
 `Vault.PrunePendingPublish` is not implementation-ready until a stale-pending TTL is pinned in open values. Until then, stale pending prune behavior is blocked rather than guessed.
 
@@ -1274,7 +1281,8 @@ Late ACK after pending deleted/refunded is rejected.
 
 ### 11.5 Ownership
 
-NFT item owner is source of truth.
+Superseded for final username ownership semantics: the registry name record is the name-to-item anchor, and the current
+owner is read from the exact `UsernameNFTItem` pointed to by that record. Item-only ownership is non-authoritative.
 
 No seize, revoke, force-transfer, admin transfer.
 

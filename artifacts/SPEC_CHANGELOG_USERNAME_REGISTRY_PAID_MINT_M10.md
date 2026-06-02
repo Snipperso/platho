@@ -3,7 +3,7 @@
 Accepted changes:
 
 1. Pinned `AthTransferNotificationMintUsernameV1` exact payload with raw username bytes as remaining slice.
-2. Pinned canonical username byte rules: 4..32 bytes, ASCII `a-z` and `0-9` only, no unicode, no uppercase, no separators.
+2. Pinned canonical username byte rules: 4..16 bytes, ASCII `a-z`, `0-9`, `_`, and `-` only, no unicode and no uppercase.
 3. Pinned `name_hash = cell_hash(uint32 domain || raw username bytes)` with domain `0xC5CC7CD6`.
 4. Pinned exact-price mint semantics; invalid authenticated notifications create refund-due accounting when storage endowment is supplied.
 5. Pinned UsernameRegistry pending mint + deterministic UsernameNFTItem deployment + ACK finalization flow.

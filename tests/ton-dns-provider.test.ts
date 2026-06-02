@@ -53,13 +53,13 @@ describe('TON DNS provider', () => {
     });
   });
 
-  it('TON-DNS-03: resolves wallet records through dnsresolve recursion', async () => {
-    const calls: Array<{ address: string; method: string; stack: any[] }> = [];
+  it('TON-DNS-03: resolves wallet records through dnsresolve recursion and forwards critical read options', async () => {
+    const calls: Array<{ address: string; method: string; stack: any[]; verify?: boolean; priority?: string; cacheTtlMs?: number }> = [];
     const walletCategory = await tonDnsCategoryHash('wallet');
     const provider = createTonDnsProvider({
       rootAddress: ROOT,
       transport: {
-        async runGetMethod(call: { address: string; method: string; stack: any[] }) {
+        async runGetMethod(call: { address: string; method: string; stack: any[]; verify?: boolean; priority?: string; cacheTtlMs?: number }) {
           calls.push(call);
           expect(call.method).toBe('dnsresolve');
           expect(call.stack[1]).toEqual({ type: 'num', value: `0x${walletCategory.toString(16)}` });
@@ -84,8 +84,13 @@ describe('TON DNS provider', () => {
       },
     });
 
-    await expect(provider.resolveWallet('alice.ton')).resolves.toBe(WALLET);
+    await expect(provider.resolveWallet('alice.ton', {
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    })).resolves.toBe(WALLET);
     expect(calls.map((call) => call.address)).toEqual([ROOT, NEXT]);
+    expect(calls.every((call) => call.verify === true && call.priority === 'critical' && call.cacheTtlMs === 0)).toBe(true);
   });
 
   it('TON-DNS-04: stays fail-closed without root, transport, or wallet record', async () => {

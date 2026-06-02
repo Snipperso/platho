@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import {
   UsernameRegistry,
   BindOfficialAthWallet,
+  BindUsernameVault,
   SealGenesis,
   AthTransferNotificationMintUsername,
   FlushAthRefundDue,
@@ -31,6 +32,7 @@ async function deploySealedRegistryWithOfficialWallet(officialWalletBalance: big
   const placeholderAthWallet = fixtureAddress('USERNAME_REGISTRY_PLACEHOLDER_ATH_WALLET_M11');
   const athMasterAddress = fixtureAddress('USERNAME_REGISTRY_ATH_MASTER_M11');
   const treasuryAthReceiver = fixtureAddress('USERNAME_REGISTRY_TREASURY_ATH_RECEIVER');
+  const vaultAddress = fixtureAddress('USERNAME_REGISTRY_VAULT_M11');
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
@@ -62,6 +64,11 @@ async function deploySealedRegistryWithOfficialWallet(officialWalletBalance: big
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
+    $$type: 'BindUsernameVault',
+    deployment_manifest_hash: MANIFEST_HASH,
+    vault_address: vaultAddress,
+  } as BindUsernameVault);
 
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',

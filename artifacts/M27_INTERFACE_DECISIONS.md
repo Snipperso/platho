@@ -2,44 +2,57 @@
 
 Date: 2026-05-20
 
-Status: superseded by on-chain payload storage fix. This is not a mainnet production approval.
+Status: historical / superseded. This is not a mainnet production approval.
+
+Current source of truth: `PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores compact
+authenticated headers/indexes and `body_hash` in CapsuleHub state; the heavy body is
+recovered from accepted publish transaction history. Pricing in this historical note is
+superseded by the final `0.030 TON` starting net price and hybrid-only private messaging.
 
 ## CapsuleHub v1
 
-Superseded decision: CapsuleHub v1 is **not** counter-only / anchor-only. Accepted private and public entries must store retrievable on-chain payload cells in CapsuleHub state.
+Current final decision: CapsuleHub v1 is **not** counter-only / anchor-only, but it also does **not** persist the heavy
+private/public body cells in contract state. Accepted private and public publish transactions carry retrievable payload
+cells in the Vault -> CapsuleHub transaction body. CapsuleHub validates those cells and persists compact authenticated
+entry state.
 
-The contract records accepted publish metadata, accounting, and payload records:
+The contract records accepted publish metadata, accounting, and compact authenticated records:
 
 - private/public latest ids;
 - private/public entry counters;
 - last private/public entry ids and UIDs;
 - private/public entry maps keyed by entry id;
-- private header/body payload cell hashes and payload cells;
-- public body payload cell hashes and payload cells;
+- private header/index state, public header/index state, `body_hash`, and contract `created_at`;
 - protocol fee accrual and flush accounting.
 
-It does not need page-map retrieval as the primary API, but it must expose retrievable entry records. Replaceable PWA transports may cache/share encrypted packages, but they are not the source of truth for delivered messages.
+The PWA retrieves heavy bodies from TON message history and verifies them against `body_hash` before display or
+decryption. Replaceable PWA transports and local encrypted history may cache the bodies, but they are not the source of
+truth for delivered messages.
 
 Reasoning:
 
-- message bodies must survive without any backend, local config file, IPFS object, or static mirror;
-- storing encrypted cells keeps plaintext private while making delivery state self-contained on-chain;
-- PWA and contract tests now use CapsuleHub as the message database for encrypted payload cells.
+- message bodies must be verifiable without any proprietary backend, local config file, IPFS object, or static mirror;
+- compact on-chain state keeps storage bounded while still authenticating every body recovered from accepted publish transaction history;
+- PWA and contract tests use CapsuleHub as the authenticated message index, with body availability depending on TON history provider coverage and local cache.
 
-Audit implication: missing retrievable payload cells is a v1 blocker. Entry payload storage, getters, wrappers, tests, code hashes, and release evidence must remain aligned.
+Audit implication: missing retrievable accepted publish transaction bodies can make a v1 message unreadable even when the
+compact entry exists. Entry hashes, getters, wrappers, tests, code hashes, provider-history behavior, and release evidence
+must remain aligned.
 
-Capacity implication: useful message capacity is measured only by bytes that are serialized into the payload cells persisted by CapsuleHub. Hash-only capacity claims, local-cache-only bodies, or off-chain carrier-only bodies are invalid for v1.
+Capacity implication: useful message capacity is measured only by bytes that are serialized into the body cell carried by
+the accepted publish transaction body and authenticated by CapsuleHub. Local-cache-only bodies or unverified off-chain
+carrier-only bodies are invalid for v1 delivery.
 
 Binary layout decision: v1 on-chain private capsule cells are fixed binary bytes, not JSON. `header_0_cell` is exactly 140 bytes (`PH0B`, including the sender wallet avatar pointer), `header_1_cell` is exactly 30 bytes (`PH1B`), and `body_cell` stores `platho.byte-layout.v1`. The canonical byte-for-byte source is `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
 
-Useful capacity is identical for standard and postquantum capsules: exactly one encrypted 1024-byte user payload slot per capsule. Small messages are zero-padded inside that slot. Long text and images are split into multiple independent capsules whose encrypted metadata carries `stream_id`, `part_index`, and `part_count`. Body sizes are exact: standard body = 1,140 bytes; postquantum body = 2,228 bytes. A single capsule must not contain multiple 1024-byte slots.
+Useful private capacity is selected per hybrid capsule from the final 1, 2, 4, 8, 16, or 32 KiB size classes. Small messages are zero-padded inside the selected encrypted slot. Long text and images are split into multiple independent capsules whose encrypted metadata carries `stream_id`, `part_index`, and `part_count`. A single capsule must not mix unrelated payload units; exact body sizes are listed in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
 
 Public publish marketing marker: CapsuleHub v1 public publish messages carry a fixed byte-aligned `uint152` marker equal to ASCII `sent via Platho.App` in the transaction message body. Public publish entries store a compact public header cell separately from a raw text body cell, `1..1024` bytes in a snake cell, not padded private capsules. This is an on-chain annotation only; the official messenger UI must not render it as part of the public post text. Private publish messages do not carry the marker.
 
 CapsuleHub does not store page counters. Clients can derive page windows from sequential entry ids. The first entry of a page must not pay a separate page-storage reserve; every capsule of the same publish profile has the same required value.
 
-PWA pricing decision: official public post price is `0.010 TON`; official per-capsule private prices are `0.010 TON` for `classical-v1` and `0.020 TON` for `hybrid-v1`.
-Both include `0.005 TON` of estimated network cost. If the current PWA estimate exceeds `0.005 TON`, the PWA adds the
+PWA pricing decision: official public posts start from `0.0337 TON` net per capsule and `hybrid-v1` private 1 KiB capsules start from `0.0347 TON` net per capsule before ATH discount and network-fee overage. `classical-v1` is not exposed as a publish option in final v1.
+Both include `0.005 TON` of estimated network cost allowance, which is not a Platho protocol fee. If the current PWA estimate exceeds that allowance, the PWA adds the
 overage rounded upward to `0.001 TON` steps. Final v1 publishes are Vault-only; Vault accepts
 `maxCharge >= canonical_max_charge` so the PWA can keep v1 above cost without a contract oracle while applying ATH
 discounts to public and private messages consistently.

@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHWallet
-BoC Size: 6578 bytes
+BoC Size: 8530 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 52
+Total structures: 59
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -70,24 +70,36 @@ TL-B: `ath_genesis_supply_ack#41544806 query_id:uint64 amount:uint128 owner_addr
 Signature: `ATHGenesisSupplyAck{query_id:uint64,amount:uint128,owner_address:address}`
 
 ### AthTransferNotification
-TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_key:uint32 sender_wallet:address = AthTransferNotification`
-Signature: `AthTransferNotification{query_id:uint64,amount:uint128,sender_key:uint32,sender_wallet:address}`
+TL-B: `ath_transfer_notification#472d9d7d query_id:uint64 sender_key:uint160 amount:uint128 sender_wallet:address = AthTransferNotification`
+Signature: `AthTransferNotification{query_id:uint64,sender_key:uint160,amount:uint128,sender_wallet:address}`
 
 ### AthTransferNotificationAck
-TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint32 = AthTransferNotificationAck`
-Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128,sender_key:uint32}`
+TL-B: `ath_transfer_notification_ack#472d9d7e query_id:uint64 amount:uint128 sender_key:uint160 = AthTransferNotificationAck`
+Signature: `AthTransferNotificationAck{query_id:uint64,amount:uint128,sender_key:uint160}`
+
+### AthTransferNotificationRefund
+TL-B: `ath_transfer_notification_refund#4154481e query_id:uint64 amount:uint128 sender_key:uint160 = AthTransferNotificationRefund`
+Signature: `AthTransferNotificationRefund{query_id:uint64,amount:uint128,sender_key:uint160}`
 
 ### PruneStaleNotification
-TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint32 = PruneStaleNotification`
-Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint32}`
+TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint160 = PruneStaleNotification`
+Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint160}`
 
 ### AthTransferNotificationMintUsername
-TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
-Signature: `AthTransferNotificationMintUsername{query_id:uint64,amount:uint128,sender_key:uint32,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
+Signature: `AthTransferNotificationMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+
+### AthTransferNotificationVaultMintUsername
+TL-B: `ath_transfer_notification_vault_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationVaultMintUsername`
+Signature: `AthTransferNotificationVaultMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### AthTransferNotificationProfileAvatar
-TL-B: `ath_transfer_notification_profile_avatar#a11a7001 query_id:uint64 amount:uint128 sender_key:uint32 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationProfileAvatar`
-Signature: `AthTransferNotificationProfileAvatar{query_id:uint64,amount:uint128,sender_key:uint32,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+TL-B: `ath_transfer_notification_profile_avatar#a11a7001 query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationProfileAvatar`
+Signature: `AthTransferNotificationProfileAvatar{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+
+### AthTransferNotificationVaultProfileAvatar
+TL-B: `ath_transfer_notification_vault_profile_avatar#a11a7002 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationVaultProfileAvatar`
+Signature: `AthTransferNotificationVaultProfileAvatar{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
 
 ### ATHTransferRequest
 TL-B: `ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest`
@@ -105,6 +117,14 @@ Signature: `ATHTransferRequestMintUsername{query_id:uint64,amount:uint128,recipi
 TL-B: `ath_transfer_request_profile_avatar#41544818 query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHTransferRequestProfileAvatar`
 Signature: `ATHTransferRequestProfileAvatar{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_value:uint128,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
 
+### ATHTransferRequestVaultProfileAvatar
+TL-B: `ath_transfer_request_vault_profile_avatar#4154481a query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHTransferRequestVaultProfileAvatar`
+Signature: `ATHTransferRequestVaultProfileAvatar{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_value:uint128,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+
+### ATHTransferRequestVaultMintUsername
+TL-B: `ath_transfer_request_vault_mint_username#4154481c query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = ATHTransferRequestVaultMintUsername`
+Signature: `ATHTransferRequestVaultMintUsername{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_value:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
+
 ### ATHInternalTransfer
 TL-B: `ath_internal_transfer#41544812 query_id:uint64 amount:uint128 sender_owner:address response_destination:address = ATHInternalTransfer`
 Signature: `ATHInternalTransfer{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address}`
@@ -120,6 +140,14 @@ Signature: `ATHInternalTransferMintUsername{query_id:uint64,amount:uint128,sende
 ### ATHInternalTransferProfileAvatar
 TL-B: `ath_internal_transfer_profile_avatar#41544819 query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHInternalTransferProfileAvatar`
 Signature: `ATHInternalTransferProfileAvatar{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_value:uint128,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+
+### ATHInternalTransferVaultProfileAvatar
+TL-B: `ath_internal_transfer_vault_profile_avatar#4154481b query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHInternalTransferVaultProfileAvatar`
+Signature: `ATHInternalTransferVaultProfileAvatar{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_value:uint128,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
+
+### ATHInternalTransferVaultMintUsername
+TL-B: `ath_internal_transfer_vault_mint_username#4154481d query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = ATHInternalTransferVaultMintUsername`
+Signature: `ATHInternalTransferVaultMintUsername{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_value:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
 
 ### ATHTransferAck
 TL-B: `ath_transfer_ack#41544811 query_id:uint64 amount:uint128 = ATHTransferAck`
@@ -150,20 +178,20 @@ TL-B: `_ balance:int257 owner_address:address ath_master_address:address = ATHWa
 Signature: `ATHWalletDataView{balance:int257,owner_address:address,ath_master_address:address}`
 
 ### PendingAthTransferNotificationView
-TL-B: `_ exists:bool sender_owner:address amount:int257 created_at:int257 = PendingAthTransferNotificationView`
-Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,amount:int257,created_at:int257}`
+TL-B: `_ exists:bool sender_owner:address response_destination:address amount:int257 created_at:int257 = PendingAthTransferNotificationView`
+Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,response_destination:address,amount:int257,created_at:int257}`
 
 ### PendingAthTransferNotification
-TL-B: `_ sender_owner:address amount:uint128 created_at:uint32 = PendingAthTransferNotification`
-Signature: `PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}`
+TL-B: `_ sender_owner:address response_destination:address response_ack_value:uint64 amount:uint128 created_at:uint32 = PendingAthTransferNotification`
+Signature: `PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}`
 
 ### PendingAthOutgoingTransfer
 TL-B: `_ recipient_wallet:address response_destination:address amount:uint128 created_at:uint32 = PendingAthOutgoingTransfer`
 Signature: `PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}`
 
 ### ATHWallet$Data
-TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pruned_notification_acks:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}> = ATHWallet`
-Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>,pruned_notification_acks:dict<int, int>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}>}`
+TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}> = ATHWallet`
+Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}>}`
 
 ### BindMarketStabilityReserveFunder
 TL-B: `bind_market_stability_reserve_funder#4d535246 deployment_manifest_hash:uint256 reserve_funder_address:address = BindMarketStabilityReserveFunder`

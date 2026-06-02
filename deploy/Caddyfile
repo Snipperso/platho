@@ -1,6 +1,19 @@
 (platho_security_headers) {
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-SLdbJxH1ETsf/Yx+7SyKot6BP+1toqgkV32YAmD36K0=' 'sha256-RaSAaXmdhJXw3EBibZEVWPjFAFKOuUWWQUpb+UMMJDw='; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://rpc.platho.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Cross-Origin-Opener-Policy "same-origin"
+    Cross-Origin-Resource-Policy "same-origin"
+    -Server
+  }
+}
+
+(platho_rpc_headers) {
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
     X-Content-Type-Options "nosniff"
     Referrer-Policy "no-referrer"
     Permissions-Policy "camera=(), microphone=(), geolocation=()"
@@ -14,7 +27,7 @@ platho.app {
   import platho_security_headers
 
   encode zstd gzip
-  root * /var/www/platho.app/current
+  root * /srv/platho/current
 
   @service_worker path /sw.js
   header @service_worker Cache-Control "no-cache, no-store, must-revalidate"
@@ -25,16 +38,35 @@ platho.app {
   @manifest path /manifest.webmanifest
   header @manifest Cache-Control "no-cache"
 
-  @runtime path /app.js /styles.css /platho-config.mjs /platho-wallet.mjs /pwa-contract-transactions.mjs /replay-store.mjs /vault-chain-provider.mjs /crypto/*
+  @runtime path /app.js /styles.css /platho-config.mjs /capsule-part-policy.mjs /message-pricing-policy.mjs /public-channel-subscriptions.mjs /recipient-identities.mjs /encrypted-message-store.mjs /platho-wallet.mjs /ton-mnemonic-wordlist.mjs /pwa-contract-transactions.mjs /vault-ton-rpc-provider.mjs /ton-dns-provider.mjs /capsulehub-ton-rpc-provider.mjs /ath-ton-rpc-provider.mjs /profile-registry-ton-rpc-provider.mjs /username-ton-rpc-provider.mjs /replay-store.mjs /vault-chain-provider.mjs /webp-encoder.mjs /qr-code.mjs /crypto/*
   header @runtime Cache-Control "public, max-age=3600"
 
   @static path /assets/* /vendor/*
   header @static Cache-Control "public, max-age=86400"
 
-  try_files {path} /index.html
-  file_server
+  @strict_static path /sw.js /index.html /manifest.webmanifest *.css *.js *.mjs *.json *.md *.wasm *.svg *.png
+
+  handle @strict_static {
+    file_server
+  }
+
+  handle @static {
+    file_server
+  }
+
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
 }
 
 www.platho.app {
   redir https://platho.app{uri} permanent
+}
+
+rpc.platho.app {
+  import platho_rpc_headers
+
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:8790
 }

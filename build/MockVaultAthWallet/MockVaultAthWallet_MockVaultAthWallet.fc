@@ -27,7 +27,7 @@ cell $VaultAthTransferAck$_store_cell((int, int) v, builder b) inline;
 (int) $MockVaultAthWallet$_contract_load() impure inline;
 
 ;; $MockVaultAthWallet$_fun_compute_sender_key
-((int), int) $MockVaultAthWallet$_fun_compute_sender_key((int) $self, slice $sender_owner) impure inline_ref;
+((int), int) $MockVaultAthWallet$_fun_compute_sender_key((int) $self, int $query_id, slice $sender_owner) impure inline_ref;
 
 ;; $MessageParameters$_constructor_to_value_bounce_mode_body
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_bounce_mode_body(slice $to, int $value, int $bounce, int $mode, cell $body) inline;
@@ -94,15 +94,15 @@ int $Cell$_fun_hash(cell $self) impure asm """
 ;;
 ;; Type: AthTransferNotification
 ;; Header: 0x472d9d7d
-;; TLB: ath_transfer_notification#472d9d7d query_id:uint64 amount:uint128 sender_key:uint32 sender_wallet:address = AthTransferNotification
+;; TLB: ath_transfer_notification#472d9d7d query_id:uint64 sender_key:uint160 amount:uint128 sender_wallet:address = AthTransferNotification
 ;;
 
 builder $AthTransferNotification$_store(builder build_0, (int, int, int, slice) v) inline {
-    var (v'query_id, v'amount, v'sender_key, v'sender_wallet) = v;
+    var (v'query_id, v'sender_key, v'amount, v'sender_wallet) = v;
     build_0 = store_uint(build_0, 1194171773, 32);
     build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'sender_key, 160);
     build_0 = build_0.store_uint(v'amount, 128);
-    build_0 = build_0.store_uint(v'sender_key, 32);
     build_0 = build_0.store_slice(v'sender_wallet);
     return build_0;
 }
@@ -112,7 +112,7 @@ cell $AthTransferNotification$_store_cell((int, int, int, slice) v, builder b) i
 }
 
 ((int, int, int, slice)) $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet(int $query_id, int $sender_key, int $amount, slice $sender_wallet) inline {
-    return ($query_id, $amount, $sender_key, $sender_wallet);
+    return ($query_id, $sender_key, $amount, $sender_wallet);
 }
 
 ;;
@@ -156,9 +156,9 @@ cell $VaultAthTransferAck$_store_cell((int, int) v, builder b) inline {
 ;; Contract MockVaultAthWallet functions
 ;;
 
-((int), int) $MockVaultAthWallet$_fun_compute_sender_key((int) $self, slice $sender_owner) impure inline_ref {
+((int), int) $MockVaultAthWallet$_fun_compute_sender_key((int) $self, int $query_id, slice $sender_owner) impure inline_ref {
     var (($self'reject_transfers)) = $self;
-    var $fresh$ret_0 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint($global_beginCell(), 1096044105, 32), $sender_owner))) % 4294967296);
+    var $fresh$ret_0 = ($Cell$_fun_hash($Builder$_fun_endCell($Builder$_fun_storeAddress(store_uint(store_uint($global_beginCell(), 1096044105, 32), $query_id, 64), $sender_owner))) % 1461501637330902918203684832716283019655932542976);
     return (($self'reject_transfers), $fresh$ret_0);
 }
 
@@ -201,7 +201,7 @@ cell $VaultAthTransferAck$_store_cell((int, int) v, builder b) inline {
         var $msg'vault = in_msg~load_msg_addr();
         var $msg'sender_wallet = in_msg~load_msg_addr();
         var $msg'amount = in_msg~load_uint(128);
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'vault, 0, true, 64, $AthTransferNotification$_store_cell($AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet($msg'query_id, ($self'reject_transfers)~$MockVaultAthWallet$_fun_compute_sender_key($msg'sender_wallet), $msg'amount, $msg'sender_wallet), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($msg'vault, 0, true, 64, $AthTransferNotification$_store_cell($AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet($msg'query_id, ($self'reject_transfers)~$MockVaultAthWallet$_fun_compute_sender_key($msg'query_id, $msg'sender_wallet), $msg'amount, $msg'sender_wallet), begin_cell())));
         
         return ();
     }

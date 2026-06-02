@@ -29,9 +29,14 @@ describe('PWA recipient identity routing', () => {
       ok: true,
       identity: { type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT, label: 'alice.ath' },
     });
+    expect(parseRecipientIdentity('Alice_1-X.ATH')).toMatchObject({
+      ok: true,
+      identity: { type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT, label: 'alice_1-x.ath' },
+    });
     expect(parseRecipientIdentity('@alice')).toMatchObject({ ok: false });
     expect(parseRecipientIdentity('alice')).toMatchObject({ ok: false });
     expect(parseRecipientIdentity('alice.platho')).toMatchObject({ ok: false });
+    expect(parseRecipientIdentity('bad.name.ath')).toMatchObject({ ok: false });
   });
 
   it('RECIPIENT-ID-02: new threads keep the route the user typed as the primary chat label', () => {

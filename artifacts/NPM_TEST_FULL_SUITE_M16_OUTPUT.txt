@@ -1,3 +1,6 @@
+DEPRECATED_HISTORICAL_ARTIFACT=DO_NOT_USE_AS_CURRENT_RELEASE_EVIDENCE
+SUPERSEDED_BY=artifacts/CURRENT_FULL_TEST_SUMMARY.json
+
 
 > platho-deployment-binding-vault-capsulehub-milestone@1.0.0 test
 > vitest run --config vitest.all.config.ts --reporter=dot --testTimeout=30000
@@ -11,4 +14,3 @@
 [2m      Tests [22m [1m[32m97 passed[39m[22m[90m (97)[39m
 [2m   Start at [22m 09:33:58
 [2m   Duration [22m 29.77s[2m (transform 1.42s, setup 0ms, import 7.97s, tests 16.95s, environment 2ms)[22m
-

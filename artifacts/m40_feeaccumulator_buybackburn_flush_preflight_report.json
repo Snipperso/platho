@@ -2,7 +2,7 @@
   "profile": "PLATHO.V1.M40.FEEACCUMULATOR_BUYBACKBURN_FLUSH_PREFLIGHT",
   "status": "PASS",
   "finding": "FEEACCUMULATOR_BUYBACKBURN_PREMATURE_FLUSH_LOW",
-  "summary": "Added an operator preflight guard for FeeAccumulator -> BuybackBurn FlushBuybackDue so premature flush attempts are blocked before caller-funded reserve can be donated to FeeAccumulator balance.",
+  "summary": "Added an operator preflight guard for FeeAccumulator -> BuybackBurn FlushBuybackDue so premature flush attempts are blocked before caller-funded reserve can be donated to FeeAccumulator balance. The guard now also requires accepted M20F mainnet route-freeze evidence, so route_frozen alone is not enough for production reserve flush.",
   "source_changes": [
     "scripts/buyback_flush_preflight.ts",
     "tests/buyback-flush-preflight.test.ts",
@@ -15,13 +15,14 @@
     "FeeAccumulator.buyback_burn_address must equal the intended BuybackBurn address.",
     "BuybackBurn must be sealed.",
     "BuybackBurn route_frozen must be true.",
+    "M20F final mainnet route-freeze evidence must be accepted.",
     "BuybackBurn fee_accumulator_address must equal the source FeeAccumulator address."
   ],
   "verification": {
-    "focused_tests": "npm.cmd run test:file -- tests\\fee-accumulator.test.ts tests\\fee-accumulator-backing-negative.test.ts tests\\m19h-buybackburn-funding-envelope.test.ts tests\\buybackburn-production.test.ts tests\\buybackburn-auth-negative-matrix.test.ts tests\\buyback-flush-preflight.test.ts",
-    "focused_tests_result": "6 files / 39 tests PASS",
+    "focused_tests": "npm.cmd run test:file -- tests\\buyback-flush-preflight.test.ts tests\\enable-buyback-split-preflight.test.ts tests\\m20f-mainnet-route-freeze-preflight.test.ts tests\\m20u-buybackburn-implementation-readiness.test.ts tests\\buybackburn-production.test.ts tests\\buybackburn-auth-negative-matrix.test.ts tests\\fee-accumulator.test.ts tests\\fee-accumulator-backing-negative.test.ts tests\\m19h-buybackburn-funding-envelope.test.ts tests\\m29-buybackburn-abi-freeze.test.ts",
+    "focused_tests_result": "10 files / 83 tests PASS",
     "full_suite": "npm.cmd test",
     "full_suite_result": "68 files / 291 tests PASS"
   },
-  "production_note": "No contract bytecode changed. This is an operational guard for a Low premature-flush reserve donation scenario; principal accounting in the FeeAccumulator -> BuybackBurn seam remains covered by existing contract tests."
+  "production_note": "No contract bytecode changed. This is an operational guard for premature reserve flush and route-evidence mistakes; principal accounting in the FeeAccumulator -> BuybackBurn seam remains covered by existing contract tests."
 }

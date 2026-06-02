@@ -3,7 +3,15 @@ import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
-import { Vault, BindDeploymentManifest as VaultBind, BindOfficialAthWallet as VaultBindAth, SealGenesis as VaultSeal, DepositTon } from '../build/Vault/Vault_Vault';
+import {
+  Vault,
+  BindDeploymentManifest as VaultBind,
+  BindOfficialAthWallet as VaultBindAth,
+  BindProfileRegistry as VaultBindProfile,
+  BindUsernameRegistry as VaultBindUsername,
+  SealGenesis as VaultSeal,
+  DepositTon,
+} from '../build/Vault/Vault_Vault';
 import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -76,6 +84,16 @@ describe('Deployment binding profile', () => {
       deployment_manifest_hash: MANIFEST_HASH,
       official_ath_wallet_address: officialAthWallet,
     } as VaultBindAth);
+    await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindProfileRegistry',
+      deployment_manifest_hash: MANIFEST_HASH,
+      profile_registry_address: fixtureAddress('POST_SEAL_PROFILE_REGISTRY'),
+    } as VaultBindProfile);
+    await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindUsernameRegistry',
+      deployment_manifest_hash: MANIFEST_HASH,
+      username_registry_address: fixtureAddress('POST_SEAL_USERNAME_REGISTRY'),
+    } as VaultBindUsername);
 
     const vg = await vault.getGetGlobal();
     const cs = await capsule.getGetState();
@@ -157,6 +175,16 @@ describe('Deployment binding profile', () => {
       deployment_manifest_hash: MANIFEST_HASH,
       official_ath_wallet_address: officialAthWallet,
     } as VaultBindAth);
+    await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindProfileRegistry',
+      deployment_manifest_hash: MANIFEST_HASH,
+      profile_registry_address: fixtureAddress('POST_SEAL_PROFILE_REGISTRY_2'),
+    } as VaultBindProfile);
+    await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindUsernameRegistry',
+      deployment_manifest_hash: MANIFEST_HASH,
+      username_registry_address: fixtureAddress('POST_SEAL_USERNAME_REGISTRY_2'),
+    } as VaultBindUsername);
     await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
       deployment_manifest_hash: MANIFEST_HASH,

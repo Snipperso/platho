@@ -17,6 +17,10 @@ The current canonical ATH model is:
 
 Short form: `15M` activity airdrop, `15M` initial liquidity, `10M` long-term vesting, and `60M` MarketStabilitySeller reserve.
 
+Protocol fees collected before pool launch are not expected to fully fund the TON side of initial liquidity. Initial
+liquidity may require project/treasury funding in addition to protocol revenue; this must not be described as a liability
+owed to activity-airdrop users.
+
 The `10M` long-term vesting reserve is held by immutable `ATHVesting`, backed by its official ATH wallet, and unlocks `100,000 ATH` per 365-day period for `100` periods. It is not a liquid operations bucket.
 
 MarketStabilitySeller uses `20` tranches of `3,000,000 ATH`, from `x2` through `x21` of the initial pool price. Older lower-reserve, shorter-seller notes are obsolete and must not be used as an audit baseline for current archives.
@@ -29,7 +33,7 @@ The launch pool target is `100,000 TON`, so the initial reference price is:
 1 ATH = 0.001 TON
 ```
 
-During the activity airdrop, a normal `0.01 TON` message receives `10 ATH`. A post-quantum `0.02 TON` message also receives `10 ATH`; the extra TON pays for the stronger messaging mode, not for farming more ATH.
+During the activity airdrop, each successfully finalized capsule receives `10 ATH`, regardless of public/private type or private size class. Public product copy may say messages start from `0.0337 TON`; current exact canonical examples are public capsules from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`, with larger private capsule blocks costing more because they reserve more execution/storage capacity. Extra TON pays for the selected capsule execution/storage/security profile, not for farming more ATH. The `10 ATH` reward is an activity bonus for real usage, not a refund, cashback, reimbursement, investment return, or price guarantee.
 
 ## Stop Rule
 
@@ -41,6 +45,7 @@ Do not proceed with deployment if any of these are false:
 - final manifest code hashes match current build outputs;
 - final manifest constants match the canonical tokenomics above;
 - no secrets, seed phrases, vanity private material, local `.env` files, SSH keys, or server scripts are included in git or external audit archives.
+- external audit archives are produced only with `npm.cmd run audit:archive`; do not zip the workspace manually.
 
 Any open C/H/M finding stops deployment. Low notes can proceed only if they are either fixed or explicitly accepted as non-blocking release notes.
 
@@ -63,7 +68,7 @@ All launch roles must be finalized in the manifest before mainnet rehearsal.
 
 | Role | Purpose |
 | --- | --- |
-| `genesis_controller_one_shot` | Performs pre-seal binding and seal actions for staged contracts. Post-seal route and pricing freezes must burn the corresponding controller hashes. |
+| `genesis_controller_one_shot` | Performs pre-seal binding and seal actions for staged contracts. In the current model this same address is also the BuybackBurn and MarketStabilitySeller launch controller until their post-pool freeze calls clear the retained controller hashes. |
 | `ath_treasury_owner` | Owner of the treasury ATH wallet and the only sender for `ATHMaster.DeployTreasurySupply`. |
 | `ton_treasury_receiver` | Receives TON treasury buckets from FeeAccumulator and MarketStabilitySeller flushes. |
 | `treasury_ath_receiver` | Receives ATH treasury share from UsernameRegistry. |
@@ -83,6 +88,14 @@ These launch roles are narrow authorities, not broad control levers. Do not desc
 - BuybackBurn launch controller performs the one-time post-pool route freeze;
 - MarketStabilitySeller launch controller performs the one-time post-pool pricing freeze;
 - FeeAccumulator treasury receiver performs the one-way `EnableBuybackSplit` after release preflight.
+
+The role name `genesis_controller_one_shot` is historical shorthand for the pre-seal phase, not a
+license to retire that key immediately after seal. The current manifest intentionally requires the
+BuybackBurn launch controller and MarketStabilitySeller launch controller to be the same address as
+`genesis_controller_one_shot`, because both contracts retain that controller hash until post-pool
+freeze. Keep the controller secure until `BuybackBurn.route_frozen == true`,
+`BuybackBurn.genesis_config_hash == 0`, `MarketStabilitySeller.pricing_frozen == true`, and
+`MarketStabilitySeller.genesis_config_hash == 0` are proven by live getters.
 
 ## Local Release Gate
 
@@ -143,7 +156,7 @@ artifacts/mainnet_genesis_verify_input_template.json
 scripts/mainnet_genesis_verify.ts
 ```
 
-## Phase 2: Deploy And Pre-Seal Binding
+## Phase 2: Deploy, Pre-Seal Binding, And Pre-Seal Funding
 
 Keep deploy order simple and auditable.
 
@@ -178,7 +191,17 @@ Keep deploy order simple and auditable.
    - `CapsuleHub.BindDeploymentManifest`;
    - `UsernameRegistry.BindOfficialAthWallet`;
    - `ProfileRegistry.BindProfileOfficialAthWallet`.
-8. Seal staged contracts:
+8. Fund the genesis-backed official ATH wallets before Vault/CapsuleHub become usable:
+   - transfer exactly `15,000,000 ATH` from the treasury ATH wallet to `vault_official_ath_wallet`;
+   - transfer exactly `10,000,000 ATH` from the treasury ATH wallet to `ath_long_term_vesting_official_ath_wallet`.
+9. Verify the pre-seal funding landed:
+   - `vault_official_ath_wallet.owner == Vault`;
+   - `vault_official_ath_wallet.master == ATHMaster`;
+   - `vault_official_ath_wallet.balance == 15,000,000 ATH`;
+   - `ath_long_term_vesting_official_ath_wallet.owner == ATHVesting`;
+   - `ath_long_term_vesting_official_ath_wallet.master == ATHMaster`;
+   - `ath_long_term_vesting_official_ath_wallet.balance == 10,000,000 ATH`.
+10. Seal staged contracts only after the funding checks above pass:
    - `Vault.SealGenesis`;
    - `CapsuleHub.SealGenesis`;
    - `UsernameRegistry.SealGenesis`;
@@ -188,21 +211,21 @@ Keep deploy order simple and auditable.
 
 Stop immediately if any post-seal binding still succeeds.
 
-## Phase 3: Final Genesis Funding And Verification
+## Phase 3: Final Genesis Verification
 
 Before final genesis verification, only allowed genesis actions may have happened. There must be no user publishes, profile updates, username mints, public posts, buyback reserve accepts, market reserve funding, or market sales.
 
-Required genesis funding and clean state:
+Required pre-seal funding and clean state:
 
 - ATHMaster treasury supply is deployed exactly once.
 - Vault official ATH wallet balance equals exactly `15,000,000 ATH`.
 - Vault has `15,000,000 ATH` airdrop remaining and zero distributed.
 - ATHVesting official ATH wallet balance equals exactly `10,000,000 ATH`.
 - ATHVesting is clean: zero claimed amount, idle phase, and no pending transfer.
-- UsernameRegistry official ATH wallet balance is zero.
-- ProfileRegistry official ATH wallet balance is zero.
-- BuybackBurn official ATH wallet balance is zero.
-- MarketStabilitySeller official ATH wallet balance is zero.
+- UsernameRegistry official ATH wallet balance is zero; it may still be `uninit` at the deterministic StateInit address.
+- ProfileRegistry official ATH wallet balance is zero; it may still be `uninit` at the deterministic StateInit address.
+- BuybackBurn official ATH wallet balance is zero; it may still be `uninit` at the deterministic StateInit address.
+- MarketStabilitySeller official ATH wallet balance is zero; it may still be `uninit` at the deterministic StateInit address.
 - FeeAccumulator buckets are zero.
 - BuybackBurn route is not frozen and all due, pending, retry, and total counters are zero.
 - MarketStabilitySeller pricing is not frozen and reserve, sale, tranche, treasury, and pending state is zero.
@@ -226,16 +249,29 @@ npm.cmd run mainnet:genesis:verify
 - ATHMaster supply and treasury deployment are correct;
 - Vault airdrop backing is exact, not underfunded or overfunded;
 - ATHVesting schedule, beneficiary, clean state, and exact official wallet backing are correct;
-- official ATH wallets for Vault, ATHVesting, UsernameRegistry, ProfileRegistry, BuybackBurn, and MarketStabilitySeller are clean or exactly funded as specified;
+- official ATH wallets for Vault and ATHVesting are active and exactly funded;
+- zero-balance official ATH wallets for UsernameRegistry, ProfileRegistry, BuybackBurn, and MarketStabilitySeller are either active with zero ATH or `uninit` at the deterministic StateInit address committed by the manifest;
 - CapsuleHub latest ids and accrued fee are zero;
 - Username/Profile records, dues, and pending flushes are zero;
 - FeeAccumulator buckets are zero;
 - BuybackBurn route/pending/due/totals are clean;
 - MarketStability pricing/reserve/sold/tranche/pending state is clean.
 
-## Phase 4: Pool Launch, Route Freeze, And Pricing Freeze
+## Phase 4: Production PWA And Activity Airdrop
 
 After clean final genesis:
+
+1. Release the production PWA only after production config, crypto review, hosting headers, and static bundle gates pass.
+2. Distribute the `15,000,000 ATH` activity airdrop through Vault.
+3. Keep BuybackBurn route freeze, MarketStabilitySeller pricing freeze, seller reserve funding, and EnableBuybackSplit blocked during this distribution phase.
+4. Verify `Vault.airdrop_remaining_ath == 0` and `Vault.airdrop_distributed_ath == 15,000,000 ATH`.
+
+Do not launch the initial ATH/TON pool before the activity airdrop is fully distributed. The pool
+is post-airdrop, not immediately post-genesis.
+
+## Phase 5: Pool Launch, Route Freeze, And Pricing Freeze
+
+After clean final genesis and complete activity airdrop distribution:
 
 1. Launch the initial ATH/TON pool with target reference cap `100,000 TON`.
 2. Capture final pool launch price evidence.
@@ -265,9 +301,13 @@ npm.cmd run m20f:preflight
    - `pricing_evidence_hash != 0`;
    - post-freeze `genesis_config_hash == 0`.
 
-The release chain at this point is strict: final manifest, live getter snapshot, `mainnet:genesis:verify` PASS, then post-pool route/pricing preflights and freezes, then reserve/readiness/buyback-split gates. M20F and MarketStabilitySeller readiness are not replacements for final genesis verification.
+The release chain at this point is strict: final manifest, live getter snapshot, `mainnet:genesis:verify` PASS, production PWA/activity airdrop distribution, then pool launch, post-pool route/pricing preflights and freezes, then reserve/readiness/buyback-split gates. M20F and MarketStabilitySeller readiness are not replacements for final genesis verification.
 
 MarketStabilitySeller pricing freeze is a real one-time launch authority. It sets the base tranche price once from pool-launch evidence. It cannot steal funds, pause, rescue, or mutate pricing after freeze, but release docs must keep this authority explicit.
+
+The controller key used for the genesis seal must not be retired before this phase. In this release
+model, the same controller address performs pre-seal genesis actions and the two post-pool freeze
+actions; only after both freeze getters show `genesis_config_hash == 0` is the controller retired.
 
 Then fill and run:
 
@@ -277,8 +317,10 @@ npm.cmd run market-stability:readiness
 ```
 
 This readiness step is post-pool and supplemental. It is not a replacement for `npm.cmd run mainnet:genesis:verify`.
-The required order is: clean final genesis verifier pass, post-pool `FreezeMarketStabilityPricing`, authenticated reserve
-funding, then MarketStabilitySeller readiness. Do not use `market-stability:readiness` as a standalone release gate.
+The required order is: clean final genesis verifier pass, production PWA release, complete `15,000,000 ATH`
+activity airdrop distribution, initial pool launch, post-pool `FreezeMarketStabilityPricing`,
+authenticated reserve funding, then MarketStabilitySeller readiness. Do not use
+`market-stability:readiness` as a standalone release gate.
 
 Readiness must block:
 
@@ -289,13 +331,13 @@ Readiness must block:
 - wrong official wallet;
 - non-basechain reserve funder or TON treasury receiver.
 
-## Phase 5: Market Stability Reserve
+## Phase 6: Market Stability Reserve
 
 MarketStabilitySeller is a staged distribution surface, not a core PWA screen. It releases reserve ATH only when buyers pay the current public tranche price, so early demand can be absorbed without forcing all users through a thin pool.
 
 Procedure:
 
-1. After pricing freeze, the reserve funder sends `60,000,000 ATH` through the production ATHWallet notify path into the official MarketStabilitySeller ATH wallet.
+1. After pricing freeze, the reserve funder sends `60,000,000 ATH` through the production ATHWallet notify path into the official MarketStabilitySeller ATH wallet. For the full-launch ceremony, do this as one authenticated notify-flow transfer; if funding is deliberately chunked, treat the seller as partially live after the first chunk and do not announce seller readiness until the checks below pass.
 2. Readiness checks:
    - `reserve_due_ath == 60,000,000 ATH`;
    - `reserve_funded_total_ath == 60,000,000 ATH`;
@@ -374,6 +416,10 @@ Verify:
 - no draft Russian documents are included in the published bundle;
 - no testnet addresses are present in production config;
 - service worker cache version is bumped;
+- service worker precaches the runtime noble vendor modules used by wallet and message crypto;
+- production hosting uses the checked-in Caddy/Nginx security headers, including strict CSP, `nosniff`, `no-referrer`, and camera/microphone/geolocation denial;
+- CSP `connect-src` names only same-origin and the approved production TON RPC hosts;
+- CSP `script-src` contains the hash for the inline import map in `web/index.html`; if the import map changes, recompute and update the header before deploy;
 - `/` and `/index.html` both serve the same PWA entry;
 - docs viewer opens:
   - About Platho;
@@ -415,5 +461,6 @@ Mainnet go is possible only if:
 - MarketStability readiness passes after pool, pricing, and reserve funding;
 - EnableBuybackSplit preflight passes before one-way enable;
 - deployment artifacts, transaction hashes, code hashes, getter snapshots, and final manifest are archived immutably.
+- external audit archives pass the archive hygiene guard and contain no browser profiles, cookies, IndexedDB, Local Storage, session data, local env files, seed material, private keys, old zip archives, `node_modules`, or `.git`.
 
 Any fail here stops the launch.

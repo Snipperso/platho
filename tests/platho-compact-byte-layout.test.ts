@@ -6,7 +6,6 @@ import {
   PLATHO_BINARY_HEADER1_BYTES,
   PLATHO_COMPACT_BODY_LAYOUT,
   PLATHO_COMPACT_IMAGE_FORMATS,
-  PLATHO_COMPACT_MAX_CHUNKS,
   PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES,
   PLATHO_COMPACT_TEXT_BLOCK_BYTES,
   PLATHO_ONCHAIN_BODY_MAX_BYTES,
@@ -24,12 +23,12 @@ import {
 
 const NOW = Date.UTC(2026, 0, 4, 12, 0, 0);
 
-function b64urlBytes(value: string): Uint8Array {
-  return new Uint8Array(Buffer.from(value, 'base64url'));
-}
-
 function bocHashHex(boc: string): string {
   return `0x${Cell.fromBoc(Buffer.from(boc, 'base64'))[0].hash().toString('hex')}`;
+}
+
+function indexedCrcBoc(boc: string): string {
+  return Cell.fromBoc(Buffer.from(boc, 'base64'))[0].toBoc({ idx: true, crc32: true }).toString('base64');
 }
 
 async function signedIdentity(suite: string) {
@@ -59,30 +58,15 @@ async function compactRoundtrip(suite: string, textBytes: number) {
 }
 
 describe('Platho compact byte layout v1', () => {
-  it('COMPACT-01: fixes exact useful payload capacity for standard and postquantum chunks', () => {
-    const standard = getCompactCapsuleCapacity(CRYPTO_SUITES.CLASSICAL_V1);
+  it('COMPACT-01: fixes exact useful payload capacity for postquantum capsules', () => {
     const hybrid = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
+    const hybrid32 = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1, { sizeClass: 32 });
 
     expect(PLATHO_BINARY_HEADER0_BYTES).toBe(140);
     expect(PLATHO_BINARY_HEADER1_BYTES).toBe(30);
-    expect(standard).toMatchObject({
-      maxChunks: PLATHO_COMPACT_MAX_CHUNKS,
-      maxChunkWireBytes: 2048,
-      chunkHeaderBytes: 24,
-      onChainBodyCapBytes: PLATHO_ONCHAIN_BODY_MAX_BYTES,
-      payloadBlockBytes: PLATHO_COMPACT_TEXT_BLOCK_BYTES,
-      payloadPrefixBytes: PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES,
-      oneChunkPlaintextBytes: 1056,
-      oneChunkBodyBytes: 1140,
-      maxBodyBytes: 1140,
-      maxEncryptedPayloadBytes: 1056,
-      maxUsefulPayloadBytes: 1024,
-      maxTextBytes: 1024,
-      maxImageBytes: 1024,
-      maxPaymentBytes: 82,
-    });
     expect(hybrid).toMatchObject({
-      maxChunks: PLATHO_COMPACT_MAX_CHUNKS,
+      sizeClass: 1,
+      maxChunks: 1,
       maxChunkWireBytes: 4096,
       chunkHeaderBytes: 24,
       onChainBodyCapBytes: PLATHO_ONCHAIN_BODY_MAX_BYTES,
@@ -97,29 +81,39 @@ describe('Platho compact byte layout v1', () => {
       maxImageBytes: 1024,
       maxPaymentBytes: 82,
     });
+    expect(hybrid32).toMatchObject({
+      sizeClass: 32,
+      maxBodyBytes: 33972,
+      maxEncryptedPayloadBytes: 32800,
+      maxUsefulPayloadBytes: 32768,
+      maxTextBytes: 32768,
+      maxImageBytes: 32768,
+    });
   });
 
-  it('COMPACT-02: pads each capsule into one exact 1024-byte useful slot', () => {
+  it('COMPACT-02: pads each capsule into the smallest supported useful slot', () => {
     const tiny = encodeCompactPayload('Привет');
     const mid = encodeCompactPayload('a'.repeat(500));
     const full = encodeCompactPayload('a'.repeat(1024));
+    const twoK = encodeCompactPayload('a'.repeat(1025));
 
     expect(tiny.length).toBe(1056);
     expect(mid.length).toBe(1056);
     expect(full.length).toBe(1056);
-    expect(() => encodeCompactPayload('a'.repeat(1025))).toThrow(/payload cap/i);
+    expect(twoK.length).toBe(2080);
+    expect(() => encodeCompactPayload({ type: 'text', text: 'a'.repeat(1025), sizeClass: 1 })).toThrow(/selected capsule size/i);
     expect(decodeCompactPayload(tiny)).toMatchObject({ type: 'text', text: 'Привет' });
   });
 
-  it('COMPACT-03: roundtrips max-size standard text inside the on-chain body cap', async () => {
-    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.CLASSICAL_V1);
-    const { capsule, opened, text } = await compactRoundtrip(CRYPTO_SUITES.CLASSICAL_V1, capacity.maxTextBytes);
+  it('COMPACT-03: roundtrips max-size postquantum text inside the on-chain body cap', async () => {
+    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
+    const { capsule, opened, text } = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes);
 
     expect(capsule.body.layout).toBe(PLATHO_COMPACT_BODY_LAYOUT);
     expect(capsule.body.envelope).toBeUndefined();
-    expect(capsule.body.byteLength).toBe(1140);
-    expect(capsule.body.chunkCount).toBe(PLATHO_COMPACT_MAX_CHUNKS);
-    expect(capsule.body.chunks.every((chunk: string) => b64urlBytes(chunk).length <= 2048)).toBe(true);
+    expect(capsule.body.byteLength).toBe(2228);
+    expect(capsule.body.bodyBytes).toBeTypeOf('string');
+    expect(capsule.body.chunks).toBeUndefined();
     expect(capsule.publish.body_cell.layout).toBe(PLATHO_ONCHAIN_CELL_LAYOUT);
     expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
     expect(capsule.header0.profileVersion).toBe(0);
@@ -137,8 +131,8 @@ describe('Platho compact byte layout v1', () => {
     expect(capsule.body.layout).toBe(PLATHO_COMPACT_BODY_LAYOUT);
     expect(capsule.body.envelope).toBeUndefined();
     expect(capsule.body.byteLength).toBe(2228);
-    expect(capsule.body.chunkCount).toBe(PLATHO_COMPACT_MAX_CHUNKS);
-    expect(capsule.body.chunks.every((chunk: string) => b64urlBytes(chunk).length <= 4096)).toBe(true);
+    expect(capsule.body.bodyBytes).toBeTypeOf('string');
+    expect(capsule.body.chunks).toBeUndefined();
     expect(capsule.publish.body_cell.layout).toBe(PLATHO_ONCHAIN_CELL_LAYOUT);
     expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
     expect(capsule.publish.header_1_cell.bytes).toBe(PLATHO_BINARY_HEADER1_BYTES);
@@ -148,8 +142,8 @@ describe('Platho compact byte layout v1', () => {
   });
 
   it('COMPACT-04B: private header0 carries signed wallet avatar pointer', async () => {
-    const alice = await signedIdentity(CRYPTO_SUITES.CLASSICAL_V1);
-    const bob = await signedIdentity(CRYPTO_SUITES.CLASSICAL_V1);
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
     const avatarHash = `0x${'51'.repeat(32)}`;
     const capsule = await createEncryptedPrivateCapsule('with avatar pointer', bob.signedBundle, alice.identity, {
       now: NOW,
@@ -165,17 +159,17 @@ describe('Platho compact byte layout v1', () => {
     expect(verified.capsule.header0.avatarHash).toBe(avatarHash);
   });
 
-  it('COMPACT-05: rejects payloads beyond the fixed useful cap', async () => {
-    const alice = await signedIdentity(CRYPTO_SUITES.CLASSICAL_V1);
-    const bob = await signedIdentity(CRYPTO_SUITES.CLASSICAL_V1);
-    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.CLASSICAL_V1);
+  it('COMPACT-05: rejects payloads beyond the largest useful cap', async () => {
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1, { sizeClass: 32 });
 
     await expect(createEncryptedPrivateCapsule(
       'a'.repeat(capacity.maxTextBytes + 1),
       bob.signedBundle,
       alice.identity,
       { now: NOW, createdAt: NOW, expiresAt: NOW + 60_000 },
-    )).rejects.toThrow(/on-chain payload cap/i);
+    )).rejects.toThrow(/largest capsule size/i);
   });
 
   it('COMPACT-06: encodes image and payment payloads without verbose JSON keys', () => {
@@ -209,7 +203,7 @@ describe('Platho compact byte layout v1', () => {
   });
 
   it('COMPACT-07: rejects pre-release JSON envelope bodies', async () => {
-    const { capsule } = await compactRoundtrip(CRYPTO_SUITES.CLASSICAL_V1, 32);
+    const { capsule } = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, 32);
     const legacy = {
       ...capsule,
       body: {
@@ -223,8 +217,8 @@ describe('Platho compact byte layout v1', () => {
   });
 
   it('COMPACT-08: opens private CapsuleHub entries from on-chain BOC cells', async () => {
-    const alice = await signedIdentity(CRYPTO_SUITES.CLASSICAL_V1);
-    const bob = await signedIdentity(CRYPTO_SUITES.CLASSICAL_V1);
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
     const capsule = await createEncryptedPrivateCapsule('stored on chain', bob.signedBundle, alice.identity, {
       now: NOW,
       createdAt: NOW,
@@ -257,6 +251,39 @@ describe('Platho compact byte layout v1', () => {
     await expect(openPrivateCapsuleChainEntry(entry, alice.identity.encryptionKeyPair, {
       now: NOW + 120_000,
     })).rejects.toThrow(/recipient|decrypt/i);
+  });
+
+  it('COMPACT-08A: opens private entries serialized with indexed CRC BOC flags', async () => {
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const capsule = await createEncryptedPrivateCapsule('indexed boc', bob.signedBundle, alice.identity, {
+      now: NOW,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+    });
+    const entry = {
+      exists: true,
+      entry_id: 8n,
+      entry_uid: 88n,
+      publish_id: 800n,
+      author_wallet: '0:1111111111111111111111111111111111111111111111111111111111111111',
+      size_class: BigInt(capsule.publish.size_class),
+      crypto_suite: BigInt(capsule.publish.crypto_suite),
+      header_0_hash: BigInt(capsule.publish.header_0_hash),
+      header_1_hash: BigInt(capsule.publish.header_1_hash),
+      body_hash: BigInt(capsule.publish.body_hash),
+      header_0_boc: indexedCrcBoc(capsule.publish.header_0_cell.boc),
+      header_1_boc: indexedCrcBoc(capsule.publish.header_1_cell.boc),
+      body_boc: indexedCrcBoc(capsule.publish.body_cell.boc),
+      created_at: BigInt(Math.floor(NOW / 1000)),
+    };
+
+    const opened = await openPrivateCapsuleChainEntry(entry, bob.identity.encryptionKeyPair, {
+      now: NOW + 120_000,
+    });
+
+    expect(opened.plaintext).toBe('indexed boc');
+    expect(opened.capsule.id).toBe(capsule.id);
   });
 
 });

@@ -14,7 +14,7 @@
   "per_contract": [
     {
       "contract": "ATHMaster.tact",
-      "non_comment_lines": 115,
+      "non_comment_lines": 117,
       "receive_handlers": 3,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -32,9 +32,9 @@
     },
     {
       "contract": "ATHWallet.tact",
-      "non_comment_lines": 898,
-      "receive_handlers": 16,
-      "bounced_handlers": 9,
+      "non_comment_lines": 1213,
+      "receive_handlers": 21,
+      "bounced_handlers": 13,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
       "storage_top_up_receive": false
@@ -50,8 +50,8 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 498,
-      "receive_handlers": 7,
+      "non_comment_lines": 691,
+      "receive_handlers": 9,
       "bounced_handlers": 1,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -68,7 +68,7 @@
     },
     {
       "contract": "MarketStabilitySeller.tact",
-      "non_comment_lines": 466,
+      "non_comment_lines": 468,
       "receive_handlers": 12,
       "bounced_handlers": 1,
       "forbidden_hits": [],
@@ -77,8 +77,8 @@
     },
     {
       "contract": "ProfileRegistry.tact",
-      "non_comment_lines": 433,
-      "receive_handlers": 11,
+      "non_comment_lines": 579,
+      "receive_handlers": 13,
       "bounced_handlers": 2,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -86,8 +86,8 @@
     },
     {
       "contract": "UsernameNFTItem.tact",
-      "non_comment_lines": 51,
-      "receive_handlers": 3,
+      "non_comment_lines": 239,
+      "receive_handlers": 5,
       "bounced_handlers": 0,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -95,8 +95,8 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 782,
-      "receive_handlers": 14,
+      "non_comment_lines": 888,
+      "receive_handlers": 16,
       "bounced_handlers": 3,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -104,9 +104,9 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 1513,
-      "receive_handlers": 18,
-      "bounced_handlers": 3,
+      "non_comment_lines": 2111,
+      "receive_handlers": 21,
+      "bounced_handlers": 5,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
       "storage_top_up_receive": true
@@ -114,33 +114,33 @@
   ],
   "hashes": {
     "ATHMASTER_CODE_HASH": {
-      "built": "79336e388a0ef7cbd6120ea08ce75d5fde44ff49c775d9c83ae95bbf4fd3e21d",
-      "pinned": "79336e388a0ef7cbd6120ea08ce75d5fde44ff49c775d9c83ae95bbf4fd3e21d",
+      "built": "1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88",
+      "pinned": "1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88",
       "match": true
     },
     "ATHVESTING_CODE_HASH": {
-      "built": "26da1246b35693e7f890199022f9ba8b3001ee466beed2392ff24e9ffbd185c4",
-      "pinned": "26da1246b35693e7f890199022f9ba8b3001ee466beed2392ff24e9ffbd185c4",
+      "built": "f0c1b8d97981441478f5169f60f586efd2aeff4191a7786e730ec966c8a3dede",
+      "pinned": "f0c1b8d97981441478f5169f60f586efd2aeff4191a7786e730ec966c8a3dede",
       "match": true
     },
     "ATH_WALLET_CODE_HASH": {
-      "built": "78fb6968c802e73ff8ccaded016e45bc4e193c8b86cd75b77d8cc3896f61d83d",
-      "pinned": "78fb6968c802e73ff8ccaded016e45bc4e193c8b86cd75b77d8cc3896f61d83d",
+      "built": "4c90b0f1b65eea96df7992409e1819b73f63f1ae2ecb9f651c42174c85f7b88d",
+      "pinned": "4c90b0f1b65eea96df7992409e1819b73f63f1ae2ecb9f651c42174c85f7b88d",
       "match": true
     },
     "BUYBACKBURN_CODE_HASH": {
-      "built": "8a105e3cdb05317a60c84fcf4b381c39e24631794eea04dc15cc30d9d6396b23",
-      "pinned": "8a105e3cdb05317a60c84fcf4b381c39e24631794eea04dc15cc30d9d6396b23",
+      "built": "1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2",
+      "pinned": "1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2",
       "match": true
     },
     "MARKET_STABILITY_SELLER_CODE_HASH": {
-      "built": "5e52c7416e8ba2edaa85afc8d5ee85f49f4fe987739c93fea1f81ce13ffcffd6",
-      "pinned": "5e52c7416e8ba2edaa85afc8d5ee85f49f4fe987739c93fea1f81ce13ffcffd6",
+      "built": "36a7779df8b0ec2394d52bcd948148ec7fc681c43c7204442ae9e0c5e0bd5fa8",
+      "pinned": "36a7779df8b0ec2394d52bcd948148ec7fc681c43c7204442ae9e0c5e0bd5fa8",
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "9d5f946d2db56aabe39c2c0bde53b7bf074eef516868b372d17ed3997935c3a3",
-      "pinned": "9d5f946d2db56aabe39c2c0bde53b7bf074eef516868b372d17ed3997935c3a3",
+      "built": "fc0dd2f1b836145e25ccd51c0f7ab8acfc9f9dcf832e86e4c17f04a886789f0e",
+      "pinned": "fc0dd2f1b836145e25ccd51c0f7ab8acfc9f9dcf832e86e4c17f04a886789f0e",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -149,23 +149,23 @@
       "match": true
     },
     "PROFILE_REGISTRY_CODE_HASH": {
-      "built": "107d8e78a3ba05afab8ad4f7fa144c9544213df69020b0ef9b67919007438eee",
-      "pinned": "107d8e78a3ba05afab8ad4f7fa144c9544213df69020b0ef9b67919007438eee",
+      "built": "4bb7e84048b4ed42312d686032f4da649f33cdbb035ad8f8d9a444ac9b7ba4f1",
+      "pinned": "4bb7e84048b4ed42312d686032f4da649f33cdbb035ad8f8d9a444ac9b7ba4f1",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
-      "built": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
-      "pinned": "c57322294ea75e5e5110f92223ac22587487689940a43654f55a0c9483cc0b11",
+      "built": "3ad1c971f6b04e67e8dafcb0624aa794e996761420500cdf10d4edc77a2037ce",
+      "pinned": "3ad1c971f6b04e67e8dafcb0624aa794e996761420500cdf10d4edc77a2037ce",
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "2391daf57ef3db6e8e1fbe24cb8763e83a242c9227b171e0be5cf6e3ccc7eea9",
-      "pinned": "2391daf57ef3db6e8e1fbe24cb8763e83a242c9227b171e0be5cf6e3ccc7eea9",
+      "built": "f5b445a179a420128fbc78660e79986d6aba1bfb185d4f183c4ce41681a7c36e",
+      "pinned": "f5b445a179a420128fbc78660e79986d6aba1bfb185d4f183c4ce41681a7c36e",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "29f19b383633146ccdff3111923d9abeea9dbfe6471b5aa9ae6b1e176aac0586",
-      "pinned": "29f19b383633146ccdff3111923d9abeea9dbfe6471b5aa9ae6b1e176aac0586",
+      "built": "a4dc953ed8f4eda13aba885b9942b05836a7e291a9215946bbfa8d87698ffc4e",
+      "pinned": "a4dc953ed8f4eda13aba885b9942b05836a7e291a9215946bbfa8d87698ffc4e",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "767a2932fcabfe5ea4c2ef5f1e2e3827bbe83a4a6f84246201b7ca63a638b4a8",
+    "manifest_hash_hex": "95eed4e3bda040c6b9059f2e44e5d9849f4647ec23cc30f7ee9ce324b8322ef6",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
@@ -221,6 +221,7 @@
     "M20TFeeAccumulatorHarness.tact",
     "MarketStabilitySeller.tact",
     "MockAthWalletNoAck.tact",
+    "MockRegistryNotificationNoAck.tact",
     "MockUsernameNFTItemNoAck.tact",
     "MockUsernameRegistryAckSink.tact",
     "MockVaultAckSink.tact",

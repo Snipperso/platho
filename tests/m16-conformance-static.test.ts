@@ -105,26 +105,61 @@ describe('M16 production conformance static checks', () => {
   it('M16-CONF-01C: production docs do not reference stale ATH distribution or seller gates', () => {
     const productionDocs = [
       join('PRODUCTION_READINESS.md'),
+      join('MAINNET_RELEASE_CHECKLIST.md'),
       join('DEPLOYMENT_RUNBOOK.md'),
+      join('web', 'docs', 'ath-whitepaper.md'),
+      join('web', 'docs', 'crypto-protocol.md'),
+      join('web', 'CRYPTO_PROTOCOL.md'),
+      join('artifacts', 'platho_v1_open_values_v0_49_final_tokenomics_market_stability.md'),
+      join('artifacts', 'platho_v1_open_values_v0_20y_activity_airdrop_15pct_tokenomics.md'),
     ];
     const forbidden = [
       /\b45M ATH\b/,
       /\b45,000,000 ATH\b/,
       /30%\s+activity airdrop/i,
+      /activity_airdrop_30pct/i,
+      /M20Y_ACTIVITY_AIRDROP_30PCT/i,
       /founder/i,
       /x2\.\.x16/i,
       /\bx16\b.*tranche/i,
       /airdrop remaining\s+`?<=\s*15M ATH`?/i,
+      /half of the final `15,000,000 ATH` activity airdrop allocation/i,
+      /remaining `15,000,000 ATH` activity airdrop allocation continues/i,
+      /allocated across activity, liquidity, treasury, and market stability/i,
+      /embedded Platho wallet seed/i,
+      /Platho wallet seed/i,
     ];
+    const activityBonusDocs = new Set([
+      join('PRODUCTION_READINESS.md'),
+      join('MAINNET_RELEASE_CHECKLIST.md'),
+      join('DEPLOYMENT_RUNBOOK.md'),
+      join('web', 'docs', 'ath-whitepaper.md'),
+      join('artifacts', 'platho_v1_open_values_v0_20y_activity_airdrop_15pct_tokenomics.md'),
+    ]);
 
     for (const productionDoc of productionDocs) {
       const source = file(productionDoc);
       expect(source, `${productionDoc} must stay English-only`).not.toMatch(/[\u0400-\u04FF]/);
-      expect(source).toMatch(/pricing freeze is a real one-time launch authority/i);
-      expect(source).toMatch(/reserve_due_ath/);
-      expect(source).toMatch(/official seller ATH wallet balance above/i);
-      expect(source).toMatch(/readiness warning/i);
-      expect(source).toMatch(/can remain stuck/i);
+      if (activityBonusDocs.has(productionDoc)) {
+        expect(source, `${productionDoc} must define ATH rewards as activity bonus`).toMatch(/activity bonus/i);
+        expect(source, `${productionDoc} must reject refund/cashback framing`).toMatch(/not (a )?(TON )?refund|not a refund/i);
+        expect(source, `${productionDoc} must reject investment framing`).toMatch(/investment return|profit expectation|profit promise|price guarantee/i);
+      }
+      const isMarketStabilityDoc = productionDoc.endsWith('PRODUCTION_READINESS.md')
+        || productionDoc.endsWith('DEPLOYMENT_RUNBOOK.md')
+        || productionDoc.endsWith(join('docs', 'ath-whitepaper.md'))
+        || productionDoc.endsWith('platho_v1_open_values_v0_49_final_tokenomics_market_stability.md');
+      if (isMarketStabilityDoc) {
+        expect(source).toMatch(/pricing freeze is a real one-time launch authority/i);
+        expect(source).toMatch(/60,000,000 ATH|60M/);
+        expect(source).toMatch(/x2[\s\S]*x21|x2\.\.x21/i);
+      }
+      if (source.includes('reserve_due_ath')) {
+        expect(source).toMatch(/reserve_funded_total_ath/);
+        expect(source).toMatch(/official (seller )?(ATH )?wallet (backs at least|balance above)/i);
+        expect(source).toMatch(/readiness warning|warning/i);
+        expect(source).toMatch(/can remain stuck/i);
+      }
       if (productionDoc.endsWith('PRODUCTION_READINESS.md')) {
         expect(source).toMatch(/Canonical ATH Tokenomics/);
         expect(source).toMatch(/15,000,000 ATH` activity airdrop/);
@@ -134,6 +169,14 @@ describe('M16 production conformance static checks', () => {
         expect(source).toMatch(/60,000,000 ATH` MarketStabilitySeller reserve/);
         expect(source).toMatch(/20` tranches of `3,000,000 ATH`, from `x2` through `x21`/);
         expect(source).toMatch(/obsolete tokenomics brief/);
+        expect(source).toMatch(/CapsuleHub v1 accepts retrievable publish body cells/);
+        expect(source).toMatch(/body_hash[\s\S]*accepted publish transaction body/);
+        expect(source).toMatch(/verified mainnet manifest/);
+        expect(source).toMatch(/pinned to the verified mainnet manifest/);
+        expect(source).toMatch(/must remain untracked and absent from release\/audit archives/);
+        expect(source).not.toMatch(/points the UI at testnet preview data/);
+        expect(source).not.toMatch(/\.env\.testnet\.local exists for faucet\/testnet work/);
+        expect(source).not.toMatch(/counter-only \/ anchor-only/);
       }
       if (productionDoc.endsWith('DEPLOYMENT_RUNBOOK.md')) {
         expect(source).toMatch(/Canonical ATH tokenomics for auditors/);
@@ -145,10 +188,25 @@ describe('M16 production conformance static checks', () => {
         expect(source).toMatch(/`20` tranches of `3M ATH`, from `x2` through `x21`/);
         expect(source).toMatch(/obsolete and must not be used as an audit baseline/);
       }
+      if (productionDoc.endsWith('MAINNET_RELEASE_CHECKLIST.md')) {
+        expect(source).toMatch(/Username Resolver Invariant/);
+        expect(source).toMatch(/UsernameRegistry\.name_records\[name_hash\]\.item_address[\s\S]*UsernameNFTItem\.owner_wallet/);
+        expect(source).toMatch(/get_name_record\.owner_wallet[\s\S]*not the current owner after transfer/);
+      }
       for (const pattern of forbidden) {
         expect(source, `${productionDoc} must not match stale tokenomics pattern ${pattern}`).not.toMatch(pattern);
       }
     }
+  });
+
+  it('M16-CONF-01D: username NFT address derivation is name-hash only, not owner-scoped', () => {
+    const registry = contractSource('UsernameRegistry.tact');
+    const provider = file(join('web', 'username-ton-rpc-provider.mjs'));
+
+    expect(registry).toMatch(/get fun get_username_item_address\s*\(\s*name_hash:\s*Int\s*\)/);
+    expect(registry).not.toMatch(/get fun get_username_item_address\s*\(\s*owner_wallet:\s*Address/);
+    expect(provider).toMatch(/method:\s*'get_username_item_address'[\s\S]*stack:\s*\[stackNumber\(nameHash\)\]/);
+    expect(provider).toMatch(/async getUsernameItemAddress\(nameHash, callOptions = \{\}\)/);
   });
 
   it('M16-CONF-02: all production contracts reject empty fallback explicitly', () => {
@@ -234,6 +292,7 @@ describe('M16 production conformance static checks', () => {
       'M20TFeeAccumulatorHarness.tact',
       'MarketStabilitySeller.tact',
       'MockAthWalletNoAck.tact',
+      'MockRegistryNotificationNoAck.tact',
       'MockUsernameNFTItemNoAck.tact',
       'MockUsernameRegistryAckSink.tact',
       'MockVaultAckSink.tact',
