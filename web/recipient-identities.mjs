@@ -231,6 +231,10 @@ export function recipientIdentityFromThreadId(threadId) {
   };
 }
 
+function normalizedPeerId(value) {
+  return String(value ?? '').replace(/[^a-z0-9_-]/gi, '') || 'unknown';
+}
+
 function shortPeerId(value) {
   return String(value ?? '').replace(/[^a-z0-9_-]/gi, '').slice(0, 8) || 'unknown';
 }
@@ -245,12 +249,13 @@ export function createInboundPeerThread(input = {}, options = {}) {
       : null,
   ]);
   const identity = preferredInboundIdentity(variants);
-  const label = identity?.label ?? input.label ?? `Unknown sender ${shortPeerId(input.senderKeyId ?? input.keyId)}`;
+  const anonymousId = normalizedPeerId(input.senderKeyId ?? input.keyId);
+  const label = identity?.label ?? input.label ?? `Anonymous ${shortPeerId(anonymousId)}`;
   return {
-    id: identity ? recipientThreadId(identity) : `peer:${encodeURIComponent(shortPeerId(input.senderKeyId ?? input.keyId))}`,
+    id: identity ? recipientThreadId(identity) : `peer:${encodeURIComponent(anonymousId)}`,
     name: label,
     avatar: avatarFromLabel(label),
-    subtitle: identity ? identityTypeLabel(identity) : 'Unknown sender',
+    subtitle: identity ? identityTypeLabel(identity) : 'Anonymous sender',
     time: options.time ?? 'now',
     state: options.state ?? 'sealed',
     preview: options.preview ?? 'No messages yet',
