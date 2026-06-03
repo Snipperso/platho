@@ -10722,10 +10722,7 @@ async function attemptPrivatePaymentCheckPublish(context) {
     await waitForPaymentCheckCreateConfirmation(provider, payment);
     message.meta = 'check created, publishing';
     await updateMessageInEncryptedHistory(thread, message);
-    const preparedPublish = await prepareCapsulesThroughVault([capsule], {
-      publishState,
-      allowOwnVaultActionReadFallback: true,
-    });
+    const preparedPublish = { ...quotedPublish, publishState };
     const publishResult = await sendPreparedCapsulesThroughVault(preparedPublish, {
       allowUnverifiedNonceRead: true,
       publishState,
@@ -10764,6 +10761,7 @@ async function attemptPrivatePaymentCheckPublish(context) {
       thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
       schedulePrivatePublishConfirmationRetry(context, error);
     } else {
+      rememberPaymentCheckActionError('publish', error, payment);
       const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(payment).catch((cancelError) => {
         rememberPaymentCheckActionError('auto-cancel', cancelError, payment);
         if (isPaymentCheckCancelPending(cancelError)) return { pending: true };
@@ -10771,10 +10769,11 @@ async function attemptPrivatePaymentCheckPublish(context) {
         return null;
       });
       message.vaultCancelIntent = cancelResult;
+      const publishErrorText = privateSendPreflightStatusText(error);
       message.meta = cancelResult?.pending
         ? 'check cancel submitted, confirming'
         : cancelResult
-        ? (cancelled ? 'check cancelled before publish' : 'check publish failed, intent cancelled')
+        ? (cancelled ? 'check cancelled before publish' : `check publish failed, intent cancelled: ${publishErrorText}`)
         : (cancelled ? 'check publish cancelled, refund required' : 'check not delivered, refund required');
       thread.state = 'blocked';
     }
@@ -11659,7 +11658,11 @@ async function runPrivateSendRetry(context) {
     return;
   }
   try {
-    await attemptPrivateComposerMessagePublish(context);
+    if (context.paymentDraft) {
+      await attemptPrivatePaymentCheckPublish(context);
+    } else {
+      await attemptPrivateComposerMessagePublish(context);
+    }
   } catch (error) {
     await settlePrivateComposerSendError(context, error);
   } finally {
