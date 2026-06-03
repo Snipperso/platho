@@ -5657,8 +5657,8 @@ function clearNavVaultBalanceRetryTimer() {
   navVaultBalanceRetryTimer = null;
 }
 
-function navVaultBalanceLoadingLabel(asset) {
-  return `Refreshing Vault ${asset} balance`;
+function navVaultBalanceLoadingLabel() {
+  return 'Refreshing Vault balance';
 }
 
 function markNavVaultBalanceIdle() {
@@ -10061,17 +10061,19 @@ function vaultMoveMaxAmount(asset) {
 function refreshNavVaultBalance() {
   const loading = plathoWallet?.address && navVaultBalanceState.status === 'pending';
   if (loading) {
-    for (const node of navVaultTonBalances) {
+    navVaultTonBalances.forEach((node, index) => {
       node.classList.add('is-loading');
+      node.hidden = index > 0;
       node.textContent = '';
-      node.title = navVaultBalanceLoadingLabel('TON');
-      node.setAttribute('aria-label', navVaultBalanceLoadingLabel('TON'));
-    }
+      node.title = navVaultBalanceLoadingLabel();
+      node.setAttribute('aria-label', navVaultBalanceLoadingLabel());
+    });
     for (const node of navVaultAthBalances) {
-      node.classList.add('is-loading');
+      node.classList.remove('is-loading');
+      node.hidden = true;
       node.textContent = '';
-      node.title = navVaultBalanceLoadingLabel('ATH');
-      node.setAttribute('aria-label', navVaultBalanceLoadingLabel('ATH'));
+      node.removeAttribute('aria-label');
+      node.removeAttribute('title');
     }
     return;
   }
@@ -10079,12 +10081,14 @@ function refreshNavVaultBalance() {
   const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
   for (const node of navVaultTonBalances) {
     node.classList.remove('is-loading');
+    node.hidden = false;
     node.removeAttribute('aria-label');
     node.removeAttribute('title');
     setText(node, tonBalance);
   }
   for (const node of navVaultAthBalances) {
     node.classList.remove('is-loading');
+    node.hidden = false;
     node.removeAttribute('aria-label');
     node.removeAttribute('title');
     setText(node, athBalance);
