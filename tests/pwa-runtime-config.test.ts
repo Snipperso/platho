@@ -1240,13 +1240,14 @@ describe('PWA runtime config guard', () => {
     const fallbackUserIndex = source.indexOf('const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
     const persistIndex = source.indexOf('const storedRecovery = await persistMessageToEncryptedHistory(thread, message)');
     const createIndex = source.indexOf("submitVaultReceiveIntentExternal('CreateReceiveIntent'");
-    const finalPrepareIndex = source.indexOf('const preparedPublish = await prepareCapsulesThroughVault([capsule], {');
+    const finalPreparedIndex = source.indexOf('const preparedPublish = { ...quotedPublish, publishState };');
 
     expect(fallbackUserIndex).toBeGreaterThanOrEqual(0);
     expect(quotedPrepareIndex).toBeGreaterThan(fallbackUserIndex);
     expect(persistIndex).toBeGreaterThan(quotedPrepareIndex);
     expect(createIndex).toBeGreaterThan(persistIndex);
-    expect(finalPrepareIndex).toBeGreaterThan(createIndex);
+    expect(finalPreparedIndex).toBeGreaterThan(createIndex);
+    expect(source.slice(createIndex)).not.toMatch(/prepareCapsulesThroughVault\(\[capsule\]/);
     expect(source).toMatch(/const commitment = secret32/);
     expect(source).toMatch(/sizeClass: VAULT_SIZE_CLASS\.STANDARD/);
     expect(source).toMatch(/allowOwnVaultActionReadFallback:\s*true/);
@@ -1258,7 +1259,23 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/waitForPaymentCheckCreateConfirmation\(provider,\s*payment\)/);
     expect(source).toMatch(/encryptedMessageStore\.persistent === false/);
     expect(source).toMatch(/privateSendBlockedStatusText\(error\)/);
+    expect(source).toMatch(/rememberPaymentCheckActionError\('publish', error, payment\)/);
     expect(source).toMatch(/check not delivered, refund required/);
+  });
+
+  it('PWA-CONFIG-01D4D: payment check retry stays on the payment-check path', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const source = app.slice(
+      app.indexOf('async function runPrivateSendRetry'),
+      app.indexOf('function rememberLocalPublicPost'),
+    );
+    const paymentBranchIndex = source.indexOf('if (context.paymentDraft)');
+    const paymentRetryIndex = source.indexOf('await attemptPrivatePaymentCheckPublish(context)');
+    const composerRetryIndex = source.indexOf('await attemptPrivateComposerMessagePublish(context)');
+
+    expect(paymentBranchIndex).toBeGreaterThanOrEqual(0);
+    expect(paymentRetryIndex).toBeGreaterThan(paymentBranchIndex);
+    expect(composerRetryIndex).toBeGreaterThan(paymentRetryIndex);
   });
 
   it('PWA-CONFIG-01D4B: payment check claim confirms Vault credit before rendering claimed', () => {
@@ -1906,11 +1923,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v336/);
+    expect(sw).toMatch(/platho-pwa-prototype-v337/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=274/);
+    expect(sw).toMatch(/\.\/app\.js\?v=275/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
