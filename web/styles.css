@@ -261,6 +261,30 @@ button:disabled,
   word-break: normal;
 }
 
+.rail-vault-balance strong.is-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  min-height: 14px;
+}
+
+.rail-vault-balance strong.is-loading::before {
+  content: "";
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(48, 213, 176, 0.18);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: rail-balance-spin 0.8s linear infinite;
+}
+
+@keyframes rail-balance-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(280px, clamp(280px, 32vw, 392px)) minmax(0, 1fr);
