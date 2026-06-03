@@ -1,4 +1,4 @@
-import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=2';
+import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=5';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const VAULT_OPS = Object.freeze({

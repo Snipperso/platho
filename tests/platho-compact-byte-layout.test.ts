@@ -7,6 +7,7 @@ import {
   PLATHO_COMPACT_BODY_LAYOUT,
   PLATHO_COMPACT_IMAGE_FORMATS,
   PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES,
+  PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
   PLATHO_COMPACT_TEXT_BLOCK_BYTES,
   PLATHO_ONCHAIN_BODY_MAX_BYTES,
   PLATHO_ONCHAIN_CELL_LAYOUT,
@@ -22,6 +23,7 @@ import {
 } from '../web/crypto/platho-crypto.mjs';
 
 const NOW = Date.UTC(2026, 0, 4, 12, 0, 0);
+const SENDER_WALLET = `0:${'12'.repeat(32)}`;
 
 function bocHashHex(boc: string): string {
   return `0x${Cell.fromBoc(Buffer.from(boc, 'base64'))[0].hash().toString('hex')}`;
@@ -157,6 +159,27 @@ describe('Platho compact byte layout v1', () => {
     expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
     expect(verified.capsule.header0.profileVersion).toBe(9);
     expect(verified.capsule.header0.avatarHash).toBe(avatarHash);
+  });
+
+  it('COMPACT-04C: encrypted compact payload can carry sender wallet metadata without changing header0', async () => {
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const capsule = await createEncryptedPrivateCapsule('with sender wallet', bob.signedBundle, alice.identity, {
+      now: NOW,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+      senderWallet: SENDER_WALLET,
+      senderVaultKeyId: 123n,
+    });
+    const opened = await openEncryptedPrivateCapsule(capsule, bob.identity.encryptionKeyPair, {
+      now: NOW + 1,
+    });
+
+    expect(PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES).toBe(69);
+    expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
+    expect(opened.plaintext).toBe('with sender wallet');
+    expect(opened.payload.senderWallet).toBe(SENDER_WALLET);
+    expect(opened.payload.senderVaultKeyId).toBe('123');
   });
 
   it('COMPACT-05: rejects payloads beyond the largest useful cap', async () => {

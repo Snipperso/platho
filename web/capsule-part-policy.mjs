@@ -88,25 +88,37 @@ export function splitUtf8ToParts(value, partBytes = SINGLE_CAPSULE_USEFUL_BYTES)
   return parts;
 }
 
-export function splitUtf8ToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFUL_BYTES) {
+function normalizePerPartOverheadBytes(options = {}) {
+  const overhead = Number(options.perPartOverheadBytes ?? options.overheadBytes ?? 0);
+  if (!Number.isSafeInteger(overhead) || overhead < 0) {
+    throw new Error('perPartOverheadBytes must be a non-negative safe integer');
+  }
+  return overhead;
+}
+
+export function splitUtf8ToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFUL_BYTES, options = {}) {
   const text = String(value ?? '');
   const maxBytes = Math.min(Number(maxPartBytes) || MAX_CAPSULE_USEFUL_BYTES, MAX_CAPSULE_USEFUL_BYTES);
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
     throw new Error('maxPartBytes must be a positive safe integer');
   }
+  const overheadBytes = normalizePerPartOverheadBytes(options);
+  const maxContentBytes = maxBytes - overheadBytes;
+  if (maxContentBytes <= 0) throw new Error('per-part overhead exceeds capsule size');
   if (text.length === 0) {
-    return [{ text: '', bytes: new Uint8Array(), usefulBytes: SINGLE_CAPSULE_USEFUL_BYTES, sizeClass: 1 }];
+    const usefulBytes = minimalCapsuleUsefulBytesForLength(overheadBytes);
+    return [{ text: '', bytes: new Uint8Array(), usefulBytes, sizeClass: capsuleSizeClassForUsefulBytes(usefulBytes) }];
   }
   const parts = [];
   let current = '';
   let usedBytes = 0;
   for (const symbol of text) {
     const symbolBytes = utf8ByteLength(symbol);
-    if (symbolBytes > maxBytes) {
+    if (symbolBytes > maxContentBytes) {
       throw new Error('single UTF-8 symbol exceeds capsule size');
     }
-    if (usedBytes + symbolBytes > maxBytes) {
-      const usefulBytes = minimalCapsuleUsefulBytesForLength(usedBytes);
+    if (usedBytes + symbolBytes > maxContentBytes) {
+      const usefulBytes = minimalCapsuleUsefulBytesForLength(usedBytes + overheadBytes);
       parts.push({ text: current, bytes: textEncoder.encode(current), usefulBytes, sizeClass: capsuleSizeClassForUsefulBytes(usefulBytes) });
       current = '';
       usedBytes = 0;
@@ -115,7 +127,7 @@ export function splitUtf8ToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFUL
     usedBytes += symbolBytes;
   }
   if (current.length > 0 || parts.length === 0) {
-    const usefulBytes = minimalCapsuleUsefulBytesForLength(usedBytes);
+    const usefulBytes = minimalCapsuleUsefulBytesForLength(usedBytes + overheadBytes);
     parts.push({ text: current, bytes: textEncoder.encode(current), usefulBytes, sizeClass: capsuleSizeClassForUsefulBytes(usefulBytes) });
   }
   return parts;
@@ -140,7 +152,7 @@ export function splitBytesToParts(value, partBytes = SINGLE_CAPSULE_USEFUL_BYTES
   return parts;
 }
 
-export function splitBytesToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFUL_BYTES) {
+export function splitBytesToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFUL_BYTES, options = {}) {
   const bytes = value instanceof Uint8Array
     ? value
     : (value instanceof ArrayBuffer
@@ -152,13 +164,18 @@ export function splitBytesToCapsuleParts(value, maxPartBytes = MAX_CAPSULE_USEFU
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
     throw new Error('maxPartBytes must be a positive safe integer');
   }
-  if (bytes.length === 0) return [capsulePart(new Uint8Array(), SINGLE_CAPSULE_USEFUL_BYTES)];
+  const overheadBytes = normalizePerPartOverheadBytes(options);
+  const maxContentBytes = maxBytes - overheadBytes;
+  if (maxContentBytes <= 0) throw new Error('per-part overhead exceeds capsule size');
+  if (bytes.length === 0) {
+    return [capsulePart(new Uint8Array(), minimalCapsuleUsefulBytesForLength(overheadBytes))];
+  }
   const parts = [];
   for (let offset = 0; offset < bytes.length;) {
     const remaining = bytes.length - offset;
-    const take = Math.min(maxBytes, remaining);
+    const take = Math.min(maxContentBytes, remaining);
     const end = offset + take;
-    const usefulBytes = minimalCapsuleUsefulBytesForLength(take);
+    const usefulBytes = minimalCapsuleUsefulBytesForLength(take + overheadBytes);
     parts.push(capsulePart(bytes.slice(offset, end), usefulBytes));
     offset = end;
   }

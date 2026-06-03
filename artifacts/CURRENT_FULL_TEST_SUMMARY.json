@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T04:45:40.2709400Z",
+  "generated_after_local_run": "2026-06-03T05:39:48.7432899Z",
   "discovered_test_files": 99,
   "executed_test_files": 99,
   "passed_test_files": 99,
   "failed_test_files": 0,
-  "total_tests": 743,
-  "passed_tests": 743,
+  "total_tests": 745,
+  "passed_tests": 745,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -56,6 +56,7 @@
     "It also includes the PWA fixed postquantum messaging cleanup: the obsolete profile encryption selector and its JS preference plumbing were removed because HYBRID_V1 is now the only private messaging suite.",
     "It also includes the PWA TON DNS profile cleanup: the optional local Link TON DNS display row and linked-ton-dns storage plumbing were removed, while TON DNS recipient/public-channel resolution remains supported through fresh critical reads.",
     "It also includes the PWA account activation UX cleanup: Activate Platho account now shows the activation transaction value, opens a required checkbox modal that downloads the encrypted wallet key backup before submitting the activation transaction, locks all non-profile tabs until the account has active Vault messaging keys, and adds profile Wallet TON / Receive TON / Send TON controls.",
-    "It also includes the PWA account activation restore fix: on wallet unlock/startup the app now refreshes the on-chain Vault activation state before locking navigation, so an already activated account does not need the Activate Platho account button to unlock the other tabs after every app entry."
+    "It also includes the PWA account activation restore fix: on wallet unlock/startup the app now refreshes the on-chain Vault activation state before locking navigation, so an already activated account does not need the Activate Platho account button to unlock the other tabs after every app entry.",
+    "It also includes the PWA private sender attribution/history fix: new encrypted private compact payloads carry sender wallet plus Vault key id metadata, inbound sync verifies that claim against the sender Vault key record before using it as the chat identity, unknown senders are grouped under stable Unknown sender threads, and encrypted local history now stores encrypted thread snapshots so restored conversations do not become Imported."
   ]
 }

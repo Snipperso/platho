@@ -12,8 +12,8 @@ import {
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-} from './crypto/platho-crypto.mjs?v=2';
-import { tonCell } from './pwa-contract-transactions.mjs?v=14';
+} from './crypto/platho-crypto.mjs?v=5';
+import { tonCell } from './pwa-contract-transactions.mjs?v=15';
 
 const {
   beginCell,
