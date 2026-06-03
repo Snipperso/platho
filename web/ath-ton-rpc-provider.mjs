@@ -100,8 +100,9 @@ export function decodePendingAthNotificationStack(result) {
   return {
     exists: readStackBool(stack, 0, 'ATH pending notification exists'),
     sender_owner: readStackAddress(stack, 1, 'ATH pending sender owner'),
-    amount: readStackInt(stack, 2, 'ATH pending amount'),
-    created_at: readStackInt(stack, 3, 'ATH pending created at'),
+    response_destination: readStackAddress(stack, 2, 'ATH pending response destination'),
+    amount: readStackInt(stack, 3, 'ATH pending amount'),
+    created_at: readStackInt(stack, 4, 'ATH pending created at'),
   };
 }
 

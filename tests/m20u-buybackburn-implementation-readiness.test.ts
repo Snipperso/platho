@@ -41,6 +41,18 @@ describe('M20U BuybackBurn implementation readiness gate', () => {
     expect(report.blockedBy).toEqual(['M20F_MAINNET_STONFI_ROUTE_FREEZE_NOT_READY']);
   });
 
+  it('keeps generated M20U JSON and captured output blockers aligned', () => {
+    const report = JSON.parse(readFileSync('artifacts/buybackburn_implementation_readiness_m20u.json', 'utf8'));
+    const output = JSON.parse(readFileSync('artifacts/GENERATE_BUYBACKBURN_IMPLEMENTATION_READINESS_M20U_OUTPUT.txt', 'utf8'));
+
+    expect(report.testnetProbeComplete).toBe(true);
+    expect(report.productionBuybackBurnImplementationReady).toBe(false);
+    expect(report.blockedBy).toEqual(['M20F_MAINNET_STONFI_ROUTE_FREEZE_NOT_READY']);
+    expect(output.implementationReady).toBe(report.productionBuybackBurnImplementationReady);
+    expect(output.blockedBy).toEqual(report.blockedBy);
+    expect(output.blockedBy).not.toContain('M20T_TESTNET_DEPLOYMENT_PROBE_NOT_COMPLETE');
+  });
+
   it('does not treat testnet completion alone as mainnet route freeze or production readiness', () => {
     const report = createBuybackBurnImplementationReadinessM20U({ testnetProbeComplete: true, stonfiRouteFreezeReady: false });
 

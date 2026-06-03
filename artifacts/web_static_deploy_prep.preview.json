@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-03T14:09:49.063Z",
+  "generatedAt": "2026-06-03T14:17:54.407Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 128,
-    "totalBytes": 2835476,
-    "bundleSha256": "b4c84d9837cc612fb3cd56daa448fd8af52c6b0705cd6c00240e7dd2b26dcc82",
+    "totalBytes": 2835566,
+    "bundleSha256": "96d28bb47c34c08d0ae2fedd30e0b3f15c0cee004d4c3b7819f1b59408d4a4e4",
     "files": [
       {
         "path": "app.js",
@@ -159,8 +159,8 @@
       },
       {
         "path": "ath-ton-rpc-provider.mjs",
-        "bytes": 6190,
-        "sha256": "da852fce9d0c71ac427879d96a45ecb6d448f639b2388e1a0a1481e02cb05fa5"
+        "bytes": 6280,
+        "sha256": "23074a01a919e3c1c35c74ee10535abbaffeb8c46ba7e0b1248b8062ac19896e"
       },
       {
         "path": "capsule-part-policy.mjs",

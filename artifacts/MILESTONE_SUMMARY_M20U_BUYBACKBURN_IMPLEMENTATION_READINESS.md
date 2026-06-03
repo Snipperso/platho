@@ -14,9 +14,10 @@ STONFI_ROUTE_FREEZE_READY = false
 Default blockers:
 
 ```text
-M20T_TESTNET_DEPLOYMENT_PROBE_NOT_COMPLETE
 M20F_MAINNET_STONFI_ROUTE_FREEZE_NOT_READY
 ```
+
+Current committed M20T evidence is complete; production remains blocked by the missing M20F mainnet STON.fi route-freeze evidence.
 
 ## What changed
 

@@ -9,6 +9,7 @@ import { encodeTonAddressSliceBoc } from '../web/vault-ton-rpc-provider.mjs';
 const MASTER = `0:${'10'.repeat(32)}`;
 const OWNER = `0:${'20'.repeat(32)}`;
 const WALLET = `0:${'30'.repeat(32)}`;
+const RESPONSE_DESTINATION = `0:${'40'.repeat(32)}`;
 const CELL_BOC = beginCell().storeUint(1, 1).endCell().toBoc({ idx: false, crc32: false }).toString('base64');
 
 function num(value: bigint | number | string) {
@@ -80,6 +81,7 @@ describe('ATH TON RPC providers', () => {
             stack: [
               num(-1n),
               { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(RESPONSE_DESTINATION) },
               num(55n),
               num(1_700_000_000n),
             ],
@@ -98,10 +100,34 @@ describe('ATH TON RPC providers', () => {
     await expect(provider.getPendingNotification(9n, 10n)).resolves.toMatchObject({
       exists: true,
       sender_owner: OWNER,
+      response_destination: RESPONSE_DESTINATION,
       amount: 55n,
     });
 
     expect(calls.map((call) => call.method)).toEqual(['get_wallet_data', 'get_pending_notification']);
     expect(calls[1].stack).toEqual([{ type: 'num', value: '0x9' }, { type: 'num', value: '0xa' }]);
+  });
+
+  it('ATH-RPC-02B: rejects stale four-field pending notification fixtures', async () => {
+    const transport = {
+      async runGetMethod(call: { method: string; address: string; stack: any[] }) {
+        if (call.method === 'get_pending_notification') {
+          return {
+            stack: [
+              num(-1n),
+              { type: 'slice', value: encodeTonAddressSliceBoc(OWNER) },
+              num(55n),
+              num(1_700_000_000n),
+            ],
+          };
+        }
+        throw new Error(`unexpected method ${call.method}`);
+      },
+    };
+    const provider = createAthWalletTonRpcProvider({ athWalletAddress: WALLET, transport });
+
+    await expect(provider.getPendingNotification(9n, 10n)).rejects.toThrow(
+      'ATH pending response destination is not an address stack item',
+    );
   });
 });
