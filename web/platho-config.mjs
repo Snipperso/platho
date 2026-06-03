@@ -298,6 +298,13 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         'Production PWA config must set a hard max network fee surcharge.',
       );
     }
+    if (config?.capsuleHub?.allowUnverifiedStaticPublicFeeds === true) {
+      addFinding(
+        findings,
+        'PWA_STATIC_PUBLIC_FEED_FALLBACK_FORBIDDEN',
+        'Production PWA config must not enable unverified static public feed fallback.',
+      );
+    }
   }
 
   return {
