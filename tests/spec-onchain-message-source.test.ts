@@ -457,6 +457,19 @@ describe('v1 on-chain message source of truth', () => {
     }
   });
 
+  it('SPEC-MSG-SOURCE-09A: public whitepaper does not claim MarketStability reserve is backed at final genesis', () => {
+    const text = read('web/docs/ath-whitepaper.md');
+
+    expect(text).not.toMatch(/activity airdrop,\s+long-term vesting reserve,\s+and market stability reserve are backed/i);
+    expect(text).not.toMatch(/market stability reserve[\s\S]{0,180}backed[\s\S]{0,180}(final launch|final genesis|production release)/i);
+    expect(text).not.toMatch(/The price is not changed manually and does not depend on discretionary team decisions/i);
+    expect(text).toMatch(/activity airdrop and long-term vesting reserve are backed at final genesis/i);
+    expect(text).toMatch(/market-stability allocation is reserved for MarketStabilitySeller[\s\S]{0,160}not funded into the seller at final genesis/i);
+    expect(text).toMatch(/Seller funding happens only after pool launch[\s\S]{0,220}pricing freeze[\s\S]{0,220}reserve-funder notify-flow/i);
+    expect(text).toMatch(/seller readiness is valid only after `reserve_due_ath`, `reserve_funded_total_ath`, and the official seller ATH wallet backing are verified/i);
+    expect(text).toMatch(/After the one-time evidence-bound pricing freeze[\s\S]{0,160}tranche schedule is deterministic/i);
+  });
+
   it('SPEC-MSG-SOURCE-09B: docs pin .ath item-owner authority and permissive separator policy', () => {
     const usernameDocs = [
       'web/CRYPTO_PROTOCOL.md',
