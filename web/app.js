@@ -382,7 +382,8 @@ let activeActionDialog = null;
 let publicDisplayMode = 'feed';
 let publicChannelSearchQuery = '';
 let publicCommentTarget = null;
-let privateImageAttachment = null;
+let privateImageAttachments = [];
+let privatePaymentCheckDraft = null;
 let publicImageAttachment = null;
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
@@ -5745,6 +5746,11 @@ function privateImageAttachmentPartCount(attachment, options = currentPrivateSen
   return privateImageCapsulePartsForSend(attachment, options).length;
 }
 
+function normalizePrivateImageAttachments(attachments = privateImageAttachments) {
+  if (Array.isArray(attachments)) return attachments.filter((attachment) => attachment?.bytes?.length);
+  return attachments?.bytes?.length ? [attachments] : [];
+}
+
 function privateSenderWalletPayloadOverhead(options = {}) {
   return options.includeSenderWalletMetadata === false ? 0 : PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES;
 }
@@ -5781,15 +5787,20 @@ function assertPrivateComposerPartLimit(partCount) {
   if (message) throw new Error(message);
 }
 
-function privateComposerSendPlan(text, attachment, options = currentPrivateSenderOptions()) {
+function privateComposerSendPlan(text, attachments = privateImageAttachments, options = currentPrivateSenderOptions(), extras = {}) {
   const plan = [];
   if (String(text ?? '').trim().length > 0) {
     for (const part of privateTextCapsulePartsForSend(text, options)) {
       plan.push({ type: 'text', text: part.text, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
     }
   }
-  for (const part of privateImageCapsulePartsForSend(attachment, options)) {
-    plan.push({ type: 'image', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
+  for (const attachment of normalizePrivateImageAttachments(attachments)) {
+    for (const part of privateImageCapsulePartsForSend(attachment, options)) {
+      plan.push({ type: 'image', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
+    }
+  }
+  if (extras.paymentCheck ?? privatePaymentCheckDraft) {
+    plan.push({ type: 'payment', sizeClass: 1, usefulBytes: SINGLE_CAPSULE_USEFUL_BYTES });
   }
   return plan;
 }
@@ -6005,7 +6016,9 @@ function composerKnownVaultTonShortfall(profile, parts = 1) {
 }
 
 function privateComposerKnownVaultTonShortfall() {
-  const plan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachment);
+  const plan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
+    paymentCheck: privatePaymentCheckDraft,
+  });
   if (privateComposerPartLimitMessage(plan.length)) return true;
   return composerKnownVaultTonShortfall(privateComposerPublishProfilesForPlan(currentOutgoingPrivateSuite(), plan), 1);
 }
@@ -6171,7 +6184,9 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
 
 function refreshComposerCostStatus() {
   if (privateComposerCostStatus) {
-    const privatePlan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachment);
+    const privatePlan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
+      paymentCheck: privatePaymentCheckDraft,
+    });
     const limitMessage = privateComposerPartLimitMessage(privatePlan.length);
     const status = limitMessage
       ? { text: limitMessage, state: 'short' }
@@ -6179,13 +6194,16 @@ function refreshComposerCostStatus() {
         privateComposerPublishProfile(),
         messageInput?.value ?? '',
         SINGLE_CAPSULE_USEFUL_BYTES,
-        privateImageAttachment,
+        privateImageAttachments[0] ?? null,
         {
           parts: Math.max(1, privatePlan.length),
           pricedProfile: privateComposerPublishProfilesForPlan(currentOutgoingPrivateSuite(), privatePlan),
         },
       );
-    privateComposerCostStatus.textContent = status.text;
+    const paymentDraftText = privatePaymentCheckDraft
+      ? ` + ${paymentAssetLabel(privatePaymentCheckDraft.asset)} check ${formatAtomicAmount(privatePaymentCheckDraft.amount)}`
+      : '';
+    privateComposerCostStatus.textContent = `${status.text}${paymentDraftText}`;
     privateComposerCostStatus.dataset.state = status.state;
   }
   refreshPrivateSendButtonState();
@@ -6291,8 +6309,85 @@ function autoResizeComposerTextarea(node) {
   node.classList.toggle('is-scrollable', node.scrollHeight > 144);
 }
 
+function privateAttachmentLabelForImage(attachment) {
+  return attachment
+    ? `${attachment.name} - ${Math.ceil(attachment.bytes.length / 1024)} KiB ${attachment.mode.label.toLowerCase()}`
+    : 'Image';
+}
+
+function createImageModeSelect(attachment, onChange) {
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', 'Image compression');
+  for (const mode of Object.values(IMAGE_COMPRESSION_MODES)) {
+    const option = document.createElement('option');
+    option.value = mode.id;
+    option.textContent = `${mode.label} ${Math.round(mode.maxBytes / 1024)} KiB`;
+    select.append(option);
+  }
+  select.value = attachment?.mode?.id ?? DEFAULT_IMAGE_COMPRESSION_MODE_ID;
+  select.addEventListener('change', onChange);
+  return select;
+}
+
+function updatePrivateAttachmentUi() {
+  const panel = privateAttachmentPanel;
+  if (!panel) return;
+  const imageAttachments = normalizePrivateImageAttachments(privateImageAttachments);
+  const hasPayment = Boolean(privatePaymentCheckDraft);
+  const hasAttachments = imageAttachments.length > 0 || hasPayment;
+  panel.hidden = !hasAttachments;
+  panel.classList.toggle('is-list', hasAttachments);
+  if (!hasAttachments) {
+    panel.replaceChildren();
+    return;
+  }
+  const rows = [];
+  imageAttachments.forEach((attachment, index) => {
+    const row = document.createElement('div');
+    row.className = 'composer-attachment-row';
+    const label = document.createElement('span');
+    label.className = 'composer-attachment-label';
+    label.textContent = privateAttachmentLabelForImage(attachment);
+    const modeSelect = createImageModeSelect(attachment, () => {
+      recompressPrivateImageAttachment(index, modeSelect.value).catch((error) => console.error(error));
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      privateImageAttachments = privateImageAttachments.filter((_, itemIndex) => itemIndex !== index);
+      updateImageAttachmentUi('private');
+      refreshComposerCostStatus();
+    });
+    row.append(label, modeSelect, remove);
+    rows.push(row);
+  });
+  if (privatePaymentCheckDraft) {
+    const row = document.createElement('div');
+    row.className = 'composer-attachment-row';
+    const label = document.createElement('span');
+    label.className = 'composer-attachment-label';
+    label.textContent = `Payment check - ${paymentAssetLabel(privatePaymentCheckDraft.asset)} ${formatAtomicAmount(privatePaymentCheckDraft.amount)}`;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      privatePaymentCheckDraft = null;
+      updateImageAttachmentUi('private');
+      refreshComposerCostStatus();
+    });
+    row.append(label, remove);
+    rows.push(row);
+  }
+  panel.replaceChildren(...rows);
+}
+
 function updateImageAttachmentUi(kind) {
-  const attachment = kind === 'public' ? publicImageAttachment : privateImageAttachment;
+  if (kind === 'private') {
+    updatePrivateAttachmentUi();
+    return;
+  }
+  const attachment = publicImageAttachment;
   const panel = kind === 'public' ? publicAttachmentPanel : privateAttachmentPanel;
   const label = kind === 'public' ? publicAttachmentLabel : privateAttachmentLabel;
   const modeSelect = kind === 'public' ? publicImageModeSelect : privateImageModeSelect;
@@ -6334,15 +6429,13 @@ async function setImageAttachment(kind, file, modeId) {
     if (kind === 'public') {
       publicImageAttachment = attachment;
     } else {
-      privateImageAttachment = attachment;
+      privateImageAttachments = [...privateImageAttachments, attachment];
     }
     updateImageAttachmentUi(kind);
     refreshComposerPublishPolicy();
   } catch (error) {
     if (kind === 'public') {
       publicImageAttachment = null;
-    } else {
-      privateImageAttachment = null;
     }
     updateImageAttachmentUi(kind);
     if (status) {
@@ -6356,11 +6449,39 @@ async function setImageAttachment(kind, file, modeId) {
   }
 }
 
+async function recompressPrivateImageAttachment(index, modeId) {
+  const attachment = privateImageAttachments[index];
+  if (!attachment?.sourceFile) return;
+  const status = privateComposerCostStatus;
+  try {
+    if (status) {
+      status.textContent = 'Recompressing image';
+      status.dataset.state = 'short';
+    }
+    const next = await compressImageFile(attachment.sourceFile, modeId);
+    privateImageAttachments = privateImageAttachments.map((item, itemIndex) => (
+      itemIndex === index ? next : item
+    ));
+    updateImageAttachmentUi('private');
+    refreshComposerCostStatus();
+  } catch (error) {
+    if (status) {
+      status.textContent = error?.message ?? 'Image compression blocked';
+      status.dataset.state = 'short';
+    }
+    throw error;
+  }
+}
+
 async function recompressImageAttachment(kind) {
-  const attachment = kind === 'public' ? publicImageAttachment : privateImageAttachment;
+  const attachment = kind === 'public' ? publicImageAttachment : privateImageAttachments[0];
   const modeSelect = kind === 'public' ? publicImageModeSelect : privateImageModeSelect;
   if (!attachment?.sourceFile || !modeSelect) return;
-  await setImageAttachment(kind, attachment.sourceFile, modeSelect.value);
+  if (kind === 'public') {
+    await setImageAttachment(kind, attachment.sourceFile, modeSelect.value);
+  } else {
+    await recompressPrivateImageAttachment(0, modeSelect.value);
+  }
 }
 
 function privateComposerPlaceholder({ readOnly = false } = {}) {
@@ -6399,7 +6520,7 @@ function refreshComposerPublishPolicy() {
     }
   }
   if (paymentCheckButton) {
-    paymentCheckButton.title = canPublish ? 'Create private payment check' : 'Create or import a wallet to attach a private payment check';
+    paymentCheckButton.title = canPublish ? 'Attach private payment check' : 'Create or import a wallet to attach a private payment check';
   }
   if (privateComposerAddButton) {
     privateComposerAddButton.disabled = !canPublish;
@@ -6435,6 +6556,24 @@ function showPrivateComposerAddMenu() {
 function togglePrivateComposerAddMenu() {
   if (privateComposerAddMenuVisible()) hidePrivateComposerAddMenu();
   else showPrivateComposerAddMenu();
+}
+
+function privateComposerDraftMessageItems(text, attachments = privateImageAttachments) {
+  const messageText = String(text ?? '').trim();
+  const images = normalizePrivateImageAttachments(attachments);
+  const items = [];
+  if (messageText) {
+    items.push({
+      text: messageText,
+      attachment: images[0] ?? null,
+    });
+    for (let index = 1; index < images.length; index += 1) {
+      items.push({ text: '', attachment: images[index] });
+    }
+    return items;
+  }
+  for (const attachment of images) items.push({ text: '', attachment });
+  return items;
 }
 
 function enforceComposerByteLimit() {
@@ -7304,7 +7443,11 @@ paymentCheckButton?.addEventListener('click', async () => {
       return;
     }
     paymentCheckButton.disabled = true;
-    await submitCreatePaymentCheck();
+    const paymentDetails = await requestPaymentCheckDetails();
+    if (!paymentDetails) return;
+    privatePaymentCheckDraft = paymentDetails;
+    updateImageAttachmentUi('private');
+    refreshComposerCostStatus();
   } catch (error) {
     refreshMessagingControls();
     console.error(error);
@@ -7403,7 +7546,7 @@ publicImageButton?.addEventListener('click', () => {
 privateImageInput?.addEventListener('change', async () => {
   const file = privateImageInput.files?.[0];
   if (!file) return;
-  await setImageAttachment('private', file, privateImageModeSelect?.value ?? DEFAULT_IMAGE_COMPRESSION_MODE_ID);
+  await setImageAttachment('private', file, DEFAULT_IMAGE_COMPRESSION_MODE_ID);
 });
 
 publicImageInput?.addEventListener('change', async () => {
@@ -7456,7 +7599,8 @@ profileAvatarInput?.addEventListener('change', async () => {
 });
 
 privateClearImageButton?.addEventListener('click', () => {
-  privateImageAttachment = null;
+  privateImageAttachments = [];
+  privatePaymentCheckDraft = null;
   updateImageAttachmentUi('private');
   refreshComposerCostStatus();
 });
@@ -7518,8 +7662,9 @@ composer?.addEventListener('submit', async (event) => {
   refreshComposerPublishPolicy();
   enforceComposerByteLimit();
   const text = messageInput.value.trim();
-  const attachment = privateImageAttachment;
-  if (!text && !attachment) return;
+  const attachments = normalizePrivateImageAttachments(privateImageAttachments);
+  const paymentDraft = privatePaymentCheckDraft;
+  if (!text && attachments.length === 0 && !paymentDraft) return;
   const thread = threads.find((item) => item.id === activeThreadId) ?? threads[0];
   if (!thread) return;
   if (thread.readOnly) {
@@ -7546,7 +7691,7 @@ composer?.addEventListener('submit', async (event) => {
 
   const selectedSuite = currentOutgoingPrivateSuite();
   const senderOptions = currentPrivateSenderOptions();
-  const sendPlan = privateComposerSendPlan(text, attachment, senderOptions);
+  const sendPlan = privateComposerSendPlan(text, attachments, senderOptions, { paymentCheck: paymentDraft });
   const limitMessage = privateComposerPartLimitMessage(sendPlan.length);
   if (limitMessage) {
     if (privateComposerCostStatus) {
@@ -7577,27 +7722,42 @@ composer?.addEventListener('submit', async (event) => {
     return;
   }
 
-  const message = {
-    type: 'out',
-    text,
-    meta: 'sending',
-    ...localMessageOrderFields(),
-  };
-  if (attachment) {
-    message.attachment = {
-      type: 'image',
-      url: attachment.dataUrl,
-      bytes: attachment.bytes.length,
-      width: attachment.width,
-      height: attachment.height,
-      mode: attachment.mode.id,
-      modeLabel: attachment.mode.label,
+  const draftItems = privateComposerDraftMessageItems(text, attachments);
+  const sendContexts = [];
+  for (const item of draftItems) {
+    const message = {
+      type: 'out',
+      text: item.text,
+      meta: 'sending',
+      ...localMessageOrderFields(),
     };
+    if (item.attachment) {
+      message.attachment = {
+        type: 'image',
+        url: item.attachment.dataUrl,
+        bytes: item.attachment.bytes.length,
+        width: item.attachment.width,
+        height: item.attachment.height,
+        mode: item.attachment.mode.id,
+        modeLabel: item.attachment.mode.label,
+      };
+    }
+    insertThreadMessage(thread, message);
+    sendContexts.push({
+      thread,
+      message,
+      text: item.text,
+      attachment: item.attachment,
+      selectedSuite,
+      senderOptions,
+      retryAttempt: 0,
+      confirmAttempt: 0,
+    });
   }
-  insertThreadMessage(thread, message);
   refreshThreadAfterMessageChange(thread);
   messageInput.value = '';
-  privateImageAttachment = null;
+  privateImageAttachments = [];
+  privatePaymentCheckDraft = null;
   updateImageAttachmentUi('private');
   autoResizeComposerTextarea(messageInput);
   refreshComposerCostStatus();
@@ -7605,20 +7765,47 @@ composer?.addEventListener('submit', async (event) => {
   renderThreads();
   renderConversation();
 
-  const sendContext = {
-    thread,
-    message,
-    text,
-    attachment,
-    selectedSuite,
-    senderOptions,
-    retryAttempt: 0,
-    confirmAttempt: 0,
-  };
-  try {
-    await attemptPrivateComposerMessagePublish(sendContext);
-  } catch (error) {
-    await settlePrivateComposerSendError(sendContext, error);
+  let privateComposerCancelled = false;
+  for (let index = 0; index < sendContexts.length; index += 1) {
+    const sendContext = sendContexts[index];
+    try {
+      await attemptPrivateComposerMessagePublish(sendContext);
+    } catch (error) {
+      await settlePrivateComposerSendError(sendContext, error);
+      if (isPublishPriceChangeCancelled(error)) {
+        privateComposerCancelled = true;
+        const remaining = sendContexts.slice(index + 1);
+        for (const context of remaining) {
+          context.thread.messages = (context.thread.messages ?? []).filter((item) => item !== context.message);
+        }
+        const remainingAttachments = remaining.map((context) => context.attachment).filter(Boolean);
+        if (remainingAttachments.length > 0) {
+          privateImageAttachments = [...privateImageAttachments, ...remainingAttachments];
+          updateImageAttachmentUi('private');
+          refreshComposerCostStatus();
+        }
+        break;
+      }
+    }
+  }
+  if (paymentDraft && privateComposerCancelled) {
+    privatePaymentCheckDraft = paymentDraft;
+    updateImageAttachmentUi('private');
+    refreshComposerCostStatus();
+  } else if (paymentDraft) {
+    try {
+      await submitCreatePaymentCheck({ thread, paymentDetails: paymentDraft });
+    } catch (error) {
+      privatePaymentCheckDraft = paymentDraft;
+      updateImageAttachmentUi('private');
+      refreshComposerCostStatus();
+      const rateLimited = noteTonRpcRateLimit(error);
+      if (privateComposerCostStatus) {
+        privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
+        privateComposerCostStatus.dataset.state = 'short';
+      }
+      if (!rateLimited) console.error(error);
+    }
   }
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -9996,14 +10183,14 @@ async function submitProfileAvatarUpdate(avatar) {
   return result;
 }
 
-async function submitCreatePaymentCheck() {
-  const thread = activeThread();
+async function submitCreatePaymentCheck(options = {}) {
+  const thread = options.thread ?? activeThread();
   if (!thread || thread.readOnly) throw new Error('Payment checks are only available in private chats');
   if (!localIdentity) throw new Error('Local encryption identity is not ready');
   const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: currentOutgoingPrivateSuite() });
   const recipientWallet = recipientEntry.walletAddress;
 
-  const paymentDetails = await requestPaymentCheckDetails();
+  const paymentDetails = options.paymentDetails ?? (await requestPaymentCheckDetails());
   if (!paymentDetails) return null;
   const { asset, amount } = paymentDetails;
 
@@ -10817,7 +11004,7 @@ async function restorePrivateDraftAfterUnsentMessage(context) {
   const { thread, message, text, attachment } = context;
   thread.messages = (thread.messages ?? []).filter((item) => item !== message);
   if (messageInput && !messageInput.value.trim()) messageInput.value = text;
-  privateImageAttachment = attachment;
+  privateImageAttachments = attachment ? [attachment] : [];
   updateImageAttachmentUi('private');
   autoResizeComposerTextarea(messageInput);
   refreshThreadAfterMessageChange(thread);

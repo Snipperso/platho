@@ -1120,11 +1120,36 @@ describe('PWA runtime config guard', () => {
     expect(senderModeUiSource).not.toMatch(/hasActivePlathoAccount\(\)/);
     expect(app).toMatch(/senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
     expect(app).toMatch(/createPrivateComposerCapsules\(text, attachment, recipientEntry, thread\.id, senderOptions\)/);
-    expect(app).toMatch(/privateComposerSendPlan\(text, attachment, senderOptions\)/);
+    expect(app).toMatch(/privateComposerSendPlan\(text, attachments, senderOptions, \{ paymentCheck: paymentDraft \}\)/);
     expect(app).toMatch(/payment[\s\S]*senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
     expect(identities).toMatch(/const anonymousId = normalizedPeerId\(input\.senderKeyId \?\? input\.keyId\)/);
     expect(identities).toMatch(/id: identity \? recipientThreadId\(identity\) : `peer:\$\{encodeURIComponent\(anonymousId\)\}`/);
     expect(identities).toMatch(/`Anonymous \$\{shortPeerId\(anonymousId\)\}`/);
+  });
+
+  it('PWA-MSG-02C: private attachments are composer drafts, not single-slot or immediate-send actions', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const paymentButtonSource = app.slice(
+      app.indexOf("paymentCheckButton?.addEventListener('click'"),
+      app.indexOf("privateComposerAddButton?.addEventListener('click'"),
+    );
+    const submitSource = app.slice(
+      app.indexOf("composer?.addEventListener('submit'"),
+      app.indexOf('createWalletButton?.addEventListener'),
+    );
+
+    expect(html).toMatch(/id="paymentCheckButton"[\s\S]*Attach private payment check/);
+    expect(app).toMatch(/let privateImageAttachments = \[\]/);
+    expect(app).toMatch(/let privatePaymentCheckDraft = null/);
+    expect(app).toMatch(/privateImageAttachments = \[\.\.\.privateImageAttachments, attachment\]/);
+    expect(app).toMatch(/function privateComposerDraftMessageItems/);
+    expect(paymentButtonSource).toMatch(/const paymentDetails = await requestPaymentCheckDetails\(\)/);
+    expect(paymentButtonSource).toMatch(/privatePaymentCheckDraft = paymentDetails/);
+    expect(paymentButtonSource).not.toMatch(/submitCreatePaymentCheck\(/);
+    expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
+    expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
+    expect(submitSource).toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
   });
 
   it('PWA-CONFIG-01D4: payment checks preflight and persist recovery before CreateReceiveIntent', () => {
@@ -1680,11 +1705,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v315/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=125/);
+    expect(sw).toMatch(/platho-pwa-prototype-v316/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=255/);
+    expect(sw).toMatch(/\.\/app\.js\?v=256/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
