@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: Vault
-BoC Size: 41387 bytes
+BoC Size: 41384 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 77

@@ -675,13 +675,13 @@ contract Vault {
         return cursor.empty();
     }
 
-    fun requireValidProfileAvatarPointer(ownerWallet: Address, avatarHash: Int, avatarStreamId: Int, avatarPartCount: Int, mediaFormat: Int) {
-        throwUnless(16640, self.isBasechainAddress(ownerWallet));
-        throwUnless(16641, avatarHash != 0);
-        throwUnless(16642, avatarStreamId != 0);
-        throwUnless(16643, avatarPartCount > 0);
-        throwUnless(16644, avatarPartCount <= PROFILE_AVATAR_MAX_PARTS);
-        throwUnless(16645, mediaFormat == PROFILE_AVATAR_MEDIA_FORMAT_WEBP);
+    fun isValidProfileAvatarPointer(ownerWallet: Address, avatarHash: Int, avatarStreamId: Int, avatarPartCount: Int, mediaFormat: Int): Bool {
+        return self.isBasechainAddress(ownerWallet)
+            && (avatarHash != 0)
+            && (avatarStreamId != 0)
+            && (avatarPartCount > 0)
+            && (avatarPartCount <= PROFILE_AVATAR_MAX_PARTS)
+            && (mediaFormat == PROFILE_AVATAR_MEDIA_FORMAT_WEBP);
     }
 
 
@@ -2179,7 +2179,9 @@ contract Vault {
         if (!(signedProfileRegistry == self.profile_registry_address)) {
             return;
         }
-        self.requireValidProfileAvatarPointer(msg.owner_wallet, avatarHash, avatarStreamId, avatarPartCount, mediaFormat);
+        if (!self.isValidProfileAvatarPointer(msg.owner_wallet, avatarHash, avatarStreamId, avatarPartCount, mediaFormat)) {
+            return;
+        }
 
         let tonCharge: Int = self.profileAvatarTonCharge();
         if (!(maxTonCharge >= tonCharge)) {
