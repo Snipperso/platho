@@ -716,7 +716,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/updateMessageInEncryptedHistory/);
     expect(app).toMatch(/attemptCancelPaymentCheckAfterPublishFailure/);
     expect(app).toMatch(/Persistent encrypted local history is required before creating a payment check/);
-    expect(app).toMatch(/check intent create pending/);
+    expect(app).toMatch(/check preparing/);
+    expect(app).toMatch(/check signing/);
     expect(app).toMatch(/isPublishPriceChangeCancelled/);
     expect(app).toMatch(/publish cancelled/);
     expect(app).toMatch(/Send cancelled/);
@@ -1222,13 +1223,16 @@ describe('PWA runtime config guard', () => {
     expect(paymentButtonSource).not.toMatch(/submitCreatePaymentCheck\(/);
     expect(submitSource).toMatch(/const attachments = normalizePrivateImageAttachments\(privateImageAttachments\)/);
     expect(submitSource).toMatch(/const paymentDraft = privatePaymentCheckDraft/);
-    expect(submitSource).toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
+    expect(submitSource).toMatch(/privateComposerDraftMessageItems\(text,\s*attachments,\s*paymentDraft\)/);
+    expect(submitSource).toMatch(/paymentDraft:\s*item\.paymentDraft/);
+    expect(submitSource).toMatch(/await attemptPrivatePaymentCheckPublish\(sendContext\)/);
+    expect(submitSource).not.toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
   });
 
   it('PWA-CONFIG-01D4: payment checks preflight and persist recovery before signed CreateReceiveIntent external', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const source = app.slice(
-      app.indexOf('async function submitCreatePaymentCheck'),
+      app.indexOf('async function attemptPrivatePaymentCheckPublish'),
       app.indexOf('async function submitVaultClaimPaymentCheck'),
     );
     const quotedPrepareIndex = source.indexOf('const quotedPublish = await prepareCapsulesThroughVault([capsule], { publishState })');
@@ -1245,7 +1249,8 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/tonBalance < createReserve \+ quotedPublish\.totalMaxCharge/);
     expect(source).toMatch(/waitForPaymentCheckCreateConfirmation\(provider,\s*payment\)/);
     expect(source).toMatch(/encryptedMessageStore\.persistent === false/);
-    expect(source).toMatch(/check intent create failed/);
+    expect(source).toMatch(/privateSendBlockedStatusText\(error\)/);
+    expect(source).toMatch(/check not delivered, refund required/);
   });
 
   it('PWA-CONFIG-01D4B: payment check claim confirms Vault credit before rendering claimed', () => {
@@ -1881,11 +1886,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v331/);
+    expect(sw).toMatch(/platho-pwa-prototype-v332/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=269/);
+    expect(sw).toMatch(/\.\/app\.js\?v=270/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
