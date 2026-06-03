@@ -450,7 +450,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/walletTonBalanceButton\?\.addEventListener\('click'/);
     expect(app).toMatch(/Activate Platho account first/);
     expect(app).toMatch(/item\.dataset\.tab !== 'profile'/);
+    expect(app).toMatch(/requestAnimationFrame\(\(\) => \{[\s\S]*!hasActivePlathoAccount\(\)[\s\S]*setView\('profile'\)/);
     expect(app).toMatch(/setView\('profile'\)/);
+    expect(app).toMatch(/await refreshVaultActivationStatus\(\{ skipGlobal: true \}\)/);
+    expect(app).toMatch(/setText\(vaultRecordStatus, 'checking'\)/);
+    expect(app).toMatch(/setText\(vaultDraftStatus, 'checking'\)/);
     expect(app).not.toMatch(/rotate blocked/);
     expect(app).not.toMatch(/setText\(vaultRotateStatus, label\)/);
     expect(app).not.toMatch(/vaultDraftStatus\.textContent = 'ready'/);
@@ -1499,6 +1503,7 @@ describe('PWA runtime config guard', () => {
     expect(dashboardSource).toMatch(/isExpectedVaultProviderUnavailable\(userError\)/);
     expect(dashboardSource).toMatch(/vaultProviderStatusForError\(userError\)/);
     expect(activationSource).toMatch(/if \(!isExpectedVaultProviderUnavailable\(error\)\) console\.error\(error\)/);
+    expect(activationSource).toMatch(/keyRecord: null/);
   });
 
   it('PWA-CONFIG-07C: ATH current supply is a live master getter value, not a hardcoded fallback', () => {
@@ -1599,11 +1604,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v304/);
+    expect(sw).toMatch(/platho-pwa-prototype-v305/);
     expect(sw).toMatch(/\.\/styles\.css\?v=123/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=244/);
+    expect(sw).toMatch(/\.\/app\.js\?v=245/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=44/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
