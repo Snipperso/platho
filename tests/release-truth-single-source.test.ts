@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
@@ -13,6 +13,31 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY: Record<string, string> = {
   USERNAME_NFT_ITEM_CODE_HASH: 'username_nft_item',
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
   VAULT_CODE_HASH: 'vault',
+};
+
+const CONTRACT_TO_CURRENT_CODE_HASH_KEY: Record<string, string> = {
+  ATHMaster: 'ATHMASTER_CODE_HASH',
+  ATHVesting: 'ATHVESTING_CODE_HASH',
+  BuybackBurn: 'BUYBACKBURN_CODE_HASH',
+  MarketStabilitySeller: 'MARKET_STABILITY_SELLER_CODE_HASH',
+  CapsuleHub: 'CAPSULEHUB_CODE_HASH',
+  FeeAccumulator: 'FEEACCUMULATOR_CODE_HASH',
+  ProfileRegistry: 'PROFILE_REGISTRY_CODE_HASH',
+  UsernameNFTItem: 'USERNAME_NFT_ITEM_CODE_HASH',
+  UsernameRegistry: 'USERNAME_REGISTRY_CODE_HASH',
+  Vault: 'VAULT_CODE_HASH',
+};
+
+const DEPLOY_ACTION_TO_CONTRACT: Record<string, string> = {
+  'Deploy ATHMaster': 'ATHMaster',
+  'Deploy ATHVesting': 'ATHVesting',
+  'Deploy BuybackBurn': 'BuybackBurn',
+  'Deploy MarketStabilitySeller': 'MarketStabilitySeller',
+  'Deploy CapsuleHub': 'CapsuleHub',
+  'Deploy FeeAccumulator': 'FeeAccumulator',
+  'Deploy ProfileRegistry': 'ProfileRegistry',
+  'Deploy UsernameRegistry': 'UsernameRegistry',
+  'Deploy Vault': 'Vault',
 };
 
 function readText(path: string): string {
@@ -139,6 +164,51 @@ describe('release truth single-source guard', () => {
 
     if (!gatesActuallyPass) {
       expect(claimsProductionGatesPassed).toBe(false);
+    }
+  });
+
+  it('keeps local mainnet final manifest code hashes aligned with CURRENT_CODE_HASHES when the local draft is archived', () => {
+    const path = 'artifacts/local/mainnet_final_manifest_draft.json';
+    if (!existsSync(path)) return;
+
+    const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
+    const draft = readJson(path);
+
+    for (const [currentKey, manifestKey] of Object.entries(CURRENT_CODE_HASH_TO_MANIFEST_KEY)) {
+      expect(normalizeHash(draft.manifest?.code_hashes?.[manifestKey]), manifestKey).toBe(
+        normalizeHash(currentCodeHashes[currentKey]),
+      );
+    }
+  });
+
+  it('keeps local mainnet deploy packet code hashes aligned with CURRENT_CODE_HASHES when the packet is archived', () => {
+    const path = 'artifacts/local/mainnet_deploy_packet.json';
+    if (!existsSync(path)) return;
+
+    const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
+    const packet = readJson(path);
+
+    for (const step of packet.phase_1_deploy_contracts ?? []) {
+      const contract = DEPLOY_ACTION_TO_CONTRACT[step.action];
+      if (!contract) continue;
+      const currentKey = CONTRACT_TO_CURRENT_CODE_HASH_KEY[contract];
+      expect(normalizeHash(step.code_hash), `${step.id} ${step.action}`).toBe(normalizeHash(currentCodeHashes[currentKey]));
+    }
+  });
+
+  it('keeps local mainnet tx dry-run StateInit code hashes aligned with CURRENT_CODE_HASHES when the packet is archived', () => {
+    const path = 'artifacts/local/mainnet_tx_dry_run_packet.json';
+    if (!existsSync(path)) return;
+
+    const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
+    const packet = readJson(path);
+
+    for (const step of packet.deploy_contracts ?? []) {
+      const currentKey = CONTRACT_TO_CURRENT_CODE_HASH_KEY[step.contract];
+      if (!currentKey) continue;
+      expect(normalizeHash(step.state_init?.code_hash_hex), `${step.id} ${step.contract}`).toBe(
+        normalizeHash(currentCodeHashes[currentKey]),
+      );
     }
   });
 });
