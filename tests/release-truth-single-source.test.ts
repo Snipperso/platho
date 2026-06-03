@@ -78,6 +78,16 @@ function normalizeHash(value: unknown): string {
   return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
 }
 
+function formatNanotons(value: string | number | bigint): string {
+  return BigInt(value).toLocaleString('en-US');
+}
+
+function extractSummaryMargin(notes: string, label: string): string | null {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = notes.match(new RegExp(`${escaped} worst retained margin is now ([0-9,]+) nanotons`));
+  return match?.[1] ?? null;
+}
+
 function currentManifestCodeHashMismatches(): string[] {
   const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
   const input = readJson('artifacts/mainnet_genesis_verify_input.json');
@@ -184,6 +194,27 @@ describe('release truth single-source guard', () => {
 
     if (!gatesActuallyPass) {
       expect(claimsProductionGatesPassed).toBe(false);
+    }
+  });
+
+  it('keeps broad full-test storage margin notes aligned with dedicated economics reports', () => {
+    const summary = readJson('artifacts/CURRENT_FULL_TEST_SUMMARY.json');
+    const notes = Array.isArray(summary.notes) ? summary.notes.join('\n') : '';
+    const profileReport = readJson('artifacts/profile_registry_storage_economics_report.json');
+    const usernameReport = readJson('artifacts/username_registry_storage_economics_report.json');
+
+    const profileMargin = extractSummaryMargin(notes, 'ProfileRegistry');
+    const usernameMargin = extractSummaryMargin(notes, 'UsernameRegistry');
+    const usernameItemMargin = extractSummaryMargin(notes, 'UsernameNFTItem');
+
+    if (profileMargin !== null) {
+      expect(profileMargin).toBe(formatNanotons(profileReport.worst_margin_vs_permanent_endowment_nanotons));
+    }
+    if (usernameMargin !== null) {
+      expect(usernameMargin).toBe(formatNanotons(usernameReport.worst_registry_margin_nanotons));
+    }
+    if (usernameItemMargin !== null) {
+      expect(usernameItemMargin).toBe(formatNanotons(usernameReport.worst_item_margin_nanotons));
     }
   });
 
