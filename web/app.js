@@ -9842,7 +9842,14 @@ function queueVaultRefreshAfterWalletChange() {
 async function resolveUsernameRegistryProvider() {
   const provider = globalThis.plathoUsernameRegistryProvider
     ?? createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: requireUsernameRegistryAddress() });
-  if (!provider?.getUsernamePrice || !provider?.getRefundDue) {
+  if (
+    !provider?.getUsernamePrice
+    || !provider?.getNameRecordByUsername
+    || !provider?.getNameRecord
+    || !provider?.getUsernameItemAddress
+    || !provider?.getGlobal
+    || !provider?.getAthWalletAddress
+  ) {
     throw new Error('UsernameRegistry provider is not configured');
   }
   return provider;
