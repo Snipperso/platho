@@ -208,10 +208,8 @@
       "treasury_ath_receiver": "REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS",
       "name_record_count": "0",
       "pending_mint_count": "0",
-      "refund_due_count": "0",
       "treasury_due_ath": "0",
       "burn_due_ath": "0",
-      "pending_refund_flush_count": "0",
       "pending_treasury_flush_count": "0",
       "pending_burn_flush_count": "0"
     },

@@ -325,6 +325,32 @@ function currentBuildConsistencyIssues(input: MainnetGenesisVerifyInput): Issue[
   ];
 }
 
+function localDraftConsistencyIssues(input: MainnetGenesisVerifyInput): Issue[] {
+  const localDraftPath = join(ARTIFACTS_DIR, 'local', 'mainnet_final_manifest_draft.json');
+  if (!existsSync(localDraftPath)) return [];
+
+  const localDraft = JSON.parse(readFileSync(localDraftPath, 'utf8')) as {
+    production_deploy_executed?: boolean;
+    manifest?: { manifest_hash_hex?: string };
+  };
+  const localDraftHash = localDraft.manifest?.manifest_hash_hex?.toLowerCase();
+  const inputHash = input.manifest?.manifest_hash_hex?.toLowerCase();
+  if (!localDraftHash || !inputHash || localDraftHash === inputHash) return [];
+
+  return [
+    issue(
+      'MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT',
+      [
+        'Stored mainnet genesis verifier input is stale relative to the current local final manifest draft.',
+        `input=${inputHash}`,
+        `local_draft=${localDraftHash}`,
+        `production_deploy_executed=${localDraft.production_deploy_executed === true ? 'true' : 'false'}`,
+        'Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification.',
+      ].join(' '),
+    ),
+  ];
+}
+
 function withAdditionalIssues(report: MainnetGenesisVerifyReport, additionalIssues: Issue[]): MainnetGenesisVerifyReport {
   if (additionalIssues.length === 0) return report;
   const issues = [...report.issues, ...additionalIssues];
@@ -1557,7 +1583,10 @@ export function writeMainnetGenesisVerifyArtifacts(inputPath = DEFAULT_MAINNET_G
     inputSha256: inputRaw ? sha256Hex(inputRaw) : null,
   });
   const report = input
-    ? withAdditionalIssues(snapshotReport, currentBuildConsistencyIssues(input))
+    ? withAdditionalIssues(snapshotReport, [
+        ...currentBuildConsistencyIssues(input),
+        ...localDraftConsistencyIssues(input),
+      ])
     : snapshotReport;
   writeFileSync(join(ARTIFACTS_DIR, 'mainnet_genesis_verify_report.json'), `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(join(ARTIFACTS_DIR, 'MAINNET_GENESIS_VERIFY.md'), markdown(report));
