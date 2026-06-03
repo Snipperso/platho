@@ -727,6 +727,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/meta: 'sending'/);
     expect(app).toMatch(/function privateSendRetryMeta/);
     expect(app).toMatch(/retrying send/);
+    expect(app).toMatch(/PRIVATE_SEND_RETRY_MAX_ATTEMPTS = 8/);
+    expect(app).toMatch(/privateSendRetryExhaustedStatusText/);
     expect(app).toMatch(/privateSendBlockedStatusText/);
     expect(app).not.toMatch(/message\.meta = 'send failed'/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.rail-item span:last-child\s*{[\s\S]*text-overflow: ellipsis;/);
@@ -821,6 +823,7 @@ describe('PWA runtime config guard', () => {
     expect(submittedStatusIndex).toBeGreaterThan(nonceIndex);
     expect(sendSource).toMatch(/const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError\(error\)/);
     expect(sendSource).toMatch(/if \(publishState\.submittedCount > 0 \|\| sentBeforeFailure \|\| ambiguousBroadcast\) publishState\.status = VAULT_PUBLISH_STATUS_PARTIAL/);
+    expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*if \(isTonRpcRateLimitError\(error\)\) return false;/);
     expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
     expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
@@ -1632,11 +1635,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v308/);
+    expect(sw).toMatch(/platho-pwa-prototype-v309/);
     expect(sw).toMatch(/\.\/styles\.css\?v=124/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=248/);
+    expect(sw).toMatch(/\.\/app\.js\?v=249/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

@@ -438,6 +438,7 @@ const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
 const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
 const MESSAGE_SYNC_COUNTDOWN_TICK_MS = 1_000;
 const PRIVATE_SEND_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+const PRIVATE_SEND_RETRY_MAX_ATTEMPTS = 8;
 const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
@@ -5550,8 +5551,8 @@ function isRecoverablePrivateSendError(error) {
 function isAmbiguousTonRpcBroadcastError(error) {
   const message = String(error?.message ?? error ?? '');
   if (/rejected|bad request|invalid boc|invalid message|exit code|not enough vault ton|nonce/i.test(message)) return false;
-  return isTonRpcRateLimitError(error)
-    || error?.code === 'TIMEOUT'
+  if (isTonRpcRateLimitError(error)) return false;
+  return error?.code === 'TIMEOUT'
     || error?.code === 'NETWORK_ERROR'
     || /timeout|network|failed to fetch|fetch failed|backoff|request aborted/i.test(message);
 }
@@ -5564,6 +5565,11 @@ function privateSendRetryDelayMs(error = null, attempt = 0) {
 
 function privateSendRetryMeta(error = null) {
   return isTonRpcRateLimitError(error) ? 'retrying after RPC busy' : 'retrying send';
+}
+
+function privateSendRetryExhaustedStatusText(error = null) {
+  if (isTonRpcRateLimitError(error)) return 'not sent: RPC stayed busy';
+  return 'not sent: retry limit reached';
 }
 
 function messageDiscountUnlocked() {
@@ -10630,6 +10636,28 @@ function schedulePrivateSendRetry(context, error) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message)) return;
   const attempt = Number(context.retryAttempt ?? 0);
+  if (attempt >= PRIVATE_SEND_RETRY_MAX_ATTEMPTS) {
+    clearPrivateSendRetry(message);
+    if (!message.localHistoryId && !privateMessageHasPublishAttempt(message)) {
+      restorePrivateDraftAfterUnsentMessage(context).catch((restoreError) => console.error(restoreError));
+      if (privateComposerCostStatus && thread.id === activeThreadId) {
+        privateComposerCostStatus.textContent = privateSendRetryExhaustedStatusText(error);
+        privateComposerCostStatus.dataset.state = 'short';
+      }
+      return;
+    }
+    message.meta = privateSendRetryExhaustedStatusText(error);
+    thread.state = 'blocked';
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+    updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+    if (privateComposerCostStatus && thread.id === activeThreadId) {
+      privateComposerCostStatus.textContent = privateSendRetryExhaustedStatusText(error);
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+    return;
+  }
   const delayMs = privateSendRetryDelayMs(error, attempt);
   context.retryAttempt = attempt + 1;
   refreshPrivateSendRetryUi(thread, message, privateSendRetryMeta(error));
