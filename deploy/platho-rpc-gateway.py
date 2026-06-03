@@ -17,6 +17,8 @@ DEFAULT_ALLOWED_ORIGINS = [
 
 DEFAULT_ALLOWED_GET_METHODS = [
     "dnsresolve",
+    "get_ath_wallet_address",
+    "get_ath_withdrawal_id",
     "get_avatar",
     "get_avatar_version",
     "get_canonical_publish_charge",
@@ -24,16 +26,25 @@ DEFAULT_ALLOWED_GET_METHODS = [
     "get_jetton_data",
     "get_key_record",
     "get_name_record",
+    "get_pending_ath_withdrawal_for",
+    "get_pending_burn_flush",
+    "get_pending_mint",
+    "get_pending_notification",
+    "get_pending_treasury_flush",
     "get_private_entry",
     "get_private_page",
     "get_public_entry",
     "get_public_page",
+    "get_receive_intent",
+    "get_receive_intent_commitment",
+    "get_receive_intent_id",
     "get_state",
     "get_user",
     "get_username_item_address",
     "get_username_price",
     "get_wallet_address",
     "get_wallet_data",
+    "seqno",
 ]
 
 ROUTES = {

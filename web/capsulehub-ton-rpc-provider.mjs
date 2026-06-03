@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
-import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=21';
+import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=22';
 import { tonCell } from './pwa-contract-transactions.mjs?v=18';
 
 const CAPSULEHUB_OPS = Object.freeze({

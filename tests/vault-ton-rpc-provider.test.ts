@@ -636,6 +636,61 @@ describe('Vault TON RPC provider', () => {
     expect(calls).toEqual(['https://toncenter.example/api/v3/message']);
   });
 
+  it('VAULT-RPC-04I3: routes get-method reads only to providers that declare support for that method', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-readonly',
+      fallbackProviderIds: ['toncenter-read'],
+      providers: [
+        {
+          id: 'platho-readonly',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+          messagesEndpoint: false,
+          supportedGetMethods: ['get_user'],
+        },
+        {
+          id: 'toncenter-read',
+          kind: 'toncenter-v3',
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `fallback-capability-config-${Math.random()}`,
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+      fetch: async (url: string, init: any) => {
+        const method = JSON.parse(String(init?.body ?? '{}')).method;
+        calls.push(`${String(url)}:${method}`);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(method === 'get_user' ? 7n : 9n)] };
+          },
+        };
+      },
+    });
+
+    await expect(transport?.runGetMethod({
+      address: VAULT,
+      method: 'get_receive_intent',
+      stack: [],
+    })).resolves.toMatchObject({ stack: [num(9n)] });
+    await expect(transport?.runGetMethod({
+      address: VAULT,
+      method: 'get_user',
+      stack: [],
+      verify: true,
+    })).resolves.toMatchObject({ stack: [num(7n)] });
+
+    expect(calls).toEqual([
+      'https://toncenter.example/api/v3/runGetMethod:get_receive_intent',
+      'https://rpc.platho.example/api/v3/runGetMethod:get_user',
+      'https://toncenter.example/api/v3/runGetMethod:get_user',
+    ]);
+  });
+
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {
     const primary = {
       kind: 'primary-rpc',
