@@ -32,7 +32,7 @@ function deepFreeze(value) {
 }
 
 export const PLATHO_APP_CONFIG = deepFreeze({
-  mode: PLATHO_APP_MODES.PREVIEW,
+  mode: PLATHO_APP_MODES.PRODUCTION,
   domain: 'platho.app',
   network: {
     chain: 'mainnet',
@@ -73,8 +73,8 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   vault: {
-    address: 'UQB9bp-qwLPBX8BA312KKTBFVrfFZwxjzEuZfJFgYSu1YfZm',
-    deploymentManifestHash: '570b3ba74eff150ce3317b35f190d8f5053f000dcfb331c0c3c1a31e46b7a234',
+    address: 'UQCIX5eYuHZCpuIoJAQufkA6HOCyDpcXWC5P4472IDWxv7F5',
+    deploymentManifestHash: '43b26836c99172fe1ad91220debbb7f5751e5610f886ea0b59842ae793ea7720',
     provider: {
       globalName: 'plathoVaultChainProvider',
       moduleUrl: './vault-ton-rpc-provider.mjs?v=20',
@@ -94,20 +94,20 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   capsuleHub: {
-    address: 'UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG',
+    address: 'UQDH-YiKrdmH5lrx7x9RNZWrzeLDvCLUNyNWIsCEfpqewN8T',
     publicReadLimit: 128,
   },
   ath: {
-    masterAddress: 'UQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9v087',
+    masterAddress: 'UQC4jzjGi7YMrC1cMIdvUiCZK8cBZuPr7Emj7K7ntx8ZKfVO',
   },
   usernameRegistry: {
-    address: 'UQBT1BIkKWCHrqL6tXKw5aUMXJjFbDNrcEVzpzCRxJ8Cf3ls',
+    address: 'UQBz5XnlnWdYmZWE8mAYKrU4I1mdMIWAllj-oTRHR23SvV_p',
   },
   profileRegistry: {
-    address: 'UQC4ncVFmD7s4xX7Q-lsjE9hyvaOrtXlNfi_Gha97NDQwUN0',
+    address: 'UQCVzGwG6DWO65D16U4XWgXQGfev8PKHNk3esoaQn8x0Z96Z',
   },
   crypto: {
-    signedBundlePurpose: 'pwa-mainnet-preview',
+    signedBundlePurpose: 'pwa-production',
   },
   messaging: {
     pricing: {
