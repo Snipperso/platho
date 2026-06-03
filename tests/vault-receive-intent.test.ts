@@ -21,10 +21,6 @@ const OP_CLAIM_RECEIVE_INTENT = 0x7E1F5036n;
 const OP_CANCEL_RECEIVE_INTENT = 0x7E1F5037n;
 const RECEIVE_INTENT_CREATE_RESERVE = 9_000_000n;
 
-function addressHash(address: Address): bigint {
-  return BigInt('0x' + address.hash.toString('hex'));
-}
-
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
@@ -86,6 +82,7 @@ function signedReceiveIntentBody(
   secretKey: Buffer,
   vaultAddress: Address,
   fields: any,
+  outerOwner: Address = owner,
 ) {
   const action = type === 'CreateReceiveIntent'
     ? VAULT_RECEIVE_INTENT_ACTION_CREATE
@@ -114,13 +111,15 @@ function signedReceiveIntentBody(
   const signedPayload = beginCell()
     .storeUint(VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, 32)
     .storeUint(0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn, 256)
+    .storeAddress(vaultAddress)
+    .storeAddress(owner)
     .storeUint(action, 8)
     .storeUint(nonce, 64)
     .storeRef(actionPayload.endCell())
     .endCell();
   return beginCell()
     .storeUint(op, 32)
-    .storeAddress(owner)
+    .storeAddress(outerOwner)
     .storeBuffer(sign(signedPayload.hash(), secretKey))
     .storeRef(signedPayload)
     .endCell();
@@ -358,5 +357,34 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     expect(await contractBalance(blockchain, vault.address)).toBe(rawBeforeAttackerCancel);
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
     expect((await vault.getGetUser(sender.address)).ton_balance).toBe(toNano('0.8') - RECEIVE_INTENT_CREATE_RESERVE);
+  });
+
+  it('VAULT-REJECT: same-auth two-wallet receive-intent replay is owner-domain separated', async () => {
+    const { vault, sender, recipient, attacker, blockchain } = await setup();
+    const sharedKey = await registerKeys(vault, sender, 16);
+    await registerKeys(vault, attacker, 16);
+    await registerKeys(vault, recipient, 17);
+    await deposit(vault, sender, toNano('1'));
+    await deposit(vault, attacker, toNano('1'));
+
+    const amount = toNano('0.2');
+    const senderNonce = (await vault.getGetUser(sender.address)).publish_nonce;
+    const attackerBefore = await vault.getGetUser(attacker.address);
+    expect(attackerBefore.publish_nonce).toBe(senderNonce);
+    const { commitment } = await computeIntent(vault, sender, recipient, amount, senderNonce, 0x2020n);
+    const body = signedReceiveIntentBody('CreateReceiveIntent', sender.address, senderNonce, sharedKey.secretKey, vault.address, {
+      asset: ASSET_TON,
+      amount,
+      recipient_wallet: recipient.address,
+      commitment,
+    }, attacker.address);
+
+    const rawBefore = await contractBalance(blockchain, vault.address);
+    await expect(blockchain.sendMessage(external({ to: vault.address, body }))).rejects.toThrow(/16288/);
+    const attackerAfter = await vault.getGetUser(attacker.address);
+    expect(attackerAfter.publish_nonce).toBe(attackerBefore.publish_nonce);
+    expect(attackerAfter.ton_balance).toBe(attackerBefore.ton_balance);
+    expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
+    expect(await contractBalance(blockchain, vault.address)).toBe(rawBefore);
   });
 });

@@ -1637,12 +1637,14 @@ contract Vault {
         throwUnless(16222, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
-        throwUnless(16227, signedPayload.bits() == 360);
-        throwUnless(16228, signedPayload.refs() == 1);
         let signedDomain: Int = signedPayload.loadUint(32);
         throwUnless(16223, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16224, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16287, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16288, signedOwner == msg.owner_wallet);
         throwUnless(16226, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CREATE);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16233, clientNonce == user.publish_nonce);
@@ -1753,6 +1755,10 @@ contract Vault {
         throwUnless(16242, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16243, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16291, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16292, signedOwner == msg.owner_wallet);
         throwUnless(16245, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16249, clientNonce == user.publish_nonce);
@@ -1793,6 +1799,10 @@ contract Vault {
         throwUnless(16255, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16256, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16295, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16296, signedOwner == msg.owner_wallet);
         throwUnless(16258, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16262, clientNonce == user.publish_nonce);
@@ -2124,12 +2134,16 @@ contract Vault {
         throwUnless(16605, signedDomain == VAULT_PROFILE_AVATAR_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16606, signedManifestHash == self.deployment_manifest_hash);
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16618, signedOwner == msg.owner_wallet);
         let clientNonce: Int = signedPayload.loadUint(64);
-        let maxTonCharge: Int = signedPayload.loadUint(128);
         throwUnless(16611, clientNonce == user.publish_nonce);
-        throwUnless(16613, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         acceptMessage();
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16617, signedVaultAddress == myAddress());
+        throwUnless(16613, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         user.publish_nonce += 1;
         user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
@@ -2213,6 +2227,8 @@ contract Vault {
     }
 
     external(msg: MintUsernameFromVaultBalance) {
+        self.requireSealed();
+        throwUnless(16700, self.isUsernameRegistryBound());
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16701, userOpt != null);
         let user: UserState = userOpt!!;
@@ -2220,22 +2236,20 @@ contract Vault {
         throwUnless(16704, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
-        throwUnless(16708, signedPayload.bits() == 736);
-        throwUnless(16709, signedPayload.refs() == 1);
         let signedDomain: Int = signedPayload.loadUint(32);
         throwUnless(16705, signedDomain == VAULT_USERNAME_MINT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16706, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        throwUnless(16707, vaultAddressSlice.loadUint(11) == 1024);
-        throwUnless(16707, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16716, signedOwner == msg.owner_wallet);
         let clientNonce: Int = signedPayload.loadUint(64);
-        let maxTonCharge: Int = signedPayload.loadUint(128);
         throwUnless(16711, clientNonce == user.publish_nonce);
-        throwUnless(16713, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         acceptMessage();
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16707, signedVaultAddress == myAddress());
+        throwUnless(16713, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         user.publish_nonce += 1;
         user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);

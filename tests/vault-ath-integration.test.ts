@@ -78,10 +78,6 @@ function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
 }
 
-function basechainAddressHash(address: Address): bigint {
-  return BigInt('0x' + address.hash.toString('hex'));
-}
-
 function senderKey(senderOwner: Address, queryId: bigint): bigint {
   return BigInt('0x' + beginCell()
     .storeUint(ATH_TRANSFER_NOTIFY_ID_DOMAIN, 32)
@@ -617,6 +613,22 @@ async function registerAvatarRouteKeys(vault: any, user: any) {
   return authKeyPair;
 }
 
+async function registerSharedAvatarRouteKeys(vault: any, users: any[]) {
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, 13));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, 83));
+  for (const user of users) {
+    await vault.send(user.getSender(), { value: toNano('0.05') }, {
+      $$type: 'RegisterMessagingKeys',
+      ...hybridMessagingKeyFields(
+        1n,
+        BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+        BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+      ),
+    } as RegisterMessagingKeys);
+  }
+  return authKeyPair;
+}
+
 async function registerKeysFromAddress(blockchain: Blockchain, vault: any, owner: Address, seedByte: number) {
   const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
   const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
@@ -651,6 +663,7 @@ async function depositTonFromAddress(blockchain: Blockchain, vault: any, owner: 
 function signedVaultProfileAvatarBody(params: {
   vault: any;
   owner: Address;
+  outerOwner?: Address;
   profileRegistry: any;
   clientNonce: bigint;
   secretKey: Buffer;
@@ -675,13 +688,15 @@ function signedVaultProfileAvatarBody(params: {
   const signedPayload = beginCell()
     .storeUint(VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, 32)
     .storeUint(MANIFEST_HASH, 256)
+    .storeAddress(params.owner)
     .storeUint(params.clientNonce, 64)
     .storeUint(params.maxTonCharge ?? PROFILE_AVATAR_TON_CHARGE, 128)
+    .storeAddress(params.vault.address)
     .storeRef(avatarPayload)
     .endCell();
   return beginCell().store(storeSetProfileAvatarFromVaultBalance({
     $$type: 'SetProfileAvatarFromVaultBalance',
-    owner_wallet: params.owner,
+    owner_wallet: params.outerOwner ?? params.owner,
     signature: sign(signedPayload.hash(), params.secretKey),
     signed_payload: signedPayload,
   })).endCell();
@@ -690,6 +705,7 @@ function signedVaultProfileAvatarBody(params: {
 function signedVaultUsernameMintBody(params: {
   vault: any;
   owner: Address;
+  outerOwner?: Address;
   usernameRegistry: any;
   clientNonce: bigint;
   secretKey: Buffer;
@@ -708,14 +724,15 @@ function signedVaultUsernameMintBody(params: {
   const signedPayload = beginCell()
     .storeUint(VAULT_USERNAME_MINT_SIGNING_DOMAIN, 32)
     .storeUint(MANIFEST_HASH, 256)
-    .storeUint(basechainAddressHash(params.vault.address), 256)
+    .storeAddress(params.owner)
     .storeUint(params.clientNonce, 64)
     .storeUint(params.maxTonCharge ?? USERNAME_MINT_TON_CHARGE, 128)
+    .storeAddress(params.vault.address)
     .storeRef(usernamePayload)
     .endCell();
   return beginCell().store(storeMintUsernameFromVaultBalance({
     $$type: 'MintUsernameFromVaultBalance',
-    owner_wallet: params.owner,
+    owner_wallet: params.outerOwner ?? params.owner,
     signature: sign(signedPayload.hash(), params.secretKey),
     signed_payload: signedPayload,
   })).endCell();
@@ -1067,6 +1084,25 @@ describe('Vault ATH integration with production ATHWallet', () => {
       expect(after.publish_nonce).toBe(before.publish_nonce);
       expect(rawAfter).toBe(rawBefore);
     }
+    async function expectAcceptedAbortWithoutLedgerChange(owner: Address, body: any, exitCode: number) {
+      const before = await ctx.vault.getGetUser(owner);
+      const rawBefore = await contractBalance(ctx.blockchain, ctx.vault.address);
+      const result = await ctx.blockchain.sendMessage(external({
+        to: ctx.vault.address,
+        body,
+      }));
+      const after = await ctx.vault.getGetUser(owner);
+      const rawAfter = await contractBalance(ctx.blockchain, ctx.vault.address);
+      const tx = result.transactions[0];
+      expect(tx.description.type).toBe('generic');
+      if (tx.description.type === 'generic' && tx.description.computePhase.type === 'vm') {
+        expect(tx.description.computePhase.exitCode).toBe(exitCode);
+      }
+      expect(after.ton_balance).toBe(before.ton_balance);
+      expect(after.ath_balance).toBe(before.ath_balance);
+      expect(after.publish_nonce).toBe(before.publish_nonce);
+      expect(rawAfter).toBeLessThan(rawBefore);
+    }
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
     await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
       vault: ctx.vault,
@@ -1080,7 +1116,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarPartCount: 1n,
     }), 16611);
 
-    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
+    await expectAcceptedAbortWithoutLedgerChange(ctx.user.address, signedVaultProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
@@ -1134,6 +1170,38 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(globalAfterMalformed.pending_profile_avatar_payment_count).toBe(0n);
     expect(rawAfterMalformed - afterMalformed.ton_balance).toBeGreaterThanOrEqual(rawBeforeMalformed - beforeMalformed.ton_balance);
 
+  });
+
+  it('VAULT-ATH-06B2: same-auth two-wallet profile avatar replay is owner-domain separated', async () => {
+    const ctx = await setupProfileAvatarRoute();
+    const attacker = await ctx.blockchain.treasury('vault-avatar-same-auth-attacker');
+    const keyPair = await registerSharedAvatarRouteKeys(ctx.vault, [ctx.user, attacker]);
+    const attackerBefore = await ctx.vault.getGetUser(attacker.address);
+    const rawBefore = await contractBalance(ctx.blockchain, ctx.vault.address);
+
+    await expect(ctx.blockchain.sendMessage(external({
+      to: ctx.vault.address,
+      body: signedVaultProfileAvatarBody({
+        vault: ctx.vault,
+        owner: ctx.user.address,
+        outerOwner: attacker.address,
+        profileRegistry: ctx.profileRegistry,
+        clientNonce: attackerBefore.publish_nonce,
+        secretKey: keyPair.secretKey,
+        avatarHash: 0x661127n,
+        avatarEntryId: 76n,
+        avatarStreamId: 0x11223344556677889900aabbccddee05n,
+        avatarPartCount: 1n,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16618 });
+
+    const attackerAfter = await ctx.vault.getGetUser(attacker.address);
+    const rawAfter = await contractBalance(ctx.blockchain, ctx.vault.address);
+    expect(attackerAfter.ton_balance).toBe(attackerBefore.ton_balance);
+    expect(attackerAfter.ath_balance).toBe(attackerBefore.ath_balance);
+    expect(attackerAfter.publish_nonce).toBe(attackerBefore.publish_nonce);
+    expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
+    expect(rawAfter).toBe(rawBefore);
   });
 
   it('VAULT-ATH-06C: Vault-funded profile notification prune cannot refund after registry acceptance', async () => {
@@ -1392,6 +1460,25 @@ describe('Vault ATH integration with production ATHWallet', () => {
       expect(after.publish_nonce).toBe(before.publish_nonce);
       expect(rawAfter).toBe(rawBefore);
     }
+    async function expectAcceptedAbortWithoutLedgerChange(owner: Address, body: any, exitCode: number) {
+      const before = await ctx.vault.getGetUser(owner);
+      const rawBefore = await contractBalance(ctx.blockchain, ctx.vault.address);
+      const result = await ctx.blockchain.sendMessage(external({
+        to: ctx.vault.address,
+        body,
+      }));
+      const after = await ctx.vault.getGetUser(owner);
+      const rawAfter = await contractBalance(ctx.blockchain, ctx.vault.address);
+      const tx = result.transactions[0];
+      expect(tx.description.type).toBe('generic');
+      if (tx.description.type === 'generic' && tx.description.computePhase.type === 'vm') {
+        expect(tx.description.computePhase.exitCode).toBe(exitCode);
+      }
+      expect(after.ton_balance).toBe(before.ton_balance);
+      expect(after.ath_balance).toBe(before.ath_balance);
+      expect(after.publish_nonce).toBe(before.publish_nonce);
+      expect(rawAfter).toBeLessThan(rawBefore);
+    }
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
     await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultUsernameMintBody({
       vault: ctx.vault,
@@ -1402,7 +1489,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       username: 'platho',
     }), 16711);
 
-    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultUsernameMintBody({
+    await expectAcceptedAbortWithoutLedgerChange(ctx.user.address, signedVaultUsernameMintBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       usernameRegistry: ctx.usernameRegistry,
@@ -1447,6 +1534,77 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(globalAfterMalformed.pending_username_mint_payment_count).toBe(0n);
     expect(rawAfterMalformed - afterMalformed.ton_balance).toBeGreaterThanOrEqual(rawBeforeMalformed - beforeMalformed.ton_balance);
 
+  });
+
+  it('VAULT-ATH-07B2: same-auth two-wallet username mint replay is owner-domain separated', async () => {
+    const ctx = await setupUsernameMintRoute();
+    const attacker = await ctx.blockchain.treasury('vault-username-same-auth-attacker');
+    const keyPair = await registerSharedAvatarRouteKeys(ctx.vault, [ctx.user, attacker]);
+    const attackerBefore = await ctx.vault.getGetUser(attacker.address);
+    const rawBefore = await contractBalance(ctx.blockchain, ctx.vault.address);
+
+    await expect(ctx.blockchain.sendMessage(external({
+      to: ctx.vault.address,
+      body: signedVaultUsernameMintBody({
+        vault: ctx.vault,
+        owner: ctx.user.address,
+        outerOwner: attacker.address,
+        usernameRegistry: ctx.usernameRegistry,
+        clientNonce: attackerBefore.publish_nonce,
+        secretKey: keyPair.secretKey,
+        username: 'platho_3',
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16716 });
+
+    const attackerAfter = await ctx.vault.getGetUser(attacker.address);
+    const rawAfter = await contractBalance(ctx.blockchain, ctx.vault.address);
+    expect(attackerAfter.ton_balance).toBe(attackerBefore.ton_balance);
+    expect(attackerAfter.ath_balance).toBe(attackerBefore.ath_balance);
+    expect(attackerAfter.publish_nonce).toBe(attackerBefore.publish_nonce);
+    expect((await ctx.vault.getGetGlobal()).pending_username_mint_payment_count).toBe(0n);
+    expect(rawAfter).toBe(rawBefore);
+  });
+
+  it('VAULT-ATH-07B3: Vault-funded username mint requires bound username registry before accepting', async () => {
+    const blockchain = await Blockchain.create();
+    const controller = await blockchain.treasury('vault-username-unbound-controller');
+    const user = await blockchain.treasury('vault-username-unbound-user');
+    const capsuleHub = await blockchain.treasury('vault-username-unbound-capsulehub');
+    const athMaster = fixtureAddress('VAULT_USERNAME_UNBOUND_ATH_MASTER');
+    const vaultInit = await Vault.init(
+      controller.address,
+      athMaster,
+      capsuleHub.address,
+      addressHash(controller.address),
+      true,
+      true,
+      MANIFEST_HASH,
+    );
+    const vaultAddress = contractAddress(0, vaultInit);
+    await blockchain.setShardAccount(vaultAddress, createShardAccount({
+      address: vaultAddress,
+      code: vaultInit.code,
+      data: vaultInit.data,
+      balance: toNano('1'),
+      workchain: vaultAddress.workChain,
+    }));
+    const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
+    const keyPair = keyPairFromSeed(Buffer.alloc(32, 83));
+    const rawBefore = await contractBalance(blockchain, vault.address);
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedVaultUsernameMintBody({
+        vault,
+        owner: user.address,
+        usernameRegistry: { address: fixtureAddress('VAULT_USERNAME_UNBOUND_REGISTRY') },
+        clientNonce: 0n,
+        secretKey: keyPair.secretKey,
+        username: 'platho',
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16700 });
+
+    expect(await contractBalance(blockchain, vault.address)).toBe(rawBefore);
   });
 
   it('VAULT-ATH-07C: Vault-funded username notification prune cannot refund before registry finality', async () => {

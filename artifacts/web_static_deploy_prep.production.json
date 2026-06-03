@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-03T15:38:39.333Z",
+  "generatedAt": "2026-06-03T17:01:12.622Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 128,
-    "totalBytes": 2843404,
-    "bundleSha256": "0a3ce42f37d4186d5335f746361f6f30756587460907e54501e6c2fe7b7af4f9",
+    "totalBytes": 2843680,
+    "bundleSha256": "ac439d59a9dd23da455dc83765c4332ff9ac18626a5b476a0f8c3dd4209ef15b",
     "files": [
       {
         "path": "app.js",
@@ -239,8 +239,8 @@
       },
       {
         "path": "pwa-contract-transactions.mjs",
-        "bytes": 63977,
-        "sha256": "253625e5282a8bef0663a05efc6d8c6e7f4848f3a1d624a98aa6824407df78b8"
+        "bytes": 64253,
+        "sha256": "b94f63e85becf2e8ac6fa2d71565e17d06219a416d6137a002507cf12e31c67d"
       },
       {
         "path": "qr-code.mjs",
