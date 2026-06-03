@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T15:41:40.0089204Z",
+  "generated_after_local_run": "2026-06-03T16:03:46.9691906Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
   "failed_test_files": 0,
-  "total_tests": 752,
-  "passed_tests": 752,
+  "total_tests": 753,
+  "passed_tests": 753,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -69,6 +69,7 @@
     "It also includes the Larisa Section 9 PWA composer/send cleanup pass: outgoing payment-check cancel now performs fresh verified intent and sender checks, persists submitted/terminal cancel state, waits for intent removal plus sender Vault balance restoration, and multi-capsule Vault publishes build each signed BOC just-in-time from a fresh nonce instead of pre-signing consecutive nonces during preparation.",
     "It also includes the Larisa Section 10 TON DNS runtime-loader cleanup pass: ton-dns-provider.mjs now exports a default ready provider matching the configured PLATHO_APP_CONFIG.tonDns provider export, runtime module versions/service-worker cache were bumped, and tests now smoke the configured TON DNS module export path.",
     "It also includes the Larisa Section 11 retrieval/cache cleanup pass: private chain sync now uses bounded multipart lookahead before declaring partial streams incomplete, public non-all history labels state the latest-128-entry cap, and successful public chain sync rebuilds channel feed caches without carrying stale same-session chainVerified posts forward unless they were reverified.",
-    "It also includes the Larisa Section 12 docs/release-truth cleanup pass: PRODUCTION_READINESS no longer hardcodes a stale final manifest hash or claims preview config is already production-pinned, public About copy names the narrow launch authorities while rejecting arbitrary admin controls, and the ATH whitepaper describes current Vault-funded username rejection/refund semantics instead of deleted direct refund-due ABI."
+    "It also includes the Larisa Section 12 docs/release-truth cleanup pass: PRODUCTION_READINESS no longer hardcodes a stale final manifest hash or claims preview config is already production-pinned, public About copy names the narrow launch authorities while rejecting arbitrary admin controls, and the ATH whitepaper describes current Vault-funded username rejection/refund semantics instead of deleted direct refund-due ABI.",
+    "It also includes the Larisa focused re-audit release-evidence cleanup: mainnet_genesis_verify_report.json and MAINNET_GENESIS_VERIFY.md now explicitly flag MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT when the stored verifier input belongs to an older final manifest than artifacts/local/mainnet_final_manifest_draft.json, without pretending final mainnet genesis is verified."
   ]
 }

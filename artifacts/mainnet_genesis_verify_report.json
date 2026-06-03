@@ -11,12 +11,17 @@
     "finalManifestSource": "artifacts/local/mainnet_final_manifest_draft.json#manifest_hash=a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd"
   },
   "issue_codes": [
-    "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST"
+    "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST",
+    "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT"
   ],
   "issues": [
     {
       "code": "CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST",
-      "message": "Final genesis evidence does not belong to the current local build: vault: current=0d61d8de253b3bc49f50d8a46006de2082909a4d7743aa0e994cb701ace1083b, manifest=a4dc953ed8f4eda13aba885b9942b05836a7e291a9215946bbfa8d87698ffc4e."
+      "message": "Final genesis evidence does not belong to the current local build: ath_master: current=06ab47304838b2efcd3fb501736829f5d61e13522268e40096c1434dfa969df0, manifest=1292f049451f70dc285c1247c9624890b2909298142a6c6760ccafa1428c4c88; ath_vesting: current=9a572e31c88c471f13e45d390c61da6159139711a300b48f889192ba6f8d2ad7, manifest=f0c1b8d97981441478f5169f60f586efd2aeff4191a7786e730ec966c8a3dede; ath_wallet: current=6d9d3dff2368d22a4148a48e71d6c91561b6db6ea64d7c14c506445202e13270, manifest=4c90b0f1b65eea96df7992409e1819b73f63f1ae2ecb9f651c42174c85f7b88d; buyback_burn: current=adf826d02915f535d900d769fe3e47ba24181e6bfe669a8de52fc75a00afd8bd, manifest=1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2; market_stability_seller: current=20f10b8c0addf8d23e405f252684a24f00ddbb9e5a29ca0def3bceefca6b8539, manifest=36a7779df8b0ec2394d52bcd948148ec7fc681c43c7204442ae9e0c5e0bd5fa8; profile_registry: current=6437b6631d0b310781fef9efa214640c69a3ae684dae2c4be5b463a673ed7e29, manifest=4bb7e84048b4ed42312d686032f4da649f33cdbb035ad8f8d9a444ac9b7ba4f1; username_registry: current=6b7739a9aadaef0c2ae69a0007e93961746d861cebabcdd5c68777f6cad2b27f, manifest=f5b445a179a420128fbc78660e79986d6aba1bfb185d4f183c4ce41681a7c36e; vault: current=ccc3552a46f805884a8deef651820be2291943dce2da7ae8b8fb058dcbb5a75a, manifest=a4dc953ed8f4eda13aba885b9942b05836a7e291a9215946bbfa8d87698ffc4e."
+    },
+    {
+      "code": "MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT",
+      "message": "Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd local_draft=3fedec5d33107df1de4a0fa98fc49a57fa7d7b1e2dec93e04e8646d1a83accb8 production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification."
     }
   ],
   "checked_manifest_hash": "a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd"

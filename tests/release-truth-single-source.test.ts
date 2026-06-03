@@ -118,6 +118,26 @@ describe('release truth single-source guard', () => {
     expect(report.status === 'MAINNET_GENESIS_VERIFIED').toBe(verified === 'true');
   });
 
+  it('marks stale mainnet verifier input when it no longer matches the current local final manifest draft', () => {
+    const verified = readText('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim().toLowerCase();
+    const input = readJson('artifacts/mainnet_genesis_verify_input.json');
+    const report = readJson('artifacts/mainnet_genesis_verify_report.json');
+    const markdown = readText('artifacts/MAINNET_GENESIS_VERIFY.md');
+    const localDraftPath = 'artifacts/local/mainnet_final_manifest_draft.json';
+
+    if (!existsSync(localDraftPath)) return;
+
+    const localDraft = readJson(localDraftPath);
+    const inputHash = normalizeHash(input.manifest?.manifest_hash_hex);
+    const localDraftHash = normalizeHash(localDraft.manifest?.manifest_hash_hex);
+
+    if (verified !== 'true' && inputHash !== localDraftHash) {
+      expect(report.issue_codes).toContain('MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT');
+      expect(markdown).toMatch(/MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT/);
+      expect(markdown).toMatch(new RegExp(localDraftHash));
+    }
+  });
+
   it('requires production PWA manifest hash to match final verified genesis evidence', async () => {
     const { PLATHO_APP_CONFIG, PLATHO_APP_MODES } = await import('../web/platho-config.mjs');
     const verified = readText('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim().toLowerCase();
