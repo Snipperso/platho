@@ -598,6 +598,43 @@ describe('Vault TON RPC provider', () => {
     ]);
   });
 
+  it('VAULT-RPC-04I2: skips read-only providers when broadcasting BOCs from fallback config', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-readonly',
+      fallbackProviderIds: ['toncenter-send'],
+      providers: [
+        {
+          id: 'platho-readonly',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+          messagesEndpoint: false,
+        },
+        {
+          id: 'toncenter-send',
+          kind: 'toncenter-v3',
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.example/api/v3/message',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `fallback-send-config-${Math.random()}`,
+      fetch: async (url: string) => {
+        calls.push(String(url));
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { ok: true, result: { hash: 'sent' } };
+          },
+        };
+      },
+    });
+
+    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
+    expect(calls).toEqual(['https://toncenter.example/api/v3/message']);
+  });
+
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {
     const primary = {
       kind: 'primary-rpc',
@@ -631,6 +668,32 @@ describe('Vault TON RPC provider', () => {
     await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).resolves.toMatchObject({ stack: [num(11n)] });
     await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
     expect(fallbackCalls).toEqual(['read:get_global', 'send']);
+  });
+
+  it('VAULT-RPC-04J1: read-only send fallback does not replace the real broadcast error', async () => {
+    const primary = {
+      kind: 'toncenter-send',
+      supportsSendBoc: true,
+      async sendBoc() {
+        const error: any = new Error('primary limited');
+        error.status = 429;
+        error.code = 'RATE_LIMITED';
+        throw error;
+      },
+    };
+    const readonly = {
+      kind: 'platho-readonly',
+      supportsSendBoc: false,
+      async sendBoc() {
+        throw new Error('TON sendBoc endpoint is not configured');
+      },
+    };
+    const transport = createFallbackTonRpcTransport({ transports: [primary, readonly] });
+
+    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      status: 429,
+    });
   });
 
   it('VAULT-RPC-04J2: falls back after RPC request timeouts', async () => {

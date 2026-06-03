@@ -1641,17 +1641,17 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v310/);
+    expect(sw).toMatch(/platho-pwa-prototype-v311/);
     expect(sw).toMatch(/\.\/styles\.css\?v=124/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=250/);
+    expect(sw).toMatch(/\.\/app\.js\?v=251/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=8/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=15/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=16/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=9/);

@@ -32,7 +32,7 @@ import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=2';
 import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=45';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=16';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=17';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   normalizePublicChannelRegistry,
