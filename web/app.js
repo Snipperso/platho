@@ -404,6 +404,10 @@ let privateChainSyncPromise = null;
 let messageAutoSyncTimer = null;
 let messageAutoSyncAt = 0;
 let messageAutoSyncCountdownTimer = null;
+let messageAutoSyncPhase = 'idle';
+let messageAutoSyncLastResult = null;
+let messageAutoSyncLastErrorLabel = null;
+let messageAutoSyncLoadingFrame = 0;
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
@@ -1503,10 +1507,26 @@ function renderConversationIdentity(thread) {
   }
 }
 
-function messageAutoSyncCountdownText() {
-  if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair || messageAutoSyncAt <= 0) return null;
+const MESSAGE_SYNC_LOADING_FRAMES = Object.freeze(['Syncing', 'Syncing.', 'Syncing..', 'Syncing...']);
+
+function messageAutoSyncNextText() {
+  if (messageAutoSyncAt <= 0) return null;
   const seconds = Math.max(1, Math.ceil((messageAutoSyncAt - Date.now()) / 1000));
-  return `Refreshing in ${seconds}s...`;
+  return `next sync in ${seconds}s`;
+}
+
+function messageAutoSyncCountdownText() {
+  if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair) return null;
+  if (messageAutoSyncPhase === 'syncing') {
+    return MESSAGE_SYNC_LOADING_FRAMES[messageAutoSyncLoadingFrame % MESSAGE_SYNC_LOADING_FRAMES.length];
+  }
+  const next = messageAutoSyncNextText();
+  if (messageAutoSyncPhase === 'synced') return next ? `✓ Synced - ${next}` : '✓ Synced';
+  if (messageAutoSyncPhase === 'delayed') {
+    const label = messageAutoSyncLastErrorLabel ?? 'Sync delayed';
+    return next ? `${label} - ${next}` : label;
+  }
+  return next ? `Next sync in ${next.replace('next sync in ', '')}` : null;
 }
 
 function conversationSubtitleText(thread) {
@@ -1528,13 +1548,43 @@ function clearMessageAutoSyncCountdownTimer() {
 function scheduleMessageAutoSyncCountdownUi() {
   clearMessageAutoSyncCountdownTimer();
   refreshConversationSubtitle();
-  if (!isChatsViewActive() || document.hidden || messageAutoSyncAt <= 0) return;
+  if (!isChatsViewActive() || document.hidden) return;
+  if (messageAutoSyncPhase === 'syncing') {
+    messageAutoSyncCountdownTimer = window.setTimeout(() => {
+      messageAutoSyncLoadingFrame = (messageAutoSyncLoadingFrame + 1) % MESSAGE_SYNC_LOADING_FRAMES.length;
+      scheduleMessageAutoSyncCountdownUi();
+    }, 420);
+    return;
+  }
+  if (messageAutoSyncAt <= 0) return;
   const remainingMs = messageAutoSyncAt - Date.now();
   if (remainingMs <= 0) return;
   messageAutoSyncCountdownTimer = window.setTimeout(
     scheduleMessageAutoSyncCountdownUi,
     Math.min(MESSAGE_SYNC_COUNTDOWN_TICK_MS, remainingMs),
   );
+}
+
+function beginMessageSyncUi() {
+  messageAutoSyncPhase = 'syncing';
+  messageAutoSyncAt = 0;
+  messageAutoSyncLastErrorLabel = null;
+  messageAutoSyncLoadingFrame = 0;
+  setText(messageSyncStatus, 'syncing');
+  scheduleMessageAutoSyncCountdownUi();
+}
+
+function completeMessageSyncUi(result) {
+  messageAutoSyncPhase = 'synced';
+  messageAutoSyncLastResult = result ?? null;
+  messageAutoSyncLastErrorLabel = null;
+  refreshConversationSubtitle();
+}
+
+function failMessageSyncUi(label) {
+  messageAutoSyncPhase = 'delayed';
+  messageAutoSyncLastErrorLabel = label || 'Sync delayed';
+  refreshConversationSubtitle();
 }
 
 function openNewChatDialog() {
@@ -4692,6 +4742,7 @@ function clearMessageAutoSyncTimer() {
     messageAutoSyncTimer = null;
   }
   messageAutoSyncAt = 0;
+  messageAutoSyncPhase = 'idle';
   clearMessageAutoSyncCountdownTimer();
   refreshConversationSubtitle();
 }
@@ -4700,14 +4751,16 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   clearMessageAutoSyncTimer();
   if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair || document.hidden) return;
   const effectiveDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
+  messageAutoSyncPhase = messageAutoSyncLastErrorLabel ? 'delayed' : (messageAutoSyncLastResult ? 'synced' : 'scheduled');
   messageAutoSyncAt = Date.now() + effectiveDelayMs;
   scheduleMessageAutoSyncCountdownUi();
   messageAutoSyncTimer = window.setTimeout(async () => {
     messageAutoSyncTimer = null;
     messageAutoSyncAt = 0;
-    refreshConversationSubtitle();
+    beginMessageSyncUi();
     try {
       const result = await syncPrivateCapsulesFromChainOnce();
+      completeMessageSyncUi(result);
       if (privateSyncImported(result)) {
         setText(messageSyncStatus, 'new messages');
       } else if (messageSyncStatus?.textContent === 'syncing') {
@@ -4715,6 +4768,8 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
       }
     } catch (error) {
       const rateLimited = noteTonRpcRateLimit(error);
+      const label = rateLimited ? 'Sync delayed' : 'Sync failed';
+      failMessageSyncUi(label);
       setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
       if (!rateLimited) console.error(error);
     } finally {
@@ -6594,12 +6649,14 @@ function setView(view) {
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
   if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
-    setText(messageSyncStatus, 'syncing');
+    beginMessageSyncUi();
     syncPrivateCapsulesFromChainOnce().then((result) => {
+      completeMessageSyncUi(result);
       setText(messageSyncStatus, privateSyncStatusText(result));
       scheduleMessageAutoSync();
     }).catch((error) => {
       const rateLimited = noteTonRpcRateLimit(error);
+      failMessageSyncUi(rateLimited ? 'Sync delayed' : 'Sync failed');
       setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
       if (!rateLimited) console.error(error);
       scheduleMessageAutoSync();
@@ -7127,11 +7184,13 @@ syncMessagesButton?.addEventListener('click', async () => {
   try {
     syncMessagesButton.disabled = true;
     clearMessageAutoSyncTimer();
-    setText(messageSyncStatus, 'syncing');
+    beginMessageSyncUi();
     const result = await syncPrivateCapsulesFromChainOnce({ forceRecentRescan: true });
+    completeMessageSyncUi(result);
     setText(messageSyncStatus, privateSyncStatusText(result));
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
+    failMessageSyncUi(rateLimited ? 'Sync delayed' : 'Sync failed');
     setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
     if (!rateLimited) console.error(error);
   } finally {
@@ -11317,16 +11376,24 @@ async function bootCrypto() {
     refreshMessagingControls();
     setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
     if (appShell?.dataset?.view === 'chats') {
+      beginMessageSyncUi();
       const syncResult = await syncPrivateCapsulesFromChainOnce().catch((error) => {
         refreshMessagingControls();
         if (noteTonRpcRateLimit(error)) {
+          failMessageSyncUi('Sync delayed');
           setText(messageSyncStatus, 'sync delayed');
         } else {
+          failMessageSyncUi('Sync failed');
           console.error(error);
         }
         return null;
       });
-      if (messageSyncStatus?.textContent !== 'sync delayed') setText(messageSyncStatus, privateSyncStatusText(syncResult));
+      if (syncResult) {
+        completeMessageSyncUi(syncResult);
+        setText(messageSyncStatus, privateSyncStatusText(syncResult));
+      } else if (messageSyncStatus?.textContent !== 'sync delayed') {
+        setText(messageSyncStatus, 'sync failed');
+      }
       scheduleMessageAutoSync();
     } else {
       setText(messageSyncStatus, 'ready');
