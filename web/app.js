@@ -9109,10 +9109,11 @@ function paymentCheckCancelBlockedStatus(error) {
   return `check cancel blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
 
-function isTonRpcVerificationUnavailableError(error) {
+function isTonRpcVerificationUnsafeForCancelError(error) {
   const message = String(error?.message ?? error ?? '');
   return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
-    || /TON RPC verification unavailable|RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message);
+    || error?.code === 'RPC_DISAGREEMENT'
+    || /TON RPC verification unavailable|TON RPC disagreement|RPC_VERIFICATION_UNAVAILABLE|RPC_DISAGREEMENT|verification unavailable/i.test(message);
 }
 
 function assertReceiveIntentMatchesPayment(intent, payment) {
@@ -9163,7 +9164,7 @@ async function readFreshReceiveIntentForCancel(provider, intentId) {
   try {
     return await readFreshReceiveIntent(provider, intentId);
   } catch (error) {
-    if (!isTonRpcVerificationUnavailableError(error)) throw error;
+    if (!isTonRpcVerificationUnsafeForCancelError(error)) throw error;
     return readFreshReceiveIntent(provider, intentId, { verify: false });
   }
 }
@@ -9181,7 +9182,7 @@ async function readFreshConnectedVaultUserForCancel(provider) {
   try {
     return await readFreshConnectedVaultUser(provider);
   } catch (error) {
-    if (!isTonRpcVerificationUnavailableError(error)) throw error;
+    if (!isTonRpcVerificationUnsafeForCancelError(error)) throw error;
     return readFreshConnectedVaultUser(provider, { verify: false });
   }
 }
@@ -10294,7 +10295,9 @@ async function submitVaultMessage(type, params, options = {}) {
 }
 
 async function submitVaultReceiveIntentExternal(type, params, options = {}) {
-  requireNoPendingServiceWorkerAppShellReload();
+  if (options.allowPendingServiceWorkerUpdate !== true) {
+    requireNoPendingServiceWorkerAppShellReload();
+  }
   const provider = options.provider ?? await resolveVaultChainProvider();
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const user = options.user ?? await loadConnectedVaultUser({
@@ -10319,7 +10322,9 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   });
   const result = await sendVaultExternalBoc(external);
   globalThis.plathoLastVaultReceiveIntentExternal = { type, params, external, result, clientNonce };
-  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
+  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
+    verify: options.allowUnverifiedNonceWait !== true,
+  });
   return { external, result, clientNonce };
 }
 
@@ -10806,7 +10811,12 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
   await options.onStatus?.('check cancel signing');
   const result = await submitVaultReceiveIntentExternal('CancelReceiveIntent', {
     intent_id: intentId,
-  }, { provider, user: beforeUser });
+  }, {
+    provider,
+    user: beforeUser,
+    allowPendingServiceWorkerUpdate: true,
+    allowUnverifiedNonceWait: true,
+  });
   setText(identitySubtitle, 'cancel confirming');
   await options.onStatus?.('check cancel submitted, confirming');
   const confirmed = await waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser);
@@ -11117,23 +11127,23 @@ async function sendVaultExternalBoc(built) {
   return { ...built, result };
 }
 
-async function readVaultPublishNonce(provider, owner) {
+async function readVaultPublishNonce(provider, owner, options = {}) {
   if (!provider?.getUser) return null;
   const user = await provider.getUser(owner, {
     vaultAddress: requireVaultAddress(),
-    verify: true,
+    verify: options.verify !== false,
     priority: 'critical',
     cacheTtlMs: 0,
   });
   return BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
 }
 
-async function waitForVaultPublishNonce(provider, owner, expectedNonce) {
+async function waitForVaultPublishNonce(provider, owner, expectedNonce, options = {}) {
   const deadline = Date.now() + VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS;
-  let lastNonce = await readVaultPublishNonce(provider, owner);
+  let lastNonce = await readVaultPublishNonce(provider, owner, options);
   while (lastNonce !== null && lastNonce < expectedNonce && Date.now() < deadline) {
     await delay(VAULT_PUBLISH_NONCE_POLL_MS);
-    lastNonce = await readVaultPublishNonce(provider, owner);
+    lastNonce = await readVaultPublishNonce(provider, owner, options);
   }
   if (lastNonce !== null && lastNonce < expectedNonce) {
     throw new Error('Vault publish was not confirmed before sending the next capsule');

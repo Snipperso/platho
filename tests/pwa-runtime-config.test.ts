@@ -1320,7 +1320,8 @@ describe('PWA runtime config guard', () => {
     expect(helpers).toMatch(/function waitForPaymentCheckCancelConfirmation/);
     expect(helpers).toMatch(/function readFreshReceiveIntentForCancel/);
     expect(helpers).toMatch(/function readFreshConnectedVaultUserForCancel/);
-    expect(helpers).toMatch(/isTonRpcVerificationUnavailableError\(error\)/);
+    expect(helpers).toMatch(/isTonRpcVerificationUnsafeForCancelError\(error\)/);
+    expect(helpers).toMatch(/RPC_DISAGREEMENT/);
     expect(helpers).toMatch(/readFreshReceiveIntent\(provider, intentId, \{ verify: false \}\)/);
     expect(helpers).toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false \}\)/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
@@ -1331,6 +1332,8 @@ describe('PWA runtime config guard', () => {
     expect(submitIndex).toBeGreaterThan(assertIndex);
     expect(waitIndex).toBeGreaterThan(submitIndex);
     expect(flashIndex).toBeGreaterThan(waitIndex);
+    expect(cancelSource).toMatch(/allowPendingServiceWorkerUpdate:\s*true/);
+    expect(cancelSource).toMatch(/allowUnverifiedNonceWait:\s*true/);
     expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel submitted'\)/);
     expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel confirming'\)/);
     expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel signing'\)/);
@@ -1367,7 +1370,8 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(source).toMatch(/provider\.getUser\(owner,\s*\{/);
-    expect(source).toMatch(/verify:\s*true/);
+    expect(source).toMatch(/verify:\s*options\.verify !== false/);
+    expect(source).toMatch(/waitForVaultPublishNonce\(provider, owner, expectedNonce, options = \{\}\)/);
     expect(source).toMatch(/priority:\s*'critical'/);
     expect(source).toMatch(/cacheTtlMs:\s*0/);
   });
@@ -1892,11 +1896,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v333/);
+    expect(sw).toMatch(/platho-pwa-prototype-v334/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=271/);
+    expect(sw).toMatch(/\.\/app\.js\?v=272/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
