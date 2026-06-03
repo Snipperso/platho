@@ -1,4 +1,4 @@
-import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs?v=5';
+import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs?v=6';
 
 export class VaultChainProviderUnavailableError extends Error {
   constructor(message = 'Vault chain provider is not configured') {
@@ -48,6 +48,7 @@ function normalizeVaultUserView(user) {
   return {
     ...user,
     current_key_id: currentKeyId,
+    auth_pubkey: uintLikeToBigInt(field(user, 'auth_pubkey', 'authPubkey') ?? 0n, 'Vault user auth_pubkey'),
     publish_nonce: uintLikeToBigInt(field(user, 'publish_nonce', 'publishNonce') ?? 0n, 'Vault user publish_nonce'),
   };
 }

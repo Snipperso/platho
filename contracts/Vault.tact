@@ -172,6 +172,7 @@ message(0xF9A44834) WithdrawAth {
 message(0x52705EDA) RegisterMessagingKeys {
     enc_pubkey: Int as uint256;
     sign_pubkey: Int as uint256;
+    auth_pubkey: Int as uint256;
     pq_kem_pubkey_hash: Int as uint256;
     pq_kem_pubkey_len: Int as uint16;
     pq_kem_pubkey: Cell;
@@ -339,7 +340,7 @@ struct UserState {
     ton_balance: Int as uint128;
     ath_balance: Int as uint128;
     current_key_id: Int as uint256;
-    current_sign_pubkey: Int as uint256;
+    auth_pubkey: Int as uint256;
     publish_nonce: Int as uint64;
 }
 
@@ -378,6 +379,7 @@ struct VaultUserView {
     ton_balance: Int;
     ath_balance: Int;
     current_key_id: Int;
+    auth_pubkey: Int;
     publish_nonce: Int;
 }
 
@@ -513,7 +515,7 @@ contract Vault {
             ton_balance: 0,
             ath_balance: 0,
             current_key_id: 0,
-            current_sign_pubkey: 0,
+            auth_pubkey: 0,
             publish_nonce: 0
         };
     }
@@ -1412,6 +1414,8 @@ contract Vault {
     receive(msg: RegisterMessagingKeys) {
         self.requireSealed();
         self.validateKeyProfile(msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.pq_kem_pubkey, msg.crypto_suite_mask);
+        throwUnless(16118, msg.auth_pubkey != 0);
+        throwUnless(16119, msg.auth_pubkey != msg.sign_pubkey);
         let userExists: Bool = self.users.exists(sender());
         let required: Int = self.keyRecordStorageEndowment(msg.crypto_suite_mask);
         if (!userExists) {
@@ -1447,7 +1451,7 @@ contract Vault {
         });
         self.key_record_count += 1;
         user.current_key_id = keyId;
-        user.current_sign_pubkey = msg.sign_pubkey;
+        user.auth_pubkey = msg.auth_pubkey;
         self.users.set(sender(), user);
     }
 
@@ -1458,6 +1462,8 @@ contract Vault {
         throwUnless(16120, userOpt != null);
         let user: UserState = userOpt!!;
         throwUnless(16121, user.current_key_id != 0);
+        throwUnless(16128, user.auth_pubkey != 0);
+        throwUnless(16129, msg.sign_pubkey != user.auth_pubkey);
 
         let oldRecordOpt: KeyRecord? = self.key_records.get(user.current_key_id);
         throwUnless(16122, oldRecordOpt != null);
@@ -1494,7 +1500,6 @@ contract Vault {
         });
         self.key_record_count += 1;
         user.current_key_id = newKeyId;
-        user.current_sign_pubkey = msg.sign_pubkey;
         self.users.set(sender(), user);
     }
 
@@ -1505,8 +1510,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16214, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16221, user.current_sign_pubkey != 0);
-        throwUnless(16222, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16221, user.auth_pubkey != 0);
+        throwUnless(16222, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -1605,8 +1610,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16239, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16240, user.current_sign_pubkey != 0);
-        throwUnless(16241, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16240, user.auth_pubkey != 0);
+        throwUnless(16241, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -1683,8 +1688,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16252, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16253, user.current_sign_pubkey != 0);
-        throwUnless(16254, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16253, user.auth_pubkey != 0);
+        throwUnless(16254, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -1748,8 +1753,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16451, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16454, user.current_sign_pubkey != 0);
-        throwUnless(16457, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16454, user.auth_pubkey != 0);
+        throwUnless(16457, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -1912,8 +1917,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16481, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16484, user.current_sign_pubkey != 0);
-        throwUnless(16487, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16484, user.auth_pubkey != 0);
+        throwUnless(16487, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -2041,8 +2046,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16601, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16602, user.current_sign_pubkey != 0);
-        throwUnless(16604, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16602, user.auth_pubkey != 0);
+        throwUnless(16604, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -2159,8 +2164,8 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16701, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16702, user.current_sign_pubkey != 0);
-        throwUnless(16704, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+        throwUnless(16702, user.auth_pubkey != 0);
+        throwUnless(16704, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
         let signedDomain: Int = signedPayload.loadUint(32);
@@ -2371,6 +2376,7 @@ contract Vault {
                 ton_balance: 0,
                 ath_balance: 0,
                 current_key_id: 0,
+                auth_pubkey: 0,
                 publish_nonce: 0
             };
         }
@@ -2380,6 +2386,7 @@ contract Vault {
             ton_balance: user.ton_balance,
             ath_balance: user.ath_balance,
             current_key_id: user.current_key_id,
+            auth_pubkey: user.auth_pubkey,
             publish_nonce: user.publish_nonce
         };
     }

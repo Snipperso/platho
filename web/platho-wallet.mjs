@@ -12,8 +12,8 @@ import {
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-} from './crypto/platho-crypto.mjs?v=5';
-import { tonCell } from './pwa-contract-transactions.mjs?v=16';
+} from './crypto/platho-crypto.mjs?v=6';
+import { tonCell } from './pwa-contract-transactions.mjs?v=17';
 
 const {
   beginCell,
@@ -304,6 +304,15 @@ export async function importPlathoWallet(recoveryPhrase, options = {}) {
 export function exportPlathoWalletRecoveryPhrase(wallet) {
   if (!wallet?.seedText) throw new Error('Platho wallet is not loaded');
   return wallet.seedText;
+}
+
+export async function deriveVaultAuthKeyPairFromWallet(wallet) {
+  if (!wallet?.seed) throw new Error('Platho wallet is not loaded');
+  const secretKey = await hkdfBytes(wallet.seed, 'vault.auth.ed25519', ED25519_SECRET_KEY_BYTES);
+  return {
+    secretKey,
+    publicKey: ed25519.getPublicKey(secretKey),
+  };
 }
 
 export async function deriveMessagingIdentityFromWallet(wallet, suite) {

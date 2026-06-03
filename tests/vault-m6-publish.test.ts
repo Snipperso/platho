@@ -234,12 +234,17 @@ async function deployBounceVault() {
 }
 
 async function registerKeys(vault: any, user: any) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, 71));
   await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
-    ...hybridMessagingKeyFields(1n, BigInt('0x' + keyPair.publicKey.toString('hex'))),
+    ...hybridMessagingKeyFields(
+      1n,
+      BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+      BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+    ),
   } as RegisterMessagingKeys);
-  return keyPair;
+  return authKeyPair;
 }
 
 async function topUpVaultTon(vault: any, user: any, amount: bigint) {
@@ -267,7 +272,7 @@ async function publishPrivate(blockchain: Blockchain, vault: any, user: any, max
     await topUpVaultTon(vault, user, maxCharge * 2n);
     userState = await vault.getGetUser(user.address);
   }
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 71));
   await blockchain.sendMessage(external({
     to: vault.address,
     body: signedPrivatePublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey, {
@@ -283,7 +288,7 @@ async function publishPublic(blockchain: Blockchain, vault: any, user: any, maxC
     await topUpVaultTon(vault, user, maxCharge * 2n);
     userState = await vault.getGetUser(user.address);
   }
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+  const keyPair = keyPairFromSeed(Buffer.alloc(32, 71));
   await blockchain.sendMessage(external({
     to: vault.address,
     body: signedPublicPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey, {
@@ -404,6 +409,26 @@ describe('Vault milestone 6: Vault-balance publish orchestration', () => {
     expect(afterUser.ath_balance).toBe(beforeUser.ath_balance + AIRDROP_REWARD_PER_MESSAGE);
     expect(vg.airdrop_remaining_ath).toBe(AIRDROP_TOTAL - AIRDROP_REWARD_PER_MESSAGE);
     expect(vg.airdrop_distributed_ath).toBe(AIRDROP_REWARD_PER_MESSAGE);
+  });
+
+  it('VAULT-M6-01A: messaging signing key cannot authorize Vault-balance publish', async () => {
+    const { blockchain, vault, user } = await deployBoundPair();
+    await registerKeys(vault, user);
+    const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, 7));
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
+    await topUpVaultTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, messagingKeyPair.secretKey, {
+        vaultAddress: vault.address,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16457 });
+
+    const after = await vault.getGetUser(user.address);
+    expect(after.publish_nonce).toBe(before.publish_nonce);
+    expect(after.ton_balance).toBe(before.ton_balance);
   });
 
   it('VAULT-M6-01B: signed Vault-balance publish may include a PWA fee surcharge above canonical maxCharge', async () => {

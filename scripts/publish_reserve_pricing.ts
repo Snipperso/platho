@@ -297,18 +297,20 @@ async function setupBoundPair(label: string) {
 }
 
 async function registerKeys(vault: any, user: any, seedByte: number) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
   const pqKemPubkey = snakeCell(1184, 0x5a);
   await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: 1n,
-    sign_pubkey: BigInt('0x' + keyPair.publicKey.toString('hex')),
+    sign_pubkey: BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+    auth_pubkey: BigInt('0x' + authKeyPair.publicKey.toString('hex')),
     pq_kem_pubkey_hash: BigInt('0x' + pqKemPubkey.hash().toString('hex')),
     pq_kem_pubkey_len: 1184n,
     pq_kem_pubkey: pqKemPubkey,
     crypto_suite_mask: SUITE_HYBRID,
   } as RegisterMessagingKeys);
-  return keyPair;
+  return authKeyPair;
 }
 
 async function topUpVaultTon(vault: any, user: any, amount: bigint) {

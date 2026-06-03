@@ -93,7 +93,7 @@ PROGRAM{
   DECLPROC $Vault$_fun_isProfileRegistryBound
   DECLPROC $Vault$_fun_isUsernameRegistryBound
   DECLPROC $Vault$_fun_requireGenesisController
-  DECLPROC $UserState$_constructor_ton_balance_ath_balance_current_key_id_current_sign_pubkey_publish_nonce
+  DECLPROC $UserState$_constructor_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce
   DECLPROC $Vault$_fun_emptyUser
   DECLPROC $Vault$_fun_getUserOrEmpty
   DECLPROC $Vault$_fun_deriveAthWalletAddress
@@ -153,7 +153,7 @@ PROGRAM{
   DECLPROC $Vault$_fun_computeKeyId
   DECLPROC $Vault$_fun_computeReceiveIntentId
   DECLPROC $Vault$_fun_computeReceiveIntentCommitment
-  DECLPROC $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_publish_nonce
+  DECLPROC $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce
   DECLPROC $Vault$_fun_get_user
   DECLPROC $VaultKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt
   DECLPROC $Vault$_fun_get_key_record
@@ -1123,13 +1123,13 @@ PROGRAM{
     EQUAL
     THROWANYIFNOT
   }>
-  $UserState$_constructor_ton_balance_ath_balance_current_key_id_current_sign_pubkey_publish_nonce PROCINLINE:<{
+  $UserState$_constructor_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce PROCINLINE:<{
   }>
   $Vault$_fun_emptyUser PROCREF:<{
     0 PUSHINT
     s0 s0 s0 PUSH3
     DUP
-    $UserState$_constructor_ton_balance_ath_balance_current_key_id_current_sign_pubkey_publish_nonce INLINECALLDICT
+    $UserState$_constructor_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce INLINECALLDICT
   }>
   $Vault$_fun_getUserOrEmpty PROCREF:<{
     267 PUSHINT
@@ -3431,7 +3431,7 @@ PROGRAM{
         ENDC
         HASHCU
   }>
-  $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_publish_nonce PROCINLINE:<{
+  $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce PROCINLINE:<{
   }>
   $Vault$_fun_get_user PROCREF:<{
     267 PUSHINT
@@ -3446,13 +3446,13 @@ PROGRAM{
       FALSE
       0 PUSHINT
       s0 s0 s0 PUSH3
-      $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_publish_nonce INLINECALLDICT
+      DUP
+      $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce INLINECALLDICT
     }>
     $UserState$_not_null INLINECALLDICT
-    NIP
     TRUE
-    4 -ROLL
-    $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_publish_nonce INLINECALLDICT
+    5 -ROLL
+    $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce INLINECALLDICT
   }>
   $VaultKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt PROCINLINE:<{
   }>
@@ -3782,8 +3782,8 @@ PROGRAM{
     s15 16 s() XCHG
     15 ROLL
     $Vault$_fun_get_user INLINECALLDICT
-    15 5 BLKDROP2
-    8 5 BLKDROP2
+    12 6 BLKDROP2
+    11 6 BLKDROP2
     $VaultUserView$_to_external INLINECALLDICT
   }>
   %get_key_record PROC:<{
@@ -6624,41 +6624,54 @@ PROGRAM{
       256 LDU
       256 LDU
       256 LDU
+      LDREF
+      DROP
+      CTOS
+      256 LDU
       16 LDU
       LDREF
       16 LDU
       DROP
-      22 s() 26 s() XCHG
-      21 s() 25 s() XCHG
-      20 s() 24 s() XCHG
-      19 s() 23 s() XCHG
-      18 s() 26 s() XCHG
-      17 s() 25 s() XCHG
-      16 s() 24 s() XCHG
-      s15 23 s() XCHG
-      s14 26 s() XCHG
-      s13 25 s() XCHG
-      s12 24 s() XCHG
-      s11 23 s() XCHG
-      s10 26 s() XCHG
-      s9 25 s() XCHG
-      s8 24 s() XCHG
-      s7 23 s() XCHG
+      22 s() 27 s() XCHG
+      21 s() 26 s() XCHG
+      20 s() 25 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 23 s() XCHG
+      17 s() 27 s() XCHG
+      16 s() 26 s() XCHG
+      s15 25 s() XCHG
+      s14 24 s() XCHG
+      s13 23 s() XCHG
+      s12 27 s() XCHG
+      s11 26 s() XCHG
+      s10 25 s() XCHG
+      s9 24 s() XCHG
+      s8 23 s() XCHG
+      s7 27 s() XCHG
       s6 26 s() XCHG
       s5 25 s() XCHG
       s4 24 s() XCHG
       s3 23 s() XCHG
-      s2 26 s() XCHG
-      s1 27 s() XCHG
-      s0 28 s() XCHG
+      s2 27 s() XCHG
+      s1 28 s() XCHG
+      s0 29 s() XCHG
       $Vault$_fun_requireSealed INLINECALLDICT
+      26 s() PUSH
+      26 s() PUSH
       25 s() PUSH
-      25 s() PUSH
-      25 s() PUSH
-      29 s() PUSH
-      31 s() PUSH
-      33 s() PUSH
+      30 s() PUSH
+      32 s() PUSH
+      34 s() PUSH
       $Vault$_fun_validateKeyProfile INLINECALLDICT
+      16118 PUSHINT
+      25 s() PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      16119 PUSHINT
+      25 s() PUSH
+      27 s() PUSH
+      NEQ
+      THROWANYIFNOT
       267 PUSHINT
       __tact_context_get_sender INLINECALLDICT
       s15 PUSH
@@ -6683,7 +6696,7 @@ PROGRAM{
       s0 s7 XCHG
       s0 s6 XCHG
       5 -ROLL
-      29 s() PUSH
+      30 s() PUSH
       $Vault$_fun_keyRecordStorageEndowment INLINECALLDICT
       24 s() PUSH
       IFNOT:<{
@@ -6732,11 +6745,11 @@ PROGRAM{
       s2 26 s() XCHG
       s1 25 s() XCHG
       25 s() PUSH
+      33 s() PUSH
+      33 s() PUSH
       32 s() PUSH
-      32 s() PUSH
-      32 s() PUSH
-      36 s() PUSH
-      39 s() PUSH
+      37 s() PUSH
+      40 s() PUSH
       $Vault$_fun_computeKeyId INLINECALLDICT
       16112 PUSHINT
       s14 PUSH
@@ -6757,59 +6770,53 @@ PROGRAM{
           LTIME
       28 s() PUSH
       DUP
-      s4 s10 XCHG
-      s9 30 s() XCHG
+      s4 s11 XCHG
+      s10 30 s() XCHG
+      s9 37 s() XCHG
       s8 36 s() XCHG
-      35 s() PUSH
-      s0 s8 XCHG
-      s7 35 s() XCHG
+      s7 34 s() XCHG
       s6 38 s() XCHG
       s5 39 s() XCHG
-      s0 40 s() XCHG
-      4 -ROLL
+      s4 40 s() XCHG
       $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
       NEWC
       $KeyRecord$_store_cell INLINECALLDICT
-      s2 s8 XCHG
-      s1 27 s() XCHG
-      23 s() PUSH
+      s2 s7 XCHG
+      s1 28 s() XCHG
+      22 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 26 s() XCHG
+      s0 17 s() XCHG
       INC
       267 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s4 19 s() XCHG
-      s3 22 s() XCHG
-      s2 23 s() XCHG
-      s1 25 s() XCHG
-      s0 21 s() XCHG
+      s4 18 s() XCHG
+      s3 21 s() XCHG
+      s2 22 s() XCHG
+      s1 24 s() XCHG
+      s0 20 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s3 s5 XCHG
-      s2 21 s() XCHG
-      s1 17 s() XCHG
+      s3 s4 XCHG
+      s2 20 s() XCHG
+      s1 16 s() XCHG
       __tact_dict_set_slice_cell INLINECALLDICT
-      s11 22 s() XCHG
-      s10 21 s() XCHG
-      s9 20 s() XCHG
-      s8 19 s() XCHG
-      s7 18 s() XCHG
-      s6 17 s() XCHG
-      s5 16 s() XCHG
-      s4 s15 XCHG
-      s3 s14 XCHG
-      s0 s13 XCHG
-      s10 s12 XCHG
-      s2 s11 XCHG
-      s7 s10 XCHG
-      s3 s9 XCHG
-      s7 s8 XCHG
-      s4 s7 XCHG
-      s0 s3 XCHG
-      s0 s5 XCHG
-      s4 s4 s4 XCHG3
-      s0 s6 XCHG
+      s10 22 s() XCHG
+      s9 21 s() XCHG
+      s8 20 s() XCHG
+      s7 19 s() XCHG
+      s6 18 s() XCHG
+      s5 17 s() XCHG
+      s4 16 s() XCHG
+      s3 s15 XCHG
+      s14 s1 s13 XCHG3
+      s5 s11 XCHG
+      s0 s10 XCHG
+      s5 s9 XCHG
+      s8 s1 s5 XCHG3
+      s6 s7 s6 XCHG3
+      s1 s3 XCHG
+      s1 s4 XCHG
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
@@ -6868,14 +6875,22 @@ PROGRAM{
       NOT
       THROWANYIFNOT
       $UserState$_not_null INLINECALLDICT
-      NIP
       16121 PUSHINT
+      s3 PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      16128 PUSHINT
       s2 PUSH
       0 NEQINT
       THROWANYIFNOT
-      16 s() PUSH
-      257 PUSHINT
+      16129 PUSHINT
+      30 s() PUSH
       s3 PUSH
+      NEQ
+      THROWANYIFNOT
+      17 s() PUSH
+      257 PUSHINT
+      s4 PUSH
       __tact_dict_get_int_cell INLINECALLDICT
       $KeyRecord$_load_opt INLINECALLDICT
       16122 PUSHINT
@@ -6899,30 +6914,30 @@ PROGRAM{
       32 PUSHPOW2DEC
       LESS
       THROWANYIFNOT
-      22 s() 36 s() XCHG
-      21 s() 35 s() XCHG
-      20 s() 34 s() XCHG
-      19 s() 33 s() XCHG
-      18 s() 32 s() XCHG
-      17 s() 31 s() XCHG
-      16 s() 30 s() XCHG
-      s15 29 s() XCHG
-      s14 28 s() XCHG
-      s13 27 s() XCHG
-      s12 26 s() XCHG
-      s11 25 s() XCHG
-      s10 24 s() XCHG
-      s9 23 s() XCHG
-      s8 36 s() XCHG
-      s7 35 s() XCHG
-      s6 34 s() XCHG
-      s5 33 s() XCHG
-      s4 32 s() XCHG
-      s3 31 s() XCHG
-      s2 30 s() XCHG
-      s1 29 s() XCHG
-      s0 28 s() XCHG
-      42 s() PUSH
+      22 s() 37 s() XCHG
+      21 s() 36 s() XCHG
+      20 s() 35 s() XCHG
+      19 s() 34 s() XCHG
+      18 s() 33 s() XCHG
+      17 s() 32 s() XCHG
+      16 s() 31 s() XCHG
+      s15 30 s() XCHG
+      s14 29 s() XCHG
+      s13 28 s() XCHG
+      s12 27 s() XCHG
+      s11 26 s() XCHG
+      s10 25 s() XCHG
+      s9 24 s() XCHG
+      s8 23 s() XCHG
+      s7 37 s() XCHG
+      s6 36 s() XCHG
+      s5 35 s() XCHG
+      s4 34 s() XCHG
+      s3 33 s() XCHG
+      s2 32 s() XCHG
+      s1 31 s() XCHG
+      s0 30 s() XCHG
+      43 s() PUSH
       $Vault$_fun_keyRecordStorageEndowment INLINECALLDICT
       2000000 PUSHINT
       ADD
@@ -6934,28 +6949,28 @@ PROGRAM{
       THROWANYIFNOT
           NOW
           LTIME
-      s9 25 s() XCHG
+      s9 26 s() XCHG
       257 PUSHINT
       NEWC
-      40 s() PUSH
+      27 s() PUSH
       s0 s11 XCHG
-      s10 40 s() XCHG
-      s9 39 s() XCHG
-      s8 38 s() XCHG
-      s7 37 s() XCHG
-      s6 36 s() XCHG
-      s5 35 s() XCHG
-      s4 34 s() XCHG
-      s3 33 s() XCHG
-      s2 34 s() XCHG
-      s0 33 s() XCHG
+      s10 42 s() XCHG
+      s9 41 s() XCHG
+      s8 40 s() XCHG
+      s7 39 s() XCHG
+      s6 38 s() XCHG
+      s5 37 s() XCHG
+      s4 36 s() XCHG
+      s3 35 s() XCHG
+      s2 36 s() XCHG
+      s0 35 s() XCHG
       SWAP
       $KeyRecord$_store_cell INLINECALLDICT
       s3 s5 XCHG
-      s2 22 s() XCHG
-      s1 18 s() XCHG
+      s2 24 s() XCHG
+      s1 20 s() XCHG
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 26 s() XCHG
+      s0 s13 XCHG
       INC
       __tact_context_get_sender INLINECALLDICT
       s13 23 s() XCHG
@@ -6968,23 +6983,25 @@ PROGRAM{
       s6 16 s() XCHG
       s5 s15 XCHG
       s4 s14 XCHG
-      s13 27 s() XCHG
+      s4 s13 XCHG
       s2 s12 XCHG
       s3 s11 XCHG
-      s6 s9 XCHG
-      s4 s8 XCHG
-      s6 s7 XCHG
-      s6 26 s() XCHG
-      s5 25 s() XCHG
-      s4 24 s() XCHG
-      s3 27 s() XCHG
-      s1 27 s() XCHG
-      27 s() PUSH
-      31 s() PUSH
-      31 s() PUSH
-      31 s() PUSH
-      35 s() PUSH
-      38 s() PUSH
+      s2 s10 XCHG
+      s8 s9 XCHG
+      s5 s8 XCHG
+      s3 s7 XCHG
+      s6 28 s() XCHG
+      s5 27 s() XCHG
+      s4 26 s() XCHG
+      s3 25 s() XCHG
+      s2 24 s() XCHG
+      s1 26 s() XCHG
+      26 s() PUSH
+      32 s() PUSH
+      32 s() PUSH
+      32 s() PUSH
+      36 s() PUSH
+      39 s() PUSH
       $Vault$_fun_computeKeyId INLINECALLDICT
       16127 PUSHINT
       s14 PUSH
@@ -6999,58 +7016,55 @@ PROGRAM{
           LTIME
       0 PUSHINT
       DUP
-      s4 s10 XCHG
-      s9 33 s() XCHG
+      s4 s11 XCHG
+      s10 32 s() XCHG
+      s9 37 s() XCHG
       s8 36 s() XCHG
-      35 s() PUSH
-      s0 s8 XCHG
       s7 35 s() XCHG
       s6 38 s() XCHG
       s5 39 s() XCHG
-      s0 40 s() XCHG
-      4 -ROLL
+      s4 40 s() XCHG
       $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
       NEWC
       $KeyRecord$_store_cell INLINECALLDICT
-      s2 s9 XCHG
-      s1 27 s() XCHG
-      24 s() PUSH
+      s2 s8 XCHG
+      s1 28 s() XCHG
+      27 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 25 s() XCHG
+      s0 27 s() XCHG
       INC
       267 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s4 20 s() XCHG
+      s4 19 s() XCHG
       s3 22 s() XCHG
-      s2 24 s() XCHG
-      s1 25 s() XCHG
-      s0 21 s() XCHG
+      s2 27 s() XCHG
+      s1 20 s() XCHG
+      s0 23 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s3 s6 XCHG
-      s2 21 s() XCHG
-      s1 17 s() XCHG
+      s3 s5 XCHG
+      s2 16 s() XCHG
+      s1 19 s() XCHG
       __tact_dict_set_slice_cell INLINECALLDICT
-      s12 22 s() XCHG
-      s11 21 s() XCHG
-      s10 20 s() XCHG
-      s9 19 s() XCHG
-      s8 18 s() XCHG
-      s7 17 s() XCHG
-      s6 16 s() XCHG
-      s5 s15 XCHG
-      s4 s14 XCHG
+      s11 22 s() XCHG
+      s10 21 s() XCHG
+      s9 20 s() XCHG
+      s8 19 s() XCHG
+      s7 18 s() XCHG
+      s6 17 s() XCHG
+      s5 16 s() XCHG
+      s4 s15 XCHG
+      s3 s14 XCHG
       s0 s13 XCHG
-      s10 s12 XCHG
-      s1 s11 XCHG
-      s3 s10 XCHG
-      s8 s9 XCHG
-      s4 s8 XCHG
-      s0 s7 XCHG
-      s5 s6 XCHG
-      s5 s4 s4 XCHG3
-      s0 s3 XCHG
+      s11 s12 XCHG
+      s11 s1 s10 XCHG3
+      s5 s9 XCHG
+      s2 s8 XCHG
+      s4 s7 XCHG
+      s0 s5 XCHG
+      s4 s4 XCHG2
+      s0 s6 XCHG
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER

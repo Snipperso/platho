@@ -62,12 +62,17 @@ async function deposit(vault: any, user: any, amount: bigint) {
 }
 
 async function registerKeys(vault: any, user: any, seedByte: number) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
   await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
-    ...hybridMessagingKeyFields(1n, BigInt('0x' + keyPair.publicKey.toString('hex'))),
+    ...hybridMessagingKeyFields(
+      1n,
+      BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+      BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+    ),
   } as RegisterMessagingKeys);
-  return keyPair;
+  return authKeyPair;
 }
 
 function signedReceiveIntentBody(

@@ -3216,6 +3216,7 @@ export type RegisterMessagingKeys = {
     $$type: 'RegisterMessagingKeys';
     enc_pubkey: bigint;
     sign_pubkey: bigint;
+    auth_pubkey: bigint;
     pq_kem_pubkey_hash: bigint;
     pq_kem_pubkey_len: bigint;
     pq_kem_pubkey: Cell;
@@ -3228,10 +3229,13 @@ export function storeRegisterMessagingKeys(src: RegisterMessagingKeys) {
         b_0.storeUint(1383096026, 32);
         b_0.storeUint(src.enc_pubkey, 256);
         b_0.storeUint(src.sign_pubkey, 256);
-        b_0.storeUint(src.pq_kem_pubkey_hash, 256);
-        b_0.storeUint(src.pq_kem_pubkey_len, 16);
-        b_0.storeRef(src.pq_kem_pubkey);
-        b_0.storeUint(src.crypto_suite_mask, 16);
+        b_0.storeUint(src.auth_pubkey, 256);
+        const b_1 = new Builder();
+        b_1.storeUint(src.pq_kem_pubkey_hash, 256);
+        b_1.storeUint(src.pq_kem_pubkey_len, 16);
+        b_1.storeRef(src.pq_kem_pubkey);
+        b_1.storeUint(src.crypto_suite_mask, 16);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
@@ -3240,37 +3244,42 @@ export function loadRegisterMessagingKeys(slice: Slice) {
     if (sc_0.loadUint(32) !== 1383096026) { throw Error('Invalid prefix'); }
     const _enc_pubkey = sc_0.loadUintBig(256);
     const _sign_pubkey = sc_0.loadUintBig(256);
-    const _pq_kem_pubkey_hash = sc_0.loadUintBig(256);
-    const _pq_kem_pubkey_len = sc_0.loadUintBig(16);
-    const _pq_kem_pubkey = sc_0.loadRef();
-    const _crypto_suite_mask = sc_0.loadUintBig(16);
-    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+    const _auth_pubkey = sc_0.loadUintBig(256);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _pq_kem_pubkey_hash = sc_1.loadUintBig(256);
+    const _pq_kem_pubkey_len = sc_1.loadUintBig(16);
+    const _pq_kem_pubkey = sc_1.loadRef();
+    const _crypto_suite_mask = sc_1.loadUintBig(16);
+    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, auth_pubkey: _auth_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function loadTupleRegisterMessagingKeys(source: TupleReader) {
     const _enc_pubkey = source.readBigNumber();
     const _sign_pubkey = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
     const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, auth_pubkey: _auth_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function loadGetterTupleRegisterMessagingKeys(source: TupleReader) {
     const _enc_pubkey = source.readBigNumber();
     const _sign_pubkey = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
     const _pq_kem_pubkey_hash = source.readBigNumber();
     const _pq_kem_pubkey_len = source.readBigNumber();
     const _pq_kem_pubkey = source.readCell();
     const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+    return { $$type: 'RegisterMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, auth_pubkey: _auth_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
 }
 
 export function storeTupleRegisterMessagingKeys(source: RegisterMessagingKeys) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.enc_pubkey);
     builder.writeNumber(source.sign_pubkey);
+    builder.writeNumber(source.auth_pubkey);
     builder.writeNumber(source.pq_kem_pubkey_hash);
     builder.writeNumber(source.pq_kem_pubkey_len);
     builder.writeCell(source.pq_kem_pubkey);
@@ -4699,7 +4708,7 @@ export type UserState = {
     ton_balance: bigint;
     ath_balance: bigint;
     current_key_id: bigint;
-    current_sign_pubkey: bigint;
+    auth_pubkey: bigint;
     publish_nonce: bigint;
 }
 
@@ -4709,7 +4718,7 @@ export function storeUserState(src: UserState) {
         b_0.storeUint(src.ton_balance, 128);
         b_0.storeUint(src.ath_balance, 128);
         b_0.storeUint(src.current_key_id, 256);
-        b_0.storeUint(src.current_sign_pubkey, 256);
+        b_0.storeUint(src.auth_pubkey, 256);
         b_0.storeUint(src.publish_nonce, 64);
     };
 }
@@ -4719,27 +4728,27 @@ export function loadUserState(slice: Slice) {
     const _ton_balance = sc_0.loadUintBig(128);
     const _ath_balance = sc_0.loadUintBig(128);
     const _current_key_id = sc_0.loadUintBig(256);
-    const _current_sign_pubkey = sc_0.loadUintBig(256);
+    const _auth_pubkey = sc_0.loadUintBig(256);
     const _publish_nonce = sc_0.loadUintBig(64);
-    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, current_sign_pubkey: _current_sign_pubkey, publish_nonce: _publish_nonce };
+    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
 }
 
 export function loadTupleUserState(source: TupleReader) {
     const _ton_balance = source.readBigNumber();
     const _ath_balance = source.readBigNumber();
     const _current_key_id = source.readBigNumber();
-    const _current_sign_pubkey = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
     const _publish_nonce = source.readBigNumber();
-    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, current_sign_pubkey: _current_sign_pubkey, publish_nonce: _publish_nonce };
+    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
 }
 
 export function loadGetterTupleUserState(source: TupleReader) {
     const _ton_balance = source.readBigNumber();
     const _ath_balance = source.readBigNumber();
     const _current_key_id = source.readBigNumber();
-    const _current_sign_pubkey = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
     const _publish_nonce = source.readBigNumber();
-    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, current_sign_pubkey: _current_sign_pubkey, publish_nonce: _publish_nonce };
+    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
 }
 
 export function storeTupleUserState(source: UserState) {
@@ -4747,7 +4756,7 @@ export function storeTupleUserState(source: UserState) {
     builder.writeNumber(source.ton_balance);
     builder.writeNumber(source.ath_balance);
     builder.writeNumber(source.current_key_id);
-    builder.writeNumber(source.current_sign_pubkey);
+    builder.writeNumber(source.auth_pubkey);
     builder.writeNumber(source.publish_nonce);
     return builder.build();
 }
@@ -5000,6 +5009,7 @@ export type VaultUserView = {
     ton_balance: bigint;
     ath_balance: bigint;
     current_key_id: bigint;
+    auth_pubkey: bigint;
     publish_nonce: bigint;
 }
 
@@ -5011,6 +5021,7 @@ export function storeVaultUserView(src: VaultUserView) {
         b_0.storeInt(src.ath_balance, 257);
         b_0.storeInt(src.current_key_id, 257);
         const b_1 = new Builder();
+        b_1.storeInt(src.auth_pubkey, 257);
         b_1.storeInt(src.publish_nonce, 257);
         b_0.storeRef(b_1.endCell());
     };
@@ -5023,8 +5034,9 @@ export function loadVaultUserView(slice: Slice) {
     const _ath_balance = sc_0.loadIntBig(257);
     const _current_key_id = sc_0.loadIntBig(257);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _auth_pubkey = sc_1.loadIntBig(257);
     const _publish_nonce = sc_1.loadIntBig(257);
-    return { $$type: 'VaultUserView' as const, exists: _exists, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, publish_nonce: _publish_nonce };
+    return { $$type: 'VaultUserView' as const, exists: _exists, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
 }
 
 export function loadTupleVaultUserView(source: TupleReader) {
@@ -5032,8 +5044,9 @@ export function loadTupleVaultUserView(source: TupleReader) {
     const _ton_balance = source.readBigNumber();
     const _ath_balance = source.readBigNumber();
     const _current_key_id = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
     const _publish_nonce = source.readBigNumber();
-    return { $$type: 'VaultUserView' as const, exists: _exists, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, publish_nonce: _publish_nonce };
+    return { $$type: 'VaultUserView' as const, exists: _exists, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
 }
 
 export function loadGetterTupleVaultUserView(source: TupleReader) {
@@ -5041,8 +5054,9 @@ export function loadGetterTupleVaultUserView(source: TupleReader) {
     const _ton_balance = source.readBigNumber();
     const _ath_balance = source.readBigNumber();
     const _current_key_id = source.readBigNumber();
+    const _auth_pubkey = source.readBigNumber();
     const _publish_nonce = source.readBigNumber();
-    return { $$type: 'VaultUserView' as const, exists: _exists, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, publish_nonce: _publish_nonce };
+    return { $$type: 'VaultUserView' as const, exists: _exists, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
 }
 
 export function storeTupleVaultUserView(source: VaultUserView) {
@@ -5051,6 +5065,7 @@ export function storeTupleVaultUserView(source: VaultUserView) {
     builder.writeNumber(source.ton_balance);
     builder.writeNumber(source.ath_balance);
     builder.writeNumber(source.current_key_id);
+    builder.writeNumber(source.auth_pubkey);
     builder.writeNumber(source.publish_nonce);
     return builder.build();
 }
@@ -5683,7 +5698,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"DepositTon","header":716160408,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"WithdrawTon","header":1212947826,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"WithdrawAth","header":4188293172,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}}]},
-    {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"CreateReceiveIntent","header":2115981365,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"ClaimReceiveIntent","header":2115981366,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
@@ -5704,10 +5719,10 @@ const ATHWallet_types: ABIType[] = [
     {"name":"PendingUsernameMintPayment","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"settlement_reserve_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"current_sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"publish_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"publish_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"settlement_reserve_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultKeyRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"VaultUserView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"ton_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publish_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"VaultUserView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"ton_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"auth_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publish_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultPendingAthWithdrawalView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"capsule_hub_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"profile_registry_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"username_registry_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"user_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"key_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"receive_intent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_ath_withdrawal_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_publish_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_profile_avatar_payment_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_username_mint_payment_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"processed_ath_deposit_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_publish_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_remaining_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_distributed_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_reward_per_message_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_total_allocation_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"Vault$Data","header":null,"fields":[{"name":"vault_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"binding_flags","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"users","type":{"kind":"dict","key":"address","value":"UserState","valueFormat":"ref"}},{"name":"key_records","type":{"kind":"dict","key":"int","value":"KeyRecord","valueFormat":"ref"}},{"name":"receive_intents","type":{"kind":"dict","key":"int","value":"ReceiveIntent","valueFormat":"ref"}},{"name":"processed_ath_deposits","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_ath_withdrawals","type":{"kind":"dict","key":"int","value":"PendingAthWithdrawal","valueFormat":"ref"}},{"name":"pending_publishes","type":{"kind":"dict","key":"int","value":"PendingPublish","valueFormat":"ref"}},{"name":"pending_profile_avatar_payments","type":{"kind":"dict","key":"int","value":"PendingProfileAvatarPayment","valueFormat":"ref"}},{"name":"pending_username_mint_payments","type":{"kind":"dict","key":"int","value":"PendingUsernameMintPayment","valueFormat":"ref"}},{"name":"user_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"key_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"receive_intent_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"processed_ath_deposit_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_ath_withdrawal_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_publish_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},

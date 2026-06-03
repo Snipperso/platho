@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=5';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=18';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=19';
 
 export class AthTonRpcProviderError extends Error {
   constructor(message) {
