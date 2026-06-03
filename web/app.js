@@ -9104,7 +9104,7 @@ function paymentCheckClaimBlockedStatus(error) {
   if (/already claimed|cancelled|does not exist|not found/i.test(text)) return 'check already claimed or cancelled';
   if (/another wallet|recipient/i.test(text)) return 'check is for another wallet';
   if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
-  return 'check claim blocked';
+  return `check claim blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
 
 function paymentCheckCancelPendingError(message = 'Payment check cancel submitted; Vault confirmation is still pending') {
@@ -9239,8 +9239,8 @@ async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUse
   let lastUser = beforeUser;
   while (Date.now() <= deadline) {
     try {
-      lastIntent = await readFreshReceiveIntent(provider, intentId);
-      lastUser = await readFreshConnectedVaultUser(provider);
+      lastIntent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
+      lastUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
       const balance = paymentAssetVaultBalance(lastUser, asset);
       if (lastIntent?.exists === false && balance >= expectedBalance) {
         rememberConnectedVaultUser(lastUser);
@@ -10838,15 +10838,20 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
     throw new Error('Vault provider cannot confirm payment checks');
   }
   const intentId = paymentIntentId(payment);
-  const beforeUser = await readFreshConnectedVaultUser(provider);
-  const intent = await readFreshReceiveIntent(provider, intentId);
+  const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
+  const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
   assertReceiveIntentMatchesPayment(intent, payment);
   setText(identitySubtitle, 'claim signing');
   await options.onStatus?.('check claim signing');
   const result = await submitVaultReceiveIntentExternal('ClaimReceiveIntent', {
     intent_id: intentId,
     secret32: paymentSecret32(payment),
-  }, { provider, user: beforeUser });
+  }, {
+    provider,
+    user: beforeUser,
+    allowPendingServiceWorkerUpdate: true,
+    allowUnverifiedNonceWait: true,
+  });
   setText(identitySubtitle, 'claim confirming');
   await options.onStatus?.('check claim submitted, confirming');
   const confirmed = await waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser);
