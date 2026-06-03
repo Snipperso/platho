@@ -361,10 +361,9 @@ An accepted mint goes through pending state and deploys `UsernameNFTItem`. Befor
 50% -> burn_due_ath
 ```
 
-A rejected mint creates refund due for direct username payments when the registry can reject the notification before
-creating a pending item deployment: invalid usernames, wrong price, or duplicate name. For Vault-funded mints, these
-rejections bounce back through the Vault ATH wallet so the user's internal Vault ATH can be restored instead of creating
-an external refund bucket.
+Current V1 username mint is Vault-funded. Invalid username, wrong price, or duplicate-name rejections bounce through the
+official ATH wallet notification path so Vault can restore the user's internal ATH. UsernameRegistry does not maintain a
+direct external username refund bucket in the current Vault-funded flow.
 
 ATH from username mint becomes protocol revenue only after deployment of the corresponding item is confirmed.
 
