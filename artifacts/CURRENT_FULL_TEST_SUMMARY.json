@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T14:30:09.6462243Z",
+  "generated_after_local_run": "2026-06-03T14:37:20.0810293Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
   "failed_test_files": 0,
-  "total_tests": 741,
-  "passed_tests": 741,
+  "total_tests": 742,
+  "passed_tests": 742,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -62,6 +62,7 @@
     "It also includes the Vault-only product action hardening: username mint, profile avatar, and payment-check claim product flows no longer expose direct user wallet transaction paths; ATHWallet now accepts only Vault-funded registry notifications for these product actions, UsernameRegistry/ProfileRegistry removed direct user-wallet receivers, and the PWA removed direct username refund wallet UI/builders.",
     "It also includes the Larisa Section 1 Vault signed-external value-flow fix: receive-intent create/claim/cancel, profile avatar, username mint, and messaging-key replacement no longer let signed malformed or underfunded requests drain raw Vault TON without either pre-accept rejection or an explicit local-reserve charge to the user's Vault ledger; related PWA builders, tests, Vault code hash, manifest hash, pricing report, conformance, artifact integrity, and static deploy prep artifacts were refreshed.",
     "It also includes the Larisa Section 3/4 cleanup pass: the ATH PWA RPC provider now decodes ATHWallet get_pending_notification with the current five-field getter shape including response_destination, stale four-field fixtures are rejected, and M20U buyback readiness artifacts now consistently show M20T complete while production remains blocked only by missing M20F mainnet route-freeze evidence.",
-    "It also includes the Larisa Section 5 cleanup pass: the PWA contract interface matrix no longer claims removed direct user-wallet username mint, profile avatar payment, or username refund-flush product actions are implemented; matrix guards now pin the current Vault-only product flow, and blocked production static deploy prep cleans stale output so old runtime builders cannot remain in the audit archive."
+    "It also includes the Larisa Section 5 cleanup pass: the PWA contract interface matrix no longer claims removed direct user-wallet username mint, profile avatar payment, or username refund-flush product actions are implemented; matrix guards now pin the current Vault-only product flow, and blocked production static deploy prep cleans stale output so old runtime builders cannot remain in the audit archive.",
+    "It also includes the Larisa Section 6 username PWA cleanup pass: resolveUsernameRegistryProvider no longer requires deleted refund-due getters, the default username RPC provider is pinned to the current price/name-record/item/global/official-wallet interface, and the interface matrix no longer documents deleted UsernameRegistry refund due/flush getters."
   ]
 }

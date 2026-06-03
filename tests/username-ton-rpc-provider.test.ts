@@ -37,6 +37,21 @@ function cell(value = 'te6ccgEBAQEAAgAAAA==') {
 }
 
 describe('Username TON RPC providers', () => {
+  it('USERNAME-RPC-00: default registry provider exposes the current PWA interface only', () => {
+    const provider: any = createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: REGISTRY, transport: { async runGetMethod() { return { stack: [] }; } } });
+
+    expect(provider.getUsernamePrice).toBeTypeOf('function');
+    expect(provider.getNameRecordByUsername).toBeTypeOf('function');
+    expect(provider.getNameRecord).toBeTypeOf('function');
+    expect(provider.getUsernameItemAddress).toBeTypeOf('function');
+    expect(provider.getGlobal).toBeTypeOf('function');
+    expect(provider.getAthWalletAddress).toBeTypeOf('function');
+    expect(provider.getPendingMint).toBeTypeOf('function');
+    expect(provider.getRefundDue).toBeUndefined();
+    expect(provider.getRefundFlushId).toBeUndefined();
+    expect(provider.getPendingRefundFlushFor).toBeUndefined();
+  });
+
   it('USERNAME-RPC-01: computes the on-chain username hash domain exactly', async () => {
     const username = 'platho';
     const expected = BigInt(`0x${beginCell()

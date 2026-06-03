@@ -71,8 +71,7 @@ These are normal user flows. They should be implemented in the PWA, with tests, 
 | Username record | `UsernameRegistry` | `get_name_record(name_hash)` | Implemented | Resolve authoritative item address for `.ath` name. |
 | Username item address | `UsernameRegistry` | `get_username_item_address(name_hash)` | Implemented | Derive item address from name hash. |
 | Username pending mint | `UsernameRegistry` | `get_pending_mint(name_hash)` | Implemented | Mint pending UI. |
-| Username refund due | `UsernameRegistry` | `get_refund_due(owner_wallet)` | Implemented | Show/flush refund due. |
-| Username refund flush | `UsernameRegistry` | `get_refund_flush_id`, `get_pending_refund_flush_for` | Implemented | Refund tracking. |
+| Username pending mint | `UsernameRegistry` | `get_pending_mint(name_hash)` | Implemented | Mint pending/recovery UI; stale pending mints are non-destructive and do not create registry refund due. |
 | Username global | `UsernameRegistry` | `get_global()` | Implemented | Registry route, prices, due/status dashboard. |
 | Username NFT item | `UsernameNFTItem` | `get_state()`, `get_nft_data()`, `NftTransfer` | Implemented/optional | Current owner is the item owner, provided the registry points to that exact item. |
 | Profile avatar current | `ProfileRegistry` | `get_avatar(owner_wallet)` | Implemented | Current wallet avatar pointer. |

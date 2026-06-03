@@ -996,8 +996,13 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
 
     expect(app).not.toMatch(/async function submitUsernameRefundFlush/);
+    expect(app).not.toMatch(/getRefundDue/);
     expect(matrix).not.toMatch(/ATHTransferRequestMintUsername/);
     expect(matrix).not.toMatch(/ATHTransferRequestProfileAvatar/);
+    expect(matrix).not.toMatch(/FlushAthRefundDue/);
+    expect(matrix).not.toMatch(/get_refund_due/);
+    expect(matrix).not.toMatch(/get_refund_flush_id/);
+    expect(matrix).not.toMatch(/get_pending_refund_flush_for/);
     expect(matrix).not.toMatch(/\|\s*Flush username refund\s*\|[\s\S]*\|\s*Implemented\s*\|/);
     expect(matrix).toContain('Direct user-wallet username mint, profile avatar payment, and username refund-flush product actions are intentionally unsupported');
     expect(matrix).toMatch(/\|\s*Mint username from Vault balance\s*\|\s*`Vault`\s*\|/);
