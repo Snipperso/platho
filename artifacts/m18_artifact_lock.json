@@ -166,7 +166,7 @@
     "tests\\publish-reserve-pricing-artifact.test.ts": "2b6fb416ad15c6833d24ddbcc284b752eb8f740a774df8b7c6596b24e2185e9b",
     "tests\\pwa-chain-self-sufficiency.test.ts": "2a379270fbacb532e94f06e3a3c55a276e63b376fd552350409178d54e62b6f7",
     "tests\\pwa-contract-transactions.test.ts": "4431c586c5c888d206f3719befb04213d37484819a0e2f848defdbb50766089a",
-    "tests\\pwa-runtime-config.test.ts": "75f06a14687790db120825d2315612a02b59155c130c70dd721864e9d90b5140",
+    "tests\\pwa-runtime-config.test.ts": "a3429d33388890a56a22f7a90df94333f9bfab7b5f6a6d4979e697c8861e06f0",
     "tests\\recipient-identities.test.ts": "c8127e4fc89dde7bfe2495646da434eb1ca50ee89d9f84259e96bb28e33f237c",
     "tests\\release-truth-single-source.test.ts": "5605d747c27e39a48362d040d7a87736ee93ee0565dafa511d688a7a12fb0418",
     "tests\\spec-onchain-message-source.test.ts": "ed44cabd0755c98e4f7177591e9c70f6f80b9fd51dcce6e22b46efbe1bab1afa",
