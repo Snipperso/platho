@@ -172,7 +172,9 @@ describe('M16 production conformance static checks', () => {
         expect(source).toMatch(/CapsuleHub v1 accepts retrievable publish body cells/);
         expect(source).toMatch(/body_hash[\s\S]*accepted publish transaction body/);
         expect(source).toMatch(/verified mainnet manifest/);
-        expect(source).toMatch(/pinned to the verified mainnet manifest/);
+        expect(source).toMatch(/must be pinned to the verified mainnet manifest/);
+        expect(source).not.toMatch(/is pinned to the verified mainnet manifest/);
+        expect(source).not.toMatch(/a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd/);
         expect(source).toMatch(/must remain untracked and absent from release\/audit archives/);
         expect(source).not.toMatch(/points the UI at testnet preview data/);
         expect(source).not.toMatch(/\.env\.testnet\.local exists for faucet\/testnet work/);

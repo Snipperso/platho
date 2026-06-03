@@ -18,7 +18,7 @@ ATH is the protocol utility token. It is used for usernames, avatar updates, and
 
 ATH is designed for system participants. A meaningful share of the supply is distributed through user activity rather than through a closed allocation to early addresses. That makes the economy less dependent on a narrow holder set and more connected to real network usage.
 
-Platho has no hidden administrative control over user balances. The contracts do not give anyone a manual switch to seize other people's funds, rewrite balances, stop operations, or change the rules after launch.
+Platho has no hidden administrative control over user balances. The contracts do not give anyone an arbitrary admin switch to seize other people's funds, rewrite balances, pause user operations, or upgrade the protocol rules. V1 still has narrow documented launch authorities: genesis binding and seal, the post-pool BuybackBurn route freeze, the post-pool MarketStabilitySeller pricing freeze, and the one-way FeeAccumulator buyback split enable after preflight.
 
 The point is simple: digital life should not depend on platform permission. Messages, username, profile, and funds should belong to the user as much as a real system can make that true.
 

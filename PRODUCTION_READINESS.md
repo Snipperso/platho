@@ -21,8 +21,8 @@ Any audit note that expects the older lower-reserve, shorter-seller schedule is 
 
 ## Release gates
 
-- Mainnet genesis evidence must be live verified: `artifacts/MAINNET_GENESIS_VERIFIED.txt` is `true`, `mainnet:genesis:verify` passes, and the verified manifest hash is `a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd`.
-- `web/platho-config.mjs` must stay pinned to the verified mainnet Vault, CapsuleHub, ATHMaster, UsernameRegistry, ProfileRegistry, and manifest hash before publishing the production PWA bundle.
+- Mainnet genesis evidence must be live verified: `artifacts/MAINNET_GENESIS_VERIFIED.txt` is `true`, `mainnet:genesis:verify` passes, and the verified manifest hash comes from the final live verifier report, not a hand-maintained docs value.
+- `web/platho-config.mjs` must be pinned to the verified mainnet Vault, CapsuleHub, ATHMaster, UsernameRegistry, ProfileRegistry, manifest hash, and production signed-bundle purpose before publishing the production PWA bundle.
 - Production TON RPC configuration must use approved mainnet providers. Critical reads stay fail-closed on disagreement or missing verification, and CapsuleHub message-history reads must have at least one concrete provider with message-history support.
 - TON DNS support must remain fail-closed. If the production bundle exposes `.ton` recipient resolution, the TON DNS root/provider configuration must be present and verified through the same approved RPC transport path.
 - Keep testnet and mainnet configuration separated. Production deploys and production PWA packaging must not read `.env.testnet.local`.
@@ -104,7 +104,7 @@ npm.cmd run web:deploy:prepare:prod
 - `web/app.js` uses a normal 24-word TON recovery phrase as the single user secret, derives wallet and messaging keys from that phrase, and has a fail-closed Vault chain binding bridge.
 - The PWA now anchors public messaging keys in Vault records and publishes private messages through CapsuleHub payload cells. Manual public-bundle / capsule package exchange is removed from the production UI.
 - Local message history is encrypted at rest with a device-local WebCrypto key. The profile UI exports/imports only the 24-word TON recovery phrase; messaging keys are deterministically derived from that phrase and are not backed up separately.
-- `web/platho-config.mjs` is pinned to the verified mainnet manifest and production signed-bundle purpose.
+- `web/platho-config.mjs` must be pinned to the verified mainnet manifest and production signed-bundle purpose before the production PWA bundle is packaged. The current archive status is derived from `artifacts/mainnet_genesis_verify_report.json`, `artifacts/MAINNET_GENESIS_VERIFIED.txt`, and `preprod:check`.
 - `.env.testnet.local` may exist in a developer workspace for faucet/testnet work; it must remain untracked and absent from release/audit archives.
 - Full-size M20T testnet harness probe is complete: see `artifacts/m20t_testnet_evidence.json` and `artifacts/M20T_TESTNET_EVIDENCE.md`.
 - M20F STON.fi live collector is prepared: see `artifacts/m20f_stonfi_live_collector_input_template.json` and `artifacts/M20F_STONFI_LIVE_COLLECTOR.md`. It is expected to stay `WAITING_FOR_FINAL_MAINNET_INPUT` until final mainnet addresses and proof refs are supplied.

@@ -193,6 +193,46 @@ describe('v1 on-chain message source of truth', () => {
     expect(noBackend).not.toMatch(/chosen or replaceable by the user/i);
   });
 
+  it('SPEC-MSG-SOURCE-03C1: release docs do not claim preview config is already production-pinned', () => {
+    const readiness = read('PRODUCTION_READINESS.md');
+    const config = read('web/platho-config.mjs');
+    const genesisFlag = read('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim();
+
+    expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PREVIEW/);
+    expect(genesisFlag).toBe('false');
+    expect(readiness).toMatch(/must be pinned to the verified mainnet manifest/);
+    expect(readiness).toMatch(/final live verifier report/);
+    expect(readiness).toMatch(/preprod:check/);
+    expect(readiness).not.toMatch(/is pinned to the verified mainnet manifest/i);
+    expect(readiness).not.toMatch(/a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd/);
+  });
+
+  it('SPEC-MSG-SOURCE-03C2: public About names narrow launch authorities when describing admin limits', () => {
+    const about = read('web/docs/about-platho.md');
+
+    expect(about).toMatch(/no hidden administrative control over user balances/i);
+    expect(about).toMatch(/narrow documented launch authorities/i);
+    expect(about).toMatch(/genesis binding and seal/i);
+    expect(about).toMatch(/BuybackBurn route freeze/i);
+    expect(about).toMatch(/MarketStabilitySeller pricing freeze/i);
+    expect(about).toMatch(/FeeAccumulator buyback split enable/i);
+    expect(about).not.toMatch(/manual switch[\s\S]{0,180}change the rules after launch/i);
+  });
+
+  it('SPEC-MSG-SOURCE-03C3: public username docs do not describe deleted direct refund-due ABI as current', () => {
+    const whitepaper = read('web/docs/ath-whitepaper.md');
+    const usernameSection = whitepaper.slice(
+      whitepaper.indexOf('## Username Fees'),
+      whitepaper.indexOf('## Profile Avatar Fees'),
+    );
+
+    expect(usernameSection).toMatch(/Current V1 username mint is Vault-funded/);
+    expect(usernameSection).toMatch(/Vault can restore the user's internal ATH/);
+    expect(usernameSection).not.toMatch(/direct username payments/i);
+    expect(usernameSection).not.toMatch(/refund due for direct username/i);
+    expect(usernameSection).not.toMatch(/FlushAthRefundDue|get_refund_due/i);
+  });
+
   it('SPEC-MSG-SOURCE-03D: public comments warning is immutable-but-not-forever retention copy', () => {
     const app = read('web/app.js');
     const source = app.slice(
