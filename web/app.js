@@ -7002,9 +7002,9 @@ function refreshMessagingControls() {
       : `${plathoAccountActivationFeeLabel()} TON`);
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
-  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || appShellReloadPending;
-  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || appShellReloadPending;
-  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || appShellReloadPending;
+  if (mintUsernameButton) mintUsernameButton.disabled = false;
+  if (linkUsernameButton) linkUsernameButton.disabled = false;
+  if (setAvatarButton) setAvatarButton.disabled = false;
   if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
   if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
   if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
@@ -7550,6 +7550,10 @@ privateSenderModeSelect?.addEventListener('change', () => {
 
 mintUsernameButton?.addEventListener('click', async () => {
   try {
+    if (!plathoWallet) {
+      flashWalletIdentityStatus('create wallet first');
+      return;
+    }
     mintUsernameButton.disabled = true;
     await submitUsernameMint();
   } catch (error) {
@@ -7562,6 +7566,10 @@ mintUsernameButton?.addEventListener('click', async () => {
 });
 
 linkUsernameButton?.addEventListener('click', async () => {
+  if (!plathoWallet) {
+    flashWalletIdentityStatus('create wallet first');
+    return;
+  }
   const previous = readWalletDisplayIdentity(plathoWallet?.address);
   const previousLinked = readLinkedPlathoUsername(plathoWallet?.address);
   try {
@@ -7577,7 +7585,7 @@ linkUsernameButton?.addEventListener('click', async () => {
     setText(linkedUsernameStatus, previousLinked?.label ?? 'optional');
     console.error(error);
   } finally {
-    linkUsernameButton.disabled = !plathoWallet;
+    linkUsernameButton.disabled = false;
   }
 });
 

@@ -1033,8 +1033,10 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/Update ready - reload before sending/);
     expect(app).toMatch(/signedActionsReady = accountActive && !appShellReloadPending/);
     expect(app).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending/);
-    expect(app).toMatch(/mintUsernameButton\.disabled = !plathoWallet \|\| appShellReloadPending/);
-    expect(app).toMatch(/setAvatarButton\.disabled = !plathoWallet \|\| appShellReloadPending/);
+    expect(app).toMatch(/mintUsernameButton\.disabled = false/);
+    expect(app).toMatch(/linkUsernameButton\.disabled = false/);
+    expect(app).toMatch(/setAvatarButton\.disabled = false/);
+    expect(app).toMatch(/if \(!plathoWallet\) \{[\s\S]*flashWalletIdentityStatus\('create wallet first'\)/);
     expect(app).not.toMatch(/mintUsernameButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).not.toMatch(/setAvatarButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).toMatch(/function canAttemptPrivateSend/);
@@ -1992,11 +1994,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v344/);
+    expect(sw).toMatch(/platho-pwa-prototype-v345/);
     expect(sw).toMatch(/\.\/styles\.css\?v=127/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=282/);
+    expect(sw).toMatch(/\.\/app\.js\?v=283/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
