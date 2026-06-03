@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-03T06:49:50.140Z",
+  "generatedAt": "2026-06-03T07:02:05.410Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 126,
-    "totalBytes": 2814633,
-    "bundleSha256": "0433ec4474b0064b050f95127f5451dcd44778cdf127eea9223e48ab8a9e57ef",
+    "totalBytes": 2815018,
+    "bundleSha256": "110372d8975b7da49e325f8973fbc3ac21c52b7f7096212ed2e6eb018bd93e5d",
     "files": [
       {
         "path": "app.js",
         "bytes": 452696,
-        "sha256": "f5740839c350cced64b755fc13824837170ebd78a1309c4d8d772942d7236105"
+        "sha256": "6bfe1008166f2c1d502e53fb4f25761d48fb7d521213b6b36c6eea0cc8f38cd1"
       },
       {
         "path": "assets/icons/back.svg",
@@ -150,7 +150,7 @@
       {
         "path": "ath-ton-rpc-provider.mjs",
         "bytes": 6190,
-        "sha256": "69ce05f36df56f5d2163932800232e2f094cd2600e95d1961b903ad5980c47d8"
+        "sha256": "9ad42cc8557696ddef3e141368a843e67f50be0539f1b2d97c7e821f55374317"
       },
       {
         "path": "capsule-part-policy.mjs",
@@ -160,7 +160,7 @@
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
         "bytes": 30312,
-        "sha256": "ae6fd167a57e43a1eeb81406c81feb6965890fcf257a08ec5054c436acf0e524"
+        "sha256": "ff39ba445cd226a07bda9f9742940f518dff2cbc533cfb2592bd1bcee14786c9"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -195,7 +195,7 @@
       {
         "path": "index.html",
         "bytes": 31078,
-        "sha256": "be393bbdcb4c4a58183b25d1f5dd1a22cded30c5b78ff2ed4ab9384cbffd11c3"
+        "sha256": "47495fc54e9fdb29311ffd781fe4dcb9c8f880d3f380563d5f60a271a33ab2b6"
       },
       {
         "path": "manifest.webmanifest",
@@ -210,7 +210,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 10304,
-        "sha256": "c624de6fdadc273e55bd4f56a9d793d42d609daf77fe88a6b2aeefd361ace7c8"
+        "sha256": "901d8d1de0b871d95c19c7bf57b341b7a55ba76baca88f50c1edbd029cf7da38"
       },
       {
         "path": "platho-wallet.mjs",
@@ -220,7 +220,7 @@
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
         "bytes": 8229,
-        "sha256": "6f13dd50fef3b30762339750fd3eb67fd412d375929a45601bc0cbce89948f77"
+        "sha256": "5a652c28f90e2671b8504ca4bff728a482574d60c34f2d98bd261eef34af3e64"
       },
       {
         "path": "public-channel-subscriptions.mjs",
@@ -255,12 +255,12 @@
       {
         "path": "sw.js",
         "bytes": 5185,
-        "sha256": "3e5db9b08e9fb9127aec01353bdaf46217bc75f4f4358c0258df5ce24a4ad1ca"
+        "sha256": "b236aa3e8b330a2cc486cca39715f27e23d9e3d9ce5e8d11d3543d84064ac5e4"
       },
       {
         "path": "ton-dns-provider.mjs",
         "bytes": 11578,
-        "sha256": "d8dc7f5703165c133a69da7f496387c0c86ae42e6351cb6bdf038b0a29b81df0"
+        "sha256": "c02de7da5b3b58f9a8c3fb0744818d184f7c2a97c8fc73e095edfc1acf89b2eb"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",
@@ -270,7 +270,7 @@
       {
         "path": "username-ton-rpc-provider.mjs",
         "bytes": 20368,
-        "sha256": "6800eff7b048b41c98b475867b6017800a1dc0f7ed2558e376eee005c12486ed"
+        "sha256": "332fbeeca201a3c5ccb2bf0834559014fa25c28b9420159665e268205e68d72e"
       },
       {
         "path": "vault-chain-provider.mjs",
@@ -279,8 +279,8 @@
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 61325,
-        "sha256": "98b907106c1dc17524ea7c3ba5e36273acecbd04005539a4e05861904bb60017"
+        "bytes": 61710,
+        "sha256": "6e4ced1f862d367e8a106d510d69030bd3851ee2a3c90e701beb4e6bfc782325"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",

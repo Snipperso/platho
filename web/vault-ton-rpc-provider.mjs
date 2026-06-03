@@ -893,6 +893,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
   return {
     kind: 'toncenter-v3',
     supportsMessageHistory: Boolean(messagesEndpoint),
+    supportsSendBoc: Boolean(sendBocEndpoint),
     async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, requestTimeoutMs, timeoutMs }) {
       const call = {
         address: assertString(address, 'TON RPC address'),
@@ -1098,6 +1099,10 @@ function isRetryableTonRpcError(error) {
     || /rate limit|timeout|network|failed to fetch/i.test(String(error?.message ?? error ?? ''));
 }
 
+function isSendBocTransportUnavailableError(error) {
+  return /sendBoc (endpoint|transport) is not configured/i.test(String(error?.message ?? error ?? ''));
+}
+
 function tryParseStackBigIntValue(value) {
   try {
     return parseStackBigIntValue(value, 'TON RPC compare value');
@@ -1296,6 +1301,7 @@ export function createFallbackTonRpcTransport(options = {}) {
     let lastError = null;
     for (const transport of transports) {
       if (typeof transport?.[methodName] !== 'function') continue;
+      if (methodName === 'sendBoc' && transport.supportsSendBoc === false) continue;
       try {
         const result = await transport[methodName](...args);
         clearToncenterRunGetMethodCache();
@@ -1303,6 +1309,7 @@ export function createFallbackTonRpcTransport(options = {}) {
         return result;
       } catch (error) {
         lastError = error;
+        if (methodName === 'sendBoc' && isSendBocTransportUnavailableError(error)) continue;
         if (!isRetryableTonRpcError(error)) throw error;
       }
     }
