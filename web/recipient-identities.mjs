@@ -245,12 +245,12 @@ export function createInboundPeerThread(input = {}, options = {}) {
       : null,
   ]);
   const identity = preferredInboundIdentity(variants);
-  const label = identity?.label ?? input.label ?? `peer ${shortPeerId(input.senderKeyId ?? input.keyId)}`;
+  const label = identity?.label ?? input.label ?? `Unknown sender ${shortPeerId(input.senderKeyId ?? input.keyId)}`;
   return {
     id: identity ? recipientThreadId(identity) : `peer:${encodeURIComponent(shortPeerId(input.senderKeyId ?? input.keyId))}`,
     name: label,
     avatar: avatarFromLabel(label),
-    subtitle: identity ? identityTypeLabel(identity) : 'Peer',
+    subtitle: identity ? identityTypeLabel(identity) : 'Unknown sender',
     time: options.time ?? 'now',
     state: options.state ?? 'sealed',
     preview: options.preview ?? 'No messages yet',

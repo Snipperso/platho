@@ -22,6 +22,12 @@ describe('encrypted local message history', () => {
     await store.putMessage({
       threadId: 'thread-alpha',
       createdAt: NOW,
+      thread: {
+        id: 'thread-alpha',
+        name: 'Alice',
+        subtitle: 'Wallet address',
+        identityVariants: [{ type: 'wallet_address', value: '0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', label: 'Alice wallet' }],
+      },
       message: {
         type: 'out',
         text: 'local history secret',
@@ -35,9 +41,11 @@ describe('encrypted local message history', () => {
 
     expect(raw).not.toContain('local history secret');
     expect(raw).not.toContain('hybrid-v1 capsule export');
+    expect(raw).not.toContain('Alice wallet');
     expect(restored).toHaveLength(1);
     expect(restored[0].message.text).toBe('local history secret');
     expect(restored[0].threadId).toBe('thread-alpha');
+    expect(restored[0].thread.name).toBe('Alice');
   });
 
   it('HISTORY-02: authenticated metadata detects clear header tampering', async () => {

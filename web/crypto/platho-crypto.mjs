@@ -44,6 +44,7 @@ export const PLATHO_ONCHAIN_BODY_MAX_BYTES = 40 * 1024;
 export const PLATHO_BINARY_HEADER0_BYTES = 140;
 export const PLATHO_BINARY_HEADER1_BYTES = 30;
 export const PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES = 32;
+export const PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES = 69;
 export const PLATHO_COMPACT_CONTENT_TYPES = Object.freeze({
   TEXT: 1,
   IMAGE: 2,
@@ -76,6 +77,8 @@ const DEFAULT_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const COMPACT_BODY_MAGIC = new Uint8Array([0x50, 0x4c, 0x42, 0x31]); // "PLB1"
 const COMPACT_CHUNK_MAGIC = new Uint8Array([0x50, 0x4c, 0x43, 0x31]); // "PLC1"
 const COMPACT_PAYLOAD_MAGIC = new Uint8Array([0x50, 0x43, 0x50, 0x31]); // "PCP1"
+const COMPACT_SENDER_WALLET_MAGIC = new Uint8Array([0x50, 0x53, 0x57, 0x31]); // "PSW1"
+const COMPACT_PAYLOAD_FLAG_SENDER_WALLET = 1;
 const PRIVATE_CAPSULE_HEADER0_MAGIC = new Uint8Array([0x50, 0x48, 0x30, 0x42]); // "PH0B"
 const PRIVATE_CAPSULE_HEADER1_MAGIC = new Uint8Array([0x50, 0x48, 0x31, 0x42]); // "PH1B"
 const COMPACT_BODY_AAD_DOMAIN = 'PLATHO.COMPACT_BODY.AAD.V1';
@@ -1009,6 +1012,59 @@ function encodeFixedCompactPayload(type, flags, content, options = {}) {
   return out;
 }
 
+function compactSenderWalletMetadataBytes(options = {}) {
+  const wallet = options.senderWallet ?? options.sender_wallet;
+  if (wallet === undefined || wallet === null || wallet === '') return null;
+  const parsed = parseTonAddress(wallet);
+  if (parsed.workchain < -128 || parsed.workchain > 127) {
+    throw new Error('sender wallet workchain must fit int8');
+  }
+  const vaultKeyId = options.senderVaultKeyId ?? options.sender_vault_key_id ?? 0n;
+  return concatBytes(
+    COMPACT_SENDER_WALLET_MAGIC,
+    new Uint8Array([parsed.workchain & 0xff]),
+    assertBytes('sender wallet hash', parsed.hash, 32),
+    writeBigUintBytes(vaultKeyId, 32, 'senderVaultKeyId'),
+  );
+}
+
+function encodeCompactPayloadContentWithMetadata(content, options = {}) {
+  const walletMetadata = compactSenderWalletMetadataBytes(options);
+  if (!walletMetadata) return { flags: 0, content: toUint8Array(content) };
+  return {
+    flags: COMPACT_PAYLOAD_FLAG_SENDER_WALLET,
+    content: concatBytes(walletMetadata, toUint8Array(content)),
+  };
+}
+
+function decodeCompactPayloadMetadata(content, flags) {
+  const unsupportedFlags = flags & ~COMPACT_PAYLOAD_FLAG_SENDER_WALLET;
+  if (unsupportedFlags !== 0) throw new Error('Unsupported compact payload flags');
+  let remaining = toUint8Array(content);
+  const metadata = {};
+  if ((flags & COMPACT_PAYLOAD_FLAG_SENDER_WALLET) !== 0) {
+    if (remaining.length < PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES) {
+      throw new Error('Compact payload sender wallet metadata is truncated');
+    }
+    const prefix = remaining.subarray(0, PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES);
+    if (!bytesEqual(prefix.subarray(0, 4), COMPACT_SENDER_WALLET_MAGIC)) {
+      throw new Error('Compact payload sender wallet metadata magic mismatch');
+    }
+    const rawWorkchain = prefix[4] >= 0x80 ? prefix[4] - 0x100 : prefix[4];
+    const senderWallet = `${rawWorkchain}:${bytesToHex(prefix.subarray(5, 37))}`;
+    const senderVaultKeyIdBigint = bytesToBigInt(prefix.subarray(37, 69));
+    metadata.senderWallet = senderWallet;
+    metadata.sender_wallet = senderWallet;
+    if (senderVaultKeyIdBigint !== 0n) {
+      const senderVaultKeyId = senderVaultKeyIdBigint.toString();
+      metadata.senderVaultKeyId = senderVaultKeyId;
+      metadata.sender_vault_key_id = senderVaultKeyId;
+    }
+    remaining = remaining.subarray(PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES);
+  }
+  return { content: remaining, metadata };
+}
+
 function compactPayloadContent(bytesLike) {
   const bytes = toUint8Array(bytesLike);
   const usefulBytes = bytes.length - PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES;
@@ -1062,23 +1118,25 @@ export function encodeCompactPayload(input, options = {}) {
   const payload = typeof input === 'string' ? { type: 'text', text: input } : (input ?? {});
   const payloadOptions = { ...payload, ...options };
   if (payload.type === 'text' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.TEXT) {
-    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.TEXT, 0, utf8(payload.text ?? ''), payloadOptions);
+    const encoded = encodeCompactPayloadContentWithMetadata(utf8(payload.text ?? ''), payloadOptions);
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.TEXT, encoded.flags, encoded.content, payloadOptions);
   }
   if (payload.type === 'image' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.IMAGE) {
     const bytes = toUint8Array(payload.bytes ?? payload.imageBytes ?? new Uint8Array());
-    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.IMAGE, 0, bytes, {
+    const encoded = encodeCompactPayloadContentWithMetadata(bytes, payloadOptions);
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.IMAGE, encoded.flags, encoded.content, {
       ...payloadOptions,
       mediaFormat: payload.format ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
     });
   }
   if (payload.type === 'payment' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.PAYMENT) {
-    const content = concatBytes(
+    const content = encodeCompactPayloadContentWithMetadata(concatBytes(
       new Uint8Array([uint8Byte(payload.asset ?? 0, 'payment asset'), 0]),
       writeBigUintBytes(payload.amount ?? 0n, 16, 'payment amount'),
       assertBytes('payment intent id', payload.intentId ?? payload.intent_id, 32),
       assertBytes('payment secret', payload.secret ?? payload.secret32, 32),
-    );
-    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, 0, content, payloadOptions);
+    ), payloadOptions);
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, content.flags, content.content, payloadOptions);
   }
   throw new Error('Unsupported Platho compact payload type');
 }
@@ -1086,12 +1144,14 @@ export function encodeCompactPayload(input, options = {}) {
 export function decodeCompactPayload(bytesLike) {
   const {
     type,
+    flags,
     content,
     mediaFormat,
     streamId,
     partIndex,
     partCount,
   } = compactPayloadContent(bytesLike);
+  const decoded = decodeCompactPayloadMetadata(content, flags);
   const part = {
     streamId,
     stream_id: `0x${bytesToHex(streamId)}`,
@@ -1099,26 +1159,27 @@ export function decodeCompactPayload(bytesLike) {
     part_index: partIndex,
     partCount,
     part_count: partCount,
+    ...decoded.metadata,
   };
   if (type === PLATHO_COMPACT_CONTENT_TYPES.TEXT) {
-    return { type: 'text', text: fromUtf8(content), ...part };
+    return { type: 'text', text: fromUtf8(decoded.content), ...part };
   }
   if (type === PLATHO_COMPACT_CONTENT_TYPES.IMAGE) {
     return {
       type: 'image',
       format: mediaFormat,
-      bytes: content,
+      bytes: decoded.content,
       ...part,
     };
   }
   if (type === PLATHO_COMPACT_CONTENT_TYPES.PAYMENT) {
-    if (content.length !== COMPACT_PAYMENT_CONTENT_BYTES) throw new Error('Compact payment payload has invalid length');
+    if (decoded.content.length !== COMPACT_PAYMENT_CONTENT_BYTES) throw new Error('Compact payment payload has invalid length');
     return {
       type: 'payment',
-      asset: content[0],
-      amount: readBigUintBytes(content, 2, 16, 'payment amount'),
-      intentId: content.subarray(18, 50),
-      secret32: content.subarray(50, 82),
+      asset: decoded.content[0],
+      amount: readBigUintBytes(decoded.content, 2, 16, 'payment amount'),
+      intentId: decoded.content.subarray(18, 50),
+      secret32: decoded.content.subarray(50, 82),
       ...part,
     };
   }

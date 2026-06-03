@@ -5,6 +5,7 @@ import {
   encodeCompactPayload,
   exportSignedPublicKeyBundle,
   openPrivateCapsuleChainEntry,
+  PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
   PLATHO_COMPACT_IMAGE_FORMATS,
   parseTonAddress,
   publicKeyBundleFromVaultKeyRecord,
@@ -12,7 +13,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=4';
+} from './crypto/platho-crypto.mjs?v=5';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -21,17 +22,17 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=7';
+} from './platho-wallet.mjs?v=8';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
-} from './encrypted-message-store.mjs?v=2';
+} from './encrypted-message-store.mjs?v=3';
 import {
   VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=1';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=44';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=15';
+} from './vault-chain-provider.mjs?v=2';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=45';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=16';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   normalizePublicChannelRegistry,
@@ -58,7 +59,7 @@ import {
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=2';
+} from './recipient-identities.mjs?v=3';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
@@ -67,7 +68,7 @@ import {
   splitBytesToParts,
   splitUtf8ToCapsuleParts,
   splitUtf8ToParts,
-} from './capsule-part-policy.mjs?v=2';
+} from './capsule-part-policy.mjs?v=3';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -100,19 +101,19 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=14';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=8';
+} from './pwa-contract-transactions.mjs?v=15';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=9';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=15';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=11';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=7';
+} from './capsulehub-ton-rpc-provider.mjs?v=16';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=12';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=8';
 import {
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=13';
+} from './username-ton-rpc-provider.mjs?v=14';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -3876,7 +3877,42 @@ async function resolveCurrentKnownVaultKeyRecord(walletAddress, provider, option
   return keyRecord;
 }
 
-async function resolveKnownPrivateSenderWallet(opened) {
+async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, provider) {
+  const raw = rawWalletAddress(walletAddress);
+  if (!raw) return null;
+  const readOptions = { vaultAddress: requireVaultAddress(), ...criticalChainReadOptions() };
+  if (vaultKeyId !== null && vaultKeyId !== undefined && BigInt(vaultKeyId) > 0n) {
+    const keyRecord = await provider.getKeyRecord(BigInt(vaultKeyId), {
+      ownerWallet: raw,
+      ...readOptions,
+    });
+    if (!sameWalletAddress(keyRecord?.owner_wallet, raw)) {
+      throw new Error('Private sender key record owner mismatch');
+    }
+    rememberKnownVaultKeyOwner(raw, keyRecord);
+    return keyRecord;
+  }
+  return resolveCurrentKnownVaultKeyRecord(raw, provider, { allowCached: false });
+}
+
+async function resolveClaimedPrivateSenderWallet(opened, provider, signPubkey) {
+  const claimedWallet = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
+  if (!claimedWallet) return null;
+  const senderVaultKeyId = opened?.payload?.senderVaultKeyId ?? opened?.payload?.sender_vault_key_id ?? null;
+  try {
+    const keyRecord = await resolveVaultKeyRecordForSenderWallet(claimedWallet, senderVaultKeyId, provider);
+    if (keyRecord?.sign_pubkey && BigInt(keyRecord.sign_pubkey).toString() === signPubkey) {
+      return rememberKnownVaultKeyOwner(claimedWallet, keyRecord);
+    }
+    console.warn('Private sender wallet claim did not match Vault signing key', claimedWallet);
+  } catch (error) {
+    if (noteTonRpcRateLimit(error)) return null;
+    console.warn('Unable to verify private sender wallet claim', claimedWallet, error);
+  }
+  return null;
+}
+
+async function resolveKnownPrivateSenderWallet(opened, options = {}) {
   const signPubkey = senderSigningPublicKeyValue(opened);
   if (!signPubkey) return null;
   const remembered = knownVaultKeyOwnerBySignPubkey.get(signPubkey);
@@ -3884,7 +3920,6 @@ async function resolveKnownPrivateSenderWallet(opened) {
     remembered,
     ...knownPrivateWalletCandidates(),
   ].filter(Boolean))];
-  if (candidates.length === 0) return null;
   let resolved = null;
   try {
     resolved = await resolveVaultChainProvider();
@@ -3892,6 +3927,10 @@ async function resolveKnownPrivateSenderWallet(opened) {
     return null;
   }
   if (!resolved?.getUser || !resolved?.getKeyRecord) return null;
+  if (options.allowClaimedSenderWallet !== false) {
+    const claimed = await resolveClaimedPrivateSenderWallet(opened, resolved, signPubkey);
+    if (claimed) return claimed;
+  }
   for (const wallet of candidates) {
     try {
       const keyRecord = await resolveCurrentKnownVaultKeyRecord(wallet, resolved, { allowCached: false });
@@ -3954,6 +3993,8 @@ async function threadForChainCapsule(opened, entry) {
     identity: preferredInboundIdentity(variants),
     identityVariants: variants,
   });
+  const existingById = threads.find((thread) => thread.id === created.id);
+  if (existingById) return refreshThreadIdentityFromVariants(existingById, variants);
   threads.push(created);
   return created;
 }
@@ -4142,7 +4183,10 @@ function privateChainMessageMeta(entry, parts = 1) {
 
 function privatePartKey(opened, entry) {
   const streamId = opened?.payload?.stream_id ?? 'single';
-  const sender = privateEntryPublisherWallet(entry) ?? opened?.capsule?.header0?.senderKeyId ?? 'unknown';
+  const sender = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet)
+    ?? privateEntryPublisherWallet(entry)
+    ?? opened?.capsule?.header0?.senderKeyId
+    ?? 'unknown';
   return `${sender}:${streamId}`;
 }
 
@@ -4630,19 +4674,86 @@ function serializeMessageForHistory(message) {
   };
 }
 
-function ensureHistoryThread(threadId) {
+function safeJsonClone(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+
+function serializeThreadForHistory(thread) {
+  if (!thread?.id) return null;
+  return safeJsonClone({
+    id: thread.id,
+    name: thread.name ?? null,
+    subtitle: thread.subtitle ?? null,
+    avatar: thread.avatar ?? null,
+    state: thread.state ?? null,
+    preview: thread.preview ?? null,
+    identity: thread.identity ?? null,
+    displayIdentity: thread.displayIdentity ?? null,
+    identityVariants: threadIdentityVariants(thread),
+    localLabel: thread.localLabel ?? null,
+    avatarImageUrl: thread.avatarImageUrl ?? null,
+  });
+}
+
+function peerLabelFromThreadId(threadId, message = null) {
+  const idText = String(threadId ?? '');
+  if (idText.startsWith('peer:')) {
+    try {
+      const decoded = decodeURIComponent(idText.slice(5));
+      return `Unknown sender ${shortPeerId(decoded)}`;
+    } catch {
+      return 'Unknown sender';
+    }
+  }
+  const senderKeyId = message?.capsule?.header0?.senderKeyId;
+  if (senderKeyId) return `Unknown sender ${shortKeyId(senderKeyId)}`;
+  return 'Unknown sender';
+}
+
+function applyHistoryThreadSnapshot(thread, snapshot) {
+  if (!thread || !snapshot || typeof snapshot !== 'object') return thread;
+  const variants = normalizeIdentityVariants([
+    snapshot.identity,
+    snapshot.displayIdentity,
+    ...(snapshot.identityVariants ?? []),
+  ]);
+  if (variants.length > 0) {
+    thread.identityVariants = normalizeIdentityVariants([
+      ...(thread.identityVariants ?? []),
+      ...variants,
+    ]);
+    thread.identity = thread.identity ?? preferredInboundIdentity(thread.identityVariants);
+  }
+  if (!thread.localLabel && snapshot.name && snapshot.name !== 'Imported') thread.name = snapshot.name;
+  if (snapshot.subtitle && snapshot.subtitle !== 'local encrypted history') thread.subtitle = snapshot.subtitle;
+  if (snapshot.avatar) thread.avatar = snapshot.avatar;
+  if (snapshot.avatarImageUrl) thread.avatarImageUrl = snapshot.avatarImageUrl;
+  if (snapshot.displayIdentity) thread.displayIdentity = snapshot.displayIdentity;
+  if (snapshot.localLabel) thread.localLabel = snapshot.localLabel;
+  return thread;
+}
+
+function ensureHistoryThread(threadId, snapshot = null, message = null) {
   let thread = threads.find((item) => item.id === threadId);
-  if (thread) return thread;
+  if (thread) return applyHistoryThreadSnapshot(thread, snapshot);
+  const restoredName = snapshot?.name && snapshot.name !== 'Imported'
+    ? snapshot.name
+    : peerLabelFromThreadId(threadId, message);
   thread = {
     id: threadId,
-    name: 'Imported',
-    subtitle: 'local encrypted history',
-    avatar: 'P',
+    name: restoredName,
+    subtitle: snapshot?.subtitle && snapshot.subtitle !== 'local encrypted history' ? snapshot.subtitle : 'Encrypted history',
+    avatar: snapshot?.avatar ?? 'P',
     preview: 'encrypted local history',
     state: 'sealed',
     time: 'local',
     messages: [],
   };
+  applyHistoryThreadSnapshot(thread, snapshot);
   threads.push(thread);
   return thread;
 }
@@ -4660,6 +4771,7 @@ async function writeMessageToEncryptedHistory(thread, message) {
     const stored = await encryptedMessageStore.putMessage({
       id: message.localHistoryId ?? undefined,
       threadId: thread.id,
+      thread: serializeThreadForHistory(thread),
       message: serializeMessageForHistory(message),
       createdAt: message.localHistoryCreatedAt ?? createdAt,
     });
@@ -4680,7 +4792,7 @@ async function restoreEncryptedMessageHistory() {
     const restored = await encryptedMessageStore.listMessages();
     let changed = false;
     for (const item of restored) {
-      const thread = ensureHistoryThread(item.threadId);
+      const thread = ensureHistoryThread(item.threadId, item.thread, item.message);
       if (thread.messages.some((message) => message.localHistoryId === item.id)) continue;
       const message = {
         ...item.message,
@@ -5210,6 +5322,15 @@ function hasActivePlathoAccount() {
   return hasActiveVaultMessagingKeys();
 }
 
+function currentVaultMessagingKeyId() {
+  try {
+    const keyId = BigInt(currentVaultUserSource()?.current_key_id ?? 0n);
+    return keyId > 0n ? keyId : null;
+  } catch {
+    return null;
+  }
+}
+
 function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
   return estimateVaultAttachedValueNanotons('RegisterMessagingKeys', localVaultDraft?.message ?? { crypto_suite_mask: VAULT_CRYPTO_SUITE.HYBRID }, {
     userExists: user?.exists === true,
@@ -5418,13 +5539,21 @@ function privateImageAttachmentPartCount(attachment) {
   return privateImageCapsulePartsForSend(attachment).length;
 }
 
-function privateTextCapsulePartsForSend(text) {
-  return splitUtf8ToCapsuleParts(text, MAX_CAPSULE_USEFUL_BYTES);
+function privateSenderWalletPayloadOverhead(options = {}) {
+  return options.includeSenderWalletMetadata === false ? 0 : PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES;
 }
 
-function privateImageCapsulePartsForSend(attachment) {
+function privateTextCapsulePartsForSend(text, options = {}) {
+  return splitUtf8ToCapsuleParts(text, MAX_CAPSULE_USEFUL_BYTES, {
+    perPartOverheadBytes: privateSenderWalletPayloadOverhead(options),
+  });
+}
+
+function privateImageCapsulePartsForSend(attachment, options = {}) {
   if (!attachment?.bytes?.length) return [];
-  return splitBytesToCapsuleParts(attachment.bytes, MAX_CAPSULE_USEFUL_BYTES);
+  return splitBytesToCapsuleParts(attachment.bytes, MAX_CAPSULE_USEFUL_BYTES, {
+    perPartOverheadBytes: privateSenderWalletPayloadOverhead(options),
+  });
 }
 
 function privateComposerRetrievalPartLimit() {
@@ -9646,12 +9775,15 @@ async function submitCreatePaymentCheck() {
     intentId,
     secret32Bytes,
   });
+  const senderVaultKeyId = currentVaultMessagingKeyId();
   const payloadBytes = encodeCompactPayload({
     type: 'payment',
     asset: Number(asset),
     amount,
     intentId: bigIntToFixedBytes(intentId, 32, 'intent id'),
     secret32: secret32Bytes,
+    senderWallet,
+    senderVaultKeyId: senderVaultKeyId ?? undefined,
   });
   const capsule = await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
     payloadBytes,
@@ -10361,6 +10493,12 @@ function imagePartsForSend(attachment, label = 'image') {
 }
 
 async function createPrivateComposerCapsules(text, attachment, recipientEntry, threadId) {
+  const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const senderVaultKeyId = currentVaultMessagingKeyId();
+  const senderMetadata = {
+    senderWallet,
+    senderVaultKeyId: senderVaultKeyId ?? undefined,
+  };
   const textParts = String(text ?? '').trim().length > 0 ? privateTextCapsulePartsForSend(text) : [];
   const imageParts = privateImageCapsulePartsForSend(attachment);
   const totalParts = textParts.length + imageParts.length;
@@ -10377,6 +10515,7 @@ async function createPrivateComposerCapsules(text, attachment, recipientEntry, t
       streamId,
       partIndex: index,
       partCount: totalParts,
+      ...senderMetadata,
     });
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
       payloadBytes,
@@ -10395,6 +10534,7 @@ async function createPrivateComposerCapsules(text, attachment, recipientEntry, t
       streamId,
       partIndex: textParts.length + index,
       partCount: totalParts,
+      ...senderMetadata,
     });
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
       payloadBytes,

@@ -78,13 +78,20 @@ describe('PWA capsule part policy', () => {
     const image33 = splitBytesToCapsuleParts(new Uint8Array((32 * 1024) + 1).fill(1));
     expect(image33.map((part) => part.sizeClass)).toEqual([32, 1]);
     expect(image33.map((part) => part.bytes.length)).toEqual([32 * 1024, 1]);
+
+    const withSenderMetadata = splitUtf8ToCapsuleParts('a'.repeat(1024), MAX_CAPSULE_USEFUL_BYTES, {
+      perPartOverheadBytes: 69,
+    });
+    expect(withSenderMetadata).toHaveLength(1);
+    expect(withSenderMetadata[0]).toMatchObject({ sizeClass: 2, usefulBytes: 2 * 1024 });
   });
 
   it('PWA-CAPSULE-PART-07: private composer text path cannot fall back to legacy 1 KiB splitting', () => {
     const appSource = readFileSync(join(process.cwd(), 'web', 'app.js'), 'utf8');
     expect(appSource.match(/function privateTextCapsulePartsForSend\s*\(/g) ?? []).toHaveLength(1);
     expect(appSource).not.toMatch(/function privateTextPartsForSend\s*\(/);
-    expect(appSource).toMatch(/function privateTextCapsulePartsForSend\s*\([^)]*\)\s*\{\s*return splitUtf8ToCapsuleParts\(text, MAX_CAPSULE_USEFUL_BYTES\);/);
+    expect(appSource).toMatch(/function privateTextCapsulePartsForSend\s*\([^)]*\)[\s\S]*return splitUtf8ToCapsuleParts\(text, MAX_CAPSULE_USEFUL_BYTES,\s*\{/);
+    expect(appSource).toMatch(/perPartOverheadBytes: privateSenderWalletPayloadOverhead\(options\)/);
     expect(appSource).toMatch(/createPrivateComposerCapsules[\s\S]*privateTextCapsulePartsForSend\(text\)/);
   });
 });

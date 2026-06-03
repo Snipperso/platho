@@ -91,6 +91,7 @@ function normalizeMessageRecordInput(input) {
     id: input.id ?? randomId(),
     threadId: assertString(input.threadId, 'message history input.threadId'),
     createdAt: input.createdAt ?? Date.now(),
+    thread: input.thread && typeof input.thread === 'object' ? safeClone(input.thread) : null,
     type: assertString(message.type, 'message.type'),
     capsuleId: message.capsule?.id ?? null,
     message: safeClone(message),
@@ -116,6 +117,7 @@ export async function sealMessageHistoryRecord(key, input) {
     version: MESSAGE_HISTORY_VERSION,
     threadId: normalized.threadId,
     createdAt: normalized.createdAt,
+    thread: normalized.thread,
     message: normalized.message,
   }));
   const header = {
@@ -173,6 +175,7 @@ export async function openMessageHistoryRecord(key, record) {
     createdAt: record.createdAt,
     type: record.type,
     capsuleId: record.capsuleId ?? null,
+    thread: payload.thread && typeof payload.thread === 'object' ? payload.thread : null,
     message: assertObject(payload.message, 'message history payload.message'),
   };
 }
