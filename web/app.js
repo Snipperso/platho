@@ -9175,13 +9175,17 @@ async function readFreshReceiveIntent(provider, intentId, options = {}) {
   });
 }
 
-async function readFreshReceiveIntentForCancel(provider, intentId) {
+async function readFreshReceiveIntentForOwnVaultAction(provider, intentId) {
   try {
     return await readFreshReceiveIntent(provider, intentId);
   } catch (error) {
     if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
     return readFreshReceiveIntent(provider, intentId, { verify: false, allowUnverifiedCriticalRead: true });
   }
+}
+
+async function readFreshReceiveIntentForCancel(provider, intentId) {
+  return readFreshReceiveIntentForOwnVaultAction(provider, intentId);
 }
 
 async function readFreshConnectedVaultUser(provider, options = {}) {
@@ -9275,7 +9279,7 @@ async function waitForPaymentCheckCreateConfirmation(provider, payment) {
   const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
   while (Date.now() <= deadline) {
     try {
-      const intent = await readFreshReceiveIntent(provider, intentId);
+      const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId);
       if (intent?.exists === true) return intent;
     } catch (error) {
       if (!noteTonRpcRateLimit(error)) throw error;
