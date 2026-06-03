@@ -765,7 +765,7 @@ describe('PWA runtime config guard', () => {
     expect(publishSource).toMatch(/return sendPreparedCapsulesThroughVault\(prepared, options\)/);
   });
 
-  it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before signing external BOCs', () => {
+  it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before send-time BOC signing', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const capSource = app.slice(
       app.indexOf('function assertNetworkFeeSurchargeWithinCap'),
@@ -775,12 +775,16 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function prepareCapsulesThroughVault'),
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
     );
+    const sendSource = app.slice(
+      app.indexOf('async function sendPreparedCapsulesThroughVault'),
+      app.indexOf('async function publishCapsulesThroughVault'),
+    );
     const capIndex = prepareSource.indexOf('assertNetworkFeeSurchargeWithinCap();');
     const surchargeIndex = prepareSource.indexOf('const surcharge = currentNetworkFeeSurchargeNanotons()');
-    const buildIndex = prepareSource.indexOf('const external = await buildVaultBalancePublishExternalBoc');
     const balanceIndex = prepareSource.indexOf('if (balance < totalMaxCharge)');
     const priceConfirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
     const surchargeConfirmIndex = prepareSource.indexOf('confirmHighNetworkFeeSurcharge');
+    const sendBuildIndex = sendSource.indexOf('item.external = await buildVaultBalancePublishExternalBoc');
 
     expect(capSource).toMatch(/networkFeeSurchargeExceedsMax\(estimate, pricingOptions\)/);
     expect(capSource).toMatch(/throw new Error\(`Network surcharge/);
@@ -790,8 +794,9 @@ describe('PWA runtime config guard', () => {
     expect(balanceIndex).toBeGreaterThan(surchargeIndex);
     expect(priceConfirmIndex).toBeGreaterThan(balanceIndex);
     expect(surchargeConfirmIndex).toBeGreaterThan(priceConfirmIndex);
-    expect(buildIndex).toBeGreaterThan(surchargeConfirmIndex);
+    expect(prepareSource).not.toMatch(/buildVaultBalancePublishExternalBoc/);
     expect(prepareSource).not.toMatch(/sendVaultExternalBoc/);
+    expect(sendBuildIndex).toBeGreaterThanOrEqual(0);
   });
 
   it('PWA-SEND-01B: private preflight shows actionable blocked reasons instead of generic send blocked', () => {
@@ -819,16 +824,21 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
       app.indexOf('async function publishCapsulesThroughVault'),
     );
+    const nonceReadIndex = sendSource.indexOf('const clientNonce = await readVaultPublishNonce(provider, owner)');
+    const buildIndex = sendSource.indexOf('item.external = await buildVaultBalancePublishExternalBoc');
     const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(item.external)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
-    const nonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, item.clientNonce + 1n)');
+    const nonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n)');
     const submittedStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_VAULT_SUBMITTED');
     const partialIndex = sendSource.indexOf('vaultPublishPartialError');
 
-    expect(sendIndex).toBeGreaterThanOrEqual(0);
+    expect(nonceReadIndex).toBeGreaterThanOrEqual(0);
+    expect(buildIndex).toBeGreaterThan(nonceReadIndex);
+    expect(sendIndex).toBeGreaterThan(buildIndex);
     expect(sentStatusIndex).toBeGreaterThan(sendIndex);
     expect(nonceIndex).toBeGreaterThan(sentStatusIndex);
     expect(submittedStatusIndex).toBeGreaterThan(nonceIndex);
+    expect(sendSource).toMatch(/clientNonce === null[\s\S]*Vault publish nonce could not be read before signing/);
     expect(sendSource).toMatch(/const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError\(error\)/);
     expect(sendSource).toMatch(/if \(publishState\.submittedCount > 0 \|\| sentBeforeFailure \|\| ambiguousBroadcast\) publishState\.status = VAULT_PUBLISH_STATUS_PARTIAL/);
     expect(app).toMatch(/function isAmbiguousTonRpcBroadcastError\(error\)[\s\S]*if \(isTonRpcRateLimitError\(error\)\) return false;/);
@@ -1232,6 +1242,50 @@ describe('PWA runtime config guard', () => {
     expect(renderSource).toMatch(/onStatus:\s*async \(status\)/);
     expect(renderSource).toMatch(/check claim submitted, confirming/);
     expect(renderSource).toMatch(/paymentCheckClaimBlockedStatus\(error\)/);
+  });
+
+  it('PWA-CONFIG-01D4C: payment check cancel verifies sender and persists terminal state', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const helpers = app.slice(
+      app.indexOf('function paymentAssetVaultBalance'),
+      app.indexOf('function delay'),
+    );
+    const cancelSource = app.slice(
+      app.indexOf('async function submitVaultCancelPaymentCheck'),
+      app.indexOf('async function attemptCancelPaymentCheckAfterPublishFailure'),
+    );
+    const renderSource = app.slice(
+      app.indexOf('function renderConversation'),
+      app.indexOf('async function openImageLightbox'),
+    );
+    const readUserIndex = cancelSource.indexOf('const beforeUser = await readFreshConnectedVaultUser(provider)');
+    const readIntentIndex = cancelSource.indexOf('const intent = await readFreshReceiveIntent(provider, intentId)');
+    const assertIndex = cancelSource.indexOf('assertReceiveIntentCancelableBySender(intent, payment)');
+    const submitIndex = cancelSource.indexOf("submitVaultReceiveIntentExternal('CancelReceiveIntent'");
+    const waitIndex = cancelSource.indexOf('waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser)');
+    const flashIndex = cancelSource.indexOf("flashWalletIdentityStatus('check cancelled')");
+
+    expect(helpers).toMatch(/function assertReceiveIntentCancelableBySender/);
+    expect(helpers).toMatch(/sameWalletAddress\(intent\.sender_wallet, connectedWallet\)/);
+    expect(helpers).toMatch(/payment\.recipientWallet[\s\S]*sameWalletAddress\(intent\.recipient_wallet, payment\.recipientWallet\)/);
+    expect(helpers).toMatch(/function waitForPaymentCheckCancelConfirmation/);
+    expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
+    expect(helpers).toMatch(/Payment check disappeared but sender Vault balance was not restored/);
+    expect(readUserIndex).toBeGreaterThanOrEqual(0);
+    expect(readIntentIndex).toBeGreaterThan(readUserIndex);
+    expect(assertIndex).toBeGreaterThan(readIntentIndex);
+    expect(submitIndex).toBeGreaterThan(assertIndex);
+    expect(waitIndex).toBeGreaterThan(submitIndex);
+    expect(flashIndex).toBeGreaterThan(waitIndex);
+    expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel submitted'\)/);
+    expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel confirming'\)/);
+    expect(renderSource).toMatch(/paymentMetaText\.includes\('cancel signing'\)/);
+    expect(renderSource).toMatch(/paymentMetaText\.includes\('another sender'\)/);
+    expect(renderSource).toMatch(/message\.meta = 'check cancel signing'/);
+    expect(renderSource).toMatch(/onStatus:\s*async \(status\)/);
+    expect(renderSource).toMatch(/message\.meta = 'check cancelled'/);
+    expect(renderSource).toMatch(/paymentCheckCancelBlockedStatus\(error\)/);
+    expect(renderSource).toMatch(/updateMessageInEncryptedHistory\(thread, message\)/);
   });
 
   it('PWA-CONFIG-01D5: public submitted publish creates durable pending feed items', () => {
@@ -1767,11 +1821,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v320/);
+    expect(sw).toMatch(/platho-pwa-prototype-v321/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=260/);
+    expect(sw).toMatch(/\.\/app\.js\?v=261/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

@@ -6977,10 +6977,15 @@ function renderConversation() {
       const paymentActionPending = paymentMetaText.includes('claim submitted')
         || paymentMetaText.includes('claim confirming')
         || paymentMetaText.includes('claim signing')
+        || paymentMetaText.includes('cancel submitted')
+        || paymentMetaText.includes('cancel confirming')
+        || paymentMetaText.includes('cancel signing')
         || paymentMetaText.includes('check claimed');
       const paymentActionTerminal = paymentMetaText.includes('already claimed')
         || paymentMetaText.includes('cancelled')
-        || paymentMetaText.includes('another wallet');
+        || paymentMetaText.includes('check cancelled')
+        || paymentMetaText.includes('another wallet')
+        || paymentMetaText.includes('another sender');
       if (message.type !== 'out' && !paymentActionPending && !paymentActionTerminal) {
         const claim = document.createElement('button');
         claim.type = 'button';
@@ -7012,19 +7017,32 @@ function renderConversation() {
         });
         actions.append(claim);
       }
-      if (message.type === 'out') {
+      if (message.type === 'out' && !paymentActionPending && !paymentActionTerminal) {
         const cancel = document.createElement('button');
         cancel.type = 'button';
         cancel.textContent = 'Cancel';
         cancel.addEventListener('click', async () => {
           cancel.disabled = true;
           try {
-            await submitVaultCancelPaymentCheck(message.payment);
-            message.meta = 'cancel submitted';
+            message.meta = 'check cancel signing';
+            renderConversation();
+            await updateMessageInEncryptedHistory(thread, message);
+            await submitVaultCancelPaymentCheck(message.payment, {
+              onStatus: async (status) => {
+                message.meta = status;
+                await updateMessageInEncryptedHistory(thread, message);
+                renderConversation();
+              },
+            });
+            message.meta = 'check cancelled';
           } catch (error) {
-            message.meta = 'cancel blocked';
-            console.error(error);
+            message.meta = isPaymentCheckCancelPending(error)
+              ? 'check cancel submitted, confirming'
+              : paymentCheckCancelBlockedStatus(error);
+            if (!isPaymentCheckCancelPending(error)) console.error(error);
           } finally {
+            await updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+            queueVaultPostTransactionRefresh();
             renderConversation();
           }
         });
@@ -8868,13 +8886,20 @@ function paymentMessageText(payment) {
 }
 
 function normalizePaymentForMessage(payment) {
-  return {
+  const normalized = {
     asset: String(payment.asset),
     amount: String(payment.amount),
     intentId: String(payment.intentId),
     intentIdHex: payment.intentIdHex ?? bytesToHex(bigIntToFixedBytes(payment.intentId, 32, 'intent id')),
     secret32Hex: payment.secret32Hex ?? bytesToHex(payment.secret32Bytes ?? bigIntToFixedBytes(payment.secret32, 32, 'secret32')),
   };
+  if (payment.senderWallet ?? payment.sender_wallet) {
+    normalized.senderWallet = requireBasechainAddress(payment.senderWallet ?? payment.sender_wallet, 'Payment check sender');
+  }
+  if (payment.recipientWallet ?? payment.recipient_wallet) {
+    normalized.recipientWallet = requireBasechainAddress(payment.recipientWallet ?? payment.recipient_wallet, 'Payment check recipient');
+  }
+  return normalized;
 }
 
 function paymentFromCompactPayload(payload) {
@@ -8922,11 +8947,49 @@ function paymentCheckClaimBlockedStatus(error) {
   return 'check claim blocked';
 }
 
+function paymentCheckCancelPendingError(message = 'Payment check cancel submitted; Vault confirmation is still pending') {
+  const error = new Error(message);
+  error.code = 'PLATHO_PAYMENT_CHECK_CANCEL_PENDING';
+  return error;
+}
+
+function isPaymentCheckCancelPending(error) {
+  return error?.code === 'PLATHO_PAYMENT_CHECK_CANCEL_PENDING';
+}
+
+function paymentCheckCancelBlockedStatus(error) {
+  const text = String(error?.message ?? error ?? '');
+  if (/already claimed|cancelled|does not exist|not found|disappeared/i.test(text)) return 'check already claimed or cancelled';
+  if (/another wallet|sender/i.test(text)) return 'check belongs to another sender';
+  if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
+  return 'check cancel blocked';
+}
+
 function assertReceiveIntentMatchesPayment(intent, payment) {
   if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
   const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   if (!sameWalletAddress(intent.recipient_wallet, connectedWallet)) {
     throw new Error('Payment check is for another wallet');
+  }
+  if (BigInt(intent.asset ?? 0n) !== BigInt(payment.asset ?? 0n)) {
+    throw new Error('Payment check asset mismatch');
+  }
+  if (BigInt(intent.amount ?? 0n) !== BigInt(payment.amount ?? 0n)) {
+    throw new Error('Payment check amount mismatch');
+  }
+}
+
+function assertReceiveIntentCancelableBySender(intent, payment) {
+  if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
+  const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  if (!sameWalletAddress(intent.sender_wallet, connectedWallet)) {
+    throw new Error('Payment check belongs to another sender');
+  }
+  if (payment.senderWallet && !sameWalletAddress(payment.senderWallet, connectedWallet)) {
+    throw new Error('Payment check local sender mismatch');
+  }
+  if (payment.recipientWallet && !sameWalletAddress(intent.recipient_wallet, payment.recipientWallet)) {
+    throw new Error('Payment check recipient mismatch');
   }
   if (BigInt(intent.asset ?? 0n) !== BigInt(payment.asset ?? 0n)) {
     throw new Error('Payment check asset mismatch');
@@ -8982,6 +9045,35 @@ async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUse
     throw new Error('Payment check disappeared but Vault balance did not update');
   }
   throw paymentCheckClaimPendingError();
+}
+
+async function waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser) {
+  const intentId = paymentIntentId(payment);
+  const asset = BigInt(payment.asset ?? 0n);
+  const amount = BigInt(payment.amount ?? 0n);
+  const beforeBalance = paymentAssetVaultBalance(beforeUser, asset);
+  const expectedBalance = beforeBalance + amount;
+  const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
+  let lastIntent = null;
+  let lastUser = beforeUser;
+  while (Date.now() <= deadline) {
+    try {
+      lastIntent = await readFreshReceiveIntent(provider, intentId);
+      lastUser = await readFreshConnectedVaultUser(provider);
+      const balance = paymentAssetVaultBalance(lastUser, asset);
+      if (lastIntent?.exists === false && balance >= expectedBalance) {
+        rememberConnectedVaultUser(lastUser);
+        return { intent: lastIntent, user: lastUser, balance };
+      }
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) throw error;
+    }
+    await delay(PAYMENT_CHECK_CLAIM_POLL_MS);
+  }
+  if (lastIntent?.exists === false) {
+    throw new Error('Payment check disappeared but sender Vault balance was not restored');
+  }
+  throw paymentCheckCancelPendingError();
 }
 
 async function waitForPaymentCheckCreateConfirmation(provider, payment) {
@@ -10341,6 +10433,8 @@ async function submitCreatePaymentCheck(options = {}) {
     amount,
     intentId,
     secret32Bytes,
+    senderWallet,
+    recipientWallet,
   });
   const senderOptions = currentPrivateSenderOptions();
   const senderVaultKeyId = currentVaultMessagingKeyId();
@@ -10448,11 +10542,14 @@ async function submitCreatePaymentCheck(options = {}) {
       message.meta = `check ${publishStateMeta(message.publishState)}`;
     } else {
       const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(payment).catch((cancelError) => {
+        if (isPaymentCheckCancelPending(cancelError)) return { pending: true };
         console.error(cancelError);
         return null;
       });
       message.vaultCancelIntent = cancelResult;
-      message.meta = cancelResult
+      message.meta = cancelResult?.pending
+        ? 'check cancel submitted, confirming'
+        : cancelResult
         ? (cancelled ? 'check cancelled before publish' : 'check publish failed, intent cancelled')
         : (cancelled ? 'check publish cancelled, cancel required' : 'check locked, cancel required');
     }
@@ -10494,15 +10591,26 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
   return { result, confirmed };
 }
 
-async function submitVaultCancelPaymentCheck(payment) {
+async function submitVaultCancelPaymentCheck(payment, options = {}) {
   const provider = await resolveVaultChainProvider();
-  const user = await readFreshConnectedVaultUser(provider);
+  if (!provider?.getReceiveIntent || !provider?.getUser) {
+    throw new Error('Vault provider cannot confirm payment checks');
+  }
+  const intentId = paymentIntentId(payment);
+  const beforeUser = await readFreshConnectedVaultUser(provider);
+  const intent = await readFreshReceiveIntent(provider, intentId);
+  assertReceiveIntentCancelableBySender(intent, payment);
   setText(identitySubtitle, 'cancel signing');
+  await options.onStatus?.('check cancel signing');
   const result = await submitVaultReceiveIntentExternal('CancelReceiveIntent', {
-    intent_id: paymentIntentId(payment),
-  }, { provider, user });
+    intent_id: intentId,
+  }, { provider, user: beforeUser });
+  setText(identitySubtitle, 'cancel confirming');
+  await options.onStatus?.('check cancel submitted, confirming');
+  const confirmed = await waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser);
   flashWalletIdentityStatus('check cancelled');
-  return result;
+  queueVaultPostTransactionRefresh();
+  return { result, confirmed };
 }
 
 async function attemptCancelPaymentCheckAfterPublishFailure(payment) {
@@ -10856,7 +10964,6 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   const quotedHold = composerEstimatedMaxChargeNanotons(quotedProfiles, 1);
   const quotedNetCost = composerEstimatedNetCostNanotons(quotedProfiles, 1);
   const publishState = options.publishState ?? createCapsulePublishState(normalizedCapsules);
-  let publishNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
   const chargePlans = [];
   let totalMaxCharge = 0n;
   const canonicalChargeCache = new Map();
@@ -10880,8 +10987,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
     const messageType = BigInt(publish.publish_kind) === VAULT_PUBLISH_KIND.PUBLIC
       ? 'PublishPublicFromVaultBalance'
       : 'PublishPrivateFromVaultBalance';
-    chargePlans.push({ capsuleId: capsule.id, messageType, publish, maxCharge, clientNonce: publishNonce, partIndex: index });
-    publishNonce += 1n;
+    chargePlans.push({ capsuleId: capsule.id, messageType, publish, maxCharge, partIndex: index });
   }
   const balance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
   if (balance < totalMaxCharge) {
@@ -10905,33 +11011,13 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   }))) {
     throw publishPriceChangeCancelledError();
   }
-  const results = [];
-  for (const item of chargePlans) {
-    const external = await buildVaultBalancePublishExternalBoc(item.messageType, {
-      owner_wallet: owner,
-      client_nonce: item.clientNonce,
-      max_charge: item.maxCharge,
-      publish: item.publish,
-      signingSecretKey: requireVaultAuthSecretKey(),
-      deploymentManifestHash: requireVaultDeploymentManifestHash(),
-    }, {
-      vaultAddress: requireVaultAddress(),
-    });
-    results.push({
-      capsuleId: item.capsuleId,
-      external,
-      maxCharge: item.maxCharge,
-      clientNonce: item.clientNonce,
-      partIndex: item.partIndex,
-    });
-  }
   return {
     normalizedCapsules,
     provider,
     owner,
     user,
     publishState,
-    results,
+    results: chargePlans,
     totalMaxCharge,
     finalNetCost,
   };
@@ -10953,10 +11039,23 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
     const item = results[index];
     notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
     try {
+      const clientNonce = await readVaultPublishNonce(provider, owner);
+      if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
+      item.clientNonce = clientNonce;
+      item.external = await buildVaultBalancePublishExternalBoc(item.messageType, {
+        owner_wallet: owner,
+        client_nonce: clientNonce,
+        max_charge: item.maxCharge,
+        publish: item.publish,
+        signingSecretKey: requireVaultAuthSecretKey(),
+        deploymentManifestHash: requireVaultDeploymentManifestHash(),
+      }, {
+        vaultAddress: requireVaultAddress(),
+      });
       lastResult = await sendVaultExternalBoc(item.external);
       item.result = lastResult;
       notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
-      await waitForVaultPublishNonce(provider, owner, item.clientNonce + 1n);
+      await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
       notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
     } catch (error) {
       const sentBeforeFailure = Boolean(item.result);
