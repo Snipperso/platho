@@ -3,7 +3,7 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T13:16:37.8794496Z",
+  "generated_after_local_run": "2026-06-03T14:13:23.0335628Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
@@ -59,6 +59,7 @@
     "It also includes the PWA account activation restore fix: on wallet unlock/startup the app now refreshes the on-chain Vault activation state before locking navigation, so an already activated account does not need the Activate Platho account button to unlock the other tabs after every app entry.",
     "It also includes the PWA private sender attribution/history fix: new encrypted private compact payloads can carry sender wallet plus Vault key id metadata, inbound sync verifies that claim against the sender Vault key record before using it as the chat identity, anonymous senders are grouped into stable per-sender-key Anonymous threads, and encrypted local history now stores encrypted thread snapshots so restored conversations do not become Imported.",
     "It also includes the PWA private sender privacy toggle: Profile stores the default private sender mode per wallet, the private composer has a separate anonymous/share-address button next to a plus menu for image/payment-check attachments, anonymous private sends omit sender wallet metadata from both message and payment-check payloads, and share-address sends keep verified sender attribution.",
-    "It also includes the Vault-only product action hardening: username mint, profile avatar, and payment-check claim product flows no longer expose direct user wallet transaction paths; ATHWallet now accepts only Vault-funded registry notifications for these product actions, UsernameRegistry/ProfileRegistry removed direct user-wallet receivers, and the PWA removed direct username refund wallet UI/builders."
+    "It also includes the Vault-only product action hardening: username mint, profile avatar, and payment-check claim product flows no longer expose direct user wallet transaction paths; ATHWallet now accepts only Vault-funded registry notifications for these product actions, UsernameRegistry/ProfileRegistry removed direct user-wallet receivers, and the PWA removed direct username refund wallet UI/builders.",
+    "It also includes the Larisa Section 1 Vault signed-external value-flow fix: receive-intent create/claim/cancel, profile avatar, username mint, and messaging-key replacement no longer let signed malformed or underfunded requests drain raw Vault TON without either pre-accept rejection or an explicit local-reserve charge to the user's Vault ledger; related PWA builders, tests, Vault code hash, manifest hash, pricing report, conformance, artifact integrity, and static deploy prep artifacts were refreshed."
   ]
 }

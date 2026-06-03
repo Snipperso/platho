@@ -73,9 +73,7 @@ export function buildVaultReceiveIntentExternalBody(
   const signedPayload = beginCell()
     .storeUint(VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, 32)
     .storeUint(deploymentManifestHash, 256)
-    .storeUint(addressHash(vaultAddress), 256)
     .storeUint(action, 8)
-    .storeUint(addressHash(owner), 256)
     .storeUint(nonce, 64)
     .storeRef(actionPayload.endCell())
     .endCell();

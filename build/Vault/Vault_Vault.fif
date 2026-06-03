@@ -149,6 +149,8 @@ PROGRAM{
   DECLPROC $Vault$_fun_creditActivityAirdrop
   DECLPROC $Vault$_fun_keyRecordStorageEndowment
   DECLPROC $Vault$_fun_validatePqPubkeyCell
+  DECLPROC $Vault$_fun_isValidPqPubkeyCell
+  DECLPROC $Vault$_fun_isValidKeyProfile
   DECLPROC $Vault$_fun_validateKeyProfile
   DECLPROC $Vault$_fun_computeKeyId
   DECLPROC $Vault$_fun_computeReceiveIntentId
@@ -3352,6 +3354,129 @@ PROGRAM{
     }>
     2DROP
   }>
+  $Vault$_fun_isValidPqPubkeyCell PROCREF:<{
+    c2 SAVE
+    SAMEALTSAVE
+    SWAP
+    2 NEQINT
+    IFJMP:<{
+      2DROP
+      FALSE
+    }>
+    DUP
+    10 PUSHINT
+        CDATASIZE
+    s0 s2 XCHG
+    10 NEQINT
+    IFJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    9472 PUSHINT
+    NEQ
+    IFJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    9 NEQINT
+    IFJMP:<{
+      2DROP
+      FALSE
+    }>
+    WHILE:<{
+      OVER
+      0 GTINT
+    }>DO<{
+      127 PUSHINT
+      s2 PUSH
+      1184 PUSHINT
+      EQUAL
+      IF:<{
+        DROP
+        41 PUSHINT
+      }>ELSE<{
+        s2 PUSH
+        127 LESSINT
+        IF:<{
+          DROP
+          OVER
+        }>
+      }>
+      OVER
+          CTOS
+      DUP
+          SBITS
+      s2 PUSH
+      3 LSHIFT#
+      NEQ
+      IFJMP:<{
+        4 BLKDROP
+        FALSE
+        RETALT
+      }>
+      s3 s1 PUSH2
+      GREATER
+      IF:<{
+        s2 POP
+        OVER
+            SREFS
+        1 NEQINT
+        IFJMP:<{
+          3 BLKDROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+            LDREF
+        DROP
+      }>ELSE<{
+            SREFS
+        IFJMP:<{
+          3 BLKDROP
+          FALSE
+          RETALT
+        }>
+        SWAP
+      }>
+      -ROT
+      SUB
+      SWAP
+    }>
+    2DROP
+    TRUE
+  }>
+  $Vault$_fun_isValidKeyProfile PROCREF:<{
+    s0 s5 XCHG
+    IFNOTJMP:<{
+      5 BLKDROP
+      FALSE
+    }>
+    s0 s3 XCHG
+    IFNOTJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    s3 PUSH
+    2 NEQINT
+    IFJMP:<{
+      4 BLKDROP
+      FALSE
+    }>
+    SWAP
+    IFNOTJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    DUP
+    1184 PUSHINT
+    NEQ
+    IFJMP:<{
+      3 BLKDROP
+      FALSE
+    }>
+    -ROT
+    $Vault$_fun_isValidPqPubkeyCell INLINECALLDICT
+  }>
   $Vault$_fun_validateKeyProfile PROCREF:<{
     16101 PUSHINT
     s0 s6 XCHG
@@ -3419,17 +3544,7 @@ PROGRAM{
         HASHCU
   }>
   $Vault$_fun_computeReceiveIntentCommitment PROCREF:<{
-        NEWC
-    1380139853 PUSHINT
-    SWAP
-    32 STU
-    s1 s3 XCHG
-    256 STU
-    SWAP
-        STSLICER
-    256 STU
-        ENDC
-        HASHCU
+    2 1 BLKDROP2
   }>
   $VaultUserView$_constructor_exists_ton_balance_ath_balance_current_key_id_auth_pubkey_publish_nonce PROCINLINE:<{
   }>
@@ -7303,6 +7418,17 @@ PROGRAM{
       THROWANYIFNOT
       s0 s4 XCHG
           CTOS
+      16136 PUSHINT
+      OVER
+          SBITS
+      864 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      16137 PUSHINT
+      OVER
+          SREFS
+      1 EQINT
+      THROWANYIFNOT
       32 LDU
       16131 PUSHINT
       s0 s2 XCHG
@@ -7359,52 +7485,122 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-      16136 PUSHINT
-      OVER
-          SBITS
-      0 EQINT
-      THROWANYIFNOT
-      16137 PUSHINT
-      OVER
-          SREFS
-      1 EQINT
-      THROWANYIFNOT
-      22 s() 28 s() XCHG
-      21 s() 27 s() XCHG
-      20 s() 26 s() XCHG
-      19 s() 25 s() XCHG
-      18 s() 24 s() XCHG
-      17 s() 23 s() XCHG
-      16 s() 28 s() XCHG
-      s15 27 s() XCHG
-      s14 26 s() XCHG
-      s13 25 s() XCHG
-      s12 24 s() XCHG
-      s11 23 s() XCHG
-      s10 28 s() XCHG
-      s9 27 s() XCHG
-      s8 26 s() XCHG
-      s7 25 s() XCHG
-      s6 24 s() XCHG
-      s5 23 s() XCHG
-      s4 28 s() XCHG
-      s3 27 s() XCHG
-      s2 26 s() XCHG
-      s1 25 s() XCHG
-      s0 29 s() XCHG
-      2 PUSHINT
-      $Vault$_fun_keyRecordStorageEndowment INLINECALLDICT
       2000000 PUSHINT
-      ADD
       16126 PUSHINT
-      29 s() PUSH
-      s2 PUSH
+      s5 s1 PUSH2
       GEQ
       THROWANYIFNOT
           ACCEPT
-      s0 30 s() XCHG
+      s4 s4 XCPU
+      SUB
+      s0 s6 XCHG
+      INC
+      267 PUSHINT
+      s7 s4 s3 PUSH3
+      s9 s4 PUSH2
+      NEWC
+      $UserState$_store_cell INLINECALLDICT
+      s2 22 s() XCHG
+      s9 s(-1) PUXC
+      __tact_dict_set_slice_cell INLINECALLDICT
+          COMMIT
+      SWAP
           LDREF
       DROP
+      DUP
+          CTOS
+      DUP
+          SBITS
+      800 PUSHINT
+      EQUAL
+      IFNOTJMP:<{
+        s2 s8 XCHG
+        8 BLKDROP
+        s13 POP
+        21 s() 22 s() XCHG
+        20 s() 21 s() XCHG
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
+        17 s() 18 s() XCHG
+        16 s() 17 s() XCHG
+        s15 16 s() XCHG
+        15 ROLL
+        $Vault$_contract_store INLINECALLDICT
+      }>
+          SREFS
+      1 EQINT
+      IFNOTJMP:<{
+        s1 s7 XCHG
+        7 BLKDROP
+        s13 POP
+        21 s() 22 s() XCHG
+        20 s() 21 s() XCHG
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
+        17 s() 18 s() XCHG
+        16 s() 17 s() XCHG
+        s15 16 s() XCHG
+        15 ROLL
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      22 s() 29 s() XCHG
+      21 s() 28 s() XCHG
+      20 s() 27 s() XCHG
+      19 s() 26 s() XCHG
+      18 s() 25 s() XCHG
+      17 s() 24 s() XCHG
+      16 s() 23 s() XCHG
+      s15 29 s() XCHG
+      s14 28 s() XCHG
+      s1 s13 XCHG
+      s12 26 s() XCHG
+      s11 25 s() XCHG
+      s10 24 s() XCHG
+      s9 23 s() XCHG
+      s8 29 s() XCHG
+      s7 28 s() XCHG
+      s1 s6 XCHG
+      s5 26 s() XCHG
+      s4 25 s() XCHG
+      s3 24 s() XCHG
+      s2 23 s() XCHG
+      s1 29 s() XCHG
+      s0 30 s() XCHG
+      2 PUSHINT
+      $Vault$_fun_keyRecordStorageEndowment INLINECALLDICT
+      26 s() PUSH
+      ADD
+      SWAP
+      s0 26 s() XCHG
+      SUB
+      29 s() PUSH
+      OVER
+      GEQ
+      IFNOTJMP:<{
+        DROP
+        22 s() POP
+        22 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s14 22 s() XCHG
+        s13 21 s() XCHG
+        s12 20 s() XCHG
+        s11 19 s() XCHG
+        s10 18 s() XCHG
+        s9 17 s() XCHG
+        s8 16 s() XCHG
+        8 8 BLKSWAP
+        s6 s7 XCHG
+        s5 s6 XCHG
+        s4 s5 XCHG
+        s3 s4 XCHG
+        s0 s3 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      s0 30 s() XCHG
           CTOS
       256 LDU
       256 LDU
@@ -7412,173 +7608,409 @@ PROGRAM{
       16 LDU
           LDREF
       16 LDU
-      16138 PUSHINT
-      OVER
+      DUP
           SBITS
       0 EQINT
-      THROWANYIFNOT
-      16139 PUSHINT
-      SWAP
+      IFNOTJMP:<{
+        7 BLKDROP
+        22 s() POP
+        22 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s14 22 s() XCHG
+        s13 21 s() XCHG
+        s12 20 s() XCHG
+        s11 19 s() XCHG
+        s10 18 s() XCHG
+        s9 17 s() XCHG
+        s8 16 s() XCHG
+        8 8 BLKSWAP
+        s6 s7 XCHG
+        s5 s6 XCHG
+        s4 s5 XCHG
+        s3 s4 XCHG
+        s0 s3 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
           SREFS
       0 EQINT
-      THROWANYIFNOT
-      22 s() 28 s() XCHG
-      21 s() 27 s() XCHG
-      20 s() 26 s() XCHG
-      19 s() 25 s() XCHG
-      18 s() 24 s() XCHG
-      17 s() 23 s() XCHG
-      16 s() 28 s() XCHG
-      s15 27 s() XCHG
-      s14 26 s() XCHG
-      s13 25 s() XCHG
-      s12 24 s() XCHG
-      s11 23 s() XCHG
-      s10 28 s() XCHG
-      s9 27 s() XCHG
-      s8 26 s() XCHG
-      s7 25 s() XCHG
-      s6 24 s() XCHG
-      s5 23 s() XCHG
-      s4 28 s() XCHG
-      s3 27 s() XCHG
-      s2 26 s() XCHG
-      s1 25 s() XCHG
-      s0 24 s() XCHG
-      23 s() PUSH
-      29 s() PUSH
-      29 s() PUSH
-      29 s() PUSH
-      29 s() PUSH
-      29 s() PUSH
-      $Vault$_fun_validateKeyProfile INLINECALLDICT
-      16129 PUSHINT
-      29 s() PUSH
-      36 s() PUSH
+      IFNOTJMP:<{
+        6 BLKDROP
+        22 s() POP
+        22 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s14 22 s() XCHG
+        s13 21 s() XCHG
+        s12 20 s() XCHG
+        s11 19 s() XCHG
+        s10 18 s() XCHG
+        s9 17 s() XCHG
+        s8 16 s() XCHG
+        8 8 BLKSWAP
+        s6 s7 XCHG
+        s5 s6 XCHG
+        s4 s5 XCHG
+        s3 s4 XCHG
+        s0 s3 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      22 s() 27 s() XCHG
+      21 s() 26 s() XCHG
+      20 s() 25 s() XCHG
+      19 s() 24 s() XCHG
+      18 s() 23 s() XCHG
+      17 s() 27 s() XCHG
+      16 s() 26 s() XCHG
+      s15 25 s() XCHG
+      s14 24 s() XCHG
+      s13 23 s() XCHG
+      s12 27 s() XCHG
+      s11 26 s() XCHG
+      s10 25 s() XCHG
+      s9 24 s() XCHG
+      s8 23 s() XCHG
+      s7 27 s() XCHG
+      s6 26 s() XCHG
+      s5 25 s() XCHG
+      s4 24 s() XCHG
+      s3 23 s() XCHG
+      s2 27 s() XCHG
+      s1 26 s() XCHG
+      s0 30 s() XCHG
+      25 s() PUSH
+      25 s() PUSH
+      25 s() PUSH
+      30 s() PUSH
+      30 s() PUSH
+      35 s() PUSH
+      $Vault$_fun_isValidKeyProfile INLINECALLDICT
+      IFNOTJMP:<{
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      24 s() PUSH
+      32 s() PUSH
       NEQ
-      THROWANYIFNOT
+      IFNOTJMP:<{
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
       s12 PUSH
       257 PUSHINT
-      33 s() PUSH
+      30 s() PUSH
       __tact_dict_get_int_cell INLINECALLDICT
       $KeyRecord$_load_opt INLINECALLDICT
-      16122 PUSHINT
-      OVER
+      DUP
       ISNULL
-      NOT
-      THROWANYIFNOT
+      IFJMP:<{
+        DROP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
       $KeyRecord$_not_null INLINECALLDICT
       NIP
-      16123 PUSHINT
-      s11 PUSH
-      43 s() PUSH
+      s10 PUSH
+      45 s() PUSH
       SDEQ
-      THROWANYIFNOT
-      16124 PUSHINT
-      SWAP
+      IFNOTJMP:<{
+        11 BLKDROP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
       0 EQINT
-      THROWANYIFNOT
-      16125 PUSHINT
-      s9 PUSH
+      IFNOTJMP:<{
+        10 BLKDROP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      s8 PUSH
       32 PUSHPOW2DEC
       LESS
-      THROWANYIFNOT
+      IFNOTJMP:<{
+        10 BLKDROP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      s8 PUSH
+      INC
+      22 s() 33 s() XCHG
+      21 s() 32 s() XCHG
+      20 s() 31 s() XCHG
+      19 s() 30 s() XCHG
+      18 s() 29 s() XCHG
+      17 s() 28 s() XCHG
+      16 s() 27 s() XCHG
+      s15 26 s() XCHG
+      s14 25 s() XCHG
+      s13 24 s() XCHG
+      s12 23 s() XCHG
+      s11 33 s() XCHG
+      s10 32 s() XCHG
+      s9 31 s() XCHG
+      s8 30 s() XCHG
+      s7 29 s() XCHG
+      s6 28 s() XCHG
+      s5 27 s() XCHG
+      s4 26 s() XCHG
+      s3 25 s() XCHG
+      s2 24 s() XCHG
+      s1 23 s() XCHG
+      s0 33 s() XCHG
+      44 s() PUSH
+      34 s() PUSH
+      38 s() PUSH
+      38 s() PUSH
+      38 s() PUSH
+      43 s() PUSH
+      47 s() PUSH
+      $Vault$_fun_computeKeyId INLINECALLDICT
+      s13 PUSH
+      257 PUSHINT
+      s2 PUSH
+      __tact_dict_exists_int INLINECALLDICT
+      IFJMP:<{
+        DROP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        24 s() POP
+        22 s() POP
+        20 s() 21 s() XCHG
+        19 s() 20 s() XCHG
+        18 s() 19 s() XCHG
+        17 s() 18 s() XCHG
+        16 s() 17 s() XCHG
+        s15 16 s() XCHG
+        15 ROLL
+        $Vault$_contract_store INLINECALLDICT
+      }>
           NOW
           LTIME
-      s9 s11 XCHG
+      s10 35 s() XCHG
+      s9 34 s() XCHG
+      s8 33 s() XCHG
+      s7 32 s() XCHG
+      s6 31 s() XCHG
+      s5 30 s() XCHG
+      s4 29 s() XCHG
+      s3 28 s() XCHG
+      s2 27 s() XCHG
+      s1 26 s() XCHG
       257 PUSHINT
-      s11 PUSH
-      s0 s10 XCHG
-      s9 s13 XCHG
-      s0 s8 XCHG
-      s7 s13 XCHG
-      s0 s6 XCHG
-      s5 s13 XCHG
-      s0 s4 XCHG
-      s3 s13 XCHG
-      s13 s2 XCHG2
+      s0 27 s() XCHG
+      SWAP
       NEWC
       $KeyRecord$_store_cell INLINECALLDICT
-      s3 s15 XCHG
-      s1 34 s() XCHG
+      s3 s5 XCHG
+      s2 16 s() XCHG
+      s1 32 s() XCHG
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 31 s() XCHG
-      INC
-      s0 31 s() XCHG
-      s0 s12 XCHG
-      30 s() PUSH
-      32 s() PUSH
-      25 s() PUSH
-      31 s() PUSH
-      31 s() PUSH
-      31 s() PUSH
-      30 s() PUSH
-      $Vault$_fun_computeKeyId INLINECALLDICT
-      16127 PUSHINT
-      s14 PUSH
-      257 PUSHINT
-      s3 PUSH
-      __tact_dict_exists_int INLINECALLDICT
-      NOT
-      THROWANYIFNOT
       257 PUSHINT
           NOW
           LTIME
       0 PUSHINT
       DUP
-      36 s() PUSH
+      39 s() PUSH
       s0 s11 XCHG
-      s10 38 s() XCHG
-      s9 30 s() XCHG
-      s8 35 s() XCHG
-      s7 34 s() XCHG
-      s6 33 s() XCHG
-      s5 32 s() XCHG
-      s0 31 s() XCHG
+      s10 29 s() XCHG
+      s9 32 s() XCHG
+      s8 31 s() XCHG
+      s7 30 s() XCHG
+      s6 34 s() XCHG
+      s5 33 s() XCHG
+      s0 37 s() XCHG
       4 -ROLL
       $KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt INLINECALLDICT
       NEWC
       $KeyRecord$_store_cell INLINECALLDICT
-      s2 s8 XCHG
-      s1 21 s() XCHG
-      22 s() PUSH
-      SWAP
+      s2 23 s() XCHG
+      s1 22 s() XCHG
+      s9 s(-1) PUXC
       __tact_dict_set_int_cell INLINECALLDICT
-      s0 18 s() XCHG
+      s0 s12 XCHG
       INC
-      s1 27 s() XCHG
+      s1 28 s() XCHG
       s0 29 s() XCHG
       SUB
-      s0 22 s() XCHG
-      INC
-      s3 22 s() XCHG
-      s2 25 s() XCHG
-      s1 19 s() XCHG
+      s0 s3 XCHG
+      s2 22 s() XCHG
+      s0 24 s() XCHG
+      s1 s6 XCHG
       267 PUSHINT
-      s0 28 s() XCHG
-      SWAP
+      s0 26 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s2 24 s() XCHG
-      s1 20 s() XCHG
+      s3 s15 XCHG
+      s2 22 s() XCHG
+      s1 23 s() XCHG
       __tact_dict_set_slice_cell INLINECALLDICT
-      s9 22 s() XCHG
-      s8 21 s() XCHG
-      s7 20 s() XCHG
-      s6 19 s() XCHG
-      s5 18 s() XCHG
-      s4 17 s() XCHG
-      s3 16 s() XCHG
-      s15 s14 s13 XCHG3
-      s11 s12 XCHG
-      s4 s11 XCHG
-      s3 s10 XCHG
-      s6 s9 XCHG
-      s0 s8 XCHG
-      s0 s6 XCHG
-      s0 s4 XCHG
-      s0 s5 XCHG
-      3 -ROLL
+      20 s() 22 s() XCHG
+      18 s() 21 s() XCHG
+      16 s() 20 s() XCHG
+      s12 19 s() XCHG
+      s14 17 s() XCHG
+      4 13 REVERSE
+      s9 s14 XCHG
+      s0 s13 XCHG
+      s5 s12 XCHG
+      s10 s11 XCHG
+      s5 s9 XCHG
+      s5 s8 XCHG
+      s5 s7 XCHG
+      s5 s6 XCHG
+      4 -ROLL
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
@@ -7641,6 +8073,17 @@ PROGRAM{
       THROWANYIFNOT
       s0 29 s() XCHG
           CTOS
+      16227 PUSHINT
+      OVER
+          SBITS
+      360 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      16228 PUSHINT
+      OVER
+          SREFS
+      1 EQINT
+      THROWANYIFNOT
       32 LDU
       16223 PUSHINT
       s0 s2 XCHG
@@ -7655,46 +8098,11 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-      256 LDU
-          MYADDR
-      16225 PUSHINT
-      SWAP
-      11 LDU
-      SWAP
-      10 PUSHPOW2
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16225 PUSHINT
-      SWAP
-      256 LDU
-      DROP
-      s1 s3 XCHG
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      8 LDU
       16226 PUSHINT
-      s0 s2 XCHG
+      SWAP
+      8 LDU
+      SWAP
       1 EQINT
-      s1 s2 XCHG
-      THROWANYIFNOT
-      256 LDU
-      29 s() PUSH
-      16227 PUSHINT
-      SWAP
-      11 LDU
-      SWAP
-      10 PUSHPOW2
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16227 PUSHINT
-      SWAP
-      256 LDU
-      DROP
-      s1 s3 XCHG
-      EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
       64 LDU
@@ -7703,13 +8111,23 @@ PROGRAM{
       30 s() PUSH
       EQUAL
       THROWANYIFNOT
+      2000000 PUSHINT
+      16265 PUSHINT
+      s6 s1 PUSH2
+      GEQ
+      THROWANYIFNOT
           ACCEPT
-      s0 28 s() XCHG
+      s0 29 s() XCHG
       INC
+      s0 s5 XCHG
+      29 s() PUSH
+      SUB
+      29 s() POP
       267 PUSHINT
-      s5 s4 s3 PUSH3
+      29 s() PUSH
+      s5 s4 PUSH2
       34 s() PUSH
-      s5 PUSH
+      s9 PUSH
       NEWC
       $UserState$_store_cell INLINECALLDICT
       s2 20 s() XCHG
@@ -7717,7 +8135,7 @@ PROGRAM{
       SWAP
       __tact_dict_set_slice_cell INLINECALLDICT
           COMMIT
-      28 s() PUSH
+      18 s() PUSH
           SBITS
       0 EQINT
       IFNOTJMP:<{
@@ -7738,7 +8156,7 @@ PROGRAM{
         3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      28 s() PUSH
+      18 s() PUSH
           SREFS
       1 EQINT
       IFNOTJMP:<{
@@ -7759,7 +8177,7 @@ PROGRAM{
         3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 28 s() XCHG
+      s0 18 s() XCHG
           LDREF
       DROP
           CTOS
@@ -7772,7 +8190,7 @@ PROGRAM{
       0 EQINT
       IFNOTJMP:<{
         9 BLKDROP
-        s13 POP
+        23 s() POP
         23 s() POP
         23 s() POP
         19 s() 22 s() XCHG
@@ -7784,23 +8202,14 @@ PROGRAM{
         s13 16 s() XCHG
         s12 s15 XCHG
         s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
+        3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
           SREFS
       0 EQINT
       IFNOTJMP:<{
         8 BLKDROP
-        s13 POP
+        23 s() POP
         23 s() POP
         23 s() POP
         19 s() 22 s() XCHG
@@ -7812,16 +8221,7 @@ PROGRAM{
         s13 16 s() XCHG
         s12 s15 XCHG
         s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
+        3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
       s3 PUSH
@@ -7834,7 +8234,7 @@ PROGRAM{
       }>
       IFNOTJMP:<{
         8 BLKDROP
-        s13 POP
+        23 s() POP
         23 s() POP
         23 s() POP
         19 s() 22 s() XCHG
@@ -7846,23 +8246,14 @@ PROGRAM{
         s13 16 s() XCHG
         s12 s15 XCHG
         s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
+        3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
       s2 PUSH
       0 GTINT
       IFNOTJMP:<{
         8 BLKDROP
-        s13 POP
+        23 s() POP
         23 s() POP
         23 s() POP
         19 s() 22 s() XCHG
@@ -7874,22 +8265,13 @@ PROGRAM{
         s13 16 s() XCHG
         s12 s15 XCHG
         s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
+        3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
       DUP
       IFNOTJMP:<{
         8 BLKDROP
-        s13 POP
+        23 s() POP
         23 s() POP
         23 s() POP
         19 s() 22 s() XCHG
@@ -7901,29 +8283,21 @@ PROGRAM{
         s13 16 s() XCHG
         s12 s15 XCHG
         s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
+        3 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      9000000 PUSHINT
+      7000000 PUSHINT
       s4 PUSH
       1 EQINT
       IF:<{
         s3 s0 PUSH2
         ADD
-        s9 s(-1) PUXC
+        33 s() PUSH
+        SWAP
         GEQ
         IFNOTJMP:<{
           9 BLKDROP
-          s13 POP
+          23 s() POP
           23 s() POP
           23 s() POP
           19 s() 22 s() XCHG
@@ -7935,23 +8309,108 @@ PROGRAM{
           s13 16 s() XCHG
           s12 s15 XCHG
           s11 s14 XCHG
-          s11 s13 XCHG
-          s9 s12 XCHG
-          s8 s11 XCHG
-          s7 s10 XCHG
-          s6 s9 XCHG
-          s5 s8 XCHG
-          s4 s7 XCHG
-          s3 s6 XCHG
-          s5 s3 s3 XCHG3
-          s0 s4 XCHG
+          3 11 BLKSWAP
           $Vault$_contract_store INLINECALLDICT
           RETALT
         }>
-        s3 s(-1) PUXC
+        22 s() 31 s() XCHG
+        21 s() 30 s() XCHG
+        20 s() 29 s() XCHG
+        19 s() 28 s() XCHG
+        18 s() 27 s() XCHG
+        17 s() 26 s() XCHG
+        16 s() 25 s() XCHG
+        s15 24 s() XCHG
+        s14 23 s() XCHG
+        s13 31 s() XCHG
+        s12 30 s() XCHG
+        s11 29 s() XCHG
+        s10 28 s() XCHG
+        s9 27 s() XCHG
+        s8 26 s() XCHG
+        s7 25 s() XCHG
+        s6 24 s() XCHG
+        s5 23 s() XCHG
+        s4 31 s() XCHG
+        s3 30 s() XCHG
+        s2 29 s() XCHG
+        s1 28 s() XCHG
+        s0 27 s() XCHG
+        33 s() PUSH
+        30 s() PUSH
+        33 s() PUSH
+        33 s() PUSH
+        27 s() PUSH
+        $Vault$_fun_computeReceiveIntentId INLINECALLDICT
+        s12 PUSH
+        257 PUSHINT
+        s2 PUSH
+        __tact_dict_exists_int INLINECALLDICT
+        IFJMP:<{
+          DROP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          s10 22 s() XCHG
+          s9 21 s() XCHG
+          s8 20 s() XCHG
+          s7 19 s() XCHG
+          s6 18 s() XCHG
+          s5 17 s() XCHG
+          s4 16 s() XCHG
+          s3 s15 XCHG
+          s14 s13 s12 XCHG3
+          11 ROLL
+          $Vault$_contract_store INLINECALLDICT
+          RETALT
+        }>
+        31 s() PUSH
+        SWAP
+        s0 29 s() XCHG
         ADD
-        s1 s8 XCHG
+        s1 33 s() XCHG
         SUB
+        s0 s3 XCHG
+        s2 25 s() XCHG
+        s1 24 s() XCHG
+        s0 34 s() XCHG
+        267 PUSHINT
+        s0 27 s() XCHG
+        NEWC
+        $UserState$_store_cell INLINECALLDICT
+        s2 s10 XCHG
+        s1 23 s() XCHG
+        30 s() PUSH
+        SWAP
+        __tact_dict_set_slice_cell INLINECALLDICT
+        257 PUSHINT
+        2000000 PUSHINT
+            NOW
+        s7 31 s() XCHG
+        s6 27 s() XCHG
+        s5 29 s() XCHG
+        s4 28 s() XCHG
+        s3 26 s() XCHG
+        s2 21 s() XCHG
+        FALSE
+        $ReceiveIntent$_constructor_sender_wallet_recipient_wallet_asset_amount_commitment_client_nonce_settlement_reserve_ton_created_at_claimed INLINECALLDICT
+        NEWC
+        $ReceiveIntent$_store_cell INLINECALLDICT
+        s2 s3 XCHG
+        s2 s14 XCHG
+        s1 18 s() XCHG
+        __tact_dict_set_int_cell INLINECALLDICT
+        s0 22 s() XCHG
+        INC
       }>ELSE<{
         22 s() 31 s() XCHG
         21 s() 30 s() XCHG
@@ -7962,7 +8421,7 @@ PROGRAM{
         16 s() 25 s() XCHG
         s15 24 s() XCHG
         s14 23 s() XCHG
-        s13 32 s() XCHG
+        s13 31 s() XCHG
         s12 30 s() XCHG
         s11 29 s() XCHG
         s10 28 s() XCHG
@@ -7971,7 +8430,7 @@ PROGRAM{
         s7 25 s() XCHG
         s6 24 s() XCHG
         s5 23 s() XCHG
-        s4 32 s() XCHG
+        s4 31 s() XCHG
         s3 30 s() XCHG
         s2 29 s() XCHG
         s1 28 s() XCHG
@@ -8061,7 +8520,7 @@ PROGRAM{
           $Vault$_contract_store INLINECALLDICT
           RETALT
         }>
-        26 s() PUSH
+        32 s() PUSH
         28 s() PUSH
         GEQ
         IFNOTJMP:<{
@@ -8090,144 +8549,99 @@ PROGRAM{
           $Vault$_contract_store INLINECALLDICT
           RETALT
         }>
-        s0 25 s() XCHG
+        33 s() PUSH
         30 s() PUSH
+        33 s() PUSH
+        33 s() PUSH
+        27 s() PUSH
+        $Vault$_fun_computeReceiveIntentId INLINECALLDICT
+        s12 PUSH
+        257 PUSHINT
+        s2 PUSH
+        __tact_dict_exists_int INLINECALLDICT
+        IFJMP:<{
+          DROP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          23 s() POP
+          s10 22 s() XCHG
+          s9 21 s() XCHG
+          s8 20 s() XCHG
+          s7 19 s() XCHG
+          s6 18 s() XCHG
+          s5 17 s() XCHG
+          s4 16 s() XCHG
+          s3 s15 XCHG
+          s14 s13 s12 XCHG3
+          11 ROLL
+          $Vault$_contract_store INLINECALLDICT
+          RETALT
+        }>
+        s0 26 s() XCHG
+        31 s() PUSH
         SUB
-        s1 26 s() XCHG
+        s1 33 s() XCHG
+        s0 28 s() XCHG
+        SUB
+        s0 s3 XCHG
+        s2 27 s() XCHG
+        s1 24 s() XCHG
+        s0 34 s() XCHG
+        267 PUSHINT
         s0 27 s() XCHG
-        SUB
-        s12 31 s() XCHG
-        21 s() 30 s() XCHG
-        20 s() 29 s() XCHG
-        19 s() 28 s() XCHG
-        18 s() 27 s() XCHG
-        17 s() 26 s() XCHG
-        16 s() 25 s() XCHG
-        s15 24 s() XCHG
-        s14 23 s() XCHG
-        s13 22 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        s4 s13 XCHG
-        s3 s12 XCHG
-        s11 s10 s0 XCHG3
-        s7 s9 XCHG
-        s6 s8 XCHG
+        NEWC
+        $UserState$_store_cell INLINECALLDICT
+        s2 s10 XCHG
+        s1 23 s() XCHG
+        30 s() PUSH
+        SWAP
+        __tact_dict_set_slice_cell INLINECALLDICT
+        257 PUSHINT
+        2000000 PUSHINT
+            NOW
+        s7 31 s() XCHG
+        s6 27 s() XCHG
+        s5 29 s() XCHG
+        s4 28 s() XCHG
+        s3 26 s() XCHG
+        s2 21 s() XCHG
+        FALSE
+        $ReceiveIntent$_constructor_sender_wallet_recipient_wallet_asset_amount_commitment_client_nonce_settlement_reserve_ton_created_at_claimed INLINECALLDICT
+        NEWC
+        $ReceiveIntent$_store_cell INLINECALLDICT
+        s2 s3 XCHG
+        s2 s14 XCHG
+        s1 16 s() XCHG
+        __tact_dict_set_int_cell INLINECALLDICT
+        s0 22 s() XCHG
+        INC
+        s13 s15 XCHG
       }>
-      22 s() 30 s() XCHG
-      21 s() 29 s() XCHG
-      20 s() 28 s() XCHG
-      19 s() 27 s() XCHG
-      18 s() 26 s() XCHG
-      17 s() 25 s() XCHG
-      16 s() 24 s() XCHG
-      s15 23 s() XCHG
-      s14 30 s() XCHG
-      s13 31 s() XCHG
-      s12 28 s() XCHG
-      s11 27 s() XCHG
-      s10 26 s() XCHG
-      s9 25 s() XCHG
-      s8 24 s() XCHG
-      s7 23 s() XCHG
-      s6 30 s() XCHG
-      s5 31 s() XCHG
-      s4 28 s() XCHG
-      s3 27 s() XCHG
-      s2 26 s() XCHG
-      s1 25 s() XCHG
-      s0 24 s() XCHG
-      32 s() PUSH
-      26 s() PUSH
-      29 s() PUSH
-      29 s() PUSH
-      32 s() PUSH
-      $Vault$_fun_computeReceiveIntentId INLINECALLDICT
-      s12 PUSH
-      257 PUSHINT
-      s2 PUSH
-      __tact_dict_exists_int INLINECALLDICT
-      IFJMP:<{
-        DROP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s11 22 s() XCHG
-        s10 21 s() XCHG
-        s9 20 s() XCHG
-        s8 19 s() XCHG
-        s7 18 s() XCHG
-        s6 17 s() XCHG
-        s5 16 s() XCHG
-        s4 s15 XCHG
-        s3 s14 XCHG
-        s13 s1 s11 XCHG3
-        10 -ROLL
-        s0 s12 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s3 25 s() XCHG
-      s2 31 s() XCHG
-      s1 32 s() XCHG
-      s0 34 s() XCHG
-      267 PUSHINT
-      s0 31 s() XCHG
-      NEWC
-      $UserState$_store_cell INLINECALLDICT
-      s2 s11 XCHG
-      s1 27 s() XCHG
-      30 s() PUSH
+      s10 22 s() XCHG
+      s9 21 s() XCHG
+      s8 20 s() XCHG
+      s7 19 s() XCHG
+      s6 18 s() XCHG
+      s5 17 s() XCHG
+      s4 16 s() XCHG
+      s3 s15 XCHG
+      s2 s14 XCHG
+      s4 s13 XCHG
+      s11 s12 XCHG
+      s10 s11 XCHG
+      s3 s10 XCHG
+      s1 s5 XCHG
+      s4 s8 s3 XCHG3
       SWAP
-      __tact_dict_set_slice_cell INLINECALLDICT
-      257 PUSHINT
-      2000000 PUSHINT
-          NOW
-      s7 31 s() XCHG
-      s6 24 s() XCHG
-      s5 26 s() XCHG
-      s4 25 s() XCHG
-      s3 22 s() XCHG
-      s2 27 s() XCHG
-      FALSE
-      $ReceiveIntent$_constructor_sender_wallet_recipient_wallet_asset_amount_commitment_client_nonce_settlement_reserve_ton_created_at_claimed INLINECALLDICT
-      NEWC
-      $ReceiveIntent$_store_cell INLINECALLDICT
-      s2 20 s() XCHG
-      s1 25 s() XCHG
-      __tact_dict_set_int_cell INLINECALLDICT
-      s0 18 s() XCHG
-      INC
-      s11 22 s() XCHG
-      s10 21 s() XCHG
-      s9 20 s() XCHG
-      s8 19 s() XCHG
-      s7 18 s() XCHG
-      s6 17 s() XCHG
-      s5 16 s() XCHG
-      s4 s15 XCHG
-      s3 s14 XCHG
-      s1 s12 XCHG
-      s1 s13 XCHG
-      s7 s11 XCHG
-      5 6 REVERSE
-      s6 s8 XCHG
-      s3 s7 XCHG
-      s5 s6 XCHG
-      s4 s5 XCHG
-      s1 s4 s3 XCHG3
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
@@ -8304,46 +8718,11 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-      256 LDU
-          MYADDR
-      16244 PUSHINT
-      SWAP
-      11 LDU
-      SWAP
-      10 PUSHPOW2
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16244 PUSHINT
-      SWAP
-      256 LDU
-      DROP
-      s1 s3 XCHG
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      8 LDU
       16245 PUSHINT
-      s0 s2 XCHG
+      SWAP
+      8 LDU
+      SWAP
       2 EQINT
-      s1 s2 XCHG
-      THROWANYIFNOT
-      256 LDU
-      29 s() PUSH
-      16246 PUSHINT
-      SWAP
-      11 LDU
-      SWAP
-      10 PUSHPOW2
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16246 PUSHINT
-      SWAP
-      256 LDU
-      DROP
-      s1 s3 XCHG
-      EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
       64 LDU
@@ -8353,399 +8732,82 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-          ACCEPT
-      s0 27 s() XCHG
-      INC
-      267 PUSHINT
-      s4 s3 s2 PUSH3
-      33 s() PUSH
-      s5 PUSH
-      NEWC
-      $UserState$_store_cell INLINECALLDICT
-      s2 19 s() XCHG
-      30 s() PUSH
-      SWAP
-      __tact_dict_set_slice_cell INLINECALLDICT
-          COMMIT
-      27 s() PUSH
-          SBITS
-      0 EQINT
-      IFNOTJMP:<{
-        17 s() POP
-        3 BLKDROP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        3 11 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      27 s() PUSH
-          SREFS
-      1 EQINT
-      IFNOTJMP:<{
-        17 s() POP
-        3 BLKDROP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        3 11 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s0 27 s() XCHG
           LDREF
       DROP
           CTOS
       256 LDU
       256 LDU
-      DUP
-          SBITS
-      0 EQINT
-      IFNOTJMP:<{
-        6 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
-          SREFS
-      0 EQINT
-      IFNOTJMP:<{
-        5 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
+      DROP
       16 s() PUSH
       257 PUSHINT
       s3 PUSH
       __tact_dict_get_int_cell INLINECALLDICT
       $ReceiveIntent$_load_opt INLINECALLDICT
-      DUP
+      16276 PUSHINT
+      OVER
       ISNULL
-      IFJMP:<{
-        6 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
+      NOT
+      THROWANYIFNOT
       $ReceiveIntent$_not_null INLINECALLDICT
-      s8 POP
-      3 BLKDROP
+      4 BLKDROP
+      s4 POP
+      33 s() PUSH
+      16278 PUSHINT
       s0 s4 XCHG
-      IFJMP:<{
-        9 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      33 s() PUSH
-      s0 s3 XCHG2
       SDEQ
-      IFNOTJMP:<{
-        8 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      DUP
-      2 EQINT
-      IF:<{
-        22 s() 30 s() XCHG
-        21 s() 29 s() XCHG
-        20 s() 28 s() XCHG
-        19 s() 27 s() XCHG
-        18 s() 26 s() XCHG
-        17 s() 25 s() XCHG
-        16 s() 24 s() XCHG
-        s15 23 s() XCHG
-        s14 30 s() XCHG
-        s13 31 s() XCHG
-        s12 28 s() XCHG
-        s11 27 s() XCHG
-        s10 26 s() XCHG
-        s9 25 s() XCHG
-        s8 24 s() XCHG
-        s7 23 s() XCHG
-        s6 30 s() XCHG
-        s5 31 s() XCHG
-        s4 28 s() XCHG
-        s3 27 s() XCHG
-        s2 26 s() XCHG
-        s1 25 s() XCHG
-        s0 24 s() XCHG
-        32 s() PUSH
-        $Vault$_fun_isBasechainAddress INLINECALLDICT
-        IFNOTJMP:<{
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          23 s() POP
-          s11 22 s() XCHG
-          s10 21 s() XCHG
-          s9 20 s() XCHG
-          s8 19 s() XCHG
-          s7 18 s() XCHG
-          s6 17 s() XCHG
-          s5 16 s() XCHG
-          s4 s15 XCHG
-          s3 s14 XCHG
-          s13 s1 s11 XCHG3
-          10 -ROLL
-          s0 s12 XCHG
-          $Vault$_contract_store INLINECALLDICT
-          RETALT
-        }>
-        s13 31 s() XCHG
-        22 s() 30 s() XCHG
-        21 s() 29 s() XCHG
-        20 s() 28 s() XCHG
-        19 s() 27 s() XCHG
-        18 s() 26 s() XCHG
-        17 s() 25 s() XCHG
-        16 s() 24 s() XCHG
-        s15 23 s() XCHG
-        s14 22 s() XCHG
-        s12 20 s() XCHG
-        s11 19 s() XCHG
-        s10 18 s() XCHG
-        s9 17 s() XCHG
-        s8 16 s() XCHG
-        8 8 BLKSWAP
-      }>
-      23 s() 30 s() XCHG
-      22 s() 29 s() XCHG
-      21 s() 28 s() XCHG
-      20 s() 27 s() XCHG
-      19 s() 26 s() XCHG
-      18 s() 25 s() XCHG
-      17 s() 24 s() XCHG
-      16 s() 30 s() XCHG
-      s15 29 s() XCHG
-      s14 31 s() XCHG
-      s13 27 s() XCHG
-      s12 26 s() XCHG
-      s11 25 s() XCHG
-      s10 24 s() XCHG
-      s9 30 s() XCHG
-      s8 29 s() XCHG
-      s7 31 s() XCHG
-      s6 27 s() XCHG
-      s5 26 s() XCHG
-      s4 25 s() XCHG
-      s3 24 s() XCHG
-      s2 30 s() XCHG
-      s1 29 s() XCHG
-      25 s() PUSH
-      SWAP
-      33 s() PUSH
-      SWAP
-      s0 26 s() XCHG
-      $Vault$_fun_computeReceiveIntentCommitment INLINECALLDICT
-      SWAP
-      s0 30 s() XCHG
+      s1 s3 XCHG
+      THROWANYIFNOT
+      s0 s3 XCHG
+      16280 PUSHINT
+      s0 s3 XCHG
       EQUAL
-      IFNOTJMP:<{
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s12 22 s() XCHG
-        s11 21 s() XCHG
-        s10 20 s() XCHG
-        s9 19 s() XCHG
-        s8 18 s() XCHG
-        s7 17 s() XCHG
-        s6 16 s() XCHG
-        s5 s15 XCHG
-        s4 s14 XCHG
-        s3 s13 XCHG
-        s12 s11 s10 XCHG3
-        s9 s1 s7 XCHG3
-        s0 s5 XCHG
-        s3 s3 XCHG2
-        s0 s8 XCHG
-        s0 s6 XCHG
-        s4 s1 s4 XCHG3
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s0 22 s() XCHG
+      s1 s2 XCHG
+      THROWANYIFNOT
+          ACCEPT
+      s0 29 s() XCHG
+      INC
+      SWAP
       1 EQINT
       IF:<{
-        s1 28 s() XCHG
-        s0 26 s() XCHG
+        s0 28 s() XCHG
+        s1 s4 XCHG
         ADD
       }>ELSE<{
-        s1 24 s() XCHG
-        s0 26 s() XCHG
+        s0 28 s() XCHG
+        s1 s3 XCHG
         ADD
-        s0 23 s() XCHG
-        s0 27 s() XCHG
+        s0 s1 s3 XCHG3
       }>
       s0 s3 XCHG
-      s2 23 s() XCHG
-      s1 22 s() XCHG
       s0 29 s() XCHG
       267 PUSHINT
-      s0 25 s() XCHG
+      s0 28 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s3 s7 XCHG
-      s2 21 s() XCHG
+      s3 s14 XCHG
+      s2 24 s() XCHG
       s1 25 s() XCHG
       __tact_dict_set_slice_cell INLINECALLDICT
-      s15 s2 XCHG2
+      s1 23 s() XCHG
+      s0 s9 XCHG
       257 PUSHINT
           DICTIDEL
       DROP
-      s0 20 s() XCHG
+      s0 22 s() XCHG
       DEC
-      s12 22 s() XCHG
-      s11 21 s() XCHG
-      s10 20 s() XCHG
-      s9 19 s() XCHG
-      s8 18 s() XCHG
-      s7 17 s() XCHG
-      s6 16 s() XCHG
-      s5 s15 XCHG
-      s4 s14 XCHG
-      s12 s13 s0 XCHG3
-      s10 s11 XCHG
-      s4 s10 XCHG
-      s3 s9 XCHG
-      s7 s8 XCHG
-      s4 s7 XCHG
-      s2 s6 XCHG
-      s2 s5 XCHG
-      s4 s1 s3 XCHG3
+      19 s() 22 s() XCHG
+      18 s() 21 s() XCHG
+      17 s() 20 s() XCHG
+      16 s() 19 s() XCHG
+      s15 18 s() XCHG
+      s14 17 s() XCHG
+      s13 16 s() XCHG
+      s12 s15 XCHG
+      s11 s14 XCHG
+      s8 s13 XCHG
+      s9 s12 XCHG
+      3 9 BLKSWAP
+      s1 s2 XCHG
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
@@ -8822,46 +8884,11 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-      256 LDU
-          MYADDR
-      16257 PUSHINT
-      SWAP
-      11 LDU
-      SWAP
-      10 PUSHPOW2
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16257 PUSHINT
-      SWAP
-      256 LDU
-      DROP
-      s1 s3 XCHG
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      8 LDU
       16258 PUSHINT
-      s0 s2 XCHG
+      SWAP
+      8 LDU
+      SWAP
       3 EQINT
-      s1 s2 XCHG
-      THROWANYIFNOT
-      256 LDU
-      29 s() PUSH
-      16259 PUSHINT
-      SWAP
-      11 LDU
-      SWAP
-      10 PUSHPOW2
-      EQUAL
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16259 PUSHINT
-      SWAP
-      256 LDU
-      DROP
-      s1 s3 XCHG
-      EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
       64 LDU
@@ -8871,195 +8898,41 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-          ACCEPT
-      s0 27 s() XCHG
-      INC
-      267 PUSHINT
-      s4 s3 s2 PUSH3
-      33 s() PUSH
-      s5 PUSH
-      NEWC
-      $UserState$_store_cell INLINECALLDICT
-      s2 19 s() XCHG
-      30 s() PUSH
-      SWAP
-      __tact_dict_set_slice_cell INLINECALLDICT
-          COMMIT
-      27 s() PUSH
-          SBITS
-      0 EQINT
-      IFNOTJMP:<{
-        17 s() POP
-        3 BLKDROP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        3 11 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      27 s() PUSH
-          SREFS
-      1 EQINT
-      IFNOTJMP:<{
-        17 s() POP
-        3 BLKDROP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        3 11 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s0 27 s() XCHG
           LDREF
       DROP
           CTOS
       256 LDU
-      DUP
-          SBITS
-      0 EQINT
-      IFNOTJMP:<{
-        5 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
-          SREFS
-      0 EQINT
-      IFNOTJMP:<{
-        4 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
+      DROP
       s15 PUSH
       257 PUSHINT
       s2 PUSH
       __tact_dict_get_int_cell INLINECALLDICT
       $ReceiveIntent$_load_opt INLINECALLDICT
-      DUP
+      16285 PUSHINT
+      OVER
       ISNULL
-      IFJMP:<{
-        5 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
+      NOT
+      THROWANYIFNOT
       $ReceiveIntent$_not_null INLINECALLDICT
       5 BLKDROP
       s2 POP
       31 s() PUSH
-      s0 s3 XCHG2
+      16286 PUSHINT
+      s0 s4 XCHG
       SDEQ
-      IFNOTJMP:<{
-        6 BLKDROP
-        s13 POP
-        23 s() POP
-        23 s() POP
-        19 s() 22 s() XCHG
-        18 s() 21 s() XCHG
-        17 s() 20 s() XCHG
-        16 s() 19 s() XCHG
-        s15 18 s() XCHG
-        s14 17 s() XCHG
-        s13 16 s() XCHG
-        s12 s15 XCHG
-        s11 s14 XCHG
-        s11 s13 XCHG
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s7 s10 XCHG
-        s6 s9 XCHG
-        s5 s8 XCHG
-        s4 s7 XCHG
-        s3 s6 XCHG
-        s5 s3 s3 XCHG3
-        s0 s4 XCHG
-        $Vault$_contract_store INLINECALLDICT
-      }>
+      s1 s3 XCHG
+      THROWANYIFNOT
+          ACCEPT
+      s0 29 s() XCHG
+      INC
       SWAP
       1 EQINT
       IF:<{
+        s0 28 s() XCHG
         s1 s4 XCHG
         ADD
       }>ELSE<{
+        s0 28 s() XCHG
         s1 s3 XCHG
         ADD
         s0 s1 s3 XCHG3
@@ -9067,11 +8940,11 @@ PROGRAM{
       s0 s3 XCHG
       s0 29 s() XCHG
       267 PUSHINT
-      s0 18 s() XCHG
+      s0 28 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s3 24 s() XCHG
-      s2 s14 XCHG
+      s3 s14 XCHG
+      s2 24 s() XCHG
       s1 25 s() XCHG
       __tact_dict_set_slice_cell INLINECALLDICT
       s1 23 s() XCHG
@@ -9093,6 +8966,7 @@ PROGRAM{
       s8 s13 XCHG
       s9 s12 XCHG
       3 9 BLKSWAP
+      s1 s2 XCHG
       $Vault$_contract_store INLINECALLDICT
     }>
     OVER
@@ -10827,34 +10701,33 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-          LDMSGADDR
-      16607 PUSHINT
-          MYADDR
-      s1 s3 XCHG
-      SDEQ
-      s1 s2 XCHG
-      THROWANYIFNOT
-          LDMSGADDR
       64 LDU
       128 LDU
-      16610 PUSHINT
-      s0 s4 XCHG
-      32 s() PUSH
-      SDEQ
-      s1 s4 XCHG
-      THROWANYIFNOT
       16611 PUSHINT
-      s2 PUSH
+      s3 PUSH
       31 s() PUSH
       EQUAL
+      THROWANYIFNOT
+      16613 PUSHINT
+      s2 PUSH
+      6000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      16614 PUSHINT
+      s6 PUSH
+      6000000 PUSHINT
+      GEQ
       THROWANYIFNOT
           ACCEPT
       s0 29 s() XCHG
       INC
+      s0 s5 XCHG
+      6000000 PUSHINT
+      SUB
       267 PUSHINT
-      s6 s5 s4 PUSH3
+      s1 s5 s4 PUSH3
       35 s() PUSH
-      s5 PUSH
+      s10 PUSH
       NEWC
       $UserState$_store_cell INLINECALLDICT
       s2 20 s() XCHG
@@ -10862,7 +10735,9 @@ PROGRAM{
       SWAP
       __tact_dict_set_slice_cell INLINECALLDICT
           COMMIT
-      21 s() PUSH
+      29 s() PUSH
+          SBITS
+      0 EQINT
       IFNOTJMP:<{
         18 s() POP
         5 BLKDROP
@@ -10880,208 +10755,27 @@ PROGRAM{
         4 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      22 s() 27 s() XCHG
-      21 s() 26 s() XCHG
-      20 s() 25 s() XCHG
-      19 s() 24 s() XCHG
-      18 s() 23 s() XCHG
-      17 s() 27 s() XCHG
-      16 s() 26 s() XCHG
-      s15 25 s() XCHG
-      s14 24 s() XCHG
-      s0 s13 XCHG
-      s12 27 s() XCHG
-      s11 26 s() XCHG
-      s10 25 s() XCHG
-      s9 24 s() XCHG
-      s0 s8 XCHG
-      s7 27 s() XCHG
-      s6 26 s() XCHG
-      s5 25 s() XCHG
-      s4 24 s() XCHG
-      s0 s3 XCHG
-      s2 27 s() XCHG
-      s1 26 s() XCHG
-      s0 28 s() XCHG
-      $Vault$_fun_isUsernameRegistryBound INLINECALLDICT
-      IFNOTJMP:<{
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        9 5 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      30 s() PUSH
-      11 LDU
-      DROP
-      10 PUSHPOW2
-      EQUAL
-      IFNOTJMP:<{
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        9 5 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
       29 s() PUSH
-      6000000 PUSHINT
-      GEQ
-      IFNOTJMP:<{
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        9 5 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      25 s() PUSH
-      6000000 PUSHINT
-      GEQ
-      IFNOTJMP:<{
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        9 5 BLKSWAP
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s0 25 s() XCHG
-      6000000 PUSHINT
-      SUB
-      267 PUSHINT
-      OVER
-      26 s() PUSH
-      31 s() PUSH
-      35 s() PUSH
-      28 s() PUSH
-      NEWC
-      $UserState$_store_cell INLINECALLDICT
-      s2 s15 XCHG
-      32 s() PUSH
-      SWAP
-      __tact_dict_set_slice_cell INLINECALLDICT
-          COMMIT
-      27 s() PUSH
-          SBITS
-      0 EQINT
-      IFNOTJMP:<{
-        s13 POP
-        22 s() POP
-        22 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        s4 s13 XCHG
-        s3 s12 XCHG
-        s11 s10 s9 XCHG3
-        s4 s8 XCHG
-        s3 s7 XCHG
-        s6 s1 s4 XCHG3
-        s5 s3 XCHG2
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      27 s() PUSH
           SREFS
       1 EQINT
       IFNOTJMP:<{
-        s13 POP
-        22 s() POP
-        22 s() POP
+        18 s() POP
+        5 BLKDROP
         23 s() POP
         23 s() POP
         23 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        s4 s13 XCHG
-        s3 s12 XCHG
-        s11 s10 s9 XCHG3
-        s4 s8 XCHG
-        s3 s7 XCHG
-        s6 s1 s4 XCHG3
-        s5 s3 XCHG2
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        4 11 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 27 s() XCHG
+      s0 29 s() XCHG
           LDREF
       DROP
       DUP
@@ -11091,59 +10785,55 @@ PROGRAM{
       739 PUSHINT
       EQUAL
       IFNOTJMP:<{
-        2DROP
+        7 BLKDROP
         s12 POP
-        21 s() POP
-        21 s() POP
-        22 s() POP
         23 s() POP
         23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        s9 s13 XCHG
-        s3 s12 XCHG
-        s11 s1 s9 XCHG3
-        s10 s8 XCHG2
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
         s3 s7 XCHG
-        4 3 BLKSWAP
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
           SREFS
       0 EQINT
       IFNOTJMP:<{
-        DROP
+        6 BLKDROP
         s12 POP
-        21 s() POP
-        21 s() POP
-        22 s() POP
         23 s() POP
         23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        s9 s13 XCHG
-        s3 s12 XCHG
-        s11 s1 s9 XCHG3
-        s10 s8 XCHG2
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
         s3 s7 XCHG
-        4 3 BLKSWAP
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
           CTOS
@@ -11155,67 +10845,65 @@ PROGRAM{
       8 LDU
       DROP
       s0 s5 XCHG
-      24 s() PUSH
+      29 s() PUSH
       SDEQ
       IFNOTJMP:<{
-        5 BLKDROP
+        10 BLKDROP
         s12 POP
-        21 s() POP
-        21 s() POP
-        22 s() POP
         23 s() POP
         23 s() POP
-        23 s() POP
-        23 s() POP
-        s13 22 s() XCHG
-        s12 21 s() XCHG
-        s11 20 s() XCHG
-        s10 19 s() XCHG
-        s9 18 s() XCHG
-        s8 17 s() XCHG
-        s7 16 s() XCHG
-        s6 s15 XCHG
-        s5 s14 XCHG
-        s9 s13 XCHG
-        s3 s12 XCHG
-        s11 s1 s9 XCHG3
-        s10 s8 XCHG2
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
         s3 s7 XCHG
-        4 3 BLKSWAP
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
-      22 s() 26 s() XCHG
-      21 s() 25 s() XCHG
-      20 s() 24 s() XCHG
-      19 s() 23 s() XCHG
-      18 s() 26 s() XCHG
-      17 s() 25 s() XCHG
-      16 s() 24 s() XCHG
-      s15 23 s() XCHG
-      s14 26 s() XCHG
-      s13 31 s() XCHG
-      s12 24 s() XCHG
-      s11 23 s() XCHG
-      s10 26 s() XCHG
-      s9 31 s() XCHG
-      s8 24 s() XCHG
-      s7 23 s() XCHG
-      s6 26 s() XCHG
-      s5 31 s() XCHG
-      s4 24 s() XCHG
-      s3 23 s() XCHG
-      s2 26 s() XCHG
-      s1 31 s() XCHG
-      s0 29 s() XCHG
+      22 s() 31 s() XCHG
+      21 s() 30 s() XCHG
+      20 s() 29 s() XCHG
+      19 s() 28 s() XCHG
+      18 s() 27 s() XCHG
+      17 s() 26 s() XCHG
+      16 s() 25 s() XCHG
+      s15 24 s() XCHG
+      s14 23 s() XCHG
+      s13 33 s() XCHG
+      s12 30 s() XCHG
+      s11 29 s() XCHG
+      s10 28 s() XCHG
+      s9 27 s() XCHG
+      s8 26 s() XCHG
+      s7 25 s() XCHG
+      s6 24 s() XCHG
+      s5 23 s() XCHG
+      s4 33 s() XCHG
+      s3 30 s() XCHG
+      s2 29 s() XCHG
+      s1 28 s() XCHG
+      s0 32 s() XCHG
       34 s() PUSH
-      24 s() PUSH
-      33 s() PUSH
-      32 s() PUSH
-      28 s() PUSH
+      31 s() PUSH
+      30 s() PUSH
+      35 s() PUSH
+      37 s() PUSH
       $Vault$_fun_requireValidProfileAvatarPointer INLINECALLDICT
       $Vault$_fun_profileAvatarTonCharge INLINECALLDICT
-      s0 34 s() XCHG
-      34 s() PUSH
+      s0 24 s() XCHG
+      24 s() PUSH
       GEQ
       IFNOTJMP:<{
         23 s() POP
@@ -11242,24 +10930,24 @@ PROGRAM{
         3 10 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 33 s() XCHG
+      s0 23 s() XCHG
       6000000 PUSHINT
       SUB
-      25 s() PUSH
+      31 s() PUSH
       OVER
       GEQ
       IFNOTJMP:<{
         DROP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
         23 s() POP
         23 s() POP
         s9 22 s() XCHG
@@ -11270,32 +10958,24 @@ PROGRAM{
         s4 17 s() XCHG
         s3 16 s() XCHG
         s15 s14 s13 XCHG3
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s6 s10 XCHG
-        s5 s9 XCHG
-        s4 s8 XCHG
-        s3 s7 XCHG
-        s6 s1 s4 XCHG3
-        s0 s0 s5 XCHG3
-        s0 s3 XCHG
+        3 10 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      28 s() PUSH
+      26 s() PUSH
       100000000000 PUSHINT
       GEQ
       IFNOTJMP:<{
         DROP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
-        22 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
         23 s() POP
         23 s() POP
         s9 22 s() XCHG
@@ -11306,15 +10986,7 @@ PROGRAM{
         s4 17 s() XCHG
         s3 16 s() XCHG
         s15 s14 s13 XCHG3
-        s9 s12 XCHG
-        s8 s11 XCHG
-        s6 s10 XCHG
-        s5 s9 XCHG
-        s4 s8 XCHG
-        s3 s7 XCHG
-        s6 s1 s4 XCHG3
-        s0 s0 s5 XCHG3
-        s0 s3 XCHG
+        3 10 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
       22 s() 23 s() XCHG
@@ -11338,11 +11010,10 @@ PROGRAM{
       s4 s5 XCHG
       s3 s4 XCHG
       s1 s3 s0 XCHG3
-      s1 33 s() XCHG
       34 s() PUSH
       SWAP
-      s0 31 s() XCHG
-      34 s() PUSH
+      s0 25 s() XCHG
+      31 s() PUSH
       $Vault$_fun_computeProfileAvatarPaymentId INLINECALLDICT
       s8 PUSH
       257 PUSHINT
@@ -11374,15 +11045,15 @@ PROGRAM{
         11 ROLL
         $Vault$_contract_store INLINECALLDICT
       }>
-      s1 25 s() XCHG
-      s0 30 s() XCHG
+      s1 31 s() XCHG
+      s0 24 s() XCHG
       SUB
-      s0 27 s() XCHG
+      s0 25 s() XCHG
       100000000000 PUSHINT
       SUB
-      s3 27 s() XCHG
+      s3 25 s() XCHG
       s0 s2 XCHG
-      s1 31 s() XCHG
+      s1 24 s() XCHG
       s0 34 s() XCHG
       267 PUSHINT
       s0 27 s() XCHG
@@ -11402,7 +11073,7 @@ PROGRAM{
       NEWC
       $PendingProfileAvatarPayment$_store_cell INLINECALLDICT
       s2 s4 XCHG
-      26 s() PUSH
+      20 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       17 s() 22 s() XCHG
@@ -11420,13 +11091,11 @@ PROGRAM{
       s5 s10 XCHG
       s4 s9 XCHG
       s3 s8 XCHG
-      s0 s7 XCHG
-      s0 s3 XCHG
-      s6 s5 XCHG2
+      s6 s7 XCHG2
+      s3 s5 XCHG
       s1 s4 XCHG
       s2 29 s() XCHG
-      s0 26 s() XCHG
-      SWAP
+      s0 25 s() XCHG
       $Vault$_fun_incrementPendingProfileAvatarPaymentCount INLINECALLDICT
           COMMIT
       55000000 PUSHINT
@@ -11434,25 +11103,25 @@ PROGRAM{
       1 PUSHINT
       100000000000 PUSHINT
           MYADDR
-      s8 29 s() XCHG
+      s8 34 s() XCHG
       s1 s7 XCHG
       30000000 PUSHINT
       25 s() PUSH
       s7 s6 s8 XCHG3
       s5 35 s() XCHG
-      s4 34 s() XCHG
-      s3 33 s() XCHG
+      s4 31 s() XCHG
+      s3 30 s() XCHG
       s2 32 s() XCHG
-      s1 30 s() XCHG
-      s0 36 s() XCHG
+      s1 33 s() XCHG
+      s0 34 s() XCHG
       $ATHTransferRequestVaultProfileAvatar$_constructor_query_id_amount_recipient_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format INLINECALLDICT
       NEWC
       $ATHTransferRequestVaultProfileAvatar$_store_cell INLINECALLDICT
       19 s() PUSH
       s0 s4 XCHG
-      s3 21 s() XCHG
+      s3 24 s() XCHG
       s2 26 s() XCHG
-      s0 25 s() XCHG
+      s0 22 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
@@ -11482,7 +11151,8 @@ PROGRAM{
       s8 s15 XCHG
       s7 s14 XCHG
       7 7 BLKSWAP
-      s5 s1 s4 XCHG3
+      s3 s6 XCHG
+      s3 s4 XCHG2
       $Vault$_contract_store INLINECALLDICT
     }>
     SWAP
@@ -11518,6 +11188,17 @@ PROGRAM{
       THROWANYIFNOT
       s0 s4 XCHG
           CTOS
+      16708 PUSHINT
+      OVER
+          SBITS
+      736 PUSHINT
+      EQUAL
+      THROWANYIFNOT
+      16709 PUSHINT
+      OVER
+          SREFS
+      1 EQINT
+      THROWANYIFNOT
       32 LDU
       16705 PUSHINT
       s0 s2 XCHG
@@ -11532,102 +11213,56 @@ PROGRAM{
       EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-          LDMSGADDR
-      16707 PUSHINT
+      256 LDU
           MYADDR
-      s1 s3 XCHG
-      SDEQ
+      16707 PUSHINT
+      SWAP
+      11 LDU
+      SWAP
+      10 PUSHPOW2
+      EQUAL
       s1 s2 XCHG
       THROWANYIFNOT
-          LDMSGADDR
+      16707 PUSHINT
+      SWAP
+      256 LDU
+      DROP
+      s1 s3 XCHG
+      EQUAL
+      s1 s2 XCHG
+      THROWANYIFNOT
       64 LDU
       128 LDU
-      16710 PUSHINT
-      s4 s10 XCPU
-      SDEQ
-      s1 s4 XCHG
-      THROWANYIFNOT
       16711 PUSHINT
-      s2 s8 PUSH2
+      s3 s8 PUSH2
       EQUAL
+      THROWANYIFNOT
+      16713 PUSHINT
+      s2 PUSH
+      6000000 PUSHINT
+      GEQ
+      THROWANYIFNOT
+      16714 PUSHINT
+      s6 PUSH
+      6000000 PUSHINT
+      GEQ
       THROWANYIFNOT
           ACCEPT
       s0 s7 XCHG
       INC
+      s0 s5 XCHG
+      6000000 PUSHINT
+      SUB
       267 PUSHINT
-      s6 s5 s4 PUSH3
-      s10 s4 PUSH2
+      s1 s5 s4 PUSH3
+      s10 s9 PUSH2
       NEWC
       $UserState$_store_cell INLINECALLDICT
       s2 23 s() XCHG
       s10 s(-1) PUXC
       __tact_dict_set_slice_cell INLINECALLDICT
           COMMIT
-      s8 PUSH
-      11 LDU
-      DROP
-      10 PUSHPOW2
-      EQUAL
-      IFNOTJMP:<{
-        21 s() POP
-        8 BLKDROP
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        $Vault$_contract_store INLINECALLDICT
-      }>
       s7 PUSH
-      6000000 PUSHINT
-      GEQ
-      IFNOTJMP:<{
-        21 s() POP
-        8 BLKDROP
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s5 PUSH
-      6000000 PUSHINT
-      GEQ
-      IFNOTJMP:<{
-        21 s() POP
-        8 BLKDROP
-        21 s() 22 s() XCHG
-        20 s() 21 s() XCHG
-        19 s() 20 s() XCHG
-        18 s() 19 s() XCHG
-        17 s() 18 s() XCHG
-        16 s() 17 s() XCHG
-        s15 16 s() XCHG
-        15 ROLL
-        $Vault$_contract_store INLINECALLDICT
-      }>
-      s0 s5 XCHG
-      6000000 PUSHINT
-      SUB
-      267 PUSHINT
-      s1 s5 s4 PUSH3
-      s10 PUSH
-      26 s() PUSH
-      NEWC
-      $UserState$_store_cell INLINECALLDICT
-      s10 PUSH
-      s3 s8 XCHG
-      SWAP
-      __tact_dict_set_slice_cell INLINECALLDICT
-          COMMIT
-      s2 PUSH
           SBITS
       0 EQINT
       IFNOTJMP:<{
@@ -11643,7 +11278,7 @@ PROGRAM{
         15 ROLL
         $Vault$_contract_store INLINECALLDICT
       }>
-      s2 PUSH
+      s7 PUSH
           SREFS
       1 EQINT
       IFNOTJMP:<{
@@ -11659,7 +11294,7 @@ PROGRAM{
         15 ROLL
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 s2 XCHG
+      s0 s7 XCHG
           LDREF
       DROP
       DUP
@@ -11669,7 +11304,7 @@ PROGRAM{
       275 PUSHINT
       GEQ
       IFNOTJMP:<{
-        s3 s9 XCHG
+        s8 s9 XCHG
         9 BLKDROP
         s13 POP
         21 s() 22 s() XCHG
@@ -11685,7 +11320,7 @@ PROGRAM{
           SREFS
       0 EQINT
       IFNOTJMP:<{
-        s2 s8 XCHG
+        s7 s8 XCHG
         8 BLKDROP
         s13 POP
         21 s() 22 s() XCHG
@@ -11705,7 +11340,7 @@ PROGRAM{
       28 s() PUSH
       SDEQ
       IFNOTJMP:<{
-        s3 s9 XCHG
+        s8 s9 XCHG
         9 BLKDROP
         s13 POP
         21 s() 22 s() XCHG
@@ -11727,7 +11362,7 @@ PROGRAM{
       16 s() 25 s() XCHG
       s15 24 s() XCHG
       s14 23 s() XCHG
-      s3 s13 XCHG
+      s8 s13 XCHG
       s12 30 s() XCHG
       s11 29 s() XCHG
       s10 28 s() XCHG
@@ -11736,7 +11371,7 @@ PROGRAM{
       s7 25 s() XCHG
       s6 24 s() XCHG
       s5 23 s() XCHG
-      s3 s4 XCHG
+      s4 26 s() XCHG
       s3 30 s() XCHG
       s2 29 s() XCHG
       s1 28 s() XCHG
@@ -11790,8 +11425,8 @@ PROGRAM{
       s0 s6 XCHG
       5 -ROLL
       $Vault$_fun_usernameMintTonCharge INLINECALLDICT
-      s0 28 s() XCHG
-      28 s() PUSH
+      s0 31 s() XCHG
+      31 s() PUSH
       GEQ
       IFNOTJMP:<{
         23 s() POP
@@ -11819,10 +11454,10 @@ PROGRAM{
         s0 s12 XCHG
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 27 s() XCHG
+      s0 30 s() XCHG
       6000000 PUSHINT
       SUB
-      25 s() PUSH
+      32 s() PUSH
       OVER
       GEQ
       IFNOTJMP:<{
@@ -11831,9 +11466,9 @@ PROGRAM{
         22 s() POP
         22 s() POP
         22 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
+        22 s() POP
+        22 s() POP
+        22 s() POP
         23 s() POP
         23 s() POP
         23 s() POP
@@ -11849,10 +11484,7 @@ PROGRAM{
         s13 s1 s11 XCHG3
         s0 s10 XCHG
         s0 s9 XCHG
-        s0 s8 XCHG
-        s0 s7 XCHG
-        s0 s6 XCHG
-        s12 s5 XCHG2
+        s12 s8 XCHG2
         $Vault$_contract_store INLINECALLDICT
       }>
       24 s() PUSH
@@ -11864,9 +11496,9 @@ PROGRAM{
         22 s() POP
         22 s() POP
         22 s() POP
-        23 s() POP
-        23 s() POP
-        23 s() POP
+        22 s() POP
+        22 s() POP
+        22 s() POP
         23 s() POP
         23 s() POP
         23 s() POP
@@ -11882,13 +11514,10 @@ PROGRAM{
         s13 s1 s11 XCHG3
         s0 s10 XCHG
         s0 s9 XCHG
-        s0 s8 XCHG
-        s0 s7 XCHG
-        s0 s6 XCHG
-        s12 s5 XCHG2
+        s12 s8 XCHG2
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 27 s() XCHG
+      s0 30 s() XCHG
       29 s() PUSH
       $Vault$_fun_computeUsernameNameHash INLINECALLDICT
       23 s() 24 s() XCHG
@@ -11915,7 +11544,7 @@ PROGRAM{
       s1 s3 s0 XCHG3
       29 s() PUSH
       s0 s2 XCHG
-      s0 32 s() XCHG
+      s0 33 s() XCHG
       SWAP
       $Vault$_fun_computeUsernameMintPaymentId INLINECALLDICT
       s7 PUSH
@@ -11947,22 +11576,22 @@ PROGRAM{
         10 3 BLKSWAP
         $Vault$_contract_store INLINECALLDICT
       }>
-      s1 25 s() XCHG
-      s0 27 s() XCHG
+      s1 32 s() XCHG
+      s0 30 s() XCHG
       SUB
       s0 23 s() XCHG
-      29 s() PUSH
+      30 s() PUSH
       SUB
       s3 23 s() XCHG
       s0 s2 XCHG
-      s1 30 s() XCHG
+      s1 26 s() XCHG
       s0 25 s() XCHG
       267 PUSHINT
-      s0 32 s() XCHG
+      s0 25 s() XCHG
       NEWC
       $UserState$_store_cell INLINECALLDICT
       s2 s10 XCHG
-      s1 28 s() XCHG
+      s1 21 s() XCHG
       24 s() PUSH
       SWAP
       __tact_dict_set_slice_cell INLINECALLDICT
@@ -11970,13 +11599,13 @@ PROGRAM{
           NOW
       24 s() PUSH
       SWAP
-      27 s() PUSH
+      28 s() PUSH
       SWAP
       $PendingUsernameMintPayment$_constructor_owner_wallet_amount_created_at INLINECALLDICT
       NEWC
       $PendingUsernameMintPayment$_store_cell INLINECALLDICT
       s2 s3 XCHG
-      23 s() PUSH
+      26 s() PUSH
       SWAP
       __tact_dict_set_int_cell INLINECALLDICT
       17 s() 22 s() XCHG
@@ -11994,11 +11623,9 @@ PROGRAM{
       s5 s10 XCHG
       s4 s9 XCHG
       s3 s8 XCHG
-      s7 s1 s6 XCHG3
-      s3 s5 XCHG
-      s4 26 s() XCHG
-      s3 s3 s0 XCHG3
-      s1 25 s() XCHG
+      s7 s6 s6 XCHG3
+      s0 s3 XCHG
+      s5 s1 s5 XCHG3
       s0 26 s() XCHG
       $Vault$_fun_incrementPendingUsernameMintPaymentCount INLINECALLDICT
           COMMIT
@@ -12006,12 +11633,12 @@ PROGRAM{
       TRUE
       1 PUSHINT
           MYADDR
-      s5 30 s() XCHG
-      s4 28 s() XCHG
+      s5 28 s() XCHG
+      s4 29 s() XCHG
       32000000 PUSHINT
       23 s() PUSH
       s4 s3 s5 XCHG3
-      s2 31 s() XCHG
+      s2 32 s() XCHG
       s1 33 s() XCHG
       s0 29 s() XCHG
       $ATHTransferRequestVaultMintUsername$_constructor_query_id_amount_recipient_response_destination_notify_value_owner_wallet_username_len_username INLINECALLDICT
@@ -12020,7 +11647,7 @@ PROGRAM{
       21 s() PUSH
       s0 s4 XCHG
       s3 23 s() XCHG
-      s2 25 s() XCHG
+      s2 26 s() XCHG
       s0 27 s() XCHG
       SWAP
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
@@ -12049,15 +11676,8 @@ PROGRAM{
       s12 17 s() XCHG
       s11 16 s() XCHG
       s10 s15 XCHG
-      s9 s14 XCHG
-      s8 s13 XCHG
-      s7 s12 XCHG
-      s6 s11 XCHG
-      s5 s10 XCHG
-      s4 s9 XCHG
-      s3 s8 XCHG
-      s7 s1 s5 XCHG3
-      s0 s6 s4 XCHG3
+      5 10 BLKSWAP
+      s1 s4 s0 XCHG3
       $Vault$_contract_store INLINECALLDICT
     }>
     15 BLKDROP

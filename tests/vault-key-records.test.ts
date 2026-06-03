@@ -45,6 +45,7 @@ const ENC_1 = 0x3000000000000000000000000000000000000000000000000000000000000003
 const SIG_1 = 0x4000000000000000000000000000000000000000000000000000000000000004n;
 const AUTH_0 = BigInt('0x' + AUTH_KEY_PAIR.publicKey.toString('hex'));
 const PQ_HASH = 0x5000000000000000000000000000000000000000000000000000000000000005n;
+const VAULT_STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 
 function snakeCell(byteLength: number, fill = 0x5a): Cell {
   let tail: Cell | null = null;
@@ -115,6 +116,10 @@ async function depositTon(vault: any, user: any, amount = toNano('0.1')) {
     $$type: 'DepositTon',
     amount,
   } as any);
+}
+
+async function contractBalance(blockchain: Blockchain, vault: any): Promise<bigint> {
+  return (await blockchain.getContract(vault.address)).balance;
 }
 
 describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
@@ -230,6 +235,8 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     await registerHybrid(vault, user);
     await depositTon(vault, user);
     const keyId = (await vault.getGetUser(user.address)).current_key_id;
+    const beforeFirstInvalid = await vault.getGetUser(user.address);
+    const rawBeforeFirstInvalid = await contractBalance(blockchain, vault);
 
     await replaceHybrid(blockchain, vault, user, {
       enc_pubkey: ENC_1,
@@ -240,8 +247,15 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
       crypto_suite_mask: 2n,
     });
 
-    expect((await vault.getGetUser(user.address)).current_key_id).toBe(keyId);
+    const afterFirstInvalid = await vault.getGetUser(user.address);
+    const rawAfterFirstInvalid = await contractBalance(blockchain, vault);
+    expect(afterFirstInvalid.current_key_id).toBe(keyId);
+    expect(afterFirstInvalid.publish_nonce).toBe(beforeFirstInvalid.publish_nonce + 1n);
+    expect(afterFirstInvalid.ton_balance).toBe(beforeFirstInvalid.ton_balance - VAULT_STATE_GROWTH_EXEC_RESERVE);
+    expect(rawAfterFirstInvalid - afterFirstInvalid.ton_balance).toBeGreaterThanOrEqual(rawBeforeFirstInvalid - beforeFirstInvalid.ton_balance);
     expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
+    const beforeSecondInvalid = await vault.getGetUser(user.address);
+    const rawBeforeSecondInvalid = await contractBalance(blockchain, vault);
 
     await replaceHybrid(blockchain, vault, user, {
       enc_pubkey: ENC_1,
@@ -252,7 +266,12 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
       crypto_suite_mask: 2n,
     });
 
-    expect((await vault.getGetUser(user.address)).current_key_id).toBe(keyId);
+    const afterSecondInvalid = await vault.getGetUser(user.address);
+    const rawAfterSecondInvalid = await contractBalance(blockchain, vault);
+    expect(afterSecondInvalid.current_key_id).toBe(keyId);
+    expect(afterSecondInvalid.publish_nonce).toBe(beforeSecondInvalid.publish_nonce + 1n);
+    expect(afterSecondInvalid.ton_balance).toBe(beforeSecondInvalid.ton_balance - VAULT_STATE_GROWTH_EXEC_RESERVE);
+    expect(rawAfterSecondInvalid - afterSecondInvalid.ton_balance).toBeGreaterThanOrEqual(rawBeforeSecondInvalid - beforeSecondInvalid.ton_balance);
     expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
   });
 });

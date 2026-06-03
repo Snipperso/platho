@@ -78,6 +78,10 @@ function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
 }
 
+function basechainAddressHash(address: Address): bigint {
+  return BigInt('0x' + address.hash.toString('hex'));
+}
+
 function senderKey(senderOwner: Address, queryId: bigint): bigint {
   return BigInt('0x' + beginCell()
     .storeUint(ATH_TRANSFER_NOTIFY_ID_DOMAIN, 32)
@@ -671,8 +675,6 @@ function signedVaultProfileAvatarBody(params: {
   const signedPayload = beginCell()
     .storeUint(VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, 32)
     .storeUint(MANIFEST_HASH, 256)
-    .storeAddress(params.vault.address)
-    .storeAddress(params.owner)
     .storeUint(params.clientNonce, 64)
     .storeUint(params.maxTonCharge ?? PROFILE_AVATAR_TON_CHARGE, 128)
     .storeRef(avatarPayload)
@@ -706,8 +708,7 @@ function signedVaultUsernameMintBody(params: {
   const signedPayload = beginCell()
     .storeUint(VAULT_USERNAME_MINT_SIGNING_DOMAIN, 32)
     .storeUint(MANIFEST_HASH, 256)
-    .storeAddress(params.vault.address)
-    .storeAddress(params.owner)
+    .storeUint(basechainAddressHash(params.vault.address), 256)
     .storeUint(params.clientNonce, 64)
     .storeUint(params.maxTonCharge ?? USERNAME_MINT_TON_CHARGE, 128)
     .storeRef(usernamePayload)
@@ -1044,7 +1045,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
   });
 
-  it('VAULT-ATH-06B: Vault-funded profile avatar stale nonce rejects and signed invalid charge becomes one-shot no-op', async () => {
+  it('VAULT-ATH-06B: Vault-funded profile avatar stale nonce and unpaid invalid charge reject without raw spend', async () => {
     const ctx = await setupProfileAvatarRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
     await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
@@ -1066,22 +1067,6 @@ describe('Vault ATH integration with production ATHWallet', () => {
       expect(after.publish_nonce).toBe(before.publish_nonce);
       expect(rawAfter).toBe(rawBefore);
     }
-    async function expectSignedNoOpAfterNonce(owner: Address, body: any) {
-      const before = await ctx.vault.getGetUser(owner);
-      const rawBefore = await contractBalance(ctx.blockchain, ctx.vault.address);
-      await ctx.blockchain.sendMessage(external({
-        to: ctx.vault.address,
-        body,
-      }));
-      const after = await ctx.vault.getGetUser(owner);
-      const rawAfter = await contractBalance(ctx.blockchain, ctx.vault.address);
-      expect(after.ton_balance).toBe(before.ton_balance);
-      expect(after.ath_balance).toBe(before.ath_balance);
-      expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
-      expect(rawAfter).toBeLessThan(rawBefore);
-      expect((await ctx.vault.getGetGlobal()).pending_profile_avatar_payment_count).toBe(0n);
-    }
-
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
     await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
       vault: ctx.vault,
@@ -1095,7 +1080,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarPartCount: 1n,
     }), 16611);
 
-    await expectSignedNoOpAfterNonce(ctx.user.address, signedVaultProfileAvatarBody({
+    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultProfileAvatarBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       profileRegistry: ctx.profileRegistry,
@@ -1106,12 +1091,12 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarEntryId: 73n,
       avatarStreamId: 0x11223344556677889900aabbccddee02n,
       avatarPartCount: 1n,
-    }));
+    }), 16613);
 
     const underfunded = await ctx.blockchain.treasury('vault-avatar-underfunded');
     const underfundedKeyPair = await registerAvatarRouteKeys(ctx.vault, underfunded);
     const underfundedBefore = await ctx.vault.getGetUser(underfunded.address);
-    await expectSignedNoOpAfterNonce(underfunded.address, signedVaultProfileAvatarBody({
+    await expectRejectedWithoutRawSpend(underfunded.address, signedVaultProfileAvatarBody({
       vault: ctx.vault,
       owner: underfunded.address,
       profileRegistry: ctx.profileRegistry,
@@ -1121,7 +1106,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarEntryId: 74n,
       avatarStreamId: 0x11223344556677889900aabbccddee03n,
       avatarPartCount: 1n,
-    }));
+    }), 16614);
 
     const beforeMalformed = await ctx.vault.getGetUser(ctx.user.address);
     const rawBeforeMalformed = await contractBalance(ctx.blockchain, ctx.vault.address);
@@ -1385,7 +1370,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(rawAfterReplay).toBe(rawAfterFirst);
   });
 
-  it('VAULT-ATH-07B: Vault-funded username stale nonce rejects and signed invalid charge becomes one-shot no-op', async () => {
+  it('VAULT-ATH-07B: Vault-funded username stale nonce and unpaid invalid charge reject without raw spend', async () => {
     const ctx = await setupUsernameMintRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
     await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
@@ -1407,22 +1392,6 @@ describe('Vault ATH integration with production ATHWallet', () => {
       expect(after.publish_nonce).toBe(before.publish_nonce);
       expect(rawAfter).toBe(rawBefore);
     }
-    async function expectSignedNoOpAfterNonce(owner: Address, body: any) {
-      const before = await ctx.vault.getGetUser(owner);
-      const rawBefore = await contractBalance(ctx.blockchain, ctx.vault.address);
-      await ctx.blockchain.sendMessage(external({
-        to: ctx.vault.address,
-        body,
-      }));
-      const after = await ctx.vault.getGetUser(owner);
-      const rawAfter = await contractBalance(ctx.blockchain, ctx.vault.address);
-      expect(after.ton_balance).toBe(before.ton_balance);
-      expect(after.ath_balance).toBe(before.ath_balance);
-      expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
-      expect(rawAfter).toBeLessThan(rawBefore);
-      expect((await ctx.vault.getGetGlobal()).pending_username_mint_payment_count).toBe(0n);
-    }
-
     const beforeUser = await ctx.vault.getGetUser(ctx.user.address);
     await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultUsernameMintBody({
       vault: ctx.vault,
@@ -1433,7 +1402,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       username: 'platho',
     }), 16711);
 
-    await expectSignedNoOpAfterNonce(ctx.user.address, signedVaultUsernameMintBody({
+    await expectRejectedWithoutRawSpend(ctx.user.address, signedVaultUsernameMintBody({
       vault: ctx.vault,
       owner: ctx.user.address,
       usernameRegistry: ctx.usernameRegistry,
@@ -1441,19 +1410,19 @@ describe('Vault ATH integration with production ATHWallet', () => {
       secretKey: keyPair.secretKey,
       maxTonCharge: USERNAME_MINT_LOCAL_EXEC_RESERVE - 1n,
       username: 'platho',
-    }));
+    }), 16713);
 
     const underfunded = await ctx.blockchain.treasury('vault-username-underfunded');
     const underfundedKeyPair = await registerAvatarRouteKeys(ctx.vault, underfunded);
     const underfundedBefore = await ctx.vault.getGetUser(underfunded.address);
-    await expectSignedNoOpAfterNonce(underfunded.address, signedVaultUsernameMintBody({
+    await expectRejectedWithoutRawSpend(underfunded.address, signedVaultUsernameMintBody({
       vault: ctx.vault,
       owner: underfunded.address,
       usernameRegistry: ctx.usernameRegistry,
       clientNonce: underfundedBefore.publish_nonce,
       secretKey: underfundedKeyPair.secretKey,
       username: 'platho',
-    }));
+    }), 16714);
 
     const beforeMalformed = await ctx.vault.getGetUser(ctx.user.address);
     const rawBeforeMalformed = await contractBalance(ctx.blockchain, ctx.vault.address);
