@@ -3,7 +3,7 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T14:50:14.7034407Z",
+  "generated_after_local_run": "2026-06-03T14:57:49.7234279Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
@@ -64,6 +64,7 @@
     "It also includes the Larisa Section 3/4 cleanup pass: the ATH PWA RPC provider now decodes ATHWallet get_pending_notification with the current five-field getter shape including response_destination, stale four-field fixtures are rejected, and M20U buyback readiness artifacts now consistently show M20T complete while production remains blocked only by missing M20F mainnet route-freeze evidence.",
     "It also includes the Larisa Section 5 cleanup pass: the PWA contract interface matrix no longer claims removed direct user-wallet username mint, profile avatar payment, or username refund-flush product actions are implemented; matrix guards now pin the current Vault-only product flow, and blocked production static deploy prep cleans stale output so old runtime builders cannot remain in the audit archive.",
     "It also includes the Larisa Section 6 username PWA cleanup pass: resolveUsernameRegistryProvider no longer requires deleted refund-due getters, the default username RPC provider is pinned to the current price/name-record/item/global/official-wallet interface, and the interface matrix no longer documents deleted UsernameRegistry refund due/flush getters.",
-    "It also includes the Larisa Section 7 deployment artifact cleanup pass: local mainnet final manifest, deploy packet, and Tonkeeper dry-run packet were regenerated against the current code hashes, DEPLOYMENT_RUNBOOK now lists every generated pre-seal binding, and release/preprod guards fail stale local mainnet deploy artifacts before they can enter an audit archive unnoticed."
+    "It also includes the Larisa Section 7 deployment artifact cleanup pass: local mainnet final manifest, deploy packet, and Tonkeeper dry-run packet were regenerated against the current code hashes, DEPLOYMENT_RUNBOOK now lists every generated pre-seal binding, and release/preprod guards fail stale local mainnet deploy artifacts before they can enter an audit archive unnoticed.",
+    "It also includes the Larisa Section 8 pricing docs cleanup pass: PLATHO_CAPSULE_V1_FINAL_SPEC no longer permits product labels from 0.030 TON; active pricing/docs/spec copy pins the public product label to from 0.0337 TON and keeps 0.030 TON only as the fixed CapsuleHub ACK reserve."
   ]
 }
