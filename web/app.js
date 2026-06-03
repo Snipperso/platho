@@ -451,7 +451,7 @@ const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
 const MESSAGE_SYNC_COUNTDOWN_TICK_MS = 1_000;
 const PRIVATE_SEND_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 const PRIVATE_SEND_RETRY_MAX_ATTEMPTS = 8;
-const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 15_000, 30_000];
 const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
@@ -4891,6 +4891,7 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
       } else if (messageSyncStatus?.textContent === 'syncing') {
         setText(messageSyncStatus, privateSyncStatusText(result));
       }
+      resumePendingPrivatePublishConfirmations();
     } catch (error) {
       const rateLimited = noteTonRpcRateLimit(error);
       const label = rateLimited ? 'Sync delayed' : 'Sync failed';
@@ -4934,6 +4935,7 @@ function serializeMessageForHistory(message) {
     capsule: message.capsule ?? null,
     capsules: message.capsules ?? null,
     publishState: message.publishState ?? null,
+    privatePublishConfirmAttempt: Number(message.privatePublishConfirmAttempt ?? 0) || 0,
     attachment: message.attachment ?? null,
     profileVersion: message.profileVersion ?? 0,
     avatarHash: message.avatarHash ?? zeroAvatarHashHex(),
@@ -5079,6 +5081,7 @@ async function restoreEncryptedMessageHistory() {
     if (changed) {
       renderThreads();
       renderConversation();
+      resumePendingPrivatePublishConfirmations();
     }
   } catch (error) {
     setText(localStateLabel, 'history blocked');
@@ -6932,6 +6935,7 @@ function setView(view) {
     syncPrivateCapsulesFromChainOnce().then((result) => {
       completeMessageSyncUi(result);
       setText(messageSyncStatus, privateSyncStatusText(result));
+      resumePendingPrivatePublishConfirmations();
       scheduleMessageAutoSync();
     }).catch((error) => {
       const rateLimited = noteTonRpcRateLimit(error);
@@ -11343,12 +11347,16 @@ function schedulePrivateSendRetry(context, error) {
 function schedulePrivatePublishConfirmationRetry(context, error = null) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
-  const attempt = Number(context.confirmAttempt ?? 0);
+  const attempt = Number(context.confirmAttempt ?? message.privatePublishConfirmAttempt ?? 0);
   const delayMs = isTonRpcRateLimitError(error)
     ? tonRpcLimitBackoffMs(error)
     : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)];
   context.confirmAttempt = attempt + 1;
-  message.meta = publishStateMeta(message.publishState);
+  message.privatePublishConfirmAttempt = context.confirmAttempt;
+  const baseMeta = publishStateMeta(message.publishState);
+  message.meta = attempt >= 3 && baseMeta.includes('confirming')
+    ? `${baseMeta} · still checking`
+    : baseMeta;
   thread.state = 'pending';
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -11378,12 +11386,35 @@ async function runPrivatePublishConfirmationRetry(context) {
     if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
       schedulePrivatePublishConfirmationRetry(context);
     } else {
+      message.privatePublishConfirmAttempt = 0;
       clearPrivatePublishConfirmRetry(message);
     }
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     if (!rateLimited) console.error(error);
     schedulePrivatePublishConfirmationRetry(context, error);
+  }
+}
+
+function hasPendingPrivatePublishConfirmation(message) {
+  return privateMessageHasPublishAttempt(message)
+    && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && messageStatusKey(message) === 'sending';
+}
+
+function resumePendingPrivatePublishConfirmations() {
+  if (document.hidden) return;
+  for (const thread of threads) {
+    for (const message of thread.messages ?? []) {
+      if (!hasPendingPrivatePublishConfirmation(message)) continue;
+      const existingKey = message.privatePublishConfirmRetryKey;
+      if (existingKey && privatePublishConfirmJobs.has(existingKey)) continue;
+      schedulePrivatePublishConfirmationRetry({
+        thread,
+        message,
+        confirmAttempt: Number(message.privatePublishConfirmAttempt ?? 0) || 0,
+      });
+    }
   }
 }
 
@@ -11435,6 +11466,7 @@ async function attemptPrivateComposerMessagePublish(context) {
   if (publishResult.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
     schedulePrivatePublishConfirmationRetry(context);
   } else {
+    message.privatePublishConfirmAttempt = 0;
     clearPrivatePublishConfirmRetry(message);
   }
   refreshMessagingControls();
@@ -12082,6 +12114,7 @@ window.addEventListener('pagehide', () => {
   lockPlathoWalletForBackground();
 });
 window.addEventListener('pageshow', () => {
+  resumePendingPrivatePublishConfirmations();
   scheduleWalletUnlockPrompt();
   if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
@@ -12094,6 +12127,7 @@ window.addEventListener('pageshow', () => {
   }
 });
 window.addEventListener('focus', () => {
+  resumePendingPrivatePublishConfirmations();
   if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
     refreshVaultNow({ includeActivation: true }).catch((error) => {

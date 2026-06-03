@@ -866,6 +866,11 @@ describe('PWA runtime config guard', () => {
     expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
     expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = \[2_000, 4_000, 8_000, 15_000, 30_000\]/);
+    expect(app).toMatch(/function resumePendingPrivatePublishConfirmations/);
+    expect(app).toMatch(/hasPendingPrivatePublishConfirmation\(message\)/);
+    expect(app).toMatch(/privatePublishConfirmJobs\.has\(existingKey\)/);
+    expect(app).toMatch(/resumePendingPrivatePublishConfirmations\(\)/);
   });
 
   it('PWA-SEND-02B: pending publish status renders as confirming/retrying, not scary partial failure', () => {
@@ -886,6 +891,8 @@ describe('PWA runtime config guard', () => {
     expect(metaSource).not.toMatch(/partial publish/);
     expect(app).toMatch(/text\.includes\('not sent'\)/);
     expect(app).not.toMatch(/text\.includes\('partial'\)\) return 'failed'/);
+    expect(app).toMatch(/still checking/);
+    expect(app).toMatch(/privatePublishConfirmAttempt/);
   });
 
   it('PWA-RPC-02: outbound private encryption resolves the recipient key through fresh verified reads', () => {
@@ -1874,11 +1881,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v330/);
+    expect(sw).toMatch(/platho-pwa-prototype-v331/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=268/);
+    expect(sw).toMatch(/\.\/app\.js\?v=269/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
