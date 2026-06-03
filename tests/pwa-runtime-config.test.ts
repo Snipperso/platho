@@ -458,6 +458,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/item\.dataset\.tab !== 'profile'/);
     expect(app).toMatch(/requestAnimationFrame\(\(\) => \{[\s\S]*!hasActivePlathoAccount\(\)[\s\S]*setView\('profile'\)/);
     expect(app).toMatch(/setView\('profile'\)/);
+    expect(app).toMatch(/Reload app to finish update/);
+    expect(app).toMatch(/reload app/);
     expect(app).toMatch(/await refreshVaultActivationStatus\(\{ skipGlobal: true \}\)/);
     expect(app).toMatch(/setText\(vaultRecordStatus, 'checking'\)/);
     expect(app).toMatch(/setText\(vaultDraftStatus, 'checking'\)/);
@@ -966,6 +968,10 @@ describe('PWA runtime config guard', () => {
 
     expect(swSource).toMatch(/pendingServiceWorkerAppShellReload = true/);
     expect(swSource).toMatch(/Update ready - reload before sending/);
+    expect(app).toMatch(/signedActionsReady = accountActive && !appShellReloadPending/);
+    expect(app).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending/);
+    expect(app).toMatch(/sendButton\.disabled = privateReadOnly \|\| !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
+    expect(app).toMatch(/publicSendButton\.disabled = !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
     expect(swSource).toMatch(/throw serviceWorkerUpdateReloadError\(\)/);
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
     expect(swSource).toMatch(/reloadForPendingServiceWorkerAppShellUpdate\(\)/);
@@ -1635,11 +1641,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v309/);
+    expect(sw).toMatch(/platho-pwa-prototype-v310/);
     expect(sw).toMatch(/\.\/styles\.css\?v=124/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=249/);
+    expect(sw).toMatch(/\.\/app\.js\?v=250/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
