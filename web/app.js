@@ -4505,7 +4505,7 @@ function messageMetaText(message) {
 function messageStatusKey(message) {
   const text = messageMetaText(message).toLowerCase();
   if (text.includes('sending') || text.includes('submitted') || text.includes('confirming') || text.includes('retrying')) return 'sending';
-  if (text.includes('failed') || text.includes('blocked') || text.includes('partial')) return 'failed';
+  if (text.includes('failed') || text.includes('blocked') || text.includes('not sent') || text.includes('cancel required')) return 'failed';
   if (text.includes('published') || text.includes('sent')) return 'sent';
   if (text.includes('received')) return 'received';
   return 'info';
@@ -10944,8 +10944,8 @@ function publishStateMeta(publishState) {
   if (confirmed >= total) return 'published';
   if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
     if (pending <= 0) return 'not sent';
-    if (total === 1) return 'submitted, confirming';
-    return `partial publish ${pending}/${total}`;
+    if (pending >= total) return total === 1 ? 'submitted, confirming' : `submitted ${pending}/${total}, confirming`;
+    return `submitted ${pending}/${total}, retrying`;
   }
   if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) return `submitted ${pending}/${total}, confirming`;
   if (publishState?.status === 'failed') return 'not sent';
