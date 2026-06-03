@@ -1281,8 +1281,9 @@ describe('PWA runtime config guard', () => {
     expect(waitIndex).toBeGreaterThan(submitIndex);
     expect(flashIndex).toBeGreaterThan(waitIndex);
     expect(claimSource).not.toMatch(/readFreshConnectedVaultUser\(provider\)\.catch/);
-    expect(helpers).toMatch(/provider\.getReceiveIntent\(intentId,\s*\{[\s\S]*verify:\s*true[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
-    expect(helpers).toMatch(/loadConnectedVaultUser\(\{[\s\S]*verify:\s*true[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
+    expect(claimSource).not.toMatch(/ForCancel/);
+    expect(helpers).toMatch(/provider\.getReceiveIntent\(intentId,\s*\{[\s\S]*verify:\s*options\.verify !== false[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
+    expect(helpers).toMatch(/loadConnectedVaultUser\(\{[\s\S]*verify:\s*options\.verify !== false[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
     expect(helpers).not.toMatch(/vaultAthBalanceAtomic/);
     expect(helpers).toMatch(/ath_balance \?\? user\?\.athBalance \?\? user\?\.ath/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
@@ -1306,8 +1307,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function renderConversation'),
       app.indexOf('async function openImageLightbox'),
     );
-    const readUserIndex = cancelSource.indexOf('const beforeUser = await readFreshConnectedVaultUser(provider)');
-    const readIntentIndex = cancelSource.indexOf('const intent = await readFreshReceiveIntent(provider, intentId)');
+    const readUserIndex = cancelSource.indexOf('const beforeUser = await readFreshConnectedVaultUserForCancel(provider)');
+    const readIntentIndex = cancelSource.indexOf('const intent = await readFreshReceiveIntentForCancel(provider, intentId)');
     const assertIndex = cancelSource.indexOf('assertReceiveIntentCancelableBySender(intent, payment)');
     const submitIndex = cancelSource.indexOf("submitVaultReceiveIntentExternal('CancelReceiveIntent'");
     const waitIndex = cancelSource.indexOf('waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser)');
@@ -1317,6 +1318,11 @@ describe('PWA runtime config guard', () => {
     expect(helpers).toMatch(/sameWalletAddress\(intent\.sender_wallet, connectedWallet\)/);
     expect(helpers).toMatch(/payment\.recipientWallet[\s\S]*sameWalletAddress\(intent\.recipient_wallet, payment\.recipientWallet\)/);
     expect(helpers).toMatch(/function waitForPaymentCheckCancelConfirmation/);
+    expect(helpers).toMatch(/function readFreshReceiveIntentForCancel/);
+    expect(helpers).toMatch(/function readFreshConnectedVaultUserForCancel/);
+    expect(helpers).toMatch(/isTonRpcVerificationUnavailableError\(error\)/);
+    expect(helpers).toMatch(/readFreshReceiveIntent\(provider, intentId, \{ verify: false \}\)/);
+    expect(helpers).toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false \}\)/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
     expect(helpers).toMatch(/Payment check disappeared but sender Vault balance was not restored/);
     expect(readUserIndex).toBeGreaterThanOrEqual(0);
@@ -1886,11 +1892,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v332/);
+    expect(sw).toMatch(/platho-pwa-prototype-v333/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=270/);
+    expect(sw).toMatch(/\.\/app\.js\?v=271/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

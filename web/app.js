@@ -9109,6 +9109,12 @@ function paymentCheckCancelBlockedStatus(error) {
   return `check cancel blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
 
+function isTonRpcVerificationUnavailableError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
+    || /TON RPC verification unavailable|RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message);
+}
+
 function assertReceiveIntentMatchesPayment(intent, payment) {
   if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
   const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -9143,23 +9149,41 @@ function assertReceiveIntentCancelableBySender(intent, payment) {
   }
 }
 
-async function readFreshReceiveIntent(provider, intentId) {
+async function readFreshReceiveIntent(provider, intentId, options = {}) {
   if (!provider?.getReceiveIntent) throw new Error('Vault provider cannot confirm payment checks');
   return provider.getReceiveIntent(intentId, {
     vaultAddress: requireVaultAddress(),
-    verify: true,
+    verify: options.verify !== false,
     priority: 'critical',
     cacheTtlMs: 0,
   });
 }
 
-async function readFreshConnectedVaultUser(provider) {
+async function readFreshReceiveIntentForCancel(provider, intentId) {
+  try {
+    return await readFreshReceiveIntent(provider, intentId);
+  } catch (error) {
+    if (!isTonRpcVerificationUnavailableError(error)) throw error;
+    return readFreshReceiveIntent(provider, intentId, { verify: false });
+  }
+}
+
+async function readFreshConnectedVaultUser(provider, options = {}) {
   return loadConnectedVaultUser({
     provider,
-    verify: true,
+    verify: options.verify !== false,
     priority: 'critical',
     cacheTtlMs: 0,
   });
+}
+
+async function readFreshConnectedVaultUserForCancel(provider) {
+  try {
+    return await readFreshConnectedVaultUser(provider);
+  } catch (error) {
+    if (!isTonRpcVerificationUnavailableError(error)) throw error;
+    return readFreshConnectedVaultUser(provider, { verify: false });
+  }
 }
 
 async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser) {
@@ -9202,8 +9226,8 @@ async function waitForPaymentCheckCancelConfirmation(provider, payment, beforeUs
   let lastUser = beforeUser;
   while (Date.now() <= deadline) {
     try {
-      lastIntent = await readFreshReceiveIntent(provider, intentId);
-      lastUser = await readFreshConnectedVaultUser(provider);
+      lastIntent = await readFreshReceiveIntentForCancel(provider, intentId);
+      lastUser = await readFreshConnectedVaultUserForCancel(provider);
       const balance = paymentAssetVaultBalance(lastUser, asset);
       if (lastIntent?.exists === false && balance >= expectedBalance) {
         rememberConnectedVaultUser(lastUser);
@@ -10775,8 +10799,8 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
     throw new Error('Vault provider cannot confirm payment checks');
   }
   const intentId = paymentIntentId(payment);
-  const beforeUser = await readFreshConnectedVaultUser(provider);
-  const intent = await readFreshReceiveIntent(provider, intentId);
+  const beforeUser = await readFreshConnectedVaultUserForCancel(provider);
+  const intent = await readFreshReceiveIntentForCancel(provider, intentId);
   assertReceiveIntentCancelableBySender(intent, payment);
   setText(identitySubtitle, 'cancel signing');
   await options.onStatus?.('check cancel signing');
