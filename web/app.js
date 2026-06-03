@@ -1076,7 +1076,7 @@ function updatePrivateSenderModeUi() {
     privateSenderModeSelect.disabled = !plathoWallet;
   }
   if (privateAnonymousButton) {
-    privateAnonymousButton.disabled = !plathoWallet || !hasActivePlathoAccount() || composer?.dataset.readOnly === 'true';
+    privateAnonymousButton.disabled = !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || composer?.dataset.readOnly === 'true';
     privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
     privateAnonymousButton.setAttribute('aria-label', anonymous ? 'Send with wallet address' : 'Send anonymously');
     privateAnonymousButton.title = anonymous
@@ -6018,12 +6018,12 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
 function refreshPrivateSendButtonState() {
   if (!sendButton) return;
   const privateReadOnly = activeThread()?.readOnly === true;
-  sendButton.disabled = privateReadOnly || !plathoWallet || !hasActivePlathoAccount() || tonRpcLimited() || privateComposerKnownVaultTonShortfall();
+  sendButton.disabled = privateReadOnly || !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || privateComposerKnownVaultTonShortfall();
 }
 
 function refreshPublicSendButtonState() {
   const publicSendButton = publicComposer?.querySelector?.('.send-button');
-  if (publicSendButton) publicSendButton.disabled = !plathoWallet || !hasActivePlathoAccount() || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
+  if (publicSendButton) publicSendButton.disabled = !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
 }
 
 async function assertVaultHasPrivatePublishHold(suite, plan) {
@@ -6490,6 +6490,8 @@ async function clearPlathoLocalData() {
 
 function refreshMessagingControls() {
   const accountActive = hasActivePlathoAccount();
+  const appShellReloadPending = pendingServiceWorkerAppShellReload === true;
+  const signedActionsReady = accountActive && !appShellReloadPending;
   const hasStoredWallet = hasStoredPlathoWalletRecord();
   const hasKnownWallet = Boolean(plathoWallet || hasStoredWallet);
   if (createWalletButton) createWalletButton.disabled = false;
@@ -6513,35 +6515,37 @@ function refreshMessagingControls() {
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = !(plathoWallet || storedWalletAddressForCopy());
   if (walletDisplayModeSelect) walletDisplayModeSelect.disabled = !plathoWallet;
-  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet || accountActive;
+  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet || accountActive || appShellReloadPending;
   setText(vaultDraftStatus, !plathoWallet
     ? 'wallet required'
-    : accountActive
+    : appShellReloadPending
+      ? 'reload app'
+      : accountActive
       ? 'active'
       : `${plathoAccountActivationFeeLabel()} TON`);
-  if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !accountActive;
-  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !accountActive;
-  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || !accountActive;
-  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !accountActive;
-  if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet || !accountActive;
-  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !accountActive;
-  if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet || !accountActive;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = !plathoWallet || !accountActive;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = !plathoWallet || !accountActive;
+  if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
+  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
+  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || !signedActionsReady;
+  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !signedActionsReady;
+  if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet || !signedActionsReady;
+  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !signedActionsReady;
+  if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet || !signedActionsReady;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !plathoWallet || !signedActionsReady;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = !plathoWallet || !signedActionsReady;
   if (privateSenderModeSelect) privateSenderModeSelect.disabled = !plathoWallet;
   if (messageInput) {
     const privateReadOnly = activeThread()?.readOnly === true;
-    messageInput.disabled = privateReadOnly || !plathoWallet || !accountActive;
+    messageInput.disabled = privateReadOnly || !plathoWallet || !signedActionsReady;
   }
   if (sendButton) {
     refreshPrivateSendButtonState();
   }
-  if (publicMessageInput) publicMessageInput.disabled = !plathoWallet || !accountActive;
-  if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet || !accountActive;
+  if (publicMessageInput) publicMessageInput.disabled = !plathoWallet || !signedActionsReady;
+  if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet || !signedActionsReady;
   refreshPublicSendButtonState();
-  if (burnAthButton) burnAthButton.disabled = !plathoWallet || !accountActive;
+  if (burnAthButton) burnAthButton.disabled = !plathoWallet || !signedActionsReady;
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
-    button.disabled = !plathoWallet || !accountActive;
+    button.disabled = !plathoWallet || !signedActionsReady;
   }
   railItems.forEach((item) => {
     const gated = item.dataset.tab !== 'profile';
@@ -6563,7 +6567,9 @@ function refreshMessagingControls() {
 function setView(view) {
   if (view !== 'profile' && !hasActivePlathoAccount()) {
     view = 'profile';
-    flashWalletIdentityStatus(plathoWallet ? 'Activate Platho account first' : 'Create or unlock wallet first');
+    flashWalletIdentityStatus(pendingServiceWorkerAppShellReload
+      ? 'Reload app to finish update'
+      : (plathoWallet ? 'Activate Platho account first' : 'Create or unlock wallet first'));
   }
   appShell.dataset.view = view;
   if (view !== 'chats') {
