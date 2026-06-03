@@ -126,8 +126,8 @@ The official PWA exposes two image compression targets before splitting into 102
 - good: WebP target <= 32 KiB.
 - maximum: WebP target <= 64 KiB, encoded as separate 1024-byte public entries when needed.
 
-Public product copy may say messages start from `0.030 TON`; the current exact public per-entry base example is
-`0.0337 TON`. Larger public images cost by entry count.
+Public product copy may say messages start from `0.0337 TON`; that is also the current exact public per-entry base
+example. Larger public images cost by entry count.
 
 CapsuleHub does not store page counters. Clients may derive page windows from sequential `entry_id` values if they want
 paginated reads. A capsule published at a page boundary costs the same as any other capsule of the same profile; v1 must
@@ -135,8 +135,9 @@ not charge the first entry of a page a separate page-storage reserve.
 
 ## PWA Message Price
 
-The official PWA may display a simple public product label of `from 0.030 TON`, while detailed pricing surfaces display
-current exact net base prices per capsule/post before ATH discount:
+The official PWA may display a simple public product label of `from 0.0337 TON`, while detailed pricing surfaces display
+current exact net base prices per capsule/post before ATH discount. The `0.030 TON` value is only the fixed CapsuleHub
+ACK reserve, not a product "from" price:
 
 - public post: from `0.0337 TON`.
 - `hybrid-v1` private 1 KiB capsule: from `0.0347 TON`.

@@ -117,6 +117,7 @@ describe('v1 on-chain message source of truth', () => {
   it('SPEC-MSG-SOURCE-03A: public pricing copy uses current exact public/private canonical examples', () => {
     const publicPriceDocs = [
       'DEPLOYMENT_RUNBOOK.md',
+      'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
       'web/CRYPTO_PROTOCOL.md',
       'web/docs/crypto-protocol.md',
       'web/docs/ath-whitepaper.md',
@@ -127,6 +128,7 @@ describe('v1 on-chain message source of truth', () => {
       expect(text, path).toMatch(/from `?0\.0337 TON`?/);
       expect(text, path).toMatch(/0\.0337 TON/);
       expect(text, path).toMatch(/0\.0347 TON/);
+      expect(text, path).not.toMatch(/from `?0\.030 TON`?/i);
     }
 
     const html = read('web/index.html');

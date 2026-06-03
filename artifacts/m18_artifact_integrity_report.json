@@ -280,7 +280,7 @@
     "tests\\pwa-runtime-config.test.ts": "7d572980b2b0ebc7a617af7bdd008cc4ca3a554ec127fec8f985bb3525ca3c26",
     "tests\\recipient-identities.test.ts": "c8127e4fc89dde7bfe2495646da434eb1ca50ee89d9f84259e96bb28e33f237c",
     "tests\\release-truth-single-source.test.ts": "5605d747c27e39a48362d040d7a87736ee93ee0565dafa511d688a7a12fb0418",
-    "tests\\spec-onchain-message-source.test.ts": "e375e40c75463ca337f20ce7d44e17a9043467069da92033ca78e16ee7d3b00d",
+    "tests\\spec-onchain-message-source.test.ts": "ed44cabd0755c98e4f7177591e9c70f6f80b9fd51dcce6e22b46efbe1bab1afa",
     "tests\\static-web-deploy-prep.test.ts": "ede3febd2af73898ad187b4d30318dc35f17a84b4a5a5eea51301318accb1ec5",
     "tests\\storage-topup-abi.test.ts": "64a30e8fe83111d800d9c1603a77f2ec16300cf9d81f4589d12ac42c23c4d107",
     "tests\\ton-dns-provider.test.ts": "a66dda759ec756a423071cbca8ec9505c395a48f5ee1f0f8981e2de60a75734c",
