@@ -8,17 +8,20 @@ import {
   BindProfileRegistry,
   BindUsernameRegistry,
   SealGenesis,
+  DepositTon,
   WithdrawAth,
-  CreateReceiveIntent,
-  ClaimReceiveIntent,
-  CancelReceiveIntent,
 } from '../build/Vault/Vault_Vault';
 import {
   ATHWallet,
   ATHTransferRequestWithNotify,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import {
+  registerVaultSigningKeys,
+  sendVaultReceiveIntentExternal,
+} from './helpers/vault-receive-intent-external';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
+const RECEIVE_INTENT_CREATE_RESERVE = 9_000_000n;
 
 function addressHash(address: Address): bigint {
   return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
@@ -153,6 +156,13 @@ async function depositAth(params: {
   } as ATHTransferRequestWithNotify);
 }
 
+async function depositTon(vault: any, user: any, amount: bigint) {
+  await vault.send(user.getSender(), { value: amount + toNano('0.05') }, {
+    $$type: 'DepositTon',
+    amount,
+  } as DepositTon);
+}
+
 describe('Vault ATH accounting invariants', () => {
   it('VAULT-INV-ATH-01: deterministic deposit/withdraw walks preserve ATH accounting after every step', async () => {
     for (const seed of [0x51a7cafe, 0x9e3779b9, 0xdecafbad, 0x13579bdf]) {
@@ -258,50 +268,49 @@ describe('Vault ATH accounting invariants', () => {
   it('VAULT-INV-ATH-02: ATH receive intent claim and cancel preserve total internal ATH and official backing', async () => {
     const { blockchain, vault, users, userAthWallets, officialVaultAthWallet } = await setup(2);
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
+    const senderKey = await registerVaultSigningKeys(vault, users[0], 61);
+    const recipientKey = await registerVaultSigningKeys(vault, users[1], 62);
     await depositAth({ vault, user: users[0], userAthWallet: userAthWallets[0], amount: 1_200n, queryId: 501n });
     await depositAth({ vault, user: users[1], userAthWallet: userAthWallets[1], amount: 300n, queryId: 502n });
+    await depositTon(vault, users[0], RECEIVE_INTENT_CREATE_RESERVE * 2n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_500n);
 
-    const claimIntentId = await vault.getGetReceiveIntentId(users[0].address, users[1].address, 2n, 500n, 1n);
+    const claimNonce = (await vault.getGetUser(users[0].address)).publish_nonce;
+    const claimIntentId = await vault.getGetReceiveIntentId(users[0].address, users[1].address, 2n, 500n, claimNonce);
     const claimSecret = 0xabcdefn;
     const claimCommitment = await vault.getGetReceiveIntentCommitment(claimIntentId, users[1].address, claimSecret);
-    await vault.send(users[0].getSender(), { value: toNano('0.05') }, {
-      $$type: 'CreateReceiveIntent',
+    await sendVaultReceiveIntentExternal(blockchain, vault, 'CreateReceiveIntent', users[0], senderKey, MANIFEST_HASH, {
       asset: 2n,
       amount: 500n,
       recipient_wallet: users[1].address,
       commitment: claimCommitment,
-      client_nonce: 1n,
-    } as CreateReceiveIntent);
+    });
     expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(1n);
 
-    await vault.send(users[1].getSender(), { value: toNano('0.05') }, {
-      $$type: 'ClaimReceiveIntent',
+    await sendVaultReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', users[1], recipientKey, MANIFEST_HASH, {
       intent_id: claimIntentId,
       secret32: claimSecret,
-    } as ClaimReceiveIntent);
+    });
     expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
     expect((await vault.getGetUser(users[1].address)).ath_balance).toBe(800n);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_500n);
 
-    const cancelIntentId = await vault.getGetReceiveIntentId(users[0].address, users[1].address, 2n, 250n, 2n);
+    const cancelNonce = (await vault.getGetUser(users[0].address)).publish_nonce;
+    const cancelIntentId = await vault.getGetReceiveIntentId(users[0].address, users[1].address, 2n, 250n, cancelNonce);
     const cancelCommitment = await vault.getGetReceiveIntentCommitment(cancelIntentId, users[1].address, 0x1234n);
-    await vault.send(users[0].getSender(), { value: toNano('0.05') }, {
-      $$type: 'CreateReceiveIntent',
+    await sendVaultReceiveIntentExternal(blockchain, vault, 'CreateReceiveIntent', users[0], senderKey, MANIFEST_HASH, {
       asset: 2n,
       amount: 250n,
       recipient_wallet: users[1].address,
       commitment: cancelCommitment,
-      client_nonce: 2n,
-    } as CreateReceiveIntent);
+    });
     expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(450n);
 
-    await vault.send(users[0].getSender(), { value: toNano('0.05') }, {
-      $$type: 'CancelReceiveIntent',
+    await sendVaultReceiveIntentExternal(blockchain, vault, 'CancelReceiveIntent', users[0], senderKey, MANIFEST_HASH, {
       intent_id: cancelIntentId,
-    } as CancelReceiveIntent);
+    });
     expect((await vault.getGetUser(users[0].address)).ath_balance).toBe(700n);
     expect((await vault.getGetUser(users[1].address)).ath_balance).toBe(800n);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);

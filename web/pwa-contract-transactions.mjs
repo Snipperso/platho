@@ -7,9 +7,9 @@ export const VAULT_OPS = Object.freeze({
   WithdrawAth: 4188293172,
   RegisterMessagingKeys: 1383096026,
   ReplaceMessagingKeys: 2312521915,
-  CreateReceiveIntent: 4152424723,
-  ClaimReceiveIntent: 2582433020,
-  CancelReceiveIntent: 841519988,
+  CreateReceiveIntent: 2115981365,
+  ClaimReceiveIntent: 2115981366,
+  CancelReceiveIntent: 2115981367,
   PublishPrivateFromVaultBalance: 2115981361,
   PublishPublicFromVaultBalance: 2115981362,
   SetProfileAvatarFromVaultBalance: 2115981363,
@@ -36,6 +36,7 @@ export const VAULT_PUBLISH_KIND = Object.freeze({
 export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
 export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
 export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
+export const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN = 0x56524331n; // "VRC1"
 
 export const VAULT_SIZE_CLASS = Object.freeze({
   KIB_1: 1n,
@@ -86,6 +87,7 @@ export const VAULT_RESERVES_NANOTONS = Object.freeze({
   keyRecordStandardStorage: 5_000_000n,
   keyRecordLongTermStorage: 30_000_000n,
   receiveIntentStorage: 5_000_000n,
+  receiveIntentSettlementExec: 2_000_000n,
   stateGrowthExec: 2_000_000n,
   depositTonExec: 2_000_000n,
   withdrawTonExec: 2_000_000n,
@@ -114,6 +116,12 @@ export const USERNAME_REGISTRY_RESERVES_NANOTONS = Object.freeze({
 export const RECEIVE_ASSETS = Object.freeze({
   TON: 1n,
   ATH: 2n,
+});
+
+export const VAULT_RECEIVE_INTENT_ACTIONS = Object.freeze({
+  CREATE: 1n,
+  CLAIM: 2n,
+  CANCEL: 3n,
 });
 
 const BOC_MAGIC = [0xb5, 0xee, 0x9c, 0x72];
@@ -555,7 +563,6 @@ function keyRecordStorageEndowment(cryptoSuiteMask) {
 export function estimateVaultAttachedValueNanotons(type, params = {}, context = {}) {
   assertString(type, 'type');
   const userExists = context.userExists === true;
-  const recipientUserExists = context.recipientUserExists === true;
 
   if (type === 'DepositTon') {
     return assertUint(params.amount, 128, 'amount')
@@ -575,11 +582,11 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
   }
   if (type === 'CreateReceiveIntent') {
     return VAULT_RESERVES_NANOTONS.receiveIntentStorage
-      + VAULT_RESERVES_NANOTONS.stateGrowthExec;
+      + VAULT_RESERVES_NANOTONS.stateGrowthExec
+      + VAULT_RESERVES_NANOTONS.receiveIntentSettlementExec;
   }
   if (type === 'ClaimReceiveIntent') {
-    return recipientUserExists ? 0n : VAULT_RESERVES_NANOTONS.userStateStorage
-      + VAULT_RESERVES_NANOTONS.stateGrowthExec;
+    return 0n;
   }
   if (type === 'CancelReceiveIntent') {
     return 0n;
@@ -764,6 +771,96 @@ function vaultUsernameMintSignedDataCell(params) {
     .endCell();
 }
 
+function vaultReceiveIntentOwner(params) {
+  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
+}
+
+function vaultReceiveIntentAction(type) {
+  if (type === 'CreateReceiveIntent') return VAULT_RECEIVE_INTENT_ACTIONS.CREATE;
+  if (type === 'ClaimReceiveIntent') return VAULT_RECEIVE_INTENT_ACTIONS.CLAIM;
+  if (type === 'CancelReceiveIntent') return VAULT_RECEIVE_INTENT_ACTIONS.CANCEL;
+  throw new Error(`Unsupported Vault receive-intent type ${type}`);
+}
+
+function vaultReceiveIntentOp(type) {
+  if (type === 'CreateReceiveIntent') return VAULT_OPS.CreateReceiveIntent;
+  if (type === 'ClaimReceiveIntent') return VAULT_OPS.ClaimReceiveIntent;
+  if (type === 'CancelReceiveIntent') return VAULT_OPS.CancelReceiveIntent;
+  throw new Error(`Unsupported Vault receive-intent type ${type}`);
+}
+
+function vaultReceiveIntentSignedDataCell(type, params = {}) {
+  let actionPayload;
+  if (type === 'CreateReceiveIntent') {
+    actionPayload = beginCell()
+      .uint(params.asset, 8, 'asset')
+      .uint(params.amount, 128, 'amount')
+      .address(params.recipient_wallet ?? params.recipientWallet, 'recipient_wallet')
+      .uint(params.commitment, 256, 'commitment')
+      .endCell();
+  } else if (type === 'ClaimReceiveIntent') {
+    actionPayload = beginCell()
+      .uint(params.intent_id ?? params.intentId, 256, 'intent_id')
+      .uint(params.secret32, 256, 'secret32')
+      .endCell();
+  } else if (type === 'CancelReceiveIntent') {
+    actionPayload = beginCell()
+      .uint(params.intent_id ?? params.intentId, 256, 'intent_id')
+      .endCell();
+  } else {
+    throw new Error(`Unsupported Vault receive-intent type ${type}`);
+  }
+
+  const builder = beginCell()
+    .uint(VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
+    .uint(vaultReceiveIntentAction(type), 8, 'action')
+    .uint(basechainAddressHashValue(vaultReceiveIntentOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .ref(actionPayload, 'action_payload');
+
+  return builder.endCell();
+}
+
+export async function buildVaultReceiveIntentBodyCell(type, params = {}) {
+  assertString(type, 'type');
+  assertObject(params, 'params');
+  const signedData = vaultReceiveIntentSignedDataCell(type, params);
+  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedData);
+  const signature = ed25519.sign(hash, signingSecretKey);
+  return {
+    bodyCell: beginVaultBody(vaultReceiveIntentOp(type))
+      .address(vaultReceiveIntentOwner(params), 'owner_wallet')
+      .bytesValue(signature, 64, 'signature')
+      .ref(signedData, 'signed_payload')
+      .endCell(),
+    signedData,
+    signedDataHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+  };
+}
+
+export async function buildVaultReceiveIntentExternalBoc(type, params = {}, options = {}) {
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const built = await buildVaultReceiveIntentBodyCell(type, {
+    ...params,
+    vaultAddress,
+    deploymentManifestHash,
+  });
+  const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  return {
+    ...built,
+    boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
 function externalInMessageCell(destinationAddress, bodyCell) {
   return beginCell()
     .uint(2n, 2, 'ext_in_msg_info.tag')
@@ -924,23 +1021,6 @@ export function buildVaultMessageBody(type, params = {}) {
         .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
         .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
         .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
-        .toBocBase64();
-    case 'CreateReceiveIntent':
-      return beginVaultBody(VAULT_OPS.CreateReceiveIntent)
-        .uint(params.asset, 8, 'asset')
-        .uint(params.amount, 128, 'amount')
-        .address(params.recipient_wallet, 'recipient_wallet')
-        .uint(params.commitment, 256, 'commitment')
-        .uint(params.client_nonce, 64, 'client_nonce')
-        .toBocBase64();
-    case 'ClaimReceiveIntent':
-      return beginVaultBody(VAULT_OPS.ClaimReceiveIntent)
-        .uint(params.intent_id, 256, 'intent_id')
-        .uint(params.secret32, 256, 'secret32')
-        .toBocBase64();
-    case 'CancelReceiveIntent':
-      return beginVaultBody(VAULT_OPS.CancelReceiveIntent)
-        .uint(params.intent_id, 256, 'intent_id')
         .toBocBase64();
     default:
       throw new Error(`Unsupported Vault message type ${type}`);

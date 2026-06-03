@@ -874,6 +874,7 @@ describe('Vault TON RPC provider', () => {
               num(100n),
               num(0xabcdn),
               num(77n),
+              num(2_000_000n),
               num(1_700_000_000n),
               num(0n),
             ],
@@ -928,6 +929,7 @@ describe('Vault TON RPC provider', () => {
       sender_wallet: OWNER,
       asset: 1n,
       amount: 100n,
+      settlement_reserve_ton: 2_000_000n,
       claimed: false,
     });
     await expect(provider.getReceiveIntentId(OWNER, `0:${'44'.repeat(32)}`, 1n, 100n, 77n)).resolves.toBe(0x1010n);

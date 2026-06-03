@@ -24,6 +24,11 @@ const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
 const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
 const RECEIVE_INTENT_COMMITMENT_DOMAIN: Int = 0x5243434d; // "RCCM"
+const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN: Int = 0x56524331; // "VRC1"
+const VAULT_RECEIVE_INTENT_ACTION_CREATE: Int = 1;
+const VAULT_RECEIVE_INTENT_ACTION_CLAIM: Int = 2;
+const VAULT_RECEIVE_INTENT_ACTION_CANCEL: Int = 3;
+const VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE: Int = 2000000;
 const VAULT_PENDING_PUBLISH_COUNT_UNIT: Int = 1;
 const VAULT_PENDING_PROFILE_COUNT_UNIT: Int = 4294967296;
 const VAULT_PENDING_USERNAME_COUNT_UNIT: Int = 281474976710656;
@@ -182,21 +187,22 @@ message(0x89D648BB) ReplaceMessagingKeys {
     crypto_suite_mask: Int as uint16;
 }
 
-message(0xF780F913) CreateReceiveIntent {
-    asset: Int as uint8;
-    amount: Int as uint128;
-    recipient_wallet: Address;
-    commitment: Int as uint256;
-    client_nonce: Int as uint64;
+message(0x7E1F5035) CreateReceiveIntent {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
 }
 
-message(0x99ECCCFC) ClaimReceiveIntent {
-    intent_id: Int as uint256;
-    secret32: Int as uint256;
+message(0x7E1F5036) ClaimReceiveIntent {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
 }
 
-message(0x32289374) CancelReceiveIntent {
-    intent_id: Int as uint256;
+message(0x7E1F5037) CancelReceiveIntent {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
 }
 
 message(0x7E1F5031) PublishPrivateFromVaultBalance {
@@ -309,6 +315,7 @@ struct ReceiveIntent {
     amount: Int as uint128;
     commitment: Int as uint256;
     client_nonce: Int as uint64;
+    settlement_reserve_ton: Int as uint128;
     created_at: Int as uint32;
     claimed: Bool;
 }
@@ -345,6 +352,7 @@ struct VaultReceiveIntentView {
     amount: Int;
     commitment: Int;
     client_nonce: Int;
+    settlement_reserve_ton: Int;
     created_at: Int;
     claimed: Bool;
 }
@@ -1492,91 +1500,246 @@ contract Vault {
 
 
 
-    receive(msg: CreateReceiveIntent) {
+    external(msg: CreateReceiveIntent) {
         self.requireSealed();
-        self.validateReceiveAsset(msg.asset);
-        throwUnless(16210, msg.amount > 0);
-        throwUnless(16211, msg.commitment != 0);
-
-        let userOpt: UserState? = self.users.get(sender());
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16214, userOpt != null);
         let user: UserState = userOpt!!;
+        throwUnless(16221, user.current_sign_pubkey != 0);
+        throwUnless(16222, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
 
-        if (msg.asset == ASSET_TON) {
-            throwUnless(16215, user.ton_balance >= msg.amount);
-            user.ton_balance -= msg.amount;
-        } else {
-            throwUnless(16219, self.isBasechainAddress(sender()));
-            throwUnless(16220, self.isBasechainAddress(msg.recipient_wallet));
-            throwUnless(16216, user.ath_balance >= msg.amount);
-            user.ath_balance -= msg.amount;
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16223, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16224, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        throwUnless(16225, vaultAddressSlice.loadUint(11) == 1024);
+        throwUnless(16225, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedAction: Int = signedPayload.loadUint(8);
+        throwUnless(16226, signedAction == VAULT_RECEIVE_INTENT_ACTION_CREATE);
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16227, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16227, signedOwnerHash == ownerPrefix.loadUint(256));
+        let clientNonce: Int = signedPayload.loadUint(64);
+        throwUnless(16233, clientNonce == user.publish_nonce);
+        acceptMessage();
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let asset: Int = actionPayload.loadUint(8);
+        let amount: Int = actionPayload.loadUint(128);
+        let recipientWallet: Address = actionPayload.loadAddress();
+        let commitment: Int = actionPayload.loadUint(256);
+        if (!(actionPayload.bits() == 0)) {
+            return;
+        }
+        if (!(actionPayload.refs() == 0)) {
+            return;
+        }
+        if (!((asset == ASSET_TON) || (asset == ASSET_ATH))) {
+            return;
+        }
+        if (!(amount > 0)) {
+            return;
+        }
+        if (!(commitment != 0)) {
+            return;
         }
 
-        let intentId: Int = self.computeReceiveIntentId(sender(), msg.recipient_wallet, msg.asset, msg.amount, msg.client_nonce);
-        throwUnless(16217, !self.receive_intents.exists(intentId));
-        throwUnless(16218, context().value >= VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE);
+        let tonReserve: Int = VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE + VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE;
+        if (asset == ASSET_TON) {
+            if (!(user.ton_balance >= amount + tonReserve)) {
+                return;
+            }
+            user.ton_balance -= (amount + tonReserve);
+        } else {
+            if (!(self.isBasechainAddress(msg.owner_wallet))) {
+                return;
+            }
+            if (!(self.isBasechainAddress(recipientWallet))) {
+                return;
+            }
+            if (!(user.ath_balance >= amount)) {
+                return;
+            }
+            if (!(user.ton_balance >= tonReserve)) {
+                return;
+            }
+            user.ath_balance -= amount;
+            user.ton_balance -= tonReserve;
+        }
 
-        self.users.set(sender(), user);
+        let intentId: Int = self.computeReceiveIntentId(msg.owner_wallet, recipientWallet, asset, amount, clientNonce);
+        if (self.receive_intents.exists(intentId)) {
+            return;
+        }
+
+        self.users.set(msg.owner_wallet, user);
         self.receive_intents.set(intentId, ReceiveIntent {
-            sender_wallet: sender(),
-            recipient_wallet: msg.recipient_wallet,
-            asset: msg.asset,
-            amount: msg.amount,
-            commitment: msg.commitment,
-            client_nonce: msg.client_nonce,
+            sender_wallet: msg.owner_wallet,
+            recipient_wallet: recipientWallet,
+            asset: asset,
+            amount: amount,
+            commitment: commitment,
+            client_nonce: clientNonce,
+            settlement_reserve_ton: VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE,
             created_at: now(),
             claimed: false
         });
         self.receive_intent_count += 1;
     }
 
-    receive(msg: ClaimReceiveIntent) {
+    external(msg: ClaimReceiveIntent) {
         self.requireSealed();
-        let intentOpt: ReceiveIntent? = self.receive_intents.get(msg.intent_id);
-        throwUnless(16230, intentOpt != null);
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16239, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16240, user.current_sign_pubkey != 0);
+        throwUnless(16241, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
+
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16242, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16243, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        throwUnless(16244, vaultAddressSlice.loadUint(11) == 1024);
+        throwUnless(16244, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedAction: Int = signedPayload.loadUint(8);
+        throwUnless(16245, signedAction == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16246, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16246, signedOwnerHash == ownerPrefix.loadUint(256));
+        let clientNonce: Int = signedPayload.loadUint(64);
+        throwUnless(16249, clientNonce == user.publish_nonce);
+        acceptMessage();
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let intentId: Int = actionPayload.loadUint(256);
+        let secret32: Int = actionPayload.loadUint(256);
+        if (!(actionPayload.bits() == 0)) {
+            return;
+        }
+        if (!(actionPayload.refs() == 0)) {
+            return;
+        }
+
+        let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
+        if (intentOpt == null) {
+            return;
+        }
         let intent: ReceiveIntent = intentOpt!!;
-        throwUnless(16231, !intent.claimed);
-        throwUnless(16232, sender() == intent.recipient_wallet);
+        if (intent.claimed) {
+            return;
+        }
+        if (!(msg.owner_wallet == intent.recipient_wallet)) {
+            return;
+        }
         if (intent.asset == ASSET_ATH) {
-            throwUnless(16236, self.isBasechainAddress(sender()));
+            if (!(self.isBasechainAddress(msg.owner_wallet))) {
+                return;
+            }
         }
-        let expected: Int = self.computeReceiveIntentCommitment(msg.intent_id, sender(), msg.secret32);
-        throwUnless(16234, expected == intent.commitment);
-
-        let userExists: Bool = self.users.exists(sender());
-        if (!userExists) {
-            throwUnless(16235, context().value >= VAULT_USER_STATE_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE);
-            self.user_count += 1;
+        let expected: Int = self.computeReceiveIntentCommitment(intentId, msg.owner_wallet, secret32);
+        if (!(expected == intent.commitment)) {
+            return;
         }
 
-        let user: UserState = self.getUserOrEmpty(sender());
         if (intent.asset == ASSET_TON) {
             user.ton_balance += intent.amount;
         } else {
             user.ath_balance += intent.amount;
         }
 
-        self.users.set(sender(), user);
-        self.receive_intents.del(msg.intent_id);
+        self.users.set(msg.owner_wallet, user);
+        self.receive_intents.del(intentId);
         self.receive_intent_count -= 1;
     }
 
-    receive(msg: CancelReceiveIntent) {
+    external(msg: CancelReceiveIntent) {
         self.requireSealed();
-        let intentOpt: ReceiveIntent? = self.receive_intents.get(msg.intent_id);
-        throwUnless(16250, intentOpt != null);
-        let intent: ReceiveIntent = intentOpt!!;
-        throwUnless(16251, sender() == intent.sender_wallet);
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16252, userOpt != null);
+        let user: UserState = userOpt!!;
+        throwUnless(16253, user.current_sign_pubkey != 0);
+        throwUnless(16254, checkSignature(msg.signed_payload.hash(), msg.signature, user.current_sign_pubkey));
 
-        let user: UserState = self.getUserOrEmpty(sender());
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16255, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16256, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        throwUnless(16257, vaultAddressSlice.loadUint(11) == 1024);
+        throwUnless(16257, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedAction: Int = signedPayload.loadUint(8);
+        throwUnless(16258, signedAction == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16259, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16259, signedOwnerHash == ownerPrefix.loadUint(256));
+        let clientNonce: Int = signedPayload.loadUint(64);
+        throwUnless(16262, clientNonce == user.publish_nonce);
+        acceptMessage();
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let intentId: Int = actionPayload.loadUint(256);
+        if (!(actionPayload.bits() == 0)) {
+            return;
+        }
+        if (!(actionPayload.refs() == 0)) {
+            return;
+        }
+
+        let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
+        if (intentOpt == null) {
+            return;
+        }
+        let intent: ReceiveIntent = intentOpt!!;
+        if (!(msg.owner_wallet == intent.sender_wallet)) {
+            return;
+        }
+
         if (intent.asset == ASSET_TON) {
             user.ton_balance += intent.amount;
         } else {
             user.ath_balance += intent.amount;
         }
 
-        self.users.set(sender(), user);
-        self.receive_intents.del(msg.intent_id);
+        self.users.set(msg.owner_wallet, user);
+        self.receive_intents.del(intentId);
         self.receive_intent_count -= 1;
     }
 
@@ -1893,14 +2056,23 @@ contract Vault {
         let maxTonCharge: Int = signedPayload.loadUint(128);
         throwUnless(16610, signedOwner == msg.owner_wallet);
         throwUnless(16611, clientNonce == user.publish_nonce);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16612, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16613, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
-        throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         acceptMessage();
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        if (!(ownerPrefix.loadUint(11) == 1024)) {
+            return;
+        }
+        if (!(maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE)) {
+            return;
+        }
+        if (!(user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE)) {
+            return;
+        }
 
         user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
-        user.publish_nonce += 1;
         self.users.set(msg.owner_wallet, user);
         commit();
 
@@ -2002,14 +2174,23 @@ contract Vault {
         let maxTonCharge: Int = signedPayload.loadUint(128);
         throwUnless(16710, signedOwner == msg.owner_wallet);
         throwUnless(16711, clientNonce == user.publish_nonce);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16712, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16713, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
-        throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         acceptMessage();
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        if (!(ownerPrefix.loadUint(11) == 1024)) {
+            return;
+        }
+        if (!(maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE)) {
+            return;
+        }
+        if (!(user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE)) {
+            return;
+        }
 
         user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
-        user.publish_nonce += 1;
         self.users.set(msg.owner_wallet, user);
         commit();
 
@@ -2255,6 +2436,7 @@ contract Vault {
                 amount: 0,
                 commitment: 0,
                 client_nonce: 0,
+                settlement_reserve_ton: 0,
                 created_at: 0,
                 claimed: false
             };
@@ -2268,6 +2450,7 @@ contract Vault {
             amount: intent.amount,
             commitment: intent.commitment,
             client_nonce: intent.client_nonce,
+            settlement_reserve_ton: intent.settlement_reserve_ton,
             created_at: intent.created_at,
             claimed: intent.claimed
         };

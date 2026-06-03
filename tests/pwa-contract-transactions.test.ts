@@ -2,9 +2,6 @@ import { Address, beginCell, Cell } from '@ton/core';
 import { ed25519 } from '../web/vendor/@noble/curves/ed25519.js';
 import { describe, expect, it } from 'vitest';
 import {
-  storeCancelReceiveIntent,
-  storeClaimReceiveIntent,
-  storeCreateReceiveIntent,
   storeDepositTon,
   storeMintUsernameFromVaultBalance,
   storeRegisterMessagingKeys,
@@ -45,6 +42,7 @@ import {
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarBodyCell,
   buildVaultProfileAvatarExternalBoc,
+  buildVaultReceiveIntentExternalBoc,
   buildVaultUsernameMintBodyCell,
   buildVaultUsernameMintExternalBoc,
   buildVaultMessageBody,
@@ -196,36 +194,56 @@ describe('PWA contract transaction builders', () => {
         crypto_suite_mask: 2n,
       }),
     ],
-    [
-      'CreateReceiveIntent',
-      {
-        asset: RECEIVE_ASSETS.TON,
-        amount: 120_000_000n,
-        recipient_wallet: RECIPIENT,
-        commitment: 0x7777n,
-        client_nonce: 9n,
-      },
-      storeCreateReceiveIntent({
-        $$type: 'CreateReceiveIntent',
-        asset: RECEIVE_ASSETS.TON,
-        amount: 120_000_000n,
-        recipient_wallet: Address.parseRaw(RECIPIENT),
-        commitment: 0x7777n,
-        client_nonce: 9n,
-      }),
-    ],
-    [
-      'ClaimReceiveIntent',
-      { intent_id: 0x8888n, secret32: 0x9999n },
-      storeClaimReceiveIntent({ $$type: 'ClaimReceiveIntent', intent_id: 0x8888n, secret32: 0x9999n }),
-    ],
-    [
-      'CancelReceiveIntent',
-      { intent_id: 0x8888n },
-      storeCancelReceiveIntent({ $$type: 'CancelReceiveIntent', intent_id: 0x8888n }),
-    ],
   ])('PWA-TX-01: %s body matches generated Tact wrapper encoding', (type, params, store) => {
     expect(buildVaultMessageBody(type, params)).toBe(generatedBody(store));
+  });
+
+  it('PWA-TX-01B: payment checks are signed Vault external BOCs, not wallet message bodies', async () => {
+    const signingSecretKey = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+    expect(() => buildVaultMessageBody('CreateReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
+    expect(() => buildVaultMessageBody('ClaimReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
+    expect(() => buildVaultMessageBody('CancelReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
+
+    const createExternal = await buildVaultReceiveIntentExternalBoc('CreateReceiveIntent', {
+      owner_wallet: OWNER,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
+      signingSecretKey,
+      client_nonce: 9n,
+      asset: RECEIVE_ASSETS.TON,
+      amount: 120_000_000n,
+      recipient_wallet: RECIPIENT,
+      commitment: 0x7777n,
+    });
+    const claimExternal = await buildVaultReceiveIntentExternalBoc('ClaimReceiveIntent', {
+      owner_wallet: RECIPIENT,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
+      signingSecretKey,
+      client_nonce: 10n,
+      intent_id: 0x8888n,
+      secret32: 0x9999n,
+    });
+    const cancelExternal = await buildVaultReceiveIntentExternalBoc('CancelReceiveIntent', {
+      owner_wallet: OWNER,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
+      signingSecretKey,
+      client_nonce: 11n,
+      intent_id: 0x8888n,
+    });
+
+    for (const external of [createExternal, claimExternal, cancelExternal]) {
+      expect(external.vaultAddress).toBe(VAULT);
+      expect(external.boc).toMatch(/^te6/);
+      expect(external.signedDataHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(external.signature).toMatch(/^[0-9a-f]{128}$/);
+      expect(ed25519.verify(
+        Buffer.from(external.signature, 'hex'),
+        Buffer.from(external.signedDataHash, 'hex'),
+        ed25519.getPublicKey(signingSecretKey),
+      )).toBe(true);
+    }
   });
 
   it('PWA-TX-02: quotes exact explicit Vault reserve values used by the PWA', () => {
@@ -233,8 +251,8 @@ describe('PWA contract transaction builders', () => {
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: true })).toBe(2_001_000n);
     expect(() => estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 1n }, { userExists: false })).toThrow(/hybrid-v1/);
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
-    expect(estimateVaultAttachedValueNanotons('CreateReceiveIntent')).toBe(7_000_000n);
-    expect(estimateVaultAttachedValueNanotons('ClaimReceiveIntent', {}, { recipientUserExists: false })).toBe(12_000_000n);
+    expect(estimateVaultAttachedValueNanotons('CreateReceiveIntent')).toBe(9_000_000n);
+    expect(estimateVaultAttachedValueNanotons('ClaimReceiveIntent')).toBe(0n);
     expect(estimateVaultAttachedValueNanotons('WithdrawAth')).toBe(40_000_000n);
   });
 

@@ -117,11 +117,11 @@ describe('PWA runtime config guard', () => {
     expect(dataUrl).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
   });
 
-  it('PWA-CONFIG-01: default workspace config is pinned to verified mainnet production contracts', () => {
+  it('PWA-CONFIG-01: default workspace config is a mainnet redeploy candidate blocked from production', () => {
     const report = validatePlathoAppConfig(PLATHO_APP_CONFIG);
 
-    expect(report.ok).toBe(true);
-    expect(report.mode).toBe(PLATHO_APP_MODES.PRODUCTION);
+    expect(report.ok).toBe(false);
+    expect(report.mode).toBe(PLATHO_APP_MODES.PREVIEW);
     expect(PLATHO_APP_CONFIG.network.chain).toBe('mainnet');
     expect(PLATHO_APP_CONFIG.network.tonRpc.requestSpacingMs).toBe(1500);
     expect(PLATHO_APP_CONFIG.network.tonRpc.rateLimitBackoffMs).toBe(60000);
@@ -145,18 +145,18 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQDjCu9J-a50z8pwgBp9AWpuD9MDQufKiKHPi-1VHRWpQbvc');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQB9bp-qwLPBX8BA312KKTBFVrfFZwxjzEuZfJFgYSu1YfZm');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
-      'a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd',
+      '570b3ba74eff150ce3317b35f190d8f5053f000dcfb331c0c3c1a31e46b7a234',
     );
     expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG');
     expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9v087');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
-    expect(report.findings.map((finding) => finding.id)).not.toContain('PWA_MODE_NOT_PRODUCTION');
+    expect(report.findings.map((finding) => finding.id)).toContain('PWA_MODE_NOT_PRODUCTION');
     expect(report.findings.map((finding) => finding.id)).not.toContain('PWA_NETWORK_NOT_MAINNET');
-    expect(report.findings.map((finding) => finding.id)).toEqual([]);
+    expect(report.findings.map((finding) => finding.id)).toEqual(['PWA_MODE_NOT_PRODUCTION']);
   });
 
   it('PWA-CONFIG-01A: Vault preview UI does not expose internal readiness artifacts', () => {
@@ -402,7 +402,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQDjCu9J-a50z8pwgBp9AWpuD9MDQufKiKHPi-1VHRWpQbvc');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQB9bp-qwLPBX8BA312KKTBFVrfFZwxjzEuZfJFgYSu1YfZm');
     expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG');
     expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9v087');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
@@ -1152,22 +1152,25 @@ describe('PWA runtime config guard', () => {
     expect(submitSource).toMatch(/submitCreatePaymentCheck\(\{ thread, paymentDetails: paymentDraft \}\)/);
   });
 
-  it('PWA-CONFIG-01D4: payment checks preflight and persist recovery before CreateReceiveIntent', () => {
+  it('PWA-CONFIG-01D4: payment checks preflight and persist recovery before signed CreateReceiveIntent external', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const source = app.slice(
       app.indexOf('async function submitCreatePaymentCheck'),
       app.indexOf('async function submitVaultClaimPaymentCheck'),
     );
-    const prepareIndex = source.indexOf('const preparedPublish = await prepareCapsulesThroughVault([capsule], { publishState })');
+    const quotedPrepareIndex = source.indexOf('const quotedPublish = await prepareCapsulesThroughVault([capsule], { publishState })');
     const persistIndex = source.indexOf('const storedRecovery = await persistMessageToEncryptedHistory(thread, message)');
-    const createIndex = source.indexOf("submitVaultMessage('CreateReceiveIntent'");
+    const createIndex = source.indexOf("submitVaultReceiveIntentExternal('CreateReceiveIntent'");
+    const finalPrepareIndex = source.indexOf('const preparedPublish = await prepareCapsulesThroughVault([capsule], { publishState })');
 
-    expect(prepareIndex).toBeGreaterThanOrEqual(0);
-    expect(persistIndex).toBeGreaterThan(prepareIndex);
+    expect(quotedPrepareIndex).toBeGreaterThanOrEqual(0);
+    expect(persistIndex).toBeGreaterThan(quotedPrepareIndex);
     expect(createIndex).toBeGreaterThan(persistIndex);
-    expect(source).toMatch(/tonBalance < amount \+ preparedPublish\.totalMaxCharge/);
+    expect(finalPrepareIndex).toBeGreaterThan(createIndex);
+    expect(source).toMatch(/tonBalance < amount \+ createReserve \+ quotedPublish\.totalMaxCharge/);
     expect(source).toMatch(/athBalance < amount/);
-    expect(source).toMatch(/tonBalance < preparedPublish\.totalMaxCharge/);
+    expect(source).toMatch(/tonBalance < createReserve \+ quotedPublish\.totalMaxCharge/);
+    expect(source).toMatch(/waitForPaymentCheckCreateConfirmation\(provider,\s*payment\)/);
     expect(source).toMatch(/encryptedMessageStore\.persistent === false/);
     expect(source).toMatch(/check intent create failed/);
   });
@@ -1189,7 +1192,7 @@ describe('PWA runtime config guard', () => {
     const readUserIndex = claimSource.indexOf('const beforeUser = await readFreshConnectedVaultUser(provider)');
     const readIntentIndex = claimSource.indexOf('const intent = await readFreshReceiveIntent(provider, intentId)');
     const assertIntentIndex = claimSource.indexOf('assertReceiveIntentMatchesPayment(intent, payment)');
-    const submitIndex = claimSource.indexOf("submitVaultMessage('ClaimReceiveIntent'");
+    const submitIndex = claimSource.indexOf("submitVaultReceiveIntentExternal('ClaimReceiveIntent'");
     const waitIndex = claimSource.indexOf('waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser)');
     const flashIndex = claimSource.indexOf('flashWalletIdentityStatus(`check claimed +');
 
@@ -1744,17 +1747,17 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v317/);
+    expect(sw).toMatch(/platho-pwa-prototype-v318/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=257/);
+    expect(sw).toMatch(/\.\/app\.js\?v=258/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=8/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=15/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=16/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=9/);

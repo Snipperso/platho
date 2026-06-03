@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=5';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=15';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=16';
 
 export class VaultTonRpcProviderError extends Error {
   constructor(message, options = {}) {
@@ -759,8 +759,9 @@ export function decodeVaultReceiveIntentViewStack(result) {
     amount: readStackInt(stack, 4, 'Vault receive intent amount'),
     commitment: readStackInt(stack, 5, 'Vault receive intent commitment'),
     client_nonce: readStackInt(stack, 6, 'Vault receive intent client_nonce'),
-    created_at: readStackInt(stack, 7, 'Vault receive intent created_at'),
-    claimed: readStackBool(stack, 8, 'Vault receive intent claimed'),
+    settlement_reserve_ton: readStackInt(stack, 7, 'Vault receive intent settlement_reserve_ton'),
+    created_at: readStackInt(stack, 8, 'Vault receive intent created_at'),
+    claimed: readStackBool(stack, 9, 'Vault receive intent claimed'),
   };
 }
 

@@ -3917,61 +3917,49 @@ export function dictValueParserReplaceMessagingKeys(): DictionaryValue<ReplaceMe
 
 export type CreateReceiveIntent = {
     $$type: 'CreateReceiveIntent';
-    asset: bigint;
-    amount: bigint;
-    recipient_wallet: Address;
-    commitment: bigint;
-    client_nonce: bigint;
+    owner_wallet: Address;
+    signature: Buffer;
+    signed_payload: Cell;
 }
 
 export function storeCreateReceiveIntent(src: CreateReceiveIntent) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(4152424723, 32);
-        b_0.storeUint(src.asset, 8);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.recipient_wallet);
-        b_0.storeUint(src.commitment, 256);
-        b_0.storeUint(src.client_nonce, 64);
+        b_0.storeUint(2115981365, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeBuffer(src.signature);
+        b_0.storeRef(src.signed_payload);
     };
 }
 
 export function loadCreateReceiveIntent(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 4152424723) { throw Error('Invalid prefix'); }
-    const _asset = sc_0.loadUintBig(8);
-    const _amount = sc_0.loadUintBig(128);
-    const _recipient_wallet = sc_0.loadAddress();
-    const _commitment = sc_0.loadUintBig(256);
-    const _client_nonce = sc_0.loadUintBig(64);
-    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, client_nonce: _client_nonce };
+    if (sc_0.loadUint(32) !== 2115981365) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _signature = sc_0.loadBuffer(64);
+    const _signed_payload = sc_0.loadRef();
+    return { $$type: 'CreateReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadTupleCreateReceiveIntent(source: TupleReader) {
-    const _asset = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _recipient_wallet = source.readAddress();
-    const _commitment = source.readBigNumber();
-    const _client_nonce = source.readBigNumber();
-    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, client_nonce: _client_nonce };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'CreateReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadGetterTupleCreateReceiveIntent(source: TupleReader) {
-    const _asset = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _recipient_wallet = source.readAddress();
-    const _commitment = source.readBigNumber();
-    const _client_nonce = source.readBigNumber();
-    return { $$type: 'CreateReceiveIntent' as const, asset: _asset, amount: _amount, recipient_wallet: _recipient_wallet, commitment: _commitment, client_nonce: _client_nonce };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'CreateReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function storeTupleCreateReceiveIntent(source: CreateReceiveIntent) {
     const builder = new TupleBuilder();
-    builder.writeNumber(source.asset);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.recipient_wallet);
-    builder.writeNumber(source.commitment);
-    builder.writeNumber(source.client_nonce);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeBuffer(source.signature);
+    builder.writeCell(source.signed_payload);
     return builder.build();
 }
 
@@ -3988,43 +3976,49 @@ export function dictValueParserCreateReceiveIntent(): DictionaryValue<CreateRece
 
 export type ClaimReceiveIntent = {
     $$type: 'ClaimReceiveIntent';
-    intent_id: bigint;
-    secret32: bigint;
+    owner_wallet: Address;
+    signature: Buffer;
+    signed_payload: Cell;
 }
 
 export function storeClaimReceiveIntent(src: ClaimReceiveIntent) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(2582433020, 32);
-        b_0.storeUint(src.intent_id, 256);
-        b_0.storeUint(src.secret32, 256);
+        b_0.storeUint(2115981366, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeBuffer(src.signature);
+        b_0.storeRef(src.signed_payload);
     };
 }
 
 export function loadClaimReceiveIntent(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2582433020) { throw Error('Invalid prefix'); }
-    const _intent_id = sc_0.loadUintBig(256);
-    const _secret32 = sc_0.loadUintBig(256);
-    return { $$type: 'ClaimReceiveIntent' as const, intent_id: _intent_id, secret32: _secret32 };
+    if (sc_0.loadUint(32) !== 2115981366) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _signature = sc_0.loadBuffer(64);
+    const _signed_payload = sc_0.loadRef();
+    return { $$type: 'ClaimReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadTupleClaimReceiveIntent(source: TupleReader) {
-    const _intent_id = source.readBigNumber();
-    const _secret32 = source.readBigNumber();
-    return { $$type: 'ClaimReceiveIntent' as const, intent_id: _intent_id, secret32: _secret32 };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'ClaimReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadGetterTupleClaimReceiveIntent(source: TupleReader) {
-    const _intent_id = source.readBigNumber();
-    const _secret32 = source.readBigNumber();
-    return { $$type: 'ClaimReceiveIntent' as const, intent_id: _intent_id, secret32: _secret32 };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'ClaimReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function storeTupleClaimReceiveIntent(source: ClaimReceiveIntent) {
     const builder = new TupleBuilder();
-    builder.writeNumber(source.intent_id);
-    builder.writeNumber(source.secret32);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeBuffer(source.signature);
+    builder.writeCell(source.signed_payload);
     return builder.build();
 }
 
@@ -4041,37 +4035,49 @@ export function dictValueParserClaimReceiveIntent(): DictionaryValue<ClaimReceiv
 
 export type CancelReceiveIntent = {
     $$type: 'CancelReceiveIntent';
-    intent_id: bigint;
+    owner_wallet: Address;
+    signature: Buffer;
+    signed_payload: Cell;
 }
 
 export function storeCancelReceiveIntent(src: CancelReceiveIntent) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(841519988, 32);
-        b_0.storeUint(src.intent_id, 256);
+        b_0.storeUint(2115981367, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeBuffer(src.signature);
+        b_0.storeRef(src.signed_payload);
     };
 }
 
 export function loadCancelReceiveIntent(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 841519988) { throw Error('Invalid prefix'); }
-    const _intent_id = sc_0.loadUintBig(256);
-    return { $$type: 'CancelReceiveIntent' as const, intent_id: _intent_id };
+    if (sc_0.loadUint(32) !== 2115981367) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _signature = sc_0.loadBuffer(64);
+    const _signed_payload = sc_0.loadRef();
+    return { $$type: 'CancelReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadTupleCancelReceiveIntent(source: TupleReader) {
-    const _intent_id = source.readBigNumber();
-    return { $$type: 'CancelReceiveIntent' as const, intent_id: _intent_id };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'CancelReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadGetterTupleCancelReceiveIntent(source: TupleReader) {
-    const _intent_id = source.readBigNumber();
-    return { $$type: 'CancelReceiveIntent' as const, intent_id: _intent_id };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'CancelReceiveIntent' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function storeTupleCancelReceiveIntent(source: CancelReceiveIntent) {
     const builder = new TupleBuilder();
-    builder.writeNumber(source.intent_id);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeBuffer(source.signature);
+    builder.writeCell(source.signed_payload);
     return builder.build();
 }
 
@@ -5035,6 +5041,7 @@ export type ReceiveIntent = {
     amount: bigint;
     commitment: bigint;
     client_nonce: bigint;
+    settlement_reserve_ton: bigint;
     created_at: bigint;
     claimed: boolean;
 }
@@ -5048,8 +5055,9 @@ export function storeReceiveIntent(src: ReceiveIntent) {
         b_0.storeUint(src.amount, 128);
         b_0.storeUint(src.commitment, 256);
         b_0.storeUint(src.client_nonce, 64);
-        b_0.storeUint(src.created_at, 32);
         const b_1 = new Builder();
+        b_1.storeUint(src.settlement_reserve_ton, 128);
+        b_1.storeUint(src.created_at, 32);
         b_1.storeBit(src.claimed);
         b_0.storeRef(b_1.endCell());
     };
@@ -5063,10 +5071,11 @@ export function loadReceiveIntent(slice: Slice) {
     const _amount = sc_0.loadUintBig(128);
     const _commitment = sc_0.loadUintBig(256);
     const _client_nonce = sc_0.loadUintBig(64);
-    const _created_at = sc_0.loadUintBig(32);
     const sc_1 = sc_0.loadRef().beginParse();
+    const _settlement_reserve_ton = sc_1.loadUintBig(128);
+    const _created_at = sc_1.loadUintBig(32);
     const _claimed = sc_1.loadBit();
-    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, settlement_reserve_ton: _settlement_reserve_ton, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadTupleReceiveIntent(source: TupleReader) {
@@ -5076,9 +5085,10 @@ export function loadTupleReceiveIntent(source: TupleReader) {
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
+    const _settlement_reserve_ton = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, settlement_reserve_ton: _settlement_reserve_ton, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadGetterTupleReceiveIntent(source: TupleReader) {
@@ -5088,9 +5098,10 @@ export function loadGetterTupleReceiveIntent(source: TupleReader) {
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
+    const _settlement_reserve_ton = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'ReceiveIntent' as const, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, settlement_reserve_ton: _settlement_reserve_ton, created_at: _created_at, claimed: _claimed };
 }
 
 export function storeTupleReceiveIntent(source: ReceiveIntent) {
@@ -5101,6 +5112,7 @@ export function storeTupleReceiveIntent(source: ReceiveIntent) {
     builder.writeNumber(source.amount);
     builder.writeNumber(source.commitment);
     builder.writeNumber(source.client_nonce);
+    builder.writeNumber(source.settlement_reserve_ton);
     builder.writeNumber(source.created_at);
     builder.writeBoolean(source.claimed);
     return builder.build();
@@ -5309,6 +5321,7 @@ export type VaultReceiveIntentView = {
     amount: bigint;
     commitment: bigint;
     client_nonce: bigint;
+    settlement_reserve_ton: bigint;
     created_at: bigint;
     claimed: boolean;
 }
@@ -5325,6 +5338,7 @@ export function storeVaultReceiveIntentView(src: VaultReceiveIntentView) {
         b_1.storeInt(src.commitment, 257);
         b_1.storeInt(src.client_nonce, 257);
         const b_2 = new Builder();
+        b_2.storeInt(src.settlement_reserve_ton, 257);
         b_2.storeInt(src.created_at, 257);
         b_2.storeBit(src.claimed);
         b_1.storeRef(b_2.endCell());
@@ -5343,9 +5357,10 @@ export function loadVaultReceiveIntentView(slice: Slice) {
     const _commitment = sc_1.loadIntBig(257);
     const _client_nonce = sc_1.loadIntBig(257);
     const sc_2 = sc_1.loadRef().beginParse();
+    const _settlement_reserve_ton = sc_2.loadIntBig(257);
     const _created_at = sc_2.loadIntBig(257);
     const _claimed = sc_2.loadBit();
-    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, settlement_reserve_ton: _settlement_reserve_ton, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadTupleVaultReceiveIntentView(source: TupleReader) {
@@ -5356,9 +5371,10 @@ export function loadTupleVaultReceiveIntentView(source: TupleReader) {
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
+    const _settlement_reserve_ton = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, settlement_reserve_ton: _settlement_reserve_ton, created_at: _created_at, claimed: _claimed };
 }
 
 export function loadGetterTupleVaultReceiveIntentView(source: TupleReader) {
@@ -5369,9 +5385,10 @@ export function loadGetterTupleVaultReceiveIntentView(source: TupleReader) {
     const _amount = source.readBigNumber();
     const _commitment = source.readBigNumber();
     const _client_nonce = source.readBigNumber();
+    const _settlement_reserve_ton = source.readBigNumber();
     const _created_at = source.readBigNumber();
     const _claimed = source.readBoolean();
-    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, created_at: _created_at, claimed: _claimed };
+    return { $$type: 'VaultReceiveIntentView' as const, exists: _exists, sender_wallet: _sender_wallet, recipient_wallet: _recipient_wallet, asset: _asset, amount: _amount, commitment: _commitment, client_nonce: _client_nonce, settlement_reserve_ton: _settlement_reserve_ton, created_at: _created_at, claimed: _claimed };
 }
 
 export function storeTupleVaultReceiveIntentView(source: VaultReceiveIntentView) {
@@ -5383,6 +5400,7 @@ export function storeTupleVaultReceiveIntentView(source: VaultReceiveIntentView)
     builder.writeNumber(source.amount);
     builder.writeNumber(source.commitment);
     builder.writeNumber(source.client_nonce);
+    builder.writeNumber(source.settlement_reserve_ton);
     builder.writeNumber(source.created_at);
     builder.writeBoolean(source.claimed);
     return builder.build();
@@ -6222,9 +6240,9 @@ const ATHWallet_types: ABIType[] = [
     {"name":"WithdrawAth","header":4188293172,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
     {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
-    {"name":"CreateReceiveIntent","header":4152424723,"fields":[{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"ClaimReceiveIntent","header":2582433020,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"secret32","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
-    {"name":"CancelReceiveIntent","header":841519988,"fields":[{"name":"intent_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"CreateReceiveIntent","header":2115981365,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"ClaimReceiveIntent","header":2115981366,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"CancelReceiveIntent","header":2115981367,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PublishPrivateFromVaultBalance","header":2115981361,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"PublishPublicFromVaultBalance","header":2115981362,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"SetProfileAvatarFromVaultBalance","header":2115981363,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
@@ -6239,10 +6257,10 @@ const ATHWallet_types: ABIType[] = [
     {"name":"PendingPublish","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"tombstone","type":{"kind":"simple","type":"bool","optional":false}},{"name":"refund_to_vault","type":{"kind":"simple","type":"bool","optional":false}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"refundable_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingProfileAvatarPayment","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingUsernameMintPayment","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"settlement_reserve_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"current_sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"publish_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"settlement_reserve_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultKeyRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultUserView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"ton_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publish_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultPendingAthWithdrawalView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
@@ -6293,9 +6311,9 @@ const ATHWallet_opcodes = {
     "WithdrawAth": 4188293172,
     "RegisterMessagingKeys": 1383096026,
     "ReplaceMessagingKeys": 2312521915,
-    "CreateReceiveIntent": 4152424723,
-    "ClaimReceiveIntent": 2582433020,
-    "CancelReceiveIntent": 841519988,
+    "CreateReceiveIntent": 2115981365,
+    "ClaimReceiveIntent": 2115981366,
+    "CancelReceiveIntent": 2115981367,
     "PublishPrivateFromVaultBalance": 2115981361,
     "PublishPublicFromVaultBalance": 2115981362,
     "SetProfileAvatarFromVaultBalance": 2115981363,
@@ -6384,6 +6402,11 @@ export const ASSET_TON = 1n;
 export const ASSET_ATH = 2n;
 export const RECEIVE_INTENT_ID_DOMAIN = 1380141380n;
 export const RECEIVE_INTENT_COMMITMENT_DOMAIN = 1380139853n;
+export const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN = 1448231729n;
+export const VAULT_RECEIVE_INTENT_ACTION_CREATE = 1n;
+export const VAULT_RECEIVE_INTENT_ACTION_CLAIM = 2n;
+export const VAULT_RECEIVE_INTENT_ACTION_CANCEL = 3n;
+export const VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE = 2000000n;
 export const VAULT_PENDING_PUBLISH_COUNT_UNIT = 1n;
 export const VAULT_PENDING_PROFILE_COUNT_UNIT = 4294967296n;
 export const VAULT_PENDING_USERNAME_COUNT_UNIT = 281474976710656n;
