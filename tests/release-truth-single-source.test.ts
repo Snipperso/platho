@@ -123,4 +123,22 @@ describe('release truth single-source guard', () => {
     expect(summary.total_tests).toBeGreaterThan(0);
     expect(summary.supersedes_historical_artifacts).toContain('artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt');
   });
+
+  it('does not claim production gates pass while production release gates are blocked', async () => {
+    const summary = readJson('artifacts/CURRENT_FULL_TEST_SUMMARY.json');
+    const notes = Array.isArray(summary.notes) ? summary.notes.join('\n') : '';
+    const claimsProductionGatesPassed = /production release gates now pass/i.test(notes)
+      || /production gates now pass/i.test(notes)
+      || /verified mainnet genesis and production PWA/i.test(notes);
+    const { PLATHO_APP_CONFIG, PLATHO_APP_MODES } = await import('../web/platho-config.mjs');
+    const verified = readText('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim().toLowerCase() === 'true';
+    const productionPrep = readJson('artifacts/web_static_deploy_prep.production.json');
+    const gatesActuallyPass = verified
+      && PLATHO_APP_CONFIG.mode === PLATHO_APP_MODES.PRODUCTION
+      && productionPrep.productionReady === true;
+
+    if (!gatesActuallyPass) {
+      expect(claimsProductionGatesPassed).toBe(false);
+    }
+  });
 });
