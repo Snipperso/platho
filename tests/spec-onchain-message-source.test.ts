@@ -233,6 +233,27 @@ describe('v1 on-chain message source of truth', () => {
     expect(usernameSection).not.toMatch(/FlushAthRefundDue|get_refund_due/i);
   });
 
+  it('SPEC-MSG-SOURCE-03C4: PWA interface matrix labels Vault-auth service flows and payment-check ordering correctly', () => {
+    const matrix = read('artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md');
+
+    for (const flow of [
+      'Mint username from Vault balance',
+      'Set wallet avatar from Vault balance',
+      'Create payment check',
+      'Claim payment check',
+      'Cancel payment check',
+    ]) {
+      const row = matrix.split('\n').find((line) => line.startsWith(`| ${flow} |`));
+      expect(row, `${flow} row must exist`).toBeTruthy();
+      expect(row, `${flow} must be a Vault external auth flow`).toContain('Vault auth key / owner signing key');
+      expect(row, `${flow} must not be documented as a wallet-sender flow`).not.toMatch(/\|\s*(sender|recipient|user) wallet\s*\|/i);
+    }
+
+    expect(matrix).toMatch(/persists encrypted local recovery first/i);
+    expect(matrix).toMatch(/creates and confirms the locked intent, then publishes the encrypted check capsule/i);
+    expect(matrix).not.toMatch(/publishes the encrypted check capsule before creating the locked intent/i);
+  });
+
   it('SPEC-MSG-SOURCE-03D: public comments warning is immutable-but-not-forever retention copy', () => {
     const app = read('web/app.js');
     const source = app.slice(

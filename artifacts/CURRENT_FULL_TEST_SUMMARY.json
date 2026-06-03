@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T18:15:47.7736325Z",
+  "generated_after_local_run": "2026-06-03T18:30:12.3409335Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
   "failed_test_files": 0,
-  "total_tests": 760,
-  "passed_tests": 760,
+  "total_tests": 762,
+  "passed_tests": 762,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -72,6 +72,7 @@
     "It also includes the Larisa Section 12 docs/release-truth cleanup pass: PRODUCTION_READINESS no longer hardcodes a stale final manifest hash or claims preview config is already production-pinned, public About copy names the narrow launch authorities while rejecting arbitrary admin controls, and the ATH whitepaper describes current Vault-funded username rejection/refund semantics instead of deleted direct refund-due ABI.",
     "It also includes the Larisa focused re-audit release-evidence cleanup: mainnet_genesis_verify_report.json and MAINNET_GENESIS_VERIFY.md now explicitly flag MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT when the stored verifier input belongs to an older final manifest than artifacts/local/mainnet_final_manifest_draft.json, without pretending final mainnet genesis is verified.",
     "It also includes the Larisa Section 11 static public feed fallback guard: production PWA config validation now rejects allowUnverifiedStaticPublicFeeds=true so static JSON cannot self-declare chain-backed public content in a production package.",
-    "It also includes the Larisa Section 12 public whitepaper cleanup: MarketStabilitySeller allocation is described as reserved at genesis but funded only after pool launch, evidence-bound pricing freeze, and reserve-funder notify-flow; public docs no longer claim seller reserve backing/readiness before final genesis production release."
+    "It also includes the Larisa Section 12 public whitepaper cleanup: MarketStabilitySeller allocation is described as reserved at genesis but funded only after pool launch, evidence-bound pricing freeze, and reserve-funder notify-flow; public docs no longer claim seller reserve backing/readiness before final genesis production release.",
+    "It also includes the Larisa Section 13 seam/interface cleanup: PWA_CONTRACT_INTERFACE_MATRIX now labels payment checks, profile avatar, and username mint as Vault-auth signed external flows instead of wallet-sender transactions, records the current payment-check ordering, and static tests pin Vault service signed payloads to manifest, Vault, and owner domains."
   ]
 }

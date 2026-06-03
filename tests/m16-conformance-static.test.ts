@@ -45,6 +45,19 @@ function contractSource(name: string): string {
   return stripLineComments(file(join('contracts', name)));
 }
 
+function contractEntrypointBlock(source: string, marker: string): string {
+  const start = source.indexOf(marker);
+  expect(start, `${marker} must exist`).toBeGreaterThanOrEqual(0);
+  const nextMarkers = [
+    source.indexOf('\n    external(msg:', start + marker.length),
+    source.indexOf('\n    receive(msg:', start + marker.length),
+    source.indexOf('\n    bounced(msg:', start + marker.length),
+    source.indexOf('\n    get fun ', start + marker.length),
+  ].filter((index) => index >= 0);
+  const end = nextMarkers.length > 0 ? Math.min(...nextMarkers) : source.length;
+  return source.slice(start, end);
+}
+
 function builtCodeHash(contractDir: string, artifactName: string): string {
   const boc = readFileSync(join('build', contractDir, `${artifactName}.code.boc`));
   return Cell.fromBoc(boc)[0].hash().toString('hex');
@@ -99,6 +112,26 @@ describe('M16 production conformance static checks', () => {
       for (const pattern of forbidden) {
         expect(source, `${runtimeFile} must not match ${pattern}`).not.toMatch(pattern);
       }
+    }
+  });
+
+  it('M16-CONF-01B2: Vault-auth service external payloads bind manifest, Vault, and owner domains', () => {
+    const vault = contractSource('Vault.tact');
+    const serviceEntrypoints = [
+      'CreateReceiveIntent',
+      'ClaimReceiveIntent',
+      'CancelReceiveIntent',
+      'SetProfileAvatarFromVaultBalance',
+      'MintUsernameFromVaultBalance',
+    ];
+
+    for (const entrypoint of serviceEntrypoints) {
+      const block = contractEntrypointBlock(vault, `external(msg: ${entrypoint})`);
+      expect(block, `${entrypoint} must verify deployment manifest`).toMatch(/signedManifestHash[\s\S]*self\.deployment_manifest_hash/);
+      expect(block, `${entrypoint} signed payload must include owner wallet`).toMatch(/signedOwner:\s*Address\s*=\s*signedPayload\.loadAddress\(\)/);
+      expect(block, `${entrypoint} signed owner must match outer owner`).toMatch(/signedOwner\s*==\s*msg\.owner_wallet/);
+      expect(block, `${entrypoint} signed payload must include Vault address`).toMatch(/signedVaultAddress:\s*Address\s*=\s*signedPayload\.loadAddress\(\)/);
+      expect(block, `${entrypoint} signed Vault must match current Vault`).toMatch(/signedVaultAddress\s*==\s*myAddress\(\)/);
     }
   });
 
