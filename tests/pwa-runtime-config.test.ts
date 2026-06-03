@@ -216,7 +216,10 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/xxxx\.ton, or xxxx\.ath/);
     expect(html).toMatch(/Local label is only shown on this device/);
     expect(html).toMatch(/id="identityMenuButton"/);
+    expect(html).toMatch(/id="privateComposerAddButton"/);
+    expect(html).toMatch(/id="privateComposerAddMenu"/);
     expect(html).toMatch(/id="paymentCheckButton"/);
+    expect(html).toMatch(/id="privateAnonymousButton"/);
     expect(html).toMatch(/aria-label="Choose display name"/);
   });
 
@@ -238,6 +241,9 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="unlockWalletButton"/);
     expect(html).toMatch(/id="changeWalletPasswordButton"/);
     expect(html).toMatch(/id="receiveWalletTonButton"/);
+    expect(html).toMatch(/id="privateSenderModeSelect"/);
+    expect(html).toMatch(/Share wallet address/);
+    expect(html).toMatch(/Anonymous/);
     expect(html).toMatch(/id="sendWalletTonButton"/);
     expect(html).toMatch(/id="unlockWalletStatus"/);
     expect(html).toMatch(/Receive TON/);
@@ -1062,6 +1068,24 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/privateReadLimit \?\? PRIVATE_CHAIN_READ_LIMIT/);
   });
 
+  it('PWA-MSG-02B: private anonymous mode omits sender wallet metadata without merging inbound peers', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const identities = readFileSync('web/recipient-identities.mjs', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+
+    expect(html).toMatch(/id="privateAnonymousButton"/);
+    expect(app).toMatch(/const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho\.privateSenderMode\.v1'/);
+    expect(app).toMatch(/ANONYMOUS: 'anonymous'/);
+    expect(app).toMatch(/function currentPrivateSenderOptions\(\)[\s\S]*includeSenderWalletMetadata: currentPrivateSenderMode\(\) !== PRIVATE_SENDER_MODES\.ANONYMOUS/);
+    expect(app).toMatch(/senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
+    expect(app).toMatch(/createPrivateComposerCapsules\(text, attachment, recipientEntry, activeThreadId, senderOptions\)/);
+    expect(app).toMatch(/privateComposerSendPlan\(text, attachment, senderOptions\)/);
+    expect(app).toMatch(/payment[\s\S]*senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
+    expect(identities).toMatch(/const anonymousId = normalizedPeerId\(input\.senderKeyId \?\? input\.keyId\)/);
+    expect(identities).toMatch(/id: identity \? recipientThreadId\(identity\) : `peer:\$\{encodeURIComponent\(anonymousId\)\}`/);
+    expect(identities).toMatch(/`Anonymous \$\{shortPeerId\(anonymousId\)\}`/);
+  });
+
   it('PWA-CONFIG-01D4: payment checks preflight and persist recovery before CreateReceiveIntent', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const source = app.slice(
@@ -1604,11 +1628,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v306/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=123/);
+    expect(sw).toMatch(/platho-pwa-prototype-v307/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=124/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=246/);
+    expect(sw).toMatch(/\.\/app\.js\?v=247/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
@@ -1620,7 +1644,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=9/);
     expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=8/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=14/);
-    expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=3/);
+    expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/ed25519\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/abstract\/edwards\.js/);

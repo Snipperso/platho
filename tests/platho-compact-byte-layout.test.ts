@@ -182,6 +182,24 @@ describe('Platho compact byte layout v1', () => {
     expect(opened.payload.senderVaultKeyId).toBe('123');
   });
 
+  it('COMPACT-04D: encrypted compact payload can remain anonymous without sender wallet metadata', async () => {
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const capsule = await createEncryptedPrivateCapsule('anonymous payload', bob.signedBundle, alice.identity, {
+      now: NOW,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+    });
+    const opened = await openEncryptedPrivateCapsule(capsule, bob.identity.encryptionKeyPair, {
+      now: NOW + 1,
+    });
+
+    expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
+    expect(opened.plaintext).toBe('anonymous payload');
+    expect(opened.payload.senderWallet).toBeUndefined();
+    expect(opened.payload.senderVaultKeyId).toBeUndefined();
+  });
+
   it('COMPACT-05: rejects payloads beyond the largest useful cap', async () => {
     const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
     const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);

@@ -59,7 +59,7 @@ import {
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=3';
+} from './recipient-identities.mjs?v=4';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
@@ -242,6 +242,9 @@ const composer = document.querySelector('#composer');
 const messageInput = document.querySelector('#messageInput');
 const sendButton = document.querySelector('.send-button');
 const privateComposerCostStatus = document.querySelector('#privateComposerCostStatus');
+const privateComposerAddButton = document.querySelector('#privateComposerAddButton');
+const privateComposerAddMenu = document.querySelector('#privateComposerAddMenu');
+const privateAnonymousButton = document.querySelector('#privateAnonymousButton');
 const paymentCheckButton = document.querySelector('#paymentCheckButton');
 const privateImageButton = document.querySelector('#privateImageButton');
 const privateImageInput = document.querySelector('#privateImageInput');
@@ -260,6 +263,7 @@ const walletAddressStatus = document.querySelector('#walletAddressStatus');
 const copyWalletAddressButton = document.querySelector('#copyWalletAddressButton');
 const walletDisplayModeSelect = document.querySelector('#walletDisplayModeSelect');
 const walletDisplayModeStatus = document.querySelector('#walletDisplayModeStatus');
+const privateSenderModeSelect = document.querySelector('#privateSenderModeSelect');
 const createWalletButton = document.querySelector('#createWalletButton');
 const createWalletStatus = document.querySelector('#createWalletStatus');
 const importWalletButton = document.querySelector('#importWalletButton');
@@ -444,6 +448,7 @@ const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
 const INSTALL_PROMPT_DISMISSED_STORAGE_KEY = 'platho.installPrompt.dismissed.v1';
 const WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX = 'platho.wallet.displayIdentity.v1';
 const LINKED_PLATHO_USERNAME_STORAGE_PREFIX = 'platho.wallet.linkedPlathoUsername.v1';
+const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho.privateSenderMode.v1';
 const PROFILE_AVATAR_POINTER_STORAGE_PREFIX = 'platho.profile.avatar.v1';
 const PROFILE_AVATAR_MEDIA_CACHE_PREFIX = 'platho.profile.avatar.media.v1';
 const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 96;
@@ -493,6 +498,10 @@ const IMAGE_COMPRESSION_MODES = Object.freeze({
 const WALLET_DISPLAY_MODES = Object.freeze({
   ADDRESS: 'address',
   PLATHO_NFT: 'platho_nft',
+});
+const PRIVATE_SENDER_MODES = Object.freeze({
+  SHARE: 'share',
+  ANONYMOUS: 'anonymous',
 });
 const WALLET_DISPLAY_MODE_LABELS = Object.freeze({
   [WALLET_DISPLAY_MODES.ADDRESS]: 'Address',
@@ -925,8 +934,20 @@ function linkedPlathoUsernameStorageKey(owner = plathoWallet?.address) {
   return owner ? `${LINKED_PLATHO_USERNAME_STORAGE_PREFIX}:${owner}` : null;
 }
 
+function privateSenderModeStorageKey(owner = plathoWallet?.address) {
+  return owner ? `${PRIVATE_SENDER_MODE_STORAGE_PREFIX}:${owner}` : null;
+}
+
 function normalizeWalletDisplayMode(value) {
   return Object.values(WALLET_DISPLAY_MODES).includes(value) ? value : WALLET_DISPLAY_MODES.ADDRESS;
+}
+
+function normalizePrivateSenderMode(value) {
+  return Object.values(PRIVATE_SENDER_MODES).includes(value) ? value : PRIVATE_SENDER_MODES.SHARE;
+}
+
+function privateSenderModeLabel(value) {
+  return normalizePrivateSenderMode(value) === PRIVATE_SENDER_MODES.ANONYMOUS ? 'anonymous' : 'share address';
 }
 
 function normalizeWalletDisplayIdentity(input) {
@@ -1001,6 +1022,59 @@ function readWalletDisplayIdentity(owner = plathoWallet?.address) {
     return normalizeWalletDisplayIdentity(JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null'));
   } catch {
     return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
+  }
+}
+
+function readPrivateSenderMode(owner = plathoWallet?.address) {
+  const key = privateSenderModeStorageKey(owner);
+  if (!key) return PRIVATE_SENDER_MODES.SHARE;
+  try {
+    return normalizePrivateSenderMode(localStorageOrNull()?.getItem(key));
+  } catch {
+    return PRIVATE_SENDER_MODES.SHARE;
+  }
+}
+
+function writePrivateSenderMode(value, owner = plathoWallet?.address) {
+  const key = privateSenderModeStorageKey(owner);
+  if (!key) return PRIVATE_SENDER_MODES.SHARE;
+  const normalized = normalizePrivateSenderMode(value);
+  try {
+    if (normalized === PRIVATE_SENDER_MODES.SHARE) {
+      localStorageOrNull()?.removeItem(key);
+    } else {
+      localStorageOrNull()?.setItem(key, normalized);
+    }
+  } catch {
+    // Privacy preference is local-only; failed persistence should not block send.
+  }
+  return normalized;
+}
+
+function currentPrivateSenderMode() {
+  return readPrivateSenderMode(plathoWallet?.address);
+}
+
+function currentPrivateSenderOptions() {
+  return {
+    includeSenderWalletMetadata: currentPrivateSenderMode() !== PRIVATE_SENDER_MODES.ANONYMOUS,
+  };
+}
+
+function updatePrivateSenderModeUi() {
+  const mode = currentPrivateSenderMode();
+  const anonymous = mode === PRIVATE_SENDER_MODES.ANONYMOUS;
+  if (privateSenderModeSelect) {
+    privateSenderModeSelect.value = mode;
+    privateSenderModeSelect.disabled = !plathoWallet;
+  }
+  if (privateAnonymousButton) {
+    privateAnonymousButton.disabled = !plathoWallet || !hasActivePlathoAccount() || composer?.dataset.readOnly === 'true';
+    privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
+    privateAnonymousButton.setAttribute('aria-label', anonymous ? 'Send with wallet address' : 'Send anonymously');
+    privateAnonymousButton.title = anonymous
+      ? 'Anonymous: your wallet address is not encrypted into new private messages'
+      : 'Share address: recipient can verify and see your wallet address';
   }
 }
 
@@ -4704,14 +4778,14 @@ function peerLabelFromThreadId(threadId, message = null) {
   if (idText.startsWith('peer:')) {
     try {
       const decoded = decodeURIComponent(idText.slice(5));
-      return `Unknown sender ${shortPeerId(decoded)}`;
+      return `Anonymous ${shortPeerId(decoded)}`;
     } catch {
-      return 'Unknown sender';
+      return 'Anonymous';
     }
   }
   const senderKeyId = message?.capsule?.header0?.senderKeyId;
-  if (senderKeyId) return `Unknown sender ${shortKeyId(senderKeyId)}`;
-  return 'Unknown sender';
+  if (senderKeyId) return `Anonymous ${shortKeyId(senderKeyId)}`;
+  return 'Anonymous';
 }
 
 function applyHistoryThreadSnapshot(thread, snapshot) {
@@ -4842,6 +4916,10 @@ function shortKeyId(keyId) {
   if (!text) return 'none';
   if (text.length <= 15) return text;
   return `${text.slice(0, 6)}...${text.slice(-6)}`;
+}
+
+function shortPeerId(value) {
+  return String(value ?? '').replace(/[^a-z0-9_-]/gi, '').slice(0, 8) || 'unknown';
 }
 
 function normalizeCryptoSuite(value) {
@@ -5534,9 +5612,9 @@ function imageAttachmentPartCount(attachment) {
   return splitBytesToParts(attachment.bytes, SINGLE_CAPSULE_USEFUL_BYTES).length;
 }
 
-function privateImageAttachmentPartCount(attachment) {
+function privateImageAttachmentPartCount(attachment, options = currentPrivateSenderOptions()) {
   if (!attachment?.bytes?.length) return 0;
-  return privateImageCapsulePartsForSend(attachment).length;
+  return privateImageCapsulePartsForSend(attachment, options).length;
 }
 
 function privateSenderWalletPayloadOverhead(options = {}) {
@@ -5575,14 +5653,14 @@ function assertPrivateComposerPartLimit(partCount) {
   if (message) throw new Error(message);
 }
 
-function privateComposerSendPlan(text, attachment) {
+function privateComposerSendPlan(text, attachment, options = currentPrivateSenderOptions()) {
   const plan = [];
   if (String(text ?? '').trim().length > 0) {
-    for (const part of privateTextCapsulePartsForSend(text)) {
+    for (const part of privateTextCapsulePartsForSend(text, options)) {
       plan.push({ type: 'text', text: part.text, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
     }
   }
-  for (const part of privateImageCapsulePartsForSend(attachment)) {
+  for (const part of privateImageCapsulePartsForSend(attachment, options)) {
     plan.push({ type: 'image', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
   }
   return plan;
@@ -6194,15 +6272,40 @@ function refreshComposerPublishPolicy() {
   if (paymentCheckButton) {
     paymentCheckButton.title = canPublish ? 'Create private payment check' : 'Create or import a wallet to attach a private payment check';
   }
+  if (privateComposerAddButton) {
+    privateComposerAddButton.disabled = !canPublish;
+    privateComposerAddButton.title = canPublish ? 'Add image or payment check' : 'Create or import a wallet to add attachments';
+  }
   if (privateImageModeSelect) {
     privateImageModeSelect.disabled = !canPublish;
   }
   if (publicImageModeSelect) {
     publicImageModeSelect.disabled = !canPublish;
   }
+  updatePrivateSenderModeUi();
   updateImageAttachmentUi('private');
   updateImageAttachmentUi('public');
   refreshComposerCostStatus();
+}
+
+function privateComposerAddMenuVisible() {
+  return Boolean(privateComposerAddMenu && !privateComposerAddMenu.hidden);
+}
+
+function hidePrivateComposerAddMenu() {
+  if (privateComposerAddMenu) privateComposerAddMenu.hidden = true;
+  privateComposerAddButton?.setAttribute('aria-expanded', 'false');
+}
+
+function showPrivateComposerAddMenu() {
+  if (!privateComposerAddMenu || !privateComposerAddButton || privateComposerAddButton.disabled) return;
+  privateComposerAddMenu.hidden = false;
+  privateComposerAddButton.setAttribute('aria-expanded', 'true');
+}
+
+function togglePrivateComposerAddMenu() {
+  if (privateComposerAddMenuVisible()) hidePrivateComposerAddMenu();
+  else showPrivateComposerAddMenu();
 }
 
 function enforceComposerByteLimit() {
@@ -6368,6 +6471,9 @@ function refreshMessagingControls() {
   if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet || !accountActive;
   if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !accountActive;
   if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet || !accountActive;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !plathoWallet || !accountActive;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = !plathoWallet || !accountActive;
+  if (privateSenderModeSelect) privateSenderModeSelect.disabled = !plathoWallet;
   if (messageInput) {
     const privateReadOnly = activeThread()?.readOnly === true;
     messageInput.disabled = privateReadOnly || !plathoWallet || !accountActive;
@@ -6393,6 +6499,7 @@ function refreshMessagingControls() {
     });
   }
   refreshVaultMoveWidget();
+  updatePrivateSenderModeUi();
   refreshComposerCostStatus();
   refreshConversationSubtitle();
   refreshMessageActionStatuses({ keepSyncStatus: true });
@@ -6521,6 +6628,8 @@ function renderConversation() {
     if (sendButton) sendButton.disabled = true;
     if (paymentCheckButton) paymentCheckButton.disabled = true;
     if (privateImageButton) privateImageButton.disabled = true;
+    if (privateComposerAddButton) privateComposerAddButton.disabled = true;
+    if (privateAnonymousButton) privateAnonymousButton.disabled = true;
     if (privateImageModeSelect) privateImageModeSelect.disabled = true;
     return;
   }
@@ -6542,6 +6651,8 @@ function renderConversation() {
   if (sendButton) sendButton.disabled = isReadOnly || !plathoWallet;
   if (paymentCheckButton) paymentCheckButton.disabled = isReadOnly || !plathoWallet;
   if (privateImageButton) privateImageButton.disabled = isReadOnly || !plathoWallet;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = isReadOnly || !plathoWallet;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = isReadOnly || !plathoWallet;
   if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
 
   refreshPrivateSendButtonState();
@@ -6855,6 +6966,13 @@ publicCommentsDefaultSelect?.addEventListener('change', () => {
   setPublicStatus(`comments ${publicCommentsDefaultLabel(value)} by default`);
 });
 
+privateSenderModeSelect?.addEventListener('change', () => {
+  const value = writePrivateSenderMode(privateSenderModeSelect.value);
+  updatePrivateSenderModeUi();
+  refreshComposerCostStatus();
+  flashWalletIdentityStatus(`Private sender: ${privateSenderModeLabel(value)}`);
+});
+
 mintUsernameButton?.addEventListener('click', async () => {
   try {
     mintUsernameButton.disabled = true;
@@ -7034,14 +7152,47 @@ publicComposerCommentsCheckbox?.addEventListener('change', () => {
 
 paymentCheckButton?.addEventListener('click', async () => {
   try {
+    hidePrivateComposerAddMenu();
+    if (!plathoWallet || !hasActivePlathoAccount()) {
+      refreshComposerPublishPolicy();
+      return;
+    }
     paymentCheckButton.disabled = true;
     await submitCreatePaymentCheck();
   } catch (error) {
     refreshMessagingControls();
     console.error(error);
   } finally {
-    paymentCheckButton.disabled = false;
+    paymentCheckButton.disabled = !plathoWallet || !hasActivePlathoAccount();
   }
+});
+
+privateComposerAddButton?.addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!plathoWallet || !hasActivePlathoAccount()) {
+    refreshComposerPublishPolicy();
+    return;
+  }
+  togglePrivateComposerAddMenu();
+});
+
+privateComposerAddMenu?.addEventListener('click', (event) => {
+  event.stopPropagation();
+});
+
+privateAnonymousButton?.addEventListener('click', () => {
+  if (!plathoWallet || !hasActivePlathoAccount()) {
+    refreshComposerPublishPolicy();
+    return;
+  }
+  const next = currentPrivateSenderMode() === PRIVATE_SENDER_MODES.ANONYMOUS
+    ? PRIVATE_SENDER_MODES.SHARE
+    : PRIVATE_SENDER_MODES.ANONYMOUS;
+  const value = writePrivateSenderMode(next);
+  updatePrivateSenderModeUi();
+  refreshComposerCostStatus();
+  flashWalletIdentityStatus(`Private sender: ${privateSenderModeLabel(value)}`);
 });
 
 registerVaultKeysButton?.addEventListener('click', async () => {
@@ -7066,6 +7217,14 @@ messageInput?.addEventListener('keydown', (event) => {
   event.preventDefault();
   composer?.requestSubmit?.();
 });
+document.addEventListener('click', (event) => {
+  if (!privateComposerAddMenuVisible()) return;
+  if (privateComposerAddMenu?.contains(event.target) || privateComposerAddButton?.contains(event.target)) return;
+  hidePrivateComposerAddMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') hidePrivateComposerAddMenu();
+});
 
 publicMessageInput?.addEventListener('input', () => {
   enforcePublicComposerByteLimit();
@@ -7079,7 +7238,8 @@ publicMessageInput?.addEventListener('keydown', (event) => {
 });
 
 privateImageButton?.addEventListener('click', () => {
-  if (!plathoWallet) {
+  hidePrivateComposerAddMenu();
+  if (!plathoWallet || !hasActivePlathoAccount()) {
     refreshComposerPublishPolicy();
     return;
   }
@@ -7239,7 +7399,8 @@ composer?.addEventListener('submit', async (event) => {
   }
 
   const selectedSuite = currentOutgoingPrivateSuite();
-  const sendPlan = privateComposerSendPlan(text, attachment);
+  const senderOptions = currentPrivateSenderOptions();
+  const sendPlan = privateComposerSendPlan(text, attachment, senderOptions);
   const limitMessage = privateComposerPartLimitMessage(sendPlan.length);
   if (limitMessage) {
     if (privateComposerCostStatus) {
@@ -7300,7 +7461,7 @@ composer?.addEventListener('submit', async (event) => {
 
   try {
     const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
-    const capsules = await createPrivateComposerCapsules(text, attachment, recipientEntry, activeThreadId);
+    const capsules = await createPrivateComposerCapsules(text, attachment, recipientEntry, activeThreadId, senderOptions);
     const capsule = capsules[0];
     const publishState = createCapsulePublishState(capsules);
     message.capsule = capsule;
@@ -9775,15 +9936,21 @@ async function submitCreatePaymentCheck() {
     intentId,
     secret32Bytes,
   });
+  const senderOptions = currentPrivateSenderOptions();
   const senderVaultKeyId = currentVaultMessagingKeyId();
+  const senderMetadata = senderOptions.includeSenderWalletMetadata === false
+    ? {}
+    : {
+      senderWallet,
+      senderVaultKeyId: senderVaultKeyId ?? undefined,
+    };
   const payloadBytes = encodeCompactPayload({
     type: 'payment',
     asset: Number(asset),
     amount,
     intentId: bigIntToFixedBytes(intentId, 32, 'intent id'),
     secret32: secret32Bytes,
-    senderWallet,
-    senderVaultKeyId: senderVaultKeyId ?? undefined,
+    ...senderMetadata,
   });
   const capsule = await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
     payloadBytes,
@@ -10492,15 +10659,17 @@ function imagePartsForSend(attachment, label = 'image') {
   return splitBytesToParts(attachment.bytes, SINGLE_CAPSULE_USEFUL_BYTES);
 }
 
-async function createPrivateComposerCapsules(text, attachment, recipientEntry, threadId) {
+async function createPrivateComposerCapsules(text, attachment, recipientEntry, threadId, options = currentPrivateSenderOptions()) {
   const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const senderVaultKeyId = currentVaultMessagingKeyId();
-  const senderMetadata = {
-    senderWallet,
-    senderVaultKeyId: senderVaultKeyId ?? undefined,
-  };
-  const textParts = String(text ?? '').trim().length > 0 ? privateTextCapsulePartsForSend(text) : [];
-  const imageParts = privateImageCapsulePartsForSend(attachment);
+  const senderMetadata = options.includeSenderWalletMetadata === false
+    ? {}
+    : {
+      senderWallet,
+      senderVaultKeyId: senderVaultKeyId ?? undefined,
+    };
+  const textParts = String(text ?? '').trim().length > 0 ? privateTextCapsulePartsForSend(text, options) : [];
+  const imageParts = privateImageCapsulePartsForSend(attachment, options);
   const totalParts = textParts.length + imageParts.length;
   if (totalParts <= 0) return [];
   assertPrivateComposerPartLimit(totalParts);
@@ -10990,6 +11159,7 @@ renderDocsNav();
 renderAthProfileStats();
 updatePublicSyncWindowUi();
 updatePublicCommentsDefaultUi();
+updatePrivateSenderModeUi();
 setPublicCommentTarget(null);
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 if (activeThreadId) {

@@ -119,12 +119,14 @@ describe('PWA recipient identity routing', () => {
     expect(identityKey(primaryThreadIdentity(withPlatho))).toBe('platho_nft:alice.ath');
   });
 
-  it('RECIPIENT-ID-04A: inbound peer fallback is explicit unknown sender copy', () => {
+  it('RECIPIENT-ID-04A: inbound anonymous peer fallback stays per sender key', () => {
     const thread = createInboundPeerThread({ senderKeyId: 'sender-alpha' });
+    const second = createInboundPeerThread({ senderKeyId: 'sender-alpha-2' });
 
-    expect(thread.id).toBe('peer:sender-a');
-    expect(thread.name).toBe('Unknown sender sender-a');
-    expect(thread.subtitle).toBe('Unknown sender');
+    expect(thread.id).toBe('peer:sender-alpha');
+    expect(second.id).toBe('peer:sender-alpha-2');
+    expect(thread.name).toBe('Anonymous sender-a');
+    expect(thread.subtitle).toBe('Anonymous sender');
   });
 
   it('RECIPIENT-ID-05: existing typed-route chats are reused without replacing their label', () => {
