@@ -7002,9 +7002,9 @@ function refreshMessagingControls() {
       : `${plathoAccountActivationFeeLabel()} TON`);
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
-  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || !signedActionsReady;
-  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !signedActionsReady;
-  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !signedActionsReady;
+  if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || appShellReloadPending;
+  if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || appShellReloadPending;
+  if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || appShellReloadPending;
   if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
   if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
   if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
