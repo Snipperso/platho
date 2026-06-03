@@ -32,8 +32,8 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=3';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=49';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=20';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=50';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=21';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -6241,8 +6241,11 @@ function refreshPublicSendButtonState() {
   if (publicSendButton) publicSendButton.disabled = !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || publicComposerKnownVaultTonShortfall();
 }
 
-async function assertVaultHasPrivatePublishHold(suite, plan) {
-  const user = rememberConnectedVaultUser(await loadConnectedVaultUser());
+async function assertVaultHasPrivatePublishHold(suite, plan, options = {}) {
+  const provider = await resolveVaultChainProvider();
+  const user = rememberConnectedVaultUser(options.allowOwnVaultActionReadFallback === true
+    ? await readFreshConnectedVaultUserForOwnVaultAction(provider)
+    : await loadConnectedVaultUser({ provider }));
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before publishing');
   }
@@ -7885,7 +7888,9 @@ composer?.addEventListener('submit', async (event) => {
   }
   if (sendButton) sendButton.disabled = true;
   try {
-    await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan);
+    await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
+      allowOwnVaultActionReadFallback: Boolean(paymentDraft),
+    });
   } catch (error) {
     const messageText = String(error?.message ?? error);
     const rateLimited = noteTonRpcRateLimit(error);
@@ -9118,7 +9123,7 @@ function paymentCheckCancelBlockedStatus(error) {
   return `check cancel blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
 
-function isTonRpcVerificationUnsafeForCancelError(error) {
+function isTonRpcVerificationUnsafeForOwnVaultActionError(error) {
   const message = String(error?.message ?? error ?? '');
   return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
     || error?.code === 'RPC_DISAGREEMENT'
@@ -9164,6 +9169,7 @@ async function readFreshReceiveIntent(provider, intentId, options = {}) {
   return provider.getReceiveIntent(intentId, {
     vaultAddress: requireVaultAddress(),
     verify: options.verify !== false,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: 'critical',
     cacheTtlMs: 0,
   });
@@ -9173,8 +9179,8 @@ async function readFreshReceiveIntentForCancel(provider, intentId) {
   try {
     return await readFreshReceiveIntent(provider, intentId);
   } catch (error) {
-    if (!isTonRpcVerificationUnsafeForCancelError(error)) throw error;
-    return readFreshReceiveIntent(provider, intentId, { verify: false });
+    if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
+    return readFreshReceiveIntent(provider, intentId, { verify: false, allowUnverifiedCriticalRead: true });
   }
 }
 
@@ -9182,17 +9188,27 @@ async function readFreshConnectedVaultUser(provider, options = {}) {
   return loadConnectedVaultUser({
     provider,
     verify: options.verify !== false,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: 'critical',
     cacheTtlMs: 0,
   });
 }
 
-async function readFreshConnectedVaultUserForCancel(provider) {
+async function readFreshConnectedVaultUserForOwnVaultAction(provider) {
   try {
     return await readFreshConnectedVaultUser(provider);
   } catch (error) {
-    if (!isTonRpcVerificationUnsafeForCancelError(error)) throw error;
-    return readFreshConnectedVaultUser(provider, { verify: false });
+    if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
+    return readFreshConnectedVaultUser(provider, { verify: false, allowUnverifiedCriticalRead: true });
+  }
+}
+
+async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
+  try {
+    return await readStrict();
+  } catch (error) {
+    if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
+    return readUnverified();
   }
 }
 
@@ -9237,7 +9253,7 @@ async function waitForPaymentCheckCancelConfirmation(provider, payment, beforeUs
   while (Date.now() <= deadline) {
     try {
       lastIntent = await readFreshReceiveIntentForCancel(provider, intentId);
-      lastUser = await readFreshConnectedVaultUserForCancel(provider);
+      lastUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
       const balance = paymentAssetVaultBalance(lastUser, asset);
       if (lastIntent?.exists === false && balance >= expectedBalance) {
         rememberConnectedVaultUser(lastUser);
@@ -9347,6 +9363,7 @@ async function loadConnectedVaultUser(options = {}) {
   return provider.getUser(requirePlathoWalletAddress(), {
     vaultAddress: requireVaultAddress(),
     verify: options.verify === true,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: options.priority,
     cacheTtlMs: options.cacheTtlMs,
   });
@@ -10333,6 +10350,7 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   globalThis.plathoLastVaultReceiveIntentExternal = { type, params, external, result, clientNonce };
   await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
     verify: options.allowUnverifiedNonceWait !== true,
+    allowUnverifiedCriticalRead: options.allowUnverifiedNonceWait === true,
   });
   return { external, result, clientNonce };
 }
@@ -10581,10 +10599,10 @@ async function attemptPrivatePaymentCheckPublish(context) {
   const recipientWallet = recipientEntry.walletAddress;
   const { asset, amount } = paymentDraft;
   const provider = await resolveVaultChainProvider();
-  if (!provider?.getReceiveIntentId || !provider?.getReceiveIntentCommitment) {
+  if (!provider?.getReceiveIntentId) {
     throw new Error('Vault provider cannot create payment checks');
   }
-  const initialUser = await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
+  const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
   if (initialUser.exists !== true || BigInt(initialUser.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before using payment checks');
   }
@@ -10593,20 +10611,25 @@ async function attemptPrivatePaymentCheckPublish(context) {
   const clientNonce = BigInt(initialUser.publish_nonce ?? initialUser.publishNonce ?? 0n);
   const secret32Bytes = randomBytes(32);
   const secret32 = bytesToBigIntValue(secret32Bytes);
-  const intentId = await provider.getReceiveIntentId(
-    senderWallet,
-    recipientWallet,
-    asset,
-    amount,
-    clientNonce,
-    { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
+  const intentId = await callWithOwnVaultActionReadFallback(
+    () => provider.getReceiveIntentId(
+      senderWallet,
+      recipientWallet,
+      asset,
+      amount,
+      clientNonce,
+      { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
+    ),
+    () => provider.getReceiveIntentId(
+      senderWallet,
+      recipientWallet,
+      asset,
+      amount,
+      clientNonce,
+      { vaultAddress: requireVaultAddress(), verify: false, allowUnverifiedCriticalRead: true, priority: 'critical', cacheTtlMs: 0 },
+    ),
   );
-  const commitment = await provider.getReceiveIntentCommitment(
-    intentId,
-    recipientWallet,
-    secret32,
-    { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
-  );
+  const commitment = secret32;
   const payment = normalizePaymentForMessage({
     asset,
     amount,
@@ -10626,12 +10649,14 @@ async function attemptPrivatePaymentCheckPublish(context) {
     type: 'payment',
     asset: Number(asset),
     amount,
+    sizeClass: VAULT_SIZE_CLASS.STANDARD,
     intentId: bigIntToFixedBytes(intentId, 32, 'intent id'),
     secret32: secret32Bytes,
     ...senderMetadata,
   });
   const capsule = await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
     payloadBytes,
+    sizeClass: VAULT_SIZE_CLASS.STANDARD,
     threadId: thread.id,
     ...currentProfilePointerFields(),
   });
@@ -10650,7 +10675,10 @@ async function attemptPrivatePaymentCheckPublish(context) {
   if (!encryptedMessageStore || encryptedMessageStore.persistent === false) {
     throw new Error('Persistent encrypted local history is required before creating a payment check');
   }
-  const quotedPublish = await prepareCapsulesThroughVault([capsule], { publishState });
+  const quotedPublish = await prepareCapsulesThroughVault([capsule], {
+    publishState,
+    allowOwnVaultActionReadFallback: true,
+  });
   const createReserve = estimateVaultAttachedValueNanotons('CreateReceiveIntent');
   const preparedUser = quotedPublish.user ?? initialUser;
   const tonBalance = BigInt(preparedUser.ton_balance ?? preparedUser.tonBalance ?? 0n);
@@ -10681,7 +10709,11 @@ async function attemptPrivatePaymentCheckPublish(context) {
       amount,
       recipient_wallet: recipientWallet,
       commitment,
-    }, { provider, user: initialUser });
+    }, {
+      provider,
+      user: initialUser,
+      allowUnverifiedNonceWait: true,
+    });
     intentCreateSubmitted = true;
     context.paymentIntentCreated = true;
     message.vaultCreateIntent = createResult;
@@ -10690,8 +10722,12 @@ async function attemptPrivatePaymentCheckPublish(context) {
     await waitForPaymentCheckCreateConfirmation(provider, payment);
     message.meta = 'check created, publishing';
     await updateMessageInEncryptedHistory(thread, message);
-    const preparedPublish = await prepareCapsulesThroughVault([capsule], { publishState });
+    const preparedPublish = await prepareCapsulesThroughVault([capsule], {
+      publishState,
+      allowOwnVaultActionReadFallback: true,
+    });
     const publishResult = await sendPreparedCapsulesThroughVault(preparedPublish, {
+      allowUnverifiedNonceRead: true,
       publishState,
       onPartState: () => {
         message.meta = `check ${publishStateMeta(publishState)}`;
@@ -10813,7 +10849,7 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
     throw new Error('Vault provider cannot confirm payment checks');
   }
   const intentId = paymentIntentId(payment);
-  const beforeUser = await readFreshConnectedVaultUserForCancel(provider);
+  const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
   const intent = await readFreshReceiveIntentForCancel(provider, intentId);
   assertReceiveIntentCancelableBySender(intent, payment);
   setText(identitySubtitle, 'cancel signing');
@@ -11141,6 +11177,7 @@ async function readVaultPublishNonce(provider, owner, options = {}) {
   const user = await provider.getUser(owner, {
     vaultAddress: requireVaultAddress(),
     verify: options.verify !== false,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: 'critical',
     cacheTtlMs: 0,
   });
@@ -11173,7 +11210,9 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   }
   const owner = requirePlathoWalletAddress();
   await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
-  const user = await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
+  const user = options.allowOwnVaultActionReadFallback === true
+    ? await readFreshConnectedVaultUserForOwnVaultAction(provider)
+    : await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before publishing');
   }
@@ -11260,7 +11299,10 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
     const item = results[index];
     notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
     try {
-      const clientNonce = await readVaultPublishNonce(provider, owner);
+      const clientNonce = await readVaultPublishNonce(provider, owner, {
+        verify: options.allowUnverifiedNonceRead !== true,
+        allowUnverifiedCriticalRead: options.allowUnverifiedNonceRead === true,
+      });
       if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
       item.clientNonce = clientNonce;
       item.external = await buildVaultBalancePublishExternalBoc(item.messageType, {
@@ -11276,7 +11318,10 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
       lastResult = await sendVaultExternalBoc(item.external);
       item.result = lastResult;
       notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
-      await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
+      await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
+        verify: options.allowUnverifiedNonceRead !== true,
+        allowUnverifiedCriticalRead: options.allowUnverifiedNonceRead === true,
+      });
       notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
     } catch (error) {
       const sentBeforeFailure = Boolean(item.result);

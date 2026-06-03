@@ -846,11 +846,11 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
       app.indexOf('async function publishCapsulesThroughVault'),
     );
-    const nonceReadIndex = sendSource.indexOf('const clientNonce = await readVaultPublishNonce(provider, owner)');
+    const nonceReadIndex = sendSource.indexOf('const clientNonce = await readVaultPublishNonce(provider, owner, {');
     const buildIndex = sendSource.indexOf('item.external = await buildVaultBalancePublishExternalBoc');
     const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(item.external)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
-    const nonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n)');
+    const nonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {');
     const submittedStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_VAULT_SUBMITTED');
     const partialIndex = sendSource.indexOf('vaultPublishPartialError');
 
@@ -1236,15 +1236,22 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function attemptPrivatePaymentCheckPublish'),
       app.indexOf('async function submitVaultClaimPaymentCheck'),
     );
-    const quotedPrepareIndex = source.indexOf('const quotedPublish = await prepareCapsulesThroughVault([capsule], { publishState })');
+    const quotedPrepareIndex = source.indexOf('const quotedPublish = await prepareCapsulesThroughVault([capsule], {');
+    const fallbackUserIndex = source.indexOf('const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
     const persistIndex = source.indexOf('const storedRecovery = await persistMessageToEncryptedHistory(thread, message)');
     const createIndex = source.indexOf("submitVaultReceiveIntentExternal('CreateReceiveIntent'");
-    const finalPrepareIndex = source.indexOf('const preparedPublish = await prepareCapsulesThroughVault([capsule], { publishState })');
+    const finalPrepareIndex = source.indexOf('const preparedPublish = await prepareCapsulesThroughVault([capsule], {');
 
-    expect(quotedPrepareIndex).toBeGreaterThanOrEqual(0);
+    expect(fallbackUserIndex).toBeGreaterThanOrEqual(0);
+    expect(quotedPrepareIndex).toBeGreaterThan(fallbackUserIndex);
     expect(persistIndex).toBeGreaterThan(quotedPrepareIndex);
     expect(createIndex).toBeGreaterThan(persistIndex);
     expect(finalPrepareIndex).toBeGreaterThan(createIndex);
+    expect(source).toMatch(/const commitment = secret32/);
+    expect(source).toMatch(/sizeClass: VAULT_SIZE_CLASS\.STANDARD/);
+    expect(source).toMatch(/allowOwnVaultActionReadFallback:\s*true/);
+    expect(source).toMatch(/allowUnverifiedNonceWait:\s*true/);
+    expect(source).toMatch(/allowUnverifiedNonceRead:\s*true/);
     expect(source).toMatch(/tonBalance < amount \+ createReserve \+ quotedPublish\.totalMaxCharge/);
     expect(source).toMatch(/athBalance < amount/);
     expect(source).toMatch(/tonBalance < createReserve \+ quotedPublish\.totalMaxCharge/);
@@ -1308,7 +1315,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function renderConversation'),
       app.indexOf('async function openImageLightbox'),
     );
-    const readUserIndex = cancelSource.indexOf('const beforeUser = await readFreshConnectedVaultUserForCancel(provider)');
+    const readUserIndex = cancelSource.indexOf('const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
     const readIntentIndex = cancelSource.indexOf('const intent = await readFreshReceiveIntentForCancel(provider, intentId)');
     const assertIndex = cancelSource.indexOf('assertReceiveIntentCancelableBySender(intent, payment)');
     const submitIndex = cancelSource.indexOf("submitVaultReceiveIntentExternal('CancelReceiveIntent'");
@@ -1320,11 +1327,12 @@ describe('PWA runtime config guard', () => {
     expect(helpers).toMatch(/payment\.recipientWallet[\s\S]*sameWalletAddress\(intent\.recipient_wallet, payment\.recipientWallet\)/);
     expect(helpers).toMatch(/function waitForPaymentCheckCancelConfirmation/);
     expect(helpers).toMatch(/function readFreshReceiveIntentForCancel/);
-    expect(helpers).toMatch(/function readFreshConnectedVaultUserForCancel/);
-    expect(helpers).toMatch(/isTonRpcVerificationUnsafeForCancelError\(error\)/);
+    expect(helpers).toMatch(/function readFreshConnectedVaultUserForOwnVaultAction/);
+    expect(helpers).toMatch(/isTonRpcVerificationUnsafeForOwnVaultActionError\(error\)/);
     expect(helpers).toMatch(/RPC_DISAGREEMENT/);
-    expect(helpers).toMatch(/readFreshReceiveIntent\(provider, intentId, \{ verify: false \}\)/);
-    expect(helpers).toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false \}\)/);
+    expect(helpers).toMatch(/allowUnverifiedCriticalRead:\s*true/);
+    expect(helpers).toMatch(/readFreshReceiveIntent\(provider, intentId, \{ verify: false, allowUnverifiedCriticalRead: true \}\)/);
+    expect(helpers).toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false, allowUnverifiedCriticalRead: true \}\)/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
     expect(helpers).toMatch(/Payment check disappeared but sender Vault balance was not restored/);
     expect(readUserIndex).toBeGreaterThanOrEqual(0);
@@ -1898,17 +1906,17 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v335/);
+    expect(sw).toMatch(/platho-pwa-prototype-v336/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=273/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
+    expect(sw).toMatch(/\.\/app\.js\?v=274/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=20/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=21/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=11/);

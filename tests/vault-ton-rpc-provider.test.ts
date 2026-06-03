@@ -756,6 +756,36 @@ describe('Vault TON RPC provider', () => {
     });
   });
 
+  it('VAULT-RPC-04K0: explicit allowUnverifiedCriticalRead bypasses critical verifier disputes', async () => {
+    const first = {
+      kind: 'first-rpc',
+      async runGetMethod() {
+        return { exit_code: 0, stack: [num(1n)] };
+      },
+    };
+    const second = {
+      kind: 'second-rpc',
+      async runGetMethod() {
+        return { exit_code: 0, stack: [num(2n)] };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [first, second],
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+    });
+
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] })).rejects.toMatchObject({
+      code: 'RPC_DISAGREEMENT',
+    });
+    await expect(transport?.runGetMethod({
+      address: VAULT,
+      method: 'get_user',
+      stack: [],
+      allowUnverifiedCriticalRead: true,
+    })).resolves.toMatchObject({ stack: [num(1n)] });
+  });
+
   it('VAULT-RPC-04K1: fails closed when critical read verification has only one provider', async () => {
     const onlyProvider = {
       kind: 'only-rpc',

@@ -1269,9 +1269,13 @@ export function createFallbackTonRpcTransport(options = {}) {
     if (!primaryTransport) throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
     const call = args[0] ?? {};
     const method = call?.method ?? methodName;
-    const mustVerify = requestOptions.verify === true
+    const allowUnverifiedCriticalRead = requestOptions.allowUnverifiedCriticalRead === true
+      || call?.allowUnverifiedCriticalRead === true;
+    const mustVerify = !allowUnverifiedCriticalRead && (
+      requestOptions.verify === true
       || call?.verify === true
-      || (verifyCriticalReads && criticalMethods.has(String(method)));
+      || (verifyCriticalReads && criticalMethods.has(String(method)))
+    );
     if (!mustVerify) return primaryResult;
     const primaryComparable = normalizeTonRpcResultForCompare(primaryResult);
     let verified = false;
@@ -1383,7 +1387,7 @@ function stackNumber(value) {
 
 function runGetCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;
