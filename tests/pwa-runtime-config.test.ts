@@ -1020,7 +1020,9 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/Update ready - reload before sending/);
     expect(app).toMatch(/signedActionsReady = accountActive && !appShellReloadPending/);
     expect(app).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending/);
-    expect(app).toMatch(/sendButton\.disabled = privateReadOnly \|\| !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
+    expect(app).toMatch(/function canAttemptPrivateSend/);
+    expect(app).toMatch(/sendButton\.disabled = !canAttemptPrivateSend\(thread\)/);
+    expect(app).toMatch(/pendingServiceWorkerAppShellReload !== true/);
     expect(app).toMatch(/publicSendButton\.disabled = !plathoWallet \|\| !hasActivePlathoAccount\(\) \|\| pendingServiceWorkerAppShellReload/);
     expect(swSource).toMatch(/throw serviceWorkerUpdateReloadError\(\)/);
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
@@ -1064,6 +1066,39 @@ describe('PWA runtime config guard', () => {
     expect(activationSource).toMatch(/const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding\(\)/);
     expect(activationSource).toMatch(/if \(!keepCurrentBinding\) delete globalThis\.plathoVaultBinding/);
     expect(activationSource).toMatch(/setText\(vaultRecordStatus, keepCurrentBinding[\s\S]*\? 'activated'/);
+  });
+
+  it('PWA-ACTIVATION-02: private draft input does not depend on flickering chain activation state', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const helpers = app.slice(
+      app.indexOf('function canEditPrivateComposerDraft'),
+      app.indexOf('function isTonRpcTransientError'),
+    );
+    const controls = app.slice(
+      app.indexOf('function refreshMessagingControls'),
+      app.indexOf('function setView'),
+    );
+    const render = app.slice(
+      app.indexOf('function renderConversation'),
+      app.indexOf('async function submitVaultClaimPaymentCheck'),
+    );
+    const addButton = app.slice(
+      app.indexOf("privateComposerAddButton?.addEventListener('click'"),
+      app.indexOf("privateComposerAddMenu?.addEventListener('click'"),
+    );
+
+    expect(helpers).toMatch(/function canEditPrivateComposerDraft/);
+    expect(helpers).toMatch(/function canAttemptPrivateSend/);
+    expect(helpers).not.toMatch(/hasActivePlathoAccount\(\)/);
+    expect(helpers).toMatch(/localIdentity && localRecipientKeyPair && localSignedPublicBundle/);
+    expect(controls).toMatch(/const canEditPrivateDraft = canEditPrivateComposerDraft\(thread\)/);
+    expect(controls).toMatch(/const canSendPrivate = canAttemptPrivateSend\(thread\)/);
+    expect(controls).toMatch(/messageInput\.disabled = !canEditPrivateDraft/);
+    expect(controls).toMatch(/paymentCheckButton\.disabled = !canSendPrivate/);
+    expect(controls).toMatch(/privateComposerAddButton\.disabled = !canEditPrivateDraft/);
+    expect(render).toMatch(/messageInput\.disabled = !canEditPrivateDraft/);
+    expect(render).toMatch(/sendButton\) sendButton\.disabled = !canSendPrivate/);
+    expect(addButton).toMatch(/if \(!canEditPrivateComposerDraft\(\)\)/);
   });
 
   it('PWA-CAPSULE-ENTRY-VERIFY-01: CapsuleHub entry reads are fresh verified before body/history trust', () => {
@@ -1802,7 +1837,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/let tonRpcLimitedUntil = 0/);
     expect(app).toMatch(/function noteTonRpcRateLimit/);
     expect(app).toMatch(/function markTonRpcLimited/);
-    expect(app).toMatch(/tonRpcLimited\(\) \|\| privateComposerKnownVaultTonShortfall\(\)/);
+    expect(app).toMatch(/!tonRpcLimited\(\)[\s\S]*&& !privateComposerKnownVaultTonShortfall\(\)/);
     expect(app).toMatch(/function refreshVaultNow/);
     expect(app).toMatch(/function refreshVaultNavBalanceInBackground/);
     expect(app).toMatch(/function queueVaultPostTransactionRefresh/);
@@ -1929,11 +1964,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v338/);
+    expect(sw).toMatch(/platho-pwa-prototype-v339/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=276/);
+    expect(sw).toMatch(/\.\/app\.js\?v=277/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
