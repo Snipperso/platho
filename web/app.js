@@ -6680,7 +6680,7 @@ function togglePrivateComposerAddMenu() {
   else showPrivateComposerAddMenu();
 }
 
-function privateComposerDraftMessageItems(text, attachments = privateImageAttachments) {
+function privateComposerDraftMessageItems(text, attachments = privateImageAttachments, paymentDraft = privatePaymentCheckDraft) {
   const messageText = String(text ?? '').trim();
   const images = normalizePrivateImageAttachments(attachments);
   const items = [];
@@ -6692,9 +6692,11 @@ function privateComposerDraftMessageItems(text, attachments = privateImageAttach
     for (let index = 1; index < images.length; index += 1) {
       items.push({ text: '', attachment: images[index] });
     }
+    if (paymentDraft) items.push({ text: paymentMessageText(paymentDraft), paymentDraft });
     return items;
   }
   for (const attachment of images) items.push({ text: '', attachment });
+  if (paymentDraft) items.push({ text: paymentMessageText(paymentDraft), paymentDraft });
   return items;
 }
 
@@ -7139,6 +7141,7 @@ function renderConversation() {
             });
             message.meta = 'check claimed';
           } catch (error) {
+            rememberPaymentCheckActionError('claim', error, message.payment);
             message.meta = isPaymentCheckClaimPending(error)
               ? 'check claim submitted, confirming'
               : paymentCheckClaimBlockedStatus(error);
@@ -7170,6 +7173,7 @@ function renderConversation() {
             });
             message.meta = 'check cancelled';
           } catch (error) {
+            rememberPaymentCheckActionError('cancel', error, message.payment);
             message.meta = isPaymentCheckCancelPending(error)
               ? 'check cancel submitted, confirming'
               : paymentCheckCancelBlockedStatus(error);
@@ -7887,7 +7891,7 @@ composer?.addEventListener('submit', async (event) => {
     return;
   }
 
-  const draftItems = privateComposerDraftMessageItems(text, attachments);
+  const draftItems = privateComposerDraftMessageItems(text, attachments, paymentDraft);
   const sendContexts = [];
   for (const item of draftItems) {
     const message = {
@@ -7907,12 +7911,16 @@ composer?.addEventListener('submit', async (event) => {
         modeLabel: item.attachment.mode.label,
       };
     }
+    if (item.paymentDraft) {
+      message.paymentDraft = item.paymentDraft;
+    }
     insertThreadMessage(thread, message);
     sendContexts.push({
       thread,
       message,
-      text: item.text,
+      text: item.paymentDraft ? '' : item.text,
       attachment: item.attachment,
+      paymentDraft: item.paymentDraft,
       selectedSuite,
       senderOptions,
       retryAttempt: 0,
@@ -7934,7 +7942,11 @@ composer?.addEventListener('submit', async (event) => {
   for (let index = 0; index < sendContexts.length; index += 1) {
     const sendContext = sendContexts[index];
     try {
-      await attemptPrivateComposerMessagePublish(sendContext);
+      if (sendContext.paymentDraft) {
+        await attemptPrivatePaymentCheckPublish(sendContext);
+      } else {
+        await attemptPrivateComposerMessagePublish(sendContext);
+      }
     } catch (error) {
       await settlePrivateComposerSendError(sendContext, error);
       if (isPublishPriceChangeCancelled(error)) {
@@ -7946,9 +7958,11 @@ composer?.addEventListener('submit', async (event) => {
         const remainingAttachments = remaining.map((context) => context.attachment).filter(Boolean);
         if (remainingAttachments.length > 0) {
           privateImageAttachments = [...privateImageAttachments, ...remainingAttachments];
-          updateImageAttachmentUi('private');
-          refreshComposerCostStatus();
         }
+        const remainingPaymentDraft = remaining.find((context) => context.paymentDraft)?.paymentDraft;
+        if (remainingPaymentDraft) privatePaymentCheckDraft = remainingPaymentDraft;
+        updateImageAttachmentUi('private');
+        refreshComposerCostStatus();
         break;
       }
     }
@@ -7957,20 +7971,6 @@ composer?.addEventListener('submit', async (event) => {
     privatePaymentCheckDraft = paymentDraft;
     updateImageAttachmentUi('private');
     refreshComposerCostStatus();
-  } else if (paymentDraft) {
-    try {
-      await submitCreatePaymentCheck({ thread, paymentDetails: paymentDraft });
-    } catch (error) {
-      privatePaymentCheckDraft = paymentDraft;
-      updateImageAttachmentUi('private');
-      refreshComposerCostStatus();
-      const rateLimited = noteTonRpcRateLimit(error);
-      if (privateComposerCostStatus) {
-        privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
-        privateComposerCostStatus.dataset.state = 'short';
-      }
-      if (!rateLimited) console.error(error);
-    }
   }
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -9091,12 +9091,22 @@ function isPaymentCheckCancelPending(error) {
   return error?.code === 'PLATHO_PAYMENT_CHECK_CANCEL_PENDING';
 }
 
+function rememberPaymentCheckActionError(action, error, payment = null) {
+  globalThis.plathoLastPaymentCheckActionError = {
+    action,
+    message: String(error?.message ?? error ?? ''),
+    code: error?.code ?? null,
+    payment,
+    at: new Date().toISOString(),
+  };
+}
+
 function paymentCheckCancelBlockedStatus(error) {
   const text = String(error?.message ?? error ?? '');
   if (/already claimed|cancelled|does not exist|not found|disappeared/i.test(text)) return 'check already claimed or cancelled';
   if (/another wallet|sender/i.test(text)) return 'check belongs to another sender';
   if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
-  return 'check cancel blocked';
+  return `check cancel blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
 
 function assertReceiveIntentMatchesPayment(intent, payment) {
@@ -10524,17 +10534,14 @@ async function submitProfileAvatarUpdate(avatar) {
   return result;
 }
 
-async function submitCreatePaymentCheck(options = {}) {
-  const thread = options.thread ?? activeThread();
+async function attemptPrivatePaymentCheckPublish(context) {
+  const { thread, message, paymentDraft, selectedSuite, senderOptions = currentPrivateSenderOptions() } = context;
   if (!thread || thread.readOnly) throw new Error('Payment checks are only available in private chats');
+  if (!paymentDraft) throw new Error('Payment check draft is missing');
   if (!localIdentity) throw new Error('Local encryption identity is not ready');
-  const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: currentOutgoingPrivateSuite() });
+  const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite ?? currentOutgoingPrivateSuite() });
   const recipientWallet = recipientEntry.walletAddress;
-
-  const paymentDetails = options.paymentDetails ?? (await requestPaymentCheckDetails());
-  if (!paymentDetails) return null;
-  const { asset, amount } = paymentDetails;
-
+  const { asset, amount } = paymentDraft;
   const provider = await resolveVaultChainProvider();
   if (!provider?.getReceiveIntentId || !provider?.getReceiveIntentCommitment) {
     throw new Error('Vault provider cannot create payment checks');
@@ -10554,13 +10561,13 @@ async function submitCreatePaymentCheck(options = {}) {
     asset,
     amount,
     clientNonce,
-    { vaultAddress: requireVaultAddress() },
+    { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
   );
   const commitment = await provider.getReceiveIntentCommitment(
     intentId,
     recipientWallet,
     secret32,
-    { vaultAddress: requireVaultAddress() },
+    { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
   );
   const payment = normalizePaymentForMessage({
     asset,
@@ -10570,7 +10577,6 @@ async function submitCreatePaymentCheck(options = {}) {
     senderWallet,
     recipientWallet,
   });
-  const senderOptions = currentPrivateSenderOptions();
   const senderVaultKeyId = currentVaultMessagingKeyId();
   const senderMetadata = senderOptions.includeSenderWalletMetadata === false
     ? {}
@@ -10588,11 +10594,24 @@ async function submitCreatePaymentCheck(options = {}) {
   });
   const capsule = await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
     payloadBytes,
-    threadId: activeThreadId,
+    threadId: thread.id,
     ...currentProfilePointerFields(),
   });
   const publishState = createCapsulePublishState([capsule]);
-  setText(identitySubtitle, 'check pricing');
+  message.text = paymentMessageText(payment);
+  message.payment = payment;
+  message.paymentDraft = paymentDraft;
+  message.capsule = capsule;
+  message.publishState = publishState;
+  message.recipientWallet = recipientWallet;
+  message.meta = 'check pricing';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+
+  if (!encryptedMessageStore || encryptedMessageStore.persistent === false) {
+    throw new Error('Persistent encrypted local history is required before creating a payment check');
+  }
   const quotedPublish = await prepareCapsulesThroughVault([capsule], { publishState });
   const createReserve = estimateVaultAttachedValueNanotons('CreateReceiveIntent');
   const preparedUser = quotedPublish.user ?? initialUser;
@@ -10608,29 +10627,8 @@ async function submitCreatePaymentCheck(options = {}) {
       throw new Error('Not enough Vault TON for payment check private publish hold');
     }
   }
-
-  const message = {
-    type: 'out',
-    text: paymentMessageText(payment),
-    meta: 'check intent create pending',
-    ...localMessageOrderFields(),
-    payment,
-    capsule,
-    publishState,
-  };
-  if (!encryptedMessageStore || encryptedMessageStore.persistent === false) {
-    throw new Error('Persistent encrypted local history is required before creating a payment check');
-  }
-  insertThreadMessage(thread, message);
-  refreshThreadAfterMessageChange(thread);
-  renderThreads();
-  renderConversation();
   const storedRecovery = await persistMessageToEncryptedHistory(thread, message);
   if (!storedRecovery && !message.localHistoryId) {
-    thread.messages = (thread.messages ?? []).filter((item) => item !== message);
-    refreshThreadAfterMessageChange(thread);
-    renderThreads();
-    renderConversation();
     throw new Error('Payment check recovery record could not be saved');
   }
 
@@ -10638,6 +10636,8 @@ async function submitCreatePaymentCheck(options = {}) {
   let intentCreateSubmitted = false;
   try {
     setText(identitySubtitle, 'check signing');
+    message.meta = 'check signing';
+    await updateMessageInEncryptedHistory(thread, message);
     createResult = await submitVaultReceiveIntentExternal('CreateReceiveIntent', {
       asset,
       amount,
@@ -10645,6 +10645,7 @@ async function submitCreatePaymentCheck(options = {}) {
       commitment,
     }, { provider, user: initialUser });
     intentCreateSubmitted = true;
+    context.paymentIntentCreated = true;
     message.vaultCreateIntent = createResult;
     message.meta = 'check created, confirming';
     await updateMessageInEncryptedHistory(thread, message);
@@ -10660,22 +10661,37 @@ async function submitCreatePaymentCheck(options = {}) {
         renderConversation();
       },
     });
+    clearPrivateSendRetry(message);
     message.vaultPublish = publishResult;
     message.publishState = publishResult.publishState ?? publishState;
     message.meta = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
       ? 'check published'
       : 'check submitted, confirming';
+    thread.state = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
+    await updateMessageInEncryptedHistory(thread, message);
+    if (publishResult.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      schedulePrivatePublishConfirmationRetry(context);
+    } else {
+      message.privatePublishConfirmAttempt = 0;
+      clearPrivatePublishConfirmRetry(message);
+    }
+    refreshMessagingControls();
+    return { createResult, payment, capsule, publishResult };
   } catch (error) {
     const cancelled = isPublishPriceChangeCancelled(error);
     const partial = isVaultPublishPartialError(error);
     if (!intentCreateSubmitted) {
-      message.meta = 'check intent create failed';
+      message.meta = cancelled ? 'check cancelled before create' : privateSendBlockedStatusText(error);
+      if (cancelled) context.cancelled = true;
     } else if (partial) {
       message.vaultPublish = error.publishResult;
       message.publishState = error.publishResult?.publishState ?? message.publishState;
       message.meta = `check ${publishStateMeta(message.publishState)}`;
+      thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
+      schedulePrivatePublishConfirmationRetry(context, error);
     } else {
       const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(payment).catch((cancelError) => {
+        rememberPaymentCheckActionError('auto-cancel', cancelError, payment);
         if (isPaymentCheckCancelPending(cancelError)) return { pending: true };
         console.error(cancelError);
         return null;
@@ -10685,18 +10701,46 @@ async function submitCreatePaymentCheck(options = {}) {
         ? 'check cancel submitted, confirming'
         : cancelResult
         ? (cancelled ? 'check cancelled before publish' : 'check publish failed, intent cancelled')
-        : (cancelled ? 'check publish cancelled, cancel required' : 'check locked, cancel required');
+        : (cancelled ? 'check publish cancelled, refund required' : 'check not delivered, refund required');
+      thread.state = 'blocked';
     }
     refreshMessagingControls();
     if (!cancelled && !partial) console.error(error);
     await updateMessageInEncryptedHistory(thread, message);
+    return { createResult, payment, capsule, error };
+  } finally {
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
   }
+}
 
+async function submitCreatePaymentCheck(options = {}) {
+  const thread = options.thread ?? activeThread();
+  if (!thread || thread.readOnly) throw new Error('Payment checks are only available in private chats');
+  const paymentDetails = options.paymentDetails ?? (await requestPaymentCheckDetails());
+  if (!paymentDetails) return null;
+  const message = {
+    type: 'out',
+    text: paymentMessageText(paymentDetails),
+    meta: 'check preparing',
+    ...localMessageOrderFields(),
+    paymentDraft: paymentDetails,
+  };
+  insertThreadMessage(thread, message);
   refreshThreadAfterMessageChange(thread);
-  await updateMessageInEncryptedHistory(thread, message);
   renderThreads();
   renderConversation();
-  return { createResult, payment, capsule };
+  const context = {
+    thread,
+    message,
+    paymentDraft: paymentDetails,
+    selectedSuite: currentOutgoingPrivateSuite(),
+    senderOptions: currentPrivateSenderOptions(),
+    retryAttempt: 0,
+    confirmAttempt: 0,
+  };
+  return attemptPrivatePaymentCheckPublish(context);
 }
 
 async function submitVaultClaimPaymentCheck(payment, options = {}) {
@@ -11419,10 +11463,11 @@ function resumePendingPrivatePublishConfirmations() {
 }
 
 async function restorePrivateDraftAfterUnsentMessage(context) {
-  const { thread, message, text, attachment } = context;
+  const { thread, message, text, attachment, paymentDraft } = context;
   thread.messages = (thread.messages ?? []).filter((item) => item !== message);
   if (messageInput && !messageInput.value.trim()) messageInput.value = text;
   privateImageAttachments = attachment ? [attachment] : [];
+  if (paymentDraft) privatePaymentCheckDraft = paymentDraft;
   updateImageAttachmentUi('private');
   autoResizeComposerTextarea(messageInput);
   refreshThreadAfterMessageChange(thread);
