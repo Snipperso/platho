@@ -634,9 +634,16 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/data-nav-vault-ath>0 ATH<\/strong>/);
     expect(css).toMatch(/\.rail-vault-balance/);
     expect(css).toMatch(/\.rail-vault-balance strong\s*{[\s\S]*white-space: normal;/);
+    expect(css).toMatch(/\.rail-vault-balance strong\.is-loading/);
+    expect(css).toMatch(/@keyframes rail-balance-spin/);
     expect(app).toMatch(/navVaultTonBalances/);
+    expect(app).toMatch(/let navVaultBalanceState = \{/);
+    expect(app).toMatch(/function markNavVaultBalancePending/);
+    expect(app).toMatch(/function markNavVaultBalanceReady/);
+    expect(app).toMatch(/function scheduleNavVaultBalanceRetry/);
     expect(app).toMatch(/refreshNavVaultBalance\(\)/);
     expect(app).toMatch(/function refreshVaultNavBalanceInBackground/);
+    expect(app).toMatch(/node\.classList\.add\('is-loading'\)/);
     expect(html).toMatch(/id="vaultMoveTonForm"/);
     expect(html).toMatch(/id="vaultMoveAthForm"/);
     expect(html).toMatch(/id="vaultMoveTonWalletBalance"[^>]*>0<\/strong>/);
@@ -1846,6 +1853,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function refreshVaultNow/);
     expect(app).toMatch(/function refreshVaultNavBalanceInBackground/);
     expect(app).toMatch(/function queueVaultPostTransactionRefresh/);
+    expect(app).toMatch(/function queueVaultPostTransactionRefresh\(\) \{[\s\S]*markNavVaultBalancePending\('transaction submitted'/);
+    expect(app).toMatch(/function queueVaultRefreshAfterWalletChange\(\) \{[\s\S]*markNavVaultBalancePending\('wallet changed'/);
+    expect(app).toMatch(/async function sendVaultExternalBoc\(built\) \{[\s\S]*markNavVaultBalancePending\('Vault action submitted'/);
+    expect(app).toMatch(/async function submitVaultMessage\(type, params, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('wallet transaction submitted'/);
+    expect(app).toMatch(/async function submitAthWalletMessage\(type, params, options = \{\}\) \{[\s\S]*markNavVaultBalancePending\('ATH transaction submitted'/);
+    expect(app).toMatch(/function markNavVaultBalanceRetryNeeded[\s\S]*markNavVaultBalancePending\(reason, \{ retry: true \}\)/);
     expect(app).toMatch(/if \(view === 'vault'\)/);
     expect(app).toMatch(/scheduleVaultAutoRefresh\(2_000\)/);
     expect(app).toMatch(/delayMs === VAULT_AUTO_REFRESH_MS && !isVaultViewActive\(\)/);
@@ -1969,11 +1982,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v340/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=126/);
+    expect(sw).toMatch(/platho-pwa-prototype-v341/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=127/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=278/);
+    expect(sw).toMatch(/\.\/app\.js\?v=279/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

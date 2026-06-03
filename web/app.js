@@ -408,6 +408,8 @@ let walletUnlockPromptTimer = null;
 let lastWalletUnlockAt = 0;
 let vaultAutoRefreshTimer = null;
 let vaultRefreshPromise = null;
+let navVaultBalanceRetryTimer = null;
+let navVaultBalanceRefreshPromise = null;
 let privateChainSyncPromise = null;
 let messageAutoSyncTimer = null;
 let messageAutoSyncAt = 0;
@@ -443,6 +445,7 @@ const WALLET_AUTO_LOCK_MS = 10 * 60 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
+const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
 const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
 const TON_RPC_CONNECTING_STATUS = 'Connecting...';
@@ -534,6 +537,11 @@ const WALLET_DISPLAY_MODE_LABELS = Object.freeze({
 let vaultPocketState = {
   wallet: { ton_balance: null, ath_balance: null },
   vault: { ton_balance: null, ath_balance: null },
+};
+let navVaultBalanceState = {
+  status: 'idle',
+  retryAttempt: 0,
+  reason: null,
 };
 let vaultProtocolState = {
   airdrop_remaining_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
@@ -5534,6 +5542,11 @@ async function loadPlathoWallet() {
     if (wallet) {
       markWalletUnlocked();
       scheduleWalletAutoLock();
+      markNavVaultBalancePending('wallet loaded', {
+        resetRetry: true,
+        retry: true,
+        retryDelayMs: 0,
+      });
       refreshOwnProfileAvatar().catch((error) => console.error(error));
     }
     return wallet;
@@ -5584,7 +5597,14 @@ function rememberConnectedVaultUser(user) {
     walletAddress: plathoWallet?.address ?? globalThis.plathoVaultBinding?.walletAddress ?? null,
     user,
   };
-  refreshNavVaultBalance();
+  vaultPocketState = {
+    wallet: vaultPocketState.wallet ?? { ton_balance: null, ath_balance: null },
+    vault: {
+      ton_balance: user.exists === true ? nonNegativeBigInt(user.ton_balance) : 0n,
+      ath_balance: user.exists === true ? nonNegativeBigInt(user.ath_balance) : 0n,
+    },
+  };
+  markNavVaultBalanceReady();
   return user;
 }
 
@@ -5626,6 +5646,70 @@ function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
 
 function plathoAccountActivationFeeLabel(user = currentVaultUserSource()) {
   return `${formatTonNanotons(plathoAccountActivationFeeNanotons(user))} TON`;
+}
+
+function clearNavVaultBalanceRetryTimer() {
+  if (!navVaultBalanceRetryTimer) return;
+  clearTimeout(navVaultBalanceRetryTimer);
+  navVaultBalanceRetryTimer = null;
+}
+
+function navVaultBalanceLoadingLabel(asset) {
+  return `Refreshing Vault ${asset} balance`;
+}
+
+function markNavVaultBalanceIdle() {
+  clearNavVaultBalanceRetryTimer();
+  navVaultBalanceState = { status: 'idle', retryAttempt: 0, reason: null };
+  refreshNavVaultBalance();
+}
+
+function markNavVaultBalanceReady() {
+  clearNavVaultBalanceRetryTimer();
+  navVaultBalanceState = { status: 'ready', retryAttempt: 0, reason: null };
+  refreshNavVaultBalance();
+}
+
+function markNavVaultBalancePending(reason = 'refreshing', options = {}) {
+  if (!plathoWallet?.address) {
+    markNavVaultBalanceIdle();
+    return;
+  }
+  if (options.resetRetry === true) {
+    navVaultBalanceState.retryAttempt = 0;
+  }
+  navVaultBalanceState = {
+    status: 'pending',
+    retryAttempt: navVaultBalanceState.retryAttempt,
+    reason,
+  };
+  refreshNavVaultBalance();
+  if (options.retry === true) scheduleNavVaultBalanceRetry(options.retryDelayMs);
+}
+
+function scheduleNavVaultBalanceRetry(delayMs = null) {
+  if (!plathoWallet?.address || document.hidden) return;
+  if (navVaultBalanceRetryTimer) return;
+  const attempt = Math.min(
+    navVaultBalanceState.retryAttempt,
+    VAULT_NAV_BALANCE_RETRY_DELAYS_MS.length - 1,
+  );
+  const effectiveDelayMs = delayMs ?? VAULT_NAV_BALANCE_RETRY_DELAYS_MS[attempt];
+  navVaultBalanceRetryTimer = setTimeout(() => {
+    navVaultBalanceRetryTimer = null;
+    refreshVaultNavBalanceInBackground({ fromRetry: true }).catch((error) => {
+      const rateLimited = noteTonRpcRateLimit(error);
+      if (!rateLimited && !isExpectedVaultProviderUnavailable(error)) console.error(error);
+    });
+  }, Math.max(0, Number(effectiveDelayMs) || 0));
+}
+
+function markNavVaultBalanceRetryNeeded(reason = 'retrying') {
+  navVaultBalanceState.retryAttempt = Math.min(
+    navVaultBalanceState.retryAttempt + 1,
+    VAULT_NAV_BALANCE_RETRY_DELAYS_MS.length - 1,
+  );
+  markNavVaultBalancePending(reason, { retry: true });
 }
 
 function walletTonBalanceLabel() {
@@ -9831,13 +9915,18 @@ function renderVaultPocketCards(walletBalances, vaultUser) {
       ath_balance: walletBalances?.ath_balance ?? null,
     },
     vault: {
-      ton_balance: vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ton_balance) : null,
-      ath_balance: vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ath_balance) : null,
+      ton_balance: vaultUser && vaultUser.exists !== true ? 0n : vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ton_balance) : null,
+      ath_balance: vaultUser && vaultUser.exists !== true ? 0n : vaultUser?.exists === true ? nonNegativeBigInt(vaultUser.ath_balance) : null,
     },
   };
   renderVaultCards([]);
   refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
+  if (vaultUser && typeof vaultUser === 'object') {
+    markNavVaultBalanceReady();
+  } else {
+    markNavVaultBalancePending('vault user unavailable', { retry: true });
+  }
 }
 
 function resetVaultPocketState() {
@@ -9845,6 +9934,7 @@ function resetVaultPocketState() {
     wallet: { ton_balance: null, ath_balance: null },
     vault: { ton_balance: null, ath_balance: null },
   };
+  markNavVaultBalanceIdle();
   refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
 }
@@ -9853,8 +9943,8 @@ function applyVaultUserPocketState(user) {
   vaultPocketState = {
     wallet: vaultPocketState.wallet ?? { ton_balance: null, ath_balance: null },
     vault: {
-      ton_balance: user?.exists === true ? nonNegativeBigInt(user.ton_balance) : null,
-      ath_balance: user?.exists === true ? nonNegativeBigInt(user.ath_balance) : null,
+      ton_balance: user?.exists === true ? nonNegativeBigInt(user.ton_balance) : 0n,
+      ath_balance: user?.exists === true ? nonNegativeBigInt(user.ath_balance) : 0n,
     },
   };
   if (user) {
@@ -9866,20 +9956,35 @@ function applyVaultUserPocketState(user) {
   }
   refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
+  markNavVaultBalanceReady();
   refreshComposerCostStatus();
   refreshComposerPublishPolicy();
   refreshMessageActionStatuses({ keepSyncStatus: true });
 }
 
-async function refreshVaultNavBalanceInBackground() {
+async function refreshVaultNavBalanceInBackground(options = {}) {
   if (!plathoWallet?.address) {
     delete globalThis.plathoVaultBinding;
     resetVaultPocketState();
     return null;
   }
-  const user = await loadConnectedVaultUser();
-  applyVaultUserPocketState(user);
-  return user;
+  if (navVaultBalanceRefreshPromise) return navVaultBalanceRefreshPromise;
+  markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
+  navVaultBalanceRefreshPromise = (async () => {
+    try {
+      const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: 0 });
+      applyVaultUserPocketState(user);
+      return user;
+    } catch (error) {
+      markNavVaultBalanceRetryNeeded('balance unavailable');
+      throw error;
+    }
+  })();
+  try {
+    return await navVaultBalanceRefreshPromise;
+  } finally {
+    navVaultBalanceRefreshPromise = null;
+  }
 }
 
 function vaultMoveDirection(asset) {
@@ -9920,10 +10025,36 @@ function vaultMoveMaxAmount(asset) {
 }
 
 function refreshNavVaultBalance() {
+  const loading = plathoWallet?.address && navVaultBalanceState.status === 'pending';
+  if (loading) {
+    for (const node of navVaultTonBalances) {
+      node.classList.add('is-loading');
+      node.textContent = '';
+      node.title = navVaultBalanceLoadingLabel('TON');
+      node.setAttribute('aria-label', navVaultBalanceLoadingLabel('TON'));
+    }
+    for (const node of navVaultAthBalances) {
+      node.classList.add('is-loading');
+      node.textContent = '';
+      node.title = navVaultBalanceLoadingLabel('ATH');
+      node.setAttribute('aria-label', navVaultBalanceLoadingLabel('ATH'));
+    }
+    return;
+  }
   const tonBalance = `${vaultMoveFormattedBalance('vault', 'TON')} TON`;
   const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
-  for (const node of navVaultTonBalances) setText(node, tonBalance);
-  for (const node of navVaultAthBalances) setText(node, athBalance);
+  for (const node of navVaultTonBalances) {
+    node.classList.remove('is-loading');
+    node.removeAttribute('aria-label');
+    node.removeAttribute('title');
+    setText(node, tonBalance);
+  }
+  for (const node of navVaultAthBalances) {
+    node.classList.remove('is-loading');
+    node.removeAttribute('aria-label');
+    node.removeAttribute('title');
+    setText(node, athBalance);
+  }
 }
 
 function refreshVaultMoveWidget() {
@@ -10120,6 +10251,11 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
 }
 
 function queueVaultPostTransactionRefresh() {
+  markNavVaultBalancePending('transaction submitted', {
+    resetRetry: true,
+    retry: true,
+    retryDelayMs: 2_000,
+  });
   refreshVaultNow({ includeActivation: true }).catch((error) => {
     if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
     if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
@@ -10136,6 +10272,11 @@ function queueVaultPostTransactionRefresh() {
 }
 
 function queueVaultRefreshAfterWalletChange() {
+  markNavVaultBalancePending('wallet changed', {
+    resetRetry: true,
+    retry: true,
+    retryDelayMs: 0,
+  });
   refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
     if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
     if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
@@ -10333,6 +10474,11 @@ async function submitVaultMessage(type, params, options = {}) {
   const transaction = createWalletTransaction(message);
   const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
   globalThis.plathoLastVaultTransaction = { type, params, message, transaction, result };
+  markNavVaultBalancePending('wallet transaction submitted', {
+    resetRetry: true,
+    retry: true,
+    retryDelayMs: 2_000,
+  });
   return result;
 }
 
@@ -10382,6 +10528,11 @@ async function submitAthWalletMessage(type, params, options = {}) {
   const transaction = createWalletTransaction(message);
   const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
   globalThis.plathoLastAthWalletTransaction = { type, params, message, transaction, result };
+  markNavVaultBalancePending('ATH transaction submitted', {
+    resetRetry: true,
+    retry: true,
+    retryDelayMs: 2_000,
+  });
   return result;
 }
 
@@ -11189,6 +11340,11 @@ async function sendVaultExternalBoc(built) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
   const result = await transport.sendBoc({ boc: built.boc, walletAddress: requireVaultAddress() });
+  markNavVaultBalancePending('Vault action submitted', {
+    resetRetry: true,
+    retry: true,
+    retryDelayMs: 2_000,
+  });
   return { ...built, result };
 }
 
