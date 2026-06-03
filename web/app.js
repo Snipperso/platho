@@ -1323,6 +1323,12 @@ function reloadForPendingServiceWorkerAppShellUpdate() {
   return true;
 }
 
+function schedulePendingServiceWorkerAppShellReload(delayMs = 250) {
+  if (!pendingServiceWorkerAppShellReload) return false;
+  setTimeout(() => reloadForPendingServiceWorkerAppShellUpdate(), delayMs);
+  return true;
+}
+
 function handleServiceWorkerControllerChange() {
   if (shouldDeferServiceWorkerReload()) {
     pendingServiceWorkerAppShellReload = true;
@@ -7182,6 +7188,9 @@ function renderConversation() {
             await updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
             queueVaultPostTransactionRefresh();
             renderConversation();
+            if (message.meta === 'check cancelled') {
+              schedulePendingServiceWorkerAppShellReload();
+            }
           }
         });
         actions.append(cancel);

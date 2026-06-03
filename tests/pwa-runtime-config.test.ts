@@ -1025,6 +1025,7 @@ describe('PWA runtime config guard', () => {
     expect(swSource).toMatch(/throw serviceWorkerUpdateReloadError\(\)/);
     expect(swSource).toMatch(/window\.location\.reload\(\)/);
     expect(swSource).toMatch(/reloadForPendingServiceWorkerAppShellUpdate\(\)/);
+    expect(swSource).toMatch(/function schedulePendingServiceWorkerAppShellReload/);
     expect(profileSource).toMatch(/async function submitVaultProfileAvatarRegistration[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/async function submitVaultMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
@@ -1341,6 +1342,7 @@ describe('PWA runtime config guard', () => {
     expect(renderSource).toMatch(/message\.meta = 'check cancel signing'/);
     expect(renderSource).toMatch(/onStatus:\s*async \(status\)/);
     expect(renderSource).toMatch(/message\.meta = 'check cancelled'/);
+    expect(renderSource).toMatch(/message\.meta === 'check cancelled'[\s\S]*schedulePendingServiceWorkerAppShellReload\(\)/);
     expect(renderSource).toMatch(/paymentCheckCancelBlockedStatus\(error\)/);
     expect(renderSource).toMatch(/updateMessageInEncryptedHistory\(thread, message\)/);
   });
@@ -1896,11 +1898,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v334/);
+    expect(sw).toMatch(/platho-pwa-prototype-v335/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=272/);
+    expect(sw).toMatch(/\.\/app\.js\?v=273/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
