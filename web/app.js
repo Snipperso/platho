@@ -5412,6 +5412,13 @@ function hasActivePlathoAccount() {
   return hasActiveVaultMessagingKeys();
 }
 
+function hasCurrentWalletVaultBinding() {
+  const binding = globalThis.plathoVaultBinding;
+  if (!binding || !plathoWallet?.address) return false;
+  if (binding.walletAddress && !sameWalletAddress(binding.walletAddress, plathoWallet.address)) return false;
+  return hasActiveVaultMessagingKeys();
+}
+
 function currentVaultMessagingKeyId() {
   try {
     const keyId = BigInt(currentVaultUserSource()?.current_key_id ?? 0n);
@@ -6022,7 +6029,8 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
 
 function refreshPrivateSendButtonState() {
   if (!sendButton) return;
-  const privateReadOnly = activeThread()?.readOnly === true;
+  const thread = activeThread();
+  const privateReadOnly = !thread || thread.readOnly === true;
   sendButton.disabled = privateReadOnly || !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || privateComposerKnownVaultTonShortfall();
 }
 
@@ -6497,6 +6505,8 @@ function refreshMessagingControls() {
   const accountActive = hasActivePlathoAccount();
   const appShellReloadPending = pendingServiceWorkerAppShellReload === true;
   const signedActionsReady = accountActive && !appShellReloadPending;
+  const thread = activeThread();
+  const canComposePrivate = Boolean(thread) && thread.readOnly !== true && Boolean(plathoWallet) && signedActionsReady;
   const hasStoredWallet = hasStoredPlathoWalletRecord();
   const hasKnownWallet = Boolean(plathoWallet || hasStoredWallet);
   if (createWalletButton) createWalletButton.disabled = false;
@@ -6534,13 +6544,13 @@ function refreshMessagingControls() {
   if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !signedActionsReady;
   if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet || !signedActionsReady;
   if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !signedActionsReady;
-  if (paymentCheckButton) paymentCheckButton.disabled = !plathoWallet || !signedActionsReady;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = !plathoWallet || !signedActionsReady;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = !plathoWallet || !signedActionsReady;
+  if (paymentCheckButton) paymentCheckButton.disabled = !canComposePrivate;
+  if (privateImageButton) privateImageButton.disabled = !canComposePrivate;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !canComposePrivate;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = !canComposePrivate;
   if (privateSenderModeSelect) privateSenderModeSelect.disabled = !plathoWallet;
   if (messageInput) {
-    const privateReadOnly = activeThread()?.readOnly === true;
-    messageInput.disabled = privateReadOnly || !plathoWallet || !signedActionsReady;
+    messageInput.disabled = !canComposePrivate;
   }
   if (sendButton) {
     refreshPrivateSendButtonState();
@@ -6707,21 +6717,26 @@ function renderConversation() {
   activeSubtitle.textContent = conversationSubtitleText(thread);
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
+  const canComposePrivate = !isReadOnly
+    && Boolean(plathoWallet)
+    && hasActivePlathoAccount()
+    && pendingServiceWorkerAppShellReload !== true;
 
   if (composer) composer.dataset.readOnly = isReadOnly ? 'true' : 'false';
   refreshComposerPublishPolicy();
   if (messageInput) {
-    messageInput.disabled = isReadOnly || !plathoWallet;
+    messageInput.disabled = !canComposePrivate;
     messageInput.placeholder = privateComposerPlaceholder({ readOnly: isReadOnly });
   }
-  if (sendButton) sendButton.disabled = isReadOnly || !plathoWallet;
-  if (paymentCheckButton) paymentCheckButton.disabled = isReadOnly || !plathoWallet;
-  if (privateImageButton) privateImageButton.disabled = isReadOnly || !plathoWallet;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = isReadOnly || !plathoWallet;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = isReadOnly || !plathoWallet;
+  if (sendButton) sendButton.disabled = !canComposePrivate;
+  if (paymentCheckButton) paymentCheckButton.disabled = !canComposePrivate;
+  if (privateImageButton) privateImageButton.disabled = !canComposePrivate;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !canComposePrivate;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = !canComposePrivate;
   if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
 
   refreshPrivateSendButtonState();
+  updatePrivateSenderModeUi();
   sortThreadMessages(thread);
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
@@ -11243,14 +11258,18 @@ async function refreshVaultActivationStatus(options = {}) {
     refreshComposerPublishPolicy();
     return globalThis.plathoVaultBinding;
   } catch (error) {
-    delete globalThis.plathoVaultBinding;
-    setText(vaultRecordStatus, isExpectedVaultProviderUnavailable(error)
-      ? vaultProviderStatusForError(error)
-      : 'record blocked');
+    const expectedUnavailable = isExpectedVaultProviderUnavailable(error);
+    const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding();
+    if (!keepCurrentBinding) delete globalThis.plathoVaultBinding;
+    setText(vaultRecordStatus, keepCurrentBinding
+      ? 'activated'
+      : expectedUnavailable
+        ? vaultProviderStatusForError(error)
+        : 'record blocked');
     refreshMessagingControls();
-    setText(vaultRotateStatus, 'not available');
+    setText(vaultRotateStatus, keepCurrentBinding ? 'ready' : 'not available');
     refreshComposerPublishPolicy();
-    if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
+    if (!expectedUnavailable) console.error(error);
     return null;
   }
 }
