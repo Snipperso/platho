@@ -117,11 +117,11 @@ describe('PWA runtime config guard', () => {
     expect(dataUrl).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
   });
 
-  it('PWA-CONFIG-01: default workspace config is a mainnet redeploy candidate blocked from production', () => {
+  it('PWA-CONFIG-01: default workspace config targets the verified production mainnet deployment', () => {
     const report = validatePlathoAppConfig(PLATHO_APP_CONFIG);
 
-    expect(report.ok).toBe(false);
-    expect(report.mode).toBe(PLATHO_APP_MODES.PREVIEW);
+    expect(report.ok).toBe(true);
+    expect(report.mode).toBe(PLATHO_APP_MODES.PRODUCTION);
     expect(PLATHO_APP_CONFIG.network.chain).toBe('mainnet');
     expect(PLATHO_APP_CONFIG.network.tonRpc.requestSpacingMs).toBe(1500);
     expect(PLATHO_APP_CONFIG.network.tonRpc.rateLimitBackoffMs).toBe(60000);
@@ -145,18 +145,16 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQB9bp-qwLPBX8BA312KKTBFVrfFZwxjzEuZfJFgYSu1YfZm');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQCIX5eYuHZCpuIoJAQufkA6HOCyDpcXWC5P4472IDWxv7F5');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
-      '570b3ba74eff150ce3317b35f190d8f5053f000dcfb331c0c3c1a31e46b7a234',
+      '43b26836c99172fe1ad91220debbb7f5751e5610f886ea0b59842ae793ea7720',
     );
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9v087');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQDH-YiKrdmH5lrx7x9RNZWrzeLDvCLUNyNWIsCEfpqewN8T');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQC4jzjGi7YMrC1cMIdvUiCZK8cBZuPr7Emj7K7ntx8ZKfVO');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
-    expect(report.findings.map((finding) => finding.id)).toContain('PWA_MODE_NOT_PRODUCTION');
-    expect(report.findings.map((finding) => finding.id)).not.toContain('PWA_NETWORK_NOT_MAINNET');
-    expect(report.findings.map((finding) => finding.id)).toEqual(['PWA_MODE_NOT_PRODUCTION']);
+    expect(report.findings.map((finding) => finding.id)).toEqual([]);
   });
 
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
@@ -415,9 +413,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQB9bp-qwLPBX8BA312KKTBFVrfFZwxjzEuZfJFgYSu1YfZm');
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBgFJQvewAICmABKDysX1-i-nrdLsZlJX-efaNEWXnfEWwG');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQBYtK4_sxTw2Z7bp8DuzQ2Nz09MWU7nmcHmPzovsUN9v087');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQCIX5eYuHZCpuIoJAQufkA6HOCyDpcXWC5P4472IDWxv7F5');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQDH-YiKrdmH5lrx7x9RNZWrzeLDvCLUNyNWIsCEfpqewN8T');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQC4jzjGi7YMrC1cMIdvUiCZK8cBZuPr7Emj7K7ntx8ZKfVO');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).toMatch(/fetchTonWalletBalance\(address\)/);
@@ -1863,12 +1861,12 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v326/);
+    expect(sw).toMatch(/platho-pwa-prototype-v327/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=264/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=48/);
+    expect(sw).toMatch(/\.\/app\.js\?v=265/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=10/);

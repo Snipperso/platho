@@ -193,17 +193,18 @@ describe('v1 on-chain message source of truth', () => {
     expect(noBackend).not.toMatch(/chosen or replaceable by the user/i);
   });
 
-  it('SPEC-MSG-SOURCE-03C1: release docs do not claim preview config is already production-pinned', () => {
+  it('SPEC-MSG-SOURCE-03C1: release docs and PWA config are pinned to the verified production manifest', () => {
     const readiness = read('PRODUCTION_READINESS.md');
     const config = read('web/platho-config.mjs');
     const genesisFlag = read('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim();
 
-    expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PREVIEW/);
-    expect(genesisFlag).toBe('false');
-    expect(readiness).toMatch(/must be pinned to the verified mainnet manifest/);
+    expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
+    expect(config).toMatch(/deploymentManifestHash:\s*'43b26836c99172fe1ad91220debbb7f5751e5610f886ea0b59842ae793ea7720'/);
+    expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
+    expect(genesisFlag).toBe('true');
+    expect(readiness).toMatch(/is pinned to the verified mainnet manifest/);
     expect(readiness).toMatch(/final live verifier report/);
     expect(readiness).toMatch(/preprod:check/);
-    expect(readiness).not.toMatch(/is pinned to the verified mainnet manifest/i);
     expect(readiness).not.toMatch(/a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd/);
   });
 
