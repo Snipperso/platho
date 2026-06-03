@@ -39,6 +39,7 @@ artifacts/vault-fresh-*.png
 artifacts/live-platho-shot*.png
 
 # Browser smoke-test profiles and local runtime state
+.codex-remote-attachments/
 .edge-smoke/
 .edge-smoke-tonconnect/
 .audit-staging*/
