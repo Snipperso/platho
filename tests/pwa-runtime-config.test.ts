@@ -1236,6 +1236,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function attemptPrivatePaymentCheckPublish'),
       app.indexOf('async function submitVaultClaimPaymentCheck'),
     );
+    const helpers = app.slice(
+      app.indexOf('function paymentAssetVaultBalance'),
+      app.indexOf('function delay'),
+    );
     const quotedPrepareIndex = source.indexOf('const quotedPublish = await prepareCapsulesThroughVault([capsule], {');
     const fallbackUserIndex = source.indexOf('const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
     const persistIndex = source.indexOf('const storedRecovery = await persistMessageToEncryptedHistory(thread, message)');
@@ -1257,6 +1261,8 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/athBalance < amount/);
     expect(source).toMatch(/tonBalance < createReserve \+ quotedPublish\.totalMaxCharge/);
     expect(source).toMatch(/waitForPaymentCheckCreateConfirmation\(provider,\s*payment\)/);
+    expect(helpers).toMatch(/function readFreshReceiveIntentForOwnVaultAction/);
+    expect(helpers).toMatch(/waitForPaymentCheckCreateConfirmation[\s\S]*readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)/);
     expect(source).toMatch(/encryptedMessageStore\.persistent === false/);
     expect(source).toMatch(/privateSendBlockedStatusText\(error\)/);
     expect(source).toMatch(/rememberPaymentCheckActionError\('publish', error, payment\)/);
@@ -1923,11 +1929,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v337/);
+    expect(sw).toMatch(/platho-pwa-prototype-v338/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=275/);
+    expect(sw).toMatch(/\.\/app\.js\?v=276/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
