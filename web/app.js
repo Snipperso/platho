@@ -1072,6 +1072,12 @@ function currentPrivateSenderOptions() {
   };
 }
 
+function canTogglePrivateSenderMode() {
+  return Boolean(plathoWallet)
+    && pendingServiceWorkerAppShellReload !== true
+    && composer?.dataset.readOnly !== 'true';
+}
+
 function updatePrivateSenderModeUi() {
   const mode = currentPrivateSenderMode();
   const anonymous = mode === PRIVATE_SENDER_MODES.ANONYMOUS;
@@ -1081,7 +1087,7 @@ function updatePrivateSenderModeUi() {
   }
   if (privateAnonymousButton) {
     const icon = privateAnonymousButton.querySelector('.icon');
-    privateAnonymousButton.disabled = !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || composer?.dataset.readOnly === 'true';
+    privateAnonymousButton.disabled = !canTogglePrivateSenderMode();
     privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
     privateAnonymousButton.setAttribute('aria-label', anonymous ? 'Share wallet address' : 'Send anonymously');
     privateAnonymousButton.title = anonymous
@@ -7322,8 +7328,8 @@ privateComposerAddMenu?.addEventListener('click', (event) => {
 });
 
 privateAnonymousButton?.addEventListener('click', () => {
-  if (!plathoWallet || !hasActivePlathoAccount()) {
-    refreshComposerPublishPolicy();
+  if (!canTogglePrivateSenderMode()) {
+    updatePrivateSenderModeUi();
     return;
   }
   const next = currentPrivateSenderMode() === PRIVATE_SENDER_MODES.ANONYMOUS

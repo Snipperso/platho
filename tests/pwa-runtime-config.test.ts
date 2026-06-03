@@ -1110,6 +1110,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho\.privateSenderMode\.v1'/);
     expect(app).toMatch(/ANONYMOUS: 'anonymous'/);
     expect(app).toMatch(/function currentPrivateSenderOptions\(\)[\s\S]*includeSenderWalletMetadata: currentPrivateSenderMode\(\) !== PRIVATE_SENDER_MODES\.ANONYMOUS/);
+    expect(app).toMatch(/function canTogglePrivateSenderMode\(\)/);
+    expect(app).toMatch(/privateAnonymousButton\.disabled = !canTogglePrivateSenderMode\(\)/);
+    expect(app).toMatch(/privateAnonymousButton\?\.addEventListener\('click', \(\) => \{[\s\S]*if \(!canTogglePrivateSenderMode\(\)\)/);
+    const senderModeUiSource = app.slice(
+      app.indexOf('function updatePrivateSenderModeUi'),
+      app.indexOf('function normalizeLinkedPlathoUsername'),
+    );
+    expect(senderModeUiSource).not.toMatch(/hasActivePlathoAccount\(\)/);
     expect(app).toMatch(/senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
     expect(app).toMatch(/createPrivateComposerCapsules\(text, attachment, recipientEntry, thread\.id, senderOptions\)/);
     expect(app).toMatch(/privateComposerSendPlan\(text, attachment, senderOptions\)/);
@@ -1672,11 +1680,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v314/);
+    expect(sw).toMatch(/platho-pwa-prototype-v315/);
     expect(sw).toMatch(/\.\/styles\.css\?v=125/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=254/);
+    expect(sw).toMatch(/\.\/app\.js\?v=255/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
