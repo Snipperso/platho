@@ -455,6 +455,7 @@ const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 400;
 const PRIVATE_CHAIN_RESCAN_OVERLAP = 25;
 const PUBLIC_CHAIN_READ_LIMIT = 128;
 const PRIVATE_CHAIN_READ_LIMIT = 50;
+const PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT = 50;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v2';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
@@ -3594,8 +3595,14 @@ async function syncPublicChannelFromChain() {
     list.push(post);
     postsByChannel.set(channelId, list);
   }
-  const nextFeedCache = { ...publicChannelFeedCache };
-  for (const [channelId, channelPosts] of postsByChannel.entries()) {
+  const channelIdsToRefresh = new Set([
+    ...publicChannelRegistry.map((channel) => channel.id),
+    ...Object.keys(publicChannelFeedCache ?? {}),
+    ...postsByChannel.keys(),
+  ]);
+  const nextFeedCache = {};
+  for (const channelId of channelIdsToRefresh) {
+    const channelPosts = postsByChannel.get(channelId) ?? [];
     const postsWithLocalPending = mergeLocalPendingPublicFeed(channelId, channelPosts);
     nextFeedCache[channelId] = {
       feed: {
@@ -4578,11 +4585,13 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const scanEnd = start + BigInt(limit) < latest ? start + BigInt(limit) : latest;
   const linearEntryIds = [];
   for (let entryId = start; entryId < scanEnd; entryId += 1n) linearEntryIds.push(entryId);
+  const linearEntryIdSet = new Set(linearEntryIds.map((entryId) => entryId.toString()));
   const retryEntryIds = privateBodyHistoryRetryEntryIds(address, latest, start, scanEnd);
   const entryIdsToScan = [...new Set([...retryEntryIds, ...linearEntryIds].map((entryId) => entryId.toString()))]
     .map((entryId) => BigInt(entryId))
     .sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0)));
 
+  let effectiveScanEnd = scanEnd;
   let imported = 0;
   let skipped = 0;
   let scanComplete = true;
@@ -4592,13 +4601,18 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const historyUnavailableEntries = [];
   let partialPrivateStream = false;
   const privatePartGroups = new Map();
-  for (const entryId of entryIdsToScan) {
+  const scannedPrivateEntryIds = new Set();
+  const scanPrivateEntryId = async (entryId, { advanceCursor = false } = {}) => {
+    const entryIdKey = entryId.toString();
+    if (scannedPrivateEntryIds.has(entryIdKey)) return true;
+    scannedPrivateEntryIds.add(entryIdKey);
+    if (advanceCursor && entryId >= effectiveScanEnd && entryId < latest) effectiveScanEnd = entryId + 1n;
     let entry = null;
     try {
       entry = await provider.getPrivateEntry(entryId, readOptions);
       if (entry.exists !== true) {
         clearPrivateBodyHistoryUnavailable(address, entryId);
-        continue;
+        return true;
       }
       entry = await resolvePrivateEntryBody(provider, entry, address);
       clearPrivateBodyHistoryUnavailable(address, entryId);
@@ -4627,7 +4641,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       if (noteTonRpcRateLimit(error)) {
         rateLimitError = error;
         scanComplete = false;
-        break;
+        return false;
       } else if (isBodyHistoryUnavailableError(error)) {
         bodyHistoryError = error;
         blockedEntryId = entryId;
@@ -4637,23 +4651,65 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         });
         rememberPrivateBodyHistoryUnavailable(address, entry, entryId);
         skipped += 1;
-        continue;
+        return true;
       } else if (/recipient|decrypt|key mismatch|expired|operation-specific/i.test(message)) {
         clearPrivateBodyHistoryUnavailable(address, entryId);
         skipped += 1;
       } else {
         console.error(error);
         scanComplete = false;
-        break;
+        return false;
       }
     }
+    return true;
+  };
+
+  for (const entryId of entryIdsToScan) {
+    if (!(await scanPrivateEntryId(entryId, { advanceCursor: linearEntryIdSet.has(entryId.toString()) }))) break;
   }
+
+  const incompletePrivatePartGroups = () => [...privatePartGroups.values()].filter((group) => {
+    const uniqueParts = new Set();
+    for (const part of group.parts) {
+      uniqueParts.add(Number(part.opened?.payload?.partIndex ?? 0));
+    }
+    return uniqueParts.size !== group.partCount;
+  });
+
+  let multipartLookaheadScanned = 0;
+  if (scanComplete) {
+    const configuredLookaheadLimit = Number(
+      options.multipartLookaheadLimit
+        ?? appConfig.capsuleHub?.privateMultipartLookaheadLimit
+        ?? PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT,
+    );
+    const lookaheadLimit = Number.isFinite(configuredLookaheadLimit)
+      ? Math.max(0, Math.floor(configuredLookaheadLimit))
+      : PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT;
+    let lookaheadEntryId = scanEnd;
+    while (
+      incompletePrivatePartGroups().length > 0
+      && lookaheadEntryId < latest
+      && multipartLookaheadScanned < lookaheadLimit
+    ) {
+      if (!(await scanPrivateEntryId(lookaheadEntryId, { advanceCursor: true }))) break;
+      lookaheadEntryId += 1n;
+      multipartLookaheadScanned += 1;
+    }
+  }
+
   for (const group of privatePartGroups.values()) {
     const uniqueParts = new Map();
     for (const part of group.parts) {
       uniqueParts.set(Number(part.opened?.payload?.partIndex ?? 0), part);
     }
     if (uniqueParts.size !== group.partCount) {
+      if (bodyHistoryError) {
+        for (const part of uniqueParts.values()) {
+          rememberPrivateBodyHistoryUnavailable(address, part.entry, part.entryId);
+        }
+        continue;
+      }
       scanComplete = false;
       partialPrivateStream = true;
       continue;
@@ -4673,27 +4729,29 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     );
     if (added) imported += 1;
   }
-  const catchUpRemaining = scanEnd < latest ? Number(latest - scanEnd) : 0;
+  const catchUpRemaining = effectiveScanEnd < latest ? Number(latest - effectiveScanEnd) : 0;
   if (scanComplete) {
     const previousCursor = storedCursor ?? 0n;
-    const nextCursor = scanEnd > previousCursor ? scanEnd : previousCursor;
+    const nextCursor = effectiveScanEnd > previousCursor ? effectiveScanEnd : previousCursor;
     writePrivateChainScanCursor(address, nextCursor);
   }
   const reason = bodyHistoryError
     ? 'body_history_unavailable'
     : (partialPrivateStream
       ? 'partial_private_stream'
-      : (scanComplete && scanEnd < latest ? 'catch_up_pending' : null));
+      : (scanComplete && effectiveScanEnd < latest ? 'catch_up_pending' : null));
   globalThis.plathoLastPrivateSync = {
     capsuleHub: address,
     keyId: localRecipientKeyPair?.keyId ?? null,
     start: start.toString(),
-    scanEnd: scanEnd.toString(),
+    scanEnd: effectiveScanEnd.toString(),
+    baseScanEnd: scanEnd.toString(),
     latest: latest.toString(),
     imported,
     skipped,
-    scanComplete: scanComplete && scanEnd >= latest,
+    scanComplete: scanComplete && effectiveScanEnd >= latest,
     pageComplete: scanComplete,
+    multipartLookaheadScanned,
     rateLimited: rateLimitError !== null,
     bodyHistoryUnavailable: bodyHistoryError !== null,
     blockedEntryId: blockedEntryId?.toString?.() ?? null,
@@ -4706,7 +4764,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const result = privateSyncResult({
     imported,
     skipped,
-    scanComplete: scanComplete && scanEnd >= latest,
+    scanComplete: scanComplete && effectiveScanEnd >= latest,
     reason,
     blockedEntryId: blockedEntryId?.toString?.() ?? null,
     historyUnavailableCount: historyUnavailableEntries.length,

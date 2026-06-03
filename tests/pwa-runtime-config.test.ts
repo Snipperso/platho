@@ -1090,6 +1090,7 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-MSG-01: default public sync window covers the maximum public multipart image', () => {
     const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
     const syncPublicSource = app.slice(
       app.indexOf('async function syncPublicChannelFromChain'),
       app.indexOf('async function syncPublicChannels'),
@@ -1102,6 +1103,10 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/publicReadLimit \?\? PUBLIC_CHAIN_READ_LIMIT/);
     expect(syncPublicSource).toMatch(/const readLimit = Number\.isFinite\(configuredLimit\)/);
     expect(syncPublicSource).toMatch(/const minEntryId = syncWindow === 'all' \? 0 : Math\.max\(0, latest - readLimit\)/);
+    expect(html).toMatch(/Latest 128 entries - up to 7 days/);
+    expect(html).toMatch(/Latest 128 entries - up to 30 days/);
+    expect(html).toMatch(/Latest 128 entries - up to 90 days/);
+    expect(html).not.toMatch(/<option value="90">90 days<\/option>/);
   });
 
   it('PWA-MSG-02: private composer cannot create streams larger than the default private sync window', () => {
@@ -1132,6 +1137,7 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(app).toMatch(/const PRIVATE_CHAIN_READ_LIMIT = 50/);
+    expect(app).toMatch(/const PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT = 50/);
     expect(helperSource).toMatch(/appConfig\.capsuleHub\?\.privateReadLimit \?\? PRIVATE_CHAIN_READ_LIMIT/);
     expect(helperSource).toMatch(/Private message has \$\{parts\} capsules; split it into messages of \$\{limit\} capsules or fewer/);
     expect(helperSource).toMatch(/function assertPrivateComposerPartLimit/);
@@ -1142,6 +1148,12 @@ describe('PWA runtime config guard', () => {
     expect(submitSource).toMatch(/privateComposerCostStatus\.textContent = limitMessage/);
     expect(capsuleSource).toMatch(/assertPrivateComposerPartLimit\(totalParts\)/);
     expect(syncSource).toMatch(/privateReadLimit \?\? PRIVATE_CHAIN_READ_LIMIT/);
+    expect(syncSource).toMatch(/appConfig\.capsuleHub\?\.privateMultipartLookaheadLimit/);
+    expect(syncSource).toMatch(/const incompletePrivatePartGroups = \(\) =>/);
+    expect(syncSource).toMatch(/while \([\s\S]*incompletePrivatePartGroups\(\)\.length > 0[\s\S]*lookaheadEntryId < latest[\s\S]*multipartLookaheadScanned < lookaheadLimit/);
+    expect(syncSource).toMatch(/scanPrivateEntryId\(lookaheadEntryId, \{ advanceCursor: true \}\)/);
+    expect(syncSource).toMatch(/if \(bodyHistoryError\) \{[\s\S]*rememberPrivateBodyHistoryUnavailable\(address, part\.entry, part\.entryId\)/);
+    expect(syncSource).toMatch(/const nextCursor = effectiveScanEnd > previousCursor \? effectiveScanEnd : previousCursor/);
   });
 
   it('PWA-MSG-02B: private anonymous mode omits sender wallet metadata without merging inbound peers', () => {
@@ -1614,6 +1626,10 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/retryEntryCount: retryEntryIds\.length/);
     expect(syncPublicSource).toMatch(/publicReadLimit/);
     expect(syncPublicSource).toMatch(/syncWindow === 'all' \? 0 : Math\.max\(0, latest - readLimit\)/);
+    expect(syncPublicSource).toMatch(/const channelIdsToRefresh = new Set/);
+    expect(syncPublicSource).toMatch(/\.\.\.Object\.keys\(publicChannelFeedCache \?\? \{\}\)/);
+    expect(syncPublicSource).toMatch(/const nextFeedCache = \{\}/);
+    expect(syncPublicSource).not.toMatch(/const nextFeedCache = \{ \.\.\.publicChannelFeedCache \}/);
     expect(app).toMatch(/function chainBackedPublicFeedOnly/);
     expect(app).toMatch(/post\?\.chainVerified === true/);
     expect(syncPublicSource).toMatch(/chainVerified: true/);
@@ -1834,11 +1850,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v322/);
+    expect(sw).toMatch(/platho-pwa-prototype-v323/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=262/);
+    expect(sw).toMatch(/\.\/app\.js\?v=263/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
