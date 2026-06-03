@@ -1855,83 +1855,6 @@ export function dictValueParserPruneStaleNotification(): DictionaryValue<PruneSt
     }
 }
 
-export type AthTransferNotificationMintUsername = {
-    $$type: 'AthTransferNotificationMintUsername';
-    query_id: bigint;
-    sender_key: bigint;
-    amount: bigint;
-    owner_wallet: Address;
-    username_len: bigint;
-    username: Slice;
-}
-
-export function storeAthTransferNotificationMintUsername(src: AthTransferNotificationMintUsername) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(2299698527, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.sender_key, 160);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeUint(src.username_len, 8);
-        b_0.storeBuilder(src.username.asBuilder());
-    };
-}
-
-export function loadAthTransferNotificationMintUsername(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2299698527) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _sender_key = sc_0.loadUintBig(160);
-    const _amount = sc_0.loadUintBig(128);
-    const _owner_wallet = sc_0.loadAddress();
-    const _username_len = sc_0.loadUintBig(8);
-    const _username = sc_0;
-    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
-}
-
-export function loadTupleAthTransferNotificationMintUsername(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _sender_key = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _owner_wallet = source.readAddress();
-    const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
-}
-
-export function loadGetterTupleAthTransferNotificationMintUsername(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _sender_key = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _owner_wallet = source.readAddress();
-    const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
-    return { $$type: 'AthTransferNotificationMintUsername' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, username_len: _username_len, username: _username };
-}
-
-export function storeTupleAthTransferNotificationMintUsername(source: AthTransferNotificationMintUsername) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeNumber(source.sender_key);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.owner_wallet);
-    builder.writeNumber(source.username_len);
-    builder.writeSlice(source.username.asCell());
-    return builder.build();
-}
-
-export function dictValueParserAthTransferNotificationMintUsername(): DictionaryValue<AthTransferNotificationMintUsername> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAthTransferNotificationMintUsername(src)).endCell());
-        },
-        parse: (src) => {
-            return loadAthTransferNotificationMintUsername(src.loadRef().beginParse());
-        }
-    }
-}
-
 export type AthTransferNotificationVaultMintUsername = {
     $$type: 'AthTransferNotificationVaultMintUsername';
     query_id: bigint;
@@ -2011,104 +1934,6 @@ export function dictValueParserAthTransferNotificationVaultMintUsername(): Dicti
         },
         parse: (src) => {
             return loadAthTransferNotificationVaultMintUsername(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type AthTransferNotificationProfileAvatar = {
-    $$type: 'AthTransferNotificationProfileAvatar';
-    query_id: bigint;
-    sender_key: bigint;
-    amount: bigint;
-    owner_wallet: Address;
-    avatar_hash: bigint;
-    avatar_entry_id: bigint;
-    avatar_stream_id: bigint;
-    avatar_part_count: bigint;
-    media_format: bigint;
-}
-
-export function storeAthTransferNotificationProfileAvatar(src: AthTransferNotificationProfileAvatar) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(2702864385, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.sender_key, 160);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeUint(src.avatar_hash, 256);
-        b_0.storeUint(src.avatar_entry_id, 64);
-        const b_1 = new Builder();
-        b_1.storeUint(src.avatar_stream_id, 128);
-        b_1.storeUint(src.avatar_part_count, 16);
-        b_1.storeUint(src.media_format, 8);
-        b_0.storeRef(b_1.endCell());
-    };
-}
-
-export function loadAthTransferNotificationProfileAvatar(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2702864385) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _sender_key = sc_0.loadUintBig(160);
-    const _amount = sc_0.loadUintBig(128);
-    const _owner_wallet = sc_0.loadAddress();
-    const _avatar_hash = sc_0.loadUintBig(256);
-    const _avatar_entry_id = sc_0.loadUintBig(64);
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _avatar_stream_id = sc_1.loadUintBig(128);
-    const _avatar_part_count = sc_1.loadUintBig(16);
-    const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function loadTupleAthTransferNotificationProfileAvatar(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _sender_key = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _owner_wallet = source.readAddress();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function loadGetterTupleAthTransferNotificationProfileAvatar(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _sender_key = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _owner_wallet = source.readAddress();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    return { $$type: 'AthTransferNotificationProfileAvatar' as const, query_id: _query_id, sender_key: _sender_key, amount: _amount, owner_wallet: _owner_wallet, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function storeTupleAthTransferNotificationProfileAvatar(source: AthTransferNotificationProfileAvatar) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeNumber(source.sender_key);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.owner_wallet);
-    builder.writeNumber(source.avatar_hash);
-    builder.writeNumber(source.avatar_entry_id);
-    builder.writeNumber(source.avatar_stream_id);
-    builder.writeNumber(source.avatar_part_count);
-    builder.writeNumber(source.media_format);
-    return builder.build();
-}
-
-export function dictValueParserAthTransferNotificationProfileAvatar(): DictionaryValue<AthTransferNotificationProfileAvatar> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeAthTransferNotificationProfileAvatar(src)).endCell());
-        },
-        parse: (src) => {
-            return loadAthTransferNotificationProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
@@ -2358,193 +2183,6 @@ export function dictValueParserATHTransferRequestWithNotify(): DictionaryValue<A
         },
         parse: (src) => {
             return loadATHTransferRequestWithNotify(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type ATHTransferRequestMintUsername = {
-    $$type: 'ATHTransferRequestMintUsername';
-    query_id: bigint;
-    amount: bigint;
-    recipient: Address;
-    response_destination: Address;
-    notify_value: bigint;
-    username_len: bigint;
-    username: Slice;
-}
-
-export function storeATHTransferRequestMintUsername(src: ATHTransferRequestMintUsername) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1096042518, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.recipient);
-        b_0.storeAddress(src.response_destination);
-        b_0.storeUint(src.notify_value, 128);
-        b_0.storeUint(src.username_len, 8);
-        b_0.storeBuilder(src.username.asBuilder());
-    };
-}
-
-export function loadATHTransferRequestMintUsername(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1096042518) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _amount = sc_0.loadUintBig(128);
-    const _recipient = sc_0.loadAddress();
-    const _response_destination = sc_0.loadAddress();
-    const _notify_value = sc_0.loadUintBig(128);
-    const _username_len = sc_0.loadUintBig(8);
-    const _username = sc_0;
-    return { $$type: 'ATHTransferRequestMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, username_len: _username_len, username: _username };
-}
-
-export function loadTupleATHTransferRequestMintUsername(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _recipient = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
-    return { $$type: 'ATHTransferRequestMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, username_len: _username_len, username: _username };
-}
-
-export function loadGetterTupleATHTransferRequestMintUsername(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _recipient = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
-    return { $$type: 'ATHTransferRequestMintUsername' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, username_len: _username_len, username: _username };
-}
-
-export function storeTupleATHTransferRequestMintUsername(source: ATHTransferRequestMintUsername) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.recipient);
-    builder.writeAddress(source.response_destination);
-    builder.writeNumber(source.notify_value);
-    builder.writeNumber(source.username_len);
-    builder.writeSlice(source.username.asCell());
-    return builder.build();
-}
-
-export function dictValueParserATHTransferRequestMintUsername(): DictionaryValue<ATHTransferRequestMintUsername> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHTransferRequestMintUsername(src)).endCell());
-        },
-        parse: (src) => {
-            return loadATHTransferRequestMintUsername(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type ATHTransferRequestProfileAvatar = {
-    $$type: 'ATHTransferRequestProfileAvatar';
-    query_id: bigint;
-    amount: bigint;
-    recipient: Address;
-    response_destination: Address;
-    notify_value: bigint;
-    avatar_hash: bigint;
-    avatar_entry_id: bigint;
-    avatar_stream_id: bigint;
-    avatar_part_count: bigint;
-    media_format: bigint;
-}
-
-export function storeATHTransferRequestProfileAvatar(src: ATHTransferRequestProfileAvatar) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1096042520, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.recipient);
-        b_0.storeAddress(src.response_destination);
-        b_0.storeUint(src.notify_value, 128);
-        const b_1 = new Builder();
-        b_1.storeUint(src.avatar_hash, 256);
-        b_1.storeUint(src.avatar_entry_id, 64);
-        b_1.storeUint(src.avatar_stream_id, 128);
-        b_1.storeUint(src.avatar_part_count, 16);
-        b_1.storeUint(src.media_format, 8);
-        b_0.storeRef(b_1.endCell());
-    };
-}
-
-export function loadATHTransferRequestProfileAvatar(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1096042520) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _amount = sc_0.loadUintBig(128);
-    const _recipient = sc_0.loadAddress();
-    const _response_destination = sc_0.loadAddress();
-    const _notify_value = sc_0.loadUintBig(128);
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _avatar_hash = sc_1.loadUintBig(256);
-    const _avatar_entry_id = sc_1.loadUintBig(64);
-    const _avatar_stream_id = sc_1.loadUintBig(128);
-    const _avatar_part_count = sc_1.loadUintBig(16);
-    const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'ATHTransferRequestProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function loadTupleATHTransferRequestProfileAvatar(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _recipient = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    return { $$type: 'ATHTransferRequestProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function loadGetterTupleATHTransferRequestProfileAvatar(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _recipient = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    return { $$type: 'ATHTransferRequestProfileAvatar' as const, query_id: _query_id, amount: _amount, recipient: _recipient, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function storeTupleATHTransferRequestProfileAvatar(source: ATHTransferRequestProfileAvatar) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.recipient);
-    builder.writeAddress(source.response_destination);
-    builder.writeNumber(source.notify_value);
-    builder.writeNumber(source.avatar_hash);
-    builder.writeNumber(source.avatar_entry_id);
-    builder.writeNumber(source.avatar_stream_id);
-    builder.writeNumber(source.avatar_part_count);
-    builder.writeNumber(source.media_format);
-    return builder.build();
-}
-
-export function dictValueParserATHTransferRequestProfileAvatar(): DictionaryValue<ATHTransferRequestProfileAvatar> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHTransferRequestProfileAvatar(src)).endCell());
-        },
-        parse: (src) => {
-            return loadATHTransferRequestProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
@@ -2892,193 +2530,6 @@ export function dictValueParserATHInternalTransferWithNotify(): DictionaryValue<
         },
         parse: (src) => {
             return loadATHInternalTransferWithNotify(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type ATHInternalTransferMintUsername = {
-    $$type: 'ATHInternalTransferMintUsername';
-    query_id: bigint;
-    amount: bigint;
-    sender_owner: Address;
-    response_destination: Address;
-    notify_value: bigint;
-    username_len: bigint;
-    username: Slice;
-}
-
-export function storeATHInternalTransferMintUsername(src: ATHInternalTransferMintUsername) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1096042519, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.sender_owner);
-        b_0.storeAddress(src.response_destination);
-        b_0.storeUint(src.notify_value, 128);
-        b_0.storeUint(src.username_len, 8);
-        b_0.storeBuilder(src.username.asBuilder());
-    };
-}
-
-export function loadATHInternalTransferMintUsername(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1096042519) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _amount = sc_0.loadUintBig(128);
-    const _sender_owner = sc_0.loadAddress();
-    const _response_destination = sc_0.loadAddress();
-    const _notify_value = sc_0.loadUintBig(128);
-    const _username_len = sc_0.loadUintBig(8);
-    const _username = sc_0;
-    return { $$type: 'ATHInternalTransferMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, username_len: _username_len, username: _username };
-}
-
-export function loadTupleATHInternalTransferMintUsername(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _sender_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
-    return { $$type: 'ATHInternalTransferMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, username_len: _username_len, username: _username };
-}
-
-export function loadGetterTupleATHInternalTransferMintUsername(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _sender_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _username_len = source.readBigNumber();
-    const _username = source.readCell().asSlice();
-    return { $$type: 'ATHInternalTransferMintUsername' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, username_len: _username_len, username: _username };
-}
-
-export function storeTupleATHInternalTransferMintUsername(source: ATHInternalTransferMintUsername) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.sender_owner);
-    builder.writeAddress(source.response_destination);
-    builder.writeNumber(source.notify_value);
-    builder.writeNumber(source.username_len);
-    builder.writeSlice(source.username.asCell());
-    return builder.build();
-}
-
-export function dictValueParserATHInternalTransferMintUsername(): DictionaryValue<ATHInternalTransferMintUsername> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHInternalTransferMintUsername(src)).endCell());
-        },
-        parse: (src) => {
-            return loadATHInternalTransferMintUsername(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type ATHInternalTransferProfileAvatar = {
-    $$type: 'ATHInternalTransferProfileAvatar';
-    query_id: bigint;
-    amount: bigint;
-    sender_owner: Address;
-    response_destination: Address;
-    notify_value: bigint;
-    avatar_hash: bigint;
-    avatar_entry_id: bigint;
-    avatar_stream_id: bigint;
-    avatar_part_count: bigint;
-    media_format: bigint;
-}
-
-export function storeATHInternalTransferProfileAvatar(src: ATHInternalTransferProfileAvatar) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1096042521, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.sender_owner);
-        b_0.storeAddress(src.response_destination);
-        b_0.storeUint(src.notify_value, 128);
-        const b_1 = new Builder();
-        b_1.storeUint(src.avatar_hash, 256);
-        b_1.storeUint(src.avatar_entry_id, 64);
-        b_1.storeUint(src.avatar_stream_id, 128);
-        b_1.storeUint(src.avatar_part_count, 16);
-        b_1.storeUint(src.media_format, 8);
-        b_0.storeRef(b_1.endCell());
-    };
-}
-
-export function loadATHInternalTransferProfileAvatar(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1096042521) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _amount = sc_0.loadUintBig(128);
-    const _sender_owner = sc_0.loadAddress();
-    const _response_destination = sc_0.loadAddress();
-    const _notify_value = sc_0.loadUintBig(128);
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _avatar_hash = sc_1.loadUintBig(256);
-    const _avatar_entry_id = sc_1.loadUintBig(64);
-    const _avatar_stream_id = sc_1.loadUintBig(128);
-    const _avatar_part_count = sc_1.loadUintBig(16);
-    const _media_format = sc_1.loadUintBig(8);
-    return { $$type: 'ATHInternalTransferProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function loadTupleATHInternalTransferProfileAvatar(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _sender_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    return { $$type: 'ATHInternalTransferProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function loadGetterTupleATHInternalTransferProfileAvatar(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _amount = source.readBigNumber();
-    const _sender_owner = source.readAddress();
-    const _response_destination = source.readAddress();
-    const _notify_value = source.readBigNumber();
-    const _avatar_hash = source.readBigNumber();
-    const _avatar_entry_id = source.readBigNumber();
-    const _avatar_stream_id = source.readBigNumber();
-    const _avatar_part_count = source.readBigNumber();
-    const _media_format = source.readBigNumber();
-    return { $$type: 'ATHInternalTransferProfileAvatar' as const, query_id: _query_id, amount: _amount, sender_owner: _sender_owner, response_destination: _response_destination, notify_value: _notify_value, avatar_hash: _avatar_hash, avatar_entry_id: _avatar_entry_id, avatar_stream_id: _avatar_stream_id, avatar_part_count: _avatar_part_count, media_format: _media_format };
-}
-
-export function storeTupleATHInternalTransferProfileAvatar(source: ATHInternalTransferProfileAvatar) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.sender_owner);
-    builder.writeAddress(source.response_destination);
-    builder.writeNumber(source.notify_value);
-    builder.writeNumber(source.avatar_hash);
-    builder.writeNumber(source.avatar_entry_id);
-    builder.writeNumber(source.avatar_stream_id);
-    builder.writeNumber(source.avatar_part_count);
-    builder.writeNumber(source.media_format);
-    return builder.build();
-}
-
-export function dictValueParserATHInternalTransferProfileAvatar(): DictionaryValue<ATHInternalTransferProfileAvatar> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeATHInternalTransferProfileAvatar(src)).endCell());
-        },
-        parse: (src) => {
-            return loadATHInternalTransferProfileAvatar(src.loadRef().beginParse());
         }
     }
 }
@@ -4246,59 +3697,6 @@ export function dictValueParserFlushBurnAthDue(): DictionaryValue<FlushBurnAthDu
     }
 }
 
-export type FlushAthRefundDue = {
-    $$type: 'FlushAthRefundDue';
-    query_id: bigint;
-    owner_wallet: Address;
-}
-
-export function storeFlushAthRefundDue(src: FlushAthRefundDue) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(1804766023, 32);
-        b_0.storeUint(src.query_id, 64);
-        b_0.storeAddress(src.owner_wallet);
-    };
-}
-
-export function loadFlushAthRefundDue(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1804766023) { throw Error('Invalid prefix'); }
-    const _query_id = sc_0.loadUintBig(64);
-    const _owner_wallet = sc_0.loadAddress();
-    return { $$type: 'FlushAthRefundDue' as const, query_id: _query_id, owner_wallet: _owner_wallet };
-}
-
-export function loadTupleFlushAthRefundDue(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _owner_wallet = source.readAddress();
-    return { $$type: 'FlushAthRefundDue' as const, query_id: _query_id, owner_wallet: _owner_wallet };
-}
-
-export function loadGetterTupleFlushAthRefundDue(source: TupleReader) {
-    const _query_id = source.readBigNumber();
-    const _owner_wallet = source.readAddress();
-    return { $$type: 'FlushAthRefundDue' as const, query_id: _query_id, owner_wallet: _owner_wallet };
-}
-
-export function storeTupleFlushAthRefundDue(source: FlushAthRefundDue) {
-    const builder = new TupleBuilder();
-    builder.writeNumber(source.query_id);
-    builder.writeAddress(source.owner_wallet);
-    return builder.build();
-}
-
-export function dictValueParserFlushAthRefundDue(): DictionaryValue<FlushAthRefundDue> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeFlushAthRefundDue(src)).endCell());
-        },
-        parse: (src) => {
-            return loadFlushAthRefundDue(src.loadRef().beginParse());
-        }
-    }
-}
-
 export type PrunePendingUsernameMint = {
     $$type: 'PrunePendingUsernameMint';
     name_hash: bigint;
@@ -4397,7 +3795,6 @@ export type PendingUsernameMint = {
     item_address: Address;
     item_deploy_value: bigint;
     created_at: bigint;
-    vault_funded: boolean;
 }
 
 export function storePendingUsernameMint(src: PendingUsernameMint) {
@@ -4412,7 +3809,6 @@ export function storePendingUsernameMint(src: PendingUsernameMint) {
         b_1.storeAddress(src.item_address);
         b_1.storeUint(src.item_deploy_value, 128);
         b_1.storeUint(src.created_at, 32);
-        b_1.storeBit(src.vault_funded);
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -4428,8 +3824,7 @@ export function loadPendingUsernameMint(slice: Slice) {
     const _item_address = sc_1.loadAddress();
     const _item_deploy_value = sc_1.loadUintBig(128);
     const _created_at = sc_1.loadUintBig(32);
-    const _vault_funded = sc_1.loadBit();
-    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
+    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
 export function loadTuplePendingUsernameMint(source: TupleReader) {
@@ -4441,8 +3836,7 @@ export function loadTuplePendingUsernameMint(source: TupleReader) {
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    const _vault_funded = source.readBoolean();
-    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
+    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
 export function loadGetterTuplePendingUsernameMint(source: TupleReader) {
@@ -4454,8 +3848,7 @@ export function loadGetterTuplePendingUsernameMint(source: TupleReader) {
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    const _vault_funded = source.readBoolean();
-    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
+    return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
 export function storeTuplePendingUsernameMint(source: PendingUsernameMint) {
@@ -4468,7 +3861,6 @@ export function storeTuplePendingUsernameMint(source: PendingUsernameMint) {
     builder.writeAddress(source.item_address);
     builder.writeNumber(source.item_deploy_value);
     builder.writeNumber(source.created_at);
-    builder.writeBoolean(source.vault_funded);
     return builder.build();
 }
 
@@ -4552,10 +3944,8 @@ export type UsernameRegistryGlobalView = {
     genesis_controller_address: Address;
     name_record_count: bigint;
     pending_mint_count: bigint;
-    refund_due_count: bigint;
     treasury_due_ath: bigint;
     burn_due_ath: bigint;
-    pending_refund_flush_count: bigint;
     pending_treasury_flush_count: bigint;
     pending_burn_flush_count: bigint;
     pending_mint_stale_ttl: bigint;
@@ -4576,16 +3966,12 @@ export function storeUsernameRegistryGlobalView(src: UsernameRegistryGlobalView)
         b_1.storeInt(src.name_record_count, 257);
         const b_2 = new Builder();
         b_2.storeInt(src.pending_mint_count, 257);
-        b_2.storeInt(src.refund_due_count, 257);
         b_2.storeInt(src.treasury_due_ath, 257);
+        b_2.storeInt(src.burn_due_ath, 257);
         const b_3 = new Builder();
-        b_3.storeInt(src.burn_due_ath, 257);
-        b_3.storeInt(src.pending_refund_flush_count, 257);
         b_3.storeInt(src.pending_treasury_flush_count, 257);
-        const b_4 = new Builder();
-        b_4.storeInt(src.pending_burn_flush_count, 257);
-        b_4.storeInt(src.pending_mint_stale_ttl, 257);
-        b_3.storeRef(b_4.endCell());
+        b_3.storeInt(src.pending_burn_flush_count, 257);
+        b_3.storeInt(src.pending_mint_stale_ttl, 257);
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -4606,16 +3992,13 @@ export function loadUsernameRegistryGlobalView(slice: Slice) {
     const _name_record_count = sc_1.loadIntBig(257);
     const sc_2 = sc_1.loadRef().beginParse();
     const _pending_mint_count = sc_2.loadIntBig(257);
-    const _refund_due_count = sc_2.loadIntBig(257);
     const _treasury_due_ath = sc_2.loadIntBig(257);
+    const _burn_due_ath = sc_2.loadIntBig(257);
     const sc_3 = sc_2.loadRef().beginParse();
-    const _burn_due_ath = sc_3.loadIntBig(257);
-    const _pending_refund_flush_count = sc_3.loadIntBig(257);
     const _pending_treasury_flush_count = sc_3.loadIntBig(257);
-    const sc_4 = sc_3.loadRef().beginParse();
-    const _pending_burn_flush_count = sc_4.loadIntBig(257);
-    const _pending_mint_stale_ttl = sc_4.loadIntBig(257);
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    const _pending_burn_flush_count = sc_3.loadIntBig(257);
+    const _pending_mint_stale_ttl = sc_3.loadIntBig(257);
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function loadTupleUsernameRegistryGlobalView(source: TupleReader) {
@@ -4629,15 +4012,12 @@ export function loadTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _genesis_controller_address = source.readAddress();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
-    const _refund_due_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
-    const _pending_refund_flush_count = source.readBigNumber();
-    source = source.readTuple();
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
     const _pending_mint_stale_ttl = source.readBigNumber();
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function loadGetterTupleUsernameRegistryGlobalView(source: TupleReader) {
@@ -4651,14 +4031,12 @@ export function loadGetterTupleUsernameRegistryGlobalView(source: TupleReader) {
     const _genesis_controller_address = source.readAddress();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
-    const _refund_due_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
-    const _pending_refund_flush_count = source.readBigNumber();
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flush_count = source.readBigNumber();
     const _pending_mint_stale_ttl = source.readBigNumber();
-    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
+    return { $$type: 'UsernameRegistryGlobalView' as const, sealed: _sealed, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, genesis_controller_address: _genesis_controller_address, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flush_count: _pending_burn_flush_count, pending_mint_stale_ttl: _pending_mint_stale_ttl };
 }
 
 export function storeTupleUsernameRegistryGlobalView(source: UsernameRegistryGlobalView) {
@@ -4673,10 +4051,8 @@ export function storeTupleUsernameRegistryGlobalView(source: UsernameRegistryGlo
     builder.writeAddress(source.genesis_controller_address);
     builder.writeNumber(source.name_record_count);
     builder.writeNumber(source.pending_mint_count);
-    builder.writeNumber(source.refund_due_count);
     builder.writeNumber(source.treasury_due_ath);
     builder.writeNumber(source.burn_due_ath);
-    builder.writeNumber(source.pending_refund_flush_count);
     builder.writeNumber(source.pending_treasury_flush_count);
     builder.writeNumber(source.pending_burn_flush_count);
     builder.writeNumber(source.pending_mint_stale_ttl);
@@ -4819,7 +4195,6 @@ export type PendingUsernameMintView = {
     item_address: Address;
     item_deploy_value: bigint;
     created_at: bigint;
-    vault_funded: boolean;
 }
 
 export function storePendingUsernameMintView(src: PendingUsernameMintView) {
@@ -4836,7 +4211,6 @@ export function storePendingUsernameMintView(src: PendingUsernameMintView) {
         const b_2 = new Builder();
         b_2.storeInt(src.item_deploy_value, 257);
         b_2.storeInt(src.created_at, 257);
-        b_2.storeBit(src.vault_funded);
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
     };
@@ -4855,8 +4229,7 @@ export function loadPendingUsernameMintView(slice: Slice) {
     const sc_2 = sc_1.loadRef().beginParse();
     const _item_deploy_value = sc_2.loadIntBig(257);
     const _created_at = sc_2.loadIntBig(257);
-    const _vault_funded = sc_2.loadBit();
-    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
+    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
 export function loadTuplePendingUsernameMintView(source: TupleReader) {
@@ -4869,8 +4242,7 @@ export function loadTuplePendingUsernameMintView(source: TupleReader) {
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    const _vault_funded = source.readBoolean();
-    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
+    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
 export function loadGetterTuplePendingUsernameMintView(source: TupleReader) {
@@ -4883,8 +4255,7 @@ export function loadGetterTuplePendingUsernameMintView(source: TupleReader) {
     const _item_address = source.readAddress();
     const _item_deploy_value = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    const _vault_funded = source.readBoolean();
-    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at, vault_funded: _vault_funded };
+    return { $$type: 'PendingUsernameMintView' as const, exists: _exists, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
 export function storeTuplePendingUsernameMintView(source: PendingUsernameMintView) {
@@ -4898,7 +4269,6 @@ export function storeTuplePendingUsernameMintView(source: PendingUsernameMintVie
     builder.writeAddress(source.item_address);
     builder.writeNumber(source.item_deploy_value);
     builder.writeNumber(source.created_at);
-    builder.writeBoolean(source.vault_funded);
     return builder.build();
 }
 
@@ -4909,141 +4279,6 @@ export function dictValueParserPendingUsernameMintView(): DictionaryValue<Pendin
         },
         parse: (src) => {
             return loadPendingUsernameMintView(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type PendingAthRefundFlush = {
-    $$type: 'PendingAthRefundFlush';
-    owner_wallet: Address;
-    amount: bigint;
-    recipient_ath_wallet: Address;
-    created_at: bigint;
-}
-
-export function storePendingAthRefundFlush(src: PendingAthRefundFlush) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeUint(src.amount, 128);
-        b_0.storeAddress(src.recipient_ath_wallet);
-        b_0.storeUint(src.created_at, 32);
-    };
-}
-
-export function loadPendingAthRefundFlush(slice: Slice) {
-    const sc_0 = slice;
-    const _owner_wallet = sc_0.loadAddress();
-    const _amount = sc_0.loadUintBig(128);
-    const _recipient_ath_wallet = sc_0.loadAddress();
-    const _created_at = sc_0.loadUintBig(32);
-    return { $$type: 'PendingAthRefundFlush' as const, owner_wallet: _owner_wallet, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
-}
-
-export function loadTuplePendingAthRefundFlush(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _amount = source.readBigNumber();
-    const _recipient_ath_wallet = source.readAddress();
-    const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthRefundFlush' as const, owner_wallet: _owner_wallet, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
-}
-
-export function loadGetterTuplePendingAthRefundFlush(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _amount = source.readBigNumber();
-    const _recipient_ath_wallet = source.readAddress();
-    const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthRefundFlush' as const, owner_wallet: _owner_wallet, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
-}
-
-export function storeTuplePendingAthRefundFlush(source: PendingAthRefundFlush) {
-    const builder = new TupleBuilder();
-    builder.writeAddress(source.owner_wallet);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.recipient_ath_wallet);
-    builder.writeNumber(source.created_at);
-    return builder.build();
-}
-
-export function dictValueParserPendingAthRefundFlush(): DictionaryValue<PendingAthRefundFlush> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePendingAthRefundFlush(src)).endCell());
-        },
-        parse: (src) => {
-            return loadPendingAthRefundFlush(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type PendingAthRefundFlushView = {
-    $$type: 'PendingAthRefundFlushView';
-    exists: boolean;
-    owner_wallet: Address;
-    amount: bigint;
-    recipient_ath_wallet: Address;
-    created_at: bigint;
-}
-
-export function storePendingAthRefundFlushView(src: PendingAthRefundFlushView) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeBit(src.exists);
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeInt(src.amount, 257);
-        b_0.storeAddress(src.recipient_ath_wallet);
-        const b_1 = new Builder();
-        b_1.storeInt(src.created_at, 257);
-        b_0.storeRef(b_1.endCell());
-    };
-}
-
-export function loadPendingAthRefundFlushView(slice: Slice) {
-    const sc_0 = slice;
-    const _exists = sc_0.loadBit();
-    const _owner_wallet = sc_0.loadAddress();
-    const _amount = sc_0.loadIntBig(257);
-    const _recipient_ath_wallet = sc_0.loadAddress();
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _created_at = sc_1.loadIntBig(257);
-    return { $$type: 'PendingAthRefundFlushView' as const, exists: _exists, owner_wallet: _owner_wallet, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
-}
-
-export function loadTuplePendingAthRefundFlushView(source: TupleReader) {
-    const _exists = source.readBoolean();
-    const _owner_wallet = source.readAddress();
-    const _amount = source.readBigNumber();
-    const _recipient_ath_wallet = source.readAddress();
-    const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthRefundFlushView' as const, exists: _exists, owner_wallet: _owner_wallet, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
-}
-
-export function loadGetterTuplePendingAthRefundFlushView(source: TupleReader) {
-    const _exists = source.readBoolean();
-    const _owner_wallet = source.readAddress();
-    const _amount = source.readBigNumber();
-    const _recipient_ath_wallet = source.readAddress();
-    const _created_at = source.readBigNumber();
-    return { $$type: 'PendingAthRefundFlushView' as const, exists: _exists, owner_wallet: _owner_wallet, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
-}
-
-export function storeTuplePendingAthRefundFlushView(source: PendingAthRefundFlushView) {
-    const builder = new TupleBuilder();
-    builder.writeBoolean(source.exists);
-    builder.writeAddress(source.owner_wallet);
-    builder.writeNumber(source.amount);
-    builder.writeAddress(source.recipient_ath_wallet);
-    builder.writeNumber(source.created_at);
-    return builder.build();
-}
-
-export function dictValueParserPendingAthRefundFlushView(): DictionaryValue<PendingAthRefundFlushView> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePendingAthRefundFlushView(src)).endCell());
-        },
-        parse: (src) => {
-            return loadPendingAthRefundFlushView(src.loadRef().beginParse());
         }
     }
 }
@@ -5397,15 +4632,11 @@ export type UsernameRegistry$Data = {
     genesis_config_hash: bigint;
     name_record_count: bigint;
     pending_mint_count: bigint;
-    refund_due_count: bigint;
     treasury_due_ath: bigint;
     burn_due_ath: bigint;
     name_records: Dictionary<bigint, NameRecord>;
     pending_mints: Dictionary<bigint, PendingUsernameMint>;
     pending_item_to_name_hash: Dictionary<Address, bigint>;
-    ath_refunds_due: Dictionary<Address, bigint>;
-    pending_refund_flushes: Dictionary<bigint, PendingAthRefundFlush>;
-    pending_refund_flush_count: bigint;
     pending_treasury_flushes: Dictionary<bigint, PendingAthTreasuryFlush>;
     pending_treasury_flush_count: bigint;
     pending_burn_flushes: Dictionary<bigint, PendingAthBurnFlush>;
@@ -5428,7 +4659,6 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
         b_1.storeUint(src.genesis_config_hash, 256);
         b_1.storeUint(src.name_record_count, 64);
         b_1.storeUint(src.pending_mint_count, 64);
-        b_1.storeUint(src.refund_due_count, 64);
         const b_2 = new Builder();
         b_2.storeUint(src.treasury_due_ath, 128);
         b_2.storeUint(src.burn_due_ath, 128);
@@ -5436,9 +4666,6 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
         b_2.storeDict(src.pending_mints, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint());
         b_2.storeDict(src.pending_item_to_name_hash, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
         const b_3 = new Builder();
-        b_3.storeDict(src.ath_refunds_due, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257));
-        b_3.storeDict(src.pending_refund_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush());
-        b_3.storeUint(src.pending_refund_flush_count, 64);
         b_3.storeDict(src.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush());
         b_3.storeUint(src.pending_treasury_flush_count, 64);
         b_3.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush());
@@ -5464,7 +4691,6 @@ export function loadUsernameRegistry$Data(slice: Slice) {
     const _genesis_config_hash = sc_1.loadUintBig(256);
     const _name_record_count = sc_1.loadUintBig(64);
     const _pending_mint_count = sc_1.loadUintBig(64);
-    const _refund_due_count = sc_1.loadUintBig(64);
     const sc_2 = sc_1.loadRef().beginParse();
     const _treasury_due_ath = sc_2.loadUintBig(128);
     const _burn_due_ath = sc_2.loadUintBig(128);
@@ -5472,15 +4698,12 @@ export function loadUsernameRegistry$Data(slice: Slice) {
     const _pending_mints = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), sc_2);
     const _pending_item_to_name_hash = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_2);
     const sc_3 = sc_2.loadRef().beginParse();
-    const _ath_refunds_due = Dictionary.load(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), sc_3);
-    const _pending_refund_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush(), sc_3);
-    const _pending_refund_flush_count = sc_3.loadUintBig(64);
     const _pending_treasury_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), sc_3);
     const _pending_treasury_flush_count = sc_3.loadUintBig(64);
     const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), sc_3);
     const _pending_burn_flush_count = sc_3.loadUintBig(64);
     const _genesis_controller_address = sc_3.loadAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
 }
 
 export function loadTupleUsernameRegistry$Data(source: TupleReader) {
@@ -5495,22 +4718,18 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _genesis_config_hash = source.readBigNumber();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
-    const _refund_due_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
-    source = source.readTuple();
     const _name_records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), source.readCellOpt());
+    source = source.readTuple();
     const _pending_mints = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), source.readCellOpt());
     const _pending_item_to_name_hash = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _ath_refunds_due = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _pending_refund_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush(), source.readCellOpt());
-    const _pending_refund_flush_count = source.readBigNumber();
     const _pending_treasury_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), source.readCellOpt());
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
 }
 
 export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
@@ -5525,21 +4744,17 @@ export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _genesis_config_hash = source.readBigNumber();
     const _name_record_count = source.readBigNumber();
     const _pending_mint_count = source.readBigNumber();
-    const _refund_due_count = source.readBigNumber();
     const _treasury_due_ath = source.readBigNumber();
     const _burn_due_ath = source.readBigNumber();
     const _name_records = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserNameRecord(), source.readCellOpt());
     const _pending_mints = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint(), source.readCellOpt());
     const _pending_item_to_name_hash = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _ath_refunds_due = Dictionary.loadDirect(Dictionary.Keys.Address(), Dictionary.Values.BigInt(257), source.readCellOpt());
-    const _pending_refund_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush(), source.readCellOpt());
-    const _pending_refund_flush_count = source.readBigNumber();
     const _pending_treasury_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush(), source.readCellOpt());
     const _pending_treasury_flush_count = source.readBigNumber();
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, refund_due_count: _refund_due_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, ath_refunds_due: _ath_refunds_due, pending_refund_flushes: _pending_refund_flushes, pending_refund_flush_count: _pending_refund_flush_count, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
 }
 
 export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
@@ -5555,15 +4770,11 @@ export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
     builder.writeNumber(source.genesis_config_hash);
     builder.writeNumber(source.name_record_count);
     builder.writeNumber(source.pending_mint_count);
-    builder.writeNumber(source.refund_due_count);
     builder.writeNumber(source.treasury_due_ath);
     builder.writeNumber(source.burn_due_ath);
     builder.writeCell(source.name_records.size > 0 ? beginCell().storeDictDirect(source.name_records, Dictionary.Keys.BigInt(257), dictValueParserNameRecord()).endCell() : null);
     builder.writeCell(source.pending_mints.size > 0 ? beginCell().storeDictDirect(source.pending_mints, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMint()).endCell() : null);
     builder.writeCell(source.pending_item_to_name_hash.size > 0 ? beginCell().storeDictDirect(source.pending_item_to_name_hash, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257)).endCell() : null);
-    builder.writeCell(source.ath_refunds_due.size > 0 ? beginCell().storeDictDirect(source.ath_refunds_due, Dictionary.Keys.Address(), Dictionary.Values.BigInt(257)).endCell() : null);
-    builder.writeCell(source.pending_refund_flushes.size > 0 ? beginCell().storeDictDirect(source.pending_refund_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthRefundFlush()).endCell() : null);
-    builder.writeNumber(source.pending_refund_flush_count);
     builder.writeCell(source.pending_treasury_flushes.size > 0 ? beginCell().storeDictDirect(source.pending_treasury_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthTreasuryFlush()).endCell() : null);
     builder.writeNumber(source.pending_treasury_flush_count);
     builder.writeCell(source.pending_burn_flushes.size > 0 ? beginCell().storeDictDirect(source.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush()).endCell() : null);
@@ -5600,7 +4811,7 @@ function initATHWallet_init_args(src: ATHWallet_init_args) {
 }
 
 async function ATHWallet_init(balance: bigint, owner_address: Address, ath_master_address: Address) {
-    const __code = Cell.fromHex('b5ee9c7241026501002146000114ff00f4a413f4bcf2c80b01020162025f04f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de207e3027026d74920c21f953106d31f07de21821041544801bae30221821041544805bae30221821041544810ba030f111204cc058020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812ba8eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544815bae30220821041544817ba0408060500e230d33fd37f59328136b3f84225c705f2f48136b422c200f2f45151a0708040077f04c8598210415448045003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404f88eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e02082104154481dba8eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544819bae3022082104154481bba08080607015c30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540804f88eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e0208210178d4519ba8eae30d33ffa00593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e0208210472d9d7dbae30220821089129d5fba08080a0b02ea81378c21c200f2f4f84210685e34103748705280db3c218101012259f40d6fa192306ddf206e92306d9fd0fa40fa40d37fd31f55306c146f04e281378d216eb3f2f46f243081378e511bbaf2f481378ff8425003c70512f2f402810101f45a305167a0f8285220c705b3941028375be30d104555125a09006e7080400a7f0ac8598210415448135003cb1fcb3fcb7fc9134a4019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001045017030d33fd39f5932813800f84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540e03fe8eb830d33fd39f59328138c2f84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821089129d60ba8eb830d33fd39f59328138eaf84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e0200e0e0c029a8210a11a7001ba8eb830d33fd39f5932813930f84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e08210a11a7002bae3025f070e0d016ed33fd39f593281394ef84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540e03a655515376db3c810101240259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e2813801216eb3f2f46f25135f0355512981380209db3c29ba18f2f4104810374614403305db3c625c5301fe5b05d33fd37ffa40308136b0f84227c705f2f48136b122c200f2f48136b25372bef2f48136b55316c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15172a1715414377f04c855308210415448025005cb1f13cb3fcb7fcecec92504085520441359c8cf8580ca00cf8440ce01fa02100052806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5401f05b05d33fd37ffa4030813840f84226c705f2f481384122c200f2f481384227c000f2f4813843f8416f24135f0382082dc6c0bef2f45161a082080f42407004705148c855208210415448065004cb1f12cb3fcb7fcec910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00103555124e043ce30221821041544814bae30221821041544816bae3022182104154481cba1315181b04d25b05d33fd37ffa40fa4030813778f84228c705f2f48137795317c705f2f410575e3346895389db3c81377a27c200f2f481377b5367bef2f48209c9c38081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a1555029db3c705410b5db3c5551547a9b2f2d55561401fedb3c5159a17f541ba5700fc855308210415448125005cb1f13cb3fcb7fcecec9106b10581049103c47b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010354044c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed545904fe5b05d33fd37ffa40fa40d430d0fa40d37f308137dcf8422ac705f2f48137dd5339c705f2f48137de5324c705f2f410591048103746ab5376db3c8137df29c200f2f48137e02cc200f2f48137e15369bef2f48137e22c8209c9c380bef2f42bdb3c208208989680a08137e3f8416f24135f0322bef2f4555129db3c705410b52d20551603fedb3c5551547dcb2ddb3c515ca150dc7f7126544d30011112011113c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a1058104d103e4a80103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f03565917014e01a11047104610354440db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542a04e45b05d33fd37ffa40fa40d37fd3078138a4f8422bc705f2f48138a5534ac705f2f4105a1049103847bc5398db3c8138a62bc200f2f48138a728c200f2f48138a8536bbef2f48138a9288209c9c380bef2f427db3c208208989680a08138aaf8416f24135f0322bef2f455512bdb3c705410d52d20551903fedb3c5551547aed2fdb3c515ea14ae07f7126513f4f13011113011114c855608210415448175008cb1f16cb3f14cb7f12cececb7fcb07cec9106b1057104e103947e0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0356591a014c5005a1106714161513db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542a043ce30221821041544818bae3022182104154481abae3022182100f8a7ea5ba1c1f252b04fe5b05d33fd37ffa40fa40d37fd430d0fa40d3078138d6f8422cc705f2f48138d7535bc705f2f4105b104a103948cd53badb3c55408138d85169db3c17f2f48138d927c200f2f48138da2ac200f2f48138db5357bef2f48138dc2a8209c9c380bef2f4550429db3c208208989680a08138ddf8416f24135f0322bef2f455512d2d4a261d04f4db3c705410f5db3c5551547baf5611db3c515aa1103b102a7f7126045611040311110302111002011114011115c8557082104154481d5009cb1f17cb3f15cb7f13cececb7f01c8ce12cb0712cecdc9106c105c104a10394a90103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf815556591e02668ae2f400c901fb00f8416f24135f035006a146505e21db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54242a04fc5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd30730813912f8422ec705f2f4813913537dc705f2f4105d104c103b4aef5376db3c81391429c200f2f48139152ec200f2f48139165369bef2f48139172e8209c9c380bef2f42ddb3c208208989680a0813918f8416f24135f0322bef2f4555129db3c705410b52d205521003082080f4240a082080f4240a082086acfc0a082081e8480a004f8db3c5551547dcb2ddb3c515ca1105d104c7f712e516d0605111505041114040311130302111202011116011117c85590821041544819500bcb1f19cb3f17cb7f15ce13cecb7f01c8cbff12cb3f12cb7f12cb0f12cb07cdc91045104a1039103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb08a5659222300065bcf81026a8ae2f400c901fb00f8416f24135f035003a1104741601513db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54242a001a58cf8680cf8480f400f400cf8104fc5b05d33fd37ffa40fa40d37fd430d0fa40d3ffd33fd37fd30fd3073081393af8422fc705f2f481393b538ec705f2f4105e104d103c102b1110541f0828db3c554081393c516fdb3c17f2f481393d2ac200f2f481393e27c200f2f481393f535abef2f4813940278209c9c380bef2f4550426db3c208208989680a08139412d4a2627003c82082dc6c0a082080f4240a082086acfc0a082081e8480a082081e8480a00486f8416f24135f0322bef2f455512adb3c705410c5db3c5551547edc2edb3c515da1106e105d7f71536d07106e05111605041115040311140302111302011117011118c85556592802e055a0db3cc91035104a10394180103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0358a110471045103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54292a005482104154481b500ccb1f1acb3f18cb7f16ce14ce12cb7f01c8ce12cbff12cb3f12cb7f12cb0f12cb07cd004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00043ce30221821041544812bae302218210178d4519bae30221821041544815ba2c2f313603fe5b05d33ffa00fa40fa40f40431fa0081396cf8422ac705f2f410591048103746ab5376db3c81396d29c200f2f481396e5369bef2f481396f2bc000917f972b8209c9c380bee2f2f48208b71b002ba08209406f40a082081e8480a0813970f8416f24135f0358bef2f4f8416f24135f0382081e8480a1555028db3c705410a52d552e035410478139082705104710394078db3c17f2f4550481390908db3c18f2f4550581390a07db3c17f2f455044a4a4a03f0db3c5551547cba2cdb3c515ba14cb07f70264c13011110011111c855508210178d45195007cb1f15cb3f5003fa02cece01fa02cec9106810581047103b4870103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0055200456594e02fe5b05d33fd37ffa40fa403081378223c200f2f4813783f84210691058104710394ab9db3c19c7051af2f4813784f8416f24135f0382087a1200bef2f45134a082082dc6c071705387c8598210415448115003cb1fcb3fcb7fc9104b441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f42407107705530009e07c8598210415448115003cb1fcb3fcb7fc944304760441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010455512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404ce5b05d33ffa00fa40fa40fa003081397624c200f2f4813977f842105a1049103847bc29db3c1dc7051bf2f455030981397851b8db3c1cf2f425c2008e1b3781397df8416f24135f0382084c4b40bef2f45137a01049030604e30df8421047103641505449145099554a323403ea813979268209c9c380bef2f481397af8416f24135f032782080f4240a082080f4240a082086acfc0a082081e8480a0bef2f45504543a97db3c555053a6db3c81397b248101012359f40c6fa131b3f2f481397c238101012359f40c6fa131b3f2f4516aa081010182080f4240f8232c544c3052f0c85c623300ba55405045ce12cecb3fcb7fcb1fc910354180206e953059f45a30944133f415e2717f544c9052ccc855308210472d9d7d5005cb1f13cb3fcb9fcb7fcec925513d034b9b441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001e8db3cf8416f24135f030982080f4240a082080f4240a019be8e3782080f4240717009c8018210d53276db58cb1fcb3fc91048413019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001034923535e245334414c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5435006c82080f424071047004c8598210415448115003cb1fcb3fcb7fc94430441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00043ce30221821041544817bae3022182104154481dbae30221821041544819ba373c404304fa5b05d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842105b104a103948cd2bdb3c1ec7051cf2f48137e85383c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082080f4240a082086acfc0a082081e8480a0bef2f410354014503b541a0a2adb3c555053b6db3c8137eb24555c623801fc8101012359f40c6fa131b3f2f48137ec298209c9c380bef2f48137ed238101012359f40c6fa131b3f2f4516da081010182080f4240f8232e544e30561201c855405045ce12cecb3fcb7fcb1fc910354180206e953059f45a30944133f415e2717f544d9052fec855308210472d9d7d5005cb1f13cb3fcb9fcb7fcec910493902fc10384b70441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f4240707053abc8598210415448115003cb1fcb3fcb7fc91049441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f42407109700bc8598210415448115003cb1fcb3fcb7fc9443049a0441359c8cf8580ca00893a3b000110005acf16ce01fa02806acf40f400c901fb004430c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404fa5b05d33fd37ffa40fa40d37fd3078138ae26c200f2f48138aff842105c104b103a49de26db3c1fc7051df2f48138b02ac200f2f48138b1f8416f24135f032b82080f4240a082080f4240a082086acfc0a082081e8480a0bef2f410354014503c541b062ddb3c55505376db3c8138b2248101012359f40c6fa131b3f2f4555c623d01fe8138b32c8209c9c380bef2f48138b4238101012359f40c6fa131b3f2f4516da081010182080f4240f823561102561002561201c855405045ce12cecb3fcb7fcb1fc910354180206e953059f45a30944133f415e2717f29514f104a030211110250dcc85550821089129d5f5007cb1f15cb3f13cb9fcb7fcecb07cec923103a3e01fe48dd441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f42407070535ac8598210415448115003cb1fcb3fcb7fc9104a441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f42407104700ac8598210415448115003cb1fcb3fcb7fc9443019441359c8cf8580ca00cf8440ce013f005afa02806acf40f400c901fb00103510341023c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404f45b05d33fd37ffa40fa40d37fd430d0fa40d3078138e027c200f2f48138e1f842105d104c103b4aef27db3c01111001c7051ef2f48138e22cc200f2f48138e3f8416f24135f032d82082dc6c0a082080f4240a082086acfc0a082081e8480a0bef2f455030c8138e451ebdb3c1ff2f45504543d7ddb3c55505386554a5c4102f8db3c8138e5248101012359f40c6fa131b3f2f48138e62e8209c9c380bef2f48138e7238101012359f40c6fa131b3f2f45168a081010182082dc6c0f823561203021112020111120152c01113c855405045ce12cecb3fcb7fcb1fc910344f70206e953059f45a30944133f415e2717f295159105904031111034edcc8624201f05560821089129d605008cb1f16cb3f14cb9f12cb7fcececb07cec9544114103a4c99441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f424071047004c8598210415448115003cb1fcb3fcb7fc94430441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00400305044e043ce3022182104154481bbae30221821041544811bae302218210472d9d7eba44484d4f03fc5b05d33fd37ffa40fa40d37fd430d0d3ffd33fd37fd30fd3073081391c29c200f2f481391df842105f104e103d102c01111001111129db3c01111201c70501111001f2f481391e26c200f2f481391ff8416f24135f032782080f4240a082080f4240a082086acfc0a082081e8480a0bef2f410354014503f541e0928db3c555c4502fe555053a6db3c813920248101012359f40c6fa131b3f2f481392156118209c9c380bef2f4813922238101012359f40c6fa131b3f2f4516aa081010182080f4240f8232c544c3052f0c855405045ce12cecb3fcb7fcb1fc910354180206e953059f45a30944133f415e2717f2c517c107a06105c041114040311120302111102624601fe011110010fc855808210a11a7001500acb1f18cb3f16cb9f14cb7f12cecbffcb3f01c8cb7f12cb0f12cb07cdc92804103c4baa441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f424070705354c8598210415448115003cb1fcb3fcb7fc91049441359c8cf8580ca00cf8440ce01fa02806acf40f4004700b8c901fb00f84282080f424071047004c8598210415448115003cb1fcb3fcb7fc94430441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001035144330c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5402fe5b05d33fd37ffa40fa40d37fd430d0fa40d3ffd33fd37fd30fd307308139442ac200f2f4813945f84205111005104f103e102d0111110111122adb3c01111301c70501111101f2f481394627c200f2f4813947f8416f24135f032882082dc6c0a082080f4240a082086acfc0a082081e8480a0bef2f455030f813948111126554904fcdb3c01111201f2f45504111053a8db3c555053b6db3c813949248101012359f40c6fa131b3f2f481394a298209c9c380bef2f481394b238101012359f40c6fa131b3f2f4516ba081010182082dc6c0f8232d4dd352fec855405045ce12cecb3fcb7fcb1fc910344a70206e953059f45a30944133f415e2717f2c08517c074a5c624b000afa4430c00001fe106c05111405041113040311120302111102011110010fc855908210a11a7002500bcb1f19cb3f17cb9f15cb7f13cece01c8cbff12cb3f12cb7f12cb0f12cb07cdc92643144a99441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f424071047004c8598210415448115003cb1fcb3fcb7fc944304c0072441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0044145053c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5402dc5b05d33fd37f308137a021c200f2f4f84210671056104510344880db3c218101012259f40d6fa192306ddf206e92306d9fd0fa40fa40d37fd31f55306c146f04e28137a1216eb3f2f46f2430318137a20aba19f2f48137a3f8425009c70518f2f416810101f45a301045103441305a4e0036c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404b4e3022182104154481eba8ebb5b05d33fd37fd39f3081380af84227c705f2f41068105710461035103401db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e0218210504e5052bae30237c00006c12116b050535b5e04f65b05d33fd37fd39f30813804f84227c705f2f481380522c200f2f410561046103646785368db3c238101012259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e2206ee3026f2530813807511dbaf2f410591048103746982a81380808db3c500dba16f2f48101015415005467c062515c520090303738810101530150884133f40c6fa19401d70030925b6de2813806216eb3f2f481380907ba16f2f445334414c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400dc216e955b59f45a3098c801cf004133f442e25054810101f45a307108700ac8598210415448115003cb1fcb3fcb7fc9104710364890441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003444405c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5403f68137fa21c200f2f455525387db3c238101012259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e28137fc216eb3f2f46f25308137fff8416f24135f03820889544024a0bef2f48137fb53bcbef2f48137fd511cbaf2f455448137fe543ad8db3c2dba1bf2f4514aa15088810101625c5404f2f45a3010574014541386db3c705385db3c10685e3410374870545ee9db3c539b82082dc6c0ba955b3839f8288e3d717011112fc8598210415448135003cb1fcb3fcb7fc9104d103e1201111101441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00090c0807e21046103544304970546cb052b055565758016820fa4430705826db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0560026f82ac87001ca0055215023810101cf00cecec90030c882104154524601cb1f13cb3fcb9f01cf16c9f900a9383f01c4db3c707f541db680400bc855308210415448125005cb1f13cb3fcb7fcecec91069105c104a103847b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb004105045901901069105810471039487927db3c813796228101012359f40c6fa131b3f2f4810101f82310394ba0c855305034cececb7fcb1fc910364780206e953059f45a30944133f415e24540125a0026c8821041544f4701cb1f12cb3f01cf16c9f90003f65b05d33fd39f3081380df8416f24135f0382081e8480bef2f454167628db3c238101012259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e281380e216eb3f2f46f2533106a1059104810374a9b81380f08db3c500cba16f2f4813810f8230982015180a019be18f2f481381106625c5d002cc8821041544e4901cb1f12cb3f01cf16c9f900a9389f009882082dc6c0bd16f2f48101012010345445135099216e955b59f45a3098c801cf004133f442e25024810101f45a30403305c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400588e248132c8f2f010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f06f2c0820201486063017dbb1c5ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de25515db3c6c658610178db3c810101240259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e2206e983070705456002802e06f25327f044313620002310179bbb02ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de2db3c6c638640006547543880de197');
+    const __code = Cell.fromHex('b5ee9c7241025201001a3e000114ff00f4a413f4bcf2c80b01020162024c04f6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de207e3027026d74920c21f953106d31f07de21821041544801bae30221821041544805bae30221821041544810ba030d0f1004cc058020d7217021d749c21f9430d31f01de20821041544802bae30220821041544812ba8eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821041544815bae3022082104154481dba0408050600e230d33fd37f59328136b3f84225c705f2f48136b422c200f2f45151a0708040077f04c8598210415448045003cb1fcb3fcb7fc92643144800441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54015c30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540804f88eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e02082104154481bba8eae30d33fd37f593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e0208210178d4519bae302208210472d9d7dba0808070a015c30d33ffa00593210571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540802ea81378c21c200f2f4f84210685e34103748705280db3c218101012259f40d6fa192306ddf206e92306d9fd0fa40fa40d37fd31f55306c146f04e281378d216eb3f2f46f243081378e511bbaf2f481378ff8425003c70512f2f402810101f45a305167a0f8285220c705b3941028375be30d104555124709006e7080400a7f0ac8598210415448135003cb1fcb3fcb7fc9134a4019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00104503fc8eb830d33fd39f5932813800f84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e020821089129d60ba8eb830d33fd39f59328138eaf84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e00c0c0b01868210a11a7002ba8eb7d33fd39f593281394ef84226c705f2f410571046103510244300db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f070c03a655515376db3c810101240259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e2813801216eb3f2f46f25135f0355512981380209db3c29ba18f2f4104810374614403305db3c4f494001fe5b05d33fd37ffa40308136b0f84227c705f2f48136b122c200f2f48136b25372bef2f48136b55316c705f2f482083d09008136b6f8416f24135f0358bef2f4f8416f24135f0382081e8480a15172a1715414377f04c855308210415448025005cb1f13cb3fcb7fcecec92504085520441359c8cf8580ca00cf8440ce01fa020e0052806acf40f400c901fb0010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5401f05b05d33fd37ffa4030813840f84226c705f2f481384122c200f2f481384227c000f2f4813843f8416f24135f0382082dc6c0bef2f45161a082080f42407004705148c855208210415448065004cb1f12cb3fcb7fcec910484830441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00103555123b043ce30221821041544814bae3022182104154481cbae3022182104154481aba1113171b04d25b05d33fd37ffa40fa4030813778f84228c705f2f48137795317c705f2f410575e3346895389db3c81377a27c200f2f481377b5367bef2f48209c9c38081377cf8416f24135f0358bef2f4f8416f24135f0382081e8480a1555029db3c705410b5db3c5551547a9b2f2342431201fedb3c5159a17f541ba5700fc855308210415448125005cb1f13cb3fcb7fcecec9106b10581049103c47b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010354044c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed544604fe5b05d33fd37ffa40fa40d430d0fa40d37f308137dcf8422ac705f2f48137dd5339c705f2f48137de5324c705f2f410591048103746ab5376db3c8137df29c200f2f48137e02cc200f2f48137e15369bef2f48137e22c8209c9c380bef2f42bdb3c208208989680a08137e3f8416f24135f0322bef2f4555129db3c705410b523144215003082080f4240a082080f4240a082086acfc0a082081e8480a003fedb3c5551547dcb2ddb3c515ca150dc7f7126544d30011112011113c855508210415448155007cb1f15cb3f13cb7fcece01c8ce12cb7fcdc9106a1058104d103e4a80103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f03434616014e01a11047104610354440db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542104fe5b05d33fd37ffa40fa40d37fd430d0fa40d3078138d6f8422cc705f2f48138d7535bc705f2f4105b104a103948cd53badb3c55408138d85169db3c17f2f48138d927c200f2f48138da2ac200f2f48138db5357bef2f48138dc2a8209c9c380bef2f4550429db3c208208989680a08138ddf8416f24135f0322bef2f455512d23381d1804f4db3c705410f5db3c5551547baf5611db3c515aa1103b102a7f7126045611040311110302111002011114011115c8557082104154481d5009cb1f17cb3f15cb7f13cececb7f01c8ce12cb0712cecdc9106c105c104a10394a90103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf814243461902668ae2f400c901fb00f8416f24135f035006a146505e21db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed541a21001a58cf8680cf8480f400f400cf81043ce3022182100f8a7ea5bae30221821041544812bae302218210178d4519ba1c22252704fc5b05d33fd37ffa40fa40d37fd430d0fa40d3ffd33fd37fd30fd3073081393af8422fc705f2f481393b538ec705f2f4105e104d103c102b1110541f0828db3c554081393c516fdb3c17f2f481393d2ac200f2f481393e27c200f2f481393f535abef2f4813940278209c9c380bef2f4550426db3c208208989680a081394123381d1e003c82082dc6c0a082080f4240a082086acfc0a082081e8480a082081e8480a00486f8416f24135f0322bef2f455512adb3c705410c5db3c5551547edc2edb3c515da1106e105d7f71536d07106e05111605041115040311140302111302011117011118c84243461f02e055a0db3cc91035104a10394180103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00f8416f24135f0358a110471045103412db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542021005482104154481b500ccb1f1acb3f18cb7f16ce14ce12cb7f01c8ce12cbff12cb3f12cb7f12cb0f12cb07cd004a20820186a0b9915be070706d4343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003fe5b05d33ffa00fa40fa40f40431fa0081396cf8422ac705f2f410591048103746ab5376db3c81396d29c200f2f481396e5369bef2f481396f2bc000917f972b8209c9c380bee2f2f48208b71b002ba08209406f40a082081e8480a0813970f8416f24135f0358bef2f4f8416f24135f0382081e8480a1555028db3c705410a5234224035410478139082705104710394078db3c17f2f4550481390908db3c18f2f4550581390a07db3c17f2f4550438383803f0db3c5551547cba2cdb3c515ba14cb07f70264c13011110011111c855508210178d45195007cb1f15cb3f5003fa02cece01fa02cec9106810581047103b4870103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0055200443463b02fe5b05d33fd37ffa40fa403081378223c200f2f4813783f84210691058104710394ab9db3c19c7051af2f4813784f8416f24135f0382087a1200bef2f45134a082082dc6c071705387c8598210415448115003cb1fcb3fcb7fc9104b441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f42407107704226009e07c8598210415448115003cb1fcb3fcb7fc944304760441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0010455512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54043ce30221821041544815bae3022182104154481dbae3022182104154481bba282d323504ce5b05d33ffa00fa40fa40fa003081397624c200f2f4813977f842105a1049103847bc29db3c1dc7051bf2f455030981397851b8db3c1cf2f425c2008e1b3781397df8416f24135f0382084c4b40bef2f45137a01049030604e30df84210471036415054491450994238292b03ea813979268209c9c380bef2f481397af8416f24135f032782080f4240a082080f4240a082086acfc0a082081e8480a0bef2f45504543a97db3c555053a6db3c81397b248101012359f40c6fa131b3f2f481397c238101012359f40c6fa131b3f2f4516aa081010182080f4240f8232c544c3052f0c8494f2a00ba55405045ce12cecb3fcb7fcb1fc910354180206e953059f45a30944133f415e2717f544c9052ccc855308210472d9d7d5005cb1f13cb3fcb9fcb7fcec925513d034b9b441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001e8db3cf8416f24135f030982080f4240a082080f4240a019be8e3782080f4240717009c8018210d53276db58cb1fcb3fc91048413019441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001034923535e245334414c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed542c006c82080f424071047004c8598210415448115003cb1fcb3fcb7fc94430441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0004fa5b05d33fd37ffa40fa40d430d0fa40d37f308137e625c200f2f48137e7f842105b104a103948cd2bdb3c1ec7051cf2f48137e85383c705f2f48137e927c200f2f48137eaf8416f24135f032882080f4240a082080f4240a082086acfc0a082081e8480a0bef2f410354014503b541a0a2adb3c555053b6db3c8137eb2442494f2e01fc8101012359f40c6fa131b3f2f48137ec298209c9c380bef2f48137ed238101012359f40c6fa131b3f2f4516da081010182080f4240f8232e544e30561201c855405045ce12cecb3fcb7fcb1fc910354180206e953059f45a30944133f415e2717f544d9052fec855308210472d9d7d5005cb1f13cb3fcb9fcb7fcec910492f02fc10384b70441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0082080f4240707053abc8598210415448115003cb1fcb3fcb7fc91049441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f42407109700bc8598210415448115003cb1fcb3fcb7fc9443049a0441359c8cf8580ca00893031000110005acf16ce01fa02806acf40f400c901fb004430c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404f45b05d33fd37ffa40fa40d37fd430d0fa40d3078138e027c200f2f48138e1f842105d104c103b4aef27db3c01111001c7051ef2f48138e22cc200f2f48138e3f8416f24135f032d82082dc6c0a082080f4240a082086acfc0a082081e8480a0bef2f455030c8138e451ebdb3c1ff2f45504543d7ddb3c555053864238493302f8db3c8138e5248101012359f40c6fa131b3f2f48138e62e8209c9c380bef2f48138e7238101012359f40c6fa131b3f2f45168a081010182082dc6c0f823561203021112020111120152c01113c855405045ce12cecb3fcb7fcb1fc910344f70206e953059f45a30944133f415e2717f295159105904031111034edcc84f3401f05560821089129d605008cb1f16cb3f14cb9f12cb7fcececb07cec9544114103a4c99441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f424071047004c8598210415448115003cb1fcb3fcb7fc94430441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00400305043b04f8e30221821041544811ba8f6e5b05d33fd37f308137a021c200f2f4f84210671056104510344880db3c218101012259f40d6fa192306ddf206e92306d9fd0fa40fa40d37fd31f55306c146f04e28137a1216eb3f2f46f2430318137a20aba19f2f48137a3f8425009c70518f2f416810101f45a30104510344130e02136473b3c02fe5b05d33fd37ffa40fa40d37fd430d0fa40d3ffd33fd37fd30fd307308139442ac200f2f4813945f84205111005104f103e102d0111110111122adb3c01111301c70501111101f2f481394627c200f2f4813947f8416f24135f032882082dc6c0a082080f4240a082086acfc0a082081e8480a0bef2f455030f813948111126423704fcdb3c01111201f2f45504111053a8db3c555053b6db3c813949248101012359f40c6fa131b3f2f481394a298209c9c380bef2f481394b238101012359f40c6fa131b3f2f4516ba081010182082dc6c0f8232d4dd352fec855405045ce12cecb3fcb7fcb1fc910344a70206e953059f45a30944133f415e2717f2c08517c0738494f39000afa4430c00001fe106c05111405041113040311120302111102011110010fc855908210a11a7002500bcb1f19cb3f17cb9f15cb7f13cece01c8cbff12cb3f12cb7f12cb0f12cb07cdc92643144a99441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00f84282080f424071047004c8598210415448115003cb1fcb3fcb7fc944303a0072441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0044145053c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed540036c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5404c28210472d9d7ebae3022182104154481eba8ebb5b05d33fd37fd39f3081380af84227c705f2f41068105710461035103401db3cc87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e0218210504e5052bae30237c00006c12116b03d40484b04f65b05d33fd37fd39f30813804f84227c705f2f481380522c200f2f410561046103646785368db3c238101012259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e2206ee3026f2530813807511dbaf2f410591048103746982a81380808db3c500dba16f2f48101015415005467c04f3e493f0090303738810101530150884133f40c6fa19401d70030925b6de2813806216eb3f2f481380907ba16f2f445334414c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400dc216e955b59f45a3098c801cf004133f442e25054810101f45a307108700ac8598210415448115003cb1fcb3fcb7fc9104710364890441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0003444405c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5403f68137fa21c200f2f455525387db3c238101012259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e28137fc216eb3f2f46f25308137fff8416f24135f03820889544024a0bef2f48137fb53bcbef2f48137fd511cbaf2f455448137fe543ad8db3c2dba1bf2f4514aa150888101014f494104f2f45a3010574014541386db3c705385db3c10685e3410374870545ee9db3c539b82082dc6c0ba955b3839f8288e3d717011112fc8598210415448135003cb1fcb3fcb7fc9104d103e1201111101441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00090c0807e21046103544304970546cb052b042434445016820fa4430705826db3c20f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d0430026f82ac87001ca0055215023810101cf00cecec90030c882104154524601cb1f13cb3fcb9f01cf16c9f900a9383f01c4db3c707f541db680400bc855308210415448125005cb1f13cb3fcb7fcecec91069105c104a103847b0103645155034c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb004105044601901069105810471039487927db3c813796228101012359f40c6fa131b3f2f4810101f82310394ba0c855305034cececb7fcb1fc910364780206e953059f45a30944133f415e2454012470026c8821041544f4701cb1f12cb3f01cf16c9f90003f65b05d33fd39f3081380df8416f24135f0382081e8480bef2f454167628db3c238101012259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e281380e216eb3f2f46f2533106a1059104810374a9b81380f08db3c500cba16f2f4813810f8230982015180a019be18f2f4813811064f494a002cc8821041544e4901cb1f12cb3f01cf16c9f900a9389f009882082dc6c0bd16f2f48101012010345445135099216e955b59f45a3098c801cf004133f442e25024810101f45a30403305c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed5400588e248132c8f2f010355512c87f01ca0055505056cb7f13cecef40001c8f40012f400cdc9ed54e05f06f2c0820201484d50017dbb1c5ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de25515db3c6c6584e0178db3c810101240259f40d6fa192306ddf206e92306d8e11d0fa40fa40d33fd37fd31f55406c156f05e2206e983070705456002802e06f25327f0443134f0002310179bbb02ed44d0d200018e1ad37ffa40fa40f404d401d0f404f4043010261025102410236c168e11810101d700fa40fa40552003d1586d6d6de2db3c6c638510006547543f12480d5');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initATHWallet_init_args({ $$type: 'ATHWallet_init_args', balance, owner_address, ath_master_address })(builder);
@@ -5718,20 +4929,14 @@ const ATHWallet_types: ABIType[] = [
     {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
     {"name":"AthTransferNotificationRefund","header":1096042526,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
     {"name":"PruneStaleNotification","header":1347309650,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
-    {"name":"AthTransferNotificationMintUsername","header":2299698527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"AthTransferNotificationVaultMintUsername","header":2299698528,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
-    {"name":"AthTransferNotificationProfileAvatar","header":2702864385,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"AthTransferNotificationVaultProfileAvatar","header":2702864386,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"payer_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHTransferRequestWithNotify","header":1096042516,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"ATHTransferRequestMintUsername","header":1096042518,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
-    {"name":"ATHTransferRequestProfileAvatar","header":1096042520,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferRequestVaultProfileAvatar","header":1096042522,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHTransferRequestVaultMintUsername","header":1096042524,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHInternalTransfer","header":1096042514,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHInternalTransferWithNotify","header":1096042517,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"ATHInternalTransferMintUsername","header":1096042519,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
-    {"name":"ATHInternalTransferProfileAvatar","header":1096042521,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHInternalTransferVaultProfileAvatar","header":1096042523,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"avatar_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"avatar_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"avatar_stream_id","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"avatar_part_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"media_format","type":{"kind":"simple","type":"uint","optional":false,"format":8}}]},
     {"name":"ATHInternalTransferVaultMintUsername","header":1096042525,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"notify_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ATHTransferAck","header":1096042513,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
@@ -5750,24 +4955,21 @@ const ATHWallet_types: ABIType[] = [
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"FlushTreasuryAthDue","header":1621736923,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"FlushBurnAthDue","header":3919758027,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"FlushAthRefundDue","header":1804766023,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PrunePendingUsernameMint","header":932634413,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"UsernameRegistryTopUpStorageReserve","header":179986205,"fields":[]},
-    {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"vault_funded","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"NameRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"refund_due_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_refund_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernamePriceView","header":null,"fields":[{"name":"valid_length","type":{"kind":"simple","type":"bool","optional":false}},{"name":"price_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameNameRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"vault_funded","type":{"kind":"simple","type":"bool","optional":false}}]},
-    {"name":"PendingAthRefundFlush","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"PendingAthRefundFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTreasuryFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthBurnFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthTreasuryFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthBurnFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameCollectionDataView","header":null,"fields":[{"name":"next_item_index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"UsernameCollectionOnchainContent","header":null,"fields":[{"name":"marker","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"metadata","type":{"kind":"dict","key":"uint","keyFormat":256,"value":"cell","valueFormat":"ref"}}]},
-    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"refund_due_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"ath_refunds_due","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_refund_flushes","type":{"kind":"dict","key":"int","value":"PendingAthRefundFlush","valueFormat":"ref"}},{"name":"pending_refund_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}}]},
 ]
 
 const ATHWallet_opcodes = {
@@ -5788,20 +4990,14 @@ const ATHWallet_opcodes = {
     "AthTransferNotificationAck": 1194171774,
     "AthTransferNotificationRefund": 1096042526,
     "PruneStaleNotification": 1347309650,
-    "AthTransferNotificationMintUsername": 2299698527,
     "AthTransferNotificationVaultMintUsername": 2299698528,
-    "AthTransferNotificationProfileAvatar": 2702864385,
     "AthTransferNotificationVaultProfileAvatar": 2702864386,
     "ATHTransferRequest": 1096042512,
     "ATHTransferRequestWithNotify": 1096042516,
-    "ATHTransferRequestMintUsername": 1096042518,
-    "ATHTransferRequestProfileAvatar": 1096042520,
     "ATHTransferRequestVaultProfileAvatar": 1096042522,
     "ATHTransferRequestVaultMintUsername": 1096042524,
     "ATHInternalTransfer": 1096042514,
     "ATHInternalTransferWithNotify": 1096042517,
-    "ATHInternalTransferMintUsername": 1096042519,
-    "ATHInternalTransferProfileAvatar": 1096042521,
     "ATHInternalTransferVaultProfileAvatar": 1096042523,
     "ATHInternalTransferVaultMintUsername": 1096042525,
     "ATHTransferAck": 1096042513,
@@ -5815,7 +5011,6 @@ const ATHWallet_opcodes = {
     "SealGenesis": 974311853,
     "FlushTreasuryAthDue": 1621736923,
     "FlushBurnAthDue": 3919758027,
-    "FlushAthRefundDue": 1804766023,
     "PrunePendingUsernameMint": 932634413,
     "UsernameRegistryTopUpStorageReserve": 179986205,
 }
@@ -5835,17 +5030,13 @@ const ATHWallet_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"ATHGenesisSupplyCredit"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequest"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestWithNotify"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestMintUsername"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestVaultMintUsername"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestProfileAvatar"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferRequestVaultProfileAvatar"}},
     {"receiver":"internal","message":{"kind":"typed","type":"JettonTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"JettonInternalTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferWithNotify"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferMintUsername"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferVaultMintUsername"}},
-    {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferProfileAvatar"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHInternalTransferVaultProfileAvatar"}},
     {"receiver":"internal","message":{"kind":"typed","type":"ATHTransferAck"}},
     {"receiver":"internal","message":{"kind":"typed","type":"AthTransferNotificationAck"}},
@@ -5892,7 +5083,6 @@ export const USERNAME_PRICE_4_CHARS = 10000000000000n;
 export const USERNAME_PRICE_5_CHARS = 1000000000000n;
 export const USERNAME_PRICE_6_PLUS_CHARS = 100000000000n;
 export const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6000000n;
-export const USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT = 4000000n;
 export const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4000000n;
 export const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 21000000n;
 export const USERNAME_ATH_TRANSFER_EXEC_RESERVE = 30000000n;
@@ -5901,17 +5091,13 @@ export const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE = 2000000n;
 export const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE = 2000000n;
 export const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
 export const USERNAME_ATH_NOTIFICATION_REFUND_VALUE = 12000000n;
-export const USERNAME_MINT_EXCESS_REFUND_MIN_VALUE = 100000n;
-export const USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE = 500000n;
 export const USERNAME_PENDING_MINT_STALE_TTL = 86400n;
 export const USERNAME_MAX_LENGTH = 16n;
 export const USERNAME_SPLIT_BASE_BPS = 10000n;
 export const USERNAME_TREASURY_SHARE_BPS = 5000n;
 export const USERNAME_NAME_HASH_DOMAIN = 3318512854n;
-export const USERNAME_REFUND_FLUSH_ID_DOMAIN = 1380337988n;
 export const USERNAME_COLLECTION_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
 export const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX = -1n;
-export const UINT64_MOD = 18446744073709551616n;
 export const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET = 1715335229n;
 export const OP_USERNAME_BIND_VAULT = 1621496068n;
 export const OP_SEAL_GENESIS = 974311853n;
@@ -5950,7 +5136,7 @@ export class ATHWallet implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHBurn | ATHGenesisSupplyCredit | ATHTransferRequest | ATHTransferRequestWithNotify | ATHTransferRequestMintUsername | ATHTransferRequestVaultMintUsername | ATHTransferRequestProfileAvatar | ATHTransferRequestVaultProfileAvatar | JettonTransfer | ATHInternalTransfer | JettonInternalTransfer | ATHInternalTransferWithNotify | ATHInternalTransferMintUsername | ATHInternalTransferVaultMintUsername | ATHInternalTransferProfileAvatar | ATHInternalTransferVaultProfileAvatar | ATHTransferAck | AthTransferNotificationAck | AthTransferNotificationRefund | PruneStaleNotification | null) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: ATHBurn | ATHGenesisSupplyCredit | ATHTransferRequest | ATHTransferRequestWithNotify | ATHTransferRequestVaultMintUsername | ATHTransferRequestVaultProfileAvatar | JettonTransfer | ATHInternalTransfer | JettonInternalTransfer | ATHInternalTransferWithNotify | ATHInternalTransferVaultMintUsername | ATHInternalTransferVaultProfileAvatar | ATHTransferAck | AthTransferNotificationAck | AthTransferNotificationRefund | PruneStaleNotification | null) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHBurn') {
@@ -5965,14 +5151,8 @@ export class ATHWallet implements Contract {
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestWithNotify') {
             body = beginCell().store(storeATHTransferRequestWithNotify(message)).endCell();
         }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestMintUsername') {
-            body = beginCell().store(storeATHTransferRequestMintUsername(message)).endCell();
-        }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestVaultMintUsername') {
             body = beginCell().store(storeATHTransferRequestVaultMintUsername(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestProfileAvatar') {
-            body = beginCell().store(storeATHTransferRequestProfileAvatar(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHTransferRequestVaultProfileAvatar') {
             body = beginCell().store(storeATHTransferRequestVaultProfileAvatar(message)).endCell();
@@ -5989,14 +5169,8 @@ export class ATHWallet implements Contract {
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferWithNotify') {
             body = beginCell().store(storeATHInternalTransferWithNotify(message)).endCell();
         }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferMintUsername') {
-            body = beginCell().store(storeATHInternalTransferMintUsername(message)).endCell();
-        }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferVaultMintUsername') {
             body = beginCell().store(storeATHInternalTransferVaultMintUsername(message)).endCell();
-        }
-        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferProfileAvatar') {
-            body = beginCell().store(storeATHInternalTransferProfileAvatar(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'ATHInternalTransferVaultProfileAvatar') {
             body = beginCell().store(storeATHInternalTransferVaultProfileAvatar(message)).endCell();

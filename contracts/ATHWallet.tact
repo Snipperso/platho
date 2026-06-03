@@ -90,17 +90,6 @@ message(0x504E5052) PruneStaleNotification {
     sender_key: Int as uint160;
 }
 
-// Official ATH wallet -> UsernameRegistry. The wallet fills amount/owner from
-// the real credited transfer; callers provide only the username bytes.
-message(0x89129D5F) AthTransferNotificationMintUsername {
-    query_id: Int as uint64;
-    sender_key: Int as uint160;
-    amount: Int as uint128;
-    owner_wallet: Address;
-    username_len: Int as uint8;
-    username: Slice as remaining;
-}
-
 // Official username ATH wallet -> UsernameRegistry for Vault-funded username
 // mints. payer_wallet is the bound Vault, owner_wallet is the wallet receiving
 // the username NFT.
@@ -112,20 +101,6 @@ message(0x89129D60) AthTransferNotificationVaultMintUsername {
     owner_wallet: Address;
     username_len: Int as uint8;
     username: Slice as remaining;
-}
-
-// Official profile ATH wallet -> ProfileRegistry. The wallet fills amount/owner
-// from the real credited transfer; callers provide only the avatar pointer.
-message(0xA11A7001) AthTransferNotificationProfileAvatar {
-    query_id: Int as uint64;
-    sender_key: Int as uint160;
-    amount: Int as uint128;
-    owner_wallet: Address;
-    avatar_hash: Int as uint256;
-    avatar_entry_id: Int as uint64;
-    avatar_stream_id: Int as uint128;
-    avatar_part_count: Int as uint16;
-    media_format: Int as uint8;
 }
 
 // Official profile ATH wallet -> ProfileRegistry for Vault-funded profile
@@ -159,29 +134,6 @@ message(0x41544814) ATHTransferRequestWithNotify {
     response_destination: Address;
     notify_destination: Address;
     notify_value: Int as uint128;
-}
-
-message(0x41544816) ATHTransferRequestMintUsername {
-    query_id: Int as uint64;
-    amount: Int as uint128;
-    recipient: Address;
-    response_destination: Address;
-    notify_value: Int as uint128;
-    username_len: Int as uint8;
-    username: Slice as remaining;
-}
-
-message(0x41544818) ATHTransferRequestProfileAvatar {
-    query_id: Int as uint64;
-    amount: Int as uint128;
-    recipient: Address;
-    response_destination: Address;
-    notify_value: Int as uint128;
-    avatar_hash: Int as uint256;
-    avatar_entry_id: Int as uint64;
-    avatar_stream_id: Int as uint128;
-    avatar_part_count: Int as uint16;
-    media_format: Int as uint8;
 }
 
 message(0x4154481A) ATHTransferRequestVaultProfileAvatar {
@@ -224,29 +176,6 @@ message(0x41544815) ATHInternalTransferWithNotify {
     response_destination: Address;
     notify_destination: Address;
     notify_value: Int as uint128;
-}
-
-message(0x41544817) ATHInternalTransferMintUsername {
-    query_id: Int as uint64;
-    amount: Int as uint128;
-    sender_owner: Address;
-    response_destination: Address;
-    notify_value: Int as uint128;
-    username_len: Int as uint8;
-    username: Slice as remaining;
-}
-
-message(0x41544819) ATHInternalTransferProfileAvatar {
-    query_id: Int as uint64;
-    amount: Int as uint128;
-    sender_owner: Address;
-    response_destination: Address;
-    notify_value: Int as uint128;
-    avatar_hash: Int as uint256;
-    avatar_entry_id: Int as uint64;
-    avatar_stream_id: Int as uint128;
-    avatar_part_count: Int as uint16;
-    media_format: Int as uint8;
 }
 
 message(0x4154481B) ATHInternalTransferVaultProfileAvatar {
@@ -680,44 +609,6 @@ contract ATHWallet {
         self.refund_owner_excess(msg.response_destination, context().value - required_value);
     }
 
-    receive(msg: ATHTransferRequestMintUsername) {
-        throwUnless(14500, sender() == self.owner_address);
-        throwUnless(14501, msg.response_destination == self.owner_address);
-        self.require_basechain_owner_path(msg.recipient, msg.response_destination);
-        throwUnless(14502, msg.amount > 0);
-        throwUnless(14503, msg.notify_value > 0);
-        throwUnless(14504, self.balance >= msg.amount);
-        throwUnless(14505, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        let downstream_value: Int = self.notify_transfer_value(msg.notify_value);
-        let required_value: Int = downstream_value + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE;
-        throwUnless(14506, context().value >= required_value);
-
-        let recipient_wallet: Address = self.derive_wallet_address(msg.recipient);
-        let recipient_init: StateInit = initOf ATHWallet(0, msg.recipient, self.ath_master_address);
-        self.store_pending_outgoing(msg.query_id, msg.amount, recipient_wallet, msg.response_destination);
-        self.balance -= msg.amount;
-
-        send(SendParameters {
-            to: recipient_wallet,
-            value: downstream_value,
-            bounce: true,
-            mode: SendPayFwdFeesSeparately,
-            code: recipient_init.code,
-            data: recipient_init.data,
-            body: ATHInternalTransferMintUsername {
-                query_id: msg.query_id,
-                amount: msg.amount,
-                sender_owner: self.owner_address,
-                response_destination: msg.response_destination,
-                notify_value: msg.notify_value,
-                username_len: msg.username_len,
-                username: msg.username
-            }.toCell()
-        });
-
-        self.refund_owner_excess(msg.response_destination, context().value - required_value);
-    }
-
     receive(msg: ATHTransferRequestVaultMintUsername) {
         throwUnless(14550, sender() == self.owner_address);
         throwUnless(14551, msg.response_destination == self.owner_address);
@@ -752,47 +643,6 @@ contract ATHWallet {
                 owner_wallet: msg.owner_wallet,
                 username_len: msg.username_len,
                 username: msg.username
-            }.toCell()
-        });
-
-        self.refund_owner_excess(msg.response_destination, context().value - required_value);
-    }
-
-    receive(msg: ATHTransferRequestProfileAvatar) {
-        throwUnless(14610, sender() == self.owner_address);
-        throwUnless(14611, msg.response_destination == self.owner_address);
-        self.require_basechain_owner_path(msg.recipient, msg.response_destination);
-        throwUnless(14612, msg.amount > 0);
-        throwUnless(14613, msg.notify_value > 0);
-        throwUnless(14614, self.balance >= msg.amount);
-        throwUnless(14615, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        let downstream_value: Int = self.notify_transfer_value(msg.notify_value);
-        let required_value: Int = downstream_value + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE;
-        throwUnless(14616, context().value >= required_value);
-
-        let recipient_wallet: Address = self.derive_wallet_address(msg.recipient);
-        let recipient_init: StateInit = initOf ATHWallet(0, msg.recipient, self.ath_master_address);
-        self.store_pending_outgoing(msg.query_id, msg.amount, recipient_wallet, msg.response_destination);
-        self.balance -= msg.amount;
-
-        send(SendParameters {
-            to: recipient_wallet,
-            value: downstream_value,
-            bounce: true,
-            mode: SendPayFwdFeesSeparately,
-            code: recipient_init.code,
-            data: recipient_init.data,
-            body: ATHInternalTransferProfileAvatar {
-                query_id: msg.query_id,
-                amount: msg.amount,
-                sender_owner: self.owner_address,
-                response_destination: msg.response_destination,
-                notify_value: msg.notify_value,
-                avatar_hash: msg.avatar_hash,
-                avatar_entry_id: msg.avatar_entry_id,
-                avatar_stream_id: msg.avatar_stream_id,
-                avatar_part_count: msg.avatar_part_count,
-                media_format: msg.media_format
             }.toCell()
         });
 
@@ -1016,64 +866,6 @@ contract ATHWallet {
         });
     }
 
-    receive(msg: ATHInternalTransferMintUsername) {
-        throwUnless(14510, msg.amount > 0);
-        throwUnless(14511, sender() == self.derive_wallet_address(msg.sender_owner));
-        throwUnless(14512, msg.notify_value > 0);
-        throwUnless(14513, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
-        let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
-        let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
-        throwUnless(14514, !self.pending_notifications.exists(pending_key));
-        throwUnless(14515, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14516, !self.processed_notifications.exists(pending_key));
-
-        self.balance += msg.amount;
-        self.pending_notifications.set(pending_key, PendingAthTransferNotification {
-            sender_owner: msg.sender_owner,
-            response_destination: msg.response_destination,
-            response_ack_value: ATH_TRANSFER_NOTIFY_ACK_VALUE,
-            amount: msg.amount,
-            created_at: now()
-        });
-
-        message(MessageParameters {
-            to: self.owner_address,
-            value: msg.notify_value,
-            mode: SendPayFwdFeesSeparately,
-            bounce: true,
-            body: AthTransferNotificationMintUsername {
-                query_id: msg.query_id,
-                sender_key: sender_key,
-                amount: msg.amount,
-                owner_wallet: msg.sender_owner,
-                username_len: msg.username_len,
-                username: msg.username
-            }.toCell()
-        });
-
-        message(MessageParameters {
-            to: msg.response_destination,
-            value: ATH_TRANSFER_NOTIFY_ACK_VALUE,
-            mode: SendDefaultMode,
-            bounce: false,
-            body: ATHTransferAck {
-                query_id: msg.query_id,
-                amount: msg.amount
-            }.toCell()
-        });
-
-        message(MessageParameters {
-            to: sender(),
-            value: ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE,
-            mode: SendPayFwdFeesSeparately,
-            bounce: false,
-            body: ATHTransferAck {
-                query_id: msg.query_id,
-                amount: msg.amount
-            }.toCell()
-        });
-    }
-
     receive(msg: ATHInternalTransferVaultMintUsername) {
         throwUnless(14560, msg.amount > 0);
         throwUnless(14561, sender() == self.derive_wallet_address(msg.sender_owner));
@@ -1108,67 +900,6 @@ contract ATHWallet {
                 owner_wallet: msg.owner_wallet,
                 username_len: msg.username_len,
                 username: msg.username
-            }.toCell()
-        });
-
-        message(MessageParameters {
-            to: sender(),
-            value: ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE,
-            mode: SendPayFwdFeesSeparately,
-            bounce: false,
-            body: ATHTransferAck {
-                query_id: msg.query_id,
-                amount: msg.amount
-            }.toCell()
-        });
-    }
-
-    receive(msg: ATHInternalTransferProfileAvatar) {
-        throwUnless(14620, msg.amount > 0);
-        throwUnless(14621, sender() == self.derive_wallet_address(msg.sender_owner));
-        throwUnless(14622, msg.notify_value > 0);
-        throwUnless(14623, context().value >= msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
-        let sender_key: Int = self.compute_sender_key(msg.query_id, msg.sender_owner);
-        let pending_key: Int = self.compute_pending_notification_key(msg.query_id, sender_key);
-        throwUnless(14624, !self.pending_notifications.exists(pending_key));
-        throwUnless(14625, msg.notify_value >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        throwUnless(14626, !self.processed_notifications.exists(pending_key));
-
-        self.balance += msg.amount;
-        self.pending_notifications.set(pending_key, PendingAthTransferNotification {
-            sender_owner: msg.sender_owner,
-            response_destination: msg.response_destination,
-            response_ack_value: ATH_TRANSFER_NOTIFY_ACK_VALUE,
-            amount: msg.amount,
-            created_at: now()
-        });
-
-        message(MessageParameters {
-            to: self.owner_address,
-            value: msg.notify_value,
-            mode: SendPayFwdFeesSeparately,
-            bounce: true,
-            body: AthTransferNotificationProfileAvatar {
-                query_id: msg.query_id,
-                sender_key: sender_key,
-                amount: msg.amount,
-                owner_wallet: msg.sender_owner,
-                avatar_hash: msg.avatar_hash,
-                avatar_entry_id: msg.avatar_entry_id,
-                avatar_stream_id: msg.avatar_stream_id,
-                avatar_part_count: msg.avatar_part_count,
-                media_format: msg.media_format
-            }.toCell()
-        });
-
-        message(MessageParameters {
-            to: msg.response_destination,
-            value: ATH_TRANSFER_NOTIFY_ACK_VALUE,
-            mode: SendDefaultMode,
-            bounce: false,
-            body: ATHTransferAck {
-                query_id: msg.query_id,
-                amount: msg.amount
             }.toCell()
         });
 
@@ -1302,15 +1033,7 @@ contract ATHWallet {
         self.restore_bounced_outgoing(msg.query_id, msg.amount);
     }
 
-    bounced(msg: bounced<ATHInternalTransferMintUsername>) {
-        self.restore_bounced_outgoing(msg.query_id, msg.amount);
-    }
-
     bounced(msg: bounced<ATHInternalTransferVaultMintUsername>) {
-        self.restore_bounced_outgoing(msg.query_id, msg.amount);
-    }
-
-    bounced(msg: bounced<ATHInternalTransferProfileAvatar>) {
         self.restore_bounced_outgoing(msg.query_id, msg.amount);
     }
 
@@ -1327,18 +1050,8 @@ contract ATHWallet {
         self.refund_bounced_notification(msg.query_id, msg.sender_key);
     }
 
-    bounced(msg: bounced<AthTransferNotificationMintUsername>) {
-        throwUnless(14530, sender() == self.owner_address);
-        self.refund_bounced_notification(msg.query_id, msg.sender_key);
-    }
-
     bounced(msg: bounced<AthTransferNotificationVaultMintUsername>) {
         throwUnless(14570, sender() == self.owner_address);
-        self.refund_bounced_notification(msg.query_id, msg.sender_key);
-    }
-
-    bounced(msg: bounced<AthTransferNotificationProfileAvatar>) {
-        throwUnless(14640, sender() == self.owner_address);
         self.refund_bounced_notification(msg.query_id, msg.sender_key);
     }
 

@@ -155,10 +155,8 @@ export interface MainnetGenesisVerifyInput {
       treasury_ath_receiver: string;
       name_record_count: string;
       pending_mint_count: string;
-      refund_due_count: string;
       treasury_due_ath: string;
       burn_due_ath: string;
-      pending_refund_flush_count: string;
       pending_treasury_flush_count: string;
       pending_burn_flush_count: string;
     };
@@ -868,10 +866,8 @@ export function createMainnetGenesisVerifyInputTemplate(): MainnetGenesisVerifyI
         treasury_ath_receiver: 'REQUIRED_MAINNET_USERNAME_TREASURY_ATH_RECEIVER_ADDRESS',
         name_record_count: '0',
         pending_mint_count: '0',
-        refund_due_count: '0',
         treasury_due_ath: '0',
         burn_due_ath: '0',
-        pending_refund_flush_count: '0',
         pending_treasury_flush_count: '0',
         pending_burn_flush_count: '0',
       },
@@ -1400,10 +1396,8 @@ export function verifyMainnetGenesisSnapshot(
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.username_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'username_registry.treasury_ath_receiver', 'ath_master');
   addDecimalZero(issues, 'USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS', s.username_registry.name_record_count, 'username_registry.name_record_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS', s.username_registry.pending_mint_count, 'username_registry.pending_mint_count');
-  addDecimalZero(issues, 'USERNAME_REGISTRY_REFUND_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.refund_due_count, 'username_registry.refund_due_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.treasury_due_ath, 'username_registry.treasury_due_ath');
   addDecimalZero(issues, 'USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.burn_due_ath, 'username_registry.burn_due_ath');
-  addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_REFUND_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_refund_flush_count, 'username_registry.pending_refund_flush_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_TREASURY_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_treasury_flush_count, 'username_registry.pending_treasury_flush_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_BURN_FLUSH_NOT_ZERO_AT_GENESIS', s.username_registry.pending_burn_flush_count, 'username_registry.pending_burn_flush_count');
 

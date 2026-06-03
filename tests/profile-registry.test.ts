@@ -8,7 +8,6 @@ import {
   ATHBurnFailed,
   ATHTransferAck,
   ATHTransferFailed,
-  AthTransferNotificationProfileAvatar,
   AthTransferNotificationVaultProfileAvatar,
   BindProfileOfficialAthWallet,
   BindProfileVault,
@@ -20,7 +19,6 @@ import {
 import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import {
-  ATHTransferRequestProfileAvatar,
   ATHWallet,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
@@ -30,8 +28,6 @@ const HALF_AVATAR_PRICE_ATH = 50_000_000_000n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
 const ATH_SENDER_KEY_MOD = 1n << 160n;
-const PROFILE_AVATAR_NOTIFY_VALUE = 30_000_000n;
-const OP_PROFILE_AVATAR_NOTIFICATION = 0xA11A7001;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -46,26 +42,6 @@ function senderKey(senderOwner: Address, queryId: bigint): bigint {
     .endCell()
     .hash()
     .toString('hex')) % ATH_SENDER_KEY_MOD;
-}
-
-async function deployAthWallet(
-  blockchain: Blockchain,
-  owner: Address,
-  athMaster: Address,
-  athBalance: bigint,
-  tonBalance = toNano('1'),
-) {
-  const zeroInit = await ATHWallet.init(0n, owner, athMaster);
-  const dataInit = await ATHWallet.init(athBalance, owner, athMaster);
-  const address = contractAddress(owner.workChain, zeroInit);
-  await blockchain.setShardAccount(address, createShardAccount({
-    address,
-    code: zeroInit.code,
-    data: dataInit.data,
-    balance: tonBalance,
-    workchain: address.workChain,
-  }));
-  return blockchain.openContract(new ATHWallet(address, zeroInit));
 }
 
 async function deploySealedProfileRegistry() {
@@ -260,12 +236,13 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
   };
 }
 
-function avatarNotification(owner: Address, overrides: Partial<AthTransferNotificationProfileAvatar> = {}): AthTransferNotificationProfileAvatar {
+function avatarNotification(owner: Address, overrides: Partial<AthTransferNotificationVaultProfileAvatar> = {}): AthTransferNotificationVaultProfileAvatar {
   return {
-    $$type: 'AthTransferNotificationProfileAvatar',
+    $$type: 'AthTransferNotificationVaultProfileAvatar',
     query_id: overrides.query_id ?? 1n,
     amount: overrides.amount ?? PROFILE_AVATAR_PRICE_ATH,
     sender_key: overrides.sender_key ?? 77n,
+    payer_wallet: overrides.payer_wallet ?? fixtureAddress('PROFILE_VAULT'),
     owner_wallet: overrides.owner_wallet ?? owner,
     avatar_hash: overrides.avatar_hash ?? 0xabc123n,
     avatar_entry_id: overrides.avatar_entry_id ?? 0n,
@@ -300,51 +277,9 @@ async function sendAcceptedAvatar(
   owner: Address,
   queryId = 1n,
 ) {
-  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, {
+  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
     query_id: queryId,
   }));
-}
-
-async function deployProfilePaymentProductionFixture(initialUserAth = PROFILE_AVATAR_PRICE_ATH * 2n) {
-  const ctx = await deployProfileRegistryWithAthSystem({
-    officialWalletBalance: 0n,
-    deployMaster: true,
-  });
-  const user = await ctx.blockchain.treasury('profile-avatar-prod-user');
-  const userAthWallet = await deployAthWallet(
-    ctx.blockchain,
-    user.address,
-    ctx.athMasterAddress,
-    initialUserAth,
-    toNano('2'),
-  );
-  return { ...ctx, user, userAthWallet };
-}
-
-async function sendProfileAvatarViaProductionWallet(params: {
-  user: any;
-  userAthWallet: any;
-  registry: any;
-  queryId: bigint;
-  amount?: bigint;
-  requestValue?: bigint;
-  overrides?: Partial<ATHTransferRequestProfileAvatar>;
-}) {
-  return await params.userAthWallet.send(params.user.getSender(), {
-    value: params.requestValue ?? toNano('0.25'),
-  }, {
-    $$type: 'ATHTransferRequestProfileAvatar',
-    query_id: params.queryId,
-    amount: params.amount ?? PROFILE_AVATAR_PRICE_ATH,
-    recipient: params.registry.address,
-    response_destination: params.user.address,
-    notify_value: PROFILE_AVATAR_NOTIFY_VALUE,
-    avatar_hash: params.overrides?.avatar_hash ?? 0xabc123n,
-    avatar_entry_id: params.overrides?.avatar_entry_id ?? 0n,
-    avatar_stream_id: params.overrides?.avatar_stream_id ?? 0x11223344556677889900aabbccddeeffn,
-    avatar_part_count: params.overrides?.avatar_part_count ?? 8n,
-    media_format: params.overrides?.media_format ?? 1n,
-  } as ATHTransferRequestProfileAvatar);
 }
 
 describe('ProfileRegistry wallet avatar pointers', () => {
@@ -507,7 +442,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       { avatar_part_count: 17n },
       { media_format: 2n },
       { owner_wallet: fixtureAddress('INVALID_POINTER_MASTERCHAIN_OWNER', -1) },
-    ] satisfies Array<Partial<AthTransferNotificationProfileAvatar>>) {
+    ] satisfies Array<Partial<AthTransferNotificationVaultProfileAvatar>>) {
       await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, overrides));
     }
 
@@ -738,132 +673,6 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(global.pending_burn_flush_count).toBe(1n);
     expect(global.treasury_due_ath).toBe(0n);
     expect(global.burn_due_ath).toBe(0n);
-  });
-
-  it('PROFILE-09: production ATHWallet profile payment accepts only through the official notification hop', async () => {
-    const ctx = await deployProfilePaymentProductionFixture();
-
-    await ctx.registry.send(ctx.user.getSender(), { value: toNano('0.05') }, avatarNotification(ctx.user.address, {
-      query_id: 900n,
-    }));
-
-    expect((await ctx.registry.getGetAvatar(ctx.user.address)).exists).toBe(false);
-    expect((await ctx.registry.getGetGlobal()).profile_count).toBe(0n);
-
-    const result = await sendProfileAvatarViaProductionWallet({
-      user: ctx.user,
-      userAthWallet: ctx.userAthWallet,
-      registry: ctx.registry,
-      queryId: 901n,
-    });
-
-    const avatar = await ctx.registry.getGetAvatar(ctx.user.address);
-    const global = await ctx.registry.getGetGlobal();
-    const sourceWallet = await ctx.userAthWallet.getGetWalletData();
-    const officialWallet = await ctx.officialAthWallet.getGetWalletData();
-    const key = senderKey(ctx.user.address, 901n);
-
-    expect(avatar.exists).toBe(true);
-    expect(avatar.owner_wallet.equals(ctx.user.address)).toBe(true);
-    expect(avatar.version).toBe(1n);
-    expect(global.profile_count).toBe(1n);
-    expect(global.avatar_record_count).toBe(1n);
-    expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
-    expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
-    expect(sourceWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
-    expect(officialWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
-    expect((await ctx.officialAthWallet.getGetPendingNotification(901n, key)).exists).toBe(false);
-    expect(findTransaction(result.transactions, {
-      from: ctx.officialAthWallet.address,
-      to: ctx.registry.address,
-      op: OP_PROFILE_AVATAR_NOTIFICATION,
-      success: true,
-    })).toBeDefined();
-    expect(findTransaction(result.transactions, {
-      from: ctx.registry.address,
-      to: ctx.officialAthWallet.address,
-      op: OP_ATH_TRANSFER_NOTIFICATION_ACK,
-      success: true,
-    })).toBeDefined();
-  });
-
-  it('PROFILE-10: rejected production avatar notifications refund the source ATH wallet through bounce', async () => {
-    const rejectedCases = [
-      { label: 'wrong-amount', amount: PROFILE_AVATAR_PRICE_ATH - 1n },
-      { label: 'zero-hash', overrides: { avatar_hash: 0n } },
-      { label: 'zero-stream', overrides: { avatar_stream_id: 0n } },
-      { label: 'zero-part-count', overrides: { avatar_part_count: 0n } },
-      { label: 'too-many-parts', overrides: { avatar_part_count: 17n } },
-      { label: 'wrong-format', overrides: { media_format: 2n } },
-    ] satisfies Array<{
-      label: string;
-      amount?: bigint;
-      overrides?: Partial<ATHTransferRequestProfileAvatar>;
-    }>;
-
-    for (const [index, rejected] of rejectedCases.entries()) {
-      const ctx = await deployProfilePaymentProductionFixture(PROFILE_AVATAR_PRICE_ATH);
-      const queryId = 1_000n + BigInt(index);
-      const key = senderKey(ctx.user.address, queryId);
-
-      await sendProfileAvatarViaProductionWallet({
-        user: ctx.user,
-        userAthWallet: ctx.userAthWallet,
-        registry: ctx.registry,
-        queryId,
-        amount: rejected.amount,
-        overrides: rejected.overrides,
-      });
-
-      const avatar = await ctx.registry.getGetAvatar(ctx.user.address);
-      const global = await ctx.registry.getGetGlobal();
-      const sourceWallet = await ctx.userAthWallet.getGetWalletData();
-      const officialWallet = await ctx.officialAthWallet.getGetWalletData();
-
-      expect(avatar.exists, rejected.label).toBe(false);
-      expect(global.profile_count, rejected.label).toBe(0n);
-      expect(global.avatar_record_count, rejected.label).toBe(0n);
-      expect(global.treasury_due_ath, rejected.label).toBe(0n);
-      expect(global.burn_due_ath, rejected.label).toBe(0n);
-      expect(sourceWallet.balance, rejected.label).toBe(PROFILE_AVATAR_PRICE_ATH);
-      expect(officialWallet.balance, rejected.label).toBe(0n);
-      expect((await ctx.officialAthWallet.getGetPendingNotification(queryId, key)).exists, rejected.label).toBe(false);
-    }
-  });
-
-  it('PROFILE-11: duplicate production profile query cannot reprocess an already ACKed notification slot', async () => {
-    const ctx = await deployProfilePaymentProductionFixture(PROFILE_AVATAR_PRICE_ATH * 2n);
-    const queryId = 1_100n;
-
-    await sendProfileAvatarViaProductionWallet({
-      user: ctx.user,
-      userAthWallet: ctx.userAthWallet,
-      registry: ctx.registry,
-      queryId,
-      overrides: { avatar_hash: 0x111n },
-    });
-    await sendProfileAvatarViaProductionWallet({
-      user: ctx.user,
-      userAthWallet: ctx.userAthWallet,
-      registry: ctx.registry,
-      queryId,
-      overrides: { avatar_hash: 0x222n },
-    });
-
-    const avatar = await ctx.registry.getGetAvatar(ctx.user.address);
-    const global = await ctx.registry.getGetGlobal();
-    const sourceWallet = await ctx.userAthWallet.getGetWalletData();
-    const officialWallet = await ctx.officialAthWallet.getGetWalletData();
-
-    expect(avatar.exists).toBe(true);
-    expect(avatar.version).toBe(1n);
-    expect(avatar.avatar_hash).toBe(0x111n);
-    expect(global.profile_count).toBe(1n);
-    expect(global.avatar_record_count).toBe(1n);
-    expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
-    expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
-    expect(sourceWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
-    expect(officialWallet.balance).toBe(PROFILE_AVATAR_PRICE_ATH);
   });
 
   it('PROFILE-12: accepts Vault-funded avatar notification only from the bound Vault payer', async () => {

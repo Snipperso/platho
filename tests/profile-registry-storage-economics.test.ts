@@ -24,12 +24,9 @@ describe('ProfileRegistry storage economics', () => {
     expect(report.status).toBe('PASS');
     expect(report.code_hashes.profile_registry).toBe(currentCodeHashes().PROFILE_REGISTRY_CODE_HASH);
     expect(report.cases.map((item) => item.label)).toEqual([
-      'DIRECT_FIRST_AVATAR',
-      'DIRECT_REPEAT_AVATAR',
       'VAULT_FIRST_AVATAR',
       'VAULT_REPEAT_AVATAR',
-      'DIRECT_MANY_OWNERS_12',
-      'DIRECT_MANY_UPDATES_ONE_OWNER_10',
+      'VAULT_MANY_OWNERS_12',
       'VAULT_MANY_UPDATES_ONE_OWNER_10',
     ]);
     for (const item of report.cases) {

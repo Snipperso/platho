@@ -4,9 +4,9 @@ Status: **PASS**
 
 Current code hashes:
 
-- Vault: `0d61d8de253b3bc49f50d8a46006de2082909a4d7743aa0e994cb701ace1083b`
+- Vault: `09eacae6577fb7991d18db2118e6996e5a90c16f49f46bc51ff0c394e1ade4dd`
 - CapsuleHub: `fc0dd2f1b836145e25ccd51c0f7ab8acfc9f9dcf832e86e4c17f04a886789f0e`
-- ATHWallet: `4c90b0f1b65eea96df7992409e1819b73f63f1ae2ecb9f651c42174c85f7b88d`
+- ATHWallet: `6d9d3dff2368d22a4148a48e71d6c91561b6db6ea64d7c14c506445202e13270`
 
 Policy: current contract constants are the release constants. Observed fees are measured with the bundled sandbox config matching the audited TON mainnet basechain fee snapshot. The x2 columns are reference sizing only; PASS does not require reserves to equal a 2x target.
 

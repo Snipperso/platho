@@ -7,7 +7,7 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
+  AthTransferNotificationVaultMintUsername,
   PrunePendingUsernameMint,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { MockUsernameNFTItemNoAck } from '../build/MockUsernameNFTItemNoAck/MockUsernameNFTItemNoAck_MockUsernameNFTItemNoAck';
@@ -101,7 +101,7 @@ async function deploySealedRegistry() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWallet, pruner };
+  return { blockchain, registry, officialAthWallet, pruner, vaultAddress };
 }
 
 async function installNoAckAt(blockchain: Blockchain, address: Address) {
@@ -122,23 +122,25 @@ async function sendMint(params: {
   username: string;
   amount: bigint;
   queryId: bigint;
+  payerWallet: Address;
   value?: bigint;
 }) {
   await params.registry.send(params.officialAthWallet.getSender(), { value: params.value ?? toNano('0.15') }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: params.queryId,
     amount: params.amount,
     sender_key: 0n,
+    payer_wallet: params.payerWallet,
     owner_wallet: params.owner,
     username_len: BigInt(Buffer.from(params.username, 'ascii').length),
     username: usernameSlice(params.username),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 }
 
 describe('UsernameRegistry state-machine invariants', () => {
   it('USERNAME-REG-INV-01: deterministic mint/reject/pending/prune walks preserve registry accounting', async () => {
     for (const seed of [0x501a2026, 0x9e3779b9, 0xdecafbad]) {
-      const { blockchain, registry, officialAthWallet, pruner } = await deploySealedRegistry();
+      const { blockchain, registry, officialAthWallet, pruner, vaultAddress } = await deploySealedRegistry();
       const rng = makeRng(seed);
       const owners = [
         fixtureAddress(`OWNER_${seed}_0`),
@@ -148,16 +150,10 @@ describe('UsernameRegistry state-machine invariants', () => {
       const normalNames = ['abcd', 'abcde', 'platho', 'user01', 'user_2', 'user-3'];
       const stuckNames = ['hold01', 'hold_2', 'hold-3', 'hold04'];
       const nameModel = new Map<string, ModelName>();
-      const refunds = new Map<string, bigint>();
       let treasuryDue = 0n;
       let burnDue = 0n;
       let queryId = BigInt(seed & 0xffff) + 1n;
       let debugContext = `seed ${seed} initial`;
-
-      function addRefund(owner: Address, amount: bigint) {
-        const key = owner.toString();
-        refunds.set(key, (refunds.get(key) ?? 0n) + amount);
-      }
 
       async function assertModel() {
         let registeredCount = 0n;
@@ -180,17 +176,9 @@ describe('UsernameRegistry state-machine invariants', () => {
           }
         }
 
-        let refundCount = 0n;
-        for (const owner of owners) {
-          const expected = refunds.get(owner.toString()) ?? 0n;
-          if (expected > 0n) refundCount += 1n;
-          expect(await registry.getGetRefundDue(owner), `${debugContext}: refund ${owner.toString()}`).toBe(expected);
-        }
-
         const global = await registry.getGetGlobal();
         expect(global.name_record_count, `${debugContext}: record count`).toBe(registeredCount);
         expect(global.pending_mint_count, `${debugContext}: pending count`).toBe(pendingCount);
-        expect(global.refund_due_count, `${debugContext}: refund count`).toBe(refundCount);
         expect(global.treasury_due_ath, `${debugContext}: treasury due`).toBe(treasuryDue);
         expect(global.burn_due_ath, `${debugContext}: burn due`).toBe(burnDue);
       }
@@ -202,25 +190,21 @@ describe('UsernameRegistry state-machine invariants', () => {
           const name = normalNames[rng() % normalNames.length];
           const amount = priceFor(name);
           debugContext = `seed ${seed} step ${step} valid-mint ${name}`;
-          await sendMint({ registry, officialAthWallet, owner, username: name, amount, queryId });
+          await sendMint({ registry, officialAthWallet, owner, username: name, amount, queryId, payerWallet: vaultAddress });
           const existing = nameModel.get(name);
           if (existing == null) {
             nameModel.set(name, { owner, amount, status: 'registered', createdAt: blockchain.now ?? 0 });
             treasuryDue += amount / 2n;
             burnDue += amount - (amount / 2n);
-          } else {
-            addRefund(owner, amount);
           }
         } else if (op === 2) {
           const invalidName = (rng() % 2) === 0 ? 'Larisa' : 'bad.name';
           debugContext = `seed ${seed} step ${step} invalid-mint ${invalidName}`;
-          await sendMint({ registry, officialAthWallet, owner, username: invalidName, amount: PRICE_6_PLUS, queryId });
-          addRefund(owner, PRICE_6_PLUS);
+          await sendMint({ registry, officialAthWallet, owner, username: invalidName, amount: PRICE_6_PLUS, queryId, payerWallet: vaultAddress });
         } else if (op === 3) {
           const name = normalNames[rng() % normalNames.length];
           debugContext = `seed ${seed} step ${step} underpay ${name}`;
-          await sendMint({ registry, officialAthWallet, owner, username: name, amount: priceFor(name) - 1n, queryId });
-          addRefund(owner, priceFor(name) - 1n);
+          await sendMint({ registry, officialAthWallet, owner, username: name, amount: priceFor(name) - 1n, queryId, payerWallet: vaultAddress });
         } else if (op === 4) {
           const available = stuckNames.filter((name) => !nameModel.has(name));
           if (available.length > 0) {
@@ -230,7 +214,7 @@ describe('UsernameRegistry state-machine invariants', () => {
             const itemAddress = await registry.getGetUsernameItemAddress(hash);
             await installNoAckAt(blockchain, itemAddress);
             debugContext = `seed ${seed} step ${step} stuck-pending ${name}`;
-            await sendMint({ registry, officialAthWallet, owner, username: name, amount, queryId });
+            await sendMint({ registry, officialAthWallet, owner, username: name, amount, queryId, payerWallet: vaultAddress });
             nameModel.set(name, { owner, amount, status: 'pending', createdAt: blockchain.now ?? 0 });
           }
         } else if (op === 5) {
@@ -238,8 +222,7 @@ describe('UsernameRegistry state-machine invariants', () => {
           if (pending.length > 0) {
             const [name, model] = pending[rng() % pending.length];
             debugContext = `seed ${seed} step ${step} duplicate-pending ${name}`;
-            await sendMint({ registry, officialAthWallet, owner, username: name, amount: model.amount, queryId });
-            addRefund(owner, model.amount);
+            await sendMint({ registry, officialAthWallet, owner, username: name, amount: model.amount, queryId, payerWallet: vaultAddress });
           }
         } else {
           const pending = [...nameModel.entries()].filter(([, model]) => model.status === 'pending');

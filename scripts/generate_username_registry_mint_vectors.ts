@@ -3,11 +3,11 @@ import { createHash } from 'crypto';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
-import { ATHWallet, storeATHTransferRequestMintUsername } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, storeATHTransferRequestVaultMintUsername } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
-const OP_ATH_TRANSFER_NOTIFICATION_MINT_USERNAME = 0x89129D5Fn;
-const OP_ATH_TRANSFER_REQUEST_MINT_USERNAME = 0x41544816n;
+const OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME = 0x89129D60n;
+const OP_ATH_TRANSFER_REQUEST_VAULT_MINT_USERNAME = 0x4154481Cn;
 const USERNAME_MINT_NOTIFY_VALUE_NANOTONS = 32000000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -28,31 +28,34 @@ function nameHash(name: string): bigint {
     .toString('hex'));
 }
 
-function mintPayload(owner: Address, name: string, amount: bigint, queryId = 1n) {
+function mintPayload(payer: Address, owner: Address, name: string, amount: bigint, queryId = 1n) {
   return beginCell()
-    .storeUint(OP_ATH_TRANSFER_NOTIFICATION_MINT_USERNAME, 32)
+    .storeUint(OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME, 32)
     .storeUint(queryId, 64)
+    .storeUint(0n, 160)
     .storeUint(amount, 128)
+    .storeAddress(payer)
     .storeAddress(owner)
     .storeUint(Buffer.from(name, 'ascii').length, 8)
     .storeBuffer(Buffer.from(name, 'ascii'))
     .endCell();
 }
 
-function mintRequestPayload(owner: Address, registryAddress: Address, name: string, amount: bigint, queryId = 1n) {
-  return beginCell().store(storeATHTransferRequestMintUsername({
-    $$type: 'ATHTransferRequestMintUsername',
+function mintRequestPayload(vault: Address, owner: Address, registryAddress: Address, name: string, amount: bigint, queryId = 1n) {
+  return beginCell().store(storeATHTransferRequestVaultMintUsername({
+    $$type: 'ATHTransferRequestVaultMintUsername',
     query_id: queryId,
     amount,
     recipient: registryAddress,
-    response_destination: owner,
+    response_destination: vault,
     notify_value: USERNAME_MINT_NOTIFY_VALUE_NANOTONS,
+    owner_wallet: owner,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: beginCell().storeBuffer(Buffer.from(name, 'ascii')).endCell().beginParse(),
   })).endCell();
 }
 
-async function itemVector(name: string, owner: Address, registryAddress: Address, amount: bigint) {
+async function itemVector(name: string, owner: Address, vault: Address, registryAddress: Address, amount: bigint) {
   const h = nameHash(name);
   const init = await UsernameNFTItem.init(registryAddress, h);
   return {
@@ -62,8 +65,8 @@ async function itemVector(name: string, owner: Address, registryAddress: Address
     item_workchain: registryAddress.workChain,
     price_ath_atomic: amount.toString(),
     name_hash: '0x' + h.toString(16).padStart(64, '0'),
-    ath_transfer_request_mint_username_boc_base64: mintRequestPayload(owner, registryAddress, name, amount).toBoc().toString('base64'),
-    official_wallet_mint_notification_boc_base64: mintPayload(owner, name, amount).toBoc().toString('base64'),
+    vault_ath_transfer_request_mint_username_boc_base64: mintRequestPayload(vault, owner, registryAddress, name, amount).toBoc().toString('base64'),
+    official_wallet_vault_mint_notification_boc_base64: mintPayload(vault, owner, name, amount).toBoc().toString('base64'),
     username_item_data_cell_hash: init.data.hash().toString('hex'),
     username_item_state_init_hash: beginCell().store(storeStateInit(init)).endCell().hash().toString('hex'),
     derived_item_address: contractAddress(registryAddress.workChain, init).toString(),
@@ -74,6 +77,7 @@ async function main() {
   const placeholderAthWallet = fixtureAddress('USERNAME_REGISTRY_PLACEHOLDER_ATH_WALLET');
   const athMasterAddress = fixtureAddress('ATH_MASTER_FOR_USERNAME_REGISTRY');
   const treasuryAthReceiver = fixtureAddress('USERNAME_REGISTRY_TREASURY_ATH_RECEIVER');
+  const vaultAddress = fixtureAddress('USERNAME_REGISTRY_VAULT');
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, fixtureAddress('GENESIS_CONTROLLER'));
   const registryAddress = contractAddress(0, registryInit);
   const officialAthWalletInit = await ATHWallet.init(0n, registryAddress, athMasterAddress);
@@ -82,8 +86,8 @@ async function main() {
   const vectors = {
     profile: 'PLATHO.V1.USERNAME_REGISTRY_PAID_MINT_M10_M13_ACK_RESERVE',
     constants: {
-      ATH_TRANSFER_REQUEST_MINT_USERNAME_OPCODE: `0x${OP_ATH_TRANSFER_REQUEST_MINT_USERNAME.toString(16).toUpperCase()}`,
-      ATH_TRANSFER_NOTIFICATION_MINT_USERNAME_OPCODE: `0x${OP_ATH_TRANSFER_NOTIFICATION_MINT_USERNAME.toString(16).toUpperCase()}`,
+      ATH_TRANSFER_REQUEST_VAULT_MINT_USERNAME_OPCODE: `0x${OP_ATH_TRANSFER_REQUEST_VAULT_MINT_USERNAME.toString(16).toUpperCase()}`,
+      ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME_OPCODE: `0x${OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME.toString(16).toUpperCase()}`,
       USERNAME_MINT_NOTIFY_VALUE_NANOTONS: USERNAME_MINT_NOTIFY_VALUE_NANOTONS.toString(),
       USERNAME_NAME_HASH_DOMAIN: '0xC5CC7CD6',
       USERNAME_MAX_LENGTH: 16,
@@ -107,12 +111,12 @@ async function main() {
       official_ath_wallet_state_init_hash: beginCell().store(storeStateInit(officialAthWalletInit)).endCell().hash().toString('hex'),
     },
     valid_mint_vectors: [
-      await itemVector('abcd', fixtureAddress('USERNAME_M10_VECTOR_OWNER_4'), registryAddress, 10000000000000n),
-      await itemVector('abcde', fixtureAddress('USERNAME_M10_VECTOR_OWNER_5'), registryAddress, 1000000000000n),
-      await itemVector('platho', fixtureAddress('USERNAME_M10_VECTOR_OWNER_6'), registryAddress, 100000000000n),
-      await itemVector('user123', fixtureAddress('USERNAME_M10_VECTOR_OWNER_DIGITS'), registryAddress, 100000000000n),
-      await itemVector('user_name', fixtureAddress('USERNAME_M10_VECTOR_OWNER_UNDERSCORE'), registryAddress, 100000000000n),
-      await itemVector('user-name', fixtureAddress('USERNAME_M10_VECTOR_OWNER_HYPHEN'), registryAddress, 100000000000n),
+      await itemVector('abcd', fixtureAddress('USERNAME_M10_VECTOR_OWNER_4'), vaultAddress, registryAddress, 10000000000000n),
+      await itemVector('abcde', fixtureAddress('USERNAME_M10_VECTOR_OWNER_5'), vaultAddress, registryAddress, 1000000000000n),
+      await itemVector('platho', fixtureAddress('USERNAME_M10_VECTOR_OWNER_6'), vaultAddress, registryAddress, 100000000000n),
+      await itemVector('user123', fixtureAddress('USERNAME_M10_VECTOR_OWNER_DIGITS'), vaultAddress, registryAddress, 100000000000n),
+      await itemVector('user_name', fixtureAddress('USERNAME_M10_VECTOR_OWNER_UNDERSCORE'), vaultAddress, registryAddress, 100000000000n),
+      await itemVector('user-name', fixtureAddress('USERNAME_M10_VECTOR_OWNER_HYPHEN'), vaultAddress, registryAddress, 100000000000n),
     ],
     invalid_examples: [
       { username: 'abc', reason: 'length < 4' },

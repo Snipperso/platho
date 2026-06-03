@@ -26,8 +26,6 @@ describe('ATHWallet tombstone economics', () => {
     expect(BigInt(report.required_tombstone_endowment_nanotons)).toBe(2_000_000n);
     expect(report.cases.map((item) => item.label)).toEqual([
       'NORMAL_NOTIFY_ACK',
-      'USERNAME_NOTIFY_ACK',
-      'PROFILE_NOTIFY_ACK',
       'VAULT_USERNAME_NOTIFY_ACK',
       'VAULT_PROFILE_NOTIFY_ACK',
       'JETTON_NOTIFY_ACK',

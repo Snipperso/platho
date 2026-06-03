@@ -89,7 +89,6 @@ import {
   buildVaultReceiveIntentExternalBoc,
   buildVaultUsernameMintExternalBoc,
   createVaultWalletMessage,
-  createUsernameRegistryWalletMessage,
   estimateVaultAttachedValueNanotons,
   PROFILE_AVATAR_PRICE_ATH,
   PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
@@ -300,7 +299,6 @@ const profileAvatarInput = document.querySelector('#profileAvatarInput');
 const mintUsernameButton = document.querySelector('#mintUsernameButton');
 const linkUsernameButton = document.querySelector('#linkUsernameButton');
 const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
-const flushUsernameRefundButton = document.querySelector('#flushUsernameRefundButton');
 const burnAthButton = document.querySelector('#burnAthButton');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
@@ -6745,7 +6743,6 @@ function refreshMessagingControls() {
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
   if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || !signedActionsReady;
   if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !signedActionsReady;
-  if (flushUsernameRefundButton) flushUsernameRefundButton.disabled = !plathoWallet || !signedActionsReady;
   if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !signedActionsReady;
   if (paymentCheckButton) paymentCheckButton.disabled = !canComposePrivate;
   if (privateImageButton) privateImageButton.disabled = !canComposePrivate;
@@ -7309,18 +7306,6 @@ linkUsernameButton?.addEventListener('click', async () => {
     console.error(error);
   } finally {
     linkUsernameButton.disabled = !plathoWallet;
-  }
-});
-
-flushUsernameRefundButton?.addEventListener('click', async () => {
-  try {
-    flushUsernameRefundButton.disabled = true;
-    await submitUsernameRefundFlush();
-  } catch (error) {
-    flashWalletIdentityStatus('refund blocked');
-    console.error(error);
-  } finally {
-    flushUsernameRefundButton.disabled = false;
   }
 });
 
@@ -10084,23 +10069,6 @@ async function submitAthWalletMessage(type, params, options = {}) {
   return result;
 }
 
-async function submitUsernameRegistryMessage(type, params, options = {}) {
-  requireNoPendingServiceWorkerAppShellReload();
-  requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const usernameRegistryAddress = requireBasechainAddress(
-    options.usernameRegistryAddress ?? requireUsernameRegistryAddress(),
-    'UsernameRegistry',
-  );
-  const message = createUsernameRegistryWalletMessage(type, params, {
-    usernameRegistryAddress,
-    ...options,
-  });
-  const transaction = createWalletTransaction(message);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  globalThis.plathoLastUsernameRegistryTransaction = { type, params, message, transaction, result };
-  return result;
-}
-
 async function submitVaultDepositTon() {
   const amount = await requestTonAmountNanotons('Move TON to Vault', 'Moves TON from your connected Platho wallet into the Vault pocket.');
   if (amount === null) return null;
@@ -10198,25 +10166,6 @@ async function submitUsernameMint() {
     flashWalletIdentityStatus('mint submitted; link after sync');
     console.error(error);
   });
-  return result;
-}
-
-async function submitUsernameRefundFlush() {
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const provider = await resolveUsernameRegistryProvider();
-  const refundDue = await provider.getRefundDue(owner, {
-    address: requireUsernameRegistryAddress(),
-  });
-  if (BigInt(refundDue ?? 0n) <= 0n) {
-    flashWalletIdentityStatus('no username refund');
-    return null;
-  }
-  setText(identitySubtitle, 'refund signing');
-  const result = await submitUsernameRegistryMessage('FlushAthRefundDue', {
-    query_id: nextQueryId(),
-    owner_wallet: owner,
-  });
-  flashWalletIdentityStatus('refund submitted');
   return result;
 }
 
@@ -11595,18 +11544,15 @@ globalThis.plathoVaultTransactions = {
   createVaultWalletMessage,
   createAthWalletMessage,
   createPublicPostPayload,
-  createUsernameRegistryWalletMessage,
   createWalletTransaction,
   submitVaultMessage,
   submitAthWalletMessage,
-  submitUsernameRegistryMessage,
   submitVaultDepositTon,
   submitVaultWithdrawTon,
   submitVaultDepositAth,
   submitVaultWithdrawAth,
   submitUsernameMint,
   submitVaultUsernameMint,
-  submitUsernameRefundFlush,
   submitAthWalletBurn,
   submitProfileAvatarUpdate,
   submitCreatePaymentCheck,

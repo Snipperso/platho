@@ -6,16 +6,16 @@ import { createHash } from 'crypto';
 import {
   ATHWallet,
   ATHInternalTransfer,
-  ATHInternalTransferMintUsername,
-  ATHInternalTransferProfileAvatar,
+  ATHInternalTransferVaultMintUsername,
+  ATHInternalTransferVaultProfileAvatar,
   ATHInternalTransferWithNotify,
   ATHTransferRequest,
   ATHTransferRequestWithNotify,
   AthTransferNotificationAck,
   PruneStaleNotification,
   storeATHInternalTransfer,
-  storeATHInternalTransferMintUsername,
-  storeATHInternalTransferProfileAvatar,
+  storeATHInternalTransferVaultMintUsername,
+  storeATHInternalTransferVaultProfileAvatar,
   storeATHInternalTransferWithNotify,
   storeATHTransferRequestWithNotify,
   storeAthTransferNotification,
@@ -161,29 +161,31 @@ describe('ATH wallet transfer profile', () => {
         notify_destination: owner.address,
         notify_value: toNano('0.03'),
       } as ATHInternalTransferWithNotify)).endCell(),
-      beginCell().store(storeATHInternalTransferMintUsername({
-        $$type: 'ATHInternalTransferMintUsername',
+      beginCell().store(storeATHInternalTransferVaultMintUsername({
+        $$type: 'ATHInternalTransferVaultMintUsername',
         query_id: 303n,
         amount,
         sender_owner: owner.address,
         response_destination: owner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: owner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferMintUsername)).endCell(),
-      beginCell().store(storeATHInternalTransferProfileAvatar({
-        $$type: 'ATHInternalTransferProfileAvatar',
+      } as ATHInternalTransferVaultMintUsername)).endCell(),
+      beginCell().store(storeATHInternalTransferVaultProfileAvatar({
+        $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: 304n,
         amount,
         sender_owner: owner.address,
         response_destination: owner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: owner.address,
         avatar_hash: 0xabcden,
         avatar_entry_id: 1n,
         avatar_stream_id: 2n,
         avatar_part_count: 1n,
         media_format: 1n,
-      } as ATHInternalTransferProfileAvatar)).endCell(),
+      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
     ];
 
     for (const body of forgedBodies) {
@@ -581,16 +583,17 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientAddress,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferMintUsername({
-        $$type: 'ATHInternalTransferMintUsername',
+      body: beginCell().store(storeATHInternalTransferVaultMintUsername({
+        $$type: 'ATHInternalTransferVaultMintUsername',
         query_id: queryId,
         amount: 70n,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferMintUsername)).endCell(),
+      } as ATHInternalTransferVaultMintUsername)).endCell(),
     }));
 
     expect(findTransaction(usernameReuse.transactions, {
@@ -603,19 +606,20 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientAddress,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferProfileAvatar({
-        $$type: 'ATHInternalTransferProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
+        $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
         amount: 80n,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         avatar_hash: 0x1234n,
         avatar_entry_id: 1n,
         avatar_stream_id: 2n,
         avatar_part_count: 1n,
         media_format: 1n,
-      } as ATHInternalTransferProfileAvatar)).endCell(),
+      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
     }));
 
     expect(findTransaction(profileReuse.transactions, {
@@ -643,19 +647,20 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferProfileAvatar({
-        $$type: 'ATHInternalTransferProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
+        $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         avatar_hash: 0x9876n,
         avatar_entry_id: 7n,
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferProfileAvatar)).endCell(),
+      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
     }));
 
     expect((await sourceWallet.getGetWalletData()).balance).toBe(0n);
@@ -670,7 +675,7 @@ describe('ATH wallet transfer profile', () => {
       bounce: false,
       body: beginCell()
         .storeUint(0xffffffff, 32)
-        .storeUint(0xA11A7001, 32)
+        .storeUint(0xA11A7002, 32)
         .storeUint(queryId, 64)
         .storeUint(key, 160)
         .storeUint(amount, 128)
@@ -720,19 +725,20 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferProfileAvatar({
-        $$type: 'ATHInternalTransferProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
+        $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         avatar_hash: 0x9876n,
         avatar_entry_id: 7n,
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferProfileAvatar)).endCell(),
+      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
@@ -746,7 +752,7 @@ describe('ATH wallet transfer profile', () => {
       bounce: false,
       body: beginCell()
         .storeUint(0xffffffff, 32)
-        .storeUint(0xA11A7001, 32)
+        .storeUint(0xA11A7002, 32)
         .storeUint(queryId, 64)
         .storeUint(key, 160)
         .storeUint(amount, 128)
@@ -778,7 +784,7 @@ describe('ATH wallet transfer profile', () => {
     expect((await recipientWallet.getGetWalletData()).balance).toBe(existingPendingAmount);
   });
 
-  it('ATH-XFER-05G: bounced notify refund is not blocked by same-query outgoing to the same refund wallet', async () => {
+  it('ATH-XFER-05G: bounced notify refund fails closed on same-query outgoing to the same refund wallet', async () => {
     const blockchain = await Blockchain.create();
     const sourceOwner = await blockchain.treasury('ath-transfer-refund-same-wallet-source');
     const recipientOwner = await blockchain.treasury('ath-transfer-refund-same-wallet-recipient');
@@ -814,19 +820,20 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWalletAddress,
       to: recipientWallet.address,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferProfileAvatar({
-        $$type: 'ATHInternalTransferProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
+        $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
         amount,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         avatar_hash: 0x9876n,
         avatar_entry_id: 7n,
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferProfileAvatar)).endCell(),
+      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
@@ -840,20 +847,20 @@ describe('ATH wallet transfer profile', () => {
       bounce: false,
       body: beginCell()
         .storeUint(0xffffffff, 32)
-        .storeUint(0xA11A7001, 32)
+        .storeUint(0xA11A7002, 32)
         .storeUint(queryId, 64)
         .storeUint(key, 160)
         .storeUint(amount, 128)
         .endCell(),
     }));
-
     expect(findTransaction(bouncedNotifyResult.transactions, {
-      from: recipientWallet.address,
-      to: sourceWalletAddress,
-      success: true,
+      from: recipientOwner.address,
+      to: recipientWallet.address,
+      success: false,
+      exitCode: 14230,
     })).toBeDefined();
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(0n);
-    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
 
     await blockchain.sendMessage(internal({
       from: sourceWalletAddress,
@@ -873,7 +880,8 @@ describe('ATH wallet transfer profile', () => {
         .endCell(),
     }));
 
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(existingPendingAmount);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount + existingPendingAmount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
   });
 
   it('ATH-XFER-05E: forged bounced notifications cannot refund or delete pending notification state', async () => {
@@ -906,42 +914,44 @@ describe('ATH wallet transfer profile', () => {
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferMintUsername({
-        $$type: 'ATHInternalTransferMintUsername',
+      body: beginCell().store(storeATHInternalTransferVaultMintUsername({
+        $$type: 'ATHInternalTransferVaultMintUsername',
         query_id: 552n,
         amount,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         username_len: BigInt(username.length),
         username: beginCell().storeBuffer(username).endCell().beginParse(),
-      } as ATHInternalTransferMintUsername)).endCell(),
+      } as ATHInternalTransferVaultMintUsername)).endCell(),
     }));
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
       value: toNano('0.05'),
-      body: beginCell().store(storeATHInternalTransferProfileAvatar({
-        $$type: 'ATHInternalTransferProfileAvatar',
+      body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
+        $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: 553n,
         amount,
         sender_owner: sourceOwner.address,
         response_destination: sourceOwner.address,
         notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
         avatar_hash: 0x9876n,
         avatar_entry_id: 7n,
         avatar_stream_id: 8n,
         avatar_part_count: 2n,
         media_format: 1n,
-      } as ATHInternalTransferProfileAvatar)).endCell(),
+      } as ATHInternalTransferVaultProfileAvatar)).endCell(),
     }));
 
     expect((await recipientWallet.getGetWalletData()).balance).toBe(amount * 3n);
 
     const forgedNotifications = [
       { op: 0x472D9D7Dn, queryId: 551n },
-      { op: 0x89129D5Fn, queryId: 552n },
-      { op: 0xA11A7001n, queryId: 553n },
+      { op: 0x89129D60n, queryId: 552n },
+      { op: 0xA11A7002n, queryId: 553n },
     ];
 
     for (const { op, queryId } of forgedNotifications) {

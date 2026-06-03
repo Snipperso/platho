@@ -178,7 +178,7 @@ export function decodeUsernameNameRecordStack(result) {
 
 export function decodePendingUsernameMintStack(result) {
   const stack = extractStack(result);
-  if (stack.length >= 10) {
+  if (stack.length >= 9) {
     return {
       exists: readStackBool(stack, 0, 'username pending mint exists'),
       query_id: readStackInt(stack, 1, 'username pending query id'),
@@ -189,7 +189,6 @@ export function decodePendingUsernameMintStack(result) {
       item_address: readStackAddress(stack, 6, 'username pending item address'),
       item_deploy_value: readStackInt(stack, 7, 'username pending item deploy value'),
       created_at: readStackInt(stack, 8, 'username pending created at'),
-      vault_funded: readStackBool(stack, 9, 'username pending vault funded'),
     };
   }
   return {
@@ -202,18 +201,6 @@ export function decodePendingUsernameMintStack(result) {
     item_address: readStackAddress(stack, 4, 'username pending item address'),
     item_deploy_value: readStackInt(stack, 5, 'username pending item deploy value'),
     created_at: readStackInt(stack, 6, 'username pending created at'),
-    vault_funded: false,
-  };
-}
-
-export function decodePendingAthRefundFlushStack(result) {
-  const stack = extractStack(result);
-  return {
-    exists: readStackBool(stack, 0, 'username refund flush exists'),
-    owner_wallet: readStackAddress(stack, 1, 'username refund owner wallet'),
-    amount: readStackInt(stack, 2, 'username refund amount'),
-    recipient_ath_wallet: readStackAddress(stack, 3, 'username refund recipient ATH wallet'),
-    created_at: readStackInt(stack, 4, 'username refund created at'),
   };
 }
 
@@ -238,8 +225,8 @@ export function decodePendingAthBurnFlushStack(result) {
 
 export function decodeUsernameRegistryGlobalStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 17) {
-    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 17 stack items, got ${stack.length}`);
+  if (stack.length !== 15) {
+    throw new UsernameTonRpcProviderError(`UsernameRegistry get_global ABI mismatch: expected 15 stack items, got ${stack.length}`);
   }
   return {
     sealed: readStackBool(stack, 0, 'UsernameRegistry sealed'),
@@ -252,13 +239,11 @@ export function decodeUsernameRegistryGlobalStack(result) {
     genesis_controller_address: readStackAddress(stack, 7, 'UsernameRegistry genesis controller'),
     name_record_count: readStackInt(stack, 8, 'UsernameRegistry name record count'),
     pending_mint_count: readStackInt(stack, 9, 'UsernameRegistry pending mint count'),
-    refund_due_count: readStackInt(stack, 10, 'UsernameRegistry refund due count'),
-    treasury_due_ath: readStackInt(stack, 11, 'UsernameRegistry treasury due'),
-    burn_due_ath: readStackInt(stack, 12, 'UsernameRegistry burn due'),
-    pending_refund_flush_count: readStackInt(stack, 13, 'UsernameRegistry pending refund flush count'),
-    pending_treasury_flush_count: readStackInt(stack, 14, 'UsernameRegistry pending treasury flush count'),
-    pending_burn_flush_count: readStackInt(stack, 15, 'UsernameRegistry pending burn flush count'),
-    pending_mint_stale_ttl: readStackInt(stack, 16, 'UsernameRegistry pending mint stale ttl'),
+    treasury_due_ath: readStackInt(stack, 10, 'UsernameRegistry treasury due'),
+    burn_due_ath: readStackInt(stack, 11, 'UsernameRegistry burn due'),
+    pending_treasury_flush_count: readStackInt(stack, 12, 'UsernameRegistry pending treasury flush count'),
+    pending_burn_flush_count: readStackInt(stack, 13, 'UsernameRegistry pending burn flush count'),
+    pending_mint_stale_ttl: readStackInt(stack, 14, 'UsernameRegistry pending mint stale ttl'),
   };
 }
 
@@ -376,44 +361,6 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_pending_mint',
         stack: [stackNumber(nameHash)],
-      }));
-    },
-    async getRefundDue(ownerWallet, callOptions = {}) {
-      const transport = resolveTransport(options);
-      const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');
-      const result = await transport.runGetMethod({
-        address,
-        method: 'get_refund_due',
-        stack: [stackAddress(ownerWallet)],
-      });
-      return readStackInt(extractStack(result), 0, 'username refund due');
-    },
-    async getPendingRefundFlush(queryId, callOptions = {}) {
-      const transport = resolveTransport(options);
-      const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');
-      return decodePendingAthRefundFlushStack(await transport.runGetMethod({
-        address,
-        method: 'get_pending_refund_flush',
-        stack: [stackNumber(queryId)],
-      }));
-    },
-    async getRefundFlushId(ownerWallet, queryId, callOptions = {}) {
-      const transport = resolveTransport(options);
-      const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');
-      const result = await transport.runGetMethod({
-        address,
-        method: 'get_refund_flush_id',
-        stack: [stackAddress(ownerWallet), stackNumber(queryId)],
-      });
-      return readStackInt(extractStack(result), 0, 'username refund flush id');
-    },
-    async getPendingRefundFlushFor(ownerWallet, queryId, callOptions = {}) {
-      const transport = resolveTransport(options);
-      const address = resolveAddress(options.usernameRegistryAddress, callOptions, 'plathoUsernameRegistryAddress', 'UsernameRegistry');
-      return decodePendingAthRefundFlushStack(await transport.runGetMethod({
-        address,
-        method: 'get_pending_refund_flush_for',
-        stack: [stackAddress(ownerWallet), stackNumber(queryId)],
       }));
     },
     async getPendingTreasuryFlush(queryId, callOptions = {}) {

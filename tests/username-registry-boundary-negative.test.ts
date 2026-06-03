@@ -7,15 +7,13 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
-  FlushAthRefundDue,
+  AthTransferNotificationVaultMintUsername,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { InitializeUsernameItem, UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
-import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoAck_MockAthWalletNoAck';
 
 const MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -23,7 +21,6 @@ const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const HALF_PRICE = 50_000_000_000n;
 
-const REFUND_DUE_STORAGE = 4_000_000n;
 const PENDING_MINT_STORAGE = 6_000_000n;
 const NFT_ITEM_DEPLOY_RESERVE = 21_000_000n;
 const ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
@@ -93,7 +90,7 @@ async function deploySealedRegistryWithTreasuryOfficial() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWallet, caller };
+  return { blockchain, registry, officialAthWallet, caller, vaultAddress };
 }
 
 async function deployUnsealedRegistryWithTreasuryReceiver(workchain: number) {
@@ -191,85 +188,38 @@ async function deployRegistryWithAthSystem(officialWalletBalance: bigint) {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWalletAddress, officialAthWallet, athMasterAddress, master, treasuryAthReceiver, flusher };
+  return { blockchain, registry, officialAthWalletAddress, officialAthWallet, athMasterAddress, master, treasuryAthReceiver, flusher, vaultAddress };
 }
 
-async function deployRegistryWithNoAckOfficial() {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const deployer = await blockchain.treasury('username-boundary-noack-deployer');
-  const flusher = await blockchain.treasury('username-boundary-noack-flusher');
-  const placeholderAthWallet = fixtureAddress('NOACK_PLACEHOLDER');
-  const athMasterAddress = fixtureAddress('NOACK_ATH_MASTER');
-  const treasuryAthReceiver = fixtureAddress('NOACK_TREASURY_RECEIVER');
-  const vaultAddress = fixtureAddress('NOACK_VAULT');
-
-  const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
-  const registryAddress = contractAddress(0, registryInit);
-  await blockchain.setShardAccount(registryAddress, createShardAccount({
-    address: registryAddress,
-    code: registryInit.code,
-    data: registryInit.data,
-    balance: toNano('3'),
-    workchain: registryAddress.workChain,
-  }));
-
-  const registry = blockchain.openContract(new UsernameRegistry(registryAddress, registryInit));
-  const officialAthWalletAddress = await registry.getGetAthWalletAddress(registryAddress);
-  const noAckInit = await MockAthWalletNoAck.init();
-  await blockchain.setShardAccount(officialAthWalletAddress, createShardAccount({
-    address: officialAthWalletAddress,
-    code: noAckInit.code,
-    data: noAckInit.data,
-    balance: toNano('3'),
-    workchain: officialAthWalletAddress.workChain,
-  }));
-
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindOfficialAthWallet',
-    deployment_manifest_hash: MANIFEST_HASH,
-    official_ath_wallet_address: officialAthWalletAddress,
-  } as BindOfficialAthWallet);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindUsernameVault',
-    deployment_manifest_hash: MANIFEST_HASH,
-    vault_address: vaultAddress,
-  } as BindUsernameVault);
-  await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'SealGenesis',
-    deployment_manifest_hash: MANIFEST_HASH,
-  } as SealGenesis);
-
-  return { blockchain, registry, officialAthWalletAddress, flusher };
-}
-
-async function sendMint(registry: any, officialSender: any, ownerWallet: Address, name: string, amount: bigint, value: bigint) {
+async function sendMint(registry: any, officialSender: any, ownerWallet: Address, name: string, amount: bigint, value: bigint, payerWallet: Address) {
   await registry.send(officialSender.getSender(), { value }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 77n,
     amount,
     sender_key: 0n,
+    payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 }
 
-async function sendMintFromAddress(blockchain: Blockchain, registry: any, officialAddress: Address, ownerWallet: Address, name: string, amount: bigint, value = toNano('0.15')) {
+async function sendMintFromAddress(blockchain: Blockchain, registry: any, officialAddress: Address, ownerWallet: Address, name: string, amount: bigint, payerWallet: Address, value = toNano('0.15')) {
   await registry.send(blockchain.sender(officialAddress), { value }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 88n,
     amount,
     sender_key: 0n,
+    payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 }
 
 describe('UsernameRegistry value/storage boundary negative matrix', () => {
   it('USERNAME-REG-BND-01: paid mint notification rejects min-1 and accepts exact ACK/storage reserves', async () => {
-    const { registry, officialAthWallet } = await deploySealedRegistryWithTreasuryOfficial();
+    const { registry, officialAthWallet, vaultAddress } = await deploySealedRegistryWithTreasuryOfficial();
     const invalidOwner = fixtureAddress('INVALID_OWNER');
     const validOwner = fixtureAddress('VALID_OWNER');
     const validHash = nameHash('exact1');
@@ -280,9 +230,10 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       invalidOwner,
       'Larisa',
       PRICE_6_PLUS,
-      REFUND_DUE_STORAGE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
+      ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
+      vaultAddress,
     );
-    expect(await registry.getGetRefundDue(invalidOwner)).toBe(0n);
+    expect((await registry.getGetNameRecord(nameHash('Larisa'))).exists).toBe(false);
 
     await sendMint(
       registry,
@@ -290,9 +241,10 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       invalidOwner,
       'Larisa',
       PRICE_6_PLUS,
-      REFUND_DUE_STORAGE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
+      ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
+      vaultAddress,
     );
-    expect(await registry.getGetRefundDue(invalidOwner)).toBe(PRICE_6_PLUS);
+    expect((await registry.getGetNameRecord(nameHash('Larisa'))).exists).toBe(false);
 
     await sendMint(
       registry,
@@ -301,6 +253,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       'exact1',
       PRICE_6_PLUS,
       PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE - 1n,
+      vaultAddress,
     );
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
@@ -312,6 +265,7 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
       'exact1',
       PRICE_6_PLUS,
       PENDING_MINT_STORAGE + NFT_ITEM_DEPLOY_RESERVE + ATH_NOTIFICATION_ACK_VALUE + STATE_GROWTH_EXEC_RESERVE,
+      vaultAddress,
     );
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(true);
   });
@@ -348,40 +302,10 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     expect(afterItemBalance).toBeGreaterThanOrEqual(beforeItemBalance);
   });
 
-  it('USERNAME-REG-BND-03: refund flush rejects min-1 and exact reserve completes transfer', async () => {
-    const ctx = await deployRegistryWithAthSystem(PRICE_6_PLUS);
-    const ownerWallet = fixtureAddress('REFUND_OWNER');
-    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'Larisa', PRICE_6_PLUS);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
-
-    const refundFlushReserve = ATH_TRANSFER_EXEC_RESERVE + DUE_FLUSH_LOCAL_EXEC_RESERVE;
-    await ctx.registry.send(ctx.flusher.getSender(), { value: refundFlushReserve - 1n }, {
-      $$type: 'FlushAthRefundDue',
-      query_id: 301n,
-      owner_wallet: ownerWallet,
-    } as FlushAthRefundDue);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
-    expect((await ctx.registry.getGetPendingRefundFlushFor(ownerWallet, 301n)).exists).toBe(false);
-
-    const beforeRegistryRefundBalance = (await ctx.blockchain.getContract(ctx.registry.address)).balance;
-    await ctx.registry.send(ctx.flusher.getSender(), { value: refundFlushReserve }, {
-      $$type: 'FlushAthRefundDue',
-      query_id: 302n,
-      owner_wallet: ownerWallet,
-    } as FlushAthRefundDue);
-    const afterRegistryRefundBalance = (await ctx.blockchain.getContract(ctx.registry.address)).balance;
-    const recipientAthWalletAddress = await ctx.registry.getGetAthWalletAddress(ownerWallet);
-    const recipientWallet = ctx.blockchain.openContract(new ATHWallet(recipientAthWalletAddress));
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
-    expect((await ctx.registry.getGetPendingRefundFlushFor(ownerWallet, 302n)).exists).toBe(false);
-    expect((await recipientWallet.getGetWalletData()).balance).toBe(PRICE_6_PLUS);
-    expect(afterRegistryRefundBalance).toBeGreaterThanOrEqual(beforeRegistryRefundBalance);
-  });
-
   it('USERNAME-REG-BND-04: treasury and burn flush reject min-1 and accept exact reserves', async () => {
     const ctx = await deployRegistryWithAthSystem(PRICE_6_PLUS);
     const ownerWallet = fixtureAddress('DUE_OWNER');
-    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'duetest', PRICE_6_PLUS);
+    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'duetest', PRICE_6_PLUS, ctx.vaultAddress);
     expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
     expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(HALF_PRICE);
 
@@ -417,87 +341,6 @@ describe('UsernameRegistry value/storage boundary negative matrix', () => {
     } as FlushBurnAthDue);
     expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(0n);
     expect((await ctx.master.getGetJettonData()).total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC - HALF_PRICE);
-  });
-
-  it('USERNAME-REG-BND-05: refund flush ids are scoped by owner wallet', async () => {
-    const ctx = await deployRegistryWithNoAckOfficial();
-    const owner1 = fixtureAddress('REFUND_SCOPE_OWNER_1');
-    const owner2 = fixtureAddress('REFUND_SCOPE_OWNER_2');
-    const queryId = 777n;
-    const reserve = ATH_TRANSFER_EXEC_RESERVE + DUE_FLUSH_LOCAL_EXEC_RESERVE;
-
-    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, owner1, 'Larisa', PRICE_6_PLUS);
-    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, owner2, 'Larisa', PRICE_6_PLUS);
-
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushAthRefundDue',
-      query_id: queryId,
-      owner_wallet: owner1,
-    } as FlushAthRefundDue);
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushAthRefundDue',
-      query_id: queryId,
-      owner_wallet: owner2,
-    } as FlushAthRefundDue);
-
-    expect((await ctx.registry.getGetPendingRefundFlushFor(owner1, queryId)).exists).toBe(true);
-    expect((await ctx.registry.getGetPendingRefundFlushFor(owner2, queryId)).exists).toBe(true);
-    expect((await ctx.registry.getGetGlobal()).pending_refund_flush_count).toBe(2n);
-  });
-
-  it('USERNAME-REG-BND-05B: pending refund flush id blocks treasury and burn reuse until cleared', async () => {
-    const ctx = await deployRegistryWithNoAckOfficial();
-    const refundOwner = fixtureAddress('REFUND_QUERY_GUARD_OWNER');
-    const mintOwner = fixtureAddress('DUE_QUERY_GUARD_OWNER');
-    const refundQuery = 778n;
-    const refundFlushId = await ctx.registry.getGetRefundFlushId(refundOwner, refundQuery);
-    const reserve = ATH_TRANSFER_EXEC_RESERVE + DUE_FLUSH_LOCAL_EXEC_RESERVE;
-
-    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, refundOwner, 'Larisa', PRICE_6_PLUS);
-    await sendMintFromAddress(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, mintOwner, 'mixdue', PRICE_6_PLUS);
-
-    expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(PRICE_6_PLUS);
-    expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
-    expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(HALF_PRICE);
-
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushAthRefundDue',
-      query_id: refundQuery,
-      owner_wallet: refundOwner,
-    } as FlushAthRefundDue);
-
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushTreasuryAthDue',
-      query_id: refundFlushId,
-    } as FlushTreasuryAthDue);
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushBurnAthDue',
-      query_id: refundFlushId,
-    } as FlushBurnAthDue);
-
-    let global = await ctx.registry.getGetGlobal();
-    expect((await ctx.registry.getGetPendingRefundFlushFor(refundOwner, refundQuery)).exists).toBe(true);
-    expect((await ctx.registry.getGetPendingTreasuryFlush(refundFlushId)).exists).toBe(false);
-    expect((await ctx.registry.getGetPendingBurnFlush(refundFlushId)).exists).toBe(false);
-    expect(global.pending_refund_flush_count).toBe(1n);
-    expect(global.pending_treasury_flush_count).toBe(0n);
-    expect(global.pending_burn_flush_count).toBe(0n);
-    expect(global.treasury_due_ath).toBe(HALF_PRICE);
-    expect(global.burn_due_ath).toBe(HALF_PRICE);
-
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushTreasuryAthDue',
-      query_id: refundFlushId + 1n,
-    } as FlushTreasuryAthDue);
-    await ctx.registry.send(ctx.flusher.getSender(), { value: reserve }, {
-      $$type: 'FlushBurnAthDue',
-      query_id: refundFlushId + 2n,
-    } as FlushBurnAthDue);
-
-    global = await ctx.registry.getGetGlobal();
-    expect(global.pending_refund_flush_count).toBe(1n);
-    expect(global.pending_treasury_flush_count).toBe(1n);
-    expect(global.pending_burn_flush_count).toBe(1n);
   });
 
   it('USERNAME-REG-BND-06: masterchain treasury receiver cannot seal the registry runtime profile', async () => {

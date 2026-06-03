@@ -3,7 +3,7 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "profile_registry": "4bb7e84048b4ed42312d686032f4da649f33cdbb035ad8f8d9a444ac9b7ba4f1"
+    "profile_registry": "6437b6631d0b310781fef9efa214640c69a3ae684dae2c4be5b463a673ed7e29"
   },
   "note": "Sandbox evidence that accepted ProfileRegistry avatar updates retain enough TON after ACK/refund actions to cover the permanent avatar record and owner-version map endowments. This is not a mainnet rent oracle; it is a release gate against underfunded permanent avatar pointer growth.",
   "constants": {
@@ -18,82 +18,45 @@
   },
   "cases": [
     {
-      "label": "DIRECT_FIRST_AVATAR",
-      "updates": 1,
-      "vault_funded": false,
-      "raw_balance_delta_nanotons": "10349999",
-      "expected_permanent_endowment_nanotons": "9000000",
-      "expected_retained_model_nanotons": "13000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "1349999",
-      "profile_count": "1",
-      "avatar_record_count": "1"
-    },
-    {
-      "label": "DIRECT_REPEAT_AVATAR",
-      "updates": 1,
-      "vault_funded": false,
-      "raw_balance_delta_nanotons": "7261599",
-      "expected_permanent_endowment_nanotons": "6000000",
-      "expected_retained_model_nanotons": "10000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "1261599",
-      "profile_count": "1",
-      "avatar_record_count": "2"
-    },
-    {
       "label": "VAULT_FIRST_AVATAR",
       "updates": 1,
-      "vault_funded": true,
-      "raw_balance_delta_nanotons": "10266199",
+      "raw_balance_delta_nanotons": "10302399",
       "expected_permanent_endowment_nanotons": "9000000",
       "expected_retained_model_nanotons": "13000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "1266199",
+      "retained_margin_vs_permanent_endowment_nanotons": "1302399",
       "profile_count": "1",
       "avatar_record_count": "1"
     },
     {
       "label": "VAULT_REPEAT_AVATAR",
       "updates": 1,
-      "vault_funded": true,
-      "raw_balance_delta_nanotons": "7177799",
+      "raw_balance_delta_nanotons": "7213999",
       "expected_permanent_endowment_nanotons": "6000000",
       "expected_retained_model_nanotons": "10000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "1177799",
+      "retained_margin_vs_permanent_endowment_nanotons": "1213999",
       "profile_count": "1",
       "avatar_record_count": "2"
     },
     {
-      "label": "DIRECT_MANY_OWNERS_12",
+      "label": "VAULT_MANY_OWNERS_12",
       "updates": 12,
-      "vault_funded": false,
-      "raw_balance_delta_nanotons": "121049987",
+      "raw_balance_delta_nanotons": "120562122",
       "expected_permanent_endowment_nanotons": "108000000",
       "expected_retained_model_nanotons": "156000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "13049987",
+      "retained_margin_vs_permanent_endowment_nanotons": "12562122",
       "profile_count": "12",
       "avatar_record_count": "12"
     },
     {
-      "label": "DIRECT_MANY_UPDATES_ONE_OWNER_10",
-      "updates": 10,
-      "vault_funded": false,
-      "raw_balance_delta_nanotons": "75079389",
-      "expected_permanent_endowment_nanotons": "63000000",
-      "expected_retained_model_nanotons": "103000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "12079389",
-      "profile_count": "1",
-      "avatar_record_count": "10"
-    },
-    {
       "label": "VAULT_MANY_UPDATES_ONE_OWNER_10",
       "updates": 10,
-      "vault_funded": true,
-      "raw_balance_delta_nanotons": "74199723",
+      "raw_balance_delta_nanotons": "74561723",
       "expected_permanent_endowment_nanotons": "63000000",
       "expected_retained_model_nanotons": "103000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "11199723",
+      "retained_margin_vs_permanent_endowment_nanotons": "11561723",
       "profile_count": "1",
       "avatar_record_count": "10"
     }
   ],
-  "worst_margin_vs_permanent_endowment_nanotons": "1177799"
+  "worst_margin_vs_permanent_endowment_nanotons": "1213999"
 }

@@ -7,9 +7,8 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
+  AthTransferNotificationVaultMintUsername,
   UsernameItemDeployedAck,
-  FlushAthRefundDue,
   FlushTreasuryAthDue,
   ATHTransferAck,
   ATHTransferFailed,
@@ -90,7 +89,7 @@ async function deploySealedRegistryWithMockOfficial() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, mockOfficial, mockOfficialAddress, attacker, flusher, athMasterAddress, treasuryAthReceiver };
+  return { blockchain, registry, mockOfficial, mockOfficialAddress, attacker, flusher, athMasterAddress, treasuryAthReceiver, vaultAddress };
 }
 
 async function sendMintFromOfficialAddress(
@@ -100,16 +99,18 @@ async function sendMintFromOfficialAddress(
   ownerWallet: Address,
   name: string,
   amount = PRICE_6_PLUS,
+  payerWallet = fixtureAddress('USERNAME_AUTH_VAULT'),
 ) {
   await registry.send(blockchain.sender(officialAddress), { value: toNano('0.15') }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 911n,
     amount,
     sender_key: 0n,
+    payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 }
 
 async function installNoAckAt(blockchain: Blockchain, address: Address) {
@@ -130,14 +131,15 @@ describe('UsernameRegistry negative authorization matrix', () => {
     const hash = nameHash('forged');
 
     await registry.send(attacker.getSender(), { value: toNano('0.15') }, {
-      $$type: 'AthTransferNotificationMintUsername',
+      $$type: 'AthTransferNotificationVaultMintUsername',
       query_id: 1n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
+      payer_wallet: fixtureAddress('USERNAME_AUTH_VAULT'),
       owner_wallet: ownerWallet,
       username_len: 6n,
       username: usernameSlice('forged'),
-    } as AthTransferNotificationMintUsername);
+    } as AthTransferNotificationVaultMintUsername);
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
 
@@ -157,7 +159,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
     const itemAddress = await ctx.registry.getGetUsernameItemAddress(hash);
     await installNoAckAt(ctx.blockchain, itemAddress);
 
-    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, ownerWallet, 'stuckx');
+    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, ownerWallet, 'stuckx', PRICE_6_PLUS, ctx.vaultAddress);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
 
     await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
@@ -178,7 +180,7 @@ describe('UsernameRegistry negative authorization matrix', () => {
     const itemAddress = await ctx.registry.getGetUsernameItemAddress(hash);
     await installNoAckAt(ctx.blockchain, itemAddress);
 
-    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, mintOwner, 'moveme');
+    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, mintOwner, 'moveme', PRICE_6_PLUS, ctx.vaultAddress);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
 
     await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.05') }, {
@@ -205,35 +207,11 @@ describe('UsernameRegistry negative authorization matrix', () => {
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 
-  it('USERNAME-REG-AUTH-NEG-03: forged refund/treasury transfer callbacks cannot clear pending flushes', async () => {
+  it('USERNAME-REG-AUTH-NEG-03: forged treasury transfer callbacks cannot clear pending flushes', async () => {
     const ctx = await deploySealedRegistryWithMockOfficial();
-    const refundOwner = fixtureAddress('REFUND_OWNER');
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');
 
-    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, refundOwner, 'Larisa');
-    expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(PRICE_6_PLUS);
-    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.05') }, {
-      $$type: 'FlushAthRefundDue',
-      query_id: 7001n,
-      owner_wallet: refundOwner,
-    } as FlushAthRefundDue);
-    expect((await ctx.registry.getGetPendingRefundFlushFor(refundOwner, 7001n)).exists).toBe(true);
-    expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(0n);
-
-    await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'ATHTransferAck',
-      query_id: 7001n,
-      amount: PRICE_6_PLUS,
-    } as ATHTransferAck);
-    await ctx.registry.send(ctx.attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'ATHTransferFailed',
-      query_id: 7001n,
-      amount: PRICE_6_PLUS,
-    } as ATHTransferFailed);
-    expect((await ctx.registry.getGetPendingRefundFlushFor(refundOwner, 7001n)).exists).toBe(true);
-    expect(await ctx.registry.getGetRefundDue(refundOwner)).toBe(0n);
-
-    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, treasuryOwner, 'treasy');
+    await sendMintFromOfficialAddress(ctx.blockchain, ctx.registry, ctx.mockOfficialAddress, treasuryOwner, 'treasy', PRICE_6_PLUS, ctx.vaultAddress);
     expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
     await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.05') }, {
       $$type: 'FlushTreasuryAthDue',

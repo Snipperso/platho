@@ -70,7 +70,7 @@ describe('Username TON RPC providers', () => {
     await expect(computeUsernameNameHash('bad.name')).rejects.toThrow(/lowercase ASCII/);
   });
 
-  it('USERNAME-RPC-02: reads registry price, records, due state, and globals', async () => {
+  it('USERNAME-RPC-02: reads registry price, records, flush state, and globals', async () => {
     const hash = 0x1234n;
     const calls: Array<{ method: string; address: string; stack: any[] }> = [];
     const transport = {
@@ -80,15 +80,7 @@ describe('Username TON RPC providers', () => {
         if (call.method === 'get_username_item_address') return { stack: [addr(ITEM)] };
         if (call.method === 'get_name_record') return { stack: [num(-1n), addr(OWNER), addr(ITEM), num(1_700_000_000n)] };
         if (call.method === 'get_pending_mint') {
-          return { stack: [num(-1n), num(911n), num(7n), addr(OWNER), num(hash), num(100n), addr(ITEM), num(20_000_000n), num(2n), num(-1n)] };
-        }
-        if (call.method === 'get_refund_due') return { stack: [num(55n)] };
-        if (call.method === 'get_pending_refund_flush') {
-          return { stack: [num(-1n), addr(OWNER), num(55n), addr(ATH_WALLET), num(3n)] };
-        }
-        if (call.method === 'get_refund_flush_id') return { stack: [num(0xabcDn)] };
-        if (call.method === 'get_pending_refund_flush_for') {
-          return { stack: [num(-1n), addr(OWNER), num(55n), addr(ATH_WALLET), num(3n)] };
+          return { stack: [num(-1n), num(911n), num(7n), addr(OWNER), num(hash), num(100n), addr(ITEM), num(20_000_000n), num(2n)] };
         }
         if (call.method === 'get_pending_treasury_flush') {
           return { stack: [num(-1n), num(77n), addr(ATH_WALLET), num(4n)] };
@@ -112,8 +104,6 @@ describe('Username TON RPC providers', () => {
               num(13n),
               num(14n),
               num(15n),
-              num(16n),
-              num(17n),
               num(86_400n),
             ],
           };
@@ -132,12 +122,7 @@ describe('Username TON RPC providers', () => {
       sender_key: 7n,
       name_hash: hash,
       item_deploy_value: 20_000_000n,
-      vault_funded: true,
     });
-    await expect(provider.getRefundDue(OWNER)).resolves.toBe(55n);
-    await expect(provider.getPendingRefundFlush(1n)).resolves.toMatchObject({ amount: 55n, recipient_ath_wallet: ATH_WALLET });
-    await expect(provider.getRefundFlushId(OWNER, 1n)).resolves.toBe(0xabcDn);
-    await expect(provider.getPendingRefundFlushFor(OWNER, 1n)).resolves.toMatchObject({ owner_wallet: OWNER, amount: 55n });
     await expect(provider.getPendingTreasuryFlush(2n)).resolves.toMatchObject({ amount: 77n, recipient_ath_wallet: ATH_WALLET });
     await expect(provider.getPendingBurnFlush(3n)).resolves.toMatchObject({ amount: 88n });
     await expect(provider.getAthWalletAddress(OWNER)).resolves.toBe(ATH_WALLET);
@@ -172,8 +157,6 @@ describe('Username TON RPC providers', () => {
       num(13n),
       num(14n),
       num(15n),
-      num(16n),
-      num(17n),
       num(86_400n),
     ];
     let seenCall: any = null;
@@ -202,11 +185,11 @@ describe('Username TON RPC providers', () => {
       usernameRegistryAddress: REGISTRY,
       transport: {
         async runGetMethod() {
-          return { stack: currentGlobalStack.slice(0, 15) };
+          return { stack: currentGlobalStack.slice(0, 13) };
         },
       },
     });
-    await expect(oldAbiProvider.getGlobal()).rejects.toThrow(/expected 17 stack items/);
+    await expect(oldAbiProvider.getGlobal()).rejects.toThrow(/expected 15 stack items/);
   });
 
   it('USERNAME-RPC-02C: identity and price getters forward critical read options', async () => {

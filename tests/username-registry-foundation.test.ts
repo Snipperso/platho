@@ -327,7 +327,6 @@ describe('UsernameRegistry foundation milestone', () => {
     expect(state.official_ath_wallet_bound).toBe(false);
     expect(state.name_record_count).toBe(0n);
     expect(state.pending_mint_count).toBe(0n);
-    expect(state.refund_due_count).toBe(0n);
     expect(state.treasury_due_ath).toBe(0n);
     expect(state.burn_due_ath).toBe(0n);
   });
