@@ -150,6 +150,7 @@ describe('PWA contract transaction builders', () => {
       {
         enc_pubkey: 0x11n,
         sign_pubkey: 0x22n,
+        auth_pubkey: 0x33n,
         pq_kem_pubkey_hash: 0x55n,
         pq_kem_pubkey_len: 1184n,
         pq_kem_pubkey: PQ_PUBKEY_BYTES,
@@ -159,6 +160,7 @@ describe('PWA contract transaction builders', () => {
         $$type: 'RegisterMessagingKeys',
         enc_pubkey: 0x11n,
         sign_pubkey: 0x22n,
+        auth_pubkey: 0x33n,
         pq_kem_pubkey_hash: 0x55n,
         pq_kem_pubkey_len: 1184n,
         pq_kem_pubkey: PQ_PUBKEY_CELL,

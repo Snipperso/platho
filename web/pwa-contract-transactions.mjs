@@ -1,4 +1,4 @@
-import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=5';
+import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const VAULT_OPS = Object.freeze({
@@ -984,10 +984,13 @@ export function buildVaultMessageBody(type, params = {}) {
       return beginVaultBody(VAULT_OPS.RegisterMessagingKeys)
         .uint(params.enc_pubkey, 256, 'enc_pubkey')
         .uint(params.sign_pubkey, 256, 'sign_pubkey')
-        .uint(params.pq_kem_pubkey_hash, 256, 'pq_kem_pubkey_hash')
-        .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
-        .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
-        .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
+        .uint(params.auth_pubkey, 256, 'auth_pubkey')
+        .ref(beginCell()
+          .uint(params.pq_kem_pubkey_hash, 256, 'pq_kem_pubkey_hash')
+          .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
+          .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
+          .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
+          .endCell(), 'register_keys_tail')
         .toBocBase64();
     case 'ReplaceMessagingKeys':
       return beginVaultBody(VAULT_OPS.ReplaceMessagingKeys)

@@ -1,6 +1,6 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=5';
-import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=18';
-import { tonCell } from './pwa-contract-transactions.mjs?v=16';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
+import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=19';
+import { tonCell } from './pwa-contract-transactions.mjs?v=17';
 
 const CAPSULEHUB_OPS = Object.freeze({
   PublishPrivateFromVault: 0xA4F862C0n,

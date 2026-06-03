@@ -1749,24 +1749,24 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v318/);
+    expect(sw).toMatch(/platho-pwa-prototype-v319/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=258/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
+    expect(sw).toMatch(/\.\/app\.js\?v=259/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=46/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
-    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=8/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=16/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=12/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=16/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=9/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=8/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=14/);
+    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=9/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=19/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=13/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=10/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=9/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=15/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=5/);
+    expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/ed25519\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/abstract\/edwards\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/hashes\/sha2\.js/);

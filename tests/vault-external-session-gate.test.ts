@@ -85,26 +85,36 @@ async function deployExtraVault(blockchain: Blockchain, label: string) {
 }
 
 async function registerKeys(vault: any, user: any) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, 8));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, 8));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, 78));
   await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
-    ...hybridMessagingKeyFields(1n, BigInt('0x' + keyPair.publicKey.toString('hex'))),
+    ...hybridMessagingKeyFields(
+      1n,
+      BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+      BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+    ),
   } as RegisterMessagingKeys);
-  return keyPair;
+  return authKeyPair;
 }
 
 async function registerKeysFromAddress(blockchain: Blockchain, vault: any, owner: Address, seedByte: number) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
   await blockchain.sendMessage(internal({
     from: owner,
     to: vault.address,
     value: toNano('0.05'),
     body: beginCell().store(storeRegisterMessagingKeys({
       $$type: 'RegisterMessagingKeys',
-      ...hybridMessagingKeyFields(1n, BigInt('0x' + keyPair.publicKey.toString('hex'))),
+      ...hybridMessagingKeyFields(
+        1n,
+        BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+        BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+      ),
     } as RegisterMessagingKeys)).endCell(),
   }));
-  return keyPair;
+  return authKeyPair;
 }
 
 async function depositTon(vault: any, user: any, amount: bigint) {

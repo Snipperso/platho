@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=5';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=16';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=17';
 
 export class VaultTonRpcProviderError extends Error {
   constructor(message, options = {}) {
@@ -721,7 +721,8 @@ export function decodeVaultUserViewStack(result) {
     ton_balance: readStackInt(stack, 1, 'Vault user ton_balance'),
     ath_balance: readStackInt(stack, 2, 'Vault user ath_balance'),
     current_key_id: readStackInt(stack, 3, 'Vault user current_key_id'),
-    publish_nonce: readStackInt(stack, 4, 'Vault user publish_nonce'),
+    auth_pubkey: readStackInt(stack, 4, 'Vault user auth_pubkey'),
+    publish_nonce: readStackInt(stack, 5, 'Vault user publish_nonce'),
   };
 }
 

@@ -1732,12 +1732,18 @@ export function parseTonAddress(address) {
   }
 }
 
-export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKey) {
+export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKey, options = {}) {
   const bundle = await normalizeRecipientBundle(publicBundle);
   if (bundle.suite !== CRYPTO_SUITES.HYBRID_V1) {
     throw new Error('Platho v1 messaging keys require hybrid-v1');
   }
   const signPublicKey = assertBytes('signingPublicKey', signingPublicKey, ED25519_PUBLIC_KEY_BYTES);
+  const authPublicKey = options.authPublicKey === undefined || options.authPublicKey === null
+    ? null
+    : assertBytes('authPublicKey', options.authPublicKey, ED25519_PUBLIC_KEY_BYTES);
+  if (authPublicKey && bytesEqual(authPublicKey, signPublicKey)) {
+    throw new Error('Vault auth public key must be separate from messaging signing key');
+  }
   const encPublicKey = assertBytes('x25519PublicKey', bundle.x25519PublicKey, X25519_PUBLIC_KEY_BYTES);
   const pqHash = bundle.suite === CRYPTO_SUITES.HYBRID_V1
     ? assertBytes('mlKem768PublicKeyHash', base64urlDecode(bundle.mlKem768PublicKeyHash), 32)
@@ -1749,6 +1755,7 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: bytesToBigInt(encPublicKey),
     sign_pubkey: bytesToBigInt(signPublicKey),
+    ...(authPublicKey ? { auth_pubkey: bytesToBigInt(authPublicKey) } : {}),
     pq_kem_pubkey_hash: bytesToBigInt(pqHash),
     pq_kem_pubkey_len: bundle.suite === CRYPTO_SUITES.HYBRID_V1 ? BigInt(MLKEM768_PUBLIC_KEY_BYTES) : 0n,
     pq_kem_pubkey: pqPubkey,
@@ -1760,6 +1767,7 @@ export async function createVaultMessagingKeyDraft(publicBundle, signingPublicKe
       $$type: draft.$$type,
       enc_pubkey: bigintHex256(draft.enc_pubkey),
       sign_pubkey: bigintHex256(draft.sign_pubkey),
+      ...(authPublicKey ? { auth_pubkey: bigintHex256(draft.auth_pubkey) } : {}),
       pq_kem_pubkey_hash: bigintHex256(draft.pq_kem_pubkey_hash),
       pq_kem_pubkey_len: Number(draft.pq_kem_pubkey_len),
       pq_kem_pubkey_b64u: base64urlEncode(pqPubkey),
@@ -2456,7 +2464,10 @@ export async function runPlathoCryptoSelfTest() {
     vaultAddress: 'testnet:vault-placeholder',
   });
   const verifiedBundle = await verifySignedPublicKeyBundle(signedBundle, { now: 1_700_000_001_000 });
-  const vaultDraft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey);
+  const vaultAuthPublicKey = ed25519.getPublicKey(new Uint8Array(32).fill(0xa7));
+  const vaultDraft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey, {
+    authPublicKey: vaultAuthPublicKey,
+  });
   if (vaultDraft.message.crypto_suite_mask !== BigInt(CONTRACT_CRYPTO_SUITE.HYBRID)) {
     throw new Error('hybrid-v1 Vault key draft failed');
   }

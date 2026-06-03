@@ -13,16 +13,17 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=5';
+} from './crypto/platho-crypto.mjs?v=6';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
+  deriveVaultAuthKeyPairFromWallet,
   deriveMessagingIdentityFromWallet,
   exportPlathoWalletRecoveryPhrase,
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=8';
+} from './platho-wallet.mjs?v=9';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -30,9 +31,9 @@ import {
 } from './encrypted-message-store.mjs?v=3';
 import {
   VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=2';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=45';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=18';
+} from './vault-chain-provider.mjs?v=3';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=46';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=19';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   normalizePublicChannelRegistry,
@@ -101,19 +102,19 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=16';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=9';
+} from './pwa-contract-transactions.mjs?v=17';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=10';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=16';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=12';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=8';
+} from './capsulehub-ton-rpc-provider.mjs?v=17';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=13';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=9';
 import {
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=14';
+} from './username-ton-rpc-provider.mjs?v=15';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -366,6 +367,7 @@ let activeThreadId = null;
 let activeDocId = APP_DOCS[0]?.id ?? null;
 const docsCache = new Map();
 let localIdentity = null;
+let localVaultAuthKeyPair = null;
 let localRecipientKeyPair = null;
 let localSignedPublicBundle = null;
 let localVaultDraft = null;
@@ -1286,6 +1288,7 @@ function lockPlathoWallet(status = 'Wallet locked', options = {}) {
   clearVaultAutoRefreshTimer();
   plathoWallet = null;
   localIdentity = null;
+  localVaultAuthKeyPair = null;
   localRecipientKeyPair = null;
   localSignedPublicBundle = null;
   localVaultDraft = null;
@@ -8156,6 +8159,13 @@ function requirePlathoWalletAddress() {
   return requirePlathoWallet().address;
 }
 
+function requireVaultAuthSecretKey() {
+  if (!localVaultAuthKeyPair?.secretKey) {
+    throw new Error('Local Vault auth key is not ready');
+  }
+  return localVaultAuthKeyPair.secretKey;
+}
+
 function parseDecimalAmount(input, decimals, symbol) {
   const text = String(input ?? '').trim().replace(',', '.');
   const match = text.match(new RegExp(`^([0-9]+)(?:\\.([0-9]{0,${decimals}}))?$`));
@@ -9337,9 +9347,7 @@ async function assertVaultProfileAvatarCanStart(owner, partCount) {
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before setting an avatar');
   }
-  if (!localIdentity?.signingSecretKey) {
-    throw new Error('Local Platho signing key is not ready');
-  }
+  requireVaultAuthSecretKey();
   const publishHold = await estimateVaultPublicPublishHoldNanotons(provider, owner, partCount);
   const totalTonHold = publishHold + PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS;
   const vaultTon = vaultTonBalanceNanotons(user);
@@ -9365,9 +9373,7 @@ async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before minting a username');
   }
-  if (!localIdentity?.signingSecretKey) {
-    throw new Error('Local Platho signing key is not ready');
-  }
+  requireVaultAuthSecretKey();
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS) {
@@ -9393,9 +9399,7 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before setting an avatar');
   }
-  if (!localIdentity?.signingSecretKey) {
-    throw new Error('Local Platho signing key is not ready');
-  }
+  requireVaultAuthSecretKey();
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS) {
@@ -9415,7 +9419,7 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
     avatar_stream_id: avatarStreamId,
     avatar_part_count: avatarPartCount,
     media_format: mediaFormat,
-    signingSecretKey: localIdentity.signingSecretKey,
+    signingSecretKey: requireVaultAuthSecretKey(),
     deploymentManifestHash: requireVaultDeploymentManifestHash(),
   }, {
     vaultAddress: requireVaultAddress(),
@@ -9446,9 +9450,7 @@ async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before minting a username');
   }
-  if (!localIdentity?.signingSecretKey) {
-    throw new Error('Local Platho signing key is not ready');
-  }
+  requireVaultAuthSecretKey();
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS) {
@@ -9464,7 +9466,7 @@ async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
     max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
     username_registry_address: registry,
     username,
-    signingSecretKey: localIdentity.signingSecretKey,
+    signingSecretKey: requireVaultAuthSecretKey(),
     deploymentManifestHash: requireVaultDeploymentManifestHash(),
   }, {
     vaultAddress: requireVaultAddress(),
@@ -10036,15 +10038,13 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before using payment checks');
   }
-  if (!localIdentity?.signingSecretKey) {
-    throw new Error('Local Platho signing key is not ready');
-  }
+  requireVaultAuthSecretKey();
   const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
   const external = await buildVaultReceiveIntentExternalBoc(type, {
     ...params,
     owner_wallet: owner,
     client_nonce: clientNonce,
-    signingSecretKey: localIdentity.signingSecretKey,
+    signingSecretKey: requireVaultAuthSecretKey(),
   }, {
     vaultAddress: requireVaultAddress(),
     deploymentManifestHash: requireVaultDeploymentManifestHash(),
@@ -10818,9 +10818,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before publishing');
   }
-  if (!localIdentity?.signingSecretKey) {
-    throw new Error('Local Platho signing key is not ready');
-  }
+  requireVaultAuthSecretKey();
   assertNetworkFeeSurchargeWithinCap();
   const surcharge = currentNetworkFeeSurchargeNanotons();
   refreshComposerCostStatus();
@@ -10884,7 +10882,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
       client_nonce: item.clientNonce,
       max_charge: item.maxCharge,
       publish: item.publish,
-      signingSecretKey: localIdentity.signingSecretKey,
+      signingSecretKey: requireVaultAuthSecretKey(),
       deploymentManifestHash: requireVaultDeploymentManifestHash(),
     }, {
       vaultAddress: requireVaultAddress(),
@@ -11629,6 +11627,12 @@ async function refreshVaultActivationStatus(options = {}) {
       currentKeyId: user.current_key_id,
       recordKeyId: user.current_key_id,
     });
+    const localAuthPubkey = localVaultAuthKeyPair?.publicKey
+      ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey)
+      : 0n;
+    if (localAuthPubkey === 0n || BigInt(user.auth_pubkey ?? 0n) !== localAuthPubkey) {
+      throw new Error('Vault auth key does not match this wallet');
+    }
     const active = binding.active === true;
     globalThis.plathoVaultBinding = active ? { walletAddress: plathoWallet.address, user, keyRecord: record } : null;
     setText(vaultRecordStatus, active ? 'activated' : 'record mismatch');
@@ -11659,6 +11663,7 @@ async function bootCrypto() {
       const hasStoredWallet = hasStoredPlathoWalletRecord();
       const requiredStatus = hasStoredWallet ? 'unlock required' : 'wallet required';
       localIdentity = null;
+      localVaultAuthKeyPair = null;
       localRecipientKeyPair = null;
       localSignedPublicBundle = null;
       localVaultDraft = null;
@@ -11677,6 +11682,7 @@ async function bootCrypto() {
     }
     renderWalletIdentity();
     localProfileAvatarPointer = readStoredProfileAvatarPointer(plathoWallet.address);
+    localVaultAuthKeyPair = await deriveVaultAuthKeyPairFromWallet(plathoWallet);
     localIdentity = await loadMessagingIdentityFromWallet(VAULT_RECEIVE_CRYPTO_SUITE);
     localRecipientKeyPair = localIdentity?.encryptionKeyPair ?? null;
     localSignedPublicBundle = await exportSignedPublicKeyBundle(localIdentity, {
@@ -11685,7 +11691,9 @@ async function bootCrypto() {
       vaultAddress: appConfig.vault?.address ?? null,
     });
     const verifiedBundle = await verifySignedPublicKeyBundle(localSignedPublicBundle);
-    localVaultDraft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey);
+    localVaultDraft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey, {
+      authPublicKey: localVaultAuthKeyPair.publicKey,
+    });
     globalThis.plathoRefreshVaultActivation = async (provider) => refreshVaultActivationStatus({ provider });
     setText(vaultRecordStatus, 'checking');
     setText(vaultDraftStatus, 'checking');
@@ -11729,6 +11737,7 @@ async function bootCrypto() {
     }
   } catch (error) {
     setText(encryptionStatus, 'unavailable');
+    localVaultAuthKeyPair = null;
     setText(keyAuthStatus, 'blocked');
     vaultDraftStatus.textContent = 'blocked';
     setText(capsulePolicyStatus, 'blocked');

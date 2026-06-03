@@ -43,9 +43,9 @@ The signed bundle is a messaging-key self-signature. Wallet ownership is anchore
 ## Wallet ownership
 
 The production PWA does not use an external wallet connector. A user creates or imports a normal 24-word TON recovery phrase, and the PWA
-deterministically derives both the TON wallet key and the messaging encryption/signing keys from that phrase. Vault
-activation is the ownership anchor: the embedded wallet signs and sends `RegisterMessagingKeys` or `ReplaceMessagingKeys`
-from the same wallet that owns the on-chain key record.
+deterministically derives the TON wallet key, a separate Vault auth key, and the messaging encryption/signing keys from that phrase. Vault
+activation is the ownership anchor: the embedded wallet signs and sends `RegisterMessagingKeys` from the same wallet that owns the on-chain key record.
+`ReplaceMessagingKeys` rotates only the public receive/messaging key record; it does not rotate the Vault auth key.
 
 Recipients trust a messaging bundle only after checking it against the active Vault key record for that wallet:
 
@@ -63,16 +63,16 @@ external wallet connection mode in final v1.
 Private capsule on-chain cells use the final `platho.byte-layout.v1` binary layout. The PWA may wrap capsules in JSON for export/share UI, but the protocol payload is binary bytes, not JSON and not an off-chain pointer. `CapsuleHub` stores compact authenticated headers/indexes plus the body hash; the encrypted body cell stays in the accepted publish transaction body and is reconstructed from TON message history, then verified against the stored hashes.
 
 Every publish goes through Vault as a Vault-balance funded signed external message. The user first funds their internal
-Vault TON balance, then the PWA signs a publish request with the active `current_sign_pubkey`; a relayer can submit the
-external message without holding the wallet key. The signed payload is domain-separated with `VPB1`,
+Vault TON balance, then the PWA signs a publish request with the active `auth_pubkey`; a relayer can submit the
+external message without holding the wallet key or the messaging signing key. The signed payload is domain-separated with `VPB1`,
 `deployment_manifest_hash`, the target Vault address, and the publish kind before owner, nonce, max charge, and payload.
 The TON value that CapsuleHub actually sends back in an ACK or bounce is credited to the user's internal Vault TON
 balance, capped by the tracked pending publish refund amount. If the Vault balance or chain access is not available, the
 PWA fails closed and must not expose publish actions.
 
-Because `current_sign_pubkey` authorizes Vault-balance publish spending, compromising the local messaging signing key is
-also a publish-spending compromise for that user's internal Vault TON balance. Key replacement revokes the old signing key
-for future nonce validation.
+Because `auth_pubkey` authorizes Vault-balance spending, compromising the local messaging signing key alone does not authorize
+Vault publish, payment-check, username, or avatar actions. A messaging signing-key compromise can still affect message-level
+identity signatures, so key replacement revokes the old public receive key record for future inbound encryption checks.
 
 PWA message pricing is per capsule. With current reserves and no ATH discount, exact canonical examples are public entries from `0.0337 TON` and `hybrid-v1` 1 KiB private
 capsules from `0.0347 TON`; larger private size classes cost more by canonical class. This includes protocol
@@ -329,6 +329,7 @@ The client can derive a `RegisterMessagingKeys` draft from a verified signed bun
 
 - `enc_pubkey`: 32-byte X25519 public key as uint256.
 - `sign_pubkey`: 32-byte Ed25519 signing public key as uint256.
+- `auth_pubkey`: separate 32-byte Ed25519 Vault auth public key as uint256.
 - `pq_kem_pubkey_hash`: SHA-256 of the ML-KEM-768 public key.
 - `pq_kem_pubkey_len`: `1184`.
 - `pq_kem_pubkey`: canonical snake-cell containing exactly 1184 ML-KEM-768 public-key bytes.
@@ -341,6 +342,7 @@ This draft is submitted by the embedded Platho wallet activation flow. Once the 
 After the wallet has registered keys on-chain, the client must fetch:
 
 - the wallet `UserState.current_key_id`;
+- for the user's own unlocked wallet, `UserState.auth_pubkey` matching the locally derived Vault auth public key;
 - the `VaultKeyRecordView` for that key id.
 
 The PWA exposes this as a fail-closed provider bridge in `web/vault-chain-provider.mjs`. The bridge expects a provider with:

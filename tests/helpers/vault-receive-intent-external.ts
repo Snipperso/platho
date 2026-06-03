@@ -22,12 +22,17 @@ function addressHash(address: Address): bigint {
 }
 
 export async function registerVaultSigningKeys(vault: any, user: any, seedByte: number, keyId = 1n) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
   await vault.send(user.getSender(), { value: 50_000_000n }, {
     $$type: 'RegisterMessagingKeys',
-    ...hybridMessagingKeyFields(keyId, BigInt('0x' + keyPair.publicKey.toString('hex'))),
+    ...hybridMessagingKeyFields(
+      keyId,
+      BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+      BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+    ),
   } as RegisterMessagingKeys);
-  return keyPair;
+  return authKeyPair;
 }
 
 export function buildVaultReceiveIntentExternalBody(

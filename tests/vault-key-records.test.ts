@@ -39,6 +39,7 @@ const ENC_0 = 0x1000000000000000000000000000000000000000000000000000000000000001
 const SIG_0 = 0x2000000000000000000000000000000000000000000000000000000000000002n;
 const ENC_1 = 0x3000000000000000000000000000000000000000000000000000000000000003n;
 const SIG_1 = 0x4000000000000000000000000000000000000000000000000000000000000004n;
+const AUTH_0 = 0x6000000000000000000000000000000000000000000000000000000000000006n;
 const PQ_HASH = 0x5000000000000000000000000000000000000000000000000000000000000005n;
 
 function snakeCell(byteLength: number, fill = 0x5a): Cell {
@@ -60,6 +61,7 @@ async function registerHybrid(vault: any, user: any, value = toNano('0.1')) {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: ENC_0,
     sign_pubkey: SIG_0,
+    auth_pubkey: AUTH_0,
     pq_kem_pubkey_hash: PQ_HASH,
     pq_kem_pubkey_len: 1184n,
     pq_kem_pubkey: PQ_CELL,
@@ -88,6 +90,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     const userState = await vault.getGetUser(user.address);
     expect(userState.exists).toBe(true);
     expect(userState.current_key_id).not.toBe(0n);
+    expect(userState.auth_pubkey).toBe(AUTH_0);
     expect((await vault.getGetGlobal()).user_count).toBe(1n);
     expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
 
@@ -104,6 +107,24 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect(record.revoked_lt).toBe(0n);
   });
 
+  it('VAULT-REJECT: Vault auth key must be separate from messaging signing key', async () => {
+    const { vault, user } = await setup();
+
+    await vault.send(user.getSender(), { value: toNano('0.1') }, {
+      $$type: 'RegisterMessagingKeys',
+      enc_pubkey: ENC_0,
+      sign_pubkey: SIG_0,
+      auth_pubkey: SIG_0,
+      pq_kem_pubkey_hash: PQ_HASH,
+      pq_kem_pubkey_len: 1184n,
+      pq_kem_pubkey: PQ_CELL,
+      crypto_suite_mask: 2n,
+    } as RegisterMessagingKeys);
+
+    expect((await vault.getGetUser(user.address)).exists).toBe(false);
+    expect((await vault.getGetGlobal()).key_record_count).toBe(0n);
+  });
+
   it('VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1', async () => {
     const { vault, user } = await setup();
 
@@ -116,6 +137,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     const userState = await vault.getGetUser(user.address);
     const newKeyId = userState.current_key_id;
     expect(newKeyId).not.toBe(oldKeyId);
+    expect(userState.auth_pubkey).toBe(AUTH_0);
 
     const oldRecord = await vault.getGetKeyRecord(oldKeyId);
     const newRecord = await vault.getGetKeyRecord(newKeyId);
@@ -158,6 +180,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
       $$type: 'RegisterMessagingKeys',
       enc_pubkey: ENC_0,
       sign_pubkey: SIG_0,
+      auth_pubkey: AUTH_0,
       pq_kem_pubkey_hash: PQ_HASH,
       pq_kem_pubkey_len: 1184n,
       pq_kem_pubkey: PQ_CELL,

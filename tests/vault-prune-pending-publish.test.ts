@@ -96,12 +96,17 @@ async function setup() {
 }
 
 async function registerKeys(vault: any, user: any) {
-  const keyPair = keyPairFromSeed(Buffer.alloc(32, 9));
+  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, 9));
+  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, 79));
   await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
-    ...hybridMessagingKeyFields(1n, BigInt('0x' + keyPair.publicKey.toString('hex'))),
+    ...hybridMessagingKeyFields(
+      1n,
+      BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
+      BigInt('0x' + authKeyPair.publicKey.toString('hex')),
+    ),
   } as RegisterMessagingKeys);
-  return keyPair;
+  return authKeyPair;
 }
 
 async function depositTon(vault: any, user: any, amount: bigint) {

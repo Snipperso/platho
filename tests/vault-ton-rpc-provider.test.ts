@@ -70,6 +70,7 @@ describe('Vault TON RPC provider', () => {
               num(0n),
               num(0n),
               num(7n),
+              num(0x99n),
               num(3n),
             ],
           };

@@ -18,10 +18,16 @@ export function snakeCell(byteLength: number, fill = 0x5a): Cell {
 
 export const HYBRID_PQ_CELL = snakeCell(Number(HYBRID_PQ_LEN));
 
-export function hybridMessagingKeyFields(encPubkey: bigint, signPubkey: bigint) {
+function defaultAuthPubkey(signPubkey: bigint) {
+  const candidate = signPubkey ^ 1n;
+  return candidate === 0n ? 2n : candidate;
+}
+
+export function hybridMessagingKeyFields(encPubkey: bigint, signPubkey: bigint, authPubkey: bigint = defaultAuthPubkey(signPubkey)) {
   return {
     enc_pubkey: encPubkey,
     sign_pubkey: signPubkey,
+    auth_pubkey: authPubkey,
     pq_kem_pubkey_hash: HYBRID_PQ_HASH,
     pq_kem_pubkey_len: HYBRID_PQ_LEN,
     pq_kem_pubkey: HYBRID_PQ_CELL,
