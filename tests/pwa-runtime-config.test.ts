@@ -456,8 +456,17 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function clearPlathoLocalData/);
     expect(app).toMatch(/platho-local-message-history-v1/);
     expect(app).toMatch(/platho-local-security-v1/);
+    expect(app).toMatch(/function deploymentStorageSuffix/);
+    expect(app).toMatch(/function currentMessageHistoryDbName/);
+    expect(app).toMatch(/createIndexedDbEncryptedMessageHistoryStore\(\{ dbName: currentMessageHistoryDbName\(\) \}\)/);
+    expect(app).toMatch(/createIndexedDbReplayStore\(\{ dbName: currentReplayDbName\(\) \}\)/);
+    expect(app).toMatch(/function publicChannelStorage/);
+    expect(app).toMatch(/readPublicChannelFeedCache\(publicChannelStorage\(\)\)/);
+    expect(app).toMatch(/writePublicChannelSubscriptions\(publicChannelStorage\(\), publicChannelSubscriptions\)/);
+    expect(app).toMatch(/scopedStorageKey\(PUBLIC_READ_CURSORS_STORAGE_KEY\)/);
     expect(app).toMatch(/localStorageOrNull\(\)\?\.clear\(\)/);
     expect(app).toMatch(/globalThis\.sessionStorage\?\.clear\?\.\(\)/);
+    expect(app).toMatch(/indexedDB\.databases\(\)/);
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
     expect(html).toMatch(/<h2>Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="walletTonBalanceButton"[\s\S]*id="registerVaultKeysButton"/);
@@ -1861,11 +1870,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v327/);
+    expect(sw).toMatch(/platho-pwa-prototype-v328/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=265/);
+    expect(sw).toMatch(/\.\/app\.js\?v=266/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=49/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

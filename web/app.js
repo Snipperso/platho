@@ -36,6 +36,8 @@ import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=49';
 import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=20';
 import {
   DEFAULT_PUBLIC_CHANNELS,
+  PUBLIC_CHANNEL_FEED_CACHE_KEY,
+  PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY,
   normalizePublicChannelRegistry,
   normalizePublicChannelFeed,
   publicChannelSubscriptionsToThreads,
@@ -147,19 +149,22 @@ function installConfiguredTonRuntime(config = appConfig) {
     if (transport) globalThis.plathoTonRpcTransport = transport;
   }
 
-  if (config?.vault?.address && !globalThis.plathoVaultAddress) {
+  if (config?.vault?.address) {
     globalThis.plathoVaultAddress = config.vault.address;
   }
-  if (config?.capsuleHub?.address && !globalThis.plathoCapsuleHubAddress) {
+  if (config?.vault?.deploymentManifestHash) {
+    globalThis.plathoVaultDeploymentManifestHash = config.vault.deploymentManifestHash;
+  }
+  if (config?.capsuleHub?.address) {
     globalThis.plathoCapsuleHubAddress = config.capsuleHub.address;
   }
-  if (config?.ath?.masterAddress && !globalThis.plathoAthMasterAddress) {
+  if (config?.ath?.masterAddress) {
     globalThis.plathoAthMasterAddress = config.ath.masterAddress;
   }
-  if (config?.usernameRegistry?.address && !globalThis.plathoUsernameRegistryAddress) {
+  if (config?.usernameRegistry?.address) {
     globalThis.plathoUsernameRegistryAddress = config.usernameRegistry.address;
   }
-  if (config?.profileRegistry?.address && !globalThis.plathoProfileRegistryAddress) {
+  if (config?.profileRegistry?.address) {
     globalThis.plathoProfileRegistryAddress = config.profileRegistry.address;
   }
 }
@@ -452,6 +457,8 @@ const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.h
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 400;
+const LEGACY_MESSAGE_HISTORY_DB_NAME = 'platho-local-message-history-v1';
+const LEGACY_REPLAY_DB_NAME = 'platho-local-security-v1';
 const PRIVATE_CHAIN_RESCAN_OVERLAP = 25;
 const PUBLIC_CHAIN_READ_LIMIT = 128;
 const PRIVATE_CHAIN_READ_LIMIT = 50;
@@ -542,6 +549,54 @@ let athProtocolState = {
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
+}
+
+function deploymentStorageSuffix() {
+  const manifestHash = String(appConfig.vault?.deploymentManifestHash ?? '').replace(/^0x/i, '').toLowerCase();
+  if (/^[0-9a-f]{64}$/.test(manifestHash)) return manifestHash.slice(0, 16);
+  const vaultAddress = String(appConfig.vault?.address ?? '').replace(/[^a-z0-9_-]/gi, '');
+  return vaultAddress.slice(-16) || 'no-deployment';
+}
+
+function scopedStorageKey(baseKey) {
+  return `${baseKey}:${deploymentStorageSuffix()}`;
+}
+
+function scopedIndexedDbName(baseName) {
+  return `${baseName}.${deploymentStorageSuffix()}`;
+}
+
+function currentMessageHistoryDbName() {
+  return scopedIndexedDbName(LEGACY_MESSAGE_HISTORY_DB_NAME);
+}
+
+function currentReplayDbName() {
+  return scopedIndexedDbName(LEGACY_REPLAY_DB_NAME);
+}
+
+function deploymentScopedStorage(storage, scopedKeys) {
+  if (!storage) return storage;
+  const keyFor = (key) => (scopedKeys.has(key) ? scopedStorageKey(key) : key);
+  return {
+    getItem(key) {
+      return storage.getItem(keyFor(key));
+    },
+    setItem(key, value) {
+      return storage.setItem(keyFor(key), value);
+    },
+    removeItem(key) {
+      return storage.removeItem(keyFor(key));
+    },
+  };
+}
+
+const PUBLIC_CHANNEL_STORAGE_KEYS = new Set([
+  PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY,
+  PUBLIC_CHANNEL_FEED_CACHE_KEY,
+]);
+
+function publicChannelStorage() {
+  return deploymentScopedStorage(localStorageOrNull(), PUBLIC_CHANNEL_STORAGE_KEYS);
 }
 
 function rememberLocalStoragePersistenceStatus(status) {
@@ -756,7 +811,7 @@ async function refreshInstalledRelatedPwaState() {
 }
 
 function profileAvatarStorageKey(owner = plathoWallet?.address) {
-  return owner ? `${PROFILE_AVATAR_POINTER_STORAGE_PREFIX}:${owner}` : null;
+  return owner ? `${PROFILE_AVATAR_POINTER_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${owner}` : null;
 }
 
 function zeroAvatarHashHex() {
@@ -948,7 +1003,7 @@ function walletDisplayIdentityStorageKey(owner = plathoWallet?.address) {
 }
 
 function linkedPlathoUsernameStorageKey(owner = plathoWallet?.address) {
-  return owner ? `${LINKED_PLATHO_USERNAME_STORAGE_PREFIX}:${owner}` : null;
+  return owner ? `${LINKED_PLATHO_USERNAME_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${owner}` : null;
 }
 
 function privateSenderModeStorageKey(owner = plathoWallet?.address) {
@@ -2243,7 +2298,7 @@ function addCustomPublicChannel(channel) {
       subscribed: subscribedById.get(item.id)?.subscribed === true,
     })),
   };
-  writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+  writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   publicDisplayMode = 'channels';
   renderPublicSurface();
@@ -2266,7 +2321,7 @@ function setPublicChannelSubscribed(channelId, subscribed) {
     activeChannelId: nextActive,
     channels,
   };
-  writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+  writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
   renderPublicSurface({ anchorUnread: false });
   setPublicStatus(subscribed ? 'channel followed' : 'channel hidden');
@@ -2275,7 +2330,7 @@ function setPublicChannelSubscribed(channelId, subscribed) {
 
 function readPublicReadCursors() {
   try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(PUBLIC_READ_CURSORS_STORAGE_KEY) ?? '{}');
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(scopedStorageKey(PUBLIC_READ_CURSORS_STORAGE_KEY)) ?? '{}');
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -2284,7 +2339,7 @@ function readPublicReadCursors() {
 
 function writePublicReadCursors() {
   try {
-    localStorageOrNull()?.setItem(PUBLIC_READ_CURSORS_STORAGE_KEY, JSON.stringify(publicReadCursors));
+    localStorageOrNull()?.setItem(scopedStorageKey(PUBLIC_READ_CURSORS_STORAGE_KEY), JSON.stringify(publicReadCursors));
   } catch {
     // Non-persistent mode still keeps read state for the current tab.
   }
@@ -2844,7 +2899,7 @@ function renderPublicChannels() {
         ...publicChannelSubscriptions,
         activeChannelId: channel.id,
       };
-      writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+      writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
       renderPublicSurface({ anchorUnread: false });
     });
     publicFeed.append(card);
@@ -3371,7 +3426,7 @@ function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
         ...publicChannelSubscriptions,
         activeChannelId: existing.id,
       };
-      writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+      writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
     }
     return existing.id;
   }
@@ -3403,7 +3458,7 @@ function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
       subscribed: subscribedById.get(item.id)?.subscribed === true,
     })),
   };
-  writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
+  writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   return id;
 }
@@ -3656,7 +3711,7 @@ async function syncPublicChannels() {
   try {
     const syncedFromChain = await syncPublicChannelFromChain();
     if (syncedFromChain) {
-      writePublicChannelFeedCache(localStorageOrNull(), publicChannelFeedCache);
+      writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
       rebuildThreadsFromPublicSubscriptions();
       renderThreads();
       renderConversation();
@@ -3703,7 +3758,7 @@ async function syncPublicChannels() {
     }
   }
   if (!changed) return;
-  writePublicChannelFeedCache(localStorageOrNull(), publicChannelFeedCache);
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
   rebuildThreadsFromPublicSubscriptions();
   renderThreads();
   renderConversation();
@@ -3744,7 +3799,7 @@ async function hydratePublicAvatars() {
     changed = attachAvatarUrlToPublicFeedCache(request.ownerWallet, request.pointer, imageUrl) || changed;
   }
   if (!changed) return false;
-  writePublicChannelFeedCache(localStorageOrNull(), publicChannelFeedCache);
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
   renderThreads();
@@ -4850,7 +4905,7 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
 
 async function bootReplayStore() {
   try {
-    localReplayStore = await createIndexedDbReplayStore();
+    localReplayStore = await createIndexedDbReplayStore({ dbName: currentReplayDbName() });
     setText(replayStoreStatus, 'device db');
   } catch {
     localReplayStore = createMemoryReplayStore();
@@ -5033,7 +5088,7 @@ async function restoreEncryptedMessageHistory() {
 
 async function bootEncryptedMessageHistory() {
   try {
-    encryptedMessageStore = await createIndexedDbEncryptedMessageHistoryStore();
+    encryptedMessageStore = await createIndexedDbEncryptedMessageHistoryStore({ dbName: currentMessageHistoryDbName() });
   } catch (indexedDbError) {
     try {
       encryptedMessageStore = await createMemoryEncryptedMessageHistoryStore();
@@ -6724,8 +6779,8 @@ async function readJsonFile(file) {
 }
 
 const PLATHO_LOCAL_INDEXED_DB_NAMES = Object.freeze([
-  'platho-local-message-history-v1',
-  'platho-local-security-v1',
+  LEGACY_MESSAGE_HISTORY_DB_NAME,
+  LEGACY_REPLAY_DB_NAME,
 ]);
 
 function deleteIndexedDbDatabase(name) {
@@ -6741,6 +6796,34 @@ function deleteIndexedDbDatabase(name) {
   });
 }
 
+async function plathoLocalIndexedDbNames() {
+  const names = new Set([
+    ...PLATHO_LOCAL_INDEXED_DB_NAMES,
+    currentMessageHistoryDbName(),
+    currentReplayDbName(),
+  ]);
+  if (globalThis.indexedDB?.databases) {
+    try {
+      const databases = await indexedDB.databases();
+      for (const database of databases ?? []) {
+        const name = database?.name;
+        if (typeof name !== 'string') continue;
+        if (
+          name === LEGACY_MESSAGE_HISTORY_DB_NAME
+          || name === LEGACY_REPLAY_DB_NAME
+          || name.startsWith(`${LEGACY_MESSAGE_HISTORY_DB_NAME}.`)
+          || name.startsWith(`${LEGACY_REPLAY_DB_NAME}.`)
+        ) {
+          names.add(name);
+        }
+      }
+    } catch {
+      // Some browsers expose IndexedDB but do not allow database enumeration.
+    }
+  }
+  return [...names];
+}
+
 function clearDocumentCookies() {
   for (const item of document.cookie.split(';')) {
     const name = item.split('=')[0]?.trim();
@@ -6753,7 +6836,7 @@ async function clearPlathoLocalData() {
   localStorageOrNull()?.clear();
   globalThis.sessionStorage?.clear?.();
   clearDocumentCookies();
-  await Promise.all(PLATHO_LOCAL_INDEXED_DB_NAMES.map((name) => deleteIndexedDbDatabase(name)));
+  await Promise.all((await plathoLocalIndexedDbNames()).map((name) => deleteIndexedDbDatabase(name)));
   if (globalThis.caches?.keys) {
     const keys = await caches.keys();
     await Promise.all(keys.filter((key) => key.startsWith('platho-')).map((key) => caches.delete(key)));
@@ -9824,8 +9907,8 @@ async function refreshVaultDashboard() {
   let userError = null;
   const [walletBalancesResult, userResult, globalResult] = await Promise.allSettled([
     loadConnectedWalletBalances(),
-    loadConnectedVaultUser(),
-    loadConnectedVaultGlobal(),
+    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
+    loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
   ]);
   const walletBalances = walletBalancesResult.status === 'fulfilled'
     ? walletBalancesResult.value
@@ -11461,7 +11544,7 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
     ...publicChannelFeedCache,
     [channelId]: { feed, syncedAt: feed.updatedAt },
   };
-  writePublicChannelFeedCache(localStorageOrNull(), publicChannelFeedCache);
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
   renderThreads();
@@ -11505,7 +11588,7 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
     ...publicChannelFeedCache,
     [channelId]: { feed, syncedAt: feed.updatedAt },
   };
-  writePublicChannelFeedCache(localStorageOrNull(), publicChannelFeedCache);
+  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: false });
 }
@@ -11779,11 +11862,16 @@ async function refreshVaultActivationStatus(options = {}) {
   try {
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
-    const user = options.user ?? await provider.getUser(plathoWallet.address, { vaultAddress: appConfig.vault?.address ?? null });
+    const user = options.user ?? await provider.getUser(plathoWallet.address, {
+      vaultAddress: requireVaultAddress(),
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    });
     const global = options.skipGlobal === true
       ? null
       : provider.getGlobal
-        ? await loadConnectedVaultGlobal({ provider }).catch(() => null)
+        ? await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 }).catch(() => null)
         : null;
     if (global) {
       vaultProtocolState = {
@@ -11808,7 +11896,12 @@ async function refreshVaultActivationStatus(options = {}) {
       refreshComposerPublishPolicy();
       return null;
     }
-    const record = await provider.getKeyRecord(user.current_key_id, { vaultAddress: appConfig.vault?.address ?? null });
+    const record = await provider.getKeyRecord(user.current_key_id, {
+      vaultAddress: requireVaultAddress(),
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    });
     const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
       ownerWallet: plathoWallet.address,
       currentKeyId: user.current_key_id,
@@ -12029,9 +12122,9 @@ window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passi
 
 customPublicChannels = readCustomPublicChannels();
 rebuildPublicChannelRegistry();
-publicChannelSubscriptions = readPublicChannelSubscriptions(localStorageOrNull(), publicChannelRegistry);
-writePublicChannelSubscriptions(localStorageOrNull(), publicChannelSubscriptions);
-publicChannelFeedCache = readPublicChannelFeedCache(localStorageOrNull());
+publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
+writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
+publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
 publicReadCursors = readPublicReadCursors();
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
