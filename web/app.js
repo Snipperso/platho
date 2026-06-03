@@ -5312,6 +5312,7 @@ async function requestWalletPasswordInput({
   submitLabel,
   confirm = false,
   create = false,
+  dismissOnBackdrop = true,
   passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
   passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
   summary = [],
@@ -5351,7 +5352,7 @@ async function requestWalletPasswordInput({
     hint,
     tone,
     submitLabel,
-    dismissOnBackdrop: false,
+    dismissOnBackdrop,
     formAutocomplete: 'on',
     fields,
     summary,
@@ -6908,15 +6909,9 @@ function refreshMessagingControls() {
     button.disabled = !plathoWallet || !signedActionsReady;
   }
   railItems.forEach((item) => {
-    const gated = item.dataset.tab !== 'profile';
-    item.disabled = gated && !accountActive;
-    item.title = item.disabled ? 'Activate Platho account first' : (item.getAttribute('aria-label') ?? '');
+    item.disabled = false;
+    item.title = item.getAttribute('aria-label') ?? '';
   });
-  if (!accountActive && appShell?.dataset?.view !== 'profile') {
-    requestAnimationFrame(() => {
-      if (!hasActivePlathoAccount() && appShell?.dataset?.view !== 'profile') setView('profile');
-    });
-  }
   refreshVaultMoveWidget();
   updatePrivateSenderModeUi();
   refreshComposerCostStatus();
@@ -6925,12 +6920,6 @@ function refreshMessagingControls() {
 }
 
 function setView(view) {
-  if (view !== 'profile' && !hasActivePlathoAccount()) {
-    view = 'profile';
-    flashWalletIdentityStatus(pendingServiceWorkerAppShellReload
-      ? 'Reload app to finish update'
-      : (plathoWallet ? 'Activate Platho account first' : 'Create or unlock wallet first'));
-  }
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
