@@ -78,16 +78,6 @@ function normalizeHash(value: unknown): string {
   return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
 }
 
-function formatNanotons(value: string | number | bigint): string {
-  return BigInt(value).toLocaleString('en-US');
-}
-
-function extractSummaryMargin(notes: string, label: string): string | null {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = notes.match(new RegExp(`${escaped} worst retained margin is now ([0-9,]+) nanotons`));
-  return match?.[1] ?? null;
-}
-
 function currentManifestCodeHashMismatches(): string[] {
   const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
   const input = readJson('artifacts/mainnet_genesis_verify_input.json');
@@ -197,25 +187,24 @@ describe('release truth single-source guard', () => {
     }
   });
 
-  it('keeps broad full-test storage margin notes aligned with dedicated economics reports', () => {
+  it('keeps exact current economics values in dedicated reports instead of full-suite prose', () => {
     const summary = readJson('artifacts/CURRENT_FULL_TEST_SUMMARY.json');
     const notes = Array.isArray(summary.notes) ? summary.notes.join('\n') : '';
+    const pricingReport = readJson('artifacts/publish_reserve_pricing_report.json');
     const profileReport = readJson('artifacts/profile_registry_storage_economics_report.json');
     const usernameReport = readJson('artifacts/username_registry_storage_economics_report.json');
 
-    const profileMargin = extractSummaryMargin(notes, 'ProfileRegistry');
-    const usernameMargin = extractSummaryMargin(notes, 'UsernameRegistry');
-    const usernameItemMargin = extractSummaryMargin(notes, 'UsernameNFTItem');
-
-    if (profileMargin !== null) {
-      expect(profileMargin).toBe(formatNanotons(profileReport.worst_margin_vs_permanent_endowment_nanotons));
-    }
-    if (usernameMargin !== null) {
-      expect(usernameMargin).toBe(formatNanotons(usernameReport.worst_registry_margin_nanotons));
-    }
-    if (usernameItemMargin !== null) {
-      expect(usernameItemMargin).toBe(formatNanotons(usernameReport.worst_item_margin_nanotons));
-    }
+    expect(pricingReport.status).toBe('PASS');
+    expect(profileReport.status).toBe('PASS');
+    expect(usernameReport.status).toBe('PASS');
+    expect(notes).not.toMatch(/\bpublic\s+1K\b[^\n.]*\b0\.\d+\s*TON\b/i);
+    expect(notes).not.toMatch(/\bprivate\s+1K\b[^\n.]*\b0\.\d+\s*TON\b/i);
+    expect(notes).not.toMatch(/\bfrom\s+0\.\d+\s*TON\b/i);
+    expect(notes).not.toMatch(/\b0\.0(?:10|30|337|347|50|63)\s*TON\b/i);
+    expect(notes).not.toMatch(/audited\s+2026-06-0[12]/i);
+    expect(notes).not.toMatch(/TON mainnet (?:basechain )?fee (?:config )?snapshot/i);
+    expect(notes).not.toMatch(/worst retained margin is now [0-9,]+ nanotons/i);
+    expect(notes).not.toMatch(/username mint hold to 0\.\d+\s*TON/i);
   });
 
   it('keeps local mainnet final manifest code hashes aligned with CURRENT_CODE_HASHES when the local draft is archived', () => {
