@@ -1610,8 +1610,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_CHAIN_RESCAN_OVERLAP = 25/);
     expect(app).toMatch(/const MESSAGE_AUTO_SYNC_MS = 60 \* 1000/);
     expect(app).toMatch(/let messageAutoSyncAt = 0/);
+    expect(app).toMatch(/let messageAutoSyncPhase = 'idle'/);
+    expect(app).toMatch(/const MESSAGE_SYNC_LOADING_FRAMES = Object\.freeze/);
     expect(app).toMatch(/function messageAutoSyncCountdownText/);
-    expect(app).toMatch(/Refreshing in \$\{seconds\}s/);
+    expect(app).toMatch(/return `next sync in \$\{seconds\}s`/);
+    expect(app).toMatch(/✓ Synced - \$\{next\}/);
+    expect(app).toMatch(/function beginMessageSyncUi/);
+    expect(app).toMatch(/function completeMessageSyncUi/);
+    expect(app).toMatch(/function failMessageSyncUi/);
     expect(app).toMatch(/messageAutoSyncAt = Date\.now\(\) \+ effectiveDelayMs/);
     expect(app).toMatch(/scheduleMessageAutoSyncCountdownUi\(\)/);
     expect(app).toMatch(/activeSubtitle\.textContent = conversationSubtitleText\(thread\)/);
@@ -1647,7 +1653,12 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/globalThis\.plathoLastPrivateSync/);
     expect(syncSource).toMatch(/rateLimited: rateLimitError !== null/);
     expect(syncSource).toMatch(/function scheduleMessageAutoSync/);
+    expect(syncSource).toMatch(/beginMessageSyncUi\(\)/);
+    expect(syncSource).toMatch(/completeMessageSyncUi\(result\)/);
+    expect(syncSource).toMatch(/failMessageSyncUi\(label\)/);
     expect(syncButtonSource).toMatch(/forceRecentRescan: true/);
+    expect(syncButtonSource).toMatch(/beginMessageSyncUi\(\)/);
+    expect(syncButtonSource).toMatch(/completeMessageSyncUi\(result\)/);
     expect(syncButtonSource).not.toMatch(/syncPublicChannels/);
     expect(app).toMatch(/function sortThreadMessages/);
     expect(app).toMatch(/function insertThreadMessage/);
@@ -1661,11 +1672,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v313/);
+    expect(sw).toMatch(/platho-pwa-prototype-v314/);
     expect(sw).toMatch(/\.\/styles\.css\?v=125/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=253/);
+    expect(sw).toMatch(/\.\/app\.js\?v=254/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
