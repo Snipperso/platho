@@ -1076,12 +1076,17 @@ function updatePrivateSenderModeUi() {
     privateSenderModeSelect.disabled = !plathoWallet;
   }
   if (privateAnonymousButton) {
+    const icon = privateAnonymousButton.querySelector('.icon');
     privateAnonymousButton.disabled = !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || composer?.dataset.readOnly === 'true';
     privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
-    privateAnonymousButton.setAttribute('aria-label', anonymous ? 'Send with wallet address' : 'Send anonymously');
+    privateAnonymousButton.setAttribute('aria-label', anonymous ? 'Share wallet address' : 'Send anonymously');
     privateAnonymousButton.title = anonymous
-      ? 'Anonymous: your wallet address is not encrypted into new private messages'
-      : 'Share address: recipient can verify and see your wallet address';
+      ? 'Recipient will not see your wallet address'
+      : 'Recipient will see your wallet address';
+    if (icon) {
+      icon.classList.toggle('icon-eye', !anonymous);
+      icon.classList.toggle('icon-eye-off', anonymous);
+    }
   }
 }
 

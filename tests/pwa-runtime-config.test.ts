@@ -201,6 +201,7 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-CONFIG-01B: chat header exposes only live controls', () => {
     const html = readFileSync('web/index.html', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
     expect(html).toMatch(/<h1>Platho\.app<\/h1>[\s\S]*Private chats/);
@@ -220,6 +221,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="privateComposerAddMenu"/);
     expect(html).toMatch(/id="paymentCheckButton"/);
     expect(html).toMatch(/id="privateAnonymousButton"/);
+    expect(html).toMatch(/icon-eye-off/);
+    expect(app).toMatch(/Recipient will see your wallet address/);
+    expect(app).toMatch(/Recipient will not see your wallet address/);
+    expect(app).toMatch(/icon\.classList\.toggle\('icon-eye', !anonymous\)/);
+    expect(app).toMatch(/icon\.classList\.toggle\('icon-eye-off', anonymous\)/);
     expect(html).toMatch(/aria-label="Choose display name"/);
   });
 
@@ -1641,11 +1647,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v311/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=124/);
+    expect(sw).toMatch(/platho-pwa-prototype-v312/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=125/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=251/);
+    expect(sw).toMatch(/\.\/app\.js\?v=252/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
@@ -1671,6 +1677,8 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/vendor\/@jsquash\/webp\/codec\/enc\/webp_enc\.wasm/);
     expect(sw).toMatch(/\.\/manifest\.webmanifest\?v=3/);
     expect(sw).toMatch(/\.\/assets\/platho-icon-192\.png\?v=3/);
+    expect(sw).toMatch(/\.\/assets\/icons\/eye\.svg/);
+    expect(sw).toMatch(/\.\/assets\/icons\/eye-off\.svg/);
   });
 
   it('PWA-CONFIG-09: production hosting configs require strict security headers', () => {

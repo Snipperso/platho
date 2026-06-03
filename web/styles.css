@@ -1030,9 +1030,9 @@ button:disabled,
 }
 
 .private-anonymous-button[aria-pressed="true"] {
-  border-color: rgba(255, 198, 92, 0.44);
-  background: rgba(255, 198, 92, 0.13);
-  color: #ffc65c;
+  border-color: rgba(48, 213, 176, 0.42);
+  background: rgba(48, 213, 176, 0.1);
+  color: var(--accent);
 }
 
 .composer-add-menu {
@@ -2550,6 +2550,8 @@ button.feed-item:hover {
 .icon-broadcast { --mask: url("./assets/icons/broadcast.svg"); }
 .icon-vault { --mask: url("./assets/icons/vault.svg"); }
 .icon-user { --mask: url("./assets/icons/user.svg"); }
+.icon-eye { --mask: url("./assets/icons/eye.svg"); }
+.icon-eye-off { --mask: url("./assets/icons/eye-off.svg"); }
 .icon-search { --mask: url("./assets/icons/search.svg"); }
 .icon-plus { --mask: url("./assets/icons/plus.svg"); }
 .icon-image { --mask: url("./assets/icons/image.svg"); }
