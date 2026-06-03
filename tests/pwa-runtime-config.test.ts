@@ -725,7 +725,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function uniqueDisplayIdentityVariants/);
     expect(app).toMatch(/function messageMetaText/);
     expect(app).toMatch(/meta: 'sending'/);
-    expect(app).toMatch(/message\.meta = 'send failed'/);
+    expect(app).toMatch(/function privateSendRetryMeta/);
+    expect(app).toMatch(/retrying send/);
+    expect(app).toMatch(/privateSendBlockedStatusText/);
+    expect(app).not.toMatch(/message\.meta = 'send failed'/);
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.rail-item span:last-child\s*{[\s\S]*text-overflow: ellipsis;/);
   });
 
@@ -816,7 +819,8 @@ describe('PWA runtime config guard', () => {
     expect(sentStatusIndex).toBeGreaterThan(sendIndex);
     expect(nonceIndex).toBeGreaterThan(sentStatusIndex);
     expect(submittedStatusIndex).toBeGreaterThan(nonceIndex);
-    expect(sendSource).toMatch(/if \(publishState\.submittedCount > 0 \|\| sentBeforeFailure\) publishState\.status = VAULT_PUBLISH_STATUS_PARTIAL/);
+    expect(sendSource).toMatch(/const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError\(error\)/);
+    expect(sendSource).toMatch(/if \(publishState\.submittedCount > 0 \|\| sentBeforeFailure \|\| ambiguousBroadcast\) publishState\.status = VAULT_PUBLISH_STATUS_PARTIAL/);
     expect(partialIndex).toBeGreaterThan(submittedStatusIndex);
     expect(sendSource).toMatch(/await confirmCapsuleHubPublishEntries\(publishState\)/);
     expect(sendSource).toMatch(/: VAULT_PUBLISH_STATUS_SUBMITTED/);
@@ -833,7 +837,7 @@ describe('PWA runtime config guard', () => {
     expect(metaSource).toMatch(/PUBLISH_PART_STATUS_SENT/);
     expect(metaSource).toMatch(/PUBLISH_PART_STATUS_UNKNOWN/);
     expect(metaSource).toMatch(/const pending = Math\.max\(submitted, publishStatePendingCount\(publishState\)\)/);
-    expect(metaSource).toMatch(/if \(pending <= 0\) return 'send failed'/);
+    expect(metaSource).toMatch(/if \(pending <= 0\) return 'not sent'/);
     expect(metaSource).toMatch(/if \(total === 1\) return 'submitted, confirming'/);
     expect(metaSource).toMatch(/partial publish \$\{pending\}\/\$\{total\}/);
     expect(metaSource).not.toMatch(/partial publish \$\{submitted\}\/\$\{total\}/);
@@ -1078,7 +1082,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/ANONYMOUS: 'anonymous'/);
     expect(app).toMatch(/function currentPrivateSenderOptions\(\)[\s\S]*includeSenderWalletMetadata: currentPrivateSenderMode\(\) !== PRIVATE_SENDER_MODES\.ANONYMOUS/);
     expect(app).toMatch(/senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
-    expect(app).toMatch(/createPrivateComposerCapsules\(text, attachment, recipientEntry, activeThreadId, senderOptions\)/);
+    expect(app).toMatch(/createPrivateComposerCapsules\(text, attachment, recipientEntry, thread\.id, senderOptions\)/);
     expect(app).toMatch(/privateComposerSendPlan\(text, attachment, senderOptions\)/);
     expect(app).toMatch(/payment[\s\S]*senderOptions\.includeSenderWalletMetadata === false[\s\S]*\? \{\}/);
     expect(identities).toMatch(/const anonymousId = normalizedPeerId\(input\.senderKeyId \?\? input\.keyId\)/);
@@ -1628,11 +1632,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v307/);
+    expect(sw).toMatch(/platho-pwa-prototype-v308/);
     expect(sw).toMatch(/\.\/styles\.css\?v=124/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=247/);
+    expect(sw).toMatch(/\.\/app\.js\?v=248/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

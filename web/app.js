@@ -407,6 +407,10 @@ let messageAutoSyncCountdownTimer = null;
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
+let privateSendRetrySeq = 0;
+const privateSendRetryJobs = new Map();
+let privatePublishConfirmSeq = 0;
+const privatePublishConfirmJobs = new Map();
 const tonWalletBalanceCache = new Map();
 const tonWalletBalanceInFlight = new Map();
 const VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES.HYBRID_V1;
@@ -433,6 +437,8 @@ const TON_RPC_CONNECTING_STATUS = 'Connecting...';
 const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
 const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
 const MESSAGE_SYNC_COUNTDOWN_TICK_MS = 1_000;
+const PRIVATE_SEND_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
@@ -4368,7 +4374,7 @@ function messageMetaText(message) {
 
 function messageStatusKey(message) {
   const text = messageMetaText(message).toLowerCase();
-  if (text.includes('sending') || text.includes('submitted') || text.includes('confirming')) return 'sending';
+  if (text.includes('sending') || text.includes('submitted') || text.includes('confirming') || text.includes('retrying')) return 'sending';
   if (text.includes('failed') || text.includes('blocked') || text.includes('partial')) return 'failed';
   if (text.includes('published') || text.includes('sent')) return 'sent';
   if (text.includes('received')) return 'received';
@@ -5515,6 +5521,49 @@ function privateSendPreflightStatusText(error) {
   if (/RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message)) return 'RPC verification unavailable';
   if (/Vault chain provider|TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
   return message;
+}
+
+function privateSendBlockedStatusText(error) {
+  return `not sent: ${privateSendPreflightStatusText(error)}`;
+}
+
+function isTonRpcTransientError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return isTonRpcRateLimitError(error)
+    || error?.code === 'TIMEOUT'
+    || error?.code === 'NETWORK_ERROR'
+    || error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
+    || /timeout|network|failed to fetch|fetch failed|backoff|temporar(?:y|ily)|verification unavailable|provider unavailable|rpc busy|request aborted/i.test(message);
+}
+
+function isFatalPrivateSendError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return isPublishPriceChangeCancelled(error)
+    || isVaultPublishPartialError(error)
+    || /not enough vault ton|vault ton balance is too low|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|network surcharge .*exceeds the production cap|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
+}
+
+function isRecoverablePrivateSendError(error) {
+  return isTonRpcTransientError(error) && !isFatalPrivateSendError(error);
+}
+
+function isAmbiguousTonRpcBroadcastError(error) {
+  const message = String(error?.message ?? error ?? '');
+  if (/rejected|bad request|invalid boc|invalid message|exit code|not enough vault ton|nonce/i.test(message)) return false;
+  return isTonRpcRateLimitError(error)
+    || error?.code === 'TIMEOUT'
+    || error?.code === 'NETWORK_ERROR'
+    || /timeout|network|failed to fetch|fetch failed|backoff|request aborted/i.test(message);
+}
+
+function privateSendRetryDelayMs(error = null, attempt = 0) {
+  if (isTonRpcRateLimitError(error)) return tonRpcLimitBackoffMs(error);
+  const index = Math.min(Math.max(0, Number(attempt) || 0), PRIVATE_SEND_RETRY_DELAYS_MS.length - 1);
+  return PRIVATE_SEND_RETRY_DELAYS_MS[index];
+}
+
+function privateSendRetryMeta(error = null) {
+  return isTonRpcRateLimitError(error) ? 'retrying after RPC busy' : 'retrying send';
 }
 
 function messageDiscountUnlocked() {
@@ -7459,66 +7508,20 @@ composer?.addEventListener('submit', async (event) => {
   renderThreads();
   renderConversation();
 
+  const sendContext = {
+    thread,
+    message,
+    text,
+    attachment,
+    selectedSuite,
+    senderOptions,
+    retryAttempt: 0,
+    confirmAttempt: 0,
+  };
   try {
-    const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
-    const capsules = await createPrivateComposerCapsules(text, attachment, recipientEntry, activeThreadId, senderOptions);
-    const capsule = capsules[0];
-    const publishState = createCapsulePublishState(capsules);
-    message.capsule = capsule;
-    message.capsules = capsules;
-    message.publishState = publishState;
-    message.recipientWallet = recipientEntry.walletAddress;
-    message.meta = publishStateMeta(publishState);
-    renderConversation();
-    const publishCallbacks = {
-      publishState,
-      onReadyToSend: async () => {
-        await persistMessageToEncryptedHistory(thread, message);
-      },
-      onPartState: () => {
-        message.meta = publishStateMeta(publishState);
-        updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
-        renderConversation();
-      },
-    };
-    const publishResult = capsules.length > 1
-      ? await publishCapsulesThroughVault(capsules, publishCallbacks)
-      : await publishCapsuleThroughVault(capsule, publishCallbacks);
-    message.vaultPublish = publishResult;
-    message.publishState = publishResult.publishState ?? publishState;
-    message.meta = publishStateMeta(message.publishState);
-    thread.state = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
-    await updateMessageInEncryptedHistory(thread, message);
-    refreshMessagingControls();
+    await attemptPrivateComposerMessagePublish(sendContext);
   } catch (error) {
-    const cancelled = isPublishPriceChangeCancelled(error);
-    const partial = isVaultPublishPartialError(error);
-    const rateLimited = noteTonRpcRateLimit(error);
-    if (partial) {
-      message.vaultPublish = error.publishResult;
-      message.publishState = error.publishResult?.publishState ?? message.publishState;
-      message.meta = publishStateMeta(message.publishState);
-      thread.state = 'blocked';
-      await updateMessageInEncryptedHistory(thread, message);
-    } else if (cancelled) {
-      thread.messages = (thread.messages ?? []).filter((item) => item !== message);
-      messageInput.value = text;
-      privateImageAttachment = attachment;
-      updateImageAttachmentUi('private');
-      autoResizeComposerTextarea(messageInput);
-    } else {
-      message.meta = 'send failed';
-      thread.state = 'blocked';
-      await updateMessageInEncryptedHistory(thread, message);
-    }
-    if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = cancelled
-        ? 'Send cancelled'
-        : (partial ? 'Partial publish' : (rateLimited ? TON_RPC_CONNECTING_STATUS : 'Send failed'));
-      privateComposerCostStatus.dataset.state = cancelled ? 'ready' : 'short';
-    }
-    refreshMessagingControls();
-    if (!rateLimited && !cancelled && !partial) console.error(error);
+    await settlePrivateComposerSendError(sendContext, error);
   }
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -10258,12 +10261,12 @@ function publishStateMeta(publishState) {
   const pending = Math.max(submitted, publishStatePendingCount(publishState));
   if (confirmed >= total) return 'published';
   if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    if (pending <= 0) return 'send failed';
+    if (pending <= 0) return 'not sent';
     if (total === 1) return 'submitted, confirming';
     return `partial publish ${pending}/${total}`;
   }
   if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) return `submitted ${pending}/${total}, confirming`;
-  if (publishState?.status === 'failed') return 'send failed';
+  if (publishState?.status === 'failed') return 'not sent';
   return total > 1 ? `sending ${total} parts` : 'sending';
 }
 
@@ -10515,13 +10518,14 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
       notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
     } catch (error) {
       const sentBeforeFailure = Boolean(item.result);
+      const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
       const part = setPublishPartStatus(
         publishState,
         item.partIndex,
-        sentBeforeFailure ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED,
+        sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED,
         { error: String(error?.message ?? error) },
       );
-      if (publishState.submittedCount > 0 || sentBeforeFailure) publishState.status = VAULT_PUBLISH_STATUS_PARTIAL;
+      if (publishState.submittedCount > 0 || sentBeforeFailure || ambiguousBroadcast) publishState.status = VAULT_PUBLISH_STATUS_PARTIAL;
       notifyPublishState(options, publishState, part);
       const partialResult = {
         status: publishState.status === VAULT_PUBLISH_STATUS_PARTIAL ? VAULT_PUBLISH_STATUS_PARTIAL : 'vault-publish-failed',
@@ -10570,6 +10574,241 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
 async function publishCapsulesThroughVault(capsules, options = {}) {
   const prepared = await prepareCapsulesThroughVault(capsules, options);
   return sendPreparedCapsulesThroughVault(prepared, options);
+}
+
+function privateMessageHasPublishAttempt(message) {
+  return (message?.publishState?.parts ?? []).some((part) => (
+    part.status === PUBLISH_PART_STATUS_SENT
+    || part.status === PUBLISH_PART_STATUS_UNKNOWN
+    || part.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+    || part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
+  ));
+}
+
+function privateSendRetryKey(message) {
+  if (!message.privateSendRetryKey) {
+    privateSendRetrySeq += 1;
+    message.privateSendRetryKey = `private-send-${Date.now()}-${privateSendRetrySeq}`;
+  }
+  return message.privateSendRetryKey;
+}
+
+function privatePublishConfirmRetryKey(message) {
+  if (!message.privatePublishConfirmRetryKey) {
+    privatePublishConfirmSeq += 1;
+    message.privatePublishConfirmRetryKey = `private-confirm-${Date.now()}-${privatePublishConfirmSeq}`;
+  }
+  return message.privatePublishConfirmRetryKey;
+}
+
+function clearPrivateSendRetry(message) {
+  const key = message?.privateSendRetryKey;
+  if (!key) return;
+  const job = privateSendRetryJobs.get(key);
+  if (job?.timer) window.clearTimeout(job.timer);
+  privateSendRetryJobs.delete(key);
+}
+
+function clearPrivatePublishConfirmRetry(message) {
+  const key = message?.privatePublishConfirmRetryKey;
+  if (!key) return;
+  const job = privatePublishConfirmJobs.get(key);
+  if (job?.timer) window.clearTimeout(job.timer);
+  privatePublishConfirmJobs.delete(key);
+}
+
+function refreshPrivateSendRetryUi(thread, message, meta) {
+  message.meta = meta;
+  thread.state = messageStatusKey(message) === 'sending' ? 'sending' : thread.state;
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+}
+
+function schedulePrivateSendRetry(context, error) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message)) return;
+  const attempt = Number(context.retryAttempt ?? 0);
+  const delayMs = privateSendRetryDelayMs(error, attempt);
+  context.retryAttempt = attempt + 1;
+  refreshPrivateSendRetryUi(thread, message, privateSendRetryMeta(error));
+  if (privateComposerCostStatus && thread.id === activeThreadId) {
+    privateComposerCostStatus.textContent = privateSendRetryMeta(error);
+    privateComposerCostStatus.dataset.state = 'ready';
+  }
+  const key = privateSendRetryKey(message);
+  const previous = privateSendRetryJobs.get(key);
+  if (previous?.timer) window.clearTimeout(previous.timer);
+  const timer = window.setTimeout(() => {
+    privateSendRetryJobs.delete(key);
+    runPrivateSendRetry(context).catch((retryError) => console.error(retryError));
+  }, delayMs);
+  privateSendRetryJobs.set(key, { timer, context });
+}
+
+function schedulePrivatePublishConfirmationRetry(context, error = null) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
+  const attempt = Number(context.confirmAttempt ?? 0);
+  const delayMs = isTonRpcRateLimitError(error)
+    ? tonRpcLimitBackoffMs(error)
+    : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)];
+  context.confirmAttempt = attempt + 1;
+  message.meta = publishStateMeta(message.publishState);
+  thread.state = 'pending';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+  const key = privatePublishConfirmRetryKey(message);
+  const previous = privatePublishConfirmJobs.get(key);
+  if (previous?.timer) window.clearTimeout(previous.timer);
+  const timer = window.setTimeout(() => {
+    privatePublishConfirmJobs.delete(key);
+    runPrivatePublishConfirmationRetry(context).catch((confirmError) => console.error(confirmError));
+  }, delayMs);
+  privatePublishConfirmJobs.set(key, { timer, context });
+}
+
+async function runPrivatePublishConfirmationRetry(context) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
+  try {
+    await confirmCapsuleHubPublishEntries(message.publishState);
+    message.meta = publishStateMeta(message.publishState);
+    thread.state = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
+    await updateMessageInEncryptedHistory(thread, message);
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+    if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      schedulePrivatePublishConfirmationRetry(context);
+    } else {
+      clearPrivatePublishConfirmRetry(message);
+    }
+  } catch (error) {
+    const rateLimited = noteTonRpcRateLimit(error);
+    if (!rateLimited) console.error(error);
+    schedulePrivatePublishConfirmationRetry(context, error);
+  }
+}
+
+async function restorePrivateDraftAfterUnsentMessage(context) {
+  const { thread, message, text, attachment } = context;
+  thread.messages = (thread.messages ?? []).filter((item) => item !== message);
+  if (messageInput && !messageInput.value.trim()) messageInput.value = text;
+  privateImageAttachment = attachment;
+  updateImageAttachmentUi('private');
+  autoResizeComposerTextarea(messageInput);
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+}
+
+async function attemptPrivateComposerMessagePublish(context) {
+  const { thread, message, text, attachment, selectedSuite, senderOptions } = context;
+  const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
+  const capsules = await createPrivateComposerCapsules(text, attachment, recipientEntry, thread.id, senderOptions);
+  const capsule = capsules[0];
+  const publishState = createCapsulePublishState(capsules);
+  message.capsule = capsule;
+  message.capsules = capsules;
+  message.publishState = publishState;
+  message.recipientWallet = recipientEntry.walletAddress;
+  message.meta = publishStateMeta(publishState);
+  refreshThreadAfterMessageChange(thread);
+  renderConversation();
+  const publishCallbacks = {
+    publishState,
+    onReadyToSend: async () => {
+      await persistMessageToEncryptedHistory(thread, message);
+    },
+    onPartState: () => {
+      message.meta = publishStateMeta(publishState);
+      updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+      renderConversation();
+    },
+  };
+  const publishResult = capsules.length > 1
+    ? await publishCapsulesThroughVault(capsules, publishCallbacks)
+    : await publishCapsuleThroughVault(capsule, publishCallbacks);
+  clearPrivateSendRetry(message);
+  message.vaultPublish = publishResult;
+  message.publishState = publishResult.publishState ?? publishState;
+  message.meta = publishStateMeta(message.publishState);
+  thread.state = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
+  await updateMessageInEncryptedHistory(thread, message);
+  if (publishResult.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+    schedulePrivatePublishConfirmationRetry(context);
+  } else {
+    clearPrivatePublishConfirmRetry(message);
+  }
+  refreshMessagingControls();
+  return publishResult;
+}
+
+async function settlePrivateComposerSendError(context, error) {
+  const { thread, message } = context;
+  const cancelled = isPublishPriceChangeCancelled(error);
+  const partial = isVaultPublishPartialError(error);
+  const rateLimited = noteTonRpcRateLimit(error);
+  if (partial) {
+    clearPrivateSendRetry(message);
+    message.vaultPublish = error.publishResult;
+    message.publishState = error.publishResult?.publishState ?? message.publishState;
+    message.meta = publishStateMeta(message.publishState);
+    thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
+    await updateMessageInEncryptedHistory(thread, message);
+    schedulePrivatePublishConfirmationRetry(context, error);
+  } else if (cancelled) {
+    clearPrivateSendRetry(message);
+    clearPrivatePublishConfirmRetry(message);
+    await restorePrivateDraftAfterUnsentMessage(context);
+  } else if (isRecoverablePrivateSendError(error) && !privateMessageHasPublishAttempt(message)) {
+    schedulePrivateSendRetry(context, error);
+  } else if (!privateMessageHasPublishAttempt(message) && !message.localHistoryId) {
+    clearPrivateSendRetry(message);
+    clearPrivatePublishConfirmRetry(message);
+    await restorePrivateDraftAfterUnsentMessage(context);
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+  } else {
+    clearPrivateSendRetry(message);
+    message.meta = privateSendBlockedStatusText(error);
+    thread.state = 'blocked';
+    await updateMessageInEncryptedHistory(thread, message);
+  }
+  if (privateComposerCostStatus) {
+    privateComposerCostStatus.textContent = cancelled
+      ? 'Send cancelled'
+      : (partial || privateMessageHasPublishAttempt(message)
+        ? publishStateMeta(message.publishState)
+        : (rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error)));
+    privateComposerCostStatus.dataset.state = cancelled ? 'ready' : 'short';
+  }
+  refreshMessagingControls();
+  if (!rateLimited && !cancelled && !partial && !isRecoverablePrivateSendError(error)) console.error(error);
+}
+
+async function runPrivateSendRetry(context) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message)) return;
+  if (tonRpcLimited()) {
+    schedulePrivateSendRetry(context, { message: TON_RPC_CONNECTING_STATUS, code: 'RATE_LIMITED' });
+    return;
+  }
+  try {
+    await attemptPrivateComposerMessagePublish(context);
+  } catch (error) {
+    await settlePrivateComposerSendError(context, error);
+  } finally {
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+  }
 }
 
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null, options = {}) {
