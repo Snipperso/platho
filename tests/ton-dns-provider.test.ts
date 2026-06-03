@@ -4,6 +4,7 @@ import {
   TON_DNS_RECORD_TAGS,
   createTonDnsProvider,
   decodeTonDnsRecordCell,
+  default as defaultTonDnsProvider,
   normalizeTonDnsName,
   tonDnsCategoryHash,
   tonDnsNameToInternalBytes,
@@ -34,6 +35,10 @@ function textDecoder(bytes: Uint8Array) {
 }
 
 describe('TON DNS provider', () => {
+  it('TON-DNS-00: module default export is a ready runtime provider', () => {
+    expect(defaultTonDnsProvider?.resolveWallet).toBeTypeOf('function');
+  });
+
   it('TON-DNS-01: normalizes and encodes .ton names in TON DNS order', () => {
     expect(normalizeTonDnsName('Alice.TON')).toBe('alice.ton');
     expect(textDecoder(tonDnsNameToInternalBytes('alice.ton'))).toBe('ton\\0alice\\0');

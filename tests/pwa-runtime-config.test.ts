@@ -159,6 +159,19 @@ describe('PWA runtime config guard', () => {
     expect(report.findings.map((finding) => finding.id)).toEqual(['PWA_MODE_NOT_PRODUCTION']);
   });
 
+  it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
+    const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
+    const moduleUrl = providerConfig.moduleUrl;
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=11/);
+    const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
+    const module = await import(modulePath);
+    const exportName = providerConfig.exportName ?? 'default';
+    const provider = module[exportName] ?? module.default ?? module.provider;
+
+    expect(exportName).toBe('default');
+    expect(provider?.resolveWallet).toBeTypeOf('function');
+  });
+
   it('PWA-CONFIG-01A: Vault preview UI does not expose internal readiness artifacts', () => {
     const vaultText = JSON.stringify({
       cards: PLATHO_APP_CONFIG.ui.vaultCards,
@@ -1821,11 +1834,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v321/);
+    expect(sw).toMatch(/platho-pwa-prototype-v322/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=261/);
+    expect(sw).toMatch(/\.\/app\.js\?v=262/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=47/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
@@ -1835,7 +1848,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=11/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=10/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=6/);
