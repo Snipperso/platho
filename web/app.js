@@ -6259,7 +6259,9 @@ function refreshMessagingControls() {
     item.title = item.disabled ? 'Activate Platho account first' : (item.getAttribute('aria-label') ?? '');
   });
   if (!accountActive && appShell?.dataset?.view !== 'profile') {
-    requestAnimationFrame(() => setView('profile'));
+    requestAnimationFrame(() => {
+      if (!hasActivePlathoAccount() && appShell?.dataset?.view !== 'profile') setView('profile');
+    });
   }
   refreshVaultMoveWidget();
   refreshComposerCostStatus();
@@ -10629,7 +10631,11 @@ async function refreshVaultActivationStatus(options = {}) {
       renderAthProfileStats();
     }
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
-      delete globalThis.plathoVaultBinding;
+      globalThis.plathoVaultBinding = {
+        walletAddress: plathoWallet.address,
+        user,
+        keyRecord: null,
+      };
       setText(vaultRecordStatus, 'account activation required');
       refreshMessageActionStatuses();
       refreshMessagingControls();
@@ -10695,8 +10701,10 @@ async function bootCrypto() {
     });
     const verifiedBundle = await verifySignedPublicKeyBundle(localSignedPublicBundle);
     localVaultDraft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey);
-    refreshMessagingControls();
     globalThis.plathoRefreshVaultActivation = async (provider) => refreshVaultActivationStatus({ provider });
+    setText(vaultRecordStatus, 'checking');
+    setText(vaultDraftStatus, 'checking');
+    await refreshVaultActivationStatus({ skipGlobal: true });
     const result = await runPlathoCryptoSelfTest();
     setText(encryptionStatus, result.hybrid.aadTamperRejected ? 'hybrid passed' : 'review');
     setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? 'signed bundle' : 'review');
