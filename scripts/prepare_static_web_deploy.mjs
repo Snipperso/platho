@@ -463,6 +463,14 @@ function prepareStaticWebDeploy(options) {
   const runtimeFiles = selectStaticWebRuntimeFiles(webFiles);
   const excludedWebFiles = webFiles.filter((file) => !runtimeFiles.includes(file));
   const outputDir = resolve(ROOT, options.outputDir);
+  const cleanOutput = () => {
+    if (options.clean && existsSync(outputDir)) {
+      if (!isInside(resolve(ARTIFACTS_DIR), outputDir)) {
+        throw new Error(`Refusing to clean output outside artifacts: ${outputDir}`);
+      }
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  };
 
   const files = createFileRecords(WEB_ROOT, runtimeFiles);
   const report = createStaticWebDeployReport({
@@ -476,16 +484,12 @@ function prepareStaticWebDeploy(options) {
   });
 
   if (report.blockers.length > 0) {
+    cleanOutput();
     writeReport(report);
     return report;
   }
 
-  if (options.clean && existsSync(outputDir)) {
-    if (!isInside(resolve(ARTIFACTS_DIR), outputDir)) {
-      throw new Error(`Refusing to clean output outside artifacts: ${outputDir}`);
-    }
-    rmSync(outputDir, { recursive: true, force: true });
-  }
+  cleanOutput();
   assertNoStaleOutputFiles(outputDir, runtimeFiles);
   copyRuntimeFiles(WEB_ROOT, outputDir, runtimeFiles);
   writeReport(report);

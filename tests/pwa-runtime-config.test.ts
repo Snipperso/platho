@@ -991,6 +991,19 @@ describe('PWA runtime config guard', () => {
     expect(prepareSource).toMatch(/async function prepareCapsulesThroughVault[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
   });
 
+  it('PWA-INTERFACE-MATRIX-01: matrix does not claim removed direct identity product actions', () => {
+    const matrix = readFileSync('artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+
+    expect(app).not.toMatch(/async function submitUsernameRefundFlush/);
+    expect(matrix).not.toMatch(/ATHTransferRequestMintUsername/);
+    expect(matrix).not.toMatch(/ATHTransferRequestProfileAvatar/);
+    expect(matrix).not.toMatch(/\|\s*Flush username refund\s*\|[\s\S]*\|\s*Implemented\s*\|/);
+    expect(matrix).toContain('Direct user-wallet username mint, profile avatar payment, and username refund-flush product actions are intentionally unsupported');
+    expect(matrix).toMatch(/\|\s*Mint username from Vault balance\s*\|\s*`Vault`\s*\|/);
+    expect(matrix).toMatch(/\|\s*Set wallet avatar from Vault balance\s*\|\s*`Vault`\s*\|/);
+  });
+
   it('PWA-ACTIVATION-01: transient Vault provider errors do not clear an active composer binding', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const activationSource = app.slice(

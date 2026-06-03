@@ -8,6 +8,8 @@ Purpose: list the contract entrypoints and getters that the production PWA must 
 
 This matrix reflects the current wallet-like Vault model. The PWA uses internal Vault TON/ATH balances plus signed external publish messages with `publish_nonce`. Older draft publish surfaces are superseded and are not part of active v1 evidence.
 
+Direct user-wallet username mint, profile avatar payment, and username refund-flush product actions are intentionally unsupported in the current V1 PWA. These product flows go through Vault-funded messages so normal user operations do not expose separate external wallet transactions for identity/profile actions.
+
 ## Current PWA Reality
 
 - It creates/imports a normal 24-word TON recovery phrase and deterministically derives both the TON wallet key and messaging keys from that phrase.
@@ -40,10 +42,7 @@ These are normal user flows. They should be implemented in the PWA, with tests, 
 | Publish public channel post/comment/avatar capsule | `Vault` external | `PublishPublicFromVaultBalance` | owner signing key | Implemented | Public body is raw PWA bytes in the accepted publish transaction body; final display requires CapsuleHub hash verification. |
 | Transfer ATH to another owner | user `ATHWallet` | `ATHTransferRequest(query_id, amount, recipient, response_destination)` | user wallet to user ATHWallet | Implemented | Normal ATH transfer from the user's external ATH wallet. |
 | Burn own ATH | user `ATHWallet` | `ATHBurn(query_id, amount, response_destination)` | user wallet to user ATHWallet | Implemented | Direct user burn from the user's external ATH wallet. |
-| Mint username | user `ATHWallet` | `ATHTransferRequestMintUsername(...)` | user wallet to user ATHWallet | Implemented | PWA quotes exact ATH price via `UsernameRegistry.get_username_price` first. |
 | Mint username from Vault balance | `Vault` | `MintUsernameFromVaultBalance(...)` | user wallet | Implemented | PWA checks Vault and reciprocal UsernameRegistry route state before signing. |
-| Flush username refund | `UsernameRegistry` | `FlushAthRefundDue(query_id, owner_wallet)` | owner wallet | Implemented | Used when a failed mint leaves explicit refund due. |
-| Set wallet avatar | user `ATHWallet` | `ATHTransferRequestProfileAvatar(...)` | user wallet to user ATHWallet | Implemented | PWA first publishes public avatar capsule parts through Vault/CapsuleHub, then pays ProfileRegistry. |
 | Set wallet avatar from Vault balance | `Vault` | `SetProfileAvatarFromVaultBalance(...)` | user wallet | Implemented | PWA checks Vault and reciprocal ProfileRegistry route state before signing. |
 | Create payment check | `Vault` | `CreateReceiveIntent(asset, amount, recipient_wallet, commitment, client_nonce)` | sender wallet | Implemented | PWA publishes the encrypted check capsule before creating the locked intent. |
 | Claim payment check | `Vault` | `ClaimReceiveIntent(intent_id, secret32)` | recipient wallet | Implemented | Recipient claims by secret carried in the encrypted capsule. |
