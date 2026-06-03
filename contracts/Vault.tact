@@ -2140,14 +2140,18 @@ contract Vault {
         throwUnless(16611, clientNonce == user.publish_nonce);
         throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         acceptMessage();
-        let maxTonCharge: Int = signedPayload.loadUint(128);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16617, signedVaultAddress == myAddress());
-        throwUnless(16613, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         user.publish_nonce += 1;
         user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        if (!(signedVaultAddress == myAddress())) {
+            return;
+        }
+        if (!(maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE)) {
+            return;
+        }
 
         if (!(signedPayload.bits() == 0)) {
             return;
@@ -2246,14 +2250,18 @@ contract Vault {
         throwUnless(16711, clientNonce == user.publish_nonce);
         throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         acceptMessage();
-        let maxTonCharge: Int = signedPayload.loadUint(128);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16707, signedVaultAddress == myAddress());
-        throwUnless(16713, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         user.publish_nonce += 1;
         user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        if (!(signedVaultAddress == myAddress())) {
+            return;
+        }
+        if (!(maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE)) {
+            return;
+        }
 
         if (!(signedPayload.bits() == 0)) {
             return;
