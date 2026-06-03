@@ -31,6 +31,7 @@ export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
 export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
 export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
 export const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN = 0x56524331n; // "VRC1"
+export const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN = 0x56524B31n; // "VRK1"
 
 export const VAULT_SIZE_CLASS = Object.freeze({
   KIB_1: 1n,
@@ -837,6 +838,67 @@ export async function buildVaultReceiveIntentExternalBoc(type, params = {}, opti
   };
 }
 
+function replaceMessagingKeysOwner(params) {
+  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
+}
+
+function replaceMessagingKeysSignedDataCell(params = {}) {
+  const payload = beginCell()
+    .uint(params.enc_pubkey, 256, 'enc_pubkey')
+    .uint(params.sign_pubkey, 256, 'sign_pubkey')
+    .uint(params.pq_kem_pubkey_hash, 256, 'pq_kem_pubkey_hash')
+    .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
+    .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
+    .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
+    .endCell();
+
+  return beginCell()
+    .uint(VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
+    .uint(basechainAddressHashValue(replaceMessagingKeysOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .ref(payload, 'replace_keys_payload')
+    .endCell();
+}
+
+export async function buildVaultReplaceMessagingKeysBodyCell(params = {}) {
+  assertObject(params, 'params');
+  const signedData = replaceMessagingKeysSignedDataCell(params);
+  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedData);
+  const signature = ed25519.sign(hash, signingSecretKey);
+  return {
+    bodyCell: beginVaultBody(VAULT_OPS.ReplaceMessagingKeys)
+      .address(replaceMessagingKeysOwner(params), 'owner_wallet')
+      .bytesValue(signature, 64, 'signature')
+      .ref(signedData, 'signed_payload')
+      .endCell(),
+    signedData,
+    signedDataHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+  };
+}
+
+export async function buildVaultReplaceMessagingKeysExternalBoc(params = {}, options = {}) {
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const built = await buildVaultReplaceMessagingKeysBodyCell({
+    ...params,
+    vaultAddress,
+    deploymentManifestHash,
+  });
+  const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  return {
+    ...built,
+    boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
 function externalInMessageCell(destinationAddress, bodyCell) {
   return beginCell()
     .uint(2n, 2, 'ext_in_msg_info.tag')
@@ -991,15 +1053,6 @@ export function buildVaultMessageBody(type, params = {}) {
           .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
           .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
           .endCell(), 'register_keys_tail')
-        .toBocBase64();
-    case 'ReplaceMessagingKeys':
-      return beginVaultBody(VAULT_OPS.ReplaceMessagingKeys)
-        .uint(params.enc_pubkey, 256, 'enc_pubkey')
-        .uint(params.sign_pubkey, 256, 'sign_pubkey')
-        .uint(params.pq_kem_pubkey_hash, 256, 'pq_kem_pubkey_hash')
-        .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
-        .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
-        .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
         .toBocBase64();
     default:
       throw new Error(`Unsupported Vault message type ${type}`);

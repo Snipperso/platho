@@ -5,7 +5,6 @@ import {
   storeDepositTon,
   storeMintUsernameFromVaultBalance,
   storeRegisterMessagingKeys,
-  storeReplaceMessagingKeys,
   storeSetProfileAvatarFromVaultBalance,
   storeWithdrawAth,
   storeWithdrawTon,
@@ -36,6 +35,7 @@ import {
   buildVaultProfileAvatarBodyCell,
   buildVaultProfileAvatarExternalBoc,
   buildVaultReceiveIntentExternalBoc,
+  buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultUsernameMintBodyCell,
   buildVaultUsernameMintExternalBoc,
   buildVaultMessageBody,
@@ -167,35 +167,16 @@ describe('PWA contract transaction builders', () => {
         crypto_suite_mask: 2n,
       }),
     ],
-    [
-      'ReplaceMessagingKeys',
-      {
-        enc_pubkey: 0x33n,
-        sign_pubkey: 0x44n,
-        pq_kem_pubkey_hash: 0x55n,
-        pq_kem_pubkey_len: 1184n,
-        pq_kem_pubkey: PQ_PUBKEY_BYTES,
-        crypto_suite_mask: 2n,
-      },
-      storeReplaceMessagingKeys({
-        $$type: 'ReplaceMessagingKeys',
-        enc_pubkey: 0x33n,
-        sign_pubkey: 0x44n,
-        pq_kem_pubkey_hash: 0x55n,
-        pq_kem_pubkey_len: 1184n,
-        pq_kem_pubkey: PQ_PUBKEY_CELL,
-        crypto_suite_mask: 2n,
-      }),
-    ],
   ])('PWA-TX-01: %s body matches generated Tact wrapper encoding', (type, params, store) => {
     expect(buildVaultMessageBody(type, params)).toBe(generatedBody(store));
   });
 
-  it('PWA-TX-01B: payment checks are signed Vault external BOCs, not wallet message bodies', async () => {
+  it('PWA-TX-01B: payment checks and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
     const signingSecretKey = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
     expect(() => buildVaultMessageBody('CreateReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('ClaimReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('CancelReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
+    expect(() => buildVaultMessageBody('ReplaceMessagingKeys', {})).toThrow(/Unsupported Vault message type/);
 
     const createExternal = await buildVaultReceiveIntentExternalBoc('CreateReceiveIntent', {
       owner_wallet: OWNER,
@@ -225,8 +206,21 @@ describe('PWA contract transaction builders', () => {
       client_nonce: 11n,
       intent_id: 0x8888n,
     });
+    const replaceExternal = await buildVaultReplaceMessagingKeysExternalBoc({
+      owner_wallet: OWNER,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
+      signingSecretKey,
+      client_nonce: 12n,
+      enc_pubkey: 0x33n,
+      sign_pubkey: 0x44n,
+      pq_kem_pubkey_hash: 0x55n,
+      pq_kem_pubkey_len: 1184n,
+      pq_kem_pubkey: PQ_PUBKEY_BYTES,
+      crypto_suite_mask: 2n,
+    });
 
-    for (const external of [createExternal, claimExternal, cancelExternal]) {
+    for (const external of [createExternal, claimExternal, cancelExternal, replaceExternal]) {
       expect(external.vaultAddress).toBe(VAULT);
       expect(external.boc).toMatch(/^te6/);
       expect(external.signedDataHash).toMatch(/^[0-9a-f]{64}$/);

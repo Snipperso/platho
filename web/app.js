@@ -23,7 +23,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=9';
+} from './platho-wallet.mjs?v=10';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -32,8 +32,8 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=3';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=46';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=19';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=47';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=20';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   normalizePublicChannelRegistry,
@@ -88,6 +88,7 @@ import {
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarExternalBoc,
   buildVaultReceiveIntentExternalBoc,
+  buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultUsernameMintExternalBoc,
   createVaultWalletMessage,
   estimateVaultAttachedValueNanotons,
@@ -102,19 +103,19 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=17';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=10';
+} from './pwa-contract-transactions.mjs?v=18';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=11';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=17';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=13';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=9';
+} from './capsulehub-ton-rpc-provider.mjs?v=18';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=14';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=10';
 import {
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=15';
+} from './username-ton-rpc-provider.mjs?v=16';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -10560,16 +10561,38 @@ async function confirmPlathoAccountActivation(user) {
 
 async function submitVaultReplaceMessagingKeys() {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
-  const user = await loadConnectedVaultUser();
+  const provider = await resolveVaultChainProvider();
+  const user = await loadConnectedVaultUser({
+    provider,
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
   const currentKeyId = BigInt(user.current_key_id ?? 0n);
   if (user.exists !== true || currentKeyId === 0n) {
     setText(vaultRotateStatus, 'activate account first');
     return null;
   }
+  const requiredTon = estimateVaultAttachedValueNanotons('ReplaceMessagingKeys', localVaultDraft.message);
+  const tonBalance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
+  if (tonBalance < requiredTon) {
+    throw new Error(`Vault TON balance is too low for key rotation; need ${formatTonNanotons(requiredTon)} TON`);
+  }
   setText(vaultRotateStatus, 'signing');
-  const result = await submitVaultMessage('ReplaceMessagingKeys', localVaultDraft.message, {
-    userExists: true,
+  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  const external = await buildVaultReplaceMessagingKeysExternalBoc({
+    ...localVaultDraft.message,
+    owner_wallet: owner,
+    client_nonce: clientNonce,
+    signingSecretKey: requireVaultAuthSecretKey(),
+  }, {
+    vaultAddress: requireVaultAddress(),
+    deploymentManifestHash: requireVaultDeploymentManifestHash(),
   });
+  const result = await sendVaultExternalBoc(external);
+  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
+  globalThis.plathoLastVaultReplaceMessagingKeysExternal = { external, result, clientNonce };
   setText(vaultRotateStatus, 'key update sent');
   return result;
 }

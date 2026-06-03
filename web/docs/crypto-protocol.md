@@ -38,7 +38,7 @@ The signature covers the stable JSON payload and is verified before the bundle i
 
 The PWA `keyId` is a client bundle identifier. It does not replace the Vault contract's `current_key_id`, which is computed on-chain from owner address, key generation, signing key, encryption key, PQ hash, PQ length, and crypto suite. A production client must verify the bundle against the Vault key record before trusting it for a wallet identity.
 
-The signed bundle is a messaging-key self-signature. Wallet ownership is anchored by Vault activation: the embedded Platho wallet sends `RegisterMessagingKeys`/`ReplaceMessagingKeys`, and recipients verify the signed bundle against the active on-chain key record for that wallet.
+The signed bundle is a messaging-key self-signature. Wallet ownership is anchored by Vault activation: the embedded Platho wallet sends `RegisterMessagingKeys`, later `ReplaceMessagingKeys` rotations are Vault-auth-signed external messages, and recipients verify the signed bundle against the active on-chain key record for that wallet.
 
 ## Wallet ownership
 

@@ -28,6 +28,7 @@ const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN: Int = 0x56524331; // "VRC1"
 const VAULT_RECEIVE_INTENT_ACTION_CREATE: Int = 1;
 const VAULT_RECEIVE_INTENT_ACTION_CLAIM: Int = 2;
 const VAULT_RECEIVE_INTENT_ACTION_CANCEL: Int = 3;
+const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN: Int = 0x56524B31; // "VRK1"
 const VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE: Int = 2000000;
 const VAULT_PENDING_PUBLISH_COUNT_UNIT: Int = 1;
 const VAULT_PENDING_PROFILE_COUNT_UNIT: Int = 4294967296;
@@ -180,12 +181,9 @@ message(0x52705EDA) RegisterMessagingKeys {
 }
 
 message(0x89D648BB) ReplaceMessagingKeys {
-    enc_pubkey: Int as uint256;
-    sign_pubkey: Int as uint256;
-    pq_kem_pubkey_hash: Int as uint256;
-    pq_kem_pubkey_len: Int as uint16;
-    pq_kem_pubkey: Cell;
-    crypto_suite_mask: Int as uint16;
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
 }
 
 message(0x7E1F5035) CreateReceiveIntent {
@@ -1455,44 +1453,74 @@ contract Vault {
         self.users.set(sender(), user);
     }
 
-    receive(msg: ReplaceMessagingKeys) {
-        self.requireSealed();
-        self.validateKeyProfile(msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.pq_kem_pubkey, msg.crypto_suite_mask);
-        let userOpt: UserState? = self.users.get(sender());
+    external(msg: ReplaceMessagingKeys) {
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16120, userOpt != null);
         let user: UserState = userOpt!!;
         throwUnless(16121, user.current_key_id != 0);
         throwUnless(16128, user.auth_pubkey != 0);
-        throwUnless(16129, msg.sign_pubkey != user.auth_pubkey);
+        throwUnless(16130, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
+
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16131, signedDomain == VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16132, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        throwUnless(16133, vaultAddressSlice.loadUint(11) == 1024);
+        throwUnless(16133, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        throwUnless(16134, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16134, signedOwnerHash == ownerPrefix.loadUint(256));
+        let clientNonce: Int = signedPayload.loadUint(64);
+        throwUnless(16135, clientNonce == user.publish_nonce);
+        throwUnless(16136, signedPayload.bits() == 0);
+        throwUnless(16137, signedPayload.refs() == 1);
+        let required: Int = self.keyRecordStorageEndowment(CRYPTO_SUITE_HYBRID);
+        required += VAULT_STATE_GROWTH_EXEC_RESERVE;
+        throwUnless(16126, user.ton_balance >= required);
+
+        acceptMessage();
+
+        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let encPubkey: Int = actionPayload.loadUint(256);
+        let signPubkey: Int = actionPayload.loadUint(256);
+        let pqKemPubkeyHash: Int = actionPayload.loadUint(256);
+        let pqKemPubkeyLen: Int = actionPayload.loadUint(16);
+        let pqKemPubkey: Cell = actionPayload.loadRef();
+        let cryptoSuiteMask: Int = actionPayload.loadUint(16);
+        throwUnless(16138, actionPayload.bits() == 0);
+        throwUnless(16139, actionPayload.refs() == 0);
+
+        self.validateKeyProfile(encPubkey, signPubkey, pqKemPubkeyHash, pqKemPubkeyLen, pqKemPubkey, cryptoSuiteMask);
+        throwUnless(16129, signPubkey != user.auth_pubkey);
 
         let oldRecordOpt: KeyRecord? = self.key_records.get(user.current_key_id);
         throwUnless(16122, oldRecordOpt != null);
         let oldRecord: KeyRecord = oldRecordOpt!!;
-        throwUnless(16123, oldRecord.owner_wallet == sender());
+        throwUnless(16123, oldRecord.owner_wallet == msg.owner_wallet);
         throwUnless(16124, oldRecord.revoked_lt == 0);
         throwUnless(16125, oldRecord.key_generation < UINT32_MAX);
-
-        let required: Int = self.keyRecordStorageEndowment(msg.crypto_suite_mask);
-        required += VAULT_STATE_GROWTH_EXEC_RESERVE;
-        throwUnless(16126, context().value >= required);
 
         oldRecord.revoked_at = now();
         oldRecord.revoked_lt = curLt();
         self.key_records.set(user.current_key_id, oldRecord);
 
         let keyGeneration: Int = oldRecord.key_generation + 1;
-        let newKeyId: Int = self.computeKeyId(sender(), keyGeneration, msg.enc_pubkey, msg.sign_pubkey, msg.pq_kem_pubkey_hash, msg.pq_kem_pubkey_len, msg.crypto_suite_mask);
+        let newKeyId: Int = self.computeKeyId(msg.owner_wallet, keyGeneration, encPubkey, signPubkey, pqKemPubkeyHash, pqKemPubkeyLen, cryptoSuiteMask);
         throwUnless(16127, !self.key_records.exists(newKeyId));
 
         self.key_records.set(newKeyId, KeyRecord {
-            owner_wallet: sender(),
+            owner_wallet: msg.owner_wallet,
             key_generation: keyGeneration,
-            enc_pubkey: msg.enc_pubkey,
-            sign_pubkey: msg.sign_pubkey,
-            pq_kem_pubkey_hash: msg.pq_kem_pubkey_hash,
-            pq_kem_pubkey_len: msg.pq_kem_pubkey_len,
-            pq_kem_pubkey: msg.pq_kem_pubkey,
-            crypto_suite_mask: msg.crypto_suite_mask,
+            enc_pubkey: encPubkey,
+            sign_pubkey: signPubkey,
+            pq_kem_pubkey_hash: pqKemPubkeyHash,
+            pq_kem_pubkey_len: pqKemPubkeyLen,
+            pq_kem_pubkey: pqKemPubkey,
+            crypto_suite_mask: cryptoSuiteMask,
             created_at: now(),
             created_lt: curLt(),
             revoked_at: 0,
@@ -1500,7 +1528,9 @@ contract Vault {
         });
         self.key_record_count += 1;
         user.current_key_id = newKeyId;
-        self.users.set(sender(), user);
+        user.ton_balance -= required;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
     }
 
 
@@ -2066,6 +2096,13 @@ contract Vault {
         self.users.set(msg.owner_wallet, user);
         commit();
 
+        if (!(self.sealed)) {
+            return;
+        }
+        if (!(self.isUsernameRegistryBound())) {
+            return;
+        }
+
         let ownerPrefix: Slice = msg.owner_wallet.asSlice();
         if (!(ownerPrefix.loadUint(11) == 1024)) {
             return;
@@ -2159,8 +2196,6 @@ contract Vault {
     }
 
     external(msg: MintUsernameFromVaultBalance) {
-        self.requireSealed();
-        throwUnless(16700, self.isUsernameRegistryBound());
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16701, userOpt != null);
         let user: UserState = userOpt!!;
