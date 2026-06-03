@@ -32,7 +32,7 @@ import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=2';
 import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=45';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=17';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=18';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   normalizePublicChannelRegistry,
@@ -86,6 +86,7 @@ import {
   createWalletTransaction,
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarExternalBoc,
+  buildVaultReceiveIntentExternalBoc,
   buildVaultUsernameMintExternalBoc,
   createVaultWalletMessage,
   createUsernameRegistryWalletMessage,
@@ -101,7 +102,7 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=15';
+} from './pwa-contract-transactions.mjs?v=16';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=9';
 import {
   createCapsuleHubTonRpcProvider,
@@ -8987,6 +8988,21 @@ async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUse
   throw paymentCheckClaimPendingError();
 }
 
+async function waitForPaymentCheckCreateConfirmation(provider, payment) {
+  const intentId = paymentIntentId(payment);
+  const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
+  while (Date.now() <= deadline) {
+    try {
+      const intent = await readFreshReceiveIntent(provider, intentId);
+      if (intent?.exists === true) return intent;
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) throw error;
+    }
+    await delay(PAYMENT_CHECK_CLAIM_POLL_MS);
+  }
+  throw paymentCheckClaimPendingError('Payment check create submitted; Vault confirmation is still pending');
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -10022,6 +10038,38 @@ async function submitVaultMessage(type, params, options = {}) {
   return result;
 }
 
+async function submitVaultReceiveIntentExternal(type, params, options = {}) {
+  requireNoPendingServiceWorkerAppShellReload();
+  const provider = options.provider ?? await resolveVaultChainProvider();
+  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const user = options.user ?? await loadConnectedVaultUser({
+    provider,
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
+    throw new Error('Activate Platho account before using payment checks');
+  }
+  if (!localIdentity?.signingSecretKey) {
+    throw new Error('Local Platho signing key is not ready');
+  }
+  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  const external = await buildVaultReceiveIntentExternalBoc(type, {
+    ...params,
+    owner_wallet: owner,
+    client_nonce: clientNonce,
+    signingSecretKey: localIdentity.signingSecretKey,
+  }, {
+    vaultAddress: requireVaultAddress(),
+    deploymentManifestHash: requireVaultDeploymentManifestHash(),
+  });
+  const result = await sendVaultExternalBoc(external);
+  globalThis.plathoLastVaultReceiveIntentExternal = { type, params, external, result, clientNonce };
+  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
+  return { external, result, clientNonce };
+}
+
 async function submitAthWalletMessage(type, params, options = {}) {
   requireNoPendingServiceWorkerAppShellReload();
   requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -10308,9 +10356,13 @@ async function submitCreatePaymentCheck(options = {}) {
   if (!provider?.getReceiveIntentId || !provider?.getReceiveIntentCommitment) {
     throw new Error('Vault provider cannot create payment checks');
   }
+  const initialUser = await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
+  if (initialUser.exists !== true || BigInt(initialUser.current_key_id ?? 0n) === 0n) {
+    throw new Error('Activate Platho account before using payment checks');
+  }
 
   const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const clientNonce = nextQueryId();
+  const clientNonce = BigInt(initialUser.publish_nonce ?? initialUser.publishNonce ?? 0n);
   const secret32Bytes = randomBytes(32);
   const secret32 = bytesToBigIntValue(secret32Bytes);
   const intentId = await provider.getReceiveIntentId(
@@ -10356,17 +10408,18 @@ async function submitCreatePaymentCheck(options = {}) {
   });
   const publishState = createCapsulePublishState([capsule]);
   setText(identitySubtitle, 'check pricing');
-  const preparedPublish = await prepareCapsulesThroughVault([capsule], { publishState });
-  const preparedUser = preparedPublish.user ?? {};
+  const quotedPublish = await prepareCapsulesThroughVault([capsule], { publishState });
+  const createReserve = estimateVaultAttachedValueNanotons('CreateReceiveIntent');
+  const preparedUser = quotedPublish.user ?? initialUser;
   const tonBalance = BigInt(preparedUser.ton_balance ?? preparedUser.tonBalance ?? 0n);
   const athBalance = BigInt(preparedUser.ath_balance ?? preparedUser.athBalance ?? 0n);
   if (asset === RECEIVE_ASSETS.TON) {
-    if (tonBalance < amount + preparedPublish.totalMaxCharge) {
+    if (tonBalance < amount + createReserve + quotedPublish.totalMaxCharge) {
       throw new Error('Not enough Vault TON for payment check and private publish hold');
     }
   } else {
     if (athBalance < amount) throw new Error(`Not enough ${paymentAssetLabel(asset)} in Vault`);
-    if (tonBalance < preparedPublish.totalMaxCharge) {
+    if (tonBalance < createReserve + quotedPublish.totalMaxCharge) {
       throw new Error('Not enough Vault TON for payment check private publish hold');
     }
   }
@@ -10400,17 +10453,20 @@ async function submitCreatePaymentCheck(options = {}) {
   let intentCreateSubmitted = false;
   try {
     setText(identitySubtitle, 'check signing');
-    createResult = await submitVaultMessage('CreateReceiveIntent', {
+    createResult = await submitVaultReceiveIntentExternal('CreateReceiveIntent', {
       asset,
       amount,
       recipient_wallet: recipientWallet,
       commitment,
-      client_nonce: clientNonce,
-    });
+    }, { provider, user: initialUser });
     intentCreateSubmitted = true;
     message.vaultCreateIntent = createResult;
+    message.meta = 'check created, confirming';
+    await updateMessageInEncryptedHistory(thread, message);
+    await waitForPaymentCheckCreateConfirmation(provider, payment);
     message.meta = 'check created, publishing';
     await updateMessageInEncryptedHistory(thread, message);
+    const preparedPublish = await prepareCapsulesThroughVault([capsule], { publishState });
     const publishResult = await sendPreparedCapsulesThroughVault(preparedPublish, {
       publishState,
       onPartState: () => {
@@ -10466,12 +10522,10 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
   assertReceiveIntentMatchesPayment(intent, payment);
   setText(identitySubtitle, 'claim signing');
   await options.onStatus?.('check claim signing');
-  const result = await submitVaultMessage('ClaimReceiveIntent', {
+  const result = await submitVaultReceiveIntentExternal('ClaimReceiveIntent', {
     intent_id: intentId,
     secret32: paymentSecret32(payment),
-  }, {
-    recipientUserExists: beforeUser.exists === true,
-  });
+  }, { provider, user: beforeUser });
   setText(identitySubtitle, 'claim confirming');
   await options.onStatus?.('check claim submitted, confirming');
   const confirmed = await waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser);
@@ -10484,10 +10538,12 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
 }
 
 async function submitVaultCancelPaymentCheck(payment) {
+  const provider = await resolveVaultChainProvider();
+  const user = await readFreshConnectedVaultUser(provider);
   setText(identitySubtitle, 'cancel signing');
-  const result = await submitVaultMessage('CancelReceiveIntent', {
+  const result = await submitVaultReceiveIntentExternal('CancelReceiveIntent', {
     intent_id: paymentIntentId(payment),
-  });
+  }, { provider, user });
   flashWalletIdentityStatus('check cancelled');
   return result;
 }

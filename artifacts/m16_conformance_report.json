@@ -104,8 +104,8 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 2111,
-      "receive_handlers": 21,
+      "non_comment_lines": 2286,
+      "receive_handlers": 18,
       "bounced_handlers": 5,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -164,8 +164,8 @@
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "a4dc953ed8f4eda13aba885b9942b05836a7e291a9215946bbfa8d87698ffc4e",
-      "pinned": "a4dc953ed8f4eda13aba885b9942b05836a7e291a9215946bbfa8d87698ffc4e",
+      "built": "0d61d8de253b3bc49f50d8a46006de2082909a4d7743aa0e994cb701ace1083b",
+      "pinned": "0d61d8de253b3bc49f50d8a46006de2082909a4d7743aa0e994cb701ace1083b",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "95eed4e3bda040c6b9059f2e44e5d9849f4647ec23cc30f7ee9ce324b8322ef6",
+    "manifest_hash_hex": "8b3898472dd7b11de00a45f4f8aa9dfea5587c911f3586b93431a62f2049b4da",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

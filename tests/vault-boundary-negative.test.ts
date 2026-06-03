@@ -13,8 +13,6 @@ import {
   DepositTon,
   WithdrawTon,
   RegisterMessagingKeys,
-  CreateReceiveIntent,
-  ClaimReceiveIntent,
   WithdrawAth,
   AthTransferNotification,
 } from '../build/Vault/Vault_Vault';
@@ -23,6 +21,10 @@ import {
   ATHTransferRequestWithNotify,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
+import {
+  registerVaultSigningKeys,
+  sendVaultReceiveIntentExternal,
+} from './helpers/vault-receive-intent-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -32,6 +34,7 @@ const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 2_000_000n;
 const KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 30_000_000n;
 const RECEIVE_INTENT_STORAGE_ENDOWMENT = 5_000_000n;
+const RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE = 2_000_000n;
 const VAULT_ATH_WITHDRAW_MIN_VALUE = 40_000_000n;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const ASSET_TON = 1n;
@@ -300,52 +303,32 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await exactKeys.vault.getGetUser(exactKeys.user.address)).current_key_id).not.toBe(0n);
   });
 
-  it('VAULT-BND-03: ReceiveIntent create and new-recipient claim reject min-1 and accept exact storage values', async () => {
-    const { vault, user, recipient } = await setupPlain();
+  it('VAULT-BND-03: ReceiveIntent external create consumes internal settlement reserve and claim credits activated recipient', async () => {
+    const { blockchain, vault, user, recipient } = await setupPlain();
+    const userKey = await registerVaultSigningKeys(vault, user, 71);
+    const recipientKey = await registerVaultSigningKeys(vault, recipient, 72);
     const amount = toNano('0.2');
     await depositTon(vault, user, toNano('1'));
 
-    const intentId = await vault.getGetReceiveIntentId(user.address, recipient.address, ASSET_TON, amount, 7n);
+    const createIntentRequired = RECEIVE_INTENT_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE + RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE;
+    const clientNonce = (await vault.getGetUser(user.address)).publish_nonce;
+    const intentId = await vault.getGetReceiveIntentId(user.address, recipient.address, ASSET_TON, amount, clientNonce);
     const secret = 0x7777n;
     const commitment = await vault.getGetReceiveIntentCommitment(intentId, recipient.address, secret);
 
-    const createIntentRequired = RECEIVE_INTENT_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
-    await vault.send(user.getSender(), { value: createIntentRequired - 1n }, {
-      $$type: 'CreateReceiveIntent',
+    await sendVaultReceiveIntentExternal(blockchain, vault, 'CreateReceiveIntent', user, userKey, GENESIS_HASH, {
       asset: ASSET_TON,
       amount,
       recipient_wallet: recipient.address,
       commitment,
-      client_nonce: 7n,
-    } as CreateReceiveIntent);
-    expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('1'));
-
-    await vault.send(user.getSender(), { value: createIntentRequired }, {
-      $$type: 'CreateReceiveIntent',
-      asset: ASSET_TON,
-      amount,
-      recipient_wallet: recipient.address,
-      commitment,
-      client_nonce: 7n,
-    } as CreateReceiveIntent);
+    });
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('0.8'));
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('0.8') - createIntentRequired);
 
-    const claimNewUserRequired = USER_STATE_STORAGE_ENDOWMENT + STATE_GROWTH_EXEC_RESERVE;
-    await vault.send(recipient.getSender(), { value: claimNewUserRequired - 1n }, {
-      $$type: 'ClaimReceiveIntent',
+    await sendVaultReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', recipient, recipientKey, GENESIS_HASH, {
       intent_id: intentId,
       secret32: secret,
-    } as ClaimReceiveIntent);
-    expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
-    expect((await vault.getGetUser(recipient.address)).exists).toBe(false);
-
-    await vault.send(recipient.getSender(), { value: claimNewUserRequired }, {
-      $$type: 'ClaimReceiveIntent',
-      intent_id: intentId,
-      secret32: secret,
-    } as ClaimReceiveIntent);
+    });
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(false);
     expect((await vault.getGetUser(recipient.address)).ton_balance).toBe(amount);
   });

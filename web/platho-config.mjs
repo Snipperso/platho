@@ -32,7 +32,7 @@ function deepFreeze(value) {
 }
 
 export const PLATHO_APP_CONFIG = deepFreeze({
-  mode: PLATHO_APP_MODES.PRODUCTION,
+  mode: PLATHO_APP_MODES.PREVIEW,
   domain: 'platho.app',
   network: {
     chain: 'mainnet',
@@ -73,11 +73,11 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   vault: {
-    address: 'UQDjCu9J-a50z8pwgBp9AWpuD9MDQufKiKHPi-1VHRWpQbvc',
-    deploymentManifestHash: 'a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd',
+    address: 'UQB9bp-qwLPBX8BA312KKTBFVrfFZwxjzEuZfJFgYSu1YfZm',
+    deploymentManifestHash: '570b3ba74eff150ce3317b35f190d8f5053f000dcfb331c0c3c1a31e46b7a234',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=17',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=18',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -107,7 +107,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     address: 'UQC4ncVFmD7s4xX7Q-lsjE9hyvaOrtXlNfi_Gha97NDQwUN0',
   },
   crypto: {
-    signedBundlePurpose: 'pwa-mainnet-production',
+    signedBundlePurpose: 'pwa-mainnet-preview',
   },
   messaging: {
     pricing: {
