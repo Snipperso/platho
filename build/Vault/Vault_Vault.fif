@@ -118,7 +118,7 @@ PROGRAM{
   DECLPROC $Vault$_fun_usernameMintTonCharge
   DECLPROC $Vault$_fun_usernamePriceForLength
   DECLPROC $Vault$_fun_isValidUsernameBytes
-  DECLPROC $Vault$_fun_requireValidProfileAvatarPointer
+  DECLPROC $Vault$_fun_isValidProfileAvatarPointer
   DECLPROC $Vault$_fun_discountedFee
   DECLPROC $Vault$_fun_isAllowedPrivateSizeClass
   DECLPROC $Vault$_fun_isPublishProfileValid
@@ -1471,76 +1471,84 @@ PROGRAM{
     NIP
         SEMPTY
   }>
-  $Vault$_fun_requireValidProfileAvatarPointer PROCREF:<{
-    22 s() 27 s() XCHG
-    21 s() 26 s() XCHG
-    20 s() 25 s() XCHG
-    19 s() 24 s() XCHG
-    18 s() 23 s() XCHG
-    17 s() 27 s() XCHG
-    16 s() 26 s() XCHG
-    s15 25 s() XCHG
-    s14 24 s() XCHG
-    s13 23 s() XCHG
-    s12 27 s() XCHG
-    s11 26 s() XCHG
-    s10 25 s() XCHG
-    s9 24 s() XCHG
-    s8 23 s() XCHG
+  $Vault$_fun_isValidProfileAvatarPointer PROCREF:<{
+    23 s() 27 s() XCHG
+    22 s() 26 s() XCHG
+    21 s() 25 s() XCHG
+    20 s() 24 s() XCHG
+    19 s() 27 s() XCHG
+    18 s() 26 s() XCHG
+    17 s() 25 s() XCHG
+    16 s() 24 s() XCHG
+    s15 27 s() XCHG
+    s14 26 s() XCHG
+    s13 25 s() XCHG
+    s12 24 s() XCHG
+    s11 27 s() XCHG
+    s10 26 s() XCHG
+    s9 25 s() XCHG
+    s8 24 s() XCHG
     s7 27 s() XCHG
     s6 26 s() XCHG
     s5 25 s() XCHG
     s4 24 s() XCHG
-    s3 23 s() XCHG
-    s2 27 s() XCHG
-    s1 26 s() XCHG
-    s0 25 s() XCHG
-    16640 PUSHINT
-    s0 25 s() XCHG
-    $Vault$_fun_isBasechainAddress INLINECALLDICT
+    s3 27 s() XCHG
+    s2 26 s() XCHG
     s1 25 s() XCHG
-    THROWANYIFNOT
-    16641 PUSHINT
-    s0 23 s() XCHG
-    0 NEQINT
-    s1 23 s() XCHG
-    THROWANYIFNOT
-    16642 PUSHINT
-    s0 26 s() XCHG
-    0 NEQINT
-    s1 26 s() XCHG
-    THROWANYIFNOT
-    16643 PUSHINT
-    24 s() PUSH
-    0 GTINT
-    THROWANYIFNOT
-    16644 PUSHINT
     s0 24 s() XCHG
-    17 LESSINT
-    s1 24 s() XCHG
-    THROWANYIFNOT
-    16645 PUSHINT
-    s0 22 s() XCHG
-    1 EQINT
-    s1 22 s() XCHG
-    THROWANYIFNOT
-    17 s() 22 s() XCHG
-    16 s() 21 s() XCHG
-    s15 20 s() XCHG
-    s14 19 s() XCHG
-    s13 18 s() XCHG
-    s12 17 s() XCHG
-    s11 16 s() XCHG
-    s10 s15 XCHG
-    s9 s14 XCHG
-    s8 s13 XCHG
-    s7 s12 XCHG
-    s6 s11 XCHG
-    s5 s10 XCHG
-    s4 s9 XCHG
-    s3 s8 XCHG
-    s7 s1 s5 XCHG3
-    s6 s4 XCHG2
+    $Vault$_fun_isBasechainAddress INLINECALLDICT
+    IF:<{
+      s0 26 s() XCHG
+      0 NEQINT
+    }>ELSE<{
+      26 s() POP
+      FALSE
+    }>
+    IF:<{
+      s0 24 s() XCHG
+      0 NEQINT
+    }>ELSE<{
+      24 s() POP
+      FALSE
+    }>
+    IF:<{
+      22 s() PUSH
+      0 GTINT
+    }>ELSE<{
+      FALSE
+    }>
+    IF:<{
+      s0 22 s() XCHG
+      17 LESSINT
+    }>ELSE<{
+      22 s() POP
+      FALSE
+    }>
+    IF:<{
+      s0 20 s() XCHG
+      1 EQINT
+    }>ELSE<{
+      20 s() POP
+      FALSE
+    }>
+    19 s() 23 s() XCHG
+    18 s() 22 s() XCHG
+    17 s() 21 s() XCHG
+    16 s() 20 s() XCHG
+    s15 19 s() XCHG
+    s14 18 s() XCHG
+    s13 17 s() XCHG
+    s12 16 s() XCHG
+    s11 s15 XCHG
+    s10 s14 XCHG
+    s9 s13 XCHG
+    s8 s12 XCHG
+    s7 s11 XCHG
+    s6 s10 XCHG
+    s5 s9 XCHG
+    s4 s8 XCHG
+    s3 s7 XCHG
+    s6 s5 s0 XCHG3
     s1 s3 XCHG
   }>
   $Vault$_fun_discountedFee PROCREF:<{
@@ -11006,7 +11014,32 @@ PROGRAM{
       30 s() PUSH
       35 s() PUSH
       37 s() PUSH
-      $Vault$_fun_requireValidProfileAvatarPointer INLINECALLDICT
+      $Vault$_fun_isValidProfileAvatarPointer INLINECALLDICT
+      IFNOTJMP:<{
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        23 s() POP
+        s9 22 s() XCHG
+        s8 21 s() XCHG
+        s7 20 s() XCHG
+        s6 19 s() XCHG
+        s5 18 s() XCHG
+        s4 17 s() XCHG
+        s3 16 s() XCHG
+        s15 s14 s13 XCHG3
+        3 10 BLKSWAP
+        $Vault$_contract_store INLINECALLDICT
+      }>
       $Vault$_fun_profileAvatarTonCharge INLINECALLDICT
       s0 24 s() XCHG
       24 s() PUSH

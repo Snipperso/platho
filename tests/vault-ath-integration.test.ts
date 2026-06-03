@@ -1145,6 +1145,19 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarPartCount: 1n,
     }), PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
 
+    const afterBadVault = await ctx.vault.getGetUser(ctx.user.address);
+    await expectAcceptedReturnChargesLocalReserve(ctx.user.address, signedVaultProfileAvatarBody({
+      vault: ctx.vault,
+      owner: ctx.user.address,
+      profileRegistry: ctx.profileRegistry,
+      clientNonce: afterBadVault.publish_nonce,
+      secretKey: keyPair.secretKey,
+      avatarHash: 0n,
+      avatarEntryId: 77n,
+      avatarStreamId: 0x11223344556677889900aabbccddee06n,
+      avatarPartCount: 1n,
+    }), PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
+
     const underfunded = await ctx.blockchain.treasury('vault-avatar-underfunded');
     const underfundedKeyPair = await registerAvatarRouteKeys(ctx.vault, underfunded);
     const underfundedBefore = await ctx.vault.getGetUser(underfunded.address);
