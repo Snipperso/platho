@@ -10751,42 +10751,87 @@ PROGRAM{
       GEQ
       THROWANYIFNOT
           ACCEPT
-      128 LDU
-          LDMSGADDR
-      16617 PUSHINT
-          MYADDR
-      s1 s3 XCHG
-      SDEQ
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16613 PUSHINT
-      s2 PUSH
-      6000000 PUSHINT
-      GEQ
-      THROWANYIFNOT
-      s0 29 s() XCHG
+      s0 28 s() XCHG
       INC
-      s0 s5 XCHG
+      s0 s4 XCHG
       6000000 PUSHINT
       SUB
       267 PUSHINT
-      s1 s5 s4 PUSH3
-      35 s() PUSH
-      s10 PUSH
+      s1 s4 s3 PUSH3
+      34 s() PUSH
+      s9 PUSH
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s2 20 s() XCHG
-      32 s() PUSH
+      s2 19 s() XCHG
+      31 s() PUSH
       SWAP
       __tact_dict_set_slice_cell INLINECALLDICT
           COMMIT
-      29 s() PUSH
+      s0 28 s() XCHG
+      128 LDU
+          LDMSGADDR
+          MYADDR
+      s1 s2 XCHG
+      SDEQ
+      IFNOTJMP:<{
+        6 BLKDROP
+        s12 POP
+        23 s() POP
+        23 s() POP
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      OVER
+      6000000 PUSHINT
+      GEQ
+      IFNOTJMP:<{
+        6 BLKDROP
+        s12 POP
+        23 s() POP
+        23 s() POP
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      DUP
           SBITS
       0 EQINT
       IFNOTJMP:<{
-        18 s() POP
-        5 BLKDROP
-        23 s() POP
+        6 BLKDROP
+        s12 POP
         23 s() POP
         23 s() POP
         18 s() 22 s() XCHG
@@ -10797,16 +10842,24 @@ PROGRAM{
         s13 17 s() XCHG
         s12 16 s() XCHG
         s11 s15 XCHG
-        4 11 BLKSWAP
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
-      29 s() PUSH
+      DUP
           SREFS
       1 EQINT
       IFNOTJMP:<{
-        18 s() POP
-        5 BLKDROP
-        23 s() POP
+        6 BLKDROP
+        s12 POP
         23 s() POP
         23 s() POP
         18 s() 22 s() XCHG
@@ -10817,10 +10870,18 @@ PROGRAM{
         s13 17 s() XCHG
         s12 16 s() XCHG
         s11 s15 XCHG
-        4 11 BLKSWAP
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 29 s() XCHG
           LDREF
       DROP
       DUP
@@ -11315,42 +11376,87 @@ PROGRAM{
       GEQ
       THROWANYIFNOT
           ACCEPT
-      128 LDU
-          LDMSGADDR
-      16707 PUSHINT
-          MYADDR
-      s1 s3 XCHG
-      SDEQ
-      s1 s2 XCHG
-      THROWANYIFNOT
-      16713 PUSHINT
-      s2 PUSH
-      6000000 PUSHINT
-      GEQ
-      THROWANYIFNOT
-      s0 29 s() XCHG
+      s0 28 s() XCHG
       INC
-      s0 s5 XCHG
+      s0 s4 XCHG
       6000000 PUSHINT
       SUB
       267 PUSHINT
-      s1 s5 s4 PUSH3
-      35 s() PUSH
-      s10 PUSH
+      s1 s4 s3 PUSH3
+      34 s() PUSH
+      s9 PUSH
       NEWC
       $UserState$_store_cell INLINECALLDICT
-      s2 20 s() XCHG
-      32 s() PUSH
+      s2 19 s() XCHG
+      31 s() PUSH
       SWAP
       __tact_dict_set_slice_cell INLINECALLDICT
           COMMIT
-      29 s() PUSH
+      s0 28 s() XCHG
+      128 LDU
+          LDMSGADDR
+          MYADDR
+      s1 s2 XCHG
+      SDEQ
+      IFNOTJMP:<{
+        6 BLKDROP
+        s12 POP
+        23 s() POP
+        23 s() POP
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      OVER
+      6000000 PUSHINT
+      GEQ
+      IFNOTJMP:<{
+        6 BLKDROP
+        s12 POP
+        23 s() POP
+        23 s() POP
+        18 s() 22 s() XCHG
+        17 s() 21 s() XCHG
+        16 s() 20 s() XCHG
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
+        $Vault$_contract_store INLINECALLDICT
+      }>
+      DUP
           SBITS
       0 EQINT
       IFNOTJMP:<{
-        18 s() POP
-        5 BLKDROP
-        23 s() POP
+        6 BLKDROP
+        s12 POP
         23 s() POP
         23 s() POP
         18 s() 22 s() XCHG
@@ -11361,16 +11467,24 @@ PROGRAM{
         s13 17 s() XCHG
         s12 16 s() XCHG
         s11 s15 XCHG
-        4 11 BLKSWAP
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
-      29 s() PUSH
+      DUP
           SREFS
       1 EQINT
       IFNOTJMP:<{
-        18 s() POP
-        5 BLKDROP
-        23 s() POP
+        6 BLKDROP
+        s12 POP
         23 s() POP
         23 s() POP
         18 s() 22 s() XCHG
@@ -11381,10 +11495,18 @@ PROGRAM{
         s13 17 s() XCHG
         s12 16 s() XCHG
         s11 s15 XCHG
-        4 11 BLKSWAP
+        s10 s14 XCHG
+        s12 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s6 s1 s4 XCHG3
+        s0 s5 s3 XCHG3
         $Vault$_contract_store INLINECALLDICT
       }>
-      s0 29 s() XCHG
           LDREF
       DROP
       DUP
