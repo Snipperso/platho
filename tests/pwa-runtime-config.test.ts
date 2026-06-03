@@ -1028,8 +1028,8 @@ describe('PWA runtime config guard', () => {
     expect(matrix).not.toMatch(/get_pending_refund_flush_for/);
     expect(matrix).not.toMatch(/\|\s*Flush username refund\s*\|[\s\S]*\|\s*Implemented\s*\|/);
     expect(matrix).toContain('Direct user-wallet username mint, profile avatar payment, and username refund-flush product actions are intentionally unsupported');
-    expect(matrix).toMatch(/\|\s*Mint username from Vault balance\s*\|\s*`Vault`\s*\|/);
-    expect(matrix).toMatch(/\|\s*Set wallet avatar from Vault balance\s*\|\s*`Vault`\s*\|/);
+    expect(matrix).toMatch(/\|\s*Mint username from Vault balance\s*\|\s*`Vault` external\s*\|[\s\S]*Vault auth key \/ owner signing key/);
+    expect(matrix).toMatch(/\|\s*Set wallet avatar from Vault balance\s*\|\s*`Vault` external\s*\|[\s\S]*Vault auth key \/ owner signing key/);
   });
 
   it('PWA-ACTIVATION-01: transient Vault provider errors do not clear an active composer binding', () => {

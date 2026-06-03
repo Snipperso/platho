@@ -1,6 +1,6 @@
 # Platho PWA Contract Interface Matrix
 
-Date: 2026-06-01
+Date: 2026-06-03
 
 Status: current v1 interface inventory for PWA/contract consistency work. This is not a mainnet production approval.
 
@@ -18,6 +18,7 @@ Direct user-wallet username mint, profile avatar payment, and username refund-fl
 - It persists encrypted local wallet/history data as device-local cache; chain state and accepted transaction bodies remain the protocol source of truth.
 - It has browser-safe Vault, ATHWallet, UsernameRegistry, and ProfileRegistry transaction builders, with body BoCs checked against generated wrappers.
 - It builds and signs `PublishPrivateFromVaultBalance` and `PublishPublicFromVaultBalance` external Vault BoCs using the user's wallet-derived signing key and the current `publish_nonce`.
+- It builds and signs Vault service external BoCs (`CreateReceiveIntent`, `ClaimReceiveIntent`, `CancelReceiveIntent`, `SetProfileAvatarFromVaultBalance`, and `MintUsernameFromVaultBalance`) with the same Vault auth key / owner signing key, not as wallet-sender internal transactions.
 - It confirms final publish by CapsuleHub entry/hash visibility, not only by Vault nonce advancement.
 - It publishes public posts, public comments, and profile avatar capsule parts through Vault -> CapsuleHub.
 - It derives user ATHWallet addresses through ATHMaster and never presents official protocol ATH wallets as user deposit addresses.
@@ -42,11 +43,11 @@ These are normal user flows. They should be implemented in the PWA, with tests, 
 | Publish public channel post/comment/avatar capsule | `Vault` external | `PublishPublicFromVaultBalance` | owner signing key | Implemented | Public body is raw PWA bytes in the accepted publish transaction body; final display requires CapsuleHub hash verification. |
 | Transfer ATH to another owner | user `ATHWallet` | `ATHTransferRequest(query_id, amount, recipient, response_destination)` | user wallet to user ATHWallet | Implemented | Normal ATH transfer from the user's external ATH wallet. |
 | Burn own ATH | user `ATHWallet` | `ATHBurn(query_id, amount, response_destination)` | user wallet to user ATHWallet | Implemented | Direct user burn from the user's external ATH wallet. |
-| Mint username from Vault balance | `Vault` | `MintUsernameFromVaultBalance(...)` | user wallet | Implemented | PWA checks Vault and reciprocal UsernameRegistry route state before signing. |
-| Set wallet avatar from Vault balance | `Vault` | `SetProfileAvatarFromVaultBalance(...)` | user wallet | Implemented | PWA checks Vault and reciprocal ProfileRegistry route state before signing. |
-| Create payment check | `Vault` | `CreateReceiveIntent(asset, amount, recipient_wallet, commitment, client_nonce)` | sender wallet | Implemented | PWA publishes the encrypted check capsule before creating the locked intent. |
-| Claim payment check | `Vault` | `ClaimReceiveIntent(intent_id, secret32)` | recipient wallet | Implemented | Recipient claims by secret carried in the encrypted capsule. |
-| Cancel payment check | `Vault` | `CancelReceiveIntent(intent_id)` | sender wallet | Implemented | Sender can cancel a still-open check. |
+| Mint username from Vault balance | `Vault` external | `MintUsernameFromVaultBalance(...)` | Vault auth key / owner signing key | Implemented | PWA checks Vault and reciprocal UsernameRegistry route state before signing. |
+| Set wallet avatar from Vault balance | `Vault` external | `SetProfileAvatarFromVaultBalance(...)` | Vault auth key / owner signing key | Implemented | PWA checks Vault and reciprocal ProfileRegistry route state before signing. |
+| Create payment check | `Vault` external | `CreateReceiveIntent(asset, amount, recipient_wallet, commitment, client_nonce)` | Vault auth key / owner signing key | Implemented | PWA persists encrypted local recovery first, creates and confirms the locked intent, then publishes the encrypted check capsule; if post-intent publish fails before ambiguous partial submission, it attempts cancel. |
+| Claim payment check | `Vault` external | `ClaimReceiveIntent(intent_id, secret32)` | Vault auth key / owner signing key | Implemented | Recipient claims by secret carried in the encrypted capsule. |
+| Cancel payment check | `Vault` external | `CancelReceiveIntent(intent_id)` | Vault auth key / owner signing key | Implemented | Sender can cancel a still-open check. |
 
 ## User-Facing Read/Getters The PWA Must Support
 
