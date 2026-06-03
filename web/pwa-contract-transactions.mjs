@@ -711,8 +711,6 @@ function vaultProfileAvatarSignedDataCell(params) {
   return beginCell()
     .uint(VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, 32, 'domain_magic')
     .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
-    .address(vaultProfileAvatarOwner(params), 'owner_wallet')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .uint(params.max_ton_charge ?? params.maxTonCharge, 128, 'max_ton_charge')
     .ref(avatarPayload, 'avatar_payload')
@@ -740,8 +738,7 @@ function vaultUsernameMintSignedDataCell(params) {
   return beginCell()
     .uint(VAULT_USERNAME_MINT_SIGNING_DOMAIN, 32, 'domain_magic')
     .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
-    .address(vaultUsernameMintOwner(params), 'owner_wallet')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .uint(params.max_ton_charge ?? params.maxTonCharge, 128, 'max_ton_charge')
     .ref(usernamePayload, 'username_payload')
@@ -791,9 +788,7 @@ function vaultReceiveIntentSignedDataCell(type, params = {}) {
   const builder = beginCell()
     .uint(VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, 32, 'domain_magic')
     .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
     .uint(vaultReceiveIntentAction(type), 8, 'action')
-    .uint(basechainAddressHashValue(vaultReceiveIntentOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .ref(actionPayload, 'action_payload');
 

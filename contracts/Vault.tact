@@ -1015,6 +1015,70 @@ contract Vault {
         }
     }
 
+    fun isValidPqPubkeyCell(pqLen: Int, cryptoSuiteMask: Int, pqPubkey: Cell): Bool {
+        if (cryptoSuiteMask != CRYPTO_SUITE_HYBRID) {
+            return false;
+        }
+        let size: DataSize = pqPubkey.computeDataSize(MLKEM768_PUBKEY_SNAKE_CELLS);
+        if (size.cells != MLKEM768_PUBKEY_SNAKE_CELLS) {
+            return false;
+        }
+        if (size.bits != MLKEM768_PUBKEY_SNAKE_BITS) {
+            return false;
+        }
+        if (size.refs != MLKEM768_PUBKEY_SNAKE_REFS) {
+            return false;
+        }
+
+        let cursor: Cell = pqPubkey;
+        let remaining: Int = pqLen;
+        while (remaining > 0) {
+            let chunkBytes: Int = MLKEM768_PUBKEY_SNAKE_CHUNK_BYTES;
+            if (remaining == MLKEM768_PUBKEY_LEN) {
+                chunkBytes = MLKEM768_PUBKEY_SNAKE_FIRST_CHUNK_BYTES;
+            } else {
+                if (remaining < chunkBytes) {
+                    chunkBytes = remaining;
+                }
+            }
+            let cursorSlice: Slice = cursor.beginParse();
+            if (cursorSlice.bits() != (chunkBytes * 8)) {
+                return false;
+            }
+            if (remaining > chunkBytes) {
+                if (cursorSlice.refs() != 1) {
+                    return false;
+                }
+                cursor = cursorSlice.loadRef();
+            } else {
+                if (cursorSlice.refs() != 0) {
+                    return false;
+                }
+            }
+            remaining -= chunkBytes;
+        }
+        return true;
+    }
+
+    fun isValidKeyProfile(encPubkey: Int, signPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int): Bool {
+        if (encPubkey == 0) {
+            return false;
+        }
+        if (signPubkey == 0) {
+            return false;
+        }
+        if (cryptoSuiteMask != CRYPTO_SUITE_HYBRID) {
+            return false;
+        }
+        if (pqHash == 0) {
+            return false;
+        }
+        if (pqLen != MLKEM768_PUBKEY_LEN) {
+            return false;
+        }
+        return self.isValidPqPubkeyCell(pqLen, cryptoSuiteMask, pqPubkey);
+    }
+
     fun validateKeyProfile(encPubkey: Int, signPubkey: Int, pqHash: Int, pqLen: Int, pqPubkey: Cell, cryptoSuiteMask: Int) {
         throwUnless(16101, encPubkey != 0);
         throwUnless(16102, signPubkey != 0);
@@ -1060,13 +1124,7 @@ contract Vault {
     }
 
     fun computeReceiveIntentCommitment(intentId: Int, recipientWallet: Address, secret32: Int): Int {
-        return beginCell()
-            .storeUint(RECEIVE_INTENT_COMMITMENT_DOMAIN, 32)
-            .storeUint(intentId, 256)
-            .storeAddress(recipientWallet)
-            .storeUint(secret32, 256)
-            .endCell()
-            .hash();
+        return secret32;
     }
 
     receive(msg: BindDeploymentManifest) {
@@ -1462,6 +1520,8 @@ contract Vault {
         throwUnless(16130, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
+        throwUnless(16136, signedPayload.bits() == 864);
+        throwUnless(16137, signedPayload.refs() == 1);
         let signedDomain: Int = signedPayload.loadUint(32);
         throwUnless(16131, signedDomain == VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
@@ -1476,41 +1536,75 @@ contract Vault {
         throwUnless(16134, signedOwnerHash == ownerPrefix.loadUint(256));
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16135, clientNonce == user.publish_nonce);
-        throwUnless(16136, signedPayload.bits() == 0);
-        throwUnless(16137, signedPayload.refs() == 1);
+        let localReserve: Int = VAULT_STATE_GROWTH_EXEC_RESERVE;
+        throwUnless(16126, user.ton_balance >= localReserve);
+        acceptMessage();
+        user.ton_balance -= localReserve;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        let actionPayloadCell: Cell = signedPayload.loadRef();
+        let actionPayloadPreview: Slice = actionPayloadCell.beginParse();
+        if (!(actionPayloadPreview.bits() == 800)) {
+            return;
+        }
+        if (!(actionPayloadPreview.refs() == 1)) {
+            return;
+        }
+
         let required: Int = self.keyRecordStorageEndowment(CRYPTO_SUITE_HYBRID);
         required += VAULT_STATE_GROWTH_EXEC_RESERVE;
-        throwUnless(16126, user.ton_balance >= required);
+        let remainingRequired: Int = required - localReserve;
+        if (!(user.ton_balance >= remainingRequired)) {
+            return;
+        }
 
-        acceptMessage();
-
-        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let actionPayload: Slice = actionPayloadCell.beginParse();
         let encPubkey: Int = actionPayload.loadUint(256);
         let signPubkey: Int = actionPayload.loadUint(256);
         let pqKemPubkeyHash: Int = actionPayload.loadUint(256);
         let pqKemPubkeyLen: Int = actionPayload.loadUint(16);
         let pqKemPubkey: Cell = actionPayload.loadRef();
         let cryptoSuiteMask: Int = actionPayload.loadUint(16);
-        throwUnless(16138, actionPayload.bits() == 0);
-        throwUnless(16139, actionPayload.refs() == 0);
+        if (!(actionPayload.bits() == 0)) {
+            return;
+        }
+        if (!(actionPayload.refs() == 0)) {
+            return;
+        }
 
-        self.validateKeyProfile(encPubkey, signPubkey, pqKemPubkeyHash, pqKemPubkeyLen, pqKemPubkey, cryptoSuiteMask);
-        throwUnless(16129, signPubkey != user.auth_pubkey);
+        if (!self.isValidKeyProfile(encPubkey, signPubkey, pqKemPubkeyHash, pqKemPubkeyLen, pqKemPubkey, cryptoSuiteMask)) {
+            return;
+        }
+        if (!(signPubkey != user.auth_pubkey)) {
+            return;
+        }
 
         let oldRecordOpt: KeyRecord? = self.key_records.get(user.current_key_id);
-        throwUnless(16122, oldRecordOpt != null);
+        if (oldRecordOpt == null) {
+            return;
+        }
         let oldRecord: KeyRecord = oldRecordOpt!!;
-        throwUnless(16123, oldRecord.owner_wallet == msg.owner_wallet);
-        throwUnless(16124, oldRecord.revoked_lt == 0);
-        throwUnless(16125, oldRecord.key_generation < UINT32_MAX);
+        if (!(oldRecord.owner_wallet == msg.owner_wallet)) {
+            return;
+        }
+        if (!(oldRecord.revoked_lt == 0)) {
+            return;
+        }
+        if (!(oldRecord.key_generation < UINT32_MAX)) {
+            return;
+        }
+
+        let keyGeneration: Int = oldRecord.key_generation + 1;
+        let newKeyId: Int = self.computeKeyId(msg.owner_wallet, keyGeneration, encPubkey, signPubkey, pqKemPubkeyHash, pqKemPubkeyLen, cryptoSuiteMask);
+        if (self.key_records.exists(newKeyId)) {
+            return;
+        }
 
         oldRecord.revoked_at = now();
         oldRecord.revoked_lt = curLt();
         self.key_records.set(user.current_key_id, oldRecord);
-
-        let keyGeneration: Int = oldRecord.key_generation + 1;
-        let newKeyId: Int = self.computeKeyId(msg.owner_wallet, keyGeneration, encPubkey, signPubkey, pqKemPubkeyHash, pqKemPubkeyLen, cryptoSuiteMask);
-        throwUnless(16127, !self.key_records.exists(newKeyId));
 
         self.key_records.set(newKeyId, KeyRecord {
             owner_wallet: msg.owner_wallet,
@@ -1528,8 +1622,7 @@ contract Vault {
         });
         self.key_record_count += 1;
         user.current_key_id = newKeyId;
-        user.ton_balance -= required;
-        user.publish_nonce += 1;
+        user.ton_balance -= remainingRequired;
         self.users.set(msg.owner_wallet, user);
     }
 
@@ -1544,24 +1637,20 @@ contract Vault {
         throwUnless(16222, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
+        throwUnless(16227, signedPayload.bits() == 360);
+        throwUnless(16228, signedPayload.refs() == 1);
         let signedDomain: Int = signedPayload.loadUint(32);
         throwUnless(16223, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16224, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        throwUnless(16225, vaultAddressSlice.loadUint(11) == 1024);
-        throwUnless(16225, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedAction: Int = signedPayload.loadUint(8);
-        throwUnless(16226, signedAction == VAULT_RECEIVE_INTENT_ACTION_CREATE);
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16227, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16227, signedOwnerHash == ownerPrefix.loadUint(256));
+        throwUnless(16226, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CREATE);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16233, clientNonce == user.publish_nonce);
+        let createLocalReserve: Int = VAULT_STATE_GROWTH_EXEC_RESERVE;
+        throwUnless(16265, user.ton_balance >= createLocalReserve);
         acceptMessage();
         user.publish_nonce += 1;
+        user.ton_balance -= createLocalReserve;
         self.users.set(msg.owner_wallet, user);
         commit();
 
@@ -1593,11 +1682,29 @@ contract Vault {
         }
 
         let tonReserve: Int = VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT + VAULT_STATE_GROWTH_EXEC_RESERVE + VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE;
+        let remainingTonReserve: Int = tonReserve - createLocalReserve;
         if (asset == ASSET_TON) {
-            if (!(user.ton_balance >= amount + tonReserve)) {
+            if (!(user.ton_balance >= amount + remainingTonReserve)) {
                 return;
             }
-            user.ton_balance -= (amount + tonReserve);
+            let intentId: Int = self.computeReceiveIntentId(msg.owner_wallet, recipientWallet, asset, amount, clientNonce);
+            if (self.receive_intents.exists(intentId)) {
+                return;
+            }
+            user.ton_balance -= (amount + remainingTonReserve);
+            self.users.set(msg.owner_wallet, user);
+            self.receive_intents.set(intentId, ReceiveIntent {
+                sender_wallet: msg.owner_wallet,
+                recipient_wallet: recipientWallet,
+                asset: asset,
+                amount: amount,
+                commitment: commitment,
+                client_nonce: clientNonce,
+                settlement_reserve_ton: VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE,
+                created_at: now(),
+                claimed: false
+            });
+            self.receive_intent_count += 1;
         } else {
             if (!(self.isBasechainAddress(msg.owner_wallet))) {
                 return;
@@ -1608,31 +1715,29 @@ contract Vault {
             if (!(user.ath_balance >= amount)) {
                 return;
             }
-            if (!(user.ton_balance >= tonReserve)) {
+            if (!(user.ton_balance >= remainingTonReserve)) {
+                return;
+            }
+            let intentId: Int = self.computeReceiveIntentId(msg.owner_wallet, recipientWallet, asset, amount, clientNonce);
+            if (self.receive_intents.exists(intentId)) {
                 return;
             }
             user.ath_balance -= amount;
-            user.ton_balance -= tonReserve;
+            user.ton_balance -= remainingTonReserve;
+            self.users.set(msg.owner_wallet, user);
+            self.receive_intents.set(intentId, ReceiveIntent {
+                sender_wallet: msg.owner_wallet,
+                recipient_wallet: recipientWallet,
+                asset: asset,
+                amount: amount,
+                commitment: commitment,
+                client_nonce: clientNonce,
+                settlement_reserve_ton: VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE,
+                created_at: now(),
+                claimed: false
+            });
+            self.receive_intent_count += 1;
         }
-
-        let intentId: Int = self.computeReceiveIntentId(msg.owner_wallet, recipientWallet, asset, amount, clientNonce);
-        if (self.receive_intents.exists(intentId)) {
-            return;
-        }
-
-        self.users.set(msg.owner_wallet, user);
-        self.receive_intents.set(intentId, ReceiveIntent {
-            sender_wallet: msg.owner_wallet,
-            recipient_wallet: recipientWallet,
-            asset: asset,
-            amount: amount,
-            commitment: commitment,
-            client_nonce: clientNonce,
-            settlement_reserve_ton: VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE,
-            created_at: now(),
-            claimed: false
-        });
-        self.receive_intent_count += 1;
     }
 
     external(msg: ClaimReceiveIntent) {
@@ -1648,59 +1753,21 @@ contract Vault {
         throwUnless(16242, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16243, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        throwUnless(16244, vaultAddressSlice.loadUint(11) == 1024);
-        throwUnless(16244, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedAction: Int = signedPayload.loadUint(8);
-        throwUnless(16245, signedAction == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16246, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16246, signedOwnerHash == ownerPrefix.loadUint(256));
+        throwUnless(16245, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16249, clientNonce == user.publish_nonce);
-        acceptMessage();
-        user.publish_nonce += 1;
-        self.users.set(msg.owner_wallet, user);
-        commit();
-
-        if (!(signedPayload.bits() == 0)) {
-            return;
-        }
-        if (!(signedPayload.refs() == 1)) {
-            return;
-        }
         let actionPayload: Slice = signedPayload.loadRef().beginParse();
         let intentId: Int = actionPayload.loadUint(256);
         let secret32: Int = actionPayload.loadUint(256);
-        if (!(actionPayload.bits() == 0)) {
-            return;
-        }
-        if (!(actionPayload.refs() == 0)) {
-            return;
-        }
 
         let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
-        if (intentOpt == null) {
-            return;
-        }
+        throwUnless(16276, intentOpt != null);
         let intent: ReceiveIntent = intentOpt!!;
-        if (intent.claimed) {
-            return;
-        }
-        if (!(msg.owner_wallet == intent.recipient_wallet)) {
-            return;
-        }
-        if (intent.asset == ASSET_ATH) {
-            if (!(self.isBasechainAddress(msg.owner_wallet))) {
-                return;
-            }
-        }
-        let expected: Int = self.computeReceiveIntentCommitment(intentId, msg.owner_wallet, secret32);
-        if (!(expected == intent.commitment)) {
-            return;
-        }
+        throwUnless(16278, msg.owner_wallet == intent.recipient_wallet);
+        throwUnless(16280, secret32 == intent.commitment);
+
+        acceptMessage();
+        user.publish_nonce += 1;
 
         if (intent.asset == ASSET_TON) {
             user.ton_balance += intent.amount;
@@ -1726,46 +1793,19 @@ contract Vault {
         throwUnless(16255, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16256, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        throwUnless(16257, vaultAddressSlice.loadUint(11) == 1024);
-        throwUnless(16257, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedAction: Int = signedPayload.loadUint(8);
-        throwUnless(16258, signedAction == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16259, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16259, signedOwnerHash == ownerPrefix.loadUint(256));
+        throwUnless(16258, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16262, clientNonce == user.publish_nonce);
-        acceptMessage();
-        user.publish_nonce += 1;
-        self.users.set(msg.owner_wallet, user);
-        commit();
-
-        if (!(signedPayload.bits() == 0)) {
-            return;
-        }
-        if (!(signedPayload.refs() == 1)) {
-            return;
-        }
         let actionPayload: Slice = signedPayload.loadRef().beginParse();
         let intentId: Int = actionPayload.loadUint(256);
-        if (!(actionPayload.bits() == 0)) {
-            return;
-        }
-        if (!(actionPayload.refs() == 0)) {
-            return;
-        }
 
         let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
-        if (intentOpt == null) {
-            return;
-        }
+        throwUnless(16285, intentOpt != null);
         let intent: ReceiveIntent = intentOpt!!;
-        if (!(msg.owner_wallet == intent.sender_wallet)) {
-            return;
-        }
+        throwUnless(16286, msg.owner_wallet == intent.sender_wallet);
+
+        acceptMessage();
+        user.publish_nonce += 1;
 
         if (intent.asset == ASSET_TON) {
             user.ton_balance += intent.amount;
@@ -2084,36 +2124,13 @@ contract Vault {
         throwUnless(16605, signedDomain == VAULT_PROFILE_AVATAR_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16606, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16607, signedVaultAddress == myAddress());
-        let signedOwner: Address = signedPayload.loadAddress();
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxTonCharge: Int = signedPayload.loadUint(128);
-        throwUnless(16610, signedOwner == msg.owner_wallet);
         throwUnless(16611, clientNonce == user.publish_nonce);
+        throwUnless(16613, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
+        throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         acceptMessage();
         user.publish_nonce += 1;
-        self.users.set(msg.owner_wallet, user);
-        commit();
-
-        if (!(self.sealed)) {
-            return;
-        }
-        if (!(self.isUsernameRegistryBound())) {
-            return;
-        }
-
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        if (!(ownerPrefix.loadUint(11) == 1024)) {
-            return;
-        }
-        if (!(maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE)) {
-            return;
-        }
-        if (!(user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE)) {
-            return;
-        }
-
         user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
@@ -2203,33 +2220,23 @@ contract Vault {
         throwUnless(16704, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
+        throwUnless(16708, signedPayload.bits() == 736);
+        throwUnless(16709, signedPayload.refs() == 1);
         let signedDomain: Int = signedPayload.loadUint(32);
         throwUnless(16705, signedDomain == VAULT_USERNAME_MINT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16706, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16707, signedVaultAddress == myAddress());
-        let signedOwner: Address = signedPayload.loadAddress();
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        throwUnless(16707, vaultAddressSlice.loadUint(11) == 1024);
+        throwUnless(16707, signedVaultHash == vaultAddressSlice.loadUint(256));
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxTonCharge: Int = signedPayload.loadUint(128);
-        throwUnless(16710, signedOwner == msg.owner_wallet);
         throwUnless(16711, clientNonce == user.publish_nonce);
+        throwUnless(16713, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
+        throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         acceptMessage();
         user.publish_nonce += 1;
-        self.users.set(msg.owner_wallet, user);
-        commit();
-
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        if (!(ownerPrefix.loadUint(11) == 1024)) {
-            return;
-        }
-        if (!(maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE)) {
-            return;
-        }
-        if (!(user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE)) {
-            return;
-        }
-
         user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
