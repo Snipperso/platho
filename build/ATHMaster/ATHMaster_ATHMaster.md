@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: ATHMaster
-BoC Size: 9480 bytes
+BoC Size: 7680 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 50
+Total structures: 44
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -85,17 +85,9 @@ Signature: `AthTransferNotificationRefund{query_id:uint64,amount:uint128,sender_
 TL-B: `prune_stale_notification#504e5052 query_id:uint64 sender_key:uint160 = PruneStaleNotification`
 Signature: `PruneStaleNotification{query_id:uint64,sender_key:uint160}`
 
-### AthTransferNotificationMintUsername
-TL-B: `ath_transfer_notification_mint_username#89129d5f query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationMintUsername`
-Signature: `AthTransferNotificationMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
-
 ### AthTransferNotificationVaultMintUsername
 TL-B: `ath_transfer_notification_vault_mint_username#89129d60 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address username_len:uint8 username:remainder<slice> = AthTransferNotificationVaultMintUsername`
 Signature: `AthTransferNotificationVaultMintUsername{query_id:uint64,sender_key:uint160,amount:uint128,payer_wallet:address,owner_wallet:address,username_len:uint8,username:remainder<slice>}`
-
-### AthTransferNotificationProfileAvatar
-TL-B: `ath_transfer_notification_profile_avatar#a11a7001 query_id:uint64 sender_key:uint160 amount:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationProfileAvatar`
-Signature: `AthTransferNotificationProfileAvatar{query_id:uint64,sender_key:uint160,amount:uint128,owner_wallet:address,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
 
 ### AthTransferNotificationVaultProfileAvatar
 TL-B: `ath_transfer_notification_vault_profile_avatar#a11a7002 query_id:uint64 sender_key:uint160 amount:uint128 payer_wallet:address owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = AthTransferNotificationVaultProfileAvatar`
@@ -108,14 +100,6 @@ Signature: `ATHTransferRequest{query_id:uint64,amount:uint128,recipient:address,
 ### ATHTransferRequestWithNotify
 TL-B: `ath_transfer_request_with_notify#41544814 query_id:uint64 amount:uint128 recipient:address response_destination:address notify_destination:address notify_value:uint128 = ATHTransferRequestWithNotify`
 Signature: `ATHTransferRequestWithNotify{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_destination:address,notify_value:uint128}`
-
-### ATHTransferRequestMintUsername
-TL-B: `ath_transfer_request_mint_username#41544816 query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 username_len:uint8 username:remainder<slice> = ATHTransferRequestMintUsername`
-Signature: `ATHTransferRequestMintUsername{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_value:uint128,username_len:uint8,username:remainder<slice>}`
-
-### ATHTransferRequestProfileAvatar
-TL-B: `ath_transfer_request_profile_avatar#41544818 query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHTransferRequestProfileAvatar`
-Signature: `ATHTransferRequestProfileAvatar{query_id:uint64,amount:uint128,recipient:address,response_destination:address,notify_value:uint128,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
 
 ### ATHTransferRequestVaultProfileAvatar
 TL-B: `ath_transfer_request_vault_profile_avatar#4154481a query_id:uint64 amount:uint128 recipient:address response_destination:address notify_value:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHTransferRequestVaultProfileAvatar`
@@ -132,14 +116,6 @@ Signature: `ATHInternalTransfer{query_id:uint64,amount:uint128,sender_owner:addr
 ### ATHInternalTransferWithNotify
 TL-B: `ath_internal_transfer_with_notify#41544815 query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_destination:address notify_value:uint128 = ATHInternalTransferWithNotify`
 Signature: `ATHInternalTransferWithNotify{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_destination:address,notify_value:uint128}`
-
-### ATHInternalTransferMintUsername
-TL-B: `ath_internal_transfer_mint_username#41544817 query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 username_len:uint8 username:remainder<slice> = ATHInternalTransferMintUsername`
-Signature: `ATHInternalTransferMintUsername{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_value:uint128,username_len:uint8,username:remainder<slice>}`
-
-### ATHInternalTransferProfileAvatar
-TL-B: `ath_internal_transfer_profile_avatar#41544819 query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHInternalTransferProfileAvatar`
-Signature: `ATHInternalTransferProfileAvatar{query_id:uint64,amount:uint128,sender_owner:address,response_destination:address,notify_value:uint128,avatar_hash:uint256,avatar_entry_id:uint64,avatar_stream_id:uint128,avatar_part_count:uint16,media_format:uint8}`
 
 ### ATHInternalTransferVaultProfileAvatar
 TL-B: `ath_internal_transfer_vault_profile_avatar#4154481b query_id:uint64 amount:uint128 sender_owner:address response_destination:address notify_value:uint128 owner_wallet:address avatar_hash:uint256 avatar_entry_id:uint64 avatar_stream_id:uint128 avatar_part_count:uint16 media_format:uint8 = ATHInternalTransferVaultProfileAvatar`

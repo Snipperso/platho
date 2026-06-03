@@ -1763,7 +1763,6 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(afterSecond.ath_balance).toBe(afterFirst.ath_balance);
     expect(afterSecond.publish_nonce).toBe(afterFirst.publish_nonce + 1n);
     expect(afterGlobal.pending_username_mint_payment_count).toBe(0n);
-    expect(await ctx.usernameRegistry.getGetRefundDue(ctx.user.address)).toBe(0n);
     expect((await vaultOfficialWallet.getGetWalletData()).balance).toBe(USERNAME_PRICE_6_PLUS * 2n);
     expect((await usernameOfficialWallet.getGetWalletData()).balance).toBe(USERNAME_PRICE_6_PLUS);
     expect(findTransaction(second.transactions, {

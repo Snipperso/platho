@@ -20,12 +20,6 @@ export const ATH_WALLET_OPS = Object.freeze({
   ATHBurn: 1096042497,
   ATHTransferRequest: 1096042512,
   ATHTransferRequestWithNotify: 1096042516,
-  ATHTransferRequestMintUsername: 1096042518,
-  ATHTransferRequestProfileAvatar: 1096042520,
-});
-
-export const USERNAME_REGISTRY_OPS = Object.freeze({
-  FlushAthRefundDue: 1804766023,
 });
 
 export const VAULT_PUBLISH_KIND = Object.freeze({
@@ -106,11 +100,6 @@ export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   transferNotifyExec: 7_000_000n,
   ownerRequestExec: 2_000_000n,
   notifyOwnerRequestExec: 10_000_000n,
-});
-
-export const USERNAME_REGISTRY_RESERVES_NANOTONS = Object.freeze({
-  athTransferExec: 30_000_000n,
-  dueFlushLocalExec: 2_000_000n,
 });
 
 export const RECEIVE_ASSETS = Object.freeze({
@@ -536,10 +525,6 @@ function beginAthWalletBody(op) {
   return new TinyCellBuilder().uint(op, 32, 'op');
 }
 
-function beginUsernameRegistryBody(op) {
-  return new TinyCellBuilder().uint(op, 32, 'op');
-}
-
 export function beginCell() {
   return new TinyCellBuilder();
 }
@@ -615,21 +600,12 @@ export function estimateAthWalletAttachedValueNanotons(type, params = {}) {
     return ATH_WALLET_RESERVES_NANOTONS.burnNotificationExec
       + ATH_WALLET_RESERVES_NANOTONS.ownerRequestExec;
   }
-  if (type === 'ATHTransferRequestWithNotify' || type === 'ATHTransferRequestMintUsername' || type === 'ATHTransferRequestProfileAvatar') {
+  if (type === 'ATHTransferRequestWithNotify') {
     const notifyValue = params.notify_value ?? ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue;
     return athNotifyTransferValue(notifyValue)
       + ATH_WALLET_RESERVES_NANOTONS.notifyOwnerRequestExec;
   }
   throw new Error(`Unsupported ATHWallet message type ${type}`);
-}
-
-export function estimateUsernameRegistryAttachedValueNanotons(type) {
-  assertString(type, 'type');
-  if (type === 'FlushAthRefundDue') {
-    return USERNAME_REGISTRY_RESERVES_NANOTONS.athTransferExec
-      + USERNAME_REGISTRY_RESERVES_NANOTONS.dueFlushLocalExec;
-  }
-  throw new Error(`Unsupported UsernameRegistry message type ${type}`);
 }
 
 function vaultBalancePublishOwner(params) {
@@ -1048,33 +1024,6 @@ export function buildAthWalletMessageBody(type, params = {}) {
           .uint(params.notify_value, 128, 'notify_value')
           .endCell(), 'notify_ref')
         .toBocBase64();
-    case 'ATHTransferRequestMintUsername': {
-      const usernameBytes = normalizeUsernameBytes(params.username);
-      return beginAthWalletBody(ATH_WALLET_OPS.ATHTransferRequestMintUsername)
-        .uint(params.query_id, 64, 'query_id')
-        .uint(params.amount, 128, 'amount')
-        .address(params.recipient, 'recipient')
-        .address(params.response_destination, 'response_destination')
-        .uint(params.notify_value, 128, 'notify_value')
-        .uint(usernameBytes.length, 8, 'username_len')
-        .bytesValue(usernameBytes, usernameBytes.length, 'username')
-        .toBocBase64();
-    }
-    case 'ATHTransferRequestProfileAvatar':
-      return beginAthWalletBody(ATH_WALLET_OPS.ATHTransferRequestProfileAvatar)
-        .uint(params.query_id, 64, 'query_id')
-        .uint(params.amount, 128, 'amount')
-        .address(params.recipient, 'recipient')
-        .address(params.response_destination, 'response_destination')
-        .uint(params.notify_value, 128, 'notify_value')
-        .ref(beginCell()
-          .uint(params.avatar_hash, 256, 'avatar_hash')
-          .uint(params.avatar_entry_id ?? 0n, 64, 'avatar_entry_id')
-          .uint(params.avatar_stream_id, 128, 'avatar_stream_id')
-          .uint(params.avatar_part_count, 16, 'avatar_part_count')
-          .uint(params.media_format ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP, 8, 'media_format')
-          .endCell(), 'avatar_ref')
-        .toBocBase64();
     case 'ATHBurn':
       return beginAthWalletBody(ATH_WALLET_OPS.ATHBurn)
         .uint(params.query_id, 64, 'query_id')
@@ -1083,19 +1032,6 @@ export function buildAthWalletMessageBody(type, params = {}) {
         .toBocBase64();
     default:
       throw new Error(`Unsupported ATHWallet message type ${type}`);
-  }
-}
-
-export function buildUsernameRegistryMessageBody(type, params = {}) {
-  assertObject(params, 'params');
-  switch (type) {
-    case 'FlushAthRefundDue':
-      return beginUsernameRegistryBody(USERNAME_REGISTRY_OPS.FlushAthRefundDue)
-        .uint(params.query_id, 64, 'query_id')
-        .address(params.owner_wallet, 'owner_wallet')
-        .toBocBase64();
-    default:
-      throw new Error(`Unsupported UsernameRegistry message type ${type}`);
   }
 }
 
@@ -1120,18 +1056,6 @@ export function createAthWalletMessage(type, params = {}, options = {}) {
     address,
     amount: amount.toString(),
     payload: buildAthWalletMessageBody(type, params),
-  };
-}
-
-export function createUsernameRegistryWalletMessage(type, params = {}, options = {}) {
-  const address = assertString(options.usernameRegistryAddress, 'usernameRegistryAddress');
-  const amount = options.valueNanotons !== undefined
-    ? assertUint(options.valueNanotons, 128, 'valueNanotons')
-    : estimateUsernameRegistryAttachedValueNanotons(type, params);
-  return {
-    address,
-    amount: amount.toString(),
-    payload: buildUsernameRegistryMessageBody(type, params),
   };
 }
 

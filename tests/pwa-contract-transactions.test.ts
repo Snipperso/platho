@@ -13,13 +13,8 @@ import {
 import {
   storeATHBurn,
   storeATHTransferRequest,
-  storeATHTransferRequestMintUsername,
-  storeATHTransferRequestProfileAvatar,
   storeATHTransferRequestWithNotify,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
-import {
-  storeFlushAthRefundDue,
-} from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   ATH_WALLET_RESERVES_NANOTONS,
   PUBLIC_BODY_FLAGS,
@@ -32,12 +27,10 @@ import {
   PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
   RECEIVE_ASSETS,
   USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
-  USERNAME_REGISTRY_RESERVES_NANOTONS,
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
   buildAthWalletMessageBody,
-  buildUsernameRegistryMessageBody,
   buildVaultBalancePublishBodyCell,
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarBodyCell,
@@ -50,9 +43,7 @@ import {
   createPublicPostPayload,
   createWalletTransaction,
   createVaultWalletMessage,
-  createUsernameRegistryWalletMessage,
   estimateAthWalletAttachedValueNanotons,
-  estimateUsernameRegistryAttachedValueNanotons,
   estimateVaultAttachedValueNanotons,
   readPublicPostPayload,
   tonCell,
@@ -316,55 +307,6 @@ describe('PWA contract transaction builders', () => {
       }),
     ],
     [
-      'ATHTransferRequestMintUsername',
-      {
-        query_id: 13n,
-        amount: 100_000_000_000n,
-        recipient: USERNAME_REGISTRY,
-        response_destination: OWNER,
-        notify_value: 32_000_000n,
-        username: 'platho.ath',
-      },
-      storeATHTransferRequestMintUsername({
-        $$type: 'ATHTransferRequestMintUsername',
-        query_id: 13n,
-        amount: 100_000_000_000n,
-        recipient: Address.parseRaw(USERNAME_REGISTRY),
-        response_destination: Address.parseRaw(OWNER),
-        notify_value: 32_000_000n,
-        username_len: 6n,
-        username: beginCell().storeBuffer(Buffer.from('platho', 'ascii')).endCell().beginParse(),
-      }),
-    ],
-    [
-      'ATHTransferRequestProfileAvatar',
-      {
-        query_id: 15n,
-        amount: 100_000_000_000n,
-        recipient: USERNAME_REGISTRY,
-        response_destination: OWNER,
-        notify_value: 30_000_000n,
-        avatar_hash: 0x1234n,
-        avatar_entry_id: 77n,
-        avatar_stream_id: 0xabcden,
-        avatar_part_count: 8n,
-        media_format: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
-      },
-      storeATHTransferRequestProfileAvatar({
-        $$type: 'ATHTransferRequestProfileAvatar',
-        query_id: 15n,
-        amount: 100_000_000_000n,
-        recipient: Address.parseRaw(USERNAME_REGISTRY),
-        response_destination: Address.parseRaw(OWNER),
-        notify_value: 30_000_000n,
-        avatar_hash: 0x1234n,
-        avatar_entry_id: 77n,
-        avatar_stream_id: 0xabcden,
-        avatar_part_count: 8n,
-        media_format: BigInt(PUBLIC_BODY_MEDIA_FORMATS.WEBP),
-      }),
-    ],
-    [
       'ATHBurn',
       {
         query_id: 14n,
@@ -382,45 +324,39 @@ describe('PWA contract transaction builders', () => {
     expect(buildAthWalletMessageBody(type, params)).toBe(generatedBody(store));
   });
 
-  it('PWA-TX-06B: username mint builder rejects names that cannot fit the root-cell transport', () => {
-    expect(() => buildAthWalletMessageBody('ATHTransferRequestMintUsername', {
+  it('PWA-TX-06B: direct ATHWallet username/avatar product actions are unsupported', () => {
+    expect(() => buildAthWalletMessageBody('WalletProductMintUsername', {
       query_id: 13n,
       amount: 100_000_000_000n,
       recipient: USERNAME_REGISTRY,
       response_destination: OWNER,
       notify_value: 32_000_000n,
       username: 'name_1-x',
-    })).not.toThrow();
-    expect(() => buildAthWalletMessageBody('ATHTransferRequestMintUsername', {
-      query_id: 13n,
+    })).toThrow(/Unsupported ATHWallet message type/);
+    expect(() => buildAthWalletMessageBody('WalletProductProfileAvatar', {
+      query_id: 15n,
       amount: 100_000_000_000n,
       recipient: USERNAME_REGISTRY,
       response_destination: OWNER,
-      notify_value: 32_000_000n,
-      username: 'Name_1-x',
-    })).toThrow(/lowercase ASCII/);
-    expect(() => buildAthWalletMessageBody('ATHTransferRequestMintUsername', {
-      query_id: 13n,
-      amount: 100_000_000_000n,
-      recipient: USERNAME_REGISTRY,
-      response_destination: OWNER,
-      notify_value: 32_000_000n,
-      username: 'abcdefghijklmnopq',
-    })).toThrow(/4-16 ASCII chars/);
+      notify_value: 30_000_000n,
+      avatar_hash: 0x1234n,
+      avatar_entry_id: 77n,
+      avatar_stream_id: 0xabcden,
+      avatar_part_count: 8n,
+      media_format: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
+    })).toThrow(/Unsupported ATHWallet message type/);
   });
 
-  it('PWA-TX-07: quotes exact ATHWallet and username refund values used by the PWA', () => {
+  it('PWA-TX-07: quotes exact ATHWallet generic values used by the PWA', () => {
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(30_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(51_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestMintUsername', { notify_value: 32_000_000n })).toBe(53_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestProfileAvatar', { notify_value: 30_000_000n })).toBe(51_000_000n);
-    expect(estimateUsernameRegistryAttachedValueNanotons('FlushAthRefundDue')).toBe(32_000_000n);
+    expect(() => estimateAthWalletAttachedValueNanotons('WalletProductMintUsername', { notify_value: 32_000_000n })).toThrow(/Unsupported ATHWallet message type/);
+    expect(() => estimateAthWalletAttachedValueNanotons('WalletProductProfileAvatar', { notify_value: 30_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(30_000_000n);
-    expect(USERNAME_REGISTRY_RESERVES_NANOTONS.athTransferExec).toBe(30_000_000n);
   });
 
-  it('PWA-TX-08: builds ATHWallet and UsernameRegistry wallet messages', () => {
+  it('PWA-TX-08: builds generic ATHWallet wallet messages only', () => {
     const athMessage = createAthWalletMessage('ATHTransferRequest', {
       query_id: 11n,
       amount: 500n,
@@ -437,20 +373,6 @@ describe('PWA contract transaction builders', () => {
       amount: 500n,
       recipient: Address.parseRaw(RECIPIENT),
       response_destination: Address.parseRaw(OWNER),
-    })));
-
-    const refundMessage = createUsernameRegistryWalletMessage('FlushAthRefundDue', {
-      query_id: 22n,
-      owner_wallet: OWNER,
-    }, {
-      usernameRegistryAddress: USERNAME_REGISTRY,
-    });
-    expect(refundMessage.address).toBe(USERNAME_REGISTRY);
-    expect(refundMessage.amount).toBe('32000000');
-    expect(refundMessage.payload).toBe(generatedBody(storeFlushAthRefundDue({
-      $$type: 'FlushAthRefundDue',
-      query_id: 22n,
-      owner_wallet: Address.parseRaw(OWNER),
     })));
   });
 

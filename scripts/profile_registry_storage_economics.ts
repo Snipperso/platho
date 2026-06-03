@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  AthTransferNotificationProfileAvatar,
   AthTransferNotificationVaultProfileAvatar,
   BindProfileOfficialAthWallet,
   BindProfileVault,
@@ -33,7 +32,6 @@ const PROFILE_REPEAT_RETAINED_MODEL = PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT
 type ProfileStorageCase = {
   label: string;
   updates: number;
-  vault_funded: boolean;
   raw_balance_delta_nanotons: string;
   expected_permanent_endowment_nanotons: string;
   expected_retained_model_nanotons: string;
@@ -118,12 +116,13 @@ async function setupRegistry(label: string) {
   return { blockchain, registry, officialAthWallet, vault };
 }
 
-function directNotification(owner: Address, queryId: bigint): AthTransferNotificationProfileAvatar {
+function avatarNotification(ctx: Setup, owner: Address, queryId: bigint): AthTransferNotificationVaultProfileAvatar {
   return {
-    $$type: 'AthTransferNotificationProfileAvatar',
+    $$type: 'AthTransferNotificationVaultProfileAvatar',
     query_id: queryId,
     amount: PROFILE_AVATAR_PRICE_ATH,
     sender_key: 77n,
+    payer_wallet: ctx.vault,
     owner_wallet: owner,
     avatar_hash: 0xabc000n + queryId,
     avatar_entry_id: queryId,
@@ -133,31 +132,23 @@ function directNotification(owner: Address, queryId: bigint): AthTransferNotific
   };
 }
 
-function vaultNotification(ctx: Setup, owner: Address, queryId: bigint): AthTransferNotificationVaultProfileAvatar {
-  return {
-    ...directNotification(owner, queryId),
-    $$type: 'AthTransferNotificationVaultProfileAvatar',
-    payer_wallet: ctx.vault,
-  };
-}
-
-async function sendAvatar(ctx: Setup, owner: Address, queryId: bigint, vaultFunded: boolean) {
+async function sendAvatar(ctx: Setup, owner: Address, queryId: bigint) {
   await ctx.registry.send(
     ctx.blockchain.sender(ctx.officialAthWallet),
     { value: PROFILE_NOTIFY_VALUE },
-    vaultFunded ? vaultNotification(ctx, owner, queryId) : directNotification(owner, queryId),
+    avatarNotification(ctx, owner, queryId),
   );
 }
 
-async function singleCase(label: string, vaultFunded: boolean, preUpdates: number): Promise<ProfileStorageCase> {
+async function singleCase(label: string, preUpdates: number): Promise<ProfileStorageCase> {
   const ctx = await setupRegistry(label);
   const owner = fixtureAddress(`${label}_OWNER`);
   for (let i = 0; i < preUpdates; i += 1) {
-    await sendAvatar(ctx, owner, BigInt(i + 1), vaultFunded);
+    await sendAvatar(ctx, owner, BigInt(i + 1));
   }
 
   const before = await contractBalance(ctx.blockchain, ctx.registry.address);
-  await sendAvatar(ctx, owner, BigInt(preUpdates + 1), vaultFunded);
+  await sendAvatar(ctx, owner, BigInt(preUpdates + 1));
   const after = await contractBalance(ctx.blockchain, ctx.registry.address);
   const state = await ctx.registry.getGetGlobal();
   const expectedPermanent = PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT
@@ -170,7 +161,6 @@ async function singleCase(label: string, vaultFunded: boolean, preUpdates: numbe
   return {
     label,
     updates: 1,
-    vault_funded: vaultFunded,
     raw_balance_delta_nanotons: String(rawDelta),
     expected_permanent_endowment_nanotons: String(expectedPermanent),
     expected_retained_model_nanotons: String(expectedRetainedModel),
@@ -180,14 +170,14 @@ async function singleCase(label: string, vaultFunded: boolean, preUpdates: numbe
   };
 }
 
-async function aggregateCase(label: string, owners: number, updatesPerOwner: number, vaultFunded: boolean): Promise<ProfileStorageCase> {
+async function aggregateCase(label: string, owners: number, updatesPerOwner: number): Promise<ProfileStorageCase> {
   const ctx = await setupRegistry(label);
   const before = await contractBalance(ctx.blockchain, ctx.registry.address);
   let queryId = 1n;
   for (let ownerIndex = 0; ownerIndex < owners; ownerIndex += 1) {
     const owner = fixtureAddress(`${label}_OWNER_${ownerIndex}`);
     for (let updateIndex = 0; updateIndex < updatesPerOwner; updateIndex += 1) {
-      await sendAvatar(ctx, owner, queryId, vaultFunded);
+      await sendAvatar(ctx, owner, queryId);
       queryId += 1n;
     }
   }
@@ -205,7 +195,6 @@ async function aggregateCase(label: string, owners: number, updatesPerOwner: num
   return {
     label,
     updates,
-    vault_funded: vaultFunded,
     raw_balance_delta_nanotons: String(rawDelta),
     expected_permanent_endowment_nanotons: String(expectedPermanent),
     expected_retained_model_nanotons: String(expectedRetainedModel),
@@ -225,10 +214,10 @@ function renderMarkdown(report: ProfileRegistryStorageEconomicsReport): string {
   lines.push('');
   lines.push(`ProfileRegistry code hash: \`${report.code_hashes.profile_registry}\``);
   lines.push('');
-  lines.push('| Case | Updates | Vault-funded | Retained delta | Permanent endowment | Margin |');
-  lines.push('|---|---:|---|---:|---:|---:|');
+  lines.push('| Case | Updates | Retained delta | Permanent endowment | Margin |');
+  lines.push('|---|---:|---:|---:|---:|');
   for (const item of report.cases) {
-    lines.push(`| ${item.label} | ${item.updates} | ${item.vault_funded} | ${item.raw_balance_delta_nanotons} | ${item.expected_permanent_endowment_nanotons} | ${item.retained_margin_vs_permanent_endowment_nanotons} |`);
+    lines.push(`| ${item.label} | ${item.updates} | ${item.raw_balance_delta_nanotons} | ${item.expected_permanent_endowment_nanotons} | ${item.retained_margin_vs_permanent_endowment_nanotons} |`);
   }
   lines.push('');
   lines.push(`Minimum retained margin gate: **${report.constants.minimum_storage_margin_nanotons} nanotons**.`);
@@ -239,13 +228,10 @@ function renderMarkdown(report: ProfileRegistryStorageEconomicsReport): string {
 
 export async function runProfileRegistryStorageEconomics(writeArtifacts = true): Promise<ProfileRegistryStorageEconomicsReport> {
   const cases = [
-    await singleCase('DIRECT_FIRST_AVATAR', false, 0),
-    await singleCase('DIRECT_REPEAT_AVATAR', false, 1),
-    await singleCase('VAULT_FIRST_AVATAR', true, 0),
-    await singleCase('VAULT_REPEAT_AVATAR', true, 1),
-    await aggregateCase('DIRECT_MANY_OWNERS_12', 12, 1, false),
-    await aggregateCase('DIRECT_MANY_UPDATES_ONE_OWNER_10', 1, 10, false),
-    await aggregateCase('VAULT_MANY_UPDATES_ONE_OWNER_10', 1, 10, true),
+    await singleCase('VAULT_FIRST_AVATAR', 0),
+    await singleCase('VAULT_REPEAT_AVATAR', 1),
+    await aggregateCase('VAULT_MANY_OWNERS_12', 12, 1),
+    await aggregateCase('VAULT_MANY_UPDATES_ONE_OWNER_10', 1, 10),
   ];
   const worst = cases.map((item) => BigInt(item.retained_margin_vs_permanent_endowment_nanotons)).reduce((a, b) => a < b ? a : b);
   if (worst < MINIMUM_STORAGE_MARGIN_NANOTONS) {

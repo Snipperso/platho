@@ -602,8 +602,8 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/All retained history · slow sync/);
     expect(html).toMatch(/id="walletAddressStatus"/);
     expect(html).toMatch(/id="mintUsernameButton"/);
-    expect(html).toMatch(/id="flushUsernameRefundButton"/);
-    expect(html).toMatch(/Claim failed mint refund/);
+    expect(html).not.toMatch(/id="flushUsernameRefundButton"/);
+    expect(html).not.toMatch(/Claim failed mint refund/);
     expect(html).not.toMatch(/Claim username refund/);
     expect(html).not.toMatch(/id="transferAthButton"/);
     expect(html).toMatch(/id="burnAthButton"/);
@@ -942,7 +942,7 @@ describe('PWA runtime config guard', () => {
     );
     const submitSource = app.slice(
       app.indexOf('async function submitAthWalletMessage'),
-      app.indexOf('async function submitUsernameRegistryMessage'),
+      app.indexOf('async function submitVaultDepositTon'),
     );
 
     expect(criticalMethods).toContain('get_wallet_address');
@@ -951,6 +951,8 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/\.\.\.criticalChainReadOptions\(\)/);
     expect(submitSource).toMatch(/requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/await loadConnectedAthWalletAddress\(\)/);
+    expect(app).not.toMatch(/async function submitUsernameRegistryMessage/);
+    expect(app).not.toMatch(/async function submitUsernameRefundFlush/);
   });
 
   it('PWA-SW-UPDATE-01: pending service worker update blocks new signed sends and reloads after wallet lock', () => {
@@ -985,7 +987,7 @@ describe('PWA runtime config guard', () => {
     expect(profileSource).toMatch(/async function submitVaultUsernameMint[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/async function submitVaultMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
     expect(submitSource).toMatch(/async function submitAthWalletMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
-    expect(submitSource).toMatch(/async function submitUsernameRegistryMessage[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
+    expect(submitSource).not.toMatch(/async function submitUsernameRegistryMessage/);
     expect(prepareSource).toMatch(/async function prepareCapsulesThroughVault[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
   });
 
@@ -1589,7 +1591,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const source = app.slice(
       app.indexOf('async function submitUsernameMint'),
-      app.indexOf('async function submitUsernameRefundFlush'),
+      app.indexOf('async function submitAthWalletBurn'),
     );
 
     expect(source).toMatch(/provider\.getUsernamePrice\(username\.length/);
@@ -1597,7 +1599,7 @@ describe('PWA runtime config guard', () => {
     expect(source).toMatch(/const priceAtomic = BigInt\(price\?\.price_ath_atomic \?\? 0n\)/);
     expect(source).toMatch(/priceAtomic/);
     expect(source).toMatch(/submitVaultUsernameMint/);
-    expect(source).not.toMatch(/submitAthWalletMessage\('ATHTransferRequestMintUsername'/);
+    expect(source).not.toMatch(/submitAthWalletMessage\(/);
     expect(source).not.toMatch(/amount: price,/);
   });
 

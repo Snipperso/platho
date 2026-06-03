@@ -6,7 +6,7 @@ Date: 2026-06-01
 
 Frozen source: `contracts/BuybackBurn.tact`
 
-Current code hash: `1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2`
+Current code hash: `adf826d02915f535d900d769fe3e47ba24181e6bfe669a8de52fc75a00afd8bd`
 
 Production unlock status: final genesis may seal BuybackBurn with `route_frozen=false`, but route freeze and execution remain blocked until post-pool M20F mainnet STON.fi route evidence passes. This local freeze does not set `production_buyback_burn_unlocked` or `BUYBACKBURN_IMPLEMENTATION_READY` to true.
 
@@ -50,7 +50,7 @@ Production unlock status: final genesis may seal BuybackBurn with `route_frozen=
 ## Final Local Verification
 
 - `npm.cmd run build`: pass.
-- `node scripts/hash_codes.js`: BuybackBurn hash `1026780c0c256efec9abb549f1b673938094adf01e84de18794f647fd9774fa2`.
+- `node scripts/hash_codes.js`: BuybackBurn hash `adf826d02915f535d900d769fe3e47ba24181e6bfe669a8de52fc75a00afd8bd`.
 - Targeted BuybackBurn route/readiness suite: 14 files, 71 tests passed.
 - Focused BuybackBurn production suite: 11 tests passed, including burn-failure retry coverage.
 - BuybackBurn auth-negative matrix: 6 tests passed.

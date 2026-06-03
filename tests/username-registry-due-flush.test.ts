@@ -7,7 +7,7 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
+  AthTransferNotificationVaultMintUsername,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -105,19 +105,21 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
     master,
     treasuryAthReceiver,
     flusher,
+    vaultAddress,
   };
 }
 
-async function mintValidName(blockchain: Blockchain, registry: any, officialAthWalletAddress: Address, ownerWallet: Address, name: string) {
+async function mintValidName(blockchain: Blockchain, registry: any, officialAthWalletAddress: Address, ownerWallet: Address, name: string, payerWallet: Address) {
   await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.15') }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 7001n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
+    payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 }
 
 describe('UsernameRegistry treasury/burn due flush milestone', () => {
@@ -125,7 +127,7 @@ describe('UsernameRegistry treasury/burn due flush milestone', () => {
     const ctx = await deployRegistryWithAthSystem({ officialWalletBalance: PRICE_6_PLUS, deployMaster: true });
     const ownerWallet = fixtureAddress('USERNAME_M12_TREASURY_OWNER');
 
-    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'platho');
+    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'platho', ctx.vaultAddress);
     expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
 
     const treasuryAthWalletAddress = await ctx.registry.getGetAthWalletAddress(ctx.treasuryAthReceiver);
@@ -149,7 +151,7 @@ describe('UsernameRegistry treasury/burn due flush milestone', () => {
     const ctx = await deployRegistryWithAthSystem({ officialWalletBalance: PRICE_6_PLUS, deployMaster: true });
     const ownerWallet = fixtureAddress('USERNAME_M12_BURN_OWNER');
 
-    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'larisa');
+    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'larisa', ctx.vaultAddress);
     const beforeMaster = await ctx.master.getGetJettonData();
     expect(beforeMaster.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
     expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(HALF_PRICE);
@@ -173,7 +175,7 @@ describe('UsernameRegistry treasury/burn due flush milestone', () => {
     const ctx = await deployRegistryWithAthSystem({ officialWalletBalance: 0n, deployMaster: true });
     const ownerWallet = fixtureAddress('USERNAME_M12_TREASURY_FAIL_OWNER');
 
-    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'refund');
+    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'refund', ctx.vaultAddress);
     expect((await ctx.registry.getGetGlobal()).treasury_due_ath).toBe(HALF_PRICE);
 
     await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
@@ -191,7 +193,7 @@ describe('UsernameRegistry treasury/burn due flush milestone', () => {
     const ctx = await deployRegistryWithAthSystem({ officialWalletBalance: PRICE_6_PLUS, deployMaster: false });
     const ownerWallet = fixtureAddress('USERNAME_M12_BURN_FAIL_OWNER');
 
-    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'burner');
+    await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerWallet, 'burner', ctx.vaultAddress);
     expect((await ctx.registry.getGetGlobal()).burn_due_ath).toBe(HALF_PRICE);
 
     await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {

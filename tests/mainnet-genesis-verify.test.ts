@@ -257,10 +257,8 @@ function finalInput(): MainnetGenesisVerifyInput {
         treasury_ath_receiver: addresses.treasury_ath_receiver,
         name_record_count: '0',
         pending_mint_count: '0',
-        refund_due_count: '0',
         treasury_due_ath: '0',
         burn_due_ath: '0',
-        pending_refund_flush_count: '0',
         pending_treasury_flush_count: '0',
         pending_burn_flush_count: '0',
       },
@@ -1030,10 +1028,8 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     const input = finalInput();
     input.snapshot.username_registry.name_record_count = '1';
     input.snapshot.username_registry.pending_mint_count = '1';
-    input.snapshot.username_registry.refund_due_count = '1';
     input.snapshot.username_registry.treasury_due_ath = '1';
     input.snapshot.username_registry.burn_due_ath = '1';
-    input.snapshot.username_registry.pending_refund_flush_count = '1';
     input.snapshot.username_registry.pending_treasury_flush_count = '1';
     input.snapshot.username_registry.pending_burn_flush_count = '1';
     input.snapshot.profile_registry.profile_count = '1';

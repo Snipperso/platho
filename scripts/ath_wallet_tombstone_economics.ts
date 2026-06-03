@@ -5,8 +5,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  ATHInternalTransferMintUsername,
-  ATHInternalTransferProfileAvatar,
   ATHInternalTransferVaultMintUsername,
   ATHInternalTransferVaultProfileAvatar,
   ATHInternalTransferWithNotify,
@@ -162,37 +160,6 @@ const caseSpecs: CaseSpec[] = [
       notify_destination: ctx.recipientOwner,
       notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
     } as ATHInternalTransferWithNotify),
-  },
-  {
-    label: 'USERNAME_NOTIFY_ACK',
-    terminal: 'ack',
-    message: (ctx) => ({
-      $$type: 'ATHInternalTransferMintUsername',
-      query_id: ctx.queryId,
-      amount: AMOUNT,
-      sender_owner: ctx.sourceOwner,
-      response_destination: ctx.responseDestination,
-      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
-      username_len: 6n,
-      username: usernameSlice(),
-    } as ATHInternalTransferMintUsername),
-  },
-  {
-    label: 'PROFILE_NOTIFY_ACK',
-    terminal: 'ack',
-    message: (ctx) => ({
-      $$type: 'ATHInternalTransferProfileAvatar',
-      query_id: ctx.queryId,
-      amount: AMOUNT,
-      sender_owner: ctx.sourceOwner,
-      response_destination: ctx.responseDestination,
-      notify_value: ATH_TRANSFER_NOTIFY_MIN_VALUE,
-      avatar_hash: 0x1234n,
-      avatar_entry_id: 1n,
-      avatar_stream_id: 2n,
-      avatar_part_count: 1n,
-      media_format: 1n,
-    } as ATHInternalTransferProfileAvatar),
   },
   {
     label: 'VAULT_USERNAME_NOTIFY_ACK',

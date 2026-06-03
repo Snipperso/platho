@@ -28,8 +28,6 @@ describe('UsernameRegistry storage economics', () => {
       'SUCCESS_4_CHAR',
       'SUCCESS_5_CHAR',
       'SUCCESS_6_PLUS',
-      'REJECTED_NEW_REFUND_DUE',
-      'REJECTED_EXISTING_REFUND_DUE',
       'ITEM_DEPLOY_BOUNCE_REFUND_REQUEST',
       'ITEM_RESEND_ACK_CALLER_FUNDED',
       'ITEM_TRANSFER_EXACT_MIN',

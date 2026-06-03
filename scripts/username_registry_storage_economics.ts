@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  AthTransferNotificationMintUsername,
+  AthTransferNotificationVaultMintUsername,
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
@@ -25,11 +25,9 @@ const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const USERNAME_NOTIFY_VALUE = 32_000_000n;
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6_000_000n;
-const USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT = 4_000_000n;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 21_000_000n;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
-const USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE = 500_000n;
 const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
 const USERNAME_ITEM_ACK_EXEC_RESERVE = 1_000_000n;
 const USERNAME_ITEM_ACK_FWD_FEE_ALLOWANCE = 100_000n;
@@ -38,7 +36,7 @@ const MINIMUM_STORAGE_MARGIN_NANOTONS = 1_000_000n;
 
 type StorageCase = {
   label: string;
-  kind: 'successful_mint' | 'refund_due' | 'existing_refund_due' | 'item_bounce' | 'item_resend' | 'item_transfer';
+  kind: 'successful_mint' | 'item_bounce' | 'item_resend' | 'item_transfer';
   raw_balance_delta_nanotons: string;
   item_balance_delta_nanotons: string;
   expected_registry_endowment_nanotons: string;
@@ -47,7 +45,6 @@ type StorageCase = {
   item_margin_vs_floor_nanotons: string;
   name_record_count: string;
   pending_mint_count: string;
-  refund_due_count: string;
 };
 
 export type UsernameRegistryStorageEconomicsReport = {
@@ -59,14 +56,12 @@ export type UsernameRegistryStorageEconomicsReport = {
     username_nft_item: string;
   };
   note: string;
-  constants: {
-    username_pending_mint_storage_endowment_nanotons: string;
-    username_ath_refund_due_storage_endowment_nanotons: string;
-    username_state_growth_exec_reserve_nanotons: string;
-    username_nft_item_deploy_reserve_nanotons: string;
-    username_ath_notification_ack_value_nanotons: string;
-    username_mint_excess_refund_forward_reserve_nanotons: string;
-    username_item_ack_forward_reserve_nanotons: string;
+    constants: {
+      username_pending_mint_storage_endowment_nanotons: string;
+      username_state_growth_exec_reserve_nanotons: string;
+      username_nft_item_deploy_reserve_nanotons: string;
+      username_ath_notification_ack_value_nanotons: string;
+      username_item_ack_forward_reserve_nanotons: string;
     username_item_ack_exec_reserve_nanotons: string;
     username_item_ack_fwd_fee_allowance_nanotons: string;
     username_item_min_retained_after_init_nanotons: string;
@@ -145,15 +140,16 @@ async function setupRegistry(label: string) {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWallet };
+  return { blockchain, registry, officialAthWallet, vaultAddress };
 }
 
-function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint): AthTransferNotificationMintUsername {
+function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint, payerWallet: Address): AthTransferNotificationVaultMintUsername {
   return {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: queryId,
     amount,
     sender_key: 77n,
+    payer_wallet: payerWallet,
     owner_wallet: owner,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
@@ -161,7 +157,7 @@ function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint)
 }
 
 async function sendMint(ctx: Setup, owner: Address, name: string, amount: bigint, queryId: bigint, value = USERNAME_NOTIFY_VALUE) {
-  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWallet), { value }, mintBody(owner, name, amount, queryId));
+  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWallet), { value }, mintBody(owner, name, amount, queryId, ctx.vaultAddress));
 }
 
 function assertNonNegative(label: string, value: bigint) {
@@ -197,37 +193,6 @@ async function successfulMintCase(label: string, name: string, price: bigint): P
     item_margin_vs_floor_nanotons: String(itemMargin),
     name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
-    refund_due_count: String(global.refund_due_count),
-  };
-}
-
-async function rejectedRefundCase(label: string, existingRefundDue: boolean): Promise<StorageCase> {
-  const ctx = await setupRegistry(label);
-  const owner = fixtureAddress(`${label}_OWNER`);
-  if (existingRefundDue) {
-    await sendMint(ctx, owner, 'Larisa', PRICE_6_PLUS, 1n);
-  }
-  const beforeRegistry = await balance(ctx.blockchain, ctx.registry.address);
-  await sendMint(ctx, owner, 'BadNm', PRICE_6_PLUS, 2n);
-  const afterRegistry = await balance(ctx.blockchain, ctx.registry.address);
-  const global = await ctx.registry.getGetGlobal();
-  const registryDelta = afterRegistry - beforeRegistry;
-  const expected = existingRefundDue ? 0n : USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT;
-  const margin = registryDelta - expected;
-  assertNonNegative(label, margin);
-
-  return {
-    label,
-    kind: existingRefundDue ? 'existing_refund_due' : 'refund_due',
-    raw_balance_delta_nanotons: String(registryDelta),
-    item_balance_delta_nanotons: '0',
-    expected_registry_endowment_nanotons: String(expected),
-    expected_item_floor_nanotons: '0',
-    retained_margin_vs_registry_endowment_nanotons: String(margin),
-    item_margin_vs_floor_nanotons: '0',
-    name_record_count: String(global.name_record_count),
-    pending_mint_count: String(global.pending_mint_count),
-    refund_due_count: String(global.refund_due_count),
   };
 }
 
@@ -265,7 +230,6 @@ async function itemBounceCase(): Promise<StorageCase> {
     item_margin_vs_floor_nanotons: '0',
     name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
-    refund_due_count: String(global.refund_due_count),
   };
 }
 
@@ -304,7 +268,6 @@ async function itemResendCase(): Promise<StorageCase> {
     item_margin_vs_floor_nanotons: String(itemMargin),
     name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
-    refund_due_count: String(global.refund_due_count),
   };
 }
 
@@ -347,7 +310,6 @@ async function itemTransferCase(label: string, value: bigint, forwardAmount: big
     item_margin_vs_floor_nanotons: String(itemMargin),
     name_record_count: String(global.name_record_count),
     pending_mint_count: String(global.pending_mint_count),
-    refund_due_count: String(global.refund_due_count),
   };
 }
 
@@ -380,8 +342,6 @@ export async function runUsernameRegistryStorageEconomics(writeArtifacts = true)
     await successfulMintCase('SUCCESS_4_CHAR', 'abcd', PRICE_4),
     await successfulMintCase('SUCCESS_5_CHAR', 'abcde', PRICE_5),
     await successfulMintCase('SUCCESS_6_PLUS', 'larisa', PRICE_6_PLUS),
-    await rejectedRefundCase('REJECTED_NEW_REFUND_DUE', false),
-    await rejectedRefundCase('REJECTED_EXISTING_REFUND_DUE', true),
     await itemBounceCase(),
     await itemResendCase(),
     await itemTransferCase('ITEM_TRANSFER_EXACT_MIN', 14_000_000n, 0n),
@@ -411,14 +371,12 @@ export async function runUsernameRegistryStorageEconomics(writeArtifacts = true)
       username_registry: codeHash(path.join('build', 'UsernameRegistry', 'UsernameRegistry_UsernameRegistry.code.boc')),
       username_nft_item: codeHash(path.join('build', 'UsernameNFTItem', 'UsernameNFTItem_UsernameNFTItem.code.boc')),
     },
-    note: 'Sandbox evidence that username mint/refund/item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records, refund-due entries, and UsernameNFTItem state.',
+    note: 'Sandbox evidence that username mint and item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records and UsernameNFTItem state.',
     constants: {
       username_pending_mint_storage_endowment_nanotons: String(USERNAME_PENDING_MINT_STORAGE_ENDOWMENT),
-      username_ath_refund_due_storage_endowment_nanotons: String(USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT),
       username_state_growth_exec_reserve_nanotons: String(USERNAME_STATE_GROWTH_EXEC_RESERVE),
       username_nft_item_deploy_reserve_nanotons: String(USERNAME_NFT_ITEM_DEPLOY_RESERVE),
       username_ath_notification_ack_value_nanotons: String(USERNAME_ATH_NOTIFICATION_ACK_VALUE),
-      username_mint_excess_refund_forward_reserve_nanotons: String(USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE),
       username_item_ack_forward_reserve_nanotons: String(USERNAME_ITEM_ACK_FORWARD_RESERVE),
       username_item_ack_exec_reserve_nanotons: String(USERNAME_ITEM_ACK_EXEC_RESERVE),
       username_item_ack_fwd_fee_allowance_nanotons: String(USERNAME_ITEM_ACK_FWD_FEE_ALLOWANCE),

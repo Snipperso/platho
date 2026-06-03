@@ -1,7 +1,6 @@
 // Platho v1 UsernameRegistry implementation through M13.
-// Scope: official ATH notification username mint, deterministic UsernameNFTItem deploy + ACK finalization,
-// exact price tiers, raw lowercase ASCII username validation, refund-due accounting for rejected official mints,
-// bounce-safe refund/treasury/burn due flushes, and stale pending mint prune.
+// Scope: Vault-funded official ATH notification username mint, deterministic UsernameNFTItem deploy + ACK finalization,
+// exact price tiers, raw lowercase ASCII username validation, bounce-safe treasury/burn due flushes, and stale pending mint check.
 // No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 // No BuybackBurn route, adapter, migration, or compatibility path is implemented.
 
@@ -12,7 +11,6 @@ const USERNAME_PRICE_4_CHARS: Int = 10000000000000;      // 10,000 ATH atomic un
 const USERNAME_PRICE_5_CHARS: Int = 1000000000000;       // 1,000 ATH atomic units
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
-const USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT: Int = 4000000;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 21000000;
 const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 30000000;
@@ -21,17 +19,13 @@ const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const USERNAME_ATH_NOTIFICATION_REFUND_VALUE: Int = 12000000;
-const USERNAME_MINT_EXCESS_REFUND_MIN_VALUE: Int = 100000;
-const USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE: Int = 500000;
 const USERNAME_PENDING_MINT_STALE_TTL: Int = 86400; // 24 hours
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_SPLIT_BASE_BPS: Int = 10000;
 const USERNAME_TREASURY_SHARE_BPS: Int = 5000;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
-const USERNAME_REFUND_FLUSH_ID_DOMAIN: Int = 0x52464944; // "RFID"
 const USERNAME_COLLECTION_METADATA_KEY_NAME: Int = 0x82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89;
 const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX: Int = -1;
-const UINT64_MOD: Int = 18446744073709551616;
 
 const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET: Int = 0x663DF03D;
 const OP_USERNAME_BIND_VAULT: Int = 0x60A61104;
@@ -59,11 +53,6 @@ message(0xE9A2C2CB) FlushBurnAthDue {
     query_id: Int as uint64;
 }
 
-message(0x6B928B47) FlushAthRefundDue {
-    query_id: Int as uint64;
-    owner_wallet: Address;
-}
-
 message(0x3796DF2D) PrunePendingUsernameMint {
     name_hash: Int as uint256;
 }
@@ -79,7 +68,6 @@ struct PendingUsernameMint {
     item_address: Address;
     item_deploy_value: Int as uint128;
     created_at: Int as uint32;
-    vault_funded: Bool;
 }
 
 struct NameRecord {
@@ -99,10 +87,8 @@ struct UsernameRegistryGlobalView {
     genesis_controller_address: Address;
     name_record_count: Int;
     pending_mint_count: Int;
-    refund_due_count: Int;
     treasury_due_ath: Int;
     burn_due_ath: Int;
-    pending_refund_flush_count: Int;
     pending_treasury_flush_count: Int;
     pending_burn_flush_count: Int;
     pending_mint_stale_ttl: Int;
@@ -129,22 +115,6 @@ struct PendingUsernameMintView {
     price_paid: Int;
     item_address: Address;
     item_deploy_value: Int;
-    created_at: Int;
-    vault_funded: Bool;
-}
-
-struct PendingAthRefundFlush {
-    owner_wallet: Address;
-    amount: Int as uint128;
-    recipient_ath_wallet: Address;
-    created_at: Int as uint32;
-}
-
-struct PendingAthRefundFlushView {
-    exists: Bool;
-    owner_wallet: Address;
-    amount: Int;
-    recipient_ath_wallet: Address;
     created_at: Int;
 }
 
@@ -195,15 +165,11 @@ contract UsernameRegistry {
     genesis_config_hash: Int as uint256;
     name_record_count: Int as uint64;
     pending_mint_count: Int as uint64;
-    refund_due_count: Int as uint64;
     treasury_due_ath: Int as uint128;
     burn_due_ath: Int as uint128;
     name_records: map<Int, NameRecord>;
     pending_mints: map<Int, PendingUsernameMint>;
     pending_item_to_name_hash: map<Address, Int>;
-    ath_refunds_due: map<Address, Int>;
-    pending_refund_flushes: map<Int, PendingAthRefundFlush>;
-    pending_refund_flush_count: Int as uint64;
     pending_treasury_flushes: map<Int, PendingAthTreasuryFlush>;
     pending_treasury_flush_count: Int as uint64;
     pending_burn_flushes: map<Int, PendingAthBurnFlush>;
@@ -223,10 +189,8 @@ contract UsernameRegistry {
         self.genesis_config_hash = genesis_config_hash;
         self.name_record_count = 0;
         self.pending_mint_count = 0;
-        self.refund_due_count = 0;
         self.treasury_due_ath = 0;
         self.burn_due_ath = 0;
-        self.pending_refund_flush_count = 0;
         self.pending_treasury_flush_count = 0;
         self.pending_burn_flush_count = 0;
     }
@@ -327,31 +291,6 @@ contract UsernameRegistry {
         return std.workchain == 0;
     }
 
-    fun addRefundDue(owner_wallet: Address, amount: Int) {
-        throwUnless(19110, amount > 0);
-        let existing: Int? = self.ath_refunds_due.get(owner_wallet);
-        if (existing == null) {
-            throwUnless(19111, context().value >= USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_STATE_GROWTH_EXEC_RESERVE);
-            self.ath_refunds_due.set(owner_wallet, amount);
-            self.refund_due_count += 1;
-        } else {
-            self.ath_refunds_due.set(owner_wallet, existing!! + amount);
-        }
-    }
-
-    fun requireRefundDueAndNotificationAckReserve(owner_wallet: Address): Int {
-        let existing: Int? = self.ath_refunds_due.get(owner_wallet);
-        if (existing == null) {
-            let required: Int = USERNAME_ATH_REFUND_DUE_STORAGE_ENDOWMENT + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
-            throwUnless(19124, context().value >= required);
-            return required;
-        } else {
-            let required: Int = USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
-            throwUnless(19125, context().value >= required);
-            return required;
-        }
-    }
-
     fun sendAthNotificationAck(destination: Address, query_id: Int, sender_key: Int, amount: Int) {
         message(MessageParameters {
             to: destination,
@@ -380,51 +319,6 @@ contract UsernameRegistry {
         });
     }
 
-    fun refundRejectedMintExcess(owner_wallet: Address, retained_value: Int) {
-        let retained_with_forward_reserve: Int = retained_value + USERNAME_MINT_EXCESS_REFUND_FORWARD_RESERVE;
-        let excess: Int = context().value - retained_with_forward_reserve;
-        if (excess < USERNAME_MINT_EXCESS_REFUND_MIN_VALUE) {
-            return;
-        }
-
-        message(MessageParameters {
-            to: owner_wallet,
-            value: excess,
-            bounce: false,
-            mode: SendDefaultMode,
-            body: null
-        });
-    }
-
-    fun restoreRefundDue(owner_wallet: Address, amount: Int) {
-        throwUnless(19112, amount > 0);
-        let existing: Int? = self.ath_refunds_due.get(owner_wallet);
-        if (existing == null) {
-            self.ath_refunds_due.set(owner_wallet, amount);
-            self.refund_due_count += 1;
-        } else {
-            self.ath_refunds_due.set(owner_wallet, existing!! + amount);
-        }
-    }
-
-    fun computeRefundFlushId(owner_wallet: Address, query_id: Int): Int {
-        return beginCell()
-            .storeUint(USERNAME_REFUND_FLUSH_ID_DOMAIN, 32)
-            .storeAddress(owner_wallet)
-            .storeUint(query_id, 64)
-            .endCell()
-            .hash() % UINT64_MOD;
-    }
-
-    fun clearPendingRefundFlush(query_id: Int): PendingAthRefundFlush {
-        let pendingOpt: PendingAthRefundFlush? = self.pending_refund_flushes.get(query_id);
-        throwUnless(19150, pendingOpt != null);
-        let pending: PendingAthRefundFlush = pendingOpt!!;
-        self.pending_refund_flushes.del(query_id);
-        self.pending_refund_flush_count -= 1;
-        return pending;
-    }
-
     fun clearPendingTreasuryFlush(query_id: Int): PendingAthTreasuryFlush {
         let pendingOpt: PendingAthTreasuryFlush? = self.pending_treasury_flushes.get(query_id);
         throwUnless(19250, pendingOpt != null);
@@ -444,7 +338,6 @@ contract UsernameRegistry {
     }
 
     fun requireNoDueFlushQuery(query_id: Int) {
-        throwUnless(19200, !self.pending_refund_flushes.exists(query_id));
         throwUnless(19201, !self.pending_treasury_flushes.exists(query_id));
         throwUnless(19202, !self.pending_burn_flushes.exists(query_id));
     }
@@ -459,41 +352,27 @@ contract UsernameRegistry {
         return pending;
     }
 
-    fun rejectMintOrBounceToVault(vault_funded: Bool, owner_wallet: Address, amount: Int, query_id: Int, sender_key: Int, error_code: Int) {
-        if (vault_funded) {
-            throw(error_code);
-        }
-        let retainedValue: Int = self.requireRefundDueAndNotificationAckReserve(owner_wallet);
-        self.addRefundDue(owner_wallet, amount);
-        self.sendAthNotificationAck(sender(), query_id, sender_key, amount);
-        self.refundRejectedMintExcess(owner_wallet, retainedValue);
-    }
-
-    fun acceptUsernameMint(query_id: Int, sender_key: Int, amount: Int, owner_wallet: Address, username_len: Int, username: Slice, vault_funded: Bool) {
+    fun acceptUsernameMint(query_id: Int, sender_key: Int, amount: Int, owner_wallet: Address, username_len: Int, username: Slice) {
         throwUnless(19121, amount > 0);
         throwUnless(19126, self.isBasechainAddress(owner_wallet));
 
         if (!self.isValidUsernameBytes(username_len, username)) {
-            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19170);
-            return;
+            throw(19170);
         }
 
         let name_hash: Int = self.computeNameHash(username);
         let price: Int = self.priceForLength(username_len);
 
         if (amount != price) {
-            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19171);
-            return;
+            throw(19171);
         }
 
         if (self.name_records.exists(name_hash)) {
-            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19172);
-            return;
+            throw(19172);
         }
 
         if (self.pending_mints.exists(name_hash)) {
-            self.rejectMintOrBounceToVault(vault_funded, owner_wallet, amount, query_id, sender_key, 19173);
-            return;
+            throw(19173);
         }
 
         let retainedValue: Int = USERNAME_PENDING_MINT_STORAGE_ENDOWMENT + USERNAME_NFT_ITEM_DEPLOY_RESERVE + USERNAME_ATH_NOTIFICATION_ACK_VALUE + USERNAME_STATE_GROWTH_EXEC_RESERVE;
@@ -510,8 +389,7 @@ contract UsernameRegistry {
             price_paid: amount,
             item_address: item_address,
             item_deploy_value: USERNAME_NFT_ITEM_DEPLOY_RESERVE,
-            created_at: now(),
-            vault_funded: vault_funded
+            created_at: now()
         });
         self.pending_item_to_name_hash.set(item_address, name_hash);
         self.pending_mint_count += 1;
@@ -531,9 +409,6 @@ contract UsernameRegistry {
             }.toCell()
         });
 
-        if (!vault_funded) {
-            self.refundRejectedMintExcess(owner_wallet, retainedValue);
-        }
     }
 
     receive(msg: BindOfficialAthWallet) {
@@ -581,18 +456,12 @@ contract UsernameRegistry {
         self.sealed = true;
     }
 
-    receive(msg: AthTransferNotificationMintUsername) {
-        self.requireSealed();
-        throwUnless(19120, sender() == self.official_ath_wallet_address);
-        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username, false);
-    }
-
     receive(msg: AthTransferNotificationVaultMintUsername) {
         self.requireSealed();
         throwUnless(19180, sender() == self.official_ath_wallet_address);
         throwUnless(19181, self.vault_bound);
         throwUnless(19182, msg.payer_wallet == self.vault_address);
-        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username, true);
+        self.acceptUsernameMint(msg.query_id, msg.sender_key, msg.amount, msg.owner_wallet, msg.username_len, msg.username);
     }
 
     receive(msg: UsernameItemDeployedAck) {
@@ -698,55 +567,8 @@ contract UsernameRegistry {
         });
     }
 
-    receive(msg: FlushAthRefundDue) {
-        self.requireSealed();
-        throwUnless(19151, msg.query_id > 0);
-        throwUnless(19152, self.isBasechainAddress(msg.owner_wallet));
-        let refundFlushId: Int = self.computeRefundFlushId(msg.owner_wallet, msg.query_id);
-        self.requireNoDueFlushQuery(refundFlushId);
-
-        let dueOpt: Int? = self.ath_refunds_due.get(msg.owner_wallet);
-        throwUnless(19153, dueOpt != null);
-        let due: Int = dueOpt!!;
-        throwUnless(19154, due > 0);
-        throwUnless(19155, context().value >= USERNAME_ATH_TRANSFER_EXEC_RESERVE + USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE);
-
-        self.ath_refunds_due.del(msg.owner_wallet);
-        self.refund_due_count -= 1;
-
-        let recipient_ath_wallet: Address = self.deriveAthWalletAddress(msg.owner_wallet);
-        self.pending_refund_flushes.set(refundFlushId, PendingAthRefundFlush {
-            owner_wallet: msg.owner_wallet,
-            amount: due,
-            recipient_ath_wallet: recipient_ath_wallet,
-            created_at: now()
-        });
-        self.pending_refund_flush_count += 1;
-
-        message(MessageParameters {
-            to: self.official_ath_wallet_address,
-            value: USERNAME_ATH_TRANSFER_EXEC_RESERVE,
-            mode: SendPayFwdFeesSeparately,
-            bounce: true,
-            body: ATHTransferRequest {
-                query_id: refundFlushId,
-                amount: due,
-                recipient: msg.owner_wallet,
-                response_destination: myAddress()
-            }.toCell()
-        });
-    }
-
     receive(msg: ATHTransferAck) {
         self.requireSealed();
-        let refundPendingOpt: PendingAthRefundFlush? = self.pending_refund_flushes.get(msg.query_id);
-        if (refundPendingOpt != null) {
-            let pending: PendingAthRefundFlush = self.clearPendingRefundFlush(msg.query_id);
-            throwUnless(19156, msg.amount == pending.amount);
-            throwUnless(19157, sender() == pending.recipient_ath_wallet);
-            return;
-        }
-
         let treasuryPendingOpt: PendingAthTreasuryFlush? = self.pending_treasury_flushes.get(msg.query_id);
         throwUnless(19230, treasuryPendingOpt != null);
         let treasuryPending: PendingAthTreasuryFlush = self.clearPendingTreasuryFlush(msg.query_id);
@@ -757,14 +579,6 @@ contract UsernameRegistry {
     receive(msg: ATHTransferFailed) {
         self.requireSealed();
         throwUnless(19158, sender() == self.official_ath_wallet_address);
-        let refundPendingOpt: PendingAthRefundFlush? = self.pending_refund_flushes.get(msg.query_id);
-        if (refundPendingOpt != null) {
-            let pending: PendingAthRefundFlush = self.clearPendingRefundFlush(msg.query_id);
-            throwUnless(19159, msg.amount == pending.amount);
-            self.restoreRefundDue(pending.owner_wallet, pending.amount);
-            return;
-        }
-
         let treasuryPendingOpt: PendingAthTreasuryFlush? = self.pending_treasury_flushes.get(msg.query_id);
         throwUnless(19240, treasuryPendingOpt != null);
         let treasuryPending: PendingAthTreasuryFlush = self.clearPendingTreasuryFlush(msg.query_id);
@@ -791,14 +605,6 @@ contract UsernameRegistry {
     bounced(msg: bounced<ATHTransferRequest>) {
         self.requireSealed();
         throwUnless(19160, sender() == self.official_ath_wallet_address);
-        let refundPendingOpt: PendingAthRefundFlush? = self.pending_refund_flushes.get(msg.query_id);
-        if (refundPendingOpt != null) {
-            let pending: PendingAthRefundFlush = self.clearPendingRefundFlush(msg.query_id);
-            throwUnless(19161, msg.amount == pending.amount);
-            self.restoreRefundDue(pending.owner_wallet, pending.amount);
-            return;
-        }
-
         let treasuryPendingOpt: PendingAthTreasuryFlush? = self.pending_treasury_flushes.get(msg.query_id);
         throwUnless(19242, treasuryPendingOpt != null);
         let treasuryPending: PendingAthTreasuryFlush = self.clearPendingTreasuryFlush(msg.query_id);
@@ -888,8 +694,7 @@ contract UsernameRegistry {
                 price_paid: 0,
                 item_address: self.official_ath_wallet_address,
                 item_deploy_value: 0,
-                created_at: 0,
-                vault_funded: false
+                created_at: 0
             };
         }
         let pending: PendingUsernameMint = pendingOpt!!;
@@ -902,46 +707,8 @@ contract UsernameRegistry {
             price_paid: pending.price_paid,
             item_address: pending.item_address,
             item_deploy_value: pending.item_deploy_value,
-            created_at: pending.created_at,
-            vault_funded: pending.vault_funded
-        };
-    }
-
-    get fun get_refund_due(owner_wallet: Address): Int {
-        let due: Int? = self.ath_refunds_due.get(owner_wallet);
-        if (due == null) {
-            return 0;
-        }
-        return due!!;
-    }
-
-    get fun get_pending_refund_flush(query_id: Int): PendingAthRefundFlushView {
-        let pendingOpt: PendingAthRefundFlush? = self.pending_refund_flushes.get(query_id);
-        if (pendingOpt == null) {
-            return PendingAthRefundFlushView {
-                exists: false,
-                owner_wallet: self.official_ath_wallet_address,
-                amount: 0,
-                recipient_ath_wallet: self.official_ath_wallet_address,
-                created_at: 0
-            };
-        }
-        let pending: PendingAthRefundFlush = pendingOpt!!;
-        return PendingAthRefundFlushView {
-            exists: true,
-            owner_wallet: pending.owner_wallet,
-            amount: pending.amount,
-            recipient_ath_wallet: pending.recipient_ath_wallet,
             created_at: pending.created_at
         };
-    }
-
-    get fun get_refund_flush_id(owner_wallet: Address, query_id: Int): Int {
-        return self.computeRefundFlushId(owner_wallet, query_id);
-    }
-
-    get fun get_pending_refund_flush_for(owner_wallet: Address, query_id: Int): PendingAthRefundFlushView {
-        return self.get_pending_refund_flush(self.computeRefundFlushId(owner_wallet, query_id));
     }
 
     get fun get_pending_treasury_flush(query_id: Int): PendingAthTreasuryFlushView {
@@ -996,10 +763,8 @@ contract UsernameRegistry {
             genesis_controller_address: self.genesis_controller_address,
             name_record_count: self.name_record_count,
             pending_mint_count: self.pending_mint_count,
-            refund_due_count: self.refund_due_count,
             treasury_due_ath: self.treasury_due_ath,
             burn_due_ath: self.burn_due_ath,
-            pending_refund_flush_count: self.pending_refund_flush_count,
             pending_treasury_flush_count: self.pending_treasury_flush_count,
             pending_burn_flush_count: self.pending_burn_flush_count,
             pending_mint_stale_ttl: USERNAME_PENDING_MINT_STALE_TTL

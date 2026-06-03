@@ -8,7 +8,7 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
+  AthTransferNotificationVaultMintUsername,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   NftTransfer,
@@ -91,19 +91,28 @@ async function deploySealedRegistry() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, registryAddress, officialAthWallet, attacker };
+  return { blockchain, registry, registryAddress, officialAthWallet, attacker, vaultAddress };
 }
 
-async function sendMint(registry: any, officialAthWallet: any, ownerWallet: Address, name: string, amount: bigint, value = toNano('0.1')) {
+async function sendMint(
+  registry: any,
+  officialAthWallet: any,
+  ownerWallet: Address,
+  name: string,
+  amount: bigint,
+  value = toNano('0.1'),
+  payerWallet = fixtureAddress('USERNAME_REGISTRY_VAULT'),
+) {
   return registry.send(officialAthWallet.getSender(), { value }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 1n,
     amount,
     sender_key: 0n,
+    payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 }
 
 describe('UsernameRegistry paid mint milestone', () => {
@@ -148,7 +157,6 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(record.exists).toBe(true);
     expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(global.name_record_count).toBe(1n);
-    expect(global.refund_due_count).toBe(0n);
   });
 
   it('USERNAME-REG-M10-01E: v1 separator policy intentionally permits edge separator names', async () => {
@@ -164,7 +172,6 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(record.exists).toBe(true);
     expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(global.name_record_count).toBe(1n);
-    expect(global.refund_due_count).toBe(0n);
   });
 
   it('USERNAME-REG-M10-01B: repeated item resend after finalization cannot mutate record or split due again', async () => {
@@ -237,18 +244,17 @@ describe('UsernameRegistry paid mint milestone', () => {
     })).toBeDefined();
   });
 
-  it('USERNAME-REG-M10-07: rejected official mint notification still ACKs after recording refund due', async () => {
+  it('USERNAME-REG-M10-07: rejected Vault-funded mint notification leaves registry state untouched for ATHWallet refund path', async () => {
     const { registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_INVALID_ACK_OWNER');
 
     const result = await sendMint(registry, officialAthWallet, ownerWallet, 'Larisa', PRICE_6_PLUS);
 
-    expect(await registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
     expect(findTransaction(result.transactions, {
       from: registry.address,
       to: officialAthWallet.address,
       op: OP_ATH_TRANSFER_NOTIFICATION_ACK,
-    })).toBeDefined();
+    })).toBeUndefined();
   });
 
   it('USERNAME-REG-M10-08: underfunded official mint notification cannot strand state without ACK reserve', async () => {
@@ -260,16 +266,14 @@ describe('UsernameRegistry paid mint milestone', () => {
     await sendMint(registry, officialAthWallet, invalidOwner, 'Larisa', PRICE_6_PLUS, toNano('0.004'));
     await sendMint(registry, officialAthWallet, validOwner, 'oldmin', PRICE_6_PLUS, toNano('0.026'));
 
-    expect(await registry.getGetRefundDue(invalidOwner)).toBe(0n);
     expect((await registry.getGetNameRecord(validHash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(validHash)).exists).toBe(false);
     const global = await registry.getGetGlobal();
     expect(global.name_record_count).toBe(0n);
     expect(global.pending_mint_count).toBe(0n);
-    expect(global.refund_due_count).toBe(0n);
   });
 
-  it('USERNAME-REG-M10-09: successful mint returns meaningful notify excess to the owner wallet', async () => {
+  it('USERNAME-REG-M10-09: successful Vault-funded mint does not send direct owner excess from registry', async () => {
     const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const owner = await blockchain.treasury('username-registry-success-excess-owner');
     const hash = nameHash('excess');
@@ -287,10 +291,10 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(findTransaction(result.transactions, {
       from: registry.address,
       to: owner.address,
-    })).toBeDefined();
+    })).toBeUndefined();
   });
 
-  it('USERNAME-REG-M10-10: masterchain owner mint is rejected before pending or refund state', async () => {
+  it('USERNAME-REG-M10-10: masterchain owner mint is rejected before pending or name state', async () => {
     const { registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_MASTERCHAIN_OWNER', -1);
     const hash = nameHash('master');
@@ -299,10 +303,8 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
-    expect(await registry.getGetRefundDue(ownerWallet)).toBe(0n);
     const global = await registry.getGetGlobal();
     expect(global.pending_mint_count).toBe(0n);
-    expect(global.refund_due_count).toBe(0n);
   });
 
   it('USERNAME-REG-M10-11: bounced item deploy asks the official ATH wallet to refund the pending notification', async () => {
@@ -330,7 +332,6 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
-    expect(await registry.getGetRefundDue(owner.address)).toBe(0n);
     expect(findTransaction(result.transactions, {
       from: registry.address,
       to: officialAthWallet.address,
@@ -338,46 +339,42 @@ describe('UsernameRegistry paid mint milestone', () => {
     })).toBeDefined();
   });
 
-  it('USERNAME-REG-M10-02: invalid uppercase username from official ATH wallet creates refund due and no pending/name record', async () => {
+  it('USERNAME-REG-M10-02: invalid uppercase Vault-funded username leaves no pending/name state', async () => {
     const { registry, officialAthWallet } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_UPPERCASE_OWNER');
     const hash = nameHash('Larisa');
 
     await sendMint(registry, officialAthWallet, ownerWallet, 'Larisa', PRICE_6_PLUS);
 
-    const refund = await registry.getGetRefundDue(ownerWallet);
     const record = await registry.getGetNameRecord(hash);
     const global = await registry.getGetGlobal();
 
-    expect(refund).toBe(PRICE_6_PLUS);
     expect(record.exists).toBe(false);
-    expect(global.refund_due_count).toBe(1n);
     expect(global.name_record_count).toBe(0n);
     expect(global.pending_mint_count).toBe(0n);
   });
 
-  it('USERNAME-REG-M10-03: non-official ATH sender is rejected and cannot create refund, pending, or name record', async () => {
+  it('USERNAME-REG-M10-03: non-official ATH sender is rejected and cannot create pending or name record', async () => {
     const { registry, attacker } = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M10_SPOOF_OWNER');
 
     await registry.send(attacker.getSender(), { value: toNano('0.1') }, {
-      $$type: 'AthTransferNotificationMintUsername',
+      $$type: 'AthTransferNotificationVaultMintUsername',
       query_id: 1n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
+      payer_wallet: fixtureAddress('USERNAME_REGISTRY_VAULT'),
       owner_wallet: ownerWallet,
       username_len: 6n,
       username: usernameSlice('platho'),
-    } as AthTransferNotificationMintUsername);
+    } as AthTransferNotificationVaultMintUsername);
 
     const global = await registry.getGetGlobal();
     expect(global.name_record_count).toBe(0n);
     expect(global.pending_mint_count).toBe(0n);
-    expect(global.refund_due_count).toBe(0n);
-    expect(await registry.getGetRefundDue(ownerWallet)).toBe(0n);
   });
 
-  it('USERNAME-REG-M10-04: duplicate finalized username creates refund due for the second minter without changing the existing record', async () => {
+  it('USERNAME-REG-M10-04: duplicate finalized Vault-funded username rejects without changing the existing record', async () => {
     const { registry, officialAthWallet } = await deploySealedRegistry();
     const ownerA = fixtureAddress('USERNAME_M10_DUP_OWNER_A');
     const ownerB = fixtureAddress('USERNAME_M10_DUP_OWNER_B');
@@ -391,12 +388,10 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect(record.exists).toBe(true);
     expect(record.owner_wallet.equals(ownerA)).toBe(true);
-    expect(await registry.getGetRefundDue(ownerB)).toBe(PRICE_6_PLUS);
     expect(global.name_record_count).toBe(1n);
-    expect(global.refund_due_count).toBe(1n);
   });
 
-  it('USERNAME-REG-M10-05: price tiers are enforced as exact ATH amounts and underpay is refunded', async () => {
+  it('USERNAME-REG-M10-05: price tiers are enforced as exact ATH amounts and Vault underpay leaves no registry state', async () => {
     const { registry, officialAthWallet } = await deploySealedRegistry();
     const owner4 = fixtureAddress('USERNAME_M10_PRICE_4');
     const owner5 = fixtureAddress('USERNAME_M10_PRICE_5');
@@ -408,10 +403,8 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect((await registry.getGetNameRecord(nameHash('abcd'))).exists).toBe(true);
     expect((await registry.getGetNameRecord(nameHash('abcde'))).exists).toBe(true);
-    expect(await registry.getGetRefundDue(underpayOwner)).toBe(PRICE_6_PLUS - 1n);
 
     const global = await registry.getGetGlobal();
     expect(global.name_record_count).toBe(2n);
-    expect(global.refund_due_count).toBe(1n);
   });
 });

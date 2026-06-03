@@ -7,7 +7,7 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
+  AthTransferNotificationVaultMintUsername,
   PrunePendingUsernameMint,
   UsernameItemDeployedAck,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
@@ -80,7 +80,7 @@ async function deploySealedRegistry() {
     deployment_manifest_hash: MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWallet, pruner };
+  return { blockchain, registry, officialAthWallet, pruner, vaultAddress };
 }
 
 async function installNoAckAt(blockchain: Blockchain, address: Address) {
@@ -101,14 +101,15 @@ async function createStuckPendingMint(ctx: Awaited<ReturnType<typeof deploySeale
   const noAckItem = await installNoAckAt(ctx.blockchain, itemAddress);
 
   await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('0.15') }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 13001n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
+    payer_wallet: ctx.vaultAddress,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
 
   return { hash, itemAddress, noAckItem };
 }
@@ -132,7 +133,6 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
 
     await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.03') }, {
       $$type: 'UsernameItemDeployedAck',
@@ -142,7 +142,6 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
 
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(true);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
   });
 
   it('USERNAME-REG-M13-01B: item ACK owner must match the pending mint owner before finalization', async () => {
@@ -194,10 +193,9 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     } as PrunePendingUsernameMint);
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
   });
 
-  it('USERNAME-REG-M13-03: stale prune cannot erase pending state or create duplicate remint/refund due', async () => {
+  it('USERNAME-REG-M13-03: stale prune cannot erase pending state or accept duplicate remint state', async () => {
     const ctx = await deploySealedRegistry();
     const ownerWallet = fixtureAddress('USERNAME_M13_REMINT_OWNER');
     const { hash, itemAddress } = await createStuckPendingMint(ctx, ownerWallet, 'remint');
@@ -210,21 +208,20 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(0n);
 
     await ctx.registry.send(ctx.officialAthWallet.getSender(), { value: toNano('0.15') }, {
-      $$type: 'AthTransferNotificationMintUsername',
+      $$type: 'AthTransferNotificationVaultMintUsername',
       query_id: 13002n,
       amount: PRICE_6_PLUS,
       sender_key: 0n,
+      payer_wallet: ctx.vaultAddress,
       owner_wallet: ownerWallet,
       username_len: 6n,
       username: usernameSlice('remint'),
-    } as AthTransferNotificationMintUsername);
+    } as AthTransferNotificationVaultMintUsername);
 
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(true);
     expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
 
     await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.03') }, {
       $$type: 'UsernameItemDeployedAck',
@@ -238,7 +235,6 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
-    expect(await ctx.registry.getGetRefundDue(ownerWallet)).toBe(PRICE_6_PLUS);
     expect(global.name_record_count).toBe(1n);
     expect(global.pending_mint_count).toBe(0n);
     expect(global.treasury_due_ath).toBe(PRICE_6_PLUS / 2n);

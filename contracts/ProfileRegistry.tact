@@ -204,10 +204,6 @@ contract ProfileRegistry {
         throwUnless(21125, media_format == PROFILE_AVATAR_MEDIA_FORMAT_WEBP);
     }
 
-    fun requireValidAvatarPointer(msg: AthTransferNotificationProfileAvatar) {
-        self.requireValidAvatarPointerFields(msg.owner_wallet, msg.avatar_hash, msg.avatar_stream_id, msg.avatar_part_count, msg.media_format);
-    }
-
     fun sendAthNotificationAck(query_id: Int, sender_key: Int, amount: Int) {
         message(MessageParameters {
             to: sender(),
@@ -222,48 +218,30 @@ contract ProfileRegistry {
         });
     }
 
-    fun refundAvatarExcess(query_id: Int, owner_wallet: Address, retained_value: Int, vault_funded: Bool) {
+    fun refundAvatarExcess(query_id: Int, owner_wallet: Address, retained_value: Int) {
         let excess: Int = context().value - retained_value;
         if (excess < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
 
-        if (vault_funded) {
-            if (excess <= PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE + PROFILE_EXCESS_REFUND_FORWARD_RESERVE) {
-                return;
-            }
-            let refundValue: Int = excess - PROFILE_EXCESS_REFUND_FORWARD_RESERVE;
-            let creditAmount: Int = refundValue - PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE;
-            if (creditAmount < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
-                return;
-            }
-            message(MessageParameters {
-                to: self.vault_address,
-                value: refundValue,
-                bounce: false,
-                mode: SendDefaultMode,
-                body: ProfileAvatarTonExcessRefund {
-                    query_id: query_id,
-                    owner_wallet: owner_wallet,
-                    amount: creditAmount
-                }.toCell()
-            });
-            return;
-        }
-
-        if (excess <= PROFILE_EXCESS_REFUND_FORWARD_RESERVE) {
+        if (excess <= PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE + PROFILE_EXCESS_REFUND_FORWARD_RESERVE) {
             return;
         }
         let refundValue: Int = excess - PROFILE_EXCESS_REFUND_FORWARD_RESERVE;
-        if (refundValue < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
+        let creditAmount: Int = refundValue - PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE;
+        if (creditAmount < PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE) {
             return;
         }
         message(MessageParameters {
-            to: owner_wallet,
+            to: self.vault_address,
             value: refundValue,
             bounce: false,
             mode: SendDefaultMode,
-            body: null
+            body: ProfileAvatarTonExcessRefund {
+                query_id: query_id,
+                owner_wallet: owner_wallet,
+                amount: creditAmount
+            }.toCell()
         });
     }
 
@@ -300,7 +278,7 @@ contract ProfileRegistry {
         return pending;
     }
 
-    fun acceptAvatarPayment(query_id: Int, sender_key: Int, amount: Int, owner_wallet: Address, avatar_hash: Int, avatar_entry_id: Int, avatar_stream_id: Int, avatar_part_count: Int, media_format: Int, vault_funded: Bool) {
+    fun acceptAvatarPayment(query_id: Int, sender_key: Int, amount: Int, owner_wallet: Address, avatar_hash: Int, avatar_entry_id: Int, avatar_stream_id: Int, avatar_part_count: Int, media_format: Int) {
         throwUnless(21111, amount == PROFILE_AVATAR_PRICE_ATH);
         self.requireValidAvatarPointerFields(owner_wallet, avatar_hash, avatar_stream_id, avatar_part_count, media_format);
 
@@ -340,7 +318,7 @@ contract ProfileRegistry {
         self.burn_due_ath += burn_amount;
 
         self.sendAthNotificationAck(query_id, sender_key, amount);
-        self.refundAvatarExcess(query_id, owner_wallet, retainedValue, vault_funded);
+        self.refundAvatarExcess(query_id, owner_wallet, retainedValue);
     }
 
     receive(msg: BindProfileOfficialAthWallet) {
@@ -388,23 +366,6 @@ contract ProfileRegistry {
         self.sealed = true;
     }
 
-    receive(msg: AthTransferNotificationProfileAvatar) {
-        self.requireSealed();
-        throwUnless(21110, sender() == self.official_ath_wallet_address);
-        self.acceptAvatarPayment(
-            msg.query_id,
-            msg.sender_key,
-            msg.amount,
-            msg.owner_wallet,
-            msg.avatar_hash,
-            msg.avatar_entry_id,
-            msg.avatar_stream_id,
-            msg.avatar_part_count,
-            msg.media_format,
-            false
-        );
-    }
-
     receive(msg: AthTransferNotificationVaultProfileAvatar) {
         self.requireSealed();
         throwUnless(21160, sender() == self.official_ath_wallet_address);
@@ -419,8 +380,7 @@ contract ProfileRegistry {
             msg.avatar_entry_id,
             msg.avatar_stream_id,
             msg.avatar_part_count,
-            msg.media_format,
-            true
+            msg.media_format
         );
     }
 

@@ -14,8 +14,7 @@ import {
   BindOfficialAthWallet,
   BindUsernameVault,
   SealGenesis,
-  AthTransferNotificationMintUsername,
-  FlushAthRefundDue,
+  AthTransferNotificationVaultMintUsername,
   FlushTreasuryAthDue,
   FlushBurnAthDue,
   PrunePendingUsernameMint,
@@ -414,60 +413,55 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
     deployment_manifest_hash: USERNAME_MANIFEST_HASH,
   } as SealGenesis);
 
-  return { blockchain, registry, officialAthWallet, officialAthWalletAddress, athMasterAddress, master, treasuryAthReceiver, flusher };
+  return { blockchain, registry, officialAthWallet, officialAthWalletAddress, athMasterAddress, master, treasuryAthReceiver, flusher, vaultAddress };
 }
 
-async function mintValidName(blockchain: Blockchain, registry: any, officialAthWalletAddress: Address, ownerWallet: Address, name: string) {
+async function mintValidName(blockchain: Blockchain, registry: any, officialAthWalletAddress: Address, ownerWallet: Address, name: string, payerWallet: Address) {
   const value = toNano('0.15');
   const res = await registry.send(blockchain.sender(officialAthWalletAddress), { value }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 17701n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
+    payer_wallet: payerWallet,
     owner_wallet: ownerWallet,
     username_len: BigInt(Buffer.from(name, 'ascii').length),
     username: usernameSlice(name),
-  } as AthTransferNotificationMintUsername);
+  } as AthTransferNotificationVaultMintUsername);
   return { value, res };
 }
 
 async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
   const ctx = await deployRegistryWithAthSystem({ officialWalletBalance: PRICE_6_PLUS * 2n, deployMaster: true });
   const ownerA = fixtureAddress('M17_USERNAME_OWNER_A');
-  const ownerRefund = fixtureAddress('M17_USERNAME_REFUND_OWNER');
-  const mintA = await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerA, 'platho');
+  const ownerRejected = fixtureAddress('M17_USERNAME_REJECTED_OWNER');
+  const mintA = await mintValidName(ctx.blockchain, ctx.registry, ctx.officialAthWalletAddress, ownerA, 'platho', ctx.vaultAddress);
   if ((await ctx.registry.getGetNameRecord(nameHash('platho'))).exists !== true) {
     throw new Error('Username mint scenario did not create NameRecord');
   }
 
   const invalidValue = toNano('0.1');
   const invalidRes = await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: invalidValue }, {
-    $$type: 'AthTransferNotificationMintUsername',
+    $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 17702n,
     amount: PRICE_6_PLUS,
     sender_key: 0n,
-    owner_wallet: ownerRefund,
+    payer_wallet: ctx.vaultAddress,
+    owner_wallet: ownerRejected,
     username_len: 6n,
     username: usernameSlice('Larisa'),
-  } as AthTransferNotificationMintUsername);
-
-  const refundValue = toNano('0.2');
-  const refundRes = await ctx.registry.send(ctx.flusher.getSender(), { value: refundValue }, {
-    $$type: 'FlushAthRefundDue',
-    query_id: 17703n,
-    owner_wallet: ownerRefund,
-  } as FlushAthRefundDue);
+  } as AthTransferNotificationVaultMintUsername);
 
   const treasuryValue = toNano('0.2');
   const treasuryRes = await ctx.registry.send(ctx.flusher.getSender(), { value: treasuryValue }, {
     $$type: 'FlushTreasuryAthDue',
-    query_id: 17704n,
+    query_id: 17703n,
   } as FlushTreasuryAthDue);
 
   const burnValue = toNano('0.2');
   const burnRes = await ctx.registry.send(ctx.flusher.getSender(), { value: burnValue }, {
     $$type: 'FlushBurnAthDue',
-    query_id: 17705n,
+    query_id: 17704n,
   } as FlushBurnAthDue);
 
   const afterMaster = await ctx.master.getGetJettonData();
@@ -489,7 +483,7 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
     balance: toNano('0.1'),
     workchain: itemAddress.workChain,
   }));
-  const stuckMint = await mintValidName(ctxPrune.blockchain, ctxPrune.registry, ctxPrune.officialAthWalletAddress, ownerPrune, stuckName);
+  const stuckMint = await mintValidName(ctxPrune.blockchain, ctxPrune.registry, ctxPrune.officialAthWalletAddress, ownerPrune, stuckName, ctxPrune.vaultAddress);
   ctxPrune.blockchain.now = (ctxPrune.blockchain.now ?? 1_700_000_000) + 86_401;
   const pruneValue = toNano('0.05');
   const pruneRes = await ctxPrune.registry.send(ctxPrune.flusher.getSender(), { value: pruneValue }, {
@@ -499,8 +493,7 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
 
   return scenario('USERNAME_REGISTRY_MINT_FLUSH_PRUNE', [
     opMetric('valid_username_mint_with_item_ack', mintA.value, mintA.res),
-    opMetric('invalid_username_refund_due', invalidValue, invalidRes),
-    opMetric('flush_ath_refund_due', refundValue, refundRes),
+    opMetric('invalid_username_rejected_notification', invalidValue, invalidRes),
     opMetric('flush_treasury_due_ath', treasuryValue, treasuryRes),
     opMetric('flush_burn_due_ath', burnValue, burnRes),
     opMetric('stuck_pending_mint_creation_no_ack', stuckMint.value, stuckMint.res),

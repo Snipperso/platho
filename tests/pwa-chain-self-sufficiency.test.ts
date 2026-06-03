@@ -34,7 +34,7 @@ describe('PWA on-chain self-sufficiency', () => {
     for (const method of ['get_global', 'get_avatar', 'get_avatar_version', 'get_ath_wallet_address']) {
       expect(profileRegistry, `ProfileRegistry must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
-    for (const method of ['get_global', 'get_name_record', 'get_username_price', 'get_username_item_address', 'get_refund_due']) {
+    for (const method of ['get_global', 'get_name_record', 'get_username_price', 'get_username_item_address']) {
       expect(usernameRegistry, `UsernameRegistry must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
     expect(athMaster).toMatch(/get fun get_jetton_data\b/);
