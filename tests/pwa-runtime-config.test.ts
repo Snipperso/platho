@@ -532,7 +532,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/autoLinkMintedUsername/);
     expect(app).toMatch(/waitForPlathoUsernameOwnership/);
     expect(app).toMatch(/mint submitted; link after sync/);
-    expect(app).toMatch(/100-10k ATH by length; 50% goes to burn/);
+    expect(app).toMatch(/function usernameMintPricePreview/);
+    expect(app).toMatch(/usernameMintPricePreview\(raw\)/);
+    expect(app).toMatch(/USERNAME_PRICE_6_PLUS_CHARS_ATOMIC = 100_000_000_000n/);
+    expect(app).toMatch(/function usernameMintStatusText/);
+    expect(app).toMatch(/flashWalletIdentityStatus\(rateLimited \? TON_RPC_CONNECTING_STATUS : usernameMintStatusText\(error\), 4200\)/);
     expect(app).toMatch(/estimatedUsernameMintTonFeeNanotons/);
     expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\)\} TON from Vault/);
     expect(app).toMatch(/assertVaultUsernameMintCanStart/);
@@ -1982,11 +1986,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v341/);
+    expect(sw).toMatch(/platho-pwa-prototype-v342/);
     expect(sw).toMatch(/\.\/styles\.css\?v=127/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=279/);
+    expect(sw).toMatch(/\.\/app\.js\?v=280/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);

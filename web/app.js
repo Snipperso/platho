@@ -486,6 +486,9 @@ const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 15_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 0n;
+const USERNAME_PRICE_4_CHARS_ATOMIC = 10_000_000_000_000n;
+const USERNAME_PRICE_5_CHARS_ATOMIC = 1_000_000_000_000n;
+const USERNAME_PRICE_6_PLUS_CHARS_ATOMIC = 100_000_000_000n;
 const VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE_NANOTONS = 8_700_000n;
 const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
   1: 12_000_000n,
@@ -7550,7 +7553,8 @@ mintUsernameButton?.addEventListener('click', async () => {
     mintUsernameButton.disabled = true;
     await submitUsernameMint();
   } catch (error) {
-    flashWalletIdentityStatus('username blocked');
+    const rateLimited = noteTonRpcRateLimit(error);
+    flashWalletIdentityStatus(rateLimited ? TON_RPC_CONNECTING_STATUS : usernameMintStatusText(error), 4200);
     console.error(error);
   } finally {
     mintUsernameButton.disabled = false;
@@ -8518,6 +8522,36 @@ function normalizeUsernameInput(input) {
   return username;
 }
 
+function localUsernameMintPriceAtomic(username) {
+  const length = String(username ?? '').length;
+  if (length === 4) return USERNAME_PRICE_4_CHARS_ATOMIC;
+  if (length === 5) return USERNAME_PRICE_5_CHARS_ATOMIC;
+  if (length >= 6 && length <= 16) return USERNAME_PRICE_6_PLUS_CHARS_ATOMIC;
+  return null;
+}
+
+function usernameMintPricePreview(input) {
+  try {
+    const username = normalizeUsernameInput(input);
+    const price = localUsernameMintPriceAtomic(username);
+    return price === null
+      ? '100-10k ATH by length; 50% goes to burn'
+      : `${formatAthAtomic(price)} ATH; 50% goes to burn`;
+  } catch {
+    return '100-10k ATH by length; 50% goes to burn';
+  }
+}
+
+function usernameMintStatusText(error) {
+  const message = shortUiErrorText(error, 'username blocked');
+  if (/not enough vault ath|not enough vault ton|activate platho account|usernameregistry rejected/i.test(message)) {
+    return message;
+  }
+  if (/verification unavailable/i.test(message)) return 'RPC verification unavailable';
+  if (/provider is not configured|username.*provider|ton rpc|sendboc/i.test(message)) return message;
+  return `username blocked: ${message}`;
+}
+
 async function requestAmountNanotons({ title, hint, symbol, parser, placeholder = '0.00' }) {
   let feedback = hint;
   let tone = 'muted';
@@ -8857,7 +8891,7 @@ async function requestUsernameMintName() {
         const raw = values.username?.trim() || 'not set';
         return [
           { label: 'Display', value: raw.endsWith('.ath') ? raw : `${raw}.ath` },
-          { label: 'ATH price', value: '100-10k ATH by length; 50% goes to burn' },
+          { label: 'ATH price', value: usernameMintPricePreview(raw) },
           { label: 'TON hold', value: `up to ${formatTonNanotons(estimatedUsernameMintTonFeeNanotons())} TON from Vault` },
           { label: 'Route', value: 'Vault' },
         ];
