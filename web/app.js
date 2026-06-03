@@ -6343,9 +6343,9 @@ function refreshPublicSendButtonState() {
 
 async function assertVaultHasPrivatePublishHold(suite, plan, options = {}) {
   const provider = await resolveVaultChainProvider();
-  const user = rememberConnectedVaultUser(options.allowOwnVaultActionReadFallback === true
-    ? await readFreshConnectedVaultUserForOwnVaultAction(provider)
-    : await loadConnectedVaultUser({ provider }));
+  const user = rememberConnectedVaultUser(options.allowOwnVaultActionReadFallback === false
+    ? await loadConnectedVaultUser({ provider, ...criticalChainReadOptions() })
+    : await readFreshConnectedVaultUserForOwnVaultAction(provider));
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before publishing');
   }
@@ -7991,7 +7991,7 @@ composer?.addEventListener('submit', async (event) => {
     return;
   }
   if (privateComposerCostStatus) {
-    privateComposerCostStatus.textContent = 'Checking Vault balance';
+    privateComposerCostStatus.textContent = 'Checking Vault balance...';
     privateComposerCostStatus.dataset.state = 'ready';
   }
   if (sendButton) sendButton.disabled = true;
