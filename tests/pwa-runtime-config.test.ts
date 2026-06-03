@@ -1432,6 +1432,19 @@ describe('PWA runtime config guard', () => {
     expect(report.ok).toBe(true);
   });
 
+  it('PWA-CONFIG-03E: production config rejects unverified static public feed fallback', () => {
+    const report = validatePlathoAppConfig({
+      ...productionConfig,
+      capsuleHub: {
+        address: '0:4444444444444444444444444444444444444444444444444444444444444444',
+        allowUnverifiedStaticPublicFeeds: true,
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.findings.map((finding) => finding.id)).toContain('PWA_STATIC_PUBLIC_FEED_FALLBACK_FORBIDDEN');
+  });
+
   it('PWA-CONFIG-04: production config requires a Vault provider entry', () => {
     const report = validatePlathoAppConfig({
       ...productionConfig,
@@ -1850,12 +1863,12 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v324/);
+    expect(sw).toMatch(/platho-pwa-prototype-v325/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=263/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=47/);
+    expect(sw).toMatch(/\.\/app\.js\?v=264/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=48/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=10/);
