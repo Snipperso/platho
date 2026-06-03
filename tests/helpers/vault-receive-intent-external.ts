@@ -17,10 +17,6 @@ const OP_CANCEL_RECEIVE_INTENT = 0x7E1F5037n;
 
 export type VaultReceiveIntentExternalType = 'CreateReceiveIntent' | 'ClaimReceiveIntent' | 'CancelReceiveIntent';
 
-function addressHash(address: Address): bigint {
-  return BigInt('0x' + address.hash.toString('hex'));
-}
-
 export async function registerVaultSigningKeys(vault: any, user: any, seedByte: number, keyId = 1n) {
   const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
   const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
@@ -73,6 +69,8 @@ export function buildVaultReceiveIntentExternalBody(
   const signedPayload = beginCell()
     .storeUint(VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, 32)
     .storeUint(deploymentManifestHash, 256)
+    .storeAddress(vaultAddress)
+    .storeAddress(owner)
     .storeUint(action, 8)
     .storeUint(nonce, 64)
     .storeRef(actionPayload.endCell())

@@ -27,8 +27,11 @@ import {
   RECEIVE_ASSETS,
   USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
   VAULT_CRYPTO_SUITE,
+  VAULT_PROFILE_AVATAR_SIGNING_DOMAIN,
   VAULT_PUBLISH_KIND,
+  VAULT_RECEIVE_INTENT_SIGNING_DOMAIN,
   VAULT_SIZE_CLASS,
+  VAULT_USERNAME_MINT_SIGNING_DOMAIN,
   buildAthWalletMessageBody,
   buildVaultBalancePublishBodyCell,
   buildVaultBalancePublishExternalBoc,
@@ -71,6 +74,33 @@ function cellPayload(cell: any) {
     hash: `0x${cell.hash().toString('hex')}`,
     boc: cell.toBoc({ idx: false, crc32: false }).toString('base64'),
   };
+}
+
+function tonCellToCoreCell(cell: any) {
+  return Cell.fromBoc(Buffer.from(
+    tonCell.bytesToBase64(tonCell.serializeBoc(cell)),
+    'base64',
+  ))[0];
+}
+
+function expectReceiveSignedDataEnvelope(cell: any, domain: bigint, owner: string) {
+  const slice = tonCellToCoreCell(cell).beginParse();
+  expect(slice.loadUintBig(32)).toBe(domain);
+  expect(slice.loadUintBig(256)).toBe(BigInt(DEPLOYMENT_MANIFEST_HASH));
+  expect(slice.loadAddress()?.equals(Address.parseRaw(VAULT))).toBe(true);
+  expect(slice.loadAddress()?.equals(Address.parseRaw(owner))).toBe(true);
+  return slice;
+}
+
+function expectRegistrySignedDataEnvelope(cell: any, domain: bigint, owner: string) {
+  const slice = tonCellToCoreCell(cell).beginParse();
+  expect(slice.loadUintBig(32)).toBe(domain);
+  expect(slice.loadUintBig(256)).toBe(BigInt(DEPLOYMENT_MANIFEST_HASH));
+  expect(slice.loadAddress()?.equals(Address.parseRaw(owner))).toBe(true);
+  slice.loadUintBig(64);
+  slice.loadUintBig(128);
+  expect(slice.loadAddress()?.equals(Address.parseRaw(VAULT))).toBe(true);
+  return slice;
 }
 
 function snakeCellFromBytes(bytes: Buffer) {
@@ -219,6 +249,10 @@ describe('PWA contract transaction builders', () => {
       pq_kem_pubkey: PQ_PUBKEY_BYTES,
       crypto_suite_mask: 2n,
     });
+
+    expectReceiveSignedDataEnvelope(createExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, OWNER);
+    expectReceiveSignedDataEnvelope(claimExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, RECIPIENT);
+    expectReceiveSignedDataEnvelope(cancelExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, OWNER);
 
     for (const external of [createExternal, claimExternal, cancelExternal, replaceExternal]) {
       expect(external.vaultAddress).toBe(VAULT);
@@ -446,6 +480,7 @@ describe('PWA contract transaction builders', () => {
       Buffer.from(built.signedDataHash, 'hex'),
       ed25519.getPublicKey(signingSecretKey),
     )).toBe(true);
+    expectRegistrySignedDataEnvelope(built.signedData, VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, OWNER);
     expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toBe(generatedBody(storeSetProfileAvatarFromVaultBalance({
       $$type: 'SetProfileAvatarFromVaultBalance',
       owner_wallet: Address.parseRaw(OWNER),
@@ -470,6 +505,7 @@ describe('PWA contract transaction builders', () => {
     });
     expect(external.vaultAddress).toBe(VAULT);
     expect(external.boc).toMatch(/^te6/);
+    expectRegistrySignedDataEnvelope(external.signedData, VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, OWNER);
   });
 
   it('PWA-TX-04E: creates signed Vault-funded username mint messages', async () => {
@@ -495,6 +531,7 @@ describe('PWA contract transaction builders', () => {
       Buffer.from(built.signedDataHash, 'hex'),
       ed25519.getPublicKey(signingSecretKey),
     )).toBe(true);
+    expectRegistrySignedDataEnvelope(built.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
     expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toBe(generatedBody(storeMintUsernameFromVaultBalance({
       $$type: 'MintUsernameFromVaultBalance',
       owner_wallet: Address.parseRaw(OWNER),
@@ -515,6 +552,7 @@ describe('PWA contract transaction builders', () => {
     });
     expect(external.vaultAddress).toBe(VAULT);
     expect(external.boc).toMatch(/^te6/);
+    expectRegistrySignedDataEnvelope(external.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
 
     const separatorPolicyExternal = await buildVaultUsernameMintExternalBoc({
       owner_wallet: OWNER,
@@ -529,6 +567,7 @@ describe('PWA contract transaction builders', () => {
     });
     expect(separatorPolicyExternal.vaultAddress).toBe(VAULT);
     expect(separatorPolicyExternal.boc).toMatch(/^te6/);
+    expectRegistrySignedDataEnvelope(separatorPolicyExternal.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
   });
 
   it('PWA-TX-09: creates public post payload cells and signed Vault-balance public publish messages', async () => {

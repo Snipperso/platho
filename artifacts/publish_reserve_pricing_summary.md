@@ -4,7 +4,7 @@ Status: **PASS**
 
 Current code hashes:
 
-- Vault: `ccc3552a46f805884a8deef651820be2291943dce2da7ae8b8fb058dcbb5a75a`
+- Vault: `265128b6433387ba900e130a73410b7a6cce1436983b4a81af16a59cefe75bf8`
 - CapsuleHub: `fc0dd2f1b836145e25ccd51c0f7ab8acfc9f9dcf832e86e4c17f04a886789f0e`
 - ATHWallet: `6d9d3dff2368d22a4148a48e71d6c91561b6db6ea64d7c14c506445202e13270`
 
