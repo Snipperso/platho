@@ -27,6 +27,7 @@ if (Test-Path -LiteralPath $resolvedOutput) {
 
 $forbiddenPatterns = @(
   '(^|/)\.git(/|$)',
+  '(^|/)\.codex-remote-attachments(/|$)',
   '(^|/)node_modules(/|$)',
   '(^|/)gitdir-probe(/|$)',
   '(^|/)\.audit-staging[^/]*(/|$)',
