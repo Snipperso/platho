@@ -110,7 +110,7 @@ import {
   isCapsuleHubBodyHistoryUnavailable,
 } from './capsulehub-ton-rpc-provider.mjs?v=18';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=14';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=10';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=11';
 import {
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,

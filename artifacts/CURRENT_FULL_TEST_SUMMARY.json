@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T15:12:29.2349758Z",
+  "generated_after_local_run": "2026-06-03T15:18:53.4775089Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
   "failed_test_files": 0,
-  "total_tests": 747,
-  "passed_tests": 747,
+  "total_tests": 749,
+  "passed_tests": 749,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -66,6 +66,7 @@
     "It also includes the Larisa Section 6 username PWA cleanup pass: resolveUsernameRegistryProvider no longer requires deleted refund-due getters, the default username RPC provider is pinned to the current price/name-record/item/global/official-wallet interface, and the interface matrix no longer documents deleted UsernameRegistry refund due/flush getters.",
     "It also includes the Larisa Section 7 deployment artifact cleanup pass: local mainnet final manifest, deploy packet, and Tonkeeper dry-run packet were regenerated against the current code hashes, DEPLOYMENT_RUNBOOK now lists every generated pre-seal binding, and release/preprod guards fail stale local mainnet deploy artifacts before they can enter an audit archive unnoticed.",
     "It also includes the Larisa Section 8 pricing docs cleanup pass: PLATHO_CAPSULE_V1_FINAL_SPEC no longer permits product labels from 0.030 TON; active pricing/docs/spec copy pins the public product label to from 0.0337 TON and keeps 0.030 TON only as the fixed CapsuleHub ACK reserve.",
-    "It also includes the Larisa Section 9 PWA composer/send cleanup pass: outgoing payment-check cancel now performs fresh verified intent and sender checks, persists submitted/terminal cancel state, waits for intent removal plus sender Vault balance restoration, and multi-capsule Vault publishes build each signed BOC just-in-time from a fresh nonce instead of pre-signing consecutive nonces during preparation."
+    "It also includes the Larisa Section 9 PWA composer/send cleanup pass: outgoing payment-check cancel now performs fresh verified intent and sender checks, persists submitted/terminal cancel state, waits for intent removal plus sender Vault balance restoration, and multi-capsule Vault publishes build each signed BOC just-in-time from a fresh nonce instead of pre-signing consecutive nonces during preparation.",
+    "It also includes the Larisa Section 10 TON DNS runtime-loader cleanup pass: ton-dns-provider.mjs now exports a default ready provider matching the configured PLATHO_APP_CONFIG.tonDns provider export, runtime module versions/service-worker cache were bumped, and tests now smoke the configured TON DNS module export path."
   ]
 }

@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-03T15:09:42.960Z",
+  "generatedAt": "2026-06-03T15:16:09.090Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,13 +9,13 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 128,
-    "totalBytes": 2840788,
-    "bundleSha256": "f14a2d9ad0f60f4eb1bd8c7235b5b1dc1dbd211a5b00306a88025ad8ce9c3df9",
+    "totalBytes": 2840882,
+    "bundleSha256": "b5825e4fc4d4031f2e7d799dbfa14657c3c86c6269b87732fddb168e8e805ac4",
     "files": [
       {
         "path": "app.js",
         "bytes": 476432,
-        "sha256": "390aad642f19b6522a34d9e2bce4a1820b05f98c9dced8618d84007a14f9afd0"
+        "sha256": "0c521149923b4d4c415a51a9a06d76a598e4b50b456a81c9fc62815f72b3eef5"
       },
       {
         "path": "assets/icons/back.svg",
@@ -205,7 +205,7 @@
       {
         "path": "index.html",
         "bytes": 30941,
-        "sha256": "ace093fe9ad4c04938f807f75a5af7ad808eebba2d1b4d442faebb1121db52e2"
+        "sha256": "b30ae5f4e0f1cec82d129e75cbbc4c8ff626bf0368ff16c37b533ae3aeb9469a"
       },
       {
         "path": "manifest.webmanifest",
@@ -220,7 +220,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 10299,
-        "sha256": "ee36bb469bade062ece1eb00d11bb84e0e970a95d45734600acc974cd1b4d9cf"
+        "sha256": "6b9bc1496cefcb650bd2eb8b94cd26b6de6d868308dfc408b1c9828b113b3160"
       },
       {
         "path": "platho-wallet.mjs",
@@ -265,12 +265,12 @@
       {
         "path": "sw.js",
         "bytes": 5248,
-        "sha256": "36e07f6d47d4cb900664971af80703a4fdd401867e11dcf6694c56b2ea4e0c85"
+        "sha256": "e678f8a029ed2a4fcc7c8471d0307316b20a8c040ea0c984ec9ff1c98ec2a589"
       },
       {
         "path": "ton-dns-provider.mjs",
-        "bytes": 11578,
-        "sha256": "5c5739cd2fe387c85133b385e2edf080ba7b093b4072654c9a17f73d49060778"
+        "bytes": 11672,
+        "sha256": "2b5239e6836c26e595fd2b56fb661b72a24b26730f09f756fae8b9ed89a43c62"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",

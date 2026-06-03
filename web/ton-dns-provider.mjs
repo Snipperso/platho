@@ -303,3 +303,7 @@ export function createTonDnsProvider(options = {}) {
     },
   };
 }
+
+const defaultTonDnsProvider = createTonDnsProvider();
+
+export default defaultTonDnsProvider;
