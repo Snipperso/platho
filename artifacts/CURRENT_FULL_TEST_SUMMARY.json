@@ -3,7 +3,7 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T18:30:12.3409335Z",
+  "generated_after_local_run": "2026-06-03T18:49:51.3987392Z",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
@@ -73,6 +73,7 @@
     "It also includes the Larisa focused re-audit release-evidence cleanup: mainnet_genesis_verify_report.json and MAINNET_GENESIS_VERIFY.md now explicitly flag MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT when the stored verifier input belongs to an older final manifest than artifacts/local/mainnet_final_manifest_draft.json, without pretending final mainnet genesis is verified.",
     "It also includes the Larisa Section 11 static public feed fallback guard: production PWA config validation now rejects allowUnverifiedStaticPublicFeeds=true so static JSON cannot self-declare chain-backed public content in a production package.",
     "It also includes the Larisa Section 12 public whitepaper cleanup: MarketStabilitySeller allocation is described as reserved at genesis but funded only after pool launch, evidence-bound pricing freeze, and reserve-funder notify-flow; public docs no longer claim seller reserve backing/readiness before final genesis production release.",
-    "It also includes the Larisa Section 13 seam/interface cleanup: PWA_CONTRACT_INTERFACE_MATRIX now labels payment checks, profile avatar, and username mint as Vault-auth signed external flows instead of wallet-sender transactions, records the current payment-check ordering, and static tests pin Vault service signed payloads to manifest, Vault, and owner domains."
+    "It also includes the Larisa Section 13 seam/interface cleanup: PWA_CONTRACT_INTERFACE_MATRIX now labels payment checks, profile avatar, and username mint as Vault-auth signed external flows instead of wallet-sender transactions, records the current payment-check ordering, and static tests pin Vault service signed payloads to manifest, Vault, and owner domains.",
+    "It also includes the final predeploy fresh-run checkpoint: npm.cmd test passed locally with 98/98 test files and 762/762 tests before regenerating the current mainnet manifest draft, deploy packet, tx dry-run packet, and static deploy prep evidence for the current code hashes."
   ]
 }
