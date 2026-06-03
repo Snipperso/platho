@@ -1124,6 +1124,26 @@ button:disabled,
   font-size: 12px;
 }
 
+.composer-attachment.is-list {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.composer-attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.composer-attachment-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composer-attachment[hidden] {
   display: none;
 }
