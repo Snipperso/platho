@@ -647,7 +647,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function scheduleNavVaultBalanceRetry/);
     expect(app).toMatch(/refreshNavVaultBalance\(\)/);
     expect(app).toMatch(/function refreshVaultNavBalanceInBackground/);
-    expect(app).toMatch(/node\.classList\.add\('is-loading'\)/);
+    expect(app).toMatch(/navVaultTonBalances\.forEach\(\(node, index\)/);
+    expect(app).toMatch(/node\.hidden = index > 0/);
+    expect(app).toMatch(/node\.hidden = true/);
     expect(html).toMatch(/id="vaultMoveTonForm"/);
     expect(html).toMatch(/id="vaultMoveAthForm"/);
     expect(html).toMatch(/id="vaultMoveTonWalletBalance"[^>]*>0<\/strong>/);
@@ -1986,11 +1988,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v342/);
+    expect(sw).toMatch(/platho-pwa-prototype-v343/);
     expect(sw).toMatch(/\.\/styles\.css\?v=127/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=280/);
+    expect(sw).toMatch(/\.\/app\.js\?v=281/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
