@@ -53,7 +53,7 @@ describe('PWA on-chain self-sufficiency', () => {
     const athProvider = read('web/ath-ton-rpc-provider.mjs');
 
     expect(app).toMatch(/provider\.getCanonicalPublishCharge\(/);
-    expect(app).toMatch(/provider\.getUsernamePrice\(username\.length/);
+    expect(app).toMatch(/readUsernameMintPriceForOwnVaultAction\(provider, registry, username\)/);
     expect(app).toMatch(/provider\.getUser\(walletAddress/);
     expect(app).toMatch(/provider\.getKeyRecord\(currentKeyId/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);

@@ -965,7 +965,7 @@ describe('PWA runtime config guard', () => {
     expect(usernameResolveSource).toMatch(/getNameRecordByUsername\(displayLabel, \{\s*address: registryAddress,\s*\.\.\.criticalChainReadOptions\(\),\s*\}\)/);
     expect(usernameResolveSource).toMatch(/registryCallOptions: \{ address: registryAddress, \.\.\.criticalChainReadOptions\(\) \}/);
     expect(usernameResolveSource).toMatch(/itemCallOptions: \{ address: record\.item_address, \.\.\.criticalChainReadOptions\(\) \}/);
-    expect(usernameMintSource).toMatch(/getUsernamePrice\(username\.length, \{\s*address: registry,\s*\.\.\.criticalChainReadOptions\(\),\s*\}\)/);
+    expect(usernameMintSource).toMatch(/readUsernameMintPriceForOwnVaultAction\(provider, registry, username\)/);
   });
 
   it('PWA-RPC-03: TON DNS recipient-affecting reads are fresh verified critical reads', () => {
@@ -1410,8 +1410,8 @@ describe('PWA runtime config guard', () => {
     expect(helpers).toMatch(/function waitForPaymentCheckCancelConfirmation/);
     expect(helpers).toMatch(/function readFreshReceiveIntentForCancel/);
     expect(helpers).toMatch(/function readFreshConnectedVaultUserForOwnVaultAction/);
-    expect(helpers).toMatch(/isTonRpcVerificationUnsafeForOwnVaultActionError\(error\)/);
-    expect(helpers).toMatch(/RPC_DISAGREEMENT/);
+    expect(helpers).toMatch(/isTonRpcVerificationUnavailableForOwnVaultActionError\(error\)/);
+    expect(helpers).not.toMatch(/RPC_DISAGREEMENT/);
     expect(helpers).toMatch(/allowUnverifiedCriticalRead:\s*true/);
     expect(helpers).toMatch(/readFreshReceiveIntent\(provider, intentId, \{ verify: false, allowUnverifiedCriticalRead: true \}\)/);
     expect(helpers).toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false, allowUnverifiedCriticalRead: true \}\)/);
@@ -1832,10 +1832,17 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function submitUsernameMint'),
       app.indexOf('async function submitAthWalletBurn'),
     );
+    const helper = app.slice(
+      app.indexOf('async function readUsernameMintPriceForOwnVaultAction'),
+      app.indexOf('async function resolveUsernameNftItemProvider'),
+    );
 
-    expect(source).toMatch(/provider\.getUsernamePrice\(username\.length/);
-    expect(source).toMatch(/price\?\.valid_length !== true/);
-    expect(source).toMatch(/const priceAtomic = BigInt\(price\?\.price_ath_atomic \?\? 0n\)/);
+    expect(source).toMatch(/readUsernameMintPriceForOwnVaultAction\(provider, registry, username\)/);
+    expect(helper).toMatch(/provider\.getUsernamePrice\(length, \{/);
+    expect(helper).toMatch(/price\?\.valid_length !== true/);
+    expect(helper).toMatch(/const priceAtomic = BigInt\(price\?\.price_ath_atomic \?\? 0n\)/);
+    expect(helper).toMatch(/localUsernameMintPriceAtomic\(username\)/);
+    expect(helper).toMatch(/isTonRpcVerificationUnavailableForOwnVaultActionError\(error\)/);
     expect(source).toMatch(/priceAtomic/);
     expect(source).toMatch(/submitVaultUsernameMint/);
     expect(source).not.toMatch(/submitAthWalletMessage\(/);
@@ -1994,17 +2001,17 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v345/);
+    expect(sw).toMatch(/platho-pwa-prototype-v346/);
     expect(sw).toMatch(/\.\/styles\.css\?v=127/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=283/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
+    expect(sw).toMatch(/\.\/app\.js\?v=284/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=51/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=21/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=22/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=18/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=11/);

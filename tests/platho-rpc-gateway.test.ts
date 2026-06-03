@@ -24,6 +24,26 @@ describe('Platho RPC gateway', () => {
     expect(config).not.toMatch(/https:\/\/rpc\.platho\.app\/api\/v3\/messages/);
   });
 
+  it('RPC-GATEWAY-02B: gateway allowlist covers PWA read-only get-methods', () => {
+    const gateway = readFileSync(gatewayPath, 'utf8');
+    const config = readFileSync('web/platho-config.mjs', 'utf8');
+    for (const method of [
+      'get_receive_intent',
+      'get_receive_intent_id',
+      'get_receive_intent_commitment',
+      'get_ath_wallet_address',
+      'get_pending_ath_withdrawal_for',
+      'get_pending_notification',
+      'get_pending_mint',
+      'get_pending_treasury_flush',
+      'get_pending_burn_flush',
+      'seqno',
+    ]) {
+      expect(gateway, `gateway allowlist must include ${method}`).toMatch(new RegExp(`"${method}"`));
+      expect(config, `PWA gateway capability must include ${method}`).toMatch(new RegExp(`'${method}'`));
+    }
+  });
+
   it('RPC-GATEWAY-03: local healthcheck works without calling TON upstream', async () => {
     const port = String(8910 + Math.floor(Math.random() * 500));
     const child = spawn('python', [gatewayPath], {

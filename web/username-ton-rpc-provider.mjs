@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=21';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=22';
 
 export class UsernameTonRpcProviderError extends Error {
   constructor(message) {

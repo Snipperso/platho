@@ -32,8 +32,8 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=3';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=50';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=21';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=51';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=22';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -9261,11 +9261,10 @@ function paymentCheckCancelBlockedStatus(error) {
   return `check cancel blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
 
-function isTonRpcVerificationUnsafeForOwnVaultActionError(error) {
+function isTonRpcVerificationUnavailableForOwnVaultActionError(error) {
   const message = String(error?.message ?? error ?? '');
   return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
-    || error?.code === 'RPC_DISAGREEMENT'
-    || /TON RPC verification unavailable|TON RPC disagreement|RPC_VERIFICATION_UNAVAILABLE|RPC_DISAGREEMENT|verification unavailable/i.test(message);
+    || /TON RPC verification unavailable|RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message);
 }
 
 function assertReceiveIntentMatchesPayment(intent, payment) {
@@ -9317,7 +9316,7 @@ async function readFreshReceiveIntentForOwnVaultAction(provider, intentId) {
   try {
     return await readFreshReceiveIntent(provider, intentId);
   } catch (error) {
-    if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
     return readFreshReceiveIntent(provider, intentId, { verify: false, allowUnverifiedCriticalRead: true });
   }
 }
@@ -9340,7 +9339,7 @@ async function readFreshConnectedVaultUserForOwnVaultAction(provider) {
   try {
     return await readFreshConnectedVaultUser(provider);
   } catch (error) {
-    if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
     return readFreshConnectedVaultUser(provider, { verify: false, allowUnverifiedCriticalRead: true });
   }
 }
@@ -9349,9 +9348,31 @@ async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
   try {
     return await readStrict();
   } catch (error) {
-    if (!isTonRpcVerificationUnsafeForOwnVaultActionError(error)) throw error;
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
     return readUnverified();
   }
+}
+
+async function callWithVerificationUnavailableReadFallback(readStrict, readUnverified) {
+  try {
+    return await readStrict();
+  } catch (error) {
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
+    return readUnverified();
+  }
+}
+
+async function readConnectedVaultGlobalForOwnVaultAction(provider) {
+  return callWithVerificationUnavailableReadFallback(
+    () => loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
+    () => loadConnectedVaultGlobal({
+      provider,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    }),
+  );
 }
 
 async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser) {
@@ -9685,7 +9706,7 @@ function requireManifestHashMatch(value, label) {
   }
 }
 
-async function requireProfileRegistryVaultRoute(global) {
+async function requireProfileRegistryVaultRoute(global, options = {}) {
   const registry = requireVaultProfileAvatarRoute(global);
   const resolved = await resolveProfileRegistryProvider();
   if (!resolved?.provider?.getGlobal || !resolved.provider.getAthWalletAddress) {
@@ -9695,10 +9716,17 @@ async function requireProfileRegistryVaultRoute(global) {
   if (resolvedRegistry !== registry) {
     throw new Error('ProfileRegistry provider address does not match Vault binding');
   }
-  const options = criticalChainReadOptions();
+  const readOptions = options.allowUnverifiedRead === true
+    ? {
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    }
+    : criticalChainReadOptions();
   const [registryGlobal, derivedOfficialWallet] = await Promise.all([
-    resolved.provider.getGlobal({ profileRegistryAddress: registry, ...options }),
-    resolved.provider.getAthWalletAddress(registry, { profileRegistryAddress: registry, ...options }),
+    resolved.provider.getGlobal({ profileRegistryAddress: registry, ...readOptions }),
+    resolved.provider.getAthWalletAddress(registry, { profileRegistryAddress: registry, ...readOptions }),
   ]);
   if (registryGlobal.sealed !== true) throw new Error('ProfileRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('ProfileRegistry official ATH wallet is not bound');
@@ -9725,16 +9753,30 @@ async function requireProfileRegistryVaultRoute(global) {
   return registry;
 }
 
-async function requireUsernameRegistryVaultRoute(global) {
+async function requireProfileRegistryVaultRouteForOwnVaultAction(global) {
+  return callWithVerificationUnavailableReadFallback(
+    () => requireProfileRegistryVaultRoute(global),
+    () => requireProfileRegistryVaultRoute(global, { allowUnverifiedRead: true }),
+  );
+}
+
+async function requireUsernameRegistryVaultRoute(global, options = {}) {
   const registry = requireVaultUsernameMintRoute(global);
   const provider = await resolveUsernameRegistryProvider();
   if (!provider?.getGlobal || !provider.getAthWalletAddress) {
     throw new Error('UsernameRegistry provider cannot verify Vault binding');
   }
-  const options = criticalChainReadOptions();
+  const readOptions = options.allowUnverifiedRead === true
+    ? {
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    }
+    : criticalChainReadOptions();
   const [registryGlobal, derivedOfficialWallet] = await Promise.all([
-    provider.getGlobal({ address: registry, ...options }),
-    provider.getAthWalletAddress(registry, { address: registry, ...options }),
+    provider.getGlobal({ address: registry, ...readOptions }),
+    provider.getAthWalletAddress(registry, { address: registry, ...readOptions }),
   ]);
   if (registryGlobal.sealed !== true) throw new Error('UsernameRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('UsernameRegistry official ATH wallet is not bound');
@@ -9750,6 +9792,13 @@ async function requireUsernameRegistryVaultRoute(global) {
     throw new Error('UsernameRegistry official ATH wallet is not the derived registry wallet');
   }
   return registry;
+}
+
+async function requireUsernameRegistryVaultRouteForOwnVaultAction(global) {
+  return callWithVerificationUnavailableReadFallback(
+    () => requireUsernameRegistryVaultRoute(global),
+    () => requireUsernameRegistryVaultRoute(global, { allowUnverifiedRead: true }),
+  );
 }
 
 async function estimateVaultPublicPublishHoldNanotons(provider, owner, partCount) {
@@ -9768,12 +9817,11 @@ async function estimateVaultPublicPublishHoldNanotons(provider, owner, partCount
 
 async function assertVaultProfileAvatarCanStart(owner, partCount) {
   const provider = await resolveVaultChainProvider();
-  const options = { provider, ...criticalChainReadOptions() };
   const [user, global] = await Promise.all([
-    loadConnectedVaultUser(options),
-    loadConnectedVaultGlobal(options),
+    readFreshConnectedVaultUserForOwnVaultAction(provider),
+    readConnectedVaultGlobalForOwnVaultAction(provider),
   ]);
-  await requireProfileRegistryVaultRoute(global);
+  await requireProfileRegistryVaultRouteForOwnVaultAction(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before setting an avatar');
   }
@@ -9794,12 +9842,11 @@ async function assertVaultProfileAvatarCanStart(owner, partCount) {
 
 async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
   const provider = await resolveVaultChainProvider();
-  const options = { provider, ...criticalChainReadOptions() };
   const [user, global] = await Promise.all([
-    loadConnectedVaultUser(options),
-    loadConnectedVaultGlobal(options),
+    readFreshConnectedVaultUserForOwnVaultAction(provider),
+    readConnectedVaultGlobalForOwnVaultAction(provider),
   ]);
-  await requireUsernameRegistryVaultRoute(global);
+  await requireUsernameRegistryVaultRouteForOwnVaultAction(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before minting a username');
   }
@@ -9819,12 +9866,11 @@ async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
 async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarEntryId, avatarStreamId, avatarPartCount, mediaFormat }) {
   requireNoPendingServiceWorkerAppShellReload();
   const provider = await resolveVaultChainProvider();
-  const options = { provider, ...criticalChainReadOptions() };
   const [global, rawUser] = await Promise.all([
-    loadConnectedVaultGlobal(options),
-    loadConnectedVaultUser(options),
+    readConnectedVaultGlobalForOwnVaultAction(provider),
+    readFreshConnectedVaultUserForOwnVaultAction(provider),
   ]);
-  const registry = await requireProfileRegistryVaultRoute(global);
+  const registry = await requireProfileRegistryVaultRouteForOwnVaultAction(global);
   const user = rememberConnectedVaultUser(rawUser);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before setting an avatar');
@@ -9870,12 +9916,11 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
 async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   requireNoPendingServiceWorkerAppShellReload();
   const provider = await resolveVaultChainProvider();
-  const options = { provider, ...criticalChainReadOptions() };
   const [global, rawUser] = await Promise.all([
-    loadConnectedVaultGlobal(options),
-    loadConnectedVaultUser(options),
+    readConnectedVaultGlobalForOwnVaultAction(provider),
+    readFreshConnectedVaultUserForOwnVaultAction(provider),
   ]);
-  const registry = await requireUsernameRegistryVaultRoute(global);
+  const registry = await requireUsernameRegistryVaultRouteForOwnVaultAction(global);
   const user = rememberConnectedVaultUser(rawUser);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before minting a username');
@@ -10345,6 +10390,29 @@ async function resolveUsernameRegistryProvider() {
   return provider;
 }
 
+async function readUsernameMintPriceForOwnVaultAction(provider, registry, username) {
+  const length = String(username ?? '').length;
+  const readPrice = (options) => provider.getUsernamePrice(length, {
+    address: registry,
+    ...options,
+  });
+  try {
+    const price = await readPrice(criticalChainReadOptions());
+    const priceAtomic = BigInt(price?.price_ath_atomic ?? 0n);
+    if (price?.valid_length !== true || priceAtomic <= 0n) {
+      throw new Error('UsernameRegistry rejected this username length');
+    }
+    return priceAtomic;
+  } catch (error) {
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
+    const localPrice = localUsernameMintPriceAtomic(username);
+    if (localPrice === null || localPrice <= 0n) {
+      throw new Error('UsernameRegistry rejected this username length');
+    }
+    return localPrice;
+  }
+}
+
 async function resolveUsernameNftItemProvider() {
   const provider = globalThis.plathoUsernameNftItemProvider
     ?? createUsernameNftItemTonRpcProvider({});
@@ -10659,14 +10727,7 @@ async function submitUsernameMint() {
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const registry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
   const provider = await resolveUsernameRegistryProvider();
-  const price = await provider.getUsernamePrice(username.length, {
-    address: registry,
-    ...criticalChainReadOptions(),
-  });
-  const priceAtomic = BigInt(price?.price_ath_atomic ?? 0n);
-  if (price?.valid_length !== true || priceAtomic <= 0n) {
-    throw new Error('UsernameRegistry rejected this username length');
-  }
+  const priceAtomic = await readUsernameMintPriceForOwnVaultAction(provider, registry, username);
   await assertVaultUsernameMintCanStart(owner, username, priceAtomic);
   setText(identitySubtitle, 'username signing through Vault');
   const result = await submitVaultUsernameMint({

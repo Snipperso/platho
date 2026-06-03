@@ -1204,9 +1204,48 @@ function configuredProviderList(config = {}) {
   return ordered;
 }
 
+function stringSet(value) {
+  if (!Array.isArray(value)) return null;
+  const out = new Set(value.map((item) => String(item)).filter(Boolean));
+  return out.size > 0 ? out : null;
+}
+
+function withRunGetMethodCapabilities(transport, provider = {}, defaults = {}) {
+  if (!transport) return transport;
+  const supportedGetMethods = stringSet(provider.supportedGetMethods ?? provider.allowedGetMethods ?? defaults.supportedGetMethods ?? defaults.allowedGetMethods);
+  const unsupportedGetMethods = stringSet(provider.unsupportedGetMethods ?? provider.blockedGetMethods ?? defaults.unsupportedGetMethods ?? defaults.blockedGetMethods);
+  if (!supportedGetMethods && !unsupportedGetMethods && typeof transport.supportsRunGetMethod === 'function') return transport;
+  const baseSupports = typeof transport.supportsRunGetMethod === 'function'
+    ? (method) => transport.supportsRunGetMethod(method)
+    : () => true;
+  return {
+    ...transport,
+    supportedGetMethods: supportedGetMethods ? [...supportedGetMethods] : transport.supportedGetMethods,
+    unsupportedGetMethods: unsupportedGetMethods ? [...unsupportedGetMethods] : transport.unsupportedGetMethods,
+    supportsRunGetMethod(method) {
+      const name = String(method ?? '');
+      if (!name) return false;
+      if (supportedGetMethods && !supportedGetMethods.has(name)) return false;
+      if (unsupportedGetMethods?.has(name)) return false;
+      return baseSupports(name) !== false;
+    },
+  };
+}
+
+function transportSupportsReadMethod(transport, methodName, call = {}) {
+  if (typeof transport?.[methodName] !== 'function') return false;
+  if (methodName !== 'runGetMethod') return true;
+  if (typeof transport.supportsRunGetMethod !== 'function') return true;
+  return transport.supportsRunGetMethod(call?.method) !== false;
+}
+
 export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
-  if (provider?.runGetMethod || provider?.sendBoc || provider?.getMessages) return provider;
-  if (provider?.globalName && globalThis[provider.globalName]) return globalThis[provider.globalName];
+  if (provider?.runGetMethod || provider?.sendBoc || provider?.getMessages) {
+    return withRunGetMethodCapabilities(provider, provider, defaults);
+  }
+  if (provider?.globalName && globalThis[provider.globalName]) {
+    return withRunGetMethodCapabilities(globalThis[provider.globalName], provider, defaults);
+  }
   const kind = String(provider?.kind ?? provider?.type ?? 'toncenter-v3').toLowerCase();
   if ((kind === 'custom' || kind === 'user' || kind === 'external') && provider?.globalName) {
     return null;
@@ -1219,7 +1258,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   if (!['toncenter-v3', 'toncenter', 'platho-rpc', 'json-rpc-compatible'].includes(kind)) {
     throw new VaultTonRpcProviderError(`Unsupported TON RPC provider kind: ${kind}`);
   }
-  return createTonCenterV3VaultTransport({
+  const transport = createTonCenterV3VaultTransport({
     endpoint,
     messagesEndpoint: provider?.messagesEndpoint ?? defaults.messagesEndpoint,
     sendBocEndpoint: provider?.sendBocEndpoint ?? defaults.sendBocEndpoint,
@@ -1241,6 +1280,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     messagesCacheMaxEntries: provider?.messagesCacheMaxEntries ?? defaults.messagesCacheMaxEntries,
     rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? defaults.rateLimitKey,
   });
+  return withRunGetMethodCapabilities(transport, provider, defaults);
 }
 
 export function createFallbackTonRpcTransport(options = {}) {
@@ -1256,8 +1296,9 @@ export function createFallbackTonRpcTransport(options = {}) {
     let primaryResult = null;
     let primaryTransport = null;
     let lastError = null;
+    const call = args[0] ?? {};
     for (const transport of transports) {
-      if (typeof transport?.[methodName] !== 'function') continue;
+      if (!transportSupportsReadMethod(transport, methodName, call)) continue;
       try {
         primaryResult = await transport[methodName](...args);
         primaryTransport = transport;
@@ -1267,7 +1308,6 @@ export function createFallbackTonRpcTransport(options = {}) {
       }
     }
     if (!primaryTransport) throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
-    const call = args[0] ?? {};
     const method = call?.method ?? methodName;
     const allowUnverifiedCriticalRead = requestOptions.allowUnverifiedCriticalRead === true
       || call?.allowUnverifiedCriticalRead === true;
@@ -1281,7 +1321,7 @@ export function createFallbackTonRpcTransport(options = {}) {
     let verified = false;
     let verifyError = null;
     for (const transport of transports) {
-      if (transport === primaryTransport || typeof transport?.[methodName] !== 'function') continue;
+      if (transport === primaryTransport || !transportSupportsReadMethod(transport, methodName, call)) continue;
       try {
         const verifierResult = await transport[methodName](...args);
         verified = true;
