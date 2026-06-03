@@ -3058,45 +3058,6 @@ _ %get_global() method_id(126899) {
         return ();
     }
     
-    ;; Receive ReplaceMessagingKeys message
-    if (op == 0x89d648bb) {
-        var $msg'enc_pubkey = in_msg~load_uint(256);
-        var $msg'sign_pubkey = in_msg~load_uint(256);
-        var $msg'pq_kem_pubkey_hash = in_msg~load_uint(256);
-        var $msg'pq_kem_pubkey_len = in_msg~load_uint(16);
-        var $msg'pq_kem_pubkey = in_msg~load_ref();
-        var $msg'crypto_suite_mask = in_msg~load_uint(16);
-        ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_requireSealed();
-        ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_validateKeyProfile($msg'enc_pubkey, $msg'sign_pubkey, $msg'pq_kem_pubkey_hash, $msg'pq_kem_pubkey_len, $msg'pq_kem_pubkey, $msg'crypto_suite_mask);
-        tuple $userOpt = $UserState$_load_opt(__tact_dict_get_slice_cell($self'users, 267, __tact_context_get_sender()));
-        throw_unless(16120, (~ null?($userOpt)));
-        var ($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce) = $UserState$_not_null($userOpt);
-        throw_unless(16121, ($user'current_key_id != 0));
-        throw_unless(16128, ($user'auth_pubkey != 0));
-        throw_unless(16129, ($msg'sign_pubkey != $user'auth_pubkey));
-        tuple $oldRecordOpt = $KeyRecord$_load_opt(__tact_dict_get_int_cell($self'key_records, 257, $user'current_key_id));
-        throw_unless(16122, (~ null?($oldRecordOpt)));
-        var ($oldRecord'owner_wallet, $oldRecord'key_generation, $oldRecord'enc_pubkey, $oldRecord'sign_pubkey, $oldRecord'pq_kem_pubkey_hash, $oldRecord'pq_kem_pubkey_len, $oldRecord'pq_kem_pubkey, $oldRecord'crypto_suite_mask, $oldRecord'created_at, $oldRecord'created_lt, $oldRecord'revoked_at, $oldRecord'revoked_lt) = $KeyRecord$_not_null($oldRecordOpt);
-        throw_unless(16123, ( equal_slices_bits($oldRecord'owner_wallet, __tact_context_get_sender()) ));
-        throw_unless(16124, ($oldRecord'revoked_lt == 0));
-        throw_unless(16125, ($oldRecord'key_generation < 4294967295));
-        int $required = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_keyRecordStorageEndowment($msg'crypto_suite_mask);
-        $required = $required + 2000000;
-        throw_unless(16126, ($Context$_get_value(__tact_context_get()) >= $required));
-        $oldRecord'revoked_at = $global_now();
-        $oldRecord'revoked_lt = $global_curLt();
-        $self'key_records~__tact_dict_set_int_cell(257, $user'current_key_id, $KeyRecord$_store_cell(($oldRecord'owner_wallet, $oldRecord'key_generation, $oldRecord'enc_pubkey, $oldRecord'sign_pubkey, $oldRecord'pq_kem_pubkey_hash, $oldRecord'pq_kem_pubkey_len, $oldRecord'pq_kem_pubkey, $oldRecord'crypto_suite_mask, $oldRecord'created_at, $oldRecord'created_lt, $oldRecord'revoked_at, $oldRecord'revoked_lt), begin_cell()));
-        int $keyGeneration = ($oldRecord'key_generation + 1);
-        int $newKeyId = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_computeKeyId(__tact_context_get_sender(), $keyGeneration, $msg'enc_pubkey, $msg'sign_pubkey, $msg'pq_kem_pubkey_hash, $msg'pq_kem_pubkey_len, $msg'crypto_suite_mask);
-        throw_unless(16127, (~ __tact_dict_exists_int($self'key_records, 257, $newKeyId)));
-        $self'key_records~__tact_dict_set_int_cell(257, $newKeyId, $KeyRecord$_store_cell($KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt(__tact_context_get_sender(), $keyGeneration, $msg'enc_pubkey, $msg'sign_pubkey, $msg'pq_kem_pubkey_hash, $msg'pq_kem_pubkey_len, $msg'pq_kem_pubkey, $msg'crypto_suite_mask, $global_now(), $global_curLt(), 0, 0), begin_cell()));
-        $self'key_record_count = $self'key_record_count + 1;
-        $user'current_key_id = $newKeyId;
-        $self'users~__tact_dict_set_slice_cell(267, __tact_context_get_sender(), $UserState$_store_cell(($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce), begin_cell()));
-        $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
-        return ();
-    }
-    
     ;; Receive CapsuleHubPublishAck message
     if (op == 0x874e576a) {
         var $msg'publish_id = in_msg~load_uint(256);
@@ -3172,6 +3133,71 @@ _ %get_global() method_id(126899) {
     var ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count) = $Vault$_contract_load();
     
     var op = in_msg~load_opcode_external();
+    ;; Receive ReplaceMessagingKeys message
+    if (op == 0x89d648bb) {
+        var $msg'owner_wallet = in_msg~load_msg_addr();
+        var $msg'signature = in_msg~load_bits(512);
+        var $msg'signed_payload = in_msg~load_ref();
+        tuple $userOpt = $UserState$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $msg'owner_wallet));
+        throw_unless(16120, (~ null?($userOpt)));
+        var ($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce) = $UserState$_not_null($userOpt);
+        throw_unless(16121, ($user'current_key_id != 0));
+        throw_unless(16128, ($user'auth_pubkey != 0));
+        throw_unless(16130, $global_checkSignature($Cell$_fun_hash($msg'signed_payload), $msg'signature, $user'auth_pubkey));
+        slice $signedPayload = $Cell$_fun_beginParse($msg'signed_payload);
+        int $signedDomain = $signedPayload~load_uint(32);
+        throw_unless(16131, ($signedDomain == 1448233777));
+        int $signedManifestHash = $signedPayload~load_uint(256);
+        throw_unless(16132, ($signedManifestHash == $self'deployment_manifest_hash));
+        int $signedVaultHash = $signedPayload~load_uint(256);
+        slice $vaultAddressSlice = $Address$_fun_asSlice($global_myAddress());
+        throw_unless(16133, ($vaultAddressSlice~load_uint(11) == 1024));
+        throw_unless(16133, ($signedVaultHash == $vaultAddressSlice~load_uint(256)));
+        int $signedOwnerHash = $signedPayload~load_uint(256);
+        slice $ownerPrefix = $Address$_fun_asSlice($msg'owner_wallet);
+        throw_unless(16134, ($ownerPrefix~load_uint(11) == 1024));
+        throw_unless(16134, ($signedOwnerHash == $ownerPrefix~load_uint(256)));
+        int $clientNonce = $signedPayload~load_uint(64);
+        throw_unless(16135, ($clientNonce == $user'publish_nonce));
+        throw_unless(16136, ($Slice$_fun_bits($signedPayload) == 0));
+        throw_unless(16137, ($Slice$_fun_refs($signedPayload) == 1));
+        int $required = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_keyRecordStorageEndowment(2);
+        $required = $required + 2000000;
+        throw_unless(16126, ($user'ton_balance >= $required));
+        $global_acceptMessage();
+        slice $actionPayload = $Cell$_fun_beginParse($signedPayload~$Slice$_fun_loadRef());
+        int $encPubkey = $actionPayload~load_uint(256);
+        int $signPubkey = $actionPayload~load_uint(256);
+        int $pqKemPubkeyHash = $actionPayload~load_uint(256);
+        int $pqKemPubkeyLen = $actionPayload~load_uint(16);
+        cell $pqKemPubkey = $actionPayload~$Slice$_fun_loadRef();
+        int $cryptoSuiteMask = $actionPayload~load_uint(16);
+        throw_unless(16138, ($Slice$_fun_bits($actionPayload) == 0));
+        throw_unless(16139, ($Slice$_fun_refs($actionPayload) == 0));
+        ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_validateKeyProfile($encPubkey, $signPubkey, $pqKemPubkeyHash, $pqKemPubkeyLen, $pqKemPubkey, $cryptoSuiteMask);
+        throw_unless(16129, ($signPubkey != $user'auth_pubkey));
+        tuple $oldRecordOpt = $KeyRecord$_load_opt(__tact_dict_get_int_cell($self'key_records, 257, $user'current_key_id));
+        throw_unless(16122, (~ null?($oldRecordOpt)));
+        var ($oldRecord'owner_wallet, $oldRecord'key_generation, $oldRecord'enc_pubkey, $oldRecord'sign_pubkey, $oldRecord'pq_kem_pubkey_hash, $oldRecord'pq_kem_pubkey_len, $oldRecord'pq_kem_pubkey, $oldRecord'crypto_suite_mask, $oldRecord'created_at, $oldRecord'created_lt, $oldRecord'revoked_at, $oldRecord'revoked_lt) = $KeyRecord$_not_null($oldRecordOpt);
+        throw_unless(16123, ( equal_slices_bits($oldRecord'owner_wallet, $msg'owner_wallet) ));
+        throw_unless(16124, ($oldRecord'revoked_lt == 0));
+        throw_unless(16125, ($oldRecord'key_generation < 4294967295));
+        $oldRecord'revoked_at = $global_now();
+        $oldRecord'revoked_lt = $global_curLt();
+        $self'key_records~__tact_dict_set_int_cell(257, $user'current_key_id, $KeyRecord$_store_cell(($oldRecord'owner_wallet, $oldRecord'key_generation, $oldRecord'enc_pubkey, $oldRecord'sign_pubkey, $oldRecord'pq_kem_pubkey_hash, $oldRecord'pq_kem_pubkey_len, $oldRecord'pq_kem_pubkey, $oldRecord'crypto_suite_mask, $oldRecord'created_at, $oldRecord'created_lt, $oldRecord'revoked_at, $oldRecord'revoked_lt), begin_cell()));
+        int $keyGeneration = ($oldRecord'key_generation + 1);
+        int $newKeyId = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_computeKeyId($msg'owner_wallet, $keyGeneration, $encPubkey, $signPubkey, $pqKemPubkeyHash, $pqKemPubkeyLen, $cryptoSuiteMask);
+        throw_unless(16127, (~ __tact_dict_exists_int($self'key_records, 257, $newKeyId)));
+        $self'key_records~__tact_dict_set_int_cell(257, $newKeyId, $KeyRecord$_store_cell($KeyRecord$_constructor_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt($msg'owner_wallet, $keyGeneration, $encPubkey, $signPubkey, $pqKemPubkeyHash, $pqKemPubkeyLen, $pqKemPubkey, $cryptoSuiteMask, $global_now(), $global_curLt(), 0, 0), begin_cell()));
+        $self'key_record_count = $self'key_record_count + 1;
+        $user'current_key_id = $newKeyId;
+        $user'ton_balance = $user'ton_balance - $required;
+        $user'publish_nonce = $user'publish_nonce + 1;
+        $self'users~__tact_dict_set_slice_cell(267, $msg'owner_wallet, $UserState$_store_cell(($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce), begin_cell()));
+        $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
+        return ();
+    }
+    
     ;; Receive CreateReceiveIntent message
     if (op == 0x7e1f5035) {
         var $msg'owner_wallet = in_msg~load_msg_addr();
@@ -3721,6 +3747,14 @@ _ %get_global() method_id(126899) {
         $user'publish_nonce = $user'publish_nonce + 1;
         $self'users~__tact_dict_set_slice_cell(267, $msg'owner_wallet, $UserState$_store_cell(($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce), begin_cell()));
         $global_commit();
+        ifnot ($self'sealed) {
+            $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
+            return ();
+        }
+        ifnot (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_isUsernameRegistryBound()) {
+            $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
+            return ();
+        }
         slice $ownerPrefix = $Address$_fun_asSlice($msg'owner_wallet);
         ifnot (($ownerPrefix~load_uint(11) == 1024)) {
             $Vault$_contract_store(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count));
@@ -3802,8 +3836,6 @@ _ %get_global() method_id(126899) {
         var $msg'owner_wallet = in_msg~load_msg_addr();
         var $msg'signature = in_msg~load_bits(512);
         var $msg'signed_payload = in_msg~load_ref();
-        ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_requireSealed();
-        throw_unless(16700, ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count)~$Vault$_fun_isUsernameRegistryBound());
         tuple $userOpt = $UserState$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $msg'owner_wallet));
         throw_unless(16701, (~ null?($userOpt)));
         var ($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce) = $UserState$_not_null($userOpt);

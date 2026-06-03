@@ -206,8 +206,8 @@ TL-B: `register_messaging_keys#52705eda enc_pubkey:uint256 sign_pubkey:uint256 a
 Signature: `RegisterMessagingKeys{enc_pubkey:uint256,sign_pubkey:uint256,auth_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16}`
 
 ### ReplaceMessagingKeys
-TL-B: `replace_messaging_keys#89d648bb enc_pubkey:uint256 sign_pubkey:uint256 pq_kem_pubkey_hash:uint256 pq_kem_pubkey_len:uint16 pq_kem_pubkey:^cell crypto_suite_mask:uint16 = ReplaceMessagingKeys`
-Signature: `ReplaceMessagingKeys{enc_pubkey:uint256,sign_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16}`
+TL-B: `replace_messaging_keys#89d648bb owner_wallet:address signature:fixed_bytes64 signed_payload:^cell = ReplaceMessagingKeys`
+Signature: `ReplaceMessagingKeys{owner_wallet:address,signature:fixed_bytes64,signed_payload:^cell}`
 
 ### CreateReceiveIntent
 TL-B: `create_receive_intent#7e1f5035 owner_wallet:address signature:fixed_bytes64 signed_payload:^cell = CreateReceiveIntent`

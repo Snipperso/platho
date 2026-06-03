@@ -3300,67 +3300,49 @@ export function dictValueParserRegisterMessagingKeys(): DictionaryValue<Register
 
 export type ReplaceMessagingKeys = {
     $$type: 'ReplaceMessagingKeys';
-    enc_pubkey: bigint;
-    sign_pubkey: bigint;
-    pq_kem_pubkey_hash: bigint;
-    pq_kem_pubkey_len: bigint;
-    pq_kem_pubkey: Cell;
-    crypto_suite_mask: bigint;
+    owner_wallet: Address;
+    signature: Buffer;
+    signed_payload: Cell;
 }
 
 export function storeReplaceMessagingKeys(src: ReplaceMessagingKeys) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(2312521915, 32);
-        b_0.storeUint(src.enc_pubkey, 256);
-        b_0.storeUint(src.sign_pubkey, 256);
-        b_0.storeUint(src.pq_kem_pubkey_hash, 256);
-        b_0.storeUint(src.pq_kem_pubkey_len, 16);
-        b_0.storeRef(src.pq_kem_pubkey);
-        b_0.storeUint(src.crypto_suite_mask, 16);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeBuffer(src.signature);
+        b_0.storeRef(src.signed_payload);
     };
 }
 
 export function loadReplaceMessagingKeys(slice: Slice) {
     const sc_0 = slice;
     if (sc_0.loadUint(32) !== 2312521915) { throw Error('Invalid prefix'); }
-    const _enc_pubkey = sc_0.loadUintBig(256);
-    const _sign_pubkey = sc_0.loadUintBig(256);
-    const _pq_kem_pubkey_hash = sc_0.loadUintBig(256);
-    const _pq_kem_pubkey_len = sc_0.loadUintBig(16);
-    const _pq_kem_pubkey = sc_0.loadRef();
-    const _crypto_suite_mask = sc_0.loadUintBig(16);
-    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+    const _owner_wallet = sc_0.loadAddress();
+    const _signature = sc_0.loadBuffer(64);
+    const _signed_payload = sc_0.loadRef();
+    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadTupleReplaceMessagingKeys(source: TupleReader) {
-    const _enc_pubkey = source.readBigNumber();
-    const _sign_pubkey = source.readBigNumber();
-    const _pq_kem_pubkey_hash = source.readBigNumber();
-    const _pq_kem_pubkey_len = source.readBigNumber();
-    const _pq_kem_pubkey = source.readCell();
-    const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function loadGetterTupleReplaceMessagingKeys(source: TupleReader) {
-    const _enc_pubkey = source.readBigNumber();
-    const _sign_pubkey = source.readBigNumber();
-    const _pq_kem_pubkey_hash = source.readBigNumber();
-    const _pq_kem_pubkey_len = source.readBigNumber();
-    const _pq_kem_pubkey = source.readCell();
-    const _crypto_suite_mask = source.readBigNumber();
-    return { $$type: 'ReplaceMessagingKeys' as const, enc_pubkey: _enc_pubkey, sign_pubkey: _sign_pubkey, pq_kem_pubkey_hash: _pq_kem_pubkey_hash, pq_kem_pubkey_len: _pq_kem_pubkey_len, pq_kem_pubkey: _pq_kem_pubkey, crypto_suite_mask: _crypto_suite_mask };
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
 }
 
 export function storeTupleReplaceMessagingKeys(source: ReplaceMessagingKeys) {
     const builder = new TupleBuilder();
-    builder.writeNumber(source.enc_pubkey);
-    builder.writeNumber(source.sign_pubkey);
-    builder.writeNumber(source.pq_kem_pubkey_hash);
-    builder.writeNumber(source.pq_kem_pubkey_len);
-    builder.writeCell(source.pq_kem_pubkey);
-    builder.writeNumber(source.crypto_suite_mask);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeBuffer(source.signature);
+    builder.writeCell(source.signed_payload);
     return builder.build();
 }
 
@@ -5699,7 +5681,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"WithdrawTon","header":1212947826,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"WithdrawAth","header":4188293172,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
-    {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
+    {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"CreateReceiveIntent","header":2115981365,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"ClaimReceiveIntent","header":2115981366,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"CancelReceiveIntent","header":2115981367,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
@@ -5856,6 +5838,7 @@ export const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN = 1448231729n;
 export const VAULT_RECEIVE_INTENT_ACTION_CREATE = 1n;
 export const VAULT_RECEIVE_INTENT_ACTION_CLAIM = 2n;
 export const VAULT_RECEIVE_INTENT_ACTION_CANCEL = 3n;
+export const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN = 1448233777n;
 export const VAULT_RECEIVE_INTENT_SETTLEMENT_EXEC_RESERVE = 2000000n;
 export const VAULT_PENDING_PUBLISH_COUNT_UNIT = 1n;
 export const VAULT_PENDING_PROFILE_COUNT_UNIT = 4294967296n;

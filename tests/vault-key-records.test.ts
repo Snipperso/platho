@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { Cell, beginCell, contractAddress, toNano } from '@ton/core';
+import { Cell, beginCell, contractAddress, external, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { keyPairFromSeed, sign } from '@ton/crypto';
 import {
   Vault,
   RegisterMessagingKeys,
-  ReplaceMessagingKeys,
 } from '../build/Vault/Vault_Vault';
+
+const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
+const OP_REPLACE_MESSAGING_KEYS = 0x89D648BBn;
+const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN = 0x56524B31n;
+const AUTH_KEY_PAIR = keyPairFromSeed(Buffer.alloc(32, 0x66));
 
 async function setup() {
   const blockchain = await Blockchain.create();
@@ -16,7 +21,6 @@ async function setup() {
   const attacker = await blockchain.treasury('vault-key-attacker');
 
   const capsuleHub = await blockchain.treasury('capsule-hub');
-  const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
   const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
   const address = contractAddress(0, init);
 
@@ -39,7 +43,7 @@ const ENC_0 = 0x1000000000000000000000000000000000000000000000000000000000000001
 const SIG_0 = 0x2000000000000000000000000000000000000000000000000000000000000002n;
 const ENC_1 = 0x3000000000000000000000000000000000000000000000000000000000000003n;
 const SIG_1 = 0x4000000000000000000000000000000000000000000000000000000000000004n;
-const AUTH_0 = 0x6000000000000000000000000000000000000000000000000000000000000006n;
+const AUTH_0 = BigInt('0x' + AUTH_KEY_PAIR.publicKey.toString('hex'));
 const PQ_HASH = 0x5000000000000000000000000000000000000000000000000000000000000005n;
 
 function snakeCell(byteLength: number, fill = 0x5a): Cell {
@@ -69,16 +73,48 @@ async function registerHybrid(vault: any, user: any, value = toNano('0.1')) {
   } as RegisterMessagingKeys);
 }
 
-async function replaceHybrid(vault: any, user: any, value = toNano('0.1')) {
-  await vault.send(user.getSender(), { value }, {
-    $$type: 'ReplaceMessagingKeys',
-    enc_pubkey: ENC_1,
-    sign_pubkey: SIG_1,
-    pq_kem_pubkey_hash: PQ_HASH,
-    pq_kem_pubkey_len: 1184n,
-    pq_kem_pubkey: PQ_CELL,
-    crypto_suite_mask: 2n,
-  } as ReplaceMessagingKeys);
+function addressHash(address: any): bigint {
+  return BigInt('0x' + address.hash.toString('hex'));
+}
+
+function replaceMessagingKeysExternalBody(vault: any, owner: any, nonce: bigint, fields: any = {}) {
+  const payload = beginCell()
+    .storeUint(fields.enc_pubkey ?? ENC_1, 256)
+    .storeUint(fields.sign_pubkey ?? SIG_1, 256)
+    .storeUint(fields.pq_kem_pubkey_hash ?? PQ_HASH, 256)
+    .storeUint(fields.pq_kem_pubkey_len ?? 1184n, 16)
+    .storeRef(fields.pq_kem_pubkey ?? PQ_CELL)
+    .storeUint(fields.crypto_suite_mask ?? 2n, 16)
+    .endCell();
+  const signedPayload = beginCell()
+    .storeUint(VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN, 32)
+    .storeUint(GENESIS_HASH, 256)
+    .storeUint(addressHash(vault.address), 256)
+    .storeUint(addressHash(owner.address), 256)
+    .storeUint(nonce, 64)
+    .storeRef(payload)
+    .endCell();
+  return beginCell()
+    .storeUint(OP_REPLACE_MESSAGING_KEYS, 32)
+    .storeAddress(owner.address)
+    .storeBuffer(sign(signedPayload.hash(), AUTH_KEY_PAIR.secretKey))
+    .storeRef(signedPayload)
+    .endCell();
+}
+
+async function replaceHybrid(blockchain: Blockchain, vault: any, user: any, fields: any = {}) {
+  const userState = await vault.getGetUser(user.address);
+  await blockchain.sendMessage(external({
+    to: vault.address,
+    body: replaceMessagingKeysExternalBody(vault, user, userState.publish_nonce, fields),
+  }));
+}
+
+async function depositTon(vault: any, user: any, amount = toNano('0.1')) {
+  await vault.send(user.getSender(), { value: amount + 2_000_000n }, {
+    $$type: 'DepositTon',
+    amount,
+  } as any);
 }
 
 describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
@@ -126,13 +162,14 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
   });
 
   it('VAULT-HAPPY-07: key replacement revokes previous key and creates generation 1', async () => {
-    const { vault, user } = await setup();
+    const { blockchain, vault, user } = await setup();
 
     await registerHybrid(vault, user);
+    await depositTon(vault, user);
     const oldKeyId = (await vault.getGetUser(user.address)).current_key_id;
     const oldRecordBefore = await vault.getGetKeyRecord(oldKeyId);
 
-    await replaceHybrid(vault, user);
+    await replaceHybrid(blockchain, vault, user);
 
     const userState = await vault.getGetUser(user.address);
     const newKeyId = userState.current_key_id;
@@ -157,13 +194,15 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect(newRecord.pq_kem_pubkey_len).toBe(1184n);
     expect(newRecord.pq_kem_pubkey.hash().toString('hex')).toBe(PQ_CELL.hash().toString('hex'));
     expect(newRecord.revoked_lt).toBe(0n);
+    expect(userState.ton_balance).toBe(toNano('0.1') - 32_000_000n);
+    expect(userState.publish_nonce).toBe(1n);
     expect((await vault.getGetGlobal()).key_record_count).toBe(2n);
   });
 
   it('VAULT-REJECT: cannot register twice and cannot replace before registration', async () => {
-    const { vault, user, attacker } = await setup();
+    const { blockchain, vault, user, attacker } = await setup();
 
-    await replaceHybrid(vault, attacker);
+    await expect(replaceHybrid(blockchain, vault, attacker)).rejects.toThrow(/External message not accepted|exit code 16120/i);
     expect((await vault.getGetUser(attacker.address)).exists).toBe(false);
 
     await registerHybrid(vault, user);
@@ -174,7 +213,7 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
   });
 
   it('VAULT-REJECT: invalid suite/key profile is rejected without mutating current key', async () => {
-    const { vault, user } = await setup();
+    const { blockchain, vault, user } = await setup();
 
     await vault.send(user.getSender(), { value: toNano('0.1') }, {
       $$type: 'RegisterMessagingKeys',
@@ -189,30 +228,29 @@ describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
     expect((await vault.getGetUser(user.address)).exists).toBe(false);
 
     await registerHybrid(vault, user);
+    await depositTon(vault, user);
     const keyId = (await vault.getGetUser(user.address)).current_key_id;
 
-    await vault.send(user.getSender(), { value: toNano('0.1') }, {
-      $$type: 'ReplaceMessagingKeys',
+    await replaceHybrid(blockchain, vault, user, {
       enc_pubkey: ENC_1,
       sign_pubkey: SIG_1,
       pq_kem_pubkey_hash: 0n,
       pq_kem_pubkey_len: 0n,
       pq_kem_pubkey: beginCell().endCell(),
       crypto_suite_mask: 2n,
-    } as ReplaceMessagingKeys);
+    });
 
     expect((await vault.getGetUser(user.address)).current_key_id).toBe(keyId);
     expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
 
-    await vault.send(user.getSender(), { value: toNano('0.1') }, {
-      $$type: 'ReplaceMessagingKeys',
+    await replaceHybrid(blockchain, vault, user, {
       enc_pubkey: ENC_1,
       sign_pubkey: SIG_1,
       pq_kem_pubkey_hash: PQ_HASH,
       pq_kem_pubkey_len: 1184n,
       pq_kem_pubkey: beginCell().storeBuffer(Buffer.alloc(32, 0x99)).endCell(),
       crypto_suite_mask: 2n,
-    } as ReplaceMessagingKeys);
+    });
 
     expect((await vault.getGetUser(user.address)).current_key_id).toBe(keyId);
     expect((await vault.getGetGlobal()).key_record_count).toBe(1n);
