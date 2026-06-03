@@ -484,6 +484,8 @@ const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
 });
 const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
 const VAULT_PUBLISH_NONCE_POLL_MS = 1_500;
+const PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS = 90_000;
+const PAYMENT_CHECK_CLAIM_POLL_MS = 1_500;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
 const PLATO_PUBLIC_POST_FEE_NANOTONS = 10_000_000n;
 const PLATO_MIN_PROTOCOL_FEE_NANOTONS = 0n;
@@ -6969,19 +6971,40 @@ function renderConversation() {
     if (message.payment) {
       const actions = document.createElement('div');
       actions.className = 'payment-actions';
-      if (message.type !== 'out') {
+      const paymentMetaText = String(message.meta ?? '').toLowerCase();
+      const paymentActionPending = paymentMetaText.includes('claim submitted')
+        || paymentMetaText.includes('claim confirming')
+        || paymentMetaText.includes('claim signing')
+        || paymentMetaText.includes('check claimed');
+      const paymentActionTerminal = paymentMetaText.includes('already claimed')
+        || paymentMetaText.includes('cancelled')
+        || paymentMetaText.includes('another wallet');
+      if (message.type !== 'out' && !paymentActionPending && !paymentActionTerminal) {
         const claim = document.createElement('button');
         claim.type = 'button';
         claim.textContent = 'Claim';
         claim.addEventListener('click', async () => {
           claim.disabled = true;
           try {
-            await submitVaultClaimPaymentCheck(message.payment);
+            message.meta = 'check claim signing';
+            renderConversation();
+            await updateMessageInEncryptedHistory(thread, message);
+            await submitVaultClaimPaymentCheck(message.payment, {
+              onStatus: async (status) => {
+                message.meta = status;
+                await updateMessageInEncryptedHistory(thread, message);
+                renderConversation();
+              },
+            });
             message.meta = 'check claimed';
           } catch (error) {
-            message.meta = 'check already claimed or cancelled';
-            console.error(error);
+            message.meta = isPaymentCheckClaimPending(error)
+              ? 'check claim submitted, confirming'
+              : paymentCheckClaimBlockedStatus(error);
+            if (!isPaymentCheckClaimPending(error)) console.error(error);
           } finally {
+            await updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+            queueVaultPostTransactionRefresh();
             renderConversation();
           }
         });
@@ -8877,6 +8900,93 @@ function paymentSecret32(payment) {
   return BigInt(`0x${payment.secret32Hex}`);
 }
 
+function paymentAssetVaultBalance(user, asset) {
+  const value = typeof asset === 'bigint' ? asset : BigInt(asset ?? 0);
+  return value === RECEIVE_ASSETS.ATH
+    ? nonNegativeBigInt(user?.ath_balance ?? user?.athBalance ?? user?.ath)
+    : vaultTonBalanceNanotons(user);
+}
+
+function paymentCheckClaimPendingError(message = 'Payment check claim submitted; Vault confirmation is still pending') {
+  const error = new Error(message);
+  error.code = 'PLATHO_PAYMENT_CHECK_CLAIM_PENDING';
+  return error;
+}
+
+function isPaymentCheckClaimPending(error) {
+  return error?.code === 'PLATHO_PAYMENT_CHECK_CLAIM_PENDING';
+}
+
+function paymentCheckClaimBlockedStatus(error) {
+  const text = String(error?.message ?? error ?? '');
+  if (/already claimed|cancelled|does not exist|not found/i.test(text)) return 'check already claimed or cancelled';
+  if (/another wallet|recipient/i.test(text)) return 'check is for another wallet';
+  if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
+  return 'check claim blocked';
+}
+
+function assertReceiveIntentMatchesPayment(intent, payment) {
+  if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
+  const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  if (!sameWalletAddress(intent.recipient_wallet, connectedWallet)) {
+    throw new Error('Payment check is for another wallet');
+  }
+  if (BigInt(intent.asset ?? 0n) !== BigInt(payment.asset ?? 0n)) {
+    throw new Error('Payment check asset mismatch');
+  }
+  if (BigInt(intent.amount ?? 0n) !== BigInt(payment.amount ?? 0n)) {
+    throw new Error('Payment check amount mismatch');
+  }
+}
+
+async function readFreshReceiveIntent(provider, intentId) {
+  if (!provider?.getReceiveIntent) throw new Error('Vault provider cannot confirm payment checks');
+  return provider.getReceiveIntent(intentId, {
+    vaultAddress: requireVaultAddress(),
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+}
+
+async function readFreshConnectedVaultUser(provider) {
+  return loadConnectedVaultUser({
+    provider,
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+}
+
+async function waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser) {
+  const intentId = paymentIntentId(payment);
+  const asset = BigInt(payment.asset ?? 0n);
+  const amount = BigInt(payment.amount ?? 0n);
+  const beforeBalance = paymentAssetVaultBalance(beforeUser, asset);
+  const expectedBalance = beforeBalance + amount;
+  const deadline = Date.now() + PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS;
+  let lastIntent = null;
+  let lastUser = beforeUser;
+  while (Date.now() <= deadline) {
+    try {
+      lastIntent = await readFreshReceiveIntent(provider, intentId);
+      lastUser = await readFreshConnectedVaultUser(provider);
+      const balance = paymentAssetVaultBalance(lastUser, asset);
+      if (lastIntent?.exists === false && balance >= expectedBalance) {
+        rememberConnectedVaultUser(lastUser);
+        return { intent: lastIntent, user: lastUser, balance };
+      }
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) throw error;
+    }
+    await delay(PAYMENT_CHECK_CLAIM_POLL_MS);
+  }
+  if (lastIntent?.exists === false) {
+    throw new Error('Payment check disappeared but Vault balance did not update');
+  }
+  throw paymentCheckClaimPendingError();
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -10345,17 +10455,32 @@ async function submitCreatePaymentCheck(options = {}) {
   return { createResult, payment, capsule };
 }
 
-async function submitVaultClaimPaymentCheck(payment) {
-  const user = await loadConnectedVaultUser().catch(() => ({ exists: false }));
+async function submitVaultClaimPaymentCheck(payment, options = {}) {
+  const provider = await resolveVaultChainProvider();
+  if (!provider?.getReceiveIntent || !provider?.getUser) {
+    throw new Error('Vault provider cannot confirm payment checks');
+  }
+  const intentId = paymentIntentId(payment);
+  const beforeUser = await readFreshConnectedVaultUser(provider);
+  const intent = await readFreshReceiveIntent(provider, intentId);
+  assertReceiveIntentMatchesPayment(intent, payment);
   setText(identitySubtitle, 'claim signing');
+  await options.onStatus?.('check claim signing');
   const result = await submitVaultMessage('ClaimReceiveIntent', {
-    intent_id: paymentIntentId(payment),
+    intent_id: intentId,
     secret32: paymentSecret32(payment),
   }, {
-    recipientUserExists: user.exists === true,
+    recipientUserExists: beforeUser.exists === true,
   });
-  flashWalletIdentityStatus('check claimed');
-  return result;
+  setText(identitySubtitle, 'claim confirming');
+  await options.onStatus?.('check claim submitted, confirming');
+  const confirmed = await waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser);
+  const claimedAmountText = BigInt(payment.asset ?? 0n) === RECEIVE_ASSETS.TON
+    ? formatTonNanotons(BigInt(payment.amount ?? 0n))
+    : formatAtomicAmount(payment.amount);
+  flashWalletIdentityStatus(`check claimed +${claimedAmountText} ${paymentAssetLabel(payment.asset)}`);
+  queueVaultPostTransactionRefresh();
+  return { result, confirmed };
 }
 
 async function submitVaultCancelPaymentCheck(payment) {
