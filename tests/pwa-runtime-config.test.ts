@@ -989,6 +989,20 @@ describe('PWA runtime config guard', () => {
     expect(prepareSource).toMatch(/async function prepareCapsulesThroughVault[\s\S]*requireNoPendingServiceWorkerAppShellReload\(\)/);
   });
 
+  it('PWA-ACTIVATION-01: transient Vault provider errors do not clear an active composer binding', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const activationSource = app.slice(
+      app.indexOf('async function refreshVaultActivationStatus'),
+      app.indexOf('async function bootCrypto'),
+    );
+
+    expect(app).toMatch(/function hasCurrentWalletVaultBinding\(\)/);
+    expect(activationSource).toMatch(/const expectedUnavailable = isExpectedVaultProviderUnavailable\(error\)/);
+    expect(activationSource).toMatch(/const keepCurrentBinding = expectedUnavailable && hasCurrentWalletVaultBinding\(\)/);
+    expect(activationSource).toMatch(/if \(!keepCurrentBinding\) delete globalThis\.plathoVaultBinding/);
+    expect(activationSource).toMatch(/setText\(vaultRecordStatus, keepCurrentBinding[\s\S]*\? 'activated'/);
+  });
+
   it('PWA-CAPSULE-ENTRY-VERIFY-01: CapsuleHub entry reads are fresh verified before body/history trust', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const criticalMethods = PLATHO_APP_CONFIG.network.tonRpc.criticalMethods;
@@ -1545,7 +1559,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/refreshVaultNavBalanceInBackground\(\)[\s\S]*\.finally\(\(\) => scheduleVaultAutoRefresh\(\)\)/);
     expect(dashboardSource).toMatch(/isExpectedVaultProviderUnavailable\(userError\)/);
     expect(dashboardSource).toMatch(/vaultProviderStatusForError\(userError\)/);
-    expect(activationSource).toMatch(/if \(!isExpectedVaultProviderUnavailable\(error\)\) console\.error\(error\)/);
+    expect(activationSource).toMatch(/if \(!expectedUnavailable\) console\.error\(error\)/);
     expect(activationSource).toMatch(/keyRecord: null/);
   });
 
@@ -1647,11 +1661,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v312/);
+    expect(sw).toMatch(/platho-pwa-prototype-v313/);
     expect(sw).toMatch(/\.\/styles\.css\?v=125/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=252/);
+    expect(sw).toMatch(/\.\/app\.js\?v=253/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=45/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
