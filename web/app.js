@@ -5730,6 +5730,20 @@ function privateSendBlockedStatusText(error) {
   return `not sent: ${privateSendPreflightStatusText(error)}`;
 }
 
+function canEditPrivateComposerDraft(thread = activeThread()) {
+  return Boolean(thread)
+    && thread.readOnly !== true
+    && Boolean(plathoWallet);
+}
+
+function canAttemptPrivateSend(thread = activeThread()) {
+  return canEditPrivateComposerDraft(thread)
+    && Boolean(localIdentity && localRecipientKeyPair && localSignedPublicBundle)
+    && pendingServiceWorkerAppShellReload !== true
+    && !tonRpcLimited()
+    && !privateComposerKnownVaultTonShortfall();
+}
+
 function isTonRpcTransientError(error) {
   const message = String(error?.message ?? error ?? '');
   return isTonRpcRateLimitError(error)
@@ -6232,8 +6246,7 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
 function refreshPrivateSendButtonState() {
   if (!sendButton) return;
   const thread = activeThread();
-  const privateReadOnly = !thread || thread.readOnly === true;
-  sendButton.disabled = privateReadOnly || !plathoWallet || !hasActivePlathoAccount() || pendingServiceWorkerAppShellReload || tonRpcLimited() || privateComposerKnownVaultTonShortfall();
+  sendButton.disabled = !canAttemptPrivateSend(thread);
 }
 
 function refreshPublicSendButtonState() {
@@ -6867,7 +6880,8 @@ function refreshMessagingControls() {
   const appShellReloadPending = pendingServiceWorkerAppShellReload === true;
   const signedActionsReady = accountActive && !appShellReloadPending;
   const thread = activeThread();
-  const canComposePrivate = Boolean(thread) && thread.readOnly !== true && Boolean(plathoWallet) && signedActionsReady;
+  const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
+  const canSendPrivate = canAttemptPrivateSend(thread);
   const hasStoredWallet = hasStoredPlathoWalletRecord();
   const hasKnownWallet = Boolean(plathoWallet || hasStoredWallet);
   if (createWalletButton) createWalletButton.disabled = false;
@@ -6904,13 +6918,13 @@ function refreshMessagingControls() {
   if (mintUsernameButton) mintUsernameButton.disabled = !plathoWallet || !signedActionsReady;
   if (linkUsernameButton) linkUsernameButton.disabled = !plathoWallet || !signedActionsReady;
   if (setAvatarButton) setAvatarButton.disabled = !plathoWallet || !signedActionsReady;
-  if (paymentCheckButton) paymentCheckButton.disabled = !canComposePrivate;
-  if (privateImageButton) privateImageButton.disabled = !canComposePrivate;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = !canComposePrivate;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = !canComposePrivate;
+  if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
+  if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = !canEditPrivateDraft;
   if (privateSenderModeSelect) privateSenderModeSelect.disabled = !plathoWallet;
   if (messageInput) {
-    messageInput.disabled = !canComposePrivate;
+    messageInput.disabled = !canEditPrivateDraft;
   }
   if (sendButton) {
     refreshPrivateSendButtonState();
@@ -7068,22 +7082,20 @@ function renderConversation() {
   activeSubtitle.textContent = conversationSubtitleText(thread);
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
-  const canComposePrivate = !isReadOnly
-    && Boolean(plathoWallet)
-    && hasActivePlathoAccount()
-    && pendingServiceWorkerAppShellReload !== true;
+  const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
+  const canSendPrivate = canAttemptPrivateSend(thread);
 
   if (composer) composer.dataset.readOnly = isReadOnly ? 'true' : 'false';
   refreshComposerPublishPolicy();
   if (messageInput) {
-    messageInput.disabled = !canComposePrivate;
+    messageInput.disabled = !canEditPrivateDraft;
     messageInput.placeholder = privateComposerPlaceholder({ readOnly: isReadOnly });
   }
-  if (sendButton) sendButton.disabled = !canComposePrivate;
-  if (paymentCheckButton) paymentCheckButton.disabled = !canComposePrivate;
-  if (privateImageButton) privateImageButton.disabled = !canComposePrivate;
-  if (privateComposerAddButton) privateComposerAddButton.disabled = !canComposePrivate;
-  if (privateAnonymousButton) privateAnonymousButton.disabled = !canComposePrivate;
+  if (sendButton) sendButton.disabled = !canSendPrivate;
+  if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
+  if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
+  if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
+  if (privateAnonymousButton) privateAnonymousButton.disabled = !canEditPrivateDraft;
   if (privateImageModeSelect) privateImageModeSelect.disabled = isReadOnly || !plathoWallet;
 
   refreshPrivateSendButtonState();
@@ -7619,7 +7631,7 @@ publicComposerCommentsCheckbox?.addEventListener('change', () => {
 paymentCheckButton?.addEventListener('click', async () => {
   try {
     hidePrivateComposerAddMenu();
-    if (!plathoWallet || !hasActivePlathoAccount()) {
+    if (!canAttemptPrivateSend()) {
       refreshComposerPublishPolicy();
       return;
     }
@@ -7633,14 +7645,14 @@ paymentCheckButton?.addEventListener('click', async () => {
     refreshMessagingControls();
     console.error(error);
   } finally {
-    paymentCheckButton.disabled = !plathoWallet || !hasActivePlathoAccount();
+    paymentCheckButton.disabled = !canAttemptPrivateSend();
   }
 });
 
 privateComposerAddButton?.addEventListener('click', (event) => {
   event.preventDefault();
   event.stopPropagation();
-  if (!plathoWallet || !hasActivePlathoAccount()) {
+  if (!canEditPrivateComposerDraft()) {
     refreshComposerPublishPolicy();
     return;
   }
@@ -7709,7 +7721,7 @@ publicMessageInput?.addEventListener('keydown', (event) => {
 
 privateImageButton?.addEventListener('click', () => {
   hidePrivateComposerAddMenu();
-  if (!plathoWallet || !hasActivePlathoAccount()) {
+  if (!canEditPrivateComposerDraft()) {
     refreshComposerPublishPolicy();
     return;
   }
