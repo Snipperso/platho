@@ -1333,8 +1333,8 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function renderConversation'),
       app.indexOf('async function openImageLightbox'),
     );
-    const readUserIndex = claimSource.indexOf('const beforeUser = await readFreshConnectedVaultUser(provider)');
-    const readIntentIndex = claimSource.indexOf('const intent = await readFreshReceiveIntent(provider, intentId)');
+    const readUserIndex = claimSource.indexOf('const beforeUser = await readFreshConnectedVaultUserForOwnVaultAction(provider)');
+    const readIntentIndex = claimSource.indexOf('const intent = await readFreshReceiveIntentForOwnVaultAction(provider, intentId)');
     const assertIntentIndex = claimSource.indexOf('assertReceiveIntentMatchesPayment(intent, payment)');
     const submitIndex = claimSource.indexOf("submitVaultReceiveIntentExternal('ClaimReceiveIntent'");
     const waitIndex = claimSource.indexOf('waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser)');
@@ -1347,16 +1347,21 @@ describe('PWA runtime config guard', () => {
     expect(waitIndex).toBeGreaterThan(submitIndex);
     expect(flashIndex).toBeGreaterThan(waitIndex);
     expect(claimSource).not.toMatch(/readFreshConnectedVaultUser\(provider\)\.catch/);
-    expect(claimSource).not.toMatch(/ForCancel/);
+    expect(claimSource).toMatch(/allowPendingServiceWorkerUpdate:\s*true/);
+    expect(claimSource).toMatch(/allowUnverifiedNonceWait:\s*true/);
     expect(helpers).toMatch(/provider\.getReceiveIntent\(intentId,\s*\{[\s\S]*verify:\s*options\.verify !== false[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
     expect(helpers).toMatch(/loadConnectedVaultUser\(\{[\s\S]*verify:\s*options\.verify !== false[\s\S]*priority:\s*'critical'[\s\S]*cacheTtlMs:\s*0/);
     expect(helpers).not.toMatch(/vaultAthBalanceAtomic/);
     expect(helpers).toMatch(/ath_balance \?\? user\?\.athBalance \?\? user\?\.ath/);
+    expect(helpers).toMatch(/function readFreshReceiveIntentForOwnVaultAction/);
+    expect(helpers).toMatch(/waitForPaymentCheckClaimConfirmation[\s\S]*readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)/);
+    expect(helpers).toMatch(/waitForPaymentCheckClaimConfirmation[\s\S]*readFreshConnectedVaultUserForOwnVaultAction\(provider\)/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
     expect(helpers).toMatch(/Payment check disappeared but Vault balance did not update/);
     expect(renderSource).toMatch(/onStatus:\s*async \(status\)/);
     expect(renderSource).toMatch(/check claim submitted, confirming/);
     expect(renderSource).toMatch(/paymentCheckClaimBlockedStatus\(error\)/);
+    expect(helpers).toMatch(/return `check claim blocked: \$\{shortUiErrorText\(error, 'blocked'\)\}`/);
   });
 
   it('PWA-CONFIG-01D4C: payment check cancel verifies sender and persists terminal state', () => {
@@ -1964,11 +1969,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v339/);
+    expect(sw).toMatch(/platho-pwa-prototype-v340/);
     expect(sw).toMatch(/\.\/styles\.css\?v=126/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=277/);
+    expect(sw).toMatch(/\.\/app\.js\?v=278/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=50/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=6/);
