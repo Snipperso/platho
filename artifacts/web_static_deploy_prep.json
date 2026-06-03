@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-03T18:05:54.206Z",
+  "generatedAt": "2026-06-03T18:12:57.844Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 128,
-    "totalBytes": 2843946,
-    "bundleSha256": "31f1a11218f17ca74097855226f2d6a6bc6854cfe086b14bd4ca3406f5f14e0c",
+    "totalBytes": 2844474,
+    "bundleSha256": "a7bb11f8ec01eb2581a7b045c5964ed1ea5273b0e13f33e8f1a6a622cb129705",
     "files": [
       {
         "path": "app.js",
@@ -189,8 +189,8 @@
       },
       {
         "path": "docs/ath-whitepaper.md",
-        "bytes": 26669,
-        "sha256": "9b6a93b0530367d19aa6081ae09f16f600c8e34a476d135bb35ac6276c28ebc8"
+        "bytes": 27197,
+        "sha256": "62085d458cc21b22cbd9bbef87689b8a3e53c2eb6ca480d65c719adb42550a8c"
       },
       {
         "path": "docs/crypto-protocol.md",
@@ -265,7 +265,7 @@
       {
         "path": "sw.js",
         "bytes": 5248,
-        "sha256": "f9c6f8efe9106a4299ab2a3df658e1cc6711fc8068d1676776b202804873418e"
+        "sha256": "71587915a2060e67318caa78690633d4959ffdb228cadaf688c9dbefb3913a3d"
       },
       {
         "path": "ton-dns-provider.mjs",

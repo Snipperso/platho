@@ -70,9 +70,9 @@ This allocation defines the economic structure of Platho:
 - 15% of supply is distributed to users through application activity before the pool launch.
 - 15% of supply is used for initial liquidity.
 - 10% of supply is locked in immutable long-term vesting.
-- 60% of supply is placed in MarketStabilitySeller and sold in tranches above the launch price.
+- 60% of supply is reserved for MarketStabilitySeller and sold in tranches above the launch price after the post-pool pricing freeze and reserve-funding readiness gate.
 
-The activity airdrop, long-term vesting reserve, and market stability reserve are backed by real ATH wallet balances of the corresponding contracts. The release verifier checks these balances before final launch.
+The activity airdrop and long-term vesting reserve are backed at final genesis by the official ATH wallets of Vault and ATHVesting, and the release verifier checks those balances before production release. The `60,000,000 ATH` market-stability allocation is reserved for MarketStabilitySeller, but it is not funded into the seller at final genesis. Seller funding happens only after pool launch, the one-time evidence-bound pricing freeze, and the bound reserve-funder notify-flow; seller readiness is valid only after `reserve_due_ath`, `reserve_funded_total_ath`, and the official seller ATH wallet backing are verified.
 
 ## Long-Term Protocol Vesting
 
@@ -421,7 +421,7 @@ MarketStabilitySeller is a public contract reserve that distributes ATH after th
 
 Its purpose is to reduce the early-market distortion caused by thin liquidity. At launch, a small pool can be moved sharply by a small group of early buyers. If that happens, users who need ATH for actual Platho actions can be forced to buy into an artificial price spike.
 
-MarketStabilitySeller creates a transparent supply staircase above the launch price. It sells ATH in fixed-size tranches. Each next tranche is more expensive than the previous one, and each tranche has a hard size limit. The price is not changed manually and does not depend on discretionary team decisions.
+MarketStabilitySeller creates a transparent supply staircase above the launch price. It sells ATH in fixed-size tranches. Each next tranche is more expensive than the previous one, and each tranche has a hard size limit. After the one-time evidence-bound pricing freeze, the tranche schedule is deterministic and cannot be manually changed by the team.
 
 If early speculators try to absorb a large amount of ATH, they buy from the public reserve at increasing tranche prices instead of extracting all cheap liquidity from a thin pool and reselling it to users. If ordinary users need ATH for Platho, they can buy it at a known public tranche price without pushing a small pool vertically with a single demand wave.
 
