@@ -55,6 +55,31 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
   VAULT_CODE_HASH: 'vault',
 };
 
+const CONTRACT_TO_CURRENT_CODE_HASH_KEY = {
+  ATHMaster: 'ATHMASTER_CODE_HASH',
+  ATHVesting: 'ATHVESTING_CODE_HASH',
+  BuybackBurn: 'BUYBACKBURN_CODE_HASH',
+  MarketStabilitySeller: 'MARKET_STABILITY_SELLER_CODE_HASH',
+  CapsuleHub: 'CAPSULEHUB_CODE_HASH',
+  FeeAccumulator: 'FEEACCUMULATOR_CODE_HASH',
+  ProfileRegistry: 'PROFILE_REGISTRY_CODE_HASH',
+  UsernameNFTItem: 'USERNAME_NFT_ITEM_CODE_HASH',
+  UsernameRegistry: 'USERNAME_REGISTRY_CODE_HASH',
+  Vault: 'VAULT_CODE_HASH',
+};
+
+const DEPLOY_ACTION_TO_CONTRACT = {
+  'Deploy ATHMaster': 'ATHMaster',
+  'Deploy ATHVesting': 'ATHVesting',
+  'Deploy BuybackBurn': 'BuybackBurn',
+  'Deploy MarketStabilitySeller': 'MarketStabilitySeller',
+  'Deploy CapsuleHub': 'CapsuleHub',
+  'Deploy FeeAccumulator': 'FeeAccumulator',
+  'Deploy ProfileRegistry': 'ProfileRegistry',
+  'Deploy UsernameRegistry': 'UsernameRegistry',
+  'Deploy Vault': 'Vault',
+};
+
 function readTextIfExists(file) {
   const path = join(ROOT, file);
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
@@ -173,6 +198,77 @@ function validateSingleDeployTruthSource() {
       id: 'RELEASE_TRUTH_SPLIT_NON_FINAL_MANIFEST',
       file: 'artifacts/deployment_manifest_implemented_subset_m15.json',
       message: 'MAINNET_GENESIS_VERIFIED=true cannot coexist with a current non-final implemented-subset deployment manifest.',
+    });
+  }
+}
+
+function validateLocalMainnetDeployArtifacts() {
+  const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
+  if (!currentText) return;
+  const currentCodeHashes = parseKeyValueLines(currentText);
+
+  const draft = readJsonIfExists('artifacts/local/mainnet_final_manifest_draft.json');
+  const draftMismatches = [];
+  if (draft) {
+    for (const [currentKey, manifestKey] of Object.entries(CURRENT_CODE_HASH_TO_MANIFEST_KEY)) {
+      const currentHash = normalizeHash(currentCodeHashes[currentKey]);
+      const manifestHash = normalizeHash(draft.manifest?.code_hashes?.[manifestKey]);
+      if (!currentHash || !manifestHash || currentHash !== manifestHash) {
+        draftMismatches.push(`${manifestKey}: current=${currentHash || 'missing'}, draft=${manifestHash || 'missing'}`);
+      }
+    }
+  }
+
+  if (draftMismatches.length > 0) {
+    failures.push({
+      id: 'LOCAL_MAINNET_FINAL_MANIFEST_STALE',
+      file: 'artifacts/local/mainnet_final_manifest_draft.json',
+      message: `Local final manifest draft is stale relative to CURRENT_CODE_HASHES.txt: ${draftMismatches.join('; ')}.`,
+    });
+  }
+
+  const deployPacket = readJsonIfExists('artifacts/local/mainnet_deploy_packet.json');
+  const deployMismatches = [];
+  if (deployPacket) {
+    for (const step of deployPacket.phase_1_deploy_contracts ?? []) {
+      const contract = DEPLOY_ACTION_TO_CONTRACT[step.action];
+      if (!contract) continue;
+      const currentKey = CONTRACT_TO_CURRENT_CODE_HASH_KEY[contract];
+      const currentHash = normalizeHash(currentCodeHashes[currentKey]);
+      const packetHash = normalizeHash(step.code_hash);
+      if (!currentHash || !packetHash || currentHash !== packetHash) {
+        deployMismatches.push(`${step.id} ${contract}: current=${currentHash || 'missing'}, packet=${packetHash || 'missing'}`);
+      }
+    }
+  }
+
+  if (deployMismatches.length > 0) {
+    failures.push({
+      id: 'LOCAL_MAINNET_DEPLOY_PACKET_STALE',
+      file: 'artifacts/local/mainnet_deploy_packet.json',
+      message: `Local mainnet deploy packet is stale relative to CURRENT_CODE_HASHES.txt: ${deployMismatches.join('; ')}.`,
+    });
+  }
+
+  const dryRunPacket = readJsonIfExists('artifacts/local/mainnet_tx_dry_run_packet.json');
+  const dryRunMismatches = [];
+  if (dryRunPacket) {
+    for (const step of dryRunPacket.deploy_contracts ?? []) {
+      const currentKey = CONTRACT_TO_CURRENT_CODE_HASH_KEY[step.contract];
+      if (!currentKey) continue;
+      const currentHash = normalizeHash(currentCodeHashes[currentKey]);
+      const packetHash = normalizeHash(step.state_init?.code_hash_hex);
+      if (!currentHash || !packetHash || currentHash !== packetHash) {
+        dryRunMismatches.push(`${step.id} ${step.contract}: current=${currentHash || 'missing'}, dry_run=${packetHash || 'missing'}`);
+      }
+    }
+  }
+
+  if (dryRunMismatches.length > 0) {
+    failures.push({
+      id: 'LOCAL_MAINNET_TX_DRY_RUN_PACKET_STALE',
+      file: 'artifacts/local/mainnet_tx_dry_run_packet.json',
+      message: `Local mainnet tx dry-run packet is stale relative to CURRENT_CODE_HASHES.txt: ${dryRunMismatches.join('; ')}.`,
     });
   }
 }
@@ -408,6 +504,7 @@ for (const check of envChecks) {
 }
 
 validateMainnetGenesisEvidence();
+validateLocalMainnetDeployArtifacts();
 validateCspImportMapHash();
 validatePublishReservePricingArtifact();
 

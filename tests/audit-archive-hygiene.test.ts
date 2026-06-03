@@ -38,4 +38,17 @@ describe('audit archive hygiene', () => {
     expect(runbook).toMatch(/npm\.cmd run audit:archive/);
     expect(runbook).toMatch(/archive hygiene guard/);
   });
+
+  it('RUNBOOK-DEPLOY-01: deployment runbook lists every generated pre-seal binding message', () => {
+    const runbook = readFileSync('DEPLOYMENT_RUNBOOK.md', 'utf8');
+    const packet = JSON.parse(readFileSync('artifacts/local/mainnet_deploy_packet.json', 'utf8'));
+    const bindingMessages = packet.phase_2_pre_seal_bindings
+      .map((step: { message?: string }) => step.message)
+      .filter(Boolean);
+
+    expect(bindingMessages.length).toBeGreaterThan(0);
+    for (const message of bindingMessages) {
+      expect(runbook, message).toContain(`\`${message}\``);
+    }
+  });
 });
