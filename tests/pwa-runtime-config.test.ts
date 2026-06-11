@@ -243,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v416<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v416'/);
+    expect(html).toMatch(/id="appVersionLabel">v417<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v417'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1074,7 +1074,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
       app.indexOf('async function publishCapsulesThroughVault'),
     );
-    const nonceReadIndex = sendSource.indexOf('const clientNonce = options.allowOwnVaultActionReadFallback === true');
+    const nonceReadIndex = sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true');
     const buildIndex = sendSource.indexOf('item.external = await buildVaultBalancePublishExternalBoc');
     const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(item.external)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
@@ -1084,7 +1084,7 @@ describe('PWA runtime config guard', () => {
     const finalBarrierIndex = sendSource.indexOf('installVaultPublishNonceBarrier');
     const partialIndex = sendSource.indexOf('vaultPublishPartialError');
     const clientNonceSource = sendSource.slice(
-      sendSource.indexOf('const clientNonce = options.allowOwnVaultActionReadFallback === true'),
+      sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true'),
       sendSource.indexOf('if (clientNonce === null)'),
     );
     const nonceWaitSource = app.slice(
@@ -1107,6 +1107,20 @@ describe('PWA runtime config guard', () => {
     // Back-to-back signed actions serialize on the publish nonce barrier
     // instead of blocking the final part's CapsuleHub confirmation.
     expect(sendSource).toMatch(/await awaitVaultPublishNonceBarrier\(\)/);
+    // Monotonic per-owner nonce floor: a lagging replica must never make the
+    // client sign below an observed/consumed nonce (burst-send race), and a
+    // broadcast consumes its nonce immediately from the client's view.
+    expect(sendSource).toMatch(/const nonceFloor = vaultPublishNonceFloor\(owner\)/);
+    expect(sendSource).toMatch(/if \(clientNonce < nonceFloor\) clientNonce = nonceFloor/);
+    expect(sendSource).toMatch(/raiseVaultPublishNonceFloor\(owner, clientNonce \+ 1n\)/);
+    expect(app).toMatch(/function raiseVaultPublishNonceFloor\(owner, nonce\)/);
+    // Wedged-part recovery: when the chain nonce moved past a signed part and
+    // the sender index proves the entry never landed, the part is reset and
+    // re-signed with a fresh nonce instead of staying "confirming" forever.
+    expect(app).toMatch(/async function recoverDroppedSignedPublishParts\(message\)/);
+    expect(app).toMatch(/async function provePublishPartAbsentFromSenderIndex\(publishState, part\)/);
+    expect(app).toMatch(/confirmedBy:\s*'dropped_recovery_scan'/);
+    expect(app).toMatch(/if \(chainNonce <= clientNonce\) continue/);
     expect(sendSource).toMatch(/installVaultPublishNonceBarrier\(\(async \(\) => \{/);
     expect(sendSource).toMatch(/if \(part && part\.status === PUBLISH_PART_STATUS_SENT\)/);
     expect(sendSource).toMatch(/readVaultPublishNonceForOwnVaultAction\(provider, owner\)/);
@@ -1959,6 +1973,7 @@ describe('PWA runtime config guard', () => {
     expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntries\(publishState, options = \{\}\)[\s\S]*return confirmCapsuleHubPublishEntriesWithReadMode\(publishState, options\.hot === true/);
     expect(confirmationSource).toMatch(/if \(options\.skipAckHistory !== true\)[\s\S]*confirmCapsuleHubPublishEntriesFromVaultAckHistory/);
     expect(confirmationSource).toMatch(/scanLimit: options\.scanLimit \?\? CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT/);
+    expect(retrySource).toMatch(/await recoverDroppedSignedPublishParts\(message\)/);
     expect(retrySource).toMatch(/if \(message\.publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\)[\s\S]*schedulePrivatePublishConfirmationRetry\(context\)/);
     expect(retrySource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
     expect(retrySource).toMatch(/if \(!rateLimited && !softVerification\) console\.error\(error\)/);
@@ -2650,7 +2665,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function publishCapsulesThroughVault'),
     );
     const clientNonceSource = sendSource.slice(
-      sendSource.indexOf('const clientNonce = options.allowOwnVaultActionReadFallback === true'),
+      sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true'),
       sendSource.indexOf('if (clientNonce === null)'),
     );
     const authExternalSource = app.slice(
@@ -3706,11 +3721,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v479/);
+    expect(sw).toMatch(/platho-pwa-prototype-v480/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=416/);
+    expect(sw).toMatch(/\.\/app\.js\?v=417/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);

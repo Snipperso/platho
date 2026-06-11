@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v416';
+const PLATHO_APP_RUNTIME_VERSION = 'v417';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 window.addEventListener('error', (event) => {
@@ -464,6 +464,11 @@ let vaultPublishSendWaiters = 0;
 // back-to-back signed actions cannot race the strictly sequential contract
 // nonce while the previous external is still propagating.
 let pendingVaultPublishNonceBarrier = null;
+// Monotonic per-owner floor over every nonce this client has observed on
+// chain or consumed by broadcasting a signed external. A lagging RPC replica
+// can serve an older nonce; signing below the floor can only produce a
+// permanently rejected external racing one of our own in-flight messages.
+const vaultPublishNonceFloorByOwner = new Map();
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
@@ -522,6 +527,14 @@ const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 4 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 * 1000;
 const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 * 60 * 1000;
+// A signed publish external whose nonce the chain has already moved past can
+// never be accepted again. After this age, if the entry is provably absent
+// from the sender index back beyond the broadcast moment, the part is reset
+// and re-signed with a fresh nonce instead of staying wedged forever.
+const PRIVATE_PUBLISH_DROPPED_RECOVERY_AFTER_MS = 150 * 1000;
+const PRIVATE_PUBLISH_DROPPED_RECOVERY_SCAN_LIMIT = 48;
+const PRIVATE_PUBLISH_DROPPED_RECOVERY_MAX_RESIGNS = 3;
+const PRIVATE_PUBLISH_DROPPED_RECOVERY_BROADCAST_MARGIN_S = 180;
 const PRIVATE_OUTBOUND_SYNC_PAUSE_MS = 5 * 1000;
 const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho.private.chain.index.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
@@ -6347,6 +6360,18 @@ function installVaultPublishNonceBarrier(task) {
     if (pendingVaultPublishNonceBarrier === barrier) pendingVaultPublishNonceBarrier = null;
   });
   return barrier;
+}
+
+function vaultPublishNonceFloor(owner) {
+  const key = rawWalletAddress(owner) ?? String(owner ?? '');
+  return vaultPublishNonceFloorByOwner.get(key) ?? 0n;
+}
+
+function raiseVaultPublishNonceFloor(owner, nonce) {
+  if (nonce === null || nonce === undefined) return;
+  const key = rawWalletAddress(owner) ?? String(owner ?? '');
+  const current = vaultPublishNonceFloorByOwner.get(key) ?? 0n;
+  if (nonce > current) vaultPublishNonceFloorByOwner.set(key, nonce);
 }
 
 function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
@@ -13676,17 +13701,21 @@ async function submitVaultMessage(type, params, options = {}) {
 }
 
 async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, user, buildExternal }) {
-  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  let clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  const nonceFloor = vaultPublishNonceFloor(owner);
+  if (clientNonce < nonceFloor) clientNonce = nonceFloor;
   const external = await buildExternal(clientNonce);
   let result = null;
   let ambiguousBroadcast = false;
   let broadcastError = null;
   try {
     result = await sendVaultExternalBoc(external);
+    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
   } catch (error) {
     if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
     ambiguousBroadcast = true;
     broadcastError = error;
+    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
   }
   let nonceWaitError = null;
   try {
@@ -13773,7 +13802,9 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
     throw new Error('Activate Platho account before using payment checks');
   }
   requireVaultAuthSecretKey();
-  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  let clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  const nonceFloor = vaultPublishNonceFloor(owner);
+  if (clientNonce < nonceFloor) clientNonce = nonceFloor;
   const external = await buildVaultReceiveIntentExternalBoc(type, {
     ...params,
     owner_wallet: owner,
@@ -13788,10 +13819,12 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   let broadcastError = null;
   try {
     result = await sendVaultExternalBoc(external);
+    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
   } catch (error) {
     if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
     ambiguousBroadcast = true;
     broadcastError = error;
+    raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
   }
   globalThis.plathoLastVaultReceiveIntentExternal = {
     type,
@@ -15656,7 +15689,9 @@ async function readVaultPublishNonce(provider, owner, options = {}) {
     requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
     queueTimeoutMs: options.queueTimeoutMs,
   });
-  return BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  const nonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  raiseVaultPublishNonceFloor(owner, nonce);
+  return nonce;
 }
 
 async function readVaultPublishNonceForOwnVaultAction(provider, owner, options = {}) {
@@ -15846,10 +15881,32 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
       }
       notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
       try {
-        const clientNonce = options.allowOwnVaultActionReadFallback === true
+        let clientNonce = options.allowOwnVaultActionReadFallback === true
           ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
           : await readVaultPublishNonce(provider, owner);
         if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
+        const nonceFloor = vaultPublishNonceFloor(owner);
+        if (clientNonce < nonceFloor) {
+          // A lagging replica returned a nonce we already observed consumed
+          // (or consumed ourselves by broadcasting). Re-read briefly, then
+          // trust the monotonic floor: signing below it can only produce a
+          // permanently rejected external racing our own in-flight one.
+          const staleReadDeadline = Date.now() + 10_000;
+          while (clientNonce < nonceFloor && Date.now() < staleReadDeadline) {
+            await delay(500);
+            try {
+              const reread = await readVaultPublishNonce(provider, owner, {
+                verify: false,
+                allowUnverifiedCriticalRead: true,
+                requestTimeoutMs: 4_000,
+              });
+              if (reread !== null && reread > clientNonce) clientNonce = reread;
+            } catch (rereadError) {
+              if (!isTonRpcRecoverableReadError(rereadError) && !isTonRpcRateLimitError(rereadError)) throw rereadError;
+            }
+          }
+          if (clientNonce < nonceFloor) clientNonce = nonceFloor;
+        }
         item.clientNonce = clientNonce;
         const publishId = await computeVaultPublishId(owner, clientNonce, item.publish.body_hash, item.publish.publish_kind);
         item.publishId = publishId;
@@ -15877,6 +15934,9 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         }
         lastResult = await sendVaultExternalBoc(item.external);
         item.result = lastResult;
+        // The signed external is now out: this nonce is consumed from the
+        // client's point of view even before the chain reflects it.
+        raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
         notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
         if (shouldConfirmVaultPublishNonceAfterSend(index, results.length, options)) {
           const nonceWaitOptions = {
@@ -16197,6 +16257,130 @@ function markStaleUnconfirmedPublishPartsForRetry(message, reason = 'missing Cap
   const createdAtMs = messageCreatedAtMs(message) ?? publishStateUpdatedAtMs(publishState);
   if (createdAtMs !== null && Date.now() - createdAtMs < PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS) return 0;
   return markPublishStateAwaitingPartsForRetry(publishState, reason);
+}
+
+function publishPartSignedAndUnconfirmed(part) {
+  return (
+    part?.status === PUBLISH_PART_STATUS_SENT
+    || part?.status === PUBLISH_PART_STATUS_UNKNOWN
+    || part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+  )
+    && typeof part.externalBoc === 'string'
+    && part.externalBoc.length > 0
+    && part.clientNonce !== undefined
+    && part.clientNonce !== null;
+}
+
+// Walks the sender's own private index back past the part's broadcast moment.
+// Every accepted private entry of this sender is linked in that index, so a
+// completed walk without a payload match is proof the publish never landed.
+async function provePublishPartAbsentFromSenderIndex(publishState, part) {
+  if (!localRecipientKeyPair?.keyId) return 'inconclusive';
+  const resolved = await resolveCapsuleHubProvider();
+  if (!resolved) return 'inconclusive';
+  const { provider, address } = resolved;
+  const readOptions = publishConfirmReadOptions(address, { requestTimeoutMs: 6_000 });
+  const broadcastAtS = Math.floor(Date.parse(part.lastBroadcastAt ?? '') / 1000);
+  if (!Number.isFinite(broadcastAtS)) return 'inconclusive';
+  const cutoffS = broadcastAtS - PRIVATE_PUBLISH_DROPPED_RECOVERY_BROADCAST_MARGIN_S;
+  const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
+  let senderIndex = null;
+  try {
+    senderIndex = await provider.getPrivateSenderIndex(keyIdIndex, readOptions);
+  } catch {
+    return 'inconclusive';
+  }
+  let currentLink = privateIndexLatestLink(senderIndex);
+  let scanned = 0;
+  let reachedCutoff = false;
+  while (currentLink > 0n && scanned < PRIVATE_PUBLISH_DROPPED_RECOVERY_SCAN_LIMIT) {
+    const entryId = privateIndexEntryIdFromLink(currentLink);
+    if (entryId === null) break;
+    let entry = null;
+    try {
+      entry = await provider.getPrivateEntry(entryId, readOptions);
+    } catch {
+      return 'inconclusive';
+    }
+    if (!entry?.exists) break;
+    if (publishEntryMatchesPart(entry, part, { allowPublishIdMismatch: true })) {
+      setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+        entryId: String(entry.entry_id ?? entryId),
+        confirmedBy: 'dropped_recovery_scan',
+        error: null,
+      });
+      return 'found';
+    }
+    const createdAt = Number(entry.created_at ?? entry.createdAt ?? 0);
+    if (Number.isFinite(createdAt) && createdAt > 0 && createdAt < cutoffS) {
+      reachedCutoff = true;
+      break;
+    }
+    const previousLink = privateIndexPreviousLink(entry, 'sender');
+    if (previousLink === currentLink) break;
+    currentLink = previousLink;
+    scanned += 1;
+  }
+  // Absence is proven when the walk got past the broadcast window, or the
+  // index simply has no entries newer than it.
+  if (reachedCutoff || currentLink <= 0n) return 'absent';
+  return 'inconclusive';
+}
+
+// Recovers parts wedged by a dropped/raced publish external: the chain nonce
+// moved past the signed nonce (a re-broadcast can never be accepted again),
+// and the entry is provably absent from the sender index. Such parts are
+// reset to BUILT so the normal send path re-signs them with a fresh nonce.
+async function recoverDroppedSignedPublishParts(message) {
+  const publishState = message?.publishState;
+  const candidates = (publishState?.parts ?? []).filter((part) => publishPartSignedAndUnconfirmed(part)
+    && publishPartLastBroadcastAgeMs(part) >= PRIVATE_PUBLISH_DROPPED_RECOVERY_AFTER_MS
+    && (Number(part.droppedRecoveryCount ?? 0) || 0) < PRIVATE_PUBLISH_DROPPED_RECOVERY_MAX_RESIGNS);
+  if (candidates.length === 0) return { resigned: 0, confirmed: 0 };
+  let chainNonce = null;
+  try {
+    const provider = await resolveVaultChainProvider();
+    const owner = requirePlathoWalletAddress();
+    chainNonce = await readVaultPublishNonce(provider, owner, {
+      ignoreNonceBarrier: true,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      requestTimeoutMs: 6_000,
+    });
+  } catch {
+    return { resigned: 0, confirmed: 0 };
+  }
+  if (chainNonce === null) return { resigned: 0, confirmed: 0 };
+  let resigned = 0;
+  let confirmed = 0;
+  for (const part of candidates) {
+    let clientNonce = null;
+    try {
+      clientNonce = BigInt(part.clientNonce);
+    } catch {
+      continue;
+    }
+    // While the chain nonce has not moved past the signed nonce, the
+    // existing re-broadcast path can still land this exact external.
+    if (chainNonce <= clientNonce) continue;
+    const verdict = await provePublishPartAbsentFromSenderIndex(publishState, part);
+    if (verdict === 'found') {
+      confirmed += 1;
+      continue;
+    }
+    if (verdict !== 'absent') continue;
+    const previousStatus = part.status;
+    const droppedRecoveryCount = (Number(part.droppedRecoveryCount ?? 0) || 0) + 1;
+    clearPublishPartSignedAttempt(part);
+    setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_BUILT, {
+      error: null,
+      retryReason: 'publish external dropped on-chain; re-signing with a fresh nonce',
+      retryPreviousStatus: previousStatus,
+      droppedRecoveryCount,
+    });
+    resigned += 1;
+  }
+  return { resigned, confirmed };
 }
 
 function privateSendRetryKey(message) {
@@ -16575,7 +16759,11 @@ async function runPrivatePublishConfirmationRetry(context) {
       };
     const confirmStartedAt = Date.now();
     await confirmCapsuleHubPublishEntries(message.publishState, confirmOptions);
-    const retryableMissingParts = markStaleUnconfirmedPublishPartsForRetry(message, 'missing CapsuleHub entry');
+    const droppedRecovery = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+      ? { resigned: 0, confirmed: 0 }
+      : await recoverDroppedSignedPublishParts(message);
+    const retryableMissingParts = markStaleUnconfirmedPublishPartsForRetry(message, 'missing CapsuleHub entry')
+      + droppedRecovery.resigned;
     const sendRetryScheduled = ensurePendingPrivateSendRetry(thread, message, {
       code: 'NETWORK_ERROR',
       message: retryableMissingParts > 0
