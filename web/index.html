@@ -9,7 +9,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=127">
+    <link rel="stylesheet" href="./styles.css?v=140">
     <script type="importmap">
       {
         "imports": {
@@ -31,6 +31,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel">network</span>
+              <span class="app-version-label" id="appVersionLabel">v413</span>
             </div>
           </div>
         </div>
@@ -105,10 +106,14 @@
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
                 <span class="icon icon-open-app"></span>
               </button>
+              <button class="icon-button debug-copy-button" id="copyPrivateDebugButton" type="button" aria-label="Copy debug text" title="Copy debug text" disabled>
+                <span class="icon icon-copy"></span>
+              </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
               </button>
             </div>
+            <pre class="private-debug-log" id="privateDebugLog" hidden></pre>
           </header>
 
           <div class="message-strip" id="messageStrip" aria-live="polite"></div>
@@ -129,7 +134,7 @@
                 </button>
               </div>
             </div>
-            <button class="icon-button private-anonymous-button" id="privateAnonymousButton" type="button" aria-label="Send anonymously" title="Send anonymously" aria-pressed="false">
+            <button class="icon-button private-anonymous-button" id="privateAnonymousButton" type="button" aria-label="Send pseudonymously without wallet address" title="Pseudonymous: wallet address hidden, sender key may still link messages" aria-pressed="false">
               <span class="icon icon-eye-off"></span>
             </button>
             <input id="privateImageInput" type="file" accept="image/*" hidden>
@@ -386,12 +391,10 @@
               <h2>Public channels</h2>
               <div class="settings-list">
                 <label class="settings-select-row compact-select-row" for="publicSyncWindowSelect">
-                  <span>Visible history</span>
+                  <span>History sync</span>
                   <select id="publicSyncWindowSelect" aria-label="Public sync window">
-                    <option value="7">Latest 128 entries - up to 7 days</option>
-                    <option value="30">Latest 128 entries - up to 30 days</option>
-                    <option value="90">Latest 128 entries - up to 90 days</option>
-                    <option value="all">All retained history · slow sync</option>
+                    <option value="short">Short - newest 128 entries</option>
+                    <option value="long">Long - retained history, up to 1 year</option>
                   </select>
                 </label>
                 <label class="settings-select-row compact-select-row" for="publicCommentsDefaultSelect">
@@ -407,9 +410,9 @@
             <section class="profile-section" aria-label="Usernames and avatars">
               <h2>Usernames and Avatars</h2>
               <div class="settings-list">
-                <button id="mintUsernameButton" type="button"><span>Mint .ath name</span><strong>100-10k ATH + TON fee</strong></button>
+                <button id="mintUsernameButton" type="button"><span>Mint .ath name</span><strong class="profile-action-status" id="mintUsernameStatus">100-10k ATH + TON fee</strong></button>
                 <button id="linkUsernameButton" type="button"><span>Link .ath name</span><strong id="linkedUsernameStatus">verify</strong></button>
-                <button id="setAvatarButton" type="button"><span>Set avatar</span><strong>100 ATH + TON fee</strong></button>
+                <button id="setAvatarButton" type="button"><span>Set avatar</span><strong class="profile-action-status" id="setAvatarStatus">100 ATH + TON fee</strong></button>
                 <input id="profileAvatarInput" type="file" accept="image/*" hidden>
               </div>
             </section>
@@ -428,6 +431,7 @@
               </div>
               <div class="settings-list">
                 <button id="burnAthButton" type="button"><span>Burn ATH</span><strong>wallet</strong></button>
+                <button id="flushAthButton" type="button"><span>Flush ATH</span><strong class="profile-action-status" id="flushAthStatus">checking</strong></button>
               </div>
             </section>
             </div>
@@ -440,7 +444,7 @@
           <header>
             <div>
               <h2>New Chat</h2>
-              <p id="recipientHint">Use a wallet address, xxxx.ton, or xxxx.ath. Local label is only shown on this device.</p>
+              <p id="recipientHint">Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device.</p>
             </div>
             <button class="icon-button" id="closeNewChatButton" type="button" aria-label="Close" title="Close">
               <span aria-hidden="true">&times;</span>
@@ -448,7 +452,7 @@
           </header>
           <div class="action-field">
             <label for="recipientInput">Recipient</label>
-            <input id="recipientInput" type="text" spellcheck="false" autocomplete="off" placeholder="EQ..., xxxx.ton, or xxxx.ath">
+            <input id="recipientInput" type="text" spellcheck="false" autocomplete="off" placeholder="alex, alex.ath, alex.ton, or EQ...">
           </div>
           <div class="action-field">
             <label for="recipientLocalLabel">Local label</label>
@@ -536,6 +540,6 @@
         </section>
       </div>
     </div>
-    <script src="./app.js?v=285" type="module"></script>
+    <script src="./app.js?v=413" type="module"></script>
   </body>
 </html>

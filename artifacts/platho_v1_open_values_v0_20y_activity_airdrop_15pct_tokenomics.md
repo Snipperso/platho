@@ -84,7 +84,7 @@ Reward rule:
 - maximum global reward count: `1,500,000` rewarded publishes.
 
 There is no per-wallet cap because every reward requires a paid protocol action. Current capsule pricing starts from
-`0.030 TON`; larger private capsule blocks cost more. Fully exhausting the `1,500,000` publish reward pool therefore
+`0.0337 TON` for 1 KiB public capsules and `0.0347 TON` for hybrid private 1 KiB capsules; larger public or private capsule blocks cost more. Fully exhausting the `1,500,000` publish reward pool therefore
 requires real paid usage rather than free claims.
 
 The activity airdrop is an early activity bonus and utility bootstrap, not a free claim campaign. It is not a TON refund,

@@ -195,6 +195,63 @@ async function forcePendingAthBurn(
   }));
 }
 
+type BuybackBurnData = Parameters<typeof storeBuybackBurn$Data>[0];
+
+async function forceSealedUnfrozenPostSealState(
+  env: Awaited<ReturnType<typeof setup>>,
+  overrides: Partial<BuybackBurnData> = {},
+) {
+  const balance = (await env.blockchain.getContract(env.buyback.address)).balance;
+  const base: BuybackBurnData = {
+    $$type: 'BuybackBurn$Data',
+    genesis_config_hash: addressHash(env.controller.address),
+    deployment_manifest_hash: MANIFEST_HASH,
+    ath_master_address: env.athMasterAddress,
+    fee_accumulator_address: env.feeAccumulator.address,
+    official_ath_wallet_address: env.officialAthWallet,
+    stonfi_router_address: env.stonfiRouter.address,
+    stonfi_pool_address_ton_ath: env.stonfiPoolOwner.address,
+    stonfi_ath_source_owner_address: env.stonfiAthSourceOwner.address,
+    stonfi_pton_wallet_address: env.stonfiPtonWallet.address,
+    ask_jetton_wallet_address: env.stonfiAskJettonWallet,
+    stonfi_referral_address: env.stonfiReferral.address,
+    fee_bound: true,
+    official_ath_wallet_bound: true,
+    route_frozen: false,
+    sealed: true,
+    referral_value_bps: 0n,
+    buyback_min_ath_out_per_50_ton_atomic: 0n,
+    evidence_quote_out_atomic_ath: 0n,
+    evidence_dex_min_out_atomic_ath: 0n,
+    route_evidence_hash: 0n,
+    phase: PHASE_IDLE,
+    reserve_due_ton: 0n,
+    pending_query_id: 0n,
+    pending_deadline: 0n,
+    pending_route_refund_start_ton: 0n,
+    pending_dex_min_out_atomic_ath: 0n,
+    pending_received_ath_atomic: 0n,
+    route_refund_due_ton: 0n,
+    ath_burn_retry_due_atomic: 0n,
+    last_terminal_query_id: 0n,
+    accepted_reserve_count: 0n,
+    executed_buyback_count: 0n,
+    burned_ath_total_atomic: 0n,
+  };
+  const data = beginCell().storeBit(true).store(storeBuybackBurn$Data({
+    ...base,
+    ...overrides,
+    $$type: 'BuybackBurn$Data',
+  })).endCell();
+  await env.blockchain.setShardAccount(env.buyback.address, createShardAccount({
+    address: env.buyback.address,
+    code: env.buybackInit.code,
+    data,
+    balance,
+    workchain: env.buyback.address.workChain,
+  }));
+}
+
 function routeFreeze(
   env: Awaited<ReturnType<typeof setup>>,
   overrides: Partial<FreezeBuybackRoute> = {},
@@ -340,6 +397,33 @@ describe('BuybackBurn auth and negative matrix', () => {
     const sealed = await env.buyback.getGetBuybackBurnConfig();
     expect(sealed.sealed).toBe(true);
     expect(sealed.genesis_config_hash).toBe(0n);
+  });
+
+  it('RT-BUY-005: rejects post-seal route freeze after any dirty money-state blocker', async () => {
+    const cases: Array<[string, Partial<BuybackBurnData>]> = [
+      ['reserve_due_ton', { reserve_due_ton: 1n }],
+      ['route_refund_due_ton', { route_refund_due_ton: 1n }],
+      ['ath_burn_retry_due_atomic', { ath_burn_retry_due_atomic: 1n }],
+      ['accepted_reserve_count', { accepted_reserve_count: 1n }],
+      ['phase', {
+        phase: PHASE_PENDING_STONFI_SWAP,
+        pending_query_id: 1n,
+        pending_deadline: 1_700_001_000n,
+        pending_route_refund_start_ton: 0n,
+        pending_dex_min_out_atomic_ath: 95_000n,
+      }],
+    ];
+
+    for (const [, overrides] of cases) {
+      const env = await setup();
+      await forceSealedUnfrozenPostSealState(env, overrides);
+
+      await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+
+      const config = await env.buyback.getGetBuybackBurnConfig();
+      expect(config.route_frozen).toBe(false);
+      expect(config.genesis_config_hash).toBe(addressHash(env.controller.address));
+    }
   });
 
   it('accepts reserve only from the bound FeeAccumulator with exact envelope and backed value', async () => {

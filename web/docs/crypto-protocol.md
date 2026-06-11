@@ -74,14 +74,15 @@ Because `auth_pubkey` authorizes Vault-balance spending, compromising the local 
 Vault publish, payment-check, username, or avatar actions. A messaging signing-key compromise can still affect message-level
 identity signatures, so key replacement revokes the old public receive key record for future inbound encryption checks.
 
-PWA message pricing is per capsule. With current reserves and no ATH discount, exact canonical examples are public entries from `0.0337 TON` and `hybrid-v1` 1 KiB private
-capsules from `0.0347 TON`; larger private size classes cost more by canonical class. This includes protocol
-fee, CapsuleHub compact-index storage endowment, Vault local execution reserve, and the expected ACK refund. If the PWA's
-conservative fee estimate is higher than the included network-fee allowance of `0.005 TON`, it adds
+PWA message pricing is per capsule. With current reserves and no ATH discount, exact canonical examples are 1 KiB public entries from `0.0337 TON` and `hybrid-v1` 1 KiB private
+capsules from `0.0347 TON`; larger public or private size classes cost more by canonical class. This includes the full
+Platho protocol fee of `0.01 TON`, CapsuleHub compact-index storage endowment, Vault local execution reserve, and the
+expected ACK refund. Separately, if the PWA's conservative fee estimate is higher than the included network-fee
+allowance of `0.005 TON`, it adds
 the rounded overage as a surcharge. Contract calls still start from their canonical
 required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct user
 publish ABI in final v1; every publish is Vault -> CapsuleHub. ATH discounts apply only after the Vault activity airdrop
-has distributed 15,000,000 ATH; before that gate, message protocol fees use the full fee. The PWA must show the final
+has distributed 15,000,000 ATH; before that gate, message protocol fees use the full `0.01 TON` fee. The PWA must show the final
 hold and net cost for the selected content size before signing.
 
 The surcharge is a signed network/storage safety margin, not a refundable fee bucket. CapsuleHub accepts Vault publishes
@@ -97,28 +98,30 @@ permissionless `SweepExcessReserve` call can move only surplus above that protec
 `DepositProtocolFee`, where it follows the normal treasury/buyback split. Ordinary message sending does not perform this
 sweep. If that sweep deposit bounces, the returned amount is intentionally reclassified as backed
 `accrued_plato_fee_ton` so it can be retried through the normal fee flush path.
+Normal partial `FlushFees` calls must be at least the current public protocol fee (`0.010 TON`); a smaller amount is
+valid only when it is the entire remaining accrued bucket, so discounted dust can still be finalized.
 
 CapsuleHub records `created_at = now()` for every private and public entry. The PWA uses that contract timestamp for ordering and for bounded transaction-history lookup; client header timestamps remain authenticated payload metadata, not discovery authority. Compact entry metadata can be pruned permissionlessly after the configured one-year retention window, while body availability depends on the chosen TON provider's message-history coverage and the user's local encrypted cache.
 
 Vault ATH balance is credited through explicit notify-flow accounting, not by scanning the raw official wallet balance.
 The supported deposit path is the user's ATHWallet `ATHTransferRequestWithNotify` into Vault. Manual ordinary ATH
 transfer to the official Vault ATHWallet is unsupported and must not be displayed as a deposit address or treated as a
-Vault ledger credit. `WithdrawAth` is also not TON escrow: its attached TON funds downstream ATHWallet deploy/transfer,
-storage, and ACK execution, and Vault credits back only authenticated ACK/fail/bounce value it receives, minus local
-refund reserve and capped by the original inbound value.
+Vault ledger credit. ATH withdrawal from Vault is a signed external Vault command. Its downstream ATHWallet
+deploy/transfer/ACK reserve is paid from the user's internal Vault TON balance, and Vault credits back only
+authenticated ACK/fail/bounce value it receives, minus local refund reserve and capped by the reserved internal value.
 
 Public posts and comments are a separate open profile, not private capsules without encryption. They store a compact
-`PPH1` public header cell plus a raw public body cell. Public body text is `1..1024` UTF-8 bytes for both posts and
-comments; public image bodies are `1..1024` compressed media bytes per part. Header metadata never reduces the user's
-1024-byte body budget. Public posts have no postquantum option; public copy uses the `from 0.0337 TON` product label,
+`PPH1` public header cell plus a raw public body cell. Public body text and public image/avatar bytes use the same
+1, 2, 4, 8, 16, or 32 KiB public capsule size classes as the user-visible body budget. Header metadata never reduces
+that body budget. Public posts have no postquantum option; public copy uses the `from 0.0337 TON` product label,
 while the current exact public base example is `0.0337 TON` plus the same
 network-fee surcharge rule. `kind = 1` is a public post; post `flags` bit 0 closes comments for that post. `kind = 2` is
 a one-level public comment with `parent_entry_id:uint64` and `parent_body_hash:uint256` in the header. `kind = 3` is a
 public image post, `kind = 4` is a public image comment, and `kind = 5` is public wallet avatar media. Public headers also carry `stream_id:uint128`,
 `part_index:uint16`, `part_count:uint16`, and `media_format:u8`; public v1 uses `media_format = 0` for text and
 `media_format = 1` for WebP image/avatar parts. Public post, image post, and avatar headers also carry
-`profile_version:uint32` and `avatar_hash:uint256`; zero means no avatar pointer. Long public text or image data is reconstructed from multiple 1024-byte entries
-without reducing the useful body budget. The official PWA compresses selected images to WebP targets of 8 KiB
+`profile_version:uint32` and `avatar_hash:uint256`; zero means no avatar pointer. Long public text or image data is reconstructed from multiple entries
+only after each entry has used the smallest fitting public size class up to 32 KiB. The official PWA compresses selected images to WebP targets of 8 KiB
 (`low`), 16 KiB (`medium`), 32 KiB (`good`, default), or 64 KiB (`maximum`) before splitting. There is no edit/delete/reaction/moderation or counter layer in v1.
 
 Wallet avatars are paid profile updates, not off-chain assets. The avatar bytes are published as `kind = 5` public

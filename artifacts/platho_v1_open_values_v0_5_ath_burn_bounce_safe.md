@@ -1,5 +1,11 @@
 # Platho v1 Open Values Profile
 
+> HISTORICAL ONLY. SUPERSEDED. DO NOT USE AS THE CURRENT V1 SOURCE OF TRUTH.
+> This early profile predates the final Vault-only publish flow, final public/private capsule size classes,
+> current pricing/reserve constants, and current off-state body model. Current protocol values live in
+> `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`, `artifacts/publish_reserve_pricing_report.json`, and
+> `artifacts/capsulehub_storage_economics_report.json`.
+
 **Document status:** initial freeze-candidate values  
 **Version:** v0.1-open-values  
 **Companion spec:** `platho_v1_spec_v0_3_1_smoke_clean.md`  

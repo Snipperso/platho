@@ -495,6 +495,7 @@ contract UsernameRegistry {
     }
 
     bounced(msg: bounced<InitializeUsernameItem>) {
+        // Username mint finality is intentionally item-driven: pending mints clear only on deterministic item ACK or deploy bounce/refund, not on arbitrary timeout prune.
         self.requireSealed();
         let nameFromItem: Int? = self.pending_item_to_name_hash.get(sender());
         throwUnless(19140, nameFromItem != null);
@@ -629,6 +630,7 @@ contract UsernameRegistry {
         let pending: PendingUsernameMint = pendingOpt!!;
         throwUnless(19303, now() >= pending.created_at + USERNAME_PENDING_MINT_STALE_TTL);
         throwUnless(19304, !self.name_records.exists(msg.name_hash));
+        // Conservative seam policy: do not refund a Vault-funded mint until UsernameNFTItem ACK/bounce proves item deployment finality.
         throw(19307);
     }
 

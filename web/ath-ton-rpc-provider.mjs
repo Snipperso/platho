@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=22';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=9';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=32';
 
 export class AthTonRpcProviderError extends Error {
   constructor(message) {
@@ -75,6 +75,14 @@ function stackNumber(value) {
   return { type: 'num', value: toStackNumber(value) };
 }
 
+function criticalCallOptions(callOptions = {}) {
+  const out = {};
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
+    if (callOptions[key] !== undefined) out[key] = callOptions[key];
+  }
+  return out;
+}
+
 export function decodeAthJettonDataStack(result) {
   const stack = extractStack(result);
   return {
@@ -116,6 +124,7 @@ export function createAthMasterTonRpcProvider(options = {}) {
         address,
         method: 'get_jetton_data',
         stack: [],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getWalletAddress(ownerAddress, callOptions = {}) {
@@ -125,9 +134,7 @@ export function createAthMasterTonRpcProvider(options = {}) {
         address,
         method: 'get_wallet_address',
         stack: [stackAddress(ownerAddress)],
-        verify: callOptions.verify,
-        priority: callOptions.priority,
-        cacheTtlMs: callOptions.cacheTtlMs,
+        ...criticalCallOptions(callOptions),
       });
       return readStackAddress(extractStack(result), 0, 'ATH wallet address');
     },
@@ -144,6 +151,7 @@ export function createAthWalletTonRpcProvider(options = {}) {
         address,
         method: 'get_wallet_data',
         stack: [],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getPendingNotification(queryId, senderKey, callOptions = {}) {
@@ -153,6 +161,7 @@ export function createAthWalletTonRpcProvider(options = {}) {
         address,
         method: 'get_pending_notification',
         stack: [stackNumber(queryId), stackNumber(senderKey)],
+        ...criticalCallOptions(callOptions),
       }));
     },
   };

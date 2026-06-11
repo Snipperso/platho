@@ -173,6 +173,8 @@ export interface SenderArgsLike {
 }
 
 export function buildStonfiTonToJettonTxParamsV21(params: StonfiTonToJettonTxParamsV21): SenderArgsLike {
+  // STON.fi TON->jetton v2.1 sends the transaction to the pTON wallet; routerAddress is
+  // evidence-only here and is validated by the dossier/preflight against the official route.
   const forwardPayload = createStonfiSwapBodyV21({
     askJettonWalletAddress: params.askJettonWalletAddress,
     receiverAddress: params.receiverAddress,

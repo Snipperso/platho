@@ -4,13 +4,17 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
   CapsuleHubPublishAck,
-  WithdrawAth,
+  DepositTon,
 } from '../build/Vault/Vault_Vault';
 import {
   AthTransferNotification,
   ATHTransferAck,
   ATHTransferFailed,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import {
+  registerVaultSigningKeys,
+  sendVaultWithdrawAthExternal,
+} from './helpers/vault-receive-intent-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
 const ATH_WITHDRAWAL_ID_DOMAIN = 0x41574944n; // "AWID"
@@ -46,6 +50,7 @@ async function setup() {
   }));
 
   return {
+    blockchain,
     vault: blockchain.openContract(new Vault(address, init)),
     officialAthWallet,
     capsuleHub,
@@ -95,9 +100,9 @@ describe('Vault negative authorization matrix', () => {
   });
 
   it('VAULT-AUTH-NEG-02: forged ATH withdrawal callbacks cannot clear or restore a live pending withdrawal', async () => {
-    const { vault, officialAthWallet, attacker, user, recipient } = await setup();
-    const clientQueryId = 77n;
-    const withdrawalId = computeAthWithdrawalId(user.address, clientQueryId);
+    const { blockchain, vault, officialAthWallet, attacker, user, recipient } = await setup();
+    const signingKey = await registerVaultSigningKeys(vault, user, 47);
+    const withdrawalId = computeAthWithdrawalId(user.address, 0n);
 
     await vault.send(officialAthWallet.getSender(), { value: toNano('0.05') }, {
       $$type: 'AthTransferNotification',
@@ -106,12 +111,11 @@ describe('Vault negative authorization matrix', () => {
       sender_key: 0n,
       sender_wallet: user.address,
     } as AthTransferNotification);
-    await vault.send(user.getSender(), { value: toNano('0.04') }, {
-      $$type: 'WithdrawAth',
-      query_id: clientQueryId,
-      amount: 400n,
-      recipient: recipient.address,
-    } as WithdrawAth);
+    await vault.send(user.getSender(), { value: toNano('0.08') }, {
+      $$type: 'DepositTon',
+      amount: toNano('0.04'),
+    } as DepositTon);
+    await sendVaultWithdrawAthExternal(blockchain, vault, user, signingKey, GENESIS_HASH, 400n, recipient.address);
 
     const afterWithdraw = await vault.getGetUser(user.address);
     expect(afterWithdraw.ath_balance).toBe(600n);

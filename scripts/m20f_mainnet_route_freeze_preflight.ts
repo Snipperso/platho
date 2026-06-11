@@ -46,6 +46,8 @@ export interface M20FMainnetRouteFreezeInput {
     stonfiApiSimulationCapture: string;
     stonfiSdkOrApiTxParamsCapture: string;
     routerPoolPtonCodeHashes: string;
+    athNotificationQueryIdPropagationProof: string;
+    refundExcessBodyShapeProof: string;
     successExcessProof: string;
     minOutFailureRefundProof: string;
     ptonRefundProof: string;
@@ -168,6 +170,8 @@ function makeTemplate(): M20FMainnetRouteFreezeInput {
       stonfiApiSimulationCapture: 'required: STON.fi API /v1/swap/simulate capture path/hash',
       stonfiSdkOrApiTxParamsCapture: 'required: official @ston-fi/sdk/API tx params capture path/hash',
       routerPoolPtonCodeHashes: 'required: mainnet router/pool/pTON code hash proof path/hash',
+      athNotificationQueryIdPropagationProof: 'required: mainnet proof that STON.fi ATH output preserves ExecuteBuybackChunk query_id into BuybackBurn AthTransferNotification and burn finalization',
+      refundExcessBodyShapeProof: 'required: mainnet proof that success excess, min_out refund, pTON refund, and bounce/failure bodies match BuybackBurn empty-message or typed-bounce handlers',
       successExcessProof: 'required: successful swap tx evidence where excesses return to BuybackBurn',
       minOutFailureRefundProof: 'required: min_out failure tx evidence where refund returns to BuybackBurn',
       ptonRefundProof: 'required: pTON refund tx evidence where refund returns to BuybackBurn',
@@ -197,6 +201,8 @@ function collectInputFindings(input: M20FMainnetRouteFreezeInput | null) {
         'OFFICIAL_BUYBACKBURN_ATH_WALLET_ADDRESS',
         'STONFI_API_SIMULATION_CAPTURE',
         'OFFICIAL_STONFI_SDK_OR_API_TX_PARAMS_CAPTURE',
+        'ATH_NOTIFICATION_QUERY_ID_PROPAGATION_PROOF',
+        'REFUND_EXCESS_BODY_SHAPE_PROOF',
         'MAINNET_REFUND_EXCESS_AND_FAILURE_PROOFS',
       ],
       rejectedNonProdInputs,
@@ -217,6 +223,17 @@ function collectInputFindings(input: M20FMainnetRouteFreezeInput | null) {
     if (!isBasechainTonAddress(value)) {
       rejectedNonProdInputs.push(`${key}.workchain`);
     }
+  }
+  const sourceWallet = input.addresses?.stonfiAthSourceWalletAddress;
+  const askWallet = input.addresses?.askJettonWalletAddress;
+  if (
+    typeof sourceWallet === 'string'
+    && typeof askWallet === 'string'
+    && isParseableTonAddress(sourceWallet)
+    && isParseableTonAddress(askWallet)
+    && !Address.parse(sourceWallet).equals(Address.parse(askWallet))
+  ) {
+    missingInputs.push('STONFI_ATH_SOURCE_WALLET_ASK_WALLET_MISMATCH');
   }
 
   for (const [key, value] of Object.entries(input.evidenceRefs ?? {})) {
@@ -334,6 +351,8 @@ export function createM20FMainnetRouteFreezePreflight(options: {
       'Use STON.fi API mainnet simulation for exact 50 TON -> ATH route and capture router metadata.',
       'Generate official @ston-fi/sdk/@ston-fi/api tx params from the simulation result.',
       'Capture router, pool, pTON, ATH master, and ATH wallet code hashes on mainnet.',
+      'Prove STON.fi ATH output preserves ExecuteBuybackChunk query_id into the official ATH wallet notification and BuybackBurn burn path.',
+      'Prove refund/excess/failure body shapes are handled by BuybackBurn: empty value messages from pinned route addresses or typed pTON bounce/failure bodies.',
       'Prove success excesses, min_out failure refund, pTON refund, and bounce/failure behavior return to BuybackBurn.',
       'Prove BuybackBurn ATH route notify value is production-safe: upstream notify value must be >= 40,000,000 nanotons and must not leave BuybackBurn pending.',
       'Pin Vault ATH deposit and username mint owner request values to >= 50,000,000 nanotons or stricter current safe bounds.',

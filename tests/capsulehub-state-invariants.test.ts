@@ -106,6 +106,7 @@ function vaultPrivate(step: number, overrides?: Partial<PublishPrivateFromVault>
 }
 
 function vaultPublic(author: Address, step: number, overrides?: Partial<PublishPublicFromVault>): PublishPublicFromVault {
+  const sizeClass = overrides?.size_class ?? 1n;
   const header = overrides?.header ?? finalPublicHeaderCell(0x50 + (step % 16));
   const body = overrides?.body ?? finalPublicBodyCell(0x90 + (step % 16));
   return {
@@ -113,6 +114,7 @@ function vaultPublic(author: Address, step: number, overrides?: Partial<PublishP
     bounce_id: BigInt(20_000 + step),
     bounce_tag: BigInt(40_000 + step),
     publish_id: hash256(`vault-public-${step}`),
+    size_class: sizeClass,
     author_wallet: author,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     header_hash: cellHash(header),

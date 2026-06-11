@@ -156,13 +156,15 @@ function normalizeFeedPost(post) {
   const id = nonEmptyString(post.id);
   const text = nonEmptyString(post.text) ?? '';
   const imageUrl = nonEmptyString(post.imageUrl);
-  if (!id || (!text && !imageUrl)) return null;
+  const blocks = normalizeFeedBlocks(post.blocks);
+  if (!id || (!text && !imageUrl && blocks.length === 0)) return null;
   return {
     id,
     entryId: nonEmptyString(post.entryId),
     readEntryId: nonEmptyString(post.readEntryId),
     title: nonEmptyString(post.title),
     text,
+    blocks,
     imageUrl,
     createdAt: nonEmptyString(post.createdAt),
     author: nonEmptyString(post.author),
@@ -189,7 +191,8 @@ function normalizeFeedComment(comment) {
   const id = nonEmptyString(comment.id);
   const text = nonEmptyString(comment.text) ?? '';
   const imageUrl = nonEmptyString(comment.imageUrl);
-  if (!id || (!text && !imageUrl)) return null;
+  const blocks = normalizeFeedBlocks(comment.blocks);
+  if (!id || (!text && !imageUrl && blocks.length === 0)) return null;
   return {
     id,
     entryId: nonEmptyString(comment.entryId),
@@ -197,6 +200,7 @@ function normalizeFeedComment(comment) {
     parentEntryId: nonEmptyString(comment.parentEntryId),
     parentHash: nonEmptyString(comment.parentHash),
     text,
+    blocks,
     imageUrl,
     createdAt: nonEmptyString(comment.createdAt),
     author: nonEmptyString(comment.author),
@@ -212,6 +216,30 @@ function normalizeFeedComment(comment) {
     publishStatus: nonEmptyString(comment.publishStatus),
     publishState: isObject(comment.publishState) ? safeClone(comment.publishState) : null,
   };
+}
+
+function normalizeFeedBlocks(blocks) {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.map((block) => {
+    if (!isObject(block)) return null;
+    if (block.type === 'text') {
+      const text = nonEmptyString(block.text);
+      return text ? { type: 'text', text } : null;
+    }
+    if (block.type === 'image') {
+      const url = nonEmptyString(block.url);
+      return url ? { type: 'image', url } : null;
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+function feedBlocksPreview(blocks) {
+  const text = (blocks ?? []).find((block) => block?.type === 'text' && nonEmptyString(block.text))?.text;
+  if (text) return text;
+  const imageCount = (blocks ?? []).filter((block) => block?.type === 'image').length;
+  if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
+  return null;
 }
 
 function stripStoredPublicFeedVerification(cache) {
@@ -273,16 +301,18 @@ export function publicChannelFeedToThread(channel, feed) {
     subtitle: normalizedChannel.subtitle,
     time: shortTime(latest?.createdAt) ?? 'public',
     state: posts.length > 0 ? 'channel' : 'syncing',
-    preview: latest?.title ?? latest?.text ?? (latest?.imageUrl ? 'Image' : 'Waiting for public feed'),
+    preview: latest?.title ?? feedBlocksPreview(latest?.blocks) ?? latest?.text ?? (latest?.imageUrl ? 'Image' : 'Waiting for public feed'),
     messages: posts.map((post) => ({
       type: 'in',
-      text: post.title ? `${post.title}\n${post.text}` : post.text,
+      text: post.title ? `${post.title}\n${post.text}` : (feedBlocksPreview(post.blocks) ?? post.text),
+      blocks: post.blocks,
       meta: [post.author ?? normalizedChannel.name, post.publishStatus, shortTime(post.createdAt), post.chainVerified && post.entryUid ? `uid ${post.entryUid.slice(0, 8)}` : null]
         .filter(Boolean)
         .join(' · '),
       publicPostId: post.id,
       publicPostTitle: post.title,
       publicPostText: post.text,
+      publicPostBlocks: post.blocks,
       publicPostImageUrl: post.imageUrl,
       publicAuthorWallet: post.authorWallet,
       publicProfileVersion: post.profileVersion,
@@ -297,7 +327,7 @@ export function publicChannelFeedToThread(channel, feed) {
       publicPublishState: post.publishState,
       publicCommentsAllowed: post.commentsAllowed !== false,
       publicComments: post.comments,
-      attachment: post.imageUrl ? { type: 'image', url: post.imageUrl } : null,
+      attachment: post.blocks?.length ? null : (post.imageUrl ? { type: 'image', url: post.imageUrl } : null),
     })),
   };
 }
@@ -351,8 +381,9 @@ export function publicChannelThreadsToFeedItems(threads) {
           message.meta,
         ].filter(Boolean),
         title: message.publicPostTitle ?? thread.name,
-        text: message.publicPostText ?? message.text ?? thread.preview,
-        imageUrl: message.publicPostImageUrl ?? message.attachment?.url,
+        text: feedBlocksPreview(message.publicPostBlocks) ?? message.publicPostText ?? message.text ?? thread.preview,
+        blocks: message.publicPostBlocks,
+        imageUrl: message.publicPostBlocks?.length ? null : (message.publicPostImageUrl ?? message.attachment?.url),
         comments: message.publicComments ?? [],
         compact: false,
       });

@@ -121,4 +121,71 @@ describe('encrypted local message history', () => {
     expect(store.maxRecords).toBe(500);
     expect(store.persistent).toBe(false);
   });
+
+  it('HISTORY-06: one corrupt encrypted record is quarantined without blocking valid history', async () => {
+    const key = await createAesKey();
+    const store = await createMemoryEncryptedMessageHistoryStore({ key });
+    const records = await Promise.all(['one', 'two', 'three'].map((text, index) => sealMessageHistoryRecord(key, {
+      id: `record-${text}`,
+      threadId: 'thread-alpha',
+      createdAt: NOW + index,
+      message: { type: 'in', text, meta: 'sealed' },
+    })));
+    const firstCiphertextChar = records[1].ciphertext[0] === 'A' ? 'B' : 'A';
+    const corrupt = { ...records[1], ciphertext: `${firstCiphertextChar}${records[1].ciphertext.slice(1)}` };
+    store.replaceEncryptedRecords([records[0], corrupt, records[2]]);
+
+    const detailed = await store.listMessagesDetailed({ threadId: 'thread-alpha' });
+    const restored = await store.listMessages({ threadId: 'thread-alpha' });
+
+    expect(detailed.messages.map((record) => record.message.text)).toEqual(['one', 'three']);
+    expect(detailed.failed).toHaveLength(1);
+    expect(detailed.failed[0]).toMatchObject({ id: 'record-two', threadId: 'thread-alpha' });
+    expect(restored.map((record) => record.message.text)).toEqual(['one', 'three']);
+  });
+
+  it('HISTORY-07: pending payment checks use an encrypted unpruned ledger', async () => {
+    const store = await createMemoryEncryptedMessageHistoryStore({ maxRecords: 1 });
+    await store.putPendingPaymentCheck({
+      id: 'payment-check:alpha',
+      intentId: '123',
+      payment: {
+        asset: '0',
+        amount: '1000',
+        intentId: '123',
+        secret32Hex: 'a'.repeat(64),
+      },
+      status: 'intent_confirmed',
+      recoveryNote: 'refund this pending check',
+      createdAt: NOW,
+    });
+    await store.putMessage({
+      threadId: 'thread-alpha',
+      createdAt: NOW + 1,
+      message: { type: 'out', text: 'message one', meta: 'sealed' },
+    });
+    await store.putMessage({
+      threadId: 'thread-alpha',
+      createdAt: NOW + 2,
+      message: { type: 'out', text: 'message two', meta: 'sealed' },
+    });
+
+    const messages = await store.listMessages({ threadId: 'thread-alpha' });
+    const pending = await store.listPendingPaymentChecks();
+    const rawMessages = JSON.stringify(store.dumpEncryptedRecords());
+    const rawPending = JSON.stringify(store.dumpEncryptedPendingPaymentCheckRecords());
+
+    expect(messages.map((record) => record.message.text)).toEqual(['message two']);
+    expect(pending.records).toHaveLength(1);
+    expect(pending.records[0]).toMatchObject({
+      id: 'payment-check:alpha',
+      intentId: '123',
+      status: 'intent_confirmed',
+    });
+    expect(rawMessages).not.toContain('message one');
+    expect(rawPending).not.toContain('refund this pending check');
+
+    await store.removePendingPaymentCheck('payment-check:alpha');
+    expect((await store.listPendingPaymentChecks()).records).toHaveLength(0);
+  });
 });

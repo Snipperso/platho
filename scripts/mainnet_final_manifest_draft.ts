@@ -413,6 +413,8 @@ async function buildDraft(rolesPath: string) {
     document: 'PLATHO.V1.MAINNET_FINAL_MANIFEST_DRAFT',
     generated_at: new Date().toISOString(),
     production_deploy_executed: false,
+    lifecycle_stage: 'pre_execution_manifest_template',
+    lifecycle_note: 'production_deploy_executed=false means this local draft is a pre-execution template; live release truth comes from mainnet_genesis_verify_report.json after fresh verification.',
     roles_source: rolesPath,
     ath_metadata: {
       path: ATH_METADATA_PATH,
@@ -519,6 +521,8 @@ function markdown(report: Awaited<ReturnType<typeof buildDraft>>): string {
     '',
     `Generated: ${report.generated_at}`,
     `Production deploy executed: ${report.production_deploy_executed}`,
+    `Lifecycle stage: ${report.lifecycle_stage}`,
+    `Lifecycle note: ${report.lifecycle_note}`,
     '',
     '## Manifest',
     '',

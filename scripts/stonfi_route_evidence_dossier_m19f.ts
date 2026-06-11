@@ -75,6 +75,8 @@ export interface StonfiRouteEvidenceDossierM19F {
     codeHashesCaptured: boolean;
     officialSdkOrApiTxParamsCaptured: boolean;
     liveQuoteCaptured: boolean;
+    athNotificationQueryIdPropagatesToBuybackBurn: boolean;
+    refundExcessBodyShapesMatchBuybackBurnHandlers: boolean;
     successExcessesObservedToBuybackBurn: boolean;
     minOutFailureRefundObservedToBuybackBurn: boolean;
     ptonRefundObservedToBuybackBurn: boolean;
@@ -88,6 +90,8 @@ export interface StonfiRouteEvidenceDossierM19F {
     stonfiSdkOrApiTxParams: string;
     liveQuote: string;
     codeHashProofs: string;
+    athNotificationQueryIdPropagationProof: string;
+    refundExcessBodyShapeProof: string;
     successExcessProof: string;
     minOutFailureRefundProof: string;
     ptonRefundProof: string;
@@ -120,6 +124,8 @@ export function createStonfiRouteEvidenceDossierTemplateM19F(): StonfiRouteEvide
       codeHashesCaptured: false,
       officialSdkOrApiTxParamsCaptured: false,
       liveQuoteCaptured: false,
+      athNotificationQueryIdPropagatesToBuybackBurn: false,
+      refundExcessBodyShapesMatchBuybackBurnHandlers: false,
       successExcessesObservedToBuybackBurn: false,
       minOutFailureRefundObservedToBuybackBurn: false,
       ptonRefundObservedToBuybackBurn: false,
@@ -133,6 +139,8 @@ export function createStonfiRouteEvidenceDossierTemplateM19F(): StonfiRouteEvide
       stonfiSdkOrApiTxParams: 'required: official @ston-fi/sdk/API tx params capture path/hash',
       liveQuote: 'required: quote source, block/seqno/timestamp, and output amount path/hash',
       codeHashProofs: 'required: router/pool/pTON code hash evidence path/hash',
+      athNotificationQueryIdPropagationProof: 'required: mainnet proof that ATH output notification query_id equals ExecuteBuybackChunk query_id and reaches BuybackBurn burn finalization',
+      refundExcessBodyShapeProof: 'required: mainnet proof that success excess, min_out refund, pTON refund, and bounce/failure body shapes match BuybackBurn handlers',
       successExcessProof: 'required: successful swap evidence where excesses return to BuybackBurn',
       minOutFailureRefundProof: 'required: min_out failure evidence where refund returns to BuybackBurn',
       ptonRefundProof: 'required: pTON refund evidence where refund returns to BuybackBurn',
@@ -156,6 +164,8 @@ export function createFixtureFinalDossierM19F(): StonfiRouteEvidenceDossierM19F 
       stonfiSdkOrApiTxParams: 'fixture://official-stonfi-sdk-tx-params#sha256',
       liveQuote: 'fixture://live-quote#block-seqno',
       codeHashProofs: 'fixture://code-hash-proofs#sha256',
+      athNotificationQueryIdPropagationProof: 'fixture://ath-notification-query-id-propagation#tx',
+      refundExcessBodyShapeProof: 'fixture://refund-excess-body-shape-proof#tx',
       successExcessProof: 'fixture://success-excess-proof#tx',
       minOutFailureRefundProof: 'fixture://min-out-failure-refund-proof#tx',
       ptonRefundProof: 'fixture://pton-refund-proof#tx',
@@ -201,6 +211,8 @@ export function validateStonfiRouteEvidenceDossierM19F(dossier: StonfiRouteEvide
     'stonfiSdkOrApiTxParams',
     'liveQuote',
     'codeHashProofs',
+    'athNotificationQueryIdPropagationProof',
+    'refundExcessBodyShapeProof',
     'successExcessProof',
     'minOutFailureRefundProof',
     'ptonRefundProof',

@@ -8,10 +8,10 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 |---|---:|---:|---:|---:|
 | ATH_TRANSFER_SUCCESS | 1 | 4028561 | 4028561 | 14601 |
 | ATH_BURN_SUCCESS | 1 | 1384469 | 1384469 | 8226 |
-| CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 4233602 | 2136289 | 31475 |
+| CAPSULEHUB_VAULT_PUBLISH_AND_FLUSH_BOUNCE | 3 | 5552292 | 2883023 | 42676 |
 | FEEACCUMULATOR_SPLIT_FLUSH | 7 | 4114566 | 907445 | 5901 |
 | USERNAME_REGISTRY_MINT_FLUSH_PRUNE | 6 | 19675852 | 5933583 | 35476 |
-| VAULT_BALANCE_PUBLISH | 2 | 22555946 | 12582907 | 91272 |
+| VAULT_BALANCE_PUBLISH | 2 | 23283746 | 13312307 | 91248 |
 
 ## Operation details
 
@@ -31,9 +31,9 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| private_vault_publish | 2 | 2136289 | 2136289 | 31475 | 1 | 0 |
-| public_vault_publish | 2 | 1229956 | 1229956 | 17880 | 1 | 0 |
-| flush_fee_to_missing_accumulator_bounce | 3 | 867357 | 575933 | 8219 | 0 | 0 |
+| private_vault_publish | 2 | 2883023 | 2883023 | 42676 | 1 | 0 |
+| public_vault_publish | 2 | 1936956 | 1936956 | 28485 | 1 | 0 |
+| flush_fee_to_missing_accumulator_bounce | 3 | 732313 | 440889 | 6280 | 1 | 1 |
 
 ### FEEACCUMULATOR_SPLIT_FLUSH
 
@@ -62,8 +62,8 @@ Sandbox gas/reserve sanity pass for implemented subset. Not a final mainnet gas 
 
 | Operation | Tx count | Total fees | Max single tx fee | Max gas used | Aborted | Failed compute |
 |---|---:|---:|---:|---:|---:|---:|
-| vault_balance_private_publish_to_capsulehub_ack | 3 | 12582907 | 8295750 | 91272 | 0 | 0 |
-| vault_balance_private_publish_to_missing_capsulehub_bounce | 3 | 9973039 | 8295750 | 91272 | 1 | 0 |
+| vault_balance_private_publish_to_capsulehub_ack | 3 | 13312307 | 8294150 | 91248 | 0 | 0 |
+| vault_balance_private_publish_to_missing_capsulehub_bounce | 3 | 9971439 | 8294150 | 91248 | 1 | 0 |
 
 ## Result
 

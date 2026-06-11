@@ -1,6 +1,6 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
-import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=22';
-import { tonCell } from './pwa-contract-transactions.mjs?v=18';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=9';
+import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=32';
+import { tonCell } from './pwa-contract-transactions.mjs?v=24';
 
 const CAPSULEHUB_OPS = Object.freeze({
   PublishPrivateFromVault: 0xA4F862C0n,
@@ -20,6 +20,8 @@ export class CapsuleHubTonRpcProviderError extends Error {
     if (options.entryId !== undefined) this.entryId = options.entryId;
     if (options.kind !== undefined) this.kind = options.kind;
     if (options.historyScanIncomplete !== undefined) this.historyScanIncomplete = options.historyScanIncomplete;
+    if (options.cause !== undefined) this.cause = options.cause;
+    if (options.historyError !== undefined) this.historyError = options.historyError;
   }
 }
 
@@ -137,7 +139,7 @@ function stackNumber(value) {
 
 function runGetCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead', 'requestTimeoutMs', 'timeoutMs', 'queueTimeoutMs']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;
@@ -153,37 +155,6 @@ function uint256HexPlain(value) {
 
 function cellToBocBase64(cell) {
   return tonCell.bytesToBase64(tonCell.serializeBoc(cell));
-}
-
-function snakeBytesFromBocBase64(boc, name, maxBytes = 4096) {
-  const cell = tonCell.parseBocBase64(assertString(boc, name));
-  return tonCell.readSnakeCellBytes(cell, { maxBytes, name });
-}
-
-function readUint32Be(bytes, offset, name) {
-  if (offset + 4 > bytes.length) throw new CapsuleHubTonRpcProviderError(`${name} is truncated`);
-  return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
-}
-
-function privateHeader1CreatedAtSec(header1Boc) {
-  try {
-    const bytes = snakeBytesFromBocBase64(header1Boc, 'CapsuleHub private header1', 64);
-    if (bytes.length !== 30) return 0n;
-    if (bytes[0] !== 0x50 || bytes[1] !== 0x48 || bytes[2] !== 0x31 || bytes[3] !== 0x42) return 0n;
-    return BigInt(readUint32Be(bytes, 6, 'private header1 created_at_sec'));
-  } catch {
-    return 0n;
-  }
-}
-
-function publicHeaderCreatedAtSec(headerBoc) {
-  try {
-    const bytes = snakeBytesFromBocBase64(headerBoc, 'CapsuleHub public header', 128);
-    if (bytes.length < 32) return 0n;
-    return BigInt(readUint32Be(bytes, 28, 'public header created_at_sec'));
-  } catch {
-    return 0n;
-  }
 }
 
 async function cellHashHex(cell) {
@@ -286,6 +257,7 @@ function parseCapsuleHubPublishMessageBody(bodyBoc) {
     reader.readUint(64, 'bounce_id');
     reader.readUint(160, 'bounce_tag');
     const publishId = reader.readUint(256, 'publish_id');
+    const sizeClass = reader.readUint(8, 'size_class');
     const marketingNote = reader.readUint(152, 'marketing_note');
     const authorWallet = reader.readAddress('author_wallet');
     const payload = new TinyCellReader(reader.readRef('payload'), 'CapsuleHub public publish payload');
@@ -297,6 +269,7 @@ function parseCapsuleHubPublishMessageBody(bodyBoc) {
     return {
       kind: 'public',
       publish_id: publishId,
+      size_class: sizeClass,
       marketing_note: marketingNote,
       author_wallet: authorWallet,
       header_hash: headerHash,
@@ -330,6 +303,47 @@ function messageBodyBocFromRecord(record) {
     ?? record?.in_msg?.message_content?.body
     ?? record?.inMsg?.messageContent?.body
     ?? null;
+}
+
+function messageRecordAddressValue(value) {
+  if (!value || typeof value !== 'object') return value;
+  return value.address
+    ?? value.account_address
+    ?? value.accountAddress
+    ?? value.raw
+    ?? value.addr
+    ?? value.value
+    ?? null;
+}
+
+function normalizeRecordAddressRaw(value) {
+  const address = messageRecordAddressValue(value);
+  if (address === null || address === undefined || address === '') return null;
+  try {
+    return parseTonAddress(String(address)).raw;
+  } catch {
+    return null;
+  }
+}
+
+function messageSourceRawFromRecord(record) {
+  return normalizeRecordAddressRaw(
+    record?.source
+    ?? record?.source_address
+    ?? record?.sourceAddress
+    ?? record?.src
+    ?? record?.from
+    ?? record?.in_msg?.source
+    ?? record?.in_msg?.source_address
+    ?? record?.inMsg?.source
+    ?? record?.inMsg?.sourceAddress
+    ?? null,
+  );
+}
+
+function expectedVaultSourceRaw(callOptions = {}, providerOptions = {}) {
+  const source = callOptions.vaultAddress ?? providerOptions.vaultAddress ?? null;
+  return source ? parseTonAddress(source).raw : null;
 }
 
 function messageCreatedAtSecFromRecord(record) {
@@ -371,8 +385,9 @@ function messageBucketParams(kind, entry, address, callOptions = {}, providerOpt
     limit: Number.isFinite(limit) ? Math.max(1, Math.min(1000, Math.floor(limit))) : CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT,
     sort: 'desc',
   };
-  const source = callOptions.vaultAddress ?? providerOptions.vaultAddress ?? null;
-  if (source) params.source = parseTonAddress(source).raw;
+  // Toncenter v3 message history can miss valid messages when the source
+  // filter uses a different raw-address casing. Keep the query broad enough
+  // and validate the expected Vault source after parsing each record.
   if (options.includeBodyHash !== false && entry?.body_hash !== undefined && entry?.body_hash !== null && BigInt(entry.body_hash) !== 0n) {
     params.body_hash = uint256HexPlain(entry.body_hash);
     params.limit = Math.min(params.limit, 10);
@@ -431,11 +446,14 @@ function messageLookupParamAttempts(kind, entry, address, callOptions = {}, prov
 }
 
 function bodyHistoryUnavailable(kind, entry, options = {}) {
+  // CapsuleHub stores authenticated hashes on-chain; the publish body must come from message history or this provider fails closed.
   return new CapsuleHubTonRpcProviderError('CapsuleHub publish body was not found in message history', {
     code: CAPSULEHUB_BODY_HISTORY_UNAVAILABLE,
     entryId: entry?.entry_id?.toString?.() ?? null,
     kind,
     historyScanIncomplete: options.historyScanIncomplete === true,
+    cause: options.cause,
+    historyError: options.cause ? String(options.cause?.message ?? options.cause).slice(0, 500) : undefined,
   });
 }
 
@@ -476,30 +494,50 @@ async function assertParsedPublishMatchesEntry(kind, parsed, entry) {
 
 export function decodePrivateCapsuleEntryStack(result) {
   const stack = extractStack(result);
-  const hasContractCreatedAt = stack.length >= 13;
-  const header1Boc = readStackCellBoc(stack, hasContractCreatedAt ? 12 : 11, 'private header 1 cell');
+  if (stack.length !== 15) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub private entry ABI mismatch: key-index entry view required');
+  }
+  const header1Boc = readStackCellBoc(stack, 14, 'private header 1 cell');
   return {
     exists: readStackBool(stack, 0, 'private entry exists'),
     entry_id: readStackInt(stack, 1, 'private entry id'),
-    entry_uid: readStackInt(stack, 2, 'private entry uid'),
-    publish_id: readStackInt(stack, 3, 'private publish id'),
-    author_wallet: readStackAddress(stack, 4, 'private author wallet'),
-    page_id: readStackInt(stack, 5, 'private page id'),
-    page_offset: readStackInt(stack, 6, 'private page offset'),
-    created_at: hasContractCreatedAt ? readStackInt(stack, 7, 'private created at') : privateHeader1CreatedAtSec(header1Boc),
-    header_0_hash: readStackInt(stack, hasContractCreatedAt ? 8 : 7, 'private header 0 hash'),
-    header_1_hash: readStackInt(stack, hasContractCreatedAt ? 9 : 8, 'private header 1 hash'),
-    body_hash: readStackInt(stack, hasContractCreatedAt ? 10 : 9, 'private body hash'),
-    header_0_boc: readStackCellBoc(stack, hasContractCreatedAt ? 11 : 10, 'private header 0 cell'),
+    sender_prev_link: readStackInt(stack, 2, 'private sender previous link'),
+    recipient_prev_link: readStackInt(stack, 3, 'private recipient previous link'),
+    entry_uid: readStackInt(stack, 4, 'private entry uid'),
+    publish_id: readStackInt(stack, 5, 'private publish id'),
+    author_wallet: readStackAddress(stack, 6, 'private author wallet'),
+    page_id: readStackInt(stack, 7, 'private page id'),
+    page_offset: readStackInt(stack, 8, 'private page offset'),
+    created_at: readStackInt(stack, 9, 'private created at'),
+    header_0_hash: readStackInt(stack, 10, 'private header 0 hash'),
+    header_1_hash: readStackInt(stack, 11, 'private header 1 hash'),
+    body_hash: readStackInt(stack, 12, 'private body hash'),
+    header_0_boc: readStackCellBoc(stack, 13, 'private header 0 cell'),
     header_1_boc: header1Boc,
     body_boc: null,
   };
 }
 
+export function decodePrivateCapsuleKeyIndexStack(result) {
+  const stack = extractStack(result);
+  if (stack.length !== 5) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub private key index ABI mismatch: current key-index view required');
+  }
+  return {
+    exists: readStackBool(stack, 0, 'private key index exists'),
+    key_id: readStackInt(stack, 1, 'private key index key id'),
+    latest_entry_id: readStackInt(stack, 2, 'private key index latest entry id'),
+    latest_entry_link: readStackInt(stack, 3, 'private key index latest entry link'),
+    entry_count: readStackInt(stack, 4, 'private key index entry count'),
+  };
+}
+
 export function decodePublicCapsuleEntryStack(result) {
   const stack = extractStack(result);
-  const hasContractCreatedAt = stack.length >= 11 && stackItemType(stack[10]).includes('cell');
-  const headerBoc = readStackCellBoc(stack, hasContractCreatedAt ? 10 : 9, 'public header cell');
+  if (stack.length !== 11) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub public entry ABI mismatch: current entry view required');
+  }
+  const headerBoc = readStackCellBoc(stack, 10, 'public header cell');
   return {
     exists: readStackBool(stack, 0, 'public entry exists'),
     entry_id: readStackInt(stack, 1, 'public entry id'),
@@ -508,9 +546,9 @@ export function decodePublicCapsuleEntryStack(result) {
     author_wallet: readStackAddress(stack, 4, 'public author wallet'),
     page_id: readStackInt(stack, 5, 'public page id'),
     page_offset: readStackInt(stack, 6, 'public page offset'),
-    created_at: hasContractCreatedAt ? readStackInt(stack, 7, 'public created at') : publicHeaderCreatedAtSec(headerBoc),
-    header_hash: readStackInt(stack, hasContractCreatedAt ? 8 : 7, 'public header hash'),
-    body_hash: readStackInt(stack, hasContractCreatedAt ? 9 : 8, 'public body hash'),
+    created_at: readStackInt(stack, 7, 'public created at'),
+    header_hash: readStackInt(stack, 8, 'public header hash'),
+    body_hash: readStackInt(stack, 9, 'public body hash'),
     header_boc: headerBoc,
     body_boc: null,
   };
@@ -531,8 +569,9 @@ export function decodeCapsuleHubPageStack(result) {
 
 export function decodeCapsuleHubStateStack(result) {
   const stack = extractStack(result);
-  const hasRetention = stack.length >= 14;
-  const hasReserveView = stack.length >= 21;
+  if (stack.length !== 21) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub state ABI mismatch: current state view required');
+  }
   const privateLatest = readStackInt(stack, 3, 'CapsuleHub private latest id');
   const publicLatest = readStackInt(stack, 4, 'CapsuleHub public latest id');
   return {
@@ -545,26 +584,28 @@ export function decodeCapsuleHubStateStack(result) {
     public_page_count: readStackInt(stack, 6, 'CapsuleHub public page count'),
     page_size: readStackInt(stack, 7, 'CapsuleHub page size'),
     index_storage_years: readStackInt(stack, 8, 'CapsuleHub index storage years'),
-    index_retention_seconds: hasRetention ? readStackInt(stack, 9, 'CapsuleHub index retention seconds') : 31_536_000n,
-    accrued_plato_fee_ton: readStackInt(stack, hasRetention ? 10 : 9, 'CapsuleHub accrued fee'),
-    fee_accumulator_address: readStackAddress(stack, hasRetention ? 11 : 10, 'CapsuleHub fee accumulator'),
-    vault_address: readStackAddress(stack, hasRetention ? 12 : 11, 'CapsuleHub vault'),
-    genesis_controller_address: readStackAddress(stack, hasRetention ? 13 : 12, 'CapsuleHub genesis controller'),
-    private_live_count: hasReserveView ? readStackInt(stack, 14, 'CapsuleHub private live count') : privateLatest,
-    public_live_count: hasReserveView ? readStackInt(stack, 15, 'CapsuleHub public live count') : publicLatest,
-    index_storage_reserve_ton: hasReserveView ? readStackInt(stack, 16, 'CapsuleHub index storage reserve') : 0n,
-    protected_reserve_ton: hasReserveView ? readStackInt(stack, 17, 'CapsuleHub protected reserve') : 0n,
-    reserve_floor_ton: hasReserveView ? readStackInt(stack, 18, 'CapsuleHub reserve floor') : 0n,
-    reserve_buffer_numerator: hasReserveView ? readStackInt(stack, 19, 'CapsuleHub reserve buffer numerator') : 1n,
-    reserve_buffer_denominator: hasReserveView ? readStackInt(stack, 20, 'CapsuleHub reserve buffer denominator') : 1n,
+    index_retention_seconds: readStackInt(stack, 9, 'CapsuleHub index retention seconds'),
+    accrued_plato_fee_ton: readStackInt(stack, 10, 'CapsuleHub accrued fee'),
+    fee_accumulator_address: readStackAddress(stack, 11, 'CapsuleHub fee accumulator'),
+    vault_address: readStackAddress(stack, 12, 'CapsuleHub vault'),
+    genesis_controller_address: readStackAddress(stack, 13, 'CapsuleHub genesis controller'),
+    private_live_count: readStackInt(stack, 14, 'CapsuleHub private live count'),
+    public_live_count: readStackInt(stack, 15, 'CapsuleHub public live count'),
+    index_storage_reserve_ton: readStackInt(stack, 16, 'CapsuleHub index storage reserve'),
+    protected_reserve_ton: readStackInt(stack, 17, 'CapsuleHub protected reserve'),
+    reserve_floor_ton: readStackInt(stack, 18, 'CapsuleHub reserve floor'),
+    reserve_buffer_numerator: readStackInt(stack, 19, 'CapsuleHub reserve buffer numerator'),
+    reserve_buffer_denominator: readStackInt(stack, 20, 'CapsuleHub reserve buffer denominator'),
   };
 }
 
 export function createCapsuleHubTonRpcProvider(options = {}) {
   const publishBodyCache = new Map();
 
-  async function cachePublishMessages(kind, records) {
+  async function cachePublishMessages(kind, records, expectedSourceRaw = null) {
     for (const record of records) {
+      const actualSourceRaw = messageSourceRawFromRecord(record);
+      if (expectedSourceRaw && actualSourceRaw && actualSourceRaw !== expectedSourceRaw) continue;
       const bodyBoc = messageBodyBocFromRecord(record);
       if (!bodyBoc) continue;
       try {
@@ -596,6 +637,7 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
       }
       const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
       const attempts = messageLookupParamAttempts(kind, entry, address, callOptions, options);
+      const expectedSourceRaw = expectedVaultSourceRaw(callOptions, options);
       const maxPages = Math.max(1, Number(callOptions.messageLookupMaxPages ?? options.messageLookupMaxPages ?? CAPSULEHUB_MESSAGE_BODY_LOOKUP_MAX_PAGES));
       let historyScanIncomplete = false;
       let lastHistoryError = null;
@@ -622,7 +664,7 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
                 cacheTtlMs: callOptions.messageCacheTtlMs ?? options.messageCacheTtlMs,
               });
               const records = messageRecordsFromResponse(response);
-              await cachePublishMessages(kind, records);
+              await cachePublishMessages(kind, records, expectedSourceRaw);
               parsed = await takeValidParsed();
               if (parsed) break;
               if (records.length < limit) break;
@@ -630,8 +672,9 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
             }
           } catch (error) {
             lastHistoryError = error;
+            historyScanIncomplete = true;
             if (params.body_hash !== undefined) continue;
-            if (historyTransport === historyTransports[historyTransports.length - 1]) throw error;
+            continue;
           }
           parsed = await takeValidParsed();
           if (parsed) break;
@@ -647,6 +690,7 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
         header_0_boc: entry.header_0_boc ?? parsed.header_0_boc,
         header_1_boc: entry.header_1_boc ?? parsed.header_1_boc,
         body_boc: parsed.body_boc,
+        size_class: parsed.size_class,
         created_at: entry.created_at && entry.created_at !== 0n ? entry.created_at : (parsed.created_at ?? entry.created_at),
       };
     }
@@ -655,6 +699,7 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
       author_wallet: entry.author_wallet ?? parsed.author_wallet,
       header_boc: entry.header_boc ?? parsed.header_boc,
       body_boc: parsed.body_boc,
+      size_class: parsed.size_class,
       created_at: entry.created_at && entry.created_at !== 0n ? entry.created_at : (parsed.created_at ?? entry.created_at),
     };
   }
@@ -668,6 +713,26 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
         address,
         method: 'get_private_entry',
         stack: [stackNumber(entryId)],
+        ...runGetCallOptions(callOptions),
+      }));
+    },
+    async getPrivateSenderIndex(keyId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
+      return decodePrivateCapsuleKeyIndexStack(await transport.runGetMethod({
+        address,
+        method: 'get_private_sender_index',
+        stack: [stackNumber(keyId)],
+        ...runGetCallOptions(callOptions),
+      }));
+    },
+    async getPrivateRecipientIndex(keyId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
+      return decodePrivateCapsuleKeyIndexStack(await transport.runGetMethod({
+        address,
+        method: 'get_private_recipient_index',
+        stack: [stackNumber(keyId)],
         ...runGetCallOptions(callOptions),
       }));
     },

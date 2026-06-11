@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=22';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=9';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=32';
 
 export class UsernameTonRpcProviderError extends Error {
   constructor(message) {
@@ -105,7 +105,7 @@ function stackNumber(value) {
 
 function criticalCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;
@@ -178,29 +178,22 @@ export function decodeUsernameNameRecordStack(result) {
 
 export function decodePendingUsernameMintStack(result) {
   const stack = extractStack(result);
-  if (stack.length >= 9) {
-    return {
-      exists: readStackBool(stack, 0, 'username pending mint exists'),
-      query_id: readStackInt(stack, 1, 'username pending query id'),
-      sender_key: readStackInt(stack, 2, 'username pending sender key'),
-      owner_wallet: readStackAddress(stack, 3, 'username pending owner wallet'),
-      name_hash: readStackInt(stack, 4, 'username pending name hash'),
-      price_paid: readStackInt(stack, 5, 'username pending price paid'),
-      item_address: readStackAddress(stack, 6, 'username pending item address'),
-      item_deploy_value: readStackInt(stack, 7, 'username pending item deploy value'),
-      created_at: readStackInt(stack, 8, 'username pending created at'),
-    };
+  if (stack.length !== 9) {
+    throw new UsernameTonRpcProviderError(`Username pending mint stack layout mismatch: expected 9 fields, got ${stack.length}`, {
+      code: 'USERNAME_PENDING_MINT_STACK_MISMATCH',
+      stackLength: stack.length,
+    });
   }
   return {
     exists: readStackBool(stack, 0, 'username pending mint exists'),
-    query_id: 0n,
-    sender_key: 0n,
-    owner_wallet: readStackAddress(stack, 1, 'username pending owner wallet'),
-    name_hash: readStackInt(stack, 2, 'username pending name hash'),
-    price_paid: readStackInt(stack, 3, 'username pending price paid'),
-    item_address: readStackAddress(stack, 4, 'username pending item address'),
-    item_deploy_value: readStackInt(stack, 5, 'username pending item deploy value'),
-    created_at: readStackInt(stack, 6, 'username pending created at'),
+    query_id: readStackInt(stack, 1, 'username pending query id'),
+    sender_key: readStackInt(stack, 2, 'username pending sender key'),
+    owner_wallet: readStackAddress(stack, 3, 'username pending owner wallet'),
+    name_hash: readStackInt(stack, 4, 'username pending name hash'),
+    price_paid: readStackInt(stack, 5, 'username pending price paid'),
+    item_address: readStackAddress(stack, 6, 'username pending item address'),
+    item_deploy_value: readStackInt(stack, 7, 'username pending item deploy value'),
+    created_at: readStackInt(stack, 8, 'username pending created at'),
   };
 }
 
@@ -361,6 +354,7 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_pending_mint',
         stack: [stackNumber(nameHash)],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getPendingTreasuryFlush(queryId, callOptions = {}) {
@@ -370,6 +364,7 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_pending_treasury_flush',
         stack: [stackNumber(queryId)],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getPendingBurnFlush(queryId, callOptions = {}) {
@@ -379,6 +374,7 @@ export function createUsernameRegistryTonRpcProvider(options = {}) {
         address,
         method: 'get_pending_burn_flush',
         stack: [stackNumber(queryId)],
+        ...criticalCallOptions(callOptions),
       }));
     },
     async getAthWalletAddress(ownerWallet, callOptions = {}) {

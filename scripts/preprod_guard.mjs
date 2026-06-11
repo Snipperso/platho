@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config.mjs';
 import {
+  PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
+  PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
   PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
   PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
-  publicCapsuleBaseHoldNanotons,
-  publicCapsuleBaseNetPriceNanotons,
 } from '../web/message-pricing-policy.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
@@ -54,6 +54,15 @@ const CURRENT_CODE_HASH_TO_MANIFEST_KEY = {
   USERNAME_REGISTRY_CODE_HASH: 'username_registry',
   VAULT_CODE_HASH: 'vault',
 };
+
+const PRODUCTION_CODE_HASH_KEYS = Object.freeze(Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY).sort());
+const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
+const POST_POOL_COMMANDS = Object.freeze([
+  'npm.cmd run m20f:collect',
+  'npm.cmd run m20f:preflight',
+  'npm.cmd run market-stability:readiness',
+  'npm.cmd run buyback:enable-preflight',
+]);
 
 const CONTRACT_TO_CURRENT_CODE_HASH_KEY = {
   ATHMaster: 'ATHMASTER_CODE_HASH',
@@ -129,6 +138,166 @@ function computeInlineImportMapCspHashes() {
 
 function normalizeHash(value) {
   return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
+}
+
+function normalizeHashFileText(value) {
+  return normalizeHash(String(value ?? '').trim());
+}
+
+function sectionAfterHeading(text, heading) {
+  const start = text.indexOf(heading);
+  if (start < 0) return null;
+  const after = text.slice(start + heading.length);
+  const nextHeading = after.search(/\n##\s+/);
+  return nextHeading >= 0 ? after.slice(0, nextHeading) : after;
+}
+
+function compactStepText(step, fields) {
+  return fields
+    .map((field) => step?.[field])
+    .filter((value) => value !== undefined && value !== null)
+    .map((value) => String(value))
+    .join(' ');
+}
+
+function validateFeeAccumulatorHashAliases() {
+  const canonical = readTextIfExists('artifacts/FEEACCUMULATOR_CODE_HASH.txt');
+  const legacyAlias = readTextIfExists('artifacts/FEE_ACCUMULATOR_CODE_HASH.txt');
+  const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
+  if (!canonical || !legacyAlias) return;
+
+  const canonicalHash = normalizeHashFileText(canonical);
+  const aliasHash = normalizeHashFileText(legacyAlias);
+  const currentHash = normalizeHash(parseKeyValueLines(currentText ?? '').FEEACCUMULATOR_CODE_HASH);
+  if (canonicalHash !== aliasHash || (currentHash && canonicalHash !== currentHash)) {
+    failures.push({
+      id: 'FEE_ACCUMULATOR_HASH_ALIAS_MISMATCH',
+      file: 'artifacts/FEEACCUMULATOR_CODE_HASH.txt',
+      message: 'FeeAccumulator canonical and legacy hash artifact filenames must remain identical and match CURRENT_CODE_HASHES.txt.',
+    });
+  }
+}
+
+function validateProductionCodeHashes(input) {
+  const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
+  const productionText = readTextIfExists('artifacts/CURRENT_PRODUCTION_CODE_HASHES.txt');
+  if (!productionText) {
+    failures.push({
+      id: 'CURRENT_PRODUCTION_CODE_HASHES_MISSING',
+      file: 'artifacts/CURRENT_PRODUCTION_CODE_HASHES.txt',
+      message: 'Release archives must include production-only code hashes without mock or harness hash keys.',
+    });
+    return;
+  }
+
+  const currentCodeHashes = parseKeyValueLines(currentText ?? '');
+  const productionCodeHashes = parseKeyValueLines(productionText);
+  const actualKeys = Object.keys(productionCodeHashes).sort();
+  const missing = PRODUCTION_CODE_HASH_KEYS.filter((key) => !actualKeys.includes(key));
+  const extra = actualKeys.filter((key) => !PRODUCTION_CODE_HASH_KEYS.includes(key));
+  const testKeys = actualKeys.filter((key) => TEST_DEPLOY_TARGET_RE.test(key));
+  if (missing.length > 0 || extra.length > 0 || testKeys.length > 0) {
+    failures.push({
+      id: 'CURRENT_PRODUCTION_CODE_HASHES_KEYSET_INVALID',
+      file: 'artifacts/CURRENT_PRODUCTION_CODE_HASHES.txt',
+      message: `Production-only hash file must contain exactly production keys. missing=${missing.join(',') || '-'} extra=${extra.join(',') || '-'} test=${testKeys.join(',') || '-'}.`,
+    });
+  }
+
+  const mismatches = [];
+  for (const key of PRODUCTION_CODE_HASH_KEYS) {
+    const productionHash = normalizeHash(productionCodeHashes[key]);
+    const currentHash = normalizeHash(currentCodeHashes[key]);
+    const manifestHash = normalizeHash(input?.manifest?.code_hashes?.[CURRENT_CODE_HASH_TO_MANIFEST_KEY[key]]);
+    if (!productionHash || !currentHash || productionHash !== currentHash) {
+      mismatches.push(`${key}: production=${productionHash || 'missing'}, current=${currentHash || 'missing'}`);
+    }
+    if (input && (!productionHash || !manifestHash || productionHash !== manifestHash)) {
+      mismatches.push(`${key}: production=${productionHash || 'missing'}, manifest=${manifestHash || 'missing'}`);
+    }
+  }
+
+  if (mismatches.length > 0) {
+    failures.push({
+      id: 'CURRENT_PRODUCTION_CODE_HASHES_MISMATCH',
+      file: 'artifacts/CURRENT_PRODUCTION_CODE_HASHES.txt',
+      message: `Production-only code hashes must match CURRENT_CODE_HASHES.txt and final manifest production hashes: ${mismatches.join('; ')}.`,
+    });
+  }
+}
+
+function validateProductionDeployPacketHasNoTestTargets() {
+  const deployPacket = readJsonIfExists('artifacts/local/mainnet_deploy_packet.json');
+  if (deployPacket) {
+    const offenders = [];
+    for (const step of deployPacket.phase_1_deploy_contracts ?? []) {
+      const text = compactStepText(step, ['id', 'action', 'contract', 'message', 'target_is']);
+      if (TEST_DEPLOY_TARGET_RE.test(text)) offenders.push(text);
+    }
+    if (offenders.length > 0) {
+      failures.push({
+        id: 'PRODUCTION_DEPLOY_PACKET_TEST_TARGET',
+        file: 'artifacts/local/mainnet_deploy_packet.json',
+        message: `Production deploy packet must not deploy mock, harness, or M20T contracts: ${offenders.join('; ')}.`,
+      });
+    }
+  }
+
+  const dryRunPacket = readJsonIfExists('artifacts/local/mainnet_tx_dry_run_packet.json');
+  if (dryRunPacket) {
+    const offenders = [];
+    for (const step of dryRunPacket.deploy_contracts ?? []) {
+      const text = compactStepText(step, ['id', 'action', 'contract', 'message']);
+      if (TEST_DEPLOY_TARGET_RE.test(text)) offenders.push(text);
+    }
+    if (offenders.length > 0) {
+      failures.push({
+        id: 'PRODUCTION_TX_DRY_RUN_PACKET_TEST_TARGET',
+        file: 'artifacts/local/mainnet_tx_dry_run_packet.json',
+        message: `Production dry-run packet must not deploy mock, harness, or M20T contracts: ${offenders.join('; ')}.`,
+      });
+    }
+  }
+}
+
+function validateReleaseDocsPhaseOrder() {
+  const docs = [
+    {
+      file: 'PRODUCTION_READINESS.md',
+      beforeHeading: '## Required before production PWA release',
+      postHeading: '## Required only after airdrop and pool launch',
+    },
+    {
+      file: 'MAINNET_RELEASE_CHECKLIST.md',
+      beforeHeading: '## Command Gates Before Production PWA Release',
+      postHeading: '## Post-Pool Command Gates',
+    },
+  ];
+
+  for (const doc of docs) {
+    const text = readTextIfExists(doc.file);
+    if (!text) continue;
+    const before = sectionAfterHeading(text, doc.beforeHeading);
+    const post = sectionAfterHeading(text, doc.postHeading);
+    if (before === null || post === null) {
+      failures.push({
+        id: 'RELEASE_DOC_PHASE_SECTIONS_MISSING',
+        file: doc.file,
+        message: `Release docs must split pre-PWA gates and post-pool gates with "${doc.beforeHeading}" and "${doc.postHeading}".`,
+      });
+      continue;
+    }
+
+    const misplaced = POST_POOL_COMMANDS.filter((command) => before.includes(command));
+    const missingPost = POST_POOL_COMMANDS.filter((command) => !post.includes(command));
+    if (misplaced.length > 0 || missingPost.length > 0) {
+      failures.push({
+        id: 'RELEASE_DOC_POST_POOL_COMMAND_PHASE_MISMATCH',
+        file: doc.file,
+        message: `Post-pool commands must not be required before production PWA release. misplaced=${misplaced.join(',') || '-'} missing_post=${missingPost.join(',') || '-'}.`,
+      });
+    }
+  }
 }
 
 function validateCurrentCodeHashesMatchFinalManifest(input) {
@@ -341,6 +510,7 @@ function validateMainnetGenesisEvidence() {
 
   if (input) {
     validateCurrentCodeHashesMatchFinalManifest(input);
+    validateProductionCodeHashes(input);
     validatePwaConfigMatchesFinalManifest(input);
     validateSingleDeployTruthSource();
   }
@@ -413,7 +583,12 @@ function validatePublishReservePricingArtifact() {
   }
 
   const expectedCaseIds = [
-    'public_post',
+    'public_1k',
+    'public_2k',
+    'public_4k',
+    'public_8k',
+    'public_16k',
+    'public_32k',
     'private_hybrid_1k',
     'private_hybrid_2k',
     'private_hybrid_4k',
@@ -454,11 +629,11 @@ function validatePublishReservePricingArtifact() {
 
   const caseById = new Map((report.cases ?? []).map((item) => [item?.id, item]));
   const expectedPwaCases = [
-    {
-      id: 'public_post',
-      hold: publicCapsuleBaseHoldNanotons(),
-      net: publicCapsuleBaseNetPriceNanotons(),
-    },
+    ...Object.entries(PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).map(([sizeClass, hold]) => ({
+      id: `public_${sizeClass}k`,
+      hold,
+      net: PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[sizeClass],
+    })),
     ...Object.entries(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).map(([sizeClass, hold]) => ({
       id: `private_hybrid_${sizeClass}k`,
       hold,
@@ -503,8 +678,12 @@ for (const check of envChecks) {
   }
 }
 
+validateProductionCodeHashes();
 validateMainnetGenesisEvidence();
 validateLocalMainnetDeployArtifacts();
+validateFeeAccumulatorHashAliases();
+validateProductionDeployPacketHasNoTestTargets();
+validateReleaseDocsPhaseOrder();
 validateCspImportMapHash();
 validatePublishReservePricingArtifact();
 

@@ -5,17 +5,24 @@ export const FINAL_PRIVATE_HEADER1_BYTES = 30;
 export const FINAL_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES = 1204;
 export const FINAL_PRIVATE_HYBRID_BODY_BYTES = FINAL_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES + 1024;
 export const FINAL_PUBLIC_HEADER_MAX_BYTES = 72;
-export const FINAL_PUBLIC_BODY_MAX_BYTES = 1024;
+export const FINAL_PUBLIC_1K_BODY_BYTES = 1024;
+export const FINAL_PUBLIC_32K_BODY_BYTES = 32 * 1024;
 
 export function snakeCell(byteLength: number, fill = 0x61): Cell {
   const bytes = Buffer.alloc(byteLength, fill);
+  return snakeCellFromBytes(bytes);
+}
+
+export function snakeCellFromBytes(bytes: Buffer | Uint8Array): Cell {
+  const chunks: Buffer[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 127) {
+    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
+  }
   let tail: Cell | null = null;
-  for (let offset = bytes.length; offset > 0;) {
-    const start = Math.max(0, offset - 127);
-    const builder = beginCell().storeBuffer(bytes.subarray(start, offset));
+  for (let index = chunks.length - 1; index >= 0; index -= 1) {
+    const builder = beginCell().storeBuffer(chunks[index]);
     if (tail) builder.storeRef(tail);
     tail = builder.endCell();
-    offset = start;
   }
   return tail ?? beginCell().endCell();
 }
@@ -39,7 +46,7 @@ export function finalPrivateBodyCell(sizeClass: bigint | number = 1, fill = 0x62
   return snakeCell(finalPrivateBodyBytes(sizeClass, cryptoSuite), fill);
 }
 
-export function finalPublicBodyCell(fill = 0x70, byteLength = FINAL_PUBLIC_BODY_MAX_BYTES): Cell {
+export function finalPublicBodyCell(fill = 0x70, byteLength = FINAL_PUBLIC_1K_BODY_BYTES): Cell {
   return snakeCell(byteLength, fill);
 }
 

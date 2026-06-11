@@ -11,7 +11,11 @@ import {
   SweepExcessReserve,
   storeDepositProtocolFee,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { FeeAccumulator } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
+import {
+  FeeAccumulator,
+  FlushTreasuryDue,
+  SplitAccumulated,
+} from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
   MockVaultAckSink,
   ForwardVaultPrivate,
@@ -23,6 +27,7 @@ import {
   finalPrivateHeader1Cell,
   finalPublicBodyCell,
   finalPublicHeaderCell,
+  snakeCellFromBytes,
 } from './helpers/capsule-cells';
 
 const PLATO_PRIVATE_HYBRID_FEE = 10_000_000n;
@@ -31,6 +36,8 @@ const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE = 2_000_000n;
 const CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
 const CAPSULEHUB_SWEEP_CALLER_RESERVE = CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE;
+const FEEACCUMULATOR_SPLIT_EXEC_RESERVE = 2_000_000n;
+const FEEACCUMULATOR_FLUSH_EXEC_RESERVE = 5_000_000n;
 const CAPSULEHUB_ACK_FORWARD_RESERVE = 30_000_000n;
 const CAPSULEHUB_INDEX_RETENTION_SECONDS = 31_536_000;
 const CAPSULEHUB_MIN_PROTECTED_RESERVE = 100_000_000_000n;
@@ -48,6 +55,19 @@ function hash256(label: string): bigint {
 
 function cellHash(cell: Cell): bigint {
   return BigInt('0x' + cell.hash().toString('hex'));
+}
+
+function uint256Buffer(value: bigint): Buffer {
+  if (value < 0n || value >= (1n << 256n)) throw new RangeError('uint256 out of range');
+  return Buffer.from(value.toString(16).padStart(64, '0'), 'hex');
+}
+
+function privateHeader0WithKeyIds(senderKeyId: bigint, recipientKeyId: bigint): Cell {
+  const bytes = Buffer.alloc(140, 0x44);
+  bytes.writeBigUInt64BE(0x504c544850524956n, 0);
+  uint256Buffer(senderKeyId).copy(bytes, 8);
+  uint256Buffer(recipientKeyId).copy(bytes, 40);
+  return snakeCellFromBytes(bytes);
 }
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -117,6 +137,21 @@ async function setup(options?: { feeAccumulatorDeployed?: boolean; capsuleBalanc
   return { blockchain, capsule, author, attacker, operator, treasury, feeAccumulator, feeAccumulatorAddress, mockVault, mockVaultAddress };
 }
 
+async function deployFeeAccumulatorAtConfiguredAddress(blockchain: Blockchain, address: Address, treasury: Address) {
+  const init = await FeeAccumulator.init(treasury, fixtureAddress('BUYBACK_RECEIVER'));
+  await blockchain.setShardAccount(
+    address,
+    createShardAccount({
+      address,
+      code: init.code,
+      data: init.data,
+      balance: 0n,
+      workchain: address.workChain,
+    }),
+  );
+  return blockchain.openContract(new FeeAccumulator(address, init));
+}
+
 async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
   return (await blockchain.getContract(address)).balance;
 }
@@ -154,6 +189,7 @@ function forwardVaultPrivate(capsuleAddress: Address, overrides?: Partial<Forwar
 }
 
 function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?: Partial<ForwardVaultPublic>): ForwardVaultPublic {
+  const sizeClass = overrides?.size_class ?? 1n;
   const header = overrides?.header ?? finalPublicHeaderCell(0x50);
   const body = overrides?.body ?? finalPublicBodyCell(0x79);
   return {
@@ -162,6 +198,7 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
     bounce_id: 1002n,
     bounce_tag: 2n,
     publish_id: hash256('vault-public-publish-id'),
+    size_class: sizeClass,
     author_wallet: author,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     header_hash: cellHash(header),
@@ -176,7 +213,10 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
 
 describe('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce', async () => {
-    const { capsule, author, operator, mockVault } = await setup({ feeAccumulatorDeployed: false });
+    const { capsule, author, operator, mockVault } = await setup({
+      feeAccumulatorDeployed: false,
+      capsuleBalance: CAPSULEHUB_MIN_PROTECTED_RESERVE + toNano('1'),
+    });
 
     await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
     expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
@@ -190,10 +230,18 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(state.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
   });
 
-  it('CAPSULE-FEE-01/05: FlushFees(amount) debits accrued for deployed FeeAccumulator receiver', async () => {
-    const { blockchain, capsule, author, operator, feeAccumulator, mockVault } = await setup({ feeAccumulatorDeployed: true });
+  it('RT-FEE-003/CAPSULE-FEE-01/05: FlushFees debits CapsuleHub and credits FeeAccumulator with exact backing', async () => {
+    const { blockchain, capsule, author, operator, feeAccumulator, mockVault } = await setup({
+      feeAccumulatorDeployed: true,
+      capsuleBalance: CAPSULEHUB_MIN_PROTECTED_RESERVE + toNano('1'),
+    });
 
     await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
+    const beforeCapsuleState = await capsule.getGetState();
+    const beforeFeeState = await feeAccumulator!.getGetState();
+    expect(beforeCapsuleState.accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
+    expect(beforeFeeState.accumulated_ton).toBe(0n);
+    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThanOrEqual(beforeCapsuleState.accrued_plato_fee_ton);
 
     const flush = await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
       $$type: 'FlushFees',
@@ -215,8 +263,75 @@ describe('CapsuleHub v1 milestone 1', () => {
 
     const feeState = await feeAccumulator!.getGetState();
     expect(feeState.accumulated_ton).toBe(PLATO_PUBLIC_FEE);
+    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThanOrEqual(state.accrued_plato_fee_ton);
+    expect(await contractBalance(blockchain, feeAccumulator!.address)).toBeGreaterThanOrEqual(feeState.accumulated_ton);
     const unaccountedBalance = (await contractBalance(blockchain, feeAccumulator!.address)) - feeState.accumulated_ton;
     expect(unaccountedBalance).toBeLessThanOrEqual(CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE);
+  });
+
+  it('RT-CFEE-003: three public fees flush, split, and treasury-flush with exact bucket conservation', async () => {
+    const { blockchain, capsule, author, operator, treasury, feeAccumulator, mockVault } = await setup({
+      feeAccumulatorDeployed: true,
+      capsuleBalance: CAPSULEHUB_MIN_PROTECTED_RESERVE + toNano('1'),
+    });
+    const expectedFee = PLATO_PUBLIC_FEE * 3n;
+
+    for (let i = 0; i < 3; i += 1) {
+      await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address, {
+        publish_id: hash256(`rt-cfee-003-public-${i}`),
+        bounce_id: BigInt(2000 + i),
+      }));
+    }
+
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(expectedFee);
+
+    const flush = await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
+      $$type: 'FlushFees',
+      amount: expectedFee,
+    } as FlushFees);
+
+    const depositTx = findTransaction(flush.transactions, {
+      from: capsule.address,
+      to: feeAccumulator!.address,
+      op: OP_DEPOSIT_PROTOCOL_FEE,
+      success: true,
+    });
+    expect(depositTx).toBeDefined();
+    expect(inboundValue(depositTx)).toBe(expectedFee + CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE);
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(0n);
+
+    let feeState = await feeAccumulator!.getGetState();
+    expect(feeState.accumulated_ton).toBe(expectedFee);
+    expect(feeState.treasury_due_ton).toBe(0n);
+    expect(feeState.buyback_due_ton).toBe(0n);
+
+    await feeAccumulator!.send(operator.getSender(), { value: FEEACCUMULATOR_SPLIT_EXEC_RESERVE }, {
+      $$type: 'SplitAccumulated',
+    } as SplitAccumulated);
+
+    feeState = await feeAccumulator!.getGetState();
+    expect(feeState.accumulated_ton).toBe(0n);
+    expect(feeState.treasury_due_ton).toBe(expectedFee);
+    expect(feeState.buyback_due_ton).toBe(0n);
+
+    const treasuryFlush = await feeAccumulator!.send(operator.getSender(), { value: FEEACCUMULATOR_FLUSH_EXEC_RESERVE }, {
+      $$type: 'FlushTreasuryDue',
+      amount: expectedFee,
+    } as FlushTreasuryDue);
+
+    const treasuryTx = findTransaction(treasuryFlush.transactions, {
+      from: feeAccumulator!.address,
+      to: treasury.address,
+      success: true,
+    });
+    expect(treasuryTx).toBeDefined();
+    expect(inboundValue(treasuryTx)).toBe(expectedFee);
+
+    feeState = await feeAccumulator!.getGetState();
+    expect(feeState.accumulated_ton).toBe(0n);
+    expect(feeState.treasury_due_ton).toBe(0n);
+    expect(feeState.buyback_due_ton).toBe(0n);
+    expect(await contractBalance(blockchain, feeAccumulator!.address)).toBeGreaterThanOrEqual(0n);
   });
 
   it('CAPSULE-FEE-06: dust or locally underfunded FlushFees cannot drain CapsuleHub reserve', async () => {
@@ -240,11 +355,14 @@ describe('CapsuleHub v1 milestone 1', () => {
       $$type: 'FlushFees',
       amount: PLATO_PUBLIC_FEE,
     } as FlushFees);
-    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(0n);
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(PLATO_PUBLIC_FEE);
   });
 
   it('CAPSULE-FEE-DUST-01: final discounted Vault fee below min flushes when it is the whole accrued bucket', async () => {
-    const { capsule, mockVault, operator, author, feeAccumulator } = await setup({ feeAccumulatorDeployed: true });
+    const { capsule, mockVault, operator, author, feeAccumulator } = await setup({
+      feeAccumulatorDeployed: true,
+      capsuleBalance: CAPSULEHUB_MIN_PROTECTED_RESERVE + toNano('1'),
+    });
 
     await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address, {
       publish_id: hash256('discounted-dust-publish'),
@@ -334,6 +452,74 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(inboundValue(ackTx)).toBe(CAPSULEHUB_ACK_FORWARD_RESERVE);
   });
 
+  it('CAPSULE-PRIVATE-INDEX-01: private publishes maintain sender and recipient linked indexes', async () => {
+    const { blockchain, capsule, mockVault, operator } = await setup();
+    const senderKeyId = hash256('capsule-private-index-sender');
+    const recipientKeyId = hash256('capsule-private-index-recipient');
+    const header0 = privateHeader0WithKeyIds(senderKeyId, recipientKeyId);
+
+    const first = forwardVaultPrivate(capsule.address, {
+      publish_id: hash256('indexed-private-publish-1'),
+      header_0: header0,
+      header_1: finalPrivateHeader1Cell(0x31),
+      body: finalPrivateBodyCell(1n, 0x41),
+    });
+    const second = forwardVaultPrivate(capsule.address, {
+      publish_id: hash256('indexed-private-publish-2'),
+      header_0: header0,
+      header_1: finalPrivateHeader1Cell(0x32),
+      body: finalPrivateBodyCell(1n, 0x42),
+    });
+
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, first);
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, second);
+
+    const senderIndex = await capsule.getGetPrivateSenderIndex(senderKeyId);
+    const recipientIndex = await capsule.getGetPrivateRecipientIndex(recipientKeyId);
+    expect(senderIndex).toMatchObject({
+      exists: true,
+      key_id: senderKeyId,
+      latest_entry_id: 1n,
+      latest_entry_link: 2n,
+      entry_count: 2n,
+    });
+    expect(recipientIndex).toMatchObject({
+      exists: true,
+      key_id: recipientKeyId,
+      latest_entry_id: 1n,
+      latest_entry_link: 2n,
+      entry_count: 2n,
+    });
+
+    const firstEntry = await capsule.getGetPrivateEntry(0n);
+    const secondEntry = await capsule.getGetPrivateEntry(1n);
+    expect(firstEntry.sender_prev_link).toBe(0n);
+    expect(firstEntry.recipient_prev_link).toBe(0n);
+    expect(secondEntry.sender_prev_link).toBe(1n);
+    expect(secondEntry.recipient_prev_link).toBe(1n);
+
+    blockchain.now = 1_700_000_000 + CAPSULEHUB_INDEX_RETENTION_SECONDS;
+    await capsule.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
+      $$type: 'PruneCapsuleEntry',
+      kind: 1n,
+      entry_id: 1n,
+      publish_id: second.publish_id,
+    } as PruneCapsuleEntry);
+
+    expect((await capsule.getGetPrivateSenderIndex(senderKeyId))).toMatchObject({
+      exists: true,
+      latest_entry_id: 0n,
+      latest_entry_link: 1n,
+      entry_count: 1n,
+    });
+    expect((await capsule.getGetPrivateRecipientIndex(recipientKeyId))).toMatchObject({
+      exists: true,
+      latest_entry_id: 0n,
+      latest_entry_link: 1n,
+      entry_count: 1n,
+    });
+  });
+
   it('CAPSULE-VAULT-BACKING-01: Vault publish retains protocol fee backing instead of returning it as ACK excess', async () => {
     const { blockchain, capsule, mockVault, operator } = await setup({ capsuleBalance: 0n });
 
@@ -420,6 +606,52 @@ describe('CapsuleHub v1 milestone 1', () => {
     expect(after.protected_reserve_ton).toBe(before.protected_reserve_ton + sweepAmount);
   });
 
+  it('RT-CFEE-001: bounced reserve sweep can later flush through normal FeeAccumulator deposit path', async () => {
+    const { blockchain, capsule, mockVault, operator, author, treasury, feeAccumulatorAddress } = await setup({
+      feeAccumulatorDeployed: false,
+      capsuleBalance: toNano('101'),
+    });
+
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPrivate(capsule.address));
+    await mockVault.send(operator.getSender(), { value: toNano('0.2') }, forwardVaultPublic(capsule.address, author.address));
+
+    const before = await capsule.getGetState();
+    const sweepAmount = toNano('0.5');
+    const sweep = await capsule.send(operator.getSender(), { value: CAPSULEHUB_SWEEP_CALLER_RESERVE }, {
+      $$type: 'SweepExcessReserve',
+      amount: sweepAmount,
+    } as SweepExcessReserve);
+
+    const bouncedDeposit = findTransaction(sweep.transactions, {
+      from: capsule.address,
+      to: feeAccumulatorAddress,
+      op: OP_DEPOSIT_PROTOCOL_FEE,
+    });
+    expect(bouncedDeposit).toBeDefined();
+    expect((await capsule.getGetState()).accrued_plato_fee_ton).toBe(before.accrued_plato_fee_ton + sweepAmount);
+
+    const feeAccumulator = await deployFeeAccumulatorAtConfiguredAddress(blockchain, feeAccumulatorAddress, treasury.address);
+    const flush = await capsule.send(operator.getSender(), { value: CAPSULEHUB_FEE_FLUSH_CALLER_RESERVE }, {
+      $$type: 'FlushFees',
+      amount: sweepAmount,
+    } as FlushFees);
+
+    const depositTx = findTransaction(flush.transactions, {
+      from: capsule.address,
+      to: feeAccumulator.address,
+      op: OP_DEPOSIT_PROTOCOL_FEE,
+      success: true,
+    });
+    expect(depositTx).toBeDefined();
+    expect(inboundValue(depositTx)).toBe(sweepAmount + CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE);
+    expect((await feeAccumulator.getGetState()).accumulated_ton).toBe(sweepAmount);
+
+    const after = await capsule.getGetState();
+    expect(after.accrued_plato_fee_ton).toBe(before.accrued_plato_fee_ton);
+    expect(after.protected_reserve_ton).toBe(before.protected_reserve_ton);
+    expect(await contractBalance(blockchain, capsule.address)).toBeGreaterThanOrEqual(after.protected_reserve_ton);
+  });
+
   it('CAPSULE-05: Vault public publish accepts verified author from immutable Vault and ACKs', async () => {
     const { blockchain, capsule, mockVault, operator, author } = await setup();
 
@@ -469,6 +701,7 @@ describe('CapsuleHub v1 milestone 1', () => {
       bounce_id: 666n,
       bounce_tag: 666n,
       publish_id: hash256('evil'),
+      size_class: 1n,
       author_wallet: author.address,
       marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
       header_hash: forwardVaultPublic(capsule.address, author.address).header_hash,

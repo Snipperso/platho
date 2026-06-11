@@ -36,6 +36,7 @@ const VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE = 12_000_000n;
 const VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE = 38_900_000n;
 const VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE = 67_600_000n;
 const VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE = 8_700_000n;
+const VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE = 67_600_000n;
 const VAULT_PUBLISH_SIGNING_DOMAIN = 0x56504231n;
 
 function cellHash(cell: any): bigint {
@@ -69,10 +70,10 @@ async function contractBalance(blockchain: Blockchain, address: any): Promise<bi
   return (await blockchain.getContract(address)).balance;
 }
 
-async function deployExtraVault(blockchain: Blockchain, label: string) {
+async function deployExtraVault(blockchain: Blockchain, label: string, manifestHash: bigint = GENESIS_HASH) {
   const capsuleHub = await blockchain.treasury(`${label}-capsulehub`);
   const athWallet = await blockchain.treasury(`${label}-ath-wallet`);
-  const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
+  const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, manifestHash, true, true, 0n);
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({
     address,
@@ -237,11 +238,26 @@ function signedPublicPublishBody(
   nonce: bigint,
   maxCharge: bigint,
   secretKey: Buffer,
-  overrides: { bodyHash?: bigint; headerCell?: any; bodyCell?: any; domainMagic?: bigint; manifestHash?: bigint; vaultAddress?: any; publishKind?: bigint } = {},
+  overrides: {
+    bodyHash?: bigint;
+    headerCell?: any;
+    bodyCell?: any;
+    domainMagic?: bigint;
+    manifestHash?: bigint;
+    vaultAddress?: any;
+    vaultHash?: bigint;
+    publishKind?: bigint;
+    ownerHash?: bigint;
+    messageOwner?: any;
+    sizeClass?: bigint;
+    cryptoSuite?: bigint;
+  } = {},
 ) {
   if (!overrides.vaultAddress) {
     throw new Error('vaultAddress is required for signed publish test body');
   }
+  const sizeClass = overrides.sizeClass ?? SIZE_STANDARD;
+  const cryptoSuite = overrides.cryptoSuite ?? SUITE_PUBLIC_NONE;
   const headerCell = overrides.headerCell ?? HEADER0_CELL;
   const bodyCell = overrides.bodyCell ?? BODY_CELL;
   const payload = beginCell()
@@ -253,16 +269,18 @@ function signedPublicPublishBody(
   const signedPayload = beginCell()
     .storeUint(overrides.domainMagic ?? VAULT_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(overrides.manifestHash ?? GENESIS_HASH, 256)
-    .storeAddress(overrides.vaultAddress)
+    .storeUint(overrides.vaultHash ?? addressHash(overrides.vaultAddress), 256)
     .storeUint(overrides.publishKind ?? KIND_PUBLIC, 8)
-    .storeAddress(owner)
+    .storeUint(overrides.ownerHash ?? addressHash(owner), 256)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
+    .storeUint(sizeClass, 8)
+    .storeUint(cryptoSuite, 8)
     .storeRef(payload)
     .endCell();
   return beginCell()
     .storeUint(OP_PUBLISH_PUBLIC_FROM_VAULT_BALANCE, 32)
-    .storeAddress(owner)
+    .storeAddress(overrides.messageOwner ?? owner)
     .storeBuffer(sign(signedPayload.hash(), secretKey))
     .storeRef(signedPayload)
     .endCell();
@@ -273,7 +291,7 @@ function signedPublicPublishBodyWithTrailingPayloadBit(
   nonce: bigint,
   maxCharge: bigint,
   secretKey: Buffer,
-  overrides: { domainMagic?: bigint; manifestHash?: bigint; vaultAddress?: any; publishKind?: bigint } = {},
+  overrides: { manifestHash?: bigint; vaultAddress?: any } = {},
 ) {
   if (!overrides.vaultAddress) {
     throw new Error('vaultAddress is required for signed publish test body');
@@ -286,13 +304,15 @@ function signedPublicPublishBodyWithTrailingPayloadBit(
     .storeBit(true)
     .endCell();
   const signedPayload = beginCell()
-    .storeUint(overrides.domainMagic ?? VAULT_PUBLISH_SIGNING_DOMAIN, 32)
+    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(overrides.manifestHash ?? GENESIS_HASH, 256)
-    .storeAddress(overrides.vaultAddress)
-    .storeUint(overrides.publishKind ?? KIND_PUBLIC, 8)
-    .storeAddress(owner)
+    .storeUint(addressHash(overrides.vaultAddress), 256)
+    .storeUint(KIND_PUBLIC, 8)
+    .storeUint(addressHash(owner), 256)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_PUBLIC_NONE, 8)
     .storeRef(payload)
     .endCell();
   return beginCell()
@@ -395,9 +415,33 @@ describe('Vault balance-funded publish gate', () => {
     expect((await otherVault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 
-  it('VAULT-BALANCE-PUBLISH-01B2: public signed publish is bound to the target Vault address', async () => {
+  it('VAULT-BALANCE-PUBLISH-01B2: public signed publish is bound to the deployment manifest', async () => {
     const { blockchain, vault, user } = await setup();
-    const otherVault = await deployExtraVault(blockchain, 'vault-balance-public-publish-other');
+    const otherVault = await deployExtraVault(blockchain, 'vault-balance-public-publish-other', GENESIS_HASH + 1n);
+    const keyPair = await registerKeys(vault, user);
+    await registerKeys(otherVault, user);
+    const maxCharge = await otherVault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await depositTon(vault, user, maxCharge * 2n);
+    await depositTon(otherVault, user, maxCharge * 2n);
+    const beforeOther = await otherVault.getGetUser(user.address);
+    const messageForFirstVault = signedPublicPublishBody(user.address, beforeOther.publish_nonce, maxCharge, keyPair.secretKey, {
+      vaultAddress: vault.address,
+    });
+
+    await expect(blockchain.sendMessage(external({
+      to: otherVault.address,
+      body: messageForFirstVault,
+    }))).rejects.toMatchObject({ exitCode: 16494 });
+
+    const afterOther = await otherVault.getGetUser(user.address);
+    expect(afterOther.ton_balance).toBe(beforeOther.ton_balance);
+    expect(afterOther.publish_nonce).toBe(beforeOther.publish_nonce);
+    expect((await otherVault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-01B3: public signed publish is bound to the target Vault address', async () => {
+    const { blockchain, vault, user } = await setup();
+    const otherVault = await deployExtraVault(blockchain, 'vault-balance-public-publish-other-same-manifest');
     const keyPair = await registerKeys(vault, user);
     await registerKeys(otherVault, user);
     const maxCharge = await otherVault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
@@ -417,6 +461,76 @@ describe('Vault balance-funded publish gate', () => {
     expect(afterOther.ton_balance).toBe(beforeOther.ton_balance);
     expect(afterOther.publish_nonce).toBe(beforeOther.publish_nonce);
     expect((await otherVault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-01B4: public signed publish rejects domain, kind, owner, and suite mismatches before balance mutation', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
+        domainMagic: VAULT_PUBLISH_SIGNING_DOMAIN + 1n,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16493 });
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
+        publishKind: KIND_PRIVATE,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16496 });
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
+        ownerHash: addressHash(user.address) + 1n,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16498 });
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
+        cryptoSuite: SUITE_HYBRID,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16499 });
+
+    const after = await vault.getGetUser(user.address);
+    expect(after.ton_balance).toBe(before.ton_balance);
+    expect(after.publish_nonce).toBe(before.publish_nonce);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-01B5: same-auth public publish cannot be replayed under another owner', async () => {
+    const { blockchain, vault, user } = await setup();
+    const other = await blockchain.treasury('vault-balance-publish-same-auth-other');
+    const keyPair = await registerKeys(vault, user);
+    await registerKeysFromAddress(blockchain, vault, other.address, 14);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(other.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE);
+    await depositTon(vault, user, maxCharge * 2n);
+    await depositTon(vault, other, maxCharge * 2n);
+    const beforeOther = await vault.getGetUser(other.address);
+    const signedForUserWrappedAsOther = signedPublicPublishBody(user.address, beforeOther.publish_nonce, maxCharge, keyPair.secretKey, {
+      vaultAddress: vault.address,
+      messageOwner: other.address,
+    });
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedForUserWrappedAsOther,
+    }))).rejects.toMatchObject({ exitCode: 16498 });
+
+    const afterOther = await vault.getGetUser(other.address);
+    expect(afterOther.ton_balance).toBe(beforeOther.ton_balance);
+    expect(afterOther.publish_nonce).toBe(beforeOther.publish_nonce);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 
   it('VAULT-BALANCE-PUBLISH-01C: signed publish rejects manifest and kind domain mismatches before balance mutation', async () => {
@@ -604,7 +718,7 @@ describe('Vault balance-funded publish gate', () => {
     expect(rawAfter).toBe(rawBefore);
   });
 
-  it('VAULT-BALANCE-PUBLISH-04C: below-local maxCharge is rejected before raw Vault gas spend', async () => {
+  it('VAULT-BALANCE-PUBLISH-04C: below-local maxCharge charges local reserve without CapsuleHub publish', async () => {
     const { blockchain, vault, user } = await setup();
     const keyPair = await registerKeys(vault, user);
     const canonical = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
@@ -612,18 +726,19 @@ describe('Vault balance-funded publish gate', () => {
     const before = await vault.getGetUser(user.address);
     const rawBefore = await contractBalance(blockchain, vault.address);
 
-    await expect(blockchain.sendMessage(external({
+    await blockchain.sendMessage(external({
       to: vault.address,
       body: signedPrivatePublishBody(user.address, before.publish_nonce, VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE - 1n, keyPair.secretKey, {
         vaultAddress: vault.address,
       }),
-    }))).rejects.toMatchObject({ exitCode: 16462 });
+    }));
 
     const after = await vault.getGetUser(user.address);
     const rawAfter = await contractBalance(blockchain, vault.address);
-    expect(after.ton_balance).toBe(before.ton_balance);
-    expect(after.publish_nonce).toBe(before.publish_nonce);
-    expect(rawAfter).toBe(rawBefore);
+    expect(after.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE);
+    expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect(rawAfter - after.ton_balance).toBeGreaterThanOrEqual(rawBefore - before.ton_balance);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 
   it('VAULT-BALANCE-PUBLISH-04C2: large private size classes cannot be validated for the 1K exec reserve', async () => {
@@ -635,24 +750,24 @@ describe('Vault balance-funded publish gate', () => {
     const before = await vault.getGetUser(user.address);
     const rawBefore = await contractBalance(blockchain, vault.address);
 
-    await expect(blockchain.sendMessage(external({
+    await blockchain.sendMessage(external({
       to: vault.address,
       body: signedPrivatePublishBody(user.address, before.publish_nonce, oneKiBMaxCharge, keyPair.secretKey, {
         vaultAddress: vault.address,
         sizeClass: SIZE_32K,
         bodyCell: finalPrivateBodyCell(SIZE_32K, 0x32),
       }),
-    }))).rejects.toMatchObject({ exitCode: 16462 });
+    }));
 
     const after32KiBAttempt = await vault.getGetUser(user.address);
     const rawAfter32KiBAttempt = await contractBalance(blockchain, vault.address);
-    expect(after32KiBAttempt.ton_balance).toBe(before.ton_balance);
-    expect(after32KiBAttempt.publish_nonce).toBe(before.publish_nonce);
-    expect(rawAfter32KiBAttempt).toBe(rawBefore);
+    expect(after32KiBAttempt.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE);
+    expect(after32KiBAttempt.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect(rawAfter32KiBAttempt - after32KiBAttempt.ton_balance).toBeGreaterThanOrEqual(rawBefore - before.ton_balance);
 
     await blockchain.sendMessage(external({
       to: vault.address,
-      body: signedPrivatePublishBody(user.address, before.publish_nonce, oneKiBMaxCharge, keyPair.secretKey, {
+      body: signedPrivatePublishBody(user.address, after32KiBAttempt.publish_nonce, oneKiBMaxCharge, keyPair.secretKey, {
         vaultAddress: vault.address,
         sizeClass: SIZE_16K,
         bodyCell: finalPrivateBodyCell(SIZE_16K, 0x16),
@@ -661,8 +776,8 @@ describe('Vault balance-funded publish gate', () => {
 
     const after16KiBAttempt = await vault.getGetUser(user.address);
     const rawAfter16KiBAttempt = await contractBalance(blockchain, vault.address);
-    expect(after16KiBAttempt.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE);
-    expect(after16KiBAttempt.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect(after16KiBAttempt.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE - VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE);
+    expect(after16KiBAttempt.publish_nonce).toBe(before.publish_nonce + 2n);
     expect(rawAfter16KiBAttempt - after16KiBAttempt.ton_balance).toBeGreaterThanOrEqual(rawBefore - before.ton_balance);
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
@@ -688,7 +803,7 @@ describe('Vault balance-funded publish gate', () => {
     expect(rawAfter).toBe(rawBefore);
   });
 
-  it('VAULT-BALANCE-PUBLISH-04E: non-basechain signed publish owner is rejected before raw Vault gas spend', async () => {
+  it('VAULT-BALANCE-PUBLISH-04E: non-basechain signed private publish owner is rejected before raw Vault gas spend', async () => {
     const { blockchain, vault } = await setup();
     const owner = new Address(-1, Buffer.alloc(32, 0x64));
     const keyPair = await registerKeysFromAddress(blockchain, vault, owner, 0x64);
@@ -708,17 +823,6 @@ describe('Vault balance-funded publish gate', () => {
     expect(afterPrivate.publish_nonce).toBe(before.publish_nonce);
     expect(rawAfterPrivate).toBe(rawBefore);
 
-    await expect(blockchain.sendMessage(external({
-      to: vault.address,
-      body: signedPublicPublishBody(owner, before.publish_nonce, maxCharge, keyPair.secretKey, {
-        vaultAddress: vault.address,
-      }),
-    }))).rejects.toMatchObject({ exitCode: 16480 });
-    const afterPublic = await vault.getGetUser(owner);
-    const rawAfterPublic = await contractBalance(blockchain, vault.address);
-    expect(afterPublic.ton_balance).toBe(before.ton_balance);
-    expect(afterPublic.publish_nonce).toBe(before.publish_nonce);
-    expect(rawAfterPublic).toBe(rawBefore);
   });
 
   it('VAULT-BALANCE-PUBLISH-05: public signed payload mismatch also advances nonce without pending publish', async () => {
@@ -784,6 +888,30 @@ describe('Vault balance-funded publish gate', () => {
     const after = await vault.getGetUser(user.address);
     expect(after.ton_balance).toBe(before.ton_balance - VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE);
     expect(after.publish_nonce).toBe(before.publish_nonce + 1n);
+    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
+  });
+
+  it('VAULT-BALANCE-PUBLISH-06A: invalid public size class is rejected before accept', async () => {
+    const { blockchain, vault, user } = await setup();
+    const keyPair = await registerKeys(vault, user);
+    const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_32K, SUITE_PUBLIC_NONE);
+    await depositTon(vault, user, maxCharge * 2n);
+    const before = await vault.getGetUser(user.address);
+    const rawBefore = await contractBalance(blockchain, vault.address);
+
+    await expect(blockchain.sendMessage(external({
+      to: vault.address,
+      body: signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, {
+        vaultAddress: vault.address,
+        sizeClass: 3n,
+      }),
+    }))).rejects.toMatchObject({ exitCode: 16331 });
+
+    const after = await vault.getGetUser(user.address);
+    const rawAfter = await contractBalance(blockchain, vault.address);
+    expect(after.ton_balance).toBe(before.ton_balance);
+    expect(after.publish_nonce).toBe(before.publish_nonce);
+    expect(rawAfter).toBe(rawBefore);
     expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
   });
 });

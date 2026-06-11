@@ -207,6 +207,41 @@ describe('UsernameRegistry negative authorization matrix', () => {
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 
+  it('RT-USER-004: resend ACK with transferred owner cannot spoof the pending mint owner', async () => {
+    const ctx = await deploySealedRegistryWithMockOfficial();
+    const mintOwner = fixtureAddress('RESEND_PENDING_MINT_OWNER');
+    const transferredOwner = fixtureAddress('RESEND_TRANSFERRED_OWNER');
+    const hash = nameHash('resendx');
+    const itemAddress = await ctx.registry.getGetUsernameItemAddress(hash);
+    await installNoAckAt(ctx.blockchain, itemAddress);
+
+    await sendMintFromOfficialAddress(
+      ctx.blockchain,
+      ctx.registry,
+      ctx.mockOfficialAddress,
+      mintOwner,
+      'resendx',
+      PRICE_6_PLUS,
+      ctx.vaultAddress,
+    );
+    const beforePending = await ctx.registry.getGetPendingMint(hash);
+    expect(beforePending.exists).toBe(true);
+    expect(beforePending.owner_wallet.equals(mintOwner)).toBe(true);
+
+    await ctx.registry.send(ctx.blockchain.sender(itemAddress), { value: toNano('0.05') }, {
+      $$type: 'UsernameItemDeployedAck',
+      name_hash: hash,
+      owner_wallet: transferredOwner,
+    } as UsernameItemDeployedAck);
+
+    const afterPending = await ctx.registry.getGetPendingMint(hash);
+    expect(afterPending.exists).toBe(true);
+    expect(afterPending.owner_wallet.equals(mintOwner)).toBe(true);
+    expect(afterPending.owner_wallet.equals(transferredOwner)).toBe(false);
+    expect((await ctx.registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect((await ctx.registry.getGetGlobal()).pending_mint_count).toBe(1n);
+  });
+
   it('USERNAME-REG-AUTH-NEG-03: forged treasury transfer callbacks cannot clear pending flushes', async () => {
     const ctx = await deploySealedRegistryWithMockOfficial();
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');

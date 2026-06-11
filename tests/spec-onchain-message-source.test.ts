@@ -114,6 +114,38 @@ describe('v1 on-chain message source of truth', () => {
     }
   });
 
+  it('RT-CFEE-004/SPEC-MSG-SOURCE-03AA: CapsuleHub fee flush docs reject stale 0.005 TON min-flush wording', () => {
+    const capsuleHub = read('contracts/CapsuleHub.tact');
+    expect(capsuleHub).toMatch(/const CAPSULEHUB_MIN_FEE_FLUSH_TON: Int = PLATO_PUBLIC_POST_FEE_TON;/);
+    expect(capsuleHub).toMatch(/msg\.amount >= CAPSULEHUB_MIN_FEE_FLUSH_TON \|\| msg\.amount == self\.accrued_plato_fee_ton/);
+
+    const currentFlushDocs = [
+      'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
+      'web/CRYPTO_PROTOCOL.md',
+      'web/docs/crypto-protocol.md',
+    ];
+    for (const path of currentFlushDocs) {
+      const text = read(path);
+      expect(text, path).toMatch(/partial `?FlushFees`? calls must be at least[\s\S]{0,80}`?0\.010 TON`?/i);
+      expect(text, path).toMatch(/smaller amount[\s\S]{0,120}entire remaining accrued bucket/i);
+      expect(text, path).toMatch(/discounted dust/i);
+    }
+
+    const staleCapsuleHubFlushPatterns = [
+      /CapsuleHub[\s\S]{0,180}(minimum|min(?:imum)? partial|partial fee flush|min(?:imum)? fee flush)[\s\S]{0,80}0\.005 TON/i,
+      /0\.005 TON[\s\S]{0,180}CapsuleHub[\s\S]{0,180}(minimum|min(?:imum)? partial|partial fee flush|min(?:imum)? fee flush)/i,
+      /CAPSULEHUB_MIN_FEE_FLUSH_TON[\s\S]{0,80}0\.005/i,
+      /CapsuleHub[\s\S]{0,120}5,000,000 nanotons[\s\S]{0,120}(minimum|min(?:imum)? partial|partial fee flush|min(?:imum)? fee flush)/i,
+    ];
+
+    for (const path of ACTIVE_INTERFACE_DOCS) {
+      const text = read(path);
+      for (const pattern of staleCapsuleHubFlushPatterns) {
+        expect(text, `${path} must not match stale CapsuleHub min-flush wording ${pattern}`).not.toMatch(pattern);
+      }
+    }
+  });
+
   it('SPEC-MSG-SOURCE-03A: public pricing copy uses current exact public/private canonical examples', () => {
     const publicPriceDocs = [
       'DEPLOYMENT_RUNBOOK.md',
@@ -190,21 +222,31 @@ describe('v1 on-chain message source of truth', () => {
     expect(noBackend).toMatch(/chosen by the production bundle or host integration/i);
     expect(noBackend).toMatch(/User-selectable RPC requires an explicit settings UI/i);
     expect(noBackend).toMatch(/provider history coverage affects availability/i);
+    expect(noBackend).toMatch(/owner-signed pointer trust model/i);
+    expect(noBackend).toMatch(/refuse to sign avatar registration until `CapsuleHub` entries/i);
+    expect(noBackend).toMatch(/Reusing an already-published identical avatar is an explicit recovery path/i);
     expect(noBackend).not.toMatch(/chosen or replaceable by the user/i);
   });
 
-  it('SPEC-MSG-SOURCE-03C1: release docs and PWA config are pinned to the verified production manifest', () => {
+  it('SPEC-MSG-SOURCE-03C1: release docs and PWA config do not claim production before verified genesis', () => {
     const readiness = read('PRODUCTION_READINESS.md');
     const config = read('web/platho-config.mjs');
     const genesisFlag = read('artifacts/MAINNET_GENESIS_VERIFIED.txt').trim();
 
-    expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
-    expect(config).toMatch(/deploymentManifestHash:\s*'43b26836c99172fe1ad91220debbb7f5751e5610f886ea0b59842ae793ea7720'/);
-    expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
-    expect(genesisFlag).toBe('true');
-    expect(readiness).toMatch(/is pinned to the verified mainnet manifest/);
+    if (genesisFlag === 'true') {
+      expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
+      expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
+    } else {
+      expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PREVIEW/);
+      expect(config).toMatch(/signedBundlePurpose:\s*'pwa-mainnet-preview'/);
+    }
+    expect(readiness).toMatch(/must be pinned to the verified mainnet manifest/);
     expect(readiness).toMatch(/final live verifier report/);
     expect(readiness).toMatch(/preprod:check/);
+    if (genesisFlag !== 'true') {
+      expect(readiness).not.toMatch(/is pinned to the verified mainnet manifest/);
+      expect(readiness).toMatch(/current archive may still be preview-blocked/i);
+    }
     expect(readiness).not.toMatch(/a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd/);
   });
 
@@ -232,6 +274,28 @@ describe('v1 on-chain message source of truth', () => {
     expect(usernameSection).not.toMatch(/direct username payments/i);
     expect(usernameSection).not.toMatch(/refund due for direct username/i);
     expect(usernameSection).not.toMatch(/FlushAthRefundDue|get_refund_due/i);
+  });
+
+  it('SPEC-MSG-SOURCE-03C3B: public profile avatar docs describe the supported Vault-funded V1 flow', () => {
+    const whitepaper = read('web/docs/ath-whitepaper.md');
+    const avatarSection = whitepaper.slice(
+      whitepaper.indexOf('## Profile Avatar Fees'),
+      whitepaper.indexOf('## Market Stability Seller'),
+    );
+
+    expect(avatarSection).toMatch(/Current V1 profile avatar updates are Vault-funded/);
+    expect(avatarSection).toMatch(/SetProfileAvatarFromVaultBalance/);
+    expect(avatarSection).toMatch(/payer wallet is the bound Vault/);
+    expect(avatarSection).toMatch(/Direct user-wallet avatar payment is not a supported V1 product flow/);
+  });
+
+  it('SPEC-MSG-SOURCE-03C3C: final current spec does not resurrect stale Vault session publish wording', () => {
+    const spec = read('artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md');
+
+    expect(spec).toMatch(/Vault auth-signed publishes/);
+    expect(spec).not.toMatch(/Vault session publishes/i);
+    expect(spec).not.toMatch(/session budget/i);
+    expect(spec).not.toMatch(/message_budget_ton/i);
   });
 
   it('SPEC-MSG-SOURCE-03C4: PWA interface matrix labels Vault-auth service flows and payment-check ordering correctly', () => {
@@ -355,7 +419,7 @@ describe('v1 on-chain message source of truth', () => {
     expect(capsuleHub).toMatch(/size\.bits % 8 == 0/);
     expect(vault).toMatch(/fun isPublicCapsuleShapeValid/);
     expect(vault).toMatch(/requireByteAligned/);
-    expect(docs).toMatch(/raw public content bytes|public body text is `?1\.\.1024`? UTF-8 bytes/i);
+    expect(docs).toMatch(/raw public content bytes|public body text and public image\/avatar bytes use the same\s+1, 2, 4, 8, 16, or 32 KiB public capsule size classes/i);
     expect(docs).toMatch(/ton-snake-byte-cell\.v1|snake-cell/i);
   });
 
@@ -365,8 +429,6 @@ describe('v1 on-chain message source of truth', () => {
       'web/CRYPTO_PROTOCOL.md',
       'web/docs/crypto-protocol.md',
       'web/docs/ath-whitepaper.md',
-      'artifacts/platho_v1_spec_v0_3_2_vault_m6_aligned.md',
-      'artifacts/platho_v1_open_values_v0_6.md',
     ];
 
     for (const path of vaultAthDocs) {
@@ -375,10 +437,10 @@ describe('v1 on-chain message source of truth', () => {
       expect(text, path).toMatch(/official Vault ATHWallet/i);
       expect(text, path).toMatch(/unsupported/i);
       expect(text, path).toMatch(/ATHTransferRequestWithNotify|transfer-with-notify|notify-flow/i);
-      expect(text, path).toMatch(/WithdrawAth/i);
-      expect(text, path).toMatch(/not (user |TON )?escrow/i);
-      expect(text, path).toMatch(/authenticated ACK\/fail\/bounce/i);
-      expect(text, path).toMatch(/capped\s+by\s+the\s+original\s+inbound/i);
+      expect(text, path).toMatch(/signed external Vault command|Vault auth key \/ owner signing key/i);
+      expect(text, path).toMatch(/internal Vault TON/i);
+      expect(text, path).toMatch(/authenticated\s+ACK\/fail\/bounce/i);
+      expect(text, path).toMatch(/capped\s+by\s+the\s+reserved\s+internal|reserved internal value/i);
       expect(text, path).not.toMatch(/withdraw returns all excess/i);
       expect(text, path).not.toMatch(/returns all excess/i);
       expect(text, path).not.toMatch(/full excess refund/i);
@@ -573,5 +635,17 @@ describe('v1 on-chain message source of truth', () => {
       expect(text, path).toMatch(/pricing_frozen == true/i);
       expect(text, path).toMatch(/genesis_config_hash == 0/i);
     }
+  });
+
+  it('RT-FB-001/RT-FB-003: buyback runbook requires preflights and exact-envelope queued-tail semantics', () => {
+    const runbook = read('DEPLOYMENT_RUNBOOK.md');
+
+    expect(runbook).toMatch(/scripts\/enable_buyback_split_preflight\.ts/);
+    expect(runbook).toMatch(/Only after PASS may the treasury receiver call `?FeeAccumulator\.EnableBuybackSplit`?/);
+    expect(runbook).toMatch(/route is frozen/i);
+    expect(runbook).toMatch(/M20F evidence is ready/i);
+    expect(runbook).toMatch(/FeeAccumulator\.FlushBuybackDue`? only for a complete `?51\.05 TON`? envelope/);
+    expect(runbook).toMatch(/Buyback due below one full `?51\.05 TON`? execution envelope remains queued/i);
+    expect(runbook).toMatch(/Do not send partial buyback reserve to BuybackBurn/i);
   });
 });

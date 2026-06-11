@@ -22,6 +22,8 @@
     "stonfiApiSimulationCapture": "required: STON.fi API /v1/swap/simulate capture path/hash",
     "stonfiSdkOrApiTxParamsCapture": "required: official @ston-fi/sdk/API tx params capture path/hash",
     "routerPoolPtonCodeHashes": "required: mainnet router/pool/pTON code hash proof path/hash",
+    "athNotificationQueryIdPropagationProof": "required: mainnet proof that STON.fi ATH output preserves ExecuteBuybackChunk query_id into BuybackBurn AthTransferNotification and burn finalization",
+    "refundExcessBodyShapeProof": "required: mainnet proof that success excess, min_out refund, pTON refund, and bounce/failure bodies match BuybackBurn empty-message or typed-bounce handlers",
     "successExcessProof": "required: successful swap tx evidence where excesses return to BuybackBurn",
     "minOutFailureRefundProof": "required: min_out failure tx evidence where refund returns to BuybackBurn",
     "ptonRefundProof": "required: pTON refund tx evidence where refund returns to BuybackBurn",

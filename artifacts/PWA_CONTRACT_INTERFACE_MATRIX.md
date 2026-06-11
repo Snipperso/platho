@@ -36,9 +36,9 @@ These are normal user flows. They should be implemented in the PWA, with tests, 
 | Register messaging keys | `Vault` | `RegisterMessagingKeys(enc_pubkey, sign_pubkey, pq_kem_pubkey_hash, pq_kem_pubkey_len, pq_kem_pubkey, crypto_suite_mask)` | user wallet | Implemented | Profile action builds and sends an embedded-wallet transaction after reading `get_user`. |
 | Replace messaging keys | `Vault` | `ReplaceMessagingKeys(...)` | user wallet | Implemented | Sends the current locally derived key suite as the next on-chain key record. |
 | Deposit TON into Vault ledger | `Vault` | `DepositTon(amount)` | user wallet | Implemented | Vault action prompts amount and sends current-user-aware attach value after reading `get_user`. |
-| Withdraw TON from Vault ledger | `Vault` | `WithdrawTon(amount, recipient)` | user wallet | Implemented | Defaults recipient to the connected wallet. |
+| Withdraw TON from Vault ledger | `Vault` external | `WithdrawTonFromVaultBalance(amount, recipient)` | Vault auth key / owner signing key | Implemented | Defaults recipient to the connected wallet; execution reserve is paid from internal Vault TON. |
 | Deposit ATH into Vault ledger | user `ATHWallet` | `ATHTransferRequestWithNotify(query_id, amount, recipient = Vault, response_destination = user, notify_destination = Vault, notify_value)` | user wallet to user ATHWallet | Implemented | PWA derives the user's ATHWallet via `ATHMaster.get_wallet_address(owner)` and sends the authenticated notify-flow deposit. |
-| Withdraw ATH from Vault ledger | `Vault` | `WithdrawAth(query_id, amount, recipient)` | user wallet | Implemented | Vault sends from official Vault ATHWallet. Attached TON is execution/deploy/ACK value, not user escrow. |
+| Withdraw ATH from Vault ledger | `Vault` external | `WithdrawAthFromVaultBalance(amount, recipient)` | Vault auth key / owner signing key | Implemented | Vault sends from official Vault ATHWallet; downstream ATHWallet reserve is paid from internal Vault TON. |
 | Publish private message | `Vault` external | `PublishPrivateFromVaultBalance` | owner signing key | Implemented | PWA fetches fresh canonical charge, checks balance, confirms high surcharge when needed, broadcasts, tracks per-capsule state, and confirms CapsuleHub entry hashes. |
 | Publish public channel post/comment/avatar capsule | `Vault` external | `PublishPublicFromVaultBalance` | owner signing key | Implemented | Public body is raw PWA bytes in the accepted publish transaction body; final display requires CapsuleHub hash verification. |
 | Transfer ATH to another owner | user `ATHWallet` | `ATHTransferRequest(query_id, amount, recipient, response_destination)` | user wallet to user ATHWallet | Implemented | Normal ATH transfer from the user's external ATH wallet. |
@@ -102,8 +102,8 @@ Vault ATH policy is intentionally narrow:
 - the PWA must use the user ATHWallet `ATHTransferRequestWithNotify` notify-flow for Vault ATH deposits;
 - the PWA must not show the official Vault ATHWallet as a direct deposit address;
 - manual ordinary ATH transfer to the official Vault ATHWallet is unsupported and may not credit the Vault internal ledger;
-- `WithdrawAth` attached TON is not user escrow, and PWA wording must not promise a complete excess refund;
-- Vault credits only authenticated ACK/fail/bounce value it receives, minus local refund reserve and capped by the original inbound.
+- Vault ATH withdrawal reserve is internal Vault TON, and PWA wording must not promise a complete excess refund;
+- Vault credits only authenticated ACK/fail/bounce value it receives, minus local refund reserve and capped by the reserved internal value.
 
 FeeAccumulator and buyback policy:
 

@@ -17,7 +17,7 @@ import {
   decodeVaultGlobalViewStack,
   encodeTonAddressSliceBoc,
 } from '../web/vault-ton-rpc-provider.mjs';
-import { tonCell } from '../web/pwa-contract-transactions.mjs';
+import { computeVaultMessagingKeyId, tonCell } from '../web/pwa-contract-transactions.mjs';
 
 const NOW = Date.UTC(2026, 0, 3, 10, 0, 0);
 const OWNER = `0:${'11'.repeat(32)}`;
@@ -44,7 +44,16 @@ async function keyFixture() {
   });
   const verified = await verifySignedPublicKeyBundle(signedBundle, { now: NOW + 1 });
   const draft = await createVaultMessagingKeyDraft(verified.bundle, verified.signingPublicKey);
-  return { signedBundle, draft };
+  const keyId = await computeVaultMessagingKeyId({
+    owner_wallet: OWNER,
+    key_generation: 0n,
+    enc_pubkey: draft.message.enc_pubkey,
+    sign_pubkey: draft.message.sign_pubkey,
+    pq_kem_pubkey_hash: draft.message.pq_kem_pubkey_hash,
+    pq_kem_pubkey_len: draft.message.pq_kem_pubkey_len,
+    crypto_suite_mask: draft.message.crypto_suite_mask,
+  });
+  return { signedBundle, draft, keyId };
 }
 
 describe('Vault TON RPC provider', () => {
@@ -56,7 +65,7 @@ describe('Vault TON RPC provider', () => {
   });
 
   it('VAULT-RPC-02: calls get_user/get_key_record and binds a signed bundle to Vault record', async () => {
-    const { signedBundle, draft } = await keyFixture();
+    const { signedBundle, draft, keyId } = await keyFixture();
     const calls: Array<{ method: string; address: string; stack: any[] }> = [];
     const transport = {
       kind: 'mock-ton-rpc',
@@ -69,14 +78,14 @@ describe('Vault TON RPC provider', () => {
               num(-1n),
               num(0n),
               num(0n),
-              num(7n),
+              num(keyId),
               num(0x99n),
               num(3n),
             ],
           };
         }
         if (call.method === 'get_key_record') {
-          expect(call.stack).toEqual([{ type: 'num', value: '0x7' }]);
+          expect(call.stack).toEqual([{ type: 'num', value: `0x${keyId.toString(16)}` }]);
           return {
             stack: [
               num(-1n),
@@ -108,7 +117,7 @@ describe('Vault TON RPC provider', () => {
 
     expect(binding.active).toBe(true);
     expect(binding.providerKind).toBe('mock-ton-rpc');
-    expect(binding.currentKeyId).toBe(7n);
+    expect(binding.currentKeyId).toBe(keyId);
     expect(calls.map((call) => call.method)).toEqual(['get_user', 'get_key_record']);
     expect(calls.every((call) => call.address === VAULT)).toBe(true);
   });
@@ -183,6 +192,83 @@ describe('Vault TON RPC provider', () => {
     expect(requests[0].url).toBe('https://toncenter.example/api/v3/message');
     expect(requests[0].init.headers['X-API-Key']).toBe('test-api-key');
     expect(JSON.parse(requests[0].init.body)).toEqual({ boc: 'te6ccgEBAQEAAgAAAA==' });
+  });
+
+  it('VAULT-RPC-04B1: preserves upstream sendBoc error details for diagnostics', async () => {
+    const transport = createTonCenterV3VaultTransport({
+      endpoint: 'https://toncenter.example/api/v3/runGetMethod',
+      sendBocEndpoint: 'https://toncenter.example/api/v3/message',
+      requestSpacingMs: 0,
+      fetch: async () => {
+        const response = {
+          ok: false,
+          status: 500,
+          clone() {
+            return response;
+          },
+          async text() {
+            return JSON.stringify({ error: 'external message was not accepted' });
+          },
+        };
+        return response;
+      },
+    });
+
+    let error: any = null;
+    try {
+      await transport.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({
+      status: 500,
+      code: 'HTTP_ERROR',
+      responseBody: 'external message was not accepted',
+    });
+    expect(error?.message).toContain('TON RPC sendBoc HTTP 500: external message was not accepted');
+  });
+
+  it('VAULT-RPC-04B1A: prefers gateway upstream_error over generic gateway error', async () => {
+    const upstreamDetail = 'LITE_SERVER_UNKNOWN: cannot apply external message to current state: External message was not accepted: cannot run message on account: exitcode=16483';
+    const transport = createTonCenterV3VaultTransport({
+      endpoint: 'https://toncenter.example/api/v3/runGetMethod',
+      sendBocEndpoint: 'https://toncenter.example/api/v3/message',
+      requestSpacingMs: 0,
+      fetch: async () => {
+        const response = {
+          ok: false,
+          status: 500,
+          clone() {
+            return response;
+          },
+          async text() {
+            return JSON.stringify({
+              ok: false,
+              error: 'upstream request failed',
+              upstream_status: 500,
+              upstream_error: upstreamDetail,
+            });
+          },
+        };
+        return response;
+      },
+    });
+
+    let error: any = null;
+    try {
+      await transport.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({
+      status: 500,
+      code: 'HTTP_ERROR',
+      responseBody: upstreamDetail,
+    });
+    expect(error?.message).toContain(upstreamDetail);
+    expect(error?.message).not.toContain('upstream request failed');
   });
 
   it('VAULT-RPC-04B2: wraps TON Center v3 messages endpoint through the shared limiter', async () => {
@@ -518,6 +604,9 @@ describe('Vault TON RPC provider', () => {
       'https://toncenter.example/api/v3/messages',
       'https://toncenter.example/api/v3/messages',
     ]);
+    const messageRequests = requests.filter((request) => String(request.url).includes('/messages'));
+    expect(messageRequests[0].init.cache).toBeUndefined();
+    expect(messageRequests[1].init.cache).toBe('no-store');
   });
 
   it('VAULT-RPC-04H3: fresh get-method reads do not attach to cached in-flight requests', async () => {
@@ -554,6 +643,53 @@ describe('Vault TON RPC provider', () => {
     await expect(cachedInFlight).resolves.toMatchObject({ stack: [num(1n)] });
     await expect(freshInFlight).resolves.toMatchObject({ stack: [num(2n)] });
     expect(requests).toHaveLength(2);
+  });
+
+  it('VAULT-RPC-04H4: fresh critical reads do not attach to lower-priority in-flight reads', async () => {
+    clearToncenterRunGetMethodCache();
+    const requests: any[] = [];
+    let releaseFetch: ((value: unknown) => void) | null = null;
+    const fetchGate = new Promise((resolve) => {
+      releaseFetch = resolve;
+    });
+    const transport = createTonCenterV3VaultTransport({
+      endpoint: 'https://toncenter.example/api/v3/runGetMethod',
+      requestSpacingMs: 0,
+      rateLimitKey: `fresh-critical-flight-${Math.random()}`,
+      fetch: async (url: string, init: any) => {
+        requests.push({ url, init });
+        if (requests.length === 1) await fetchGate;
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(requests.length)] };
+          },
+        };
+      },
+    });
+
+    const call = { address: VAULT, method: 'get_private_sender_index', stack: [{ type: 'num', value: '0x1' }], cacheTtlMs: 0 };
+    const syncRead = transport.runGetMethod({
+      ...call,
+      priority: 'messages',
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await expect(transport.runGetMethod({
+      ...call,
+      priority: 'critical',
+      verify: true,
+      queueTimeoutMs: 5,
+      requestTimeoutMs: 50,
+    })).rejects.toMatchObject({
+      code: 'QUEUE_TIMEOUT',
+    });
+
+    expect(requests).toHaveLength(1);
+    releaseFetch?.(null);
+    await expect(syncRead).resolves.toMatchObject({ stack: [num(1n)] });
   });
 
   it('VAULT-RPC-04I: builds a fallback transport from provider config and skips missing custom globals', async () => {
@@ -691,6 +827,84 @@ describe('Vault TON RPC provider', () => {
     ]);
   });
 
+  it('VAULT-RPC-04I4: verifier-only providers verify critical reads but are not normal read or send fallbacks', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-rpc',
+      fallbackProviderIds: [],
+      providers: [
+        {
+          id: 'platho-rpc',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://rpc.platho.example/api/v3/message',
+        },
+        {
+          id: 'toncenter-direct',
+          kind: 'toncenter-v3',
+          verifierOnly: true,
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.example/api/v3/message',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `verifier-only-${Math.random()}`,
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+      fetch: async (url: string, init: any) => {
+        const endpoint = String(url);
+        if (endpoint.includes('/message')) {
+          calls.push(endpoint);
+          return {
+            ok: true,
+            status: 200,
+            async json() {
+              return { ok: true };
+            },
+          };
+        }
+        const method = JSON.parse(String(init?.body ?? '{}')).method;
+        calls.push(`${endpoint}:${method}`);
+        if (endpoint.includes('rpc.platho.example') && method === 'get_receive_intent') {
+          return {
+            ok: false,
+            status: 503,
+            async json() {
+              return { ok: false };
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(7n)] };
+          },
+        };
+      },
+    });
+
+    await expect(transport?.runGetMethod({
+      address: VAULT,
+      method: 'get_user',
+      stack: [],
+      verify: true,
+    })).resolves.toMatchObject({ stack: [num(7n)] });
+    await expect(transport?.runGetMethod({
+      address: VAULT,
+      method: 'get_receive_intent',
+      stack: [],
+    })).rejects.toMatchObject({ status: 503 });
+    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
+
+    expect(calls).toEqual([
+      'https://rpc.platho.example/api/v3/runGetMethod:get_user',
+      'https://toncenter.example/api/v3/runGetMethod:get_user',
+      'https://rpc.platho.example/api/v3/runGetMethod:get_receive_intent',
+      'https://rpc.platho.example/api/v3/message',
+    ]);
+  });
+
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {
     const primary = {
       kind: 'primary-rpc',
@@ -786,6 +1000,56 @@ describe('Vault TON RPC provider', () => {
     expect(fallbackCalls).toEqual(['read:get_global', 'send']);
   });
 
+  it('VAULT-RPC-04J3: falls back when a custom read transport ignores request timeouts', async () => {
+    const primary = {
+      kind: 'custom-hanging-read',
+      async runGetMethod() {
+        return new Promise(() => {});
+      },
+    };
+    const fallbackCalls: string[] = [];
+    const fallback = {
+      kind: 'fallback-rpc',
+      async runGetMethod(call: any) {
+        fallbackCalls.push(`read:${call.method}`);
+        return { exit_code: 0, stack: [num(44n)] };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [primary, fallback],
+      requestTimeoutMs: 5,
+    });
+
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_private_sender_index', stack: [] })).resolves.toMatchObject({ stack: [num(44n)] });
+    expect(fallbackCalls).toEqual(['read:get_private_sender_index']);
+  });
+
+  it('VAULT-RPC-04J4: falls back when a custom send transport ignores request timeouts', async () => {
+    const primary = {
+      kind: 'custom-hanging-send',
+      supportsSendBoc: true,
+      async sendBoc() {
+        return new Promise(() => {});
+      },
+    };
+    const fallbackCalls: string[] = [];
+    const fallback = {
+      kind: 'fallback-rpc',
+      supportsSendBoc: true,
+      async sendBoc() {
+        fallbackCalls.push('send');
+        return { ok: true, result: { hash: 'fallback' } };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [primary, fallback],
+      requestTimeoutMs: 5,
+    });
+
+    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
+    expect(fallbackCalls).toEqual(['send']);
+  });
+
   it('VAULT-RPC-04K: fails closed when critical read providers disagree', async () => {
     const first = {
       kind: 'first-rpc',
@@ -809,6 +1073,52 @@ describe('Vault TON RPC provider', () => {
       name: 'VaultTonRpcProviderError',
       code: 'RPC_DISAGREEMENT',
     });
+  });
+
+  it('RT-PWA-VLT-001: get_user critical verification compares balances and publish nonce', async () => {
+    const baseUserStack = [
+      num(-1n),
+      num(100n),
+      num(200n),
+      num(300n),
+      num(400n),
+      num(500n),
+    ];
+
+    for (const [label, stackIndex, verifierValue] of [
+      ['ton_balance', 1, 101n],
+      ['ath_balance', 2, 201n],
+      ['publish_nonce', 5, 501n],
+    ] as const) {
+      const first = {
+        kind: `primary-${label}`,
+        async runGetMethod() {
+          return { exit_code: 0, stack: baseUserStack };
+        },
+      };
+      const second = {
+        kind: `verifier-${label}`,
+        async runGetMethod() {
+          const stack = [...baseUserStack];
+          stack[stackIndex] = num(verifierValue);
+          return { exit_code: 0, stack };
+        },
+      };
+      const transport = createFallbackTonRpcTransport({
+        transports: [first, second],
+        verifyCriticalReads: true,
+        criticalMethods: ['get_user'],
+      });
+
+      await expect(transport?.runGetMethod({
+        address: VAULT,
+        method: 'get_user',
+        stack: [],
+      }), label).rejects.toMatchObject({
+        name: 'VaultTonRpcProviderError',
+        code: 'RPC_DISAGREEMENT',
+      });
+    }
   });
 
   it('VAULT-RPC-04K0: explicit allowUnverifiedCriticalRead bypasses critical verifier disputes', async () => {
@@ -921,6 +1231,222 @@ describe('Vault TON RPC provider', () => {
     });
   });
 
+  it('VAULT-RPC-04K3: rejects get_user balance and nonce lag for critical verification', async () => {
+    const first = {
+      kind: 'fresh-rpc',
+      async runGetMethod() {
+        return {
+          exit_code: 0,
+          stack: [
+            num(-1n),
+            num(120_000_000n),
+            num(50_000_000_000n),
+            num(777n),
+            num(888n),
+            num(12n),
+          ],
+        };
+      },
+    };
+    const second = {
+      kind: 'lagging-rpc',
+      async runGetMethod() {
+        return {
+          exit_code: 0,
+          stack: [
+            num(-1n),
+            num(80_000_000n),
+            num(40_000_000_000n),
+            num(777n),
+            num(888n),
+            num(11n),
+          ],
+        };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [first, second],
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+    });
+
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] })).rejects.toMatchObject({
+      code: 'RPC_DISAGREEMENT',
+    });
+  });
+
+  it('VAULT-RPC-04K4: still rejects get_user when verified key fields disagree', async () => {
+    const first = {
+      kind: 'fresh-rpc',
+      async runGetMethod() {
+        return {
+          exit_code: 0,
+          stack: [
+            num(-1n),
+            num(120_000_000n),
+            num(50_000_000_000n),
+            num(777n),
+            num(888n),
+            num(12n),
+          ],
+        };
+      },
+    };
+    const second = {
+      kind: 'wrong-key-rpc',
+      async runGetMethod() {
+        return {
+          exit_code: 0,
+          stack: [
+            num(-1n),
+            num(120_000_000n),
+            num(50_000_000_000n),
+            num(778n),
+            num(888n),
+            num(12n),
+          ],
+        };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [first, second],
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+    });
+
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] })).rejects.toMatchObject({
+      name: 'VaultTonRpcProviderError',
+      code: 'RPC_DISAGREEMENT',
+    });
+  });
+
+  it('VAULT-RPC-04K5: verifies get_global static route fields without rejecting mutable counter lag', async () => {
+    const capsuleHub = `0:${'66'.repeat(32)}`;
+    const profileRegistry = `0:${'77'.repeat(32)}`;
+    const usernameRegistry = `0:${'88'.repeat(32)}`;
+    const vaultAthWallet = `0:${'99'.repeat(32)}`;
+    const athMaster = `0:${'aa'.repeat(32)}`;
+    const stablePrefix = [
+      num(-1n),
+      num(-1n),
+      num(-1n),
+      num(-1n),
+      num(0x9999n),
+      { type: 'slice', value: encodeTonAddressSliceBoc(capsuleHub) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(profileRegistry) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(usernameRegistry) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(vaultAthWallet) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(athMaster) },
+    ];
+    const first = {
+      kind: 'fresh-rpc',
+      async runGetMethod() {
+        return {
+          exit_code: 0,
+          stack: [
+            ...stablePrefix,
+            num(12n),
+            num(4n),
+            num(7n),
+            num(0n),
+            num(2n),
+            num(0n),
+            num(0n),
+            num(9n),
+            num(86_400n),
+            num(14_999_970_000_000_000n),
+            num(30_000_000_000n),
+            num(10_000_000_000n),
+            num(15_000_000_000_000_000n),
+          ],
+        };
+      },
+    };
+    const second = {
+      kind: 'lagging-rpc',
+      async runGetMethod() {
+        return {
+          exit_code: 0,
+          stack: [
+            ...stablePrefix,
+            num(11n),
+            num(3n),
+            num(6n),
+            num(0n),
+            num(1n),
+            num(0n),
+            num(0n),
+            num(8n),
+            num(86_400n),
+            num(14_999_980_000_000_000n),
+            num(20_000_000_000n),
+            num(10_000_000_000n),
+            num(15_000_000_000_000_000n),
+          ],
+        };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [first, second],
+      verifyCriticalReads: true,
+      criticalMethods: ['get_global'],
+    });
+
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).resolves.toMatchObject({
+      stack: expect.arrayContaining([num(12n), num(14_999_970_000_000_000n)]),
+    });
+  });
+
+  it('VAULT-RPC-04K6: still rejects get_global when static route fields disagree', async () => {
+    const baseStack = [
+      num(-1n),
+      num(-1n),
+      num(-1n),
+      num(-1n),
+      num(0x9999n),
+      { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'66'.repeat(32)}`) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'77'.repeat(32)}`) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'88'.repeat(32)}`) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'99'.repeat(32)}`) },
+      { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'aa'.repeat(32)}`) },
+      num(1n),
+      num(2n),
+      num(3n),
+      num(4n),
+      num(5n),
+      num(6n),
+      num(7n),
+      num(8n),
+      num(86_400n),
+      num(9n),
+      num(10n),
+      num(11n),
+      num(12n),
+    ];
+    const first = {
+      kind: 'first-rpc',
+      async runGetMethod() {
+        return { exit_code: 0, stack: baseStack };
+      },
+    };
+    const second = {
+      kind: 'wrong-manifest-rpc',
+      async runGetMethod() {
+        return { exit_code: 0, stack: baseStack.map((item, index) => (index === 4 ? num(0x8888n) : item)) };
+      },
+    };
+    const transport = createFallbackTonRpcTransport({
+      transports: [first, second],
+      verifyCriticalReads: true,
+      criticalMethods: ['get_global'],
+    });
+
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).rejects.toMatchObject({
+      name: 'VaultTonRpcProviderError',
+      code: 'RPC_DISAGREEMENT',
+    });
+  });
+
   it('VAULT-RPC-04L: reads account balance through the configured provider instead of app hardcoding Toncenter v2', async () => {
     const requests: string[] = [];
     const transport = createTonCenterV3VaultTransport({
@@ -987,10 +1513,14 @@ describe('Vault TON RPC provider', () => {
             stack: [
               num(-1n),
               num(-1n),
+              num(-1n),
+              num(-1n),
               num(0x9999n),
               { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'66'.repeat(32)}`) },
               { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'77'.repeat(32)}`) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'78'.repeat(32)}`) },
               { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'88'.repeat(32)}`) },
+              { type: 'slice', value: encodeTonAddressSliceBoc(`0:${'99'.repeat(32)}`) },
               num(1n),
               num(2n),
               num(3n),
@@ -998,9 +1528,11 @@ describe('Vault TON RPC provider', () => {
               num(5n),
               num(6n),
               num(7n),
+              num(8n),
               num(86_400n),
               num(8n),
               num(9n),
+              num(1n),
               num(10n),
             ],
           };

@@ -4,10 +4,14 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
   DepositTon,
-  WithdrawTon,
 } from '../build/Vault/Vault_Vault';
+import {
+  registerVaultSigningKeys,
+  sendVaultWithdrawTonExternal,
+} from './helpers/vault-receive-intent-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
+const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 
 async function setup() {
   const blockchain = await Blockchain.create();
@@ -25,12 +29,13 @@ async function setup() {
     balance: toNano('2'),
     workchain: address.workChain,
   }));
-  return { vault: blockchain.openContract(new Vault(address, init)), user, recipient };
+  return { blockchain, vault: blockchain.openContract(new Vault(address, init)), user, recipient };
 }
 
 describe('Vault TON accounting invariants without publish sessions', () => {
   it('VAULT-INV-TON-01: deterministic deposit/withdraw walk preserves internal TON accounting', async () => {
-    const { vault, user, recipient } = await setup();
+    const { blockchain, vault, user, recipient } = await setup();
+    const signingKey = await registerVaultSigningKeys(vault, user, 41);
     let expected = 0n;
 
     for (const amount of [toNano('0.1'), toNano('0.2'), toNano('0.05')]) {
@@ -42,19 +47,12 @@ describe('Vault TON accounting invariants without publish sessions', () => {
       expect((await vault.getGetUser(user.address)).ton_balance).toBe(expected);
     }
 
-    await vault.send(user.getSender(), { value: toNano('0.01') }, {
-      $$type: 'WithdrawTon',
-      amount: toNano('0.12'),
-      recipient: recipient.address,
-    } as WithdrawTon);
-    expected -= toNano('0.12');
+    await sendVaultWithdrawTonExternal(blockchain, vault, user, signingKey, GENESIS_HASH, toNano('0.12'), recipient.address);
+    expected -= toNano('0.12') + WITHDRAW_TON_EXEC_RESERVE;
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(expected);
 
-    await vault.send(user.getSender(), { value: toNano('0.01') }, {
-      $$type: 'WithdrawTon',
-      amount: toNano('1'),
-      recipient: recipient.address,
-    } as WithdrawTon);
+    await sendVaultWithdrawTonExternal(blockchain, vault, user, signingKey, GENESIS_HASH, toNano('1'), recipient.address);
+    expected -= WITHDRAW_TON_EXEC_RESERVE;
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(expected);
   });
 });

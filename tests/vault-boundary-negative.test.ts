@@ -11,9 +11,7 @@ import {
   BindUsernameRegistry,
   SealGenesis,
   DepositTon,
-  WithdrawTon,
   RegisterMessagingKeys,
-  WithdrawAth,
   AthTransferNotification,
 } from '../build/Vault/Vault_Vault';
 import {
@@ -24,6 +22,8 @@ import { hybridMessagingKeyFields } from './helpers/vault-hybrid-key';
 import {
   registerVaultSigningKeys,
   sendVaultReceiveIntentExternal,
+  sendVaultWithdrawAthExternal,
+  sendVaultWithdrawTonExternal,
 } from './helpers/vault-receive-intent-external';
 
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
@@ -239,25 +239,21 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount * 2n);
   });
 
-  it('VAULT-BND-01C: WithdrawTon requires caller-funded reserve and does not spend Vault backing on fees', async () => {
-    const { blockchain, vault, user, recipient } = await setupPlain();
+  it('VAULT-BND-01C: signed WithdrawTonFromVaultBalance pays execution from internal Vault TON', async () => {
+    const { vault, blockchain, user, recipient } = await setupPlain();
+    const userKey = await registerVaultSigningKeys(vault, user, 91);
     const amount = 50_000_000n;
-    await depositTon(vault, user, amount);
+    await depositTon(vault, user, amount + WITHDRAW_TON_EXEC_RESERVE);
 
-    await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE - 1n }, {
-      $$type: 'WithdrawTon',
+    const withdraw = await sendVaultWithdrawTonExternal(
+      blockchain,
+      vault,
+      user,
+      userKey,
+      GENESIS_HASH,
       amount,
-      recipient: recipient.address,
-    } as WithdrawTon);
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
-
-    const beforeVaultBalance = await contractBalance(blockchain, vault.address);
-    const withdraw = await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE }, {
-      $$type: 'WithdrawTon',
-      amount,
-      recipient: recipient.address,
-    } as WithdrawTon);
-    const afterVaultBalance = await contractBalance(blockchain, vault.address);
+      recipient.address,
+    );
     const recipientTx = findTransaction(withdraw.transactions, {
       from: vault.address,
       to: recipient.address,
@@ -266,22 +262,30 @@ describe('Vault value/storage boundary negative matrix', () => {
 
     expect(recipientTx).toBeDefined();
     expect(inboundValue(recipientTx)).toBe(amount);
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(0n);
-    expect(beforeVaultBalance - afterVaultBalance).toBeLessThanOrEqual(amount);
+    const userState = await vault.getGetUser(user.address);
+    expect(userState.ton_balance).toBe(0n);
+    expect(userState.publish_nonce).toBe(1n);
   });
 
-  it('VAULT-BND-01D: WithdrawTon to the Vault itself is rejected before debiting internal TON', async () => {
-    const { vault, user } = await setupPlain();
+  it('VAULT-BND-01D: invalid signed TON withdrawal charges only the internal exec reserve', async () => {
+    const { vault, blockchain, user } = await setupPlain();
+    const userKey = await registerVaultSigningKeys(vault, user, 92);
     const amount = 50_000_000n;
-    await depositTon(vault, user, amount);
+    await depositTon(vault, user, amount + WITHDRAW_TON_EXEC_RESERVE);
 
-    await vault.send(user.getSender(), { value: WITHDRAW_TON_EXEC_RESERVE }, {
-      $$type: 'WithdrawTon',
+    await sendVaultWithdrawTonExternal(
+      blockchain,
+      vault,
+      user,
+      userKey,
+      GENESIS_HASH,
       amount,
-      recipient: vault.address,
-    } as WithdrawTon);
+      vault.address,
+    );
 
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(amount);
+    const userState = await vault.getGetUser(user.address);
+    expect(userState.ton_balance).toBe(amount);
+    expect(userState.publish_nonce).toBe(1n);
   });
 
   it('VAULT-BND-02: RegisterMessagingKeys honors exact storage boundaries', async () => {
@@ -359,32 +363,40 @@ describe('Vault value/storage boundary negative matrix', () => {
     expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
     expect((await officialWallet.getGetWalletData()).balance).toBe(2_000n);
 
-    await vault.send(user.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE - 1n }, {
-      $$type: 'WithdrawAth',
-      query_id: 20n,
-      amount: 750n,
-      recipient: recipient.address,
-    } as WithdrawAth);
+    const userKey = await registerVaultSigningKeys(vault, user, 93);
+    await expect(sendVaultWithdrawAthExternal(
+      blockchain,
+      vault,
+      user,
+      userKey,
+      MANIFEST_HASH,
+      750n,
+      recipient.address,
+    )).rejects.toThrow(/not accepted|16027/);
     expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
-    expect((await vault.getGetPendingAthWithdrawal(20n)).exists).toBe(false);
+    expect((await vault.getGetPendingAthWithdrawalFor(user.address, 0n)).exists).toBe(false);
     expect((await officialWallet.getGetWalletData()).balance).toBe(2_000n);
 
-    await vault.send(user.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
-      $$type: 'WithdrawAth',
-      query_id: 21n,
-      amount: 750n,
-      recipient: recipient.address,
-    } as WithdrawAth);
+    await depositTon(vault, user, VAULT_ATH_WITHDRAW_MIN_VALUE);
+    await sendVaultWithdrawAthExternal(
+      blockchain,
+      vault,
+      user,
+      userKey,
+      MANIFEST_HASH,
+      750n,
+      recipient.address,
+    );
     const recipientAthWalletAddress = await athWalletAddress(recipient.address, athMaster);
     const recipientAthWallet = blockchain.openContract(new ATHWallet(recipientAthWalletAddress));
     expect((await vault.getGetUser(user.address)).ath_balance).toBe(1_250n);
-    expect((await vault.getGetPendingAthWithdrawal(21n)).exists).toBe(false);
+    expect((await vault.getGetPendingAthWithdrawalFor(user.address, 0n)).exists).toBe(false);
     expect((await officialWallet.getGetWalletData()).balance).toBe(1_250n);
     expect((await recipientAthWallet.getGetWalletData()).balance).toBe(750n);
     expect((await vault.getGetUser(user.address)).ton_balance).toBeGreaterThan(0n);
   });
 
-  it('VAULT-BND-04B: WithdrawAth to the Vault itself is rejected before debiting internal ATH', async () => {
+  it('VAULT-BND-04B: signed ATH withdrawal to the Vault itself is rejected before debiting internal ATH', async () => {
     const { blockchain, vault, user, userAthWallet, officialVaultAthWallet } = await setupAth();
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
 
@@ -399,25 +411,29 @@ describe('Vault value/storage boundary negative matrix', () => {
     const beforeUser = await vault.getGetUser(user.address);
     const beforeOfficial = await officialWallet.getGetWalletData();
 
-    await vault.send(user.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
-      $$type: 'WithdrawAth',
-      query_id: 31n,
-      amount: 750n,
-      recipient: vault.address,
-    } as WithdrawAth);
+    const userKey = await registerVaultSigningKeys(vault, user, 94);
+    await depositTon(vault, user, VAULT_ATH_WITHDRAW_MIN_VALUE);
+    await sendVaultWithdrawAthExternal(
+      blockchain,
+      vault,
+      user,
+      userKey,
+      MANIFEST_HASH,
+      750n,
+      vault.address,
+    );
 
     const afterUser = await vault.getGetUser(user.address);
     const afterOfficial = await officialWallet.getGetWalletData();
     expect(afterUser.ath_balance).toBe(beforeUser.ath_balance);
     expect(afterOfficial.balance).toBe(beforeOfficial.balance);
-    expect((await vault.getGetPendingAthWithdrawalFor(user.address, 31n)).exists).toBe(false);
+    expect((await vault.getGetPendingAthWithdrawalFor(user.address, 0n)).exists).toBe(false);
     expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
   });
 
   it('VAULT-BND-05: ATH withdrawals scope pending ids by owner wallet, not only client query_id', async () => {
     const { blockchain, vault, user, recipient, athWallet } = await setupPlain();
     const user2 = await blockchain.treasury('vault-boundary-ath-user-2');
-    const clientQueryId = 777n;
 
     await vault.send(athWallet.getSender(), { value: toNano('0.05') }, {
       $$type: 'AthTransferNotification',
@@ -434,21 +450,15 @@ describe('Vault value/storage boundary negative matrix', () => {
       sender_wallet: user2.address,
     } as AthTransferNotification);
 
-    await vault.send(user.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
-      $$type: 'WithdrawAth',
-      query_id: clientQueryId,
-      amount: 100n,
-      recipient: recipient.address,
-    } as WithdrawAth);
-    await vault.send(user2.getSender(), { value: VAULT_ATH_WITHDRAW_MIN_VALUE }, {
-      $$type: 'WithdrawAth',
-      query_id: clientQueryId,
-      amount: 100n,
-      recipient: recipient.address,
-    } as WithdrawAth);
+    const userKey = await registerVaultSigningKeys(vault, user, 95);
+    const user2Key = await registerVaultSigningKeys(vault, user2, 96);
+    await depositTon(vault, user, VAULT_ATH_WITHDRAW_MIN_VALUE);
+    await depositTon(vault, user2, VAULT_ATH_WITHDRAW_MIN_VALUE);
+    await sendVaultWithdrawAthExternal(blockchain, vault, user, userKey, GENESIS_HASH, 100n, recipient.address);
+    await sendVaultWithdrawAthExternal(blockchain, vault, user2, user2Key, GENESIS_HASH, 100n, recipient.address);
 
-    const pending1 = await vault.getGetPendingAthWithdrawalFor(user.address, clientQueryId);
-    const pending2 = await vault.getGetPendingAthWithdrawalFor(user2.address, clientQueryId);
+    const pending1 = await vault.getGetPendingAthWithdrawalFor(user.address, 0n);
+    const pending2 = await vault.getGetPendingAthWithdrawalFor(user2.address, 0n);
     expect(pending1.exists).toBe(true);
     expect(pending2.exists).toBe(true);
     expect(pending1.owner_wallet.toString()).toBe(user.address.toString());

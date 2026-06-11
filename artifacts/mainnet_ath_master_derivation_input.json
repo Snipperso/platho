@@ -3,10 +3,10 @@
   "network": "mainnet",
   "status": "FINAL_MAINNET_ATH_MASTER_INPUT",
   "treasuryOwnerAddress": "UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH",
-  "contentBocBase64": "te6cckEBDAEA8QABAwDAAQIBWAIHAgEgAwUBQb9FRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwQAFgBQbGF0aG8gQVRIAUG/btT5QqeEjOLLBmt3oRKMah/4xD9Dii3OJGErqf+riwMGAAgAQVRIAgEgCAoBQb9SCN70b1odT53OZqswn0qFEwXxZvke952SPvWONPmiCQkAaABVdGlsaXR5IHRva2VuIG9mIHRoZSBQbGF0aG8gY29tbXVuaWNhdGlvbiBwcm90b2NvbC4BQb9dAfpePAaQHEUEbGst3Opa92T+oO7XKhDUBPIxLOskfQsABAA5r2Mc4g==",
+  "contentBocBase64": "te6cckECDwEAAT0AAQMAwAECAVgCCgIBIAMIAgJwBAYBQb5eFD1QUCkJihGGmfEqE02vLa33BZEJYuWGqq5MLXtTkAUAQgBwbGF0aG8tbWFpbm5ldC0yMDI2MDYxMC1jbGVhbi0wNgFBvlRqb/4bec/dhrrT24dDE9zeL7BeanSqfzVS2WF8edEwBwAWAFBsYXRobyBBVEgBQb9u1PlCp4SM4ssGa3ehEoxqH/jEP0OKLc4kYSup/6uLAwkACABBVEgCASALDQFBv1II3vRvWh1Pnc5mqzCfSoUTBfFm+R73nZI+9Y40+aIJDABoAFV0aWxpdHkgdG9rZW4gb2YgdGhlIFBsYXRobyBjb21tdW5pY2F0aW9uIHByb3RvY29sLgFBv10B+l48BpAcRQRsay3c6lr3ZP6g7tcqENQE8jEs6yR9DgAEADkru/pv",
   "proofRefs": {
     "treasuryOwnerProof": "artifacts/mainnet_genesis_verify_input.json#manifest.addresses.ath_treasury_owner=UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH",
-    "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=3f02381090c27e0cd36e7f6098979dcbecd6ee0ea2154ddb2cea1412a9caf8ea",
+    "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=d8a113e74ef44499e27b367992a2d579a045d1670644b79458edaa504860c6fb",
     "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=06ab47304838b2efcd3fb501736829f5d61e13522268e40096c1434dfa969df0"
   }
 }

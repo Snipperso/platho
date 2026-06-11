@@ -30,7 +30,15 @@ describe('CapsuleHub canonical storage economics', () => {
       '32K': 33972,
     });
     expect(report.canonical_capsule_cells.public_header_max_bytes).toBe(72);
-    expect(report.canonical_capsule_cells.public_body_max_bytes).toBe(1024);
+    expect(report.canonical_capsule_cells.public_body_max_bytes).toBe(32 * 1024);
+    expect(report.canonical_capsule_cells.public_body_bytes_by_size_class).toEqual({
+      '1K': 1024,
+      '2K': 2048,
+      '4K': 4096,
+      '8K': 8192,
+      '16K': 16384,
+      '32K': 32768,
+    });
     expect(report.code_hashes.capsulehub).toBe(currentCodeHashes().CAPSULEHUB_CODE_HASH);
     expect(BigInt(report.minimum_retained_margin_nanotons)).toBe(1_000_000n);
     expect(BigInt(report.worst_margin_nanotons)).toBeGreaterThanOrEqual(BigInt(report.minimum_retained_margin_nanotons));
@@ -41,7 +49,12 @@ describe('CapsuleHub canonical storage economics', () => {
       'VAULT_PRIVATE_HYBRID_8K',
       'VAULT_PRIVATE_HYBRID_16K',
       'VAULT_PRIVATE_HYBRID_32K',
-      'VAULT_PUBLIC_POST',
+      'VAULT_PUBLIC_1K',
+      'VAULT_PUBLIC_2K',
+      'VAULT_PUBLIC_4K',
+      'VAULT_PUBLIC_8K',
+      'VAULT_PUBLIC_16K',
+      'VAULT_PUBLIC_32K',
     ]);
     for (const item of report.cases) {
       expect(BigInt(item.retained_margin_nanotons), item.label).toBeGreaterThanOrEqual(BigInt(report.minimum_retained_margin_nanotons));

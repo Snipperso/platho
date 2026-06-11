@@ -52,6 +52,8 @@ describe('CapsuleHub TON RPC provider', () => {
               num(0n),
               num(0n),
               num(0n),
+              num(0n),
+              num(0n),
               { type: 'slice', value: encodeTonAddressSliceBoc(AUTHOR) },
               num(0n),
               num(0n),
@@ -61,6 +63,17 @@ describe('CapsuleHub TON RPC provider', () => {
               num(0n),
               { type: 'cell', value: cellBoc(tonCell.beginCell().endCell()) },
               { type: 'cell', value: cellBoc(tonCell.beginCell().endCell()) },
+            ],
+          };
+        }
+        if (call.method === 'get_private_recipient_index' || call.method === 'get_private_sender_index') {
+          return {
+            stack: [
+              num(-1n),
+              call.stack[0],
+              num(8n),
+              num(9n),
+              num(3n),
             ],
           };
         }
@@ -97,6 +110,13 @@ describe('CapsuleHub TON RPC provider', () => {
             { type: 'slice', value: encodeTonAddressSliceBoc(FEE) },
             { type: 'slice', value: encodeTonAddressSliceBoc(VAULT) },
             { type: 'slice', value: encodeTonAddressSliceBoc(GENESIS) },
+            num(0n),
+            num(0n),
+            num(0n),
+            num(0n),
+            num(0n),
+            num(1n),
+            num(1n),
           ],
         };
       },
@@ -109,6 +129,16 @@ describe('CapsuleHub TON RPC provider', () => {
       verify: true,
     });
     await provider.getPrivateEntry(1n, {
+      cacheTtlMs: 0,
+      priority: 'critical',
+      verify: true,
+    });
+    await provider.getPrivateRecipientIndex(0x123n, {
+      cacheTtlMs: 0,
+      priority: 'critical',
+      verify: true,
+    });
+    await provider.getPrivateSenderIndex(0x456n, {
       cacheTtlMs: 0,
       priority: 'critical',
       verify: true,
@@ -132,6 +162,18 @@ describe('CapsuleHub TON RPC provider', () => {
       verify: true,
     });
     expect(calls[2]).toMatchObject({
+      method: 'get_private_recipient_index',
+      cacheTtlMs: 0,
+      priority: 'critical',
+      verify: true,
+    });
+    expect(calls[3]).toMatchObject({
+      method: 'get_private_sender_index',
+      cacheTtlMs: 0,
+      priority: 'critical',
+      verify: true,
+    });
+    expect(calls[4]).toMatchObject({
       method: 'get_public_entry',
       cacheTtlMs: 0,
       priority: 'critical',
@@ -173,6 +215,7 @@ describe('CapsuleHub TON RPC provider', () => {
       .uint(3n, 64, 'bounce_id')
       .uint(4n, 160, 'bounce_tag')
       .uint(0xbbbbn, 256, 'publish_id')
+      .uint(1n, 8, 'size_class')
       .uint(0x73656e742076696120506c6174686f2e417070n, 152, 'marketing_note')
       .address(AUTHOR, 'author_wallet')
       .ref(tonCell.beginCell()
@@ -194,6 +237,8 @@ describe('CapsuleHub TON RPC provider', () => {
             stack: [
               num(-1n),
               num(7n),
+              num(6n),
+              num(5n),
               num(0x777n),
               num(0xaaaan),
               { type: 'slice', value: encodeTonAddressSliceBoc(AUTHOR) },
@@ -222,6 +267,17 @@ describe('CapsuleHub TON RPC provider', () => {
               num(publicHeaderHash),
               num(publicBodyHash),
               { type: 'cell', value: cellBoc(publicHeader) },
+            ],
+          };
+        }
+        if (call.method === 'get_private_recipient_index' || call.method === 'get_private_sender_index') {
+          return {
+            stack: [
+              ['num', '-0x1'],
+              call.stack[0],
+              ['num', '0x7'],
+              ['num', '0x8'],
+              ['num', '0x2'],
             ],
           };
         }
@@ -289,6 +345,8 @@ describe('CapsuleHub TON RPC provider', () => {
       page_id: 0n,
       page_offset: 7n,
       created_at: 1_700_000_123n,
+      sender_prev_link: 6n,
+      recipient_prev_link: 5n,
     });
     await expect(provider.resolvePrivateEntryBody(privateEntry, { priority: 'critical', messageCacheTtlMs: 0 })).resolves.toMatchObject({
       body_boc: cellBoc(privateBody),
@@ -305,6 +363,7 @@ describe('CapsuleHub TON RPC provider', () => {
       created_at: 1_700_000_456n,
     });
     await expect(provider.resolvePublicEntryBody(publicEntry, { priority: 'critical', messageCacheTtlMs: 0 })).resolves.toMatchObject({
+      size_class: 1n,
       body_boc: cellBoc(publicBody),
     });
     await expect(provider.getState()).resolves.toMatchObject({
@@ -323,6 +382,20 @@ describe('CapsuleHub TON RPC provider', () => {
       fee_accumulator_address: FEE,
       vault_address: VAULT,
     });
+    await expect(provider.getPrivateRecipientIndex(0x101n)).resolves.toMatchObject({
+      exists: true,
+      key_id: 0x101n,
+      latest_entry_id: 7n,
+      latest_entry_link: 8n,
+      entry_count: 2n,
+    });
+    await expect(provider.getPrivateSenderIndex(0x202n)).resolves.toMatchObject({
+      exists: true,
+      key_id: 0x202n,
+      latest_entry_id: 7n,
+      latest_entry_link: 8n,
+      entry_count: 2n,
+    });
     await expect(provider.getPrivatePage(0n)).resolves.toMatchObject({
       exists: true,
       page_id: 0n,
@@ -331,7 +404,14 @@ describe('CapsuleHub TON RPC provider', () => {
       updated_at: 0n,
     });
 
-    expect(calls.map((call) => call.method)).toEqual(['get_private_entry', 'get_public_entry', 'get_state', 'get_private_page']);
+    expect(calls.map((call) => call.method)).toEqual([
+      'get_private_entry',
+      'get_public_entry',
+      'get_state',
+      'get_private_recipient_index',
+      'get_private_sender_index',
+      'get_private_page',
+    ]);
     expect(messageCalls.map((call) => call.params.opcode)).toEqual(['0xA4F862C0', '0x8C2A76B7']);
     expect(messageCalls[0].params).toMatchObject({
       body_hash: privateBodyHash.toString(16).padStart(64, '0'),
@@ -414,7 +494,9 @@ describe('CapsuleHub TON RPC provider', () => {
       limit: 10,
       sort: 'asc',
     });
+    expect(messageCalls[0]).not.toHaveProperty('source');
     expect(messageCalls[1]).not.toHaveProperty('body_hash');
+    expect(messageCalls[1]).not.toHaveProperty('source');
     expect(messageCalls[1]).toMatchObject({
       limit: 1000,
       sort: 'asc',
@@ -520,6 +602,47 @@ describe('CapsuleHub TON RPC provider', () => {
     });
     await provider.resolvePrivateEntryBody(entry).catch((error) => {
       expect(isCapsuleHubBodyHistoryUnavailable(error)).toBe(true);
+    });
+  });
+
+  it('CAPHUB-RPC-04B: reports message-history HTTP failures as body history gaps', async () => {
+    const privateHeader0 = tonCell.snakeCellFromBytes(new Uint8Array([0x10]), 'private header0');
+    const privateHeader1 = tonCell.snakeCellFromBytes(privateHeader1Bytes(1_700_000_000), 'private header1');
+    const privateBody = tonCell.snakeCellFromBytes(new Uint8Array([0x12]), 'private body');
+    const entry = {
+      exists: true,
+      entry_id: 16n,
+      entry_uid: 0x1616n,
+      publish_id: 0xfeedn,
+      author_wallet: VAULT,
+      created_at: 1_700_000_123n,
+      header_0_hash: await cellHashInt(privateHeader0),
+      header_1_hash: await cellHashInt(privateHeader1),
+      body_hash: await cellHashInt(privateBody),
+      header_0_boc: cellBoc(privateHeader0),
+      header_1_boc: cellBoc(privateHeader1),
+      body_boc: null,
+    };
+    const transport = {
+      async runGetMethod() {
+        throw new Error('unexpected runGetMethod');
+      },
+      async getMessages() {
+        const error: any = new Error('TON RPC messages HTTP 403');
+        error.status = 403;
+        error.code = 'HTTP_ERROR';
+        throw error;
+      },
+    };
+    const provider = createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport });
+
+    await expect(provider.resolvePrivateEntryBody(entry)).rejects.toMatchObject({
+      name: 'CapsuleHubTonRpcProviderError',
+      code: 'BODY_HISTORY_UNAVAILABLE',
+      entryId: '16',
+      kind: 'private',
+      historyScanIncomplete: true,
+      historyError: expect.stringContaining('HTTP 403'),
     });
   });
 
@@ -652,5 +775,74 @@ describe('CapsuleHub TON RPC provider', () => {
       body_boc: cellBoc(privateBody),
     });
     expect(calls).toEqual(['wrong:exact', 'archive:exact']);
+  });
+
+  it('RT-VCAPS-005: refuses a verified publish body from the wrong source address', async () => {
+    const wrongVault = `0:${'66'.repeat(32)}`;
+    const privateHeader0 = tonCell.snakeCellFromBytes(new Uint8Array([0x10]), 'private header0');
+    const privateHeader1 = tonCell.snakeCellFromBytes(privateHeader1Bytes(1_700_000_000), 'private header1');
+    const privateBody = tonCell.snakeCellFromBytes(new Uint8Array([0x12]), 'private body');
+    const privateHeader0Hash = await cellHashInt(privateHeader0);
+    const privateHeader1Hash = await cellHashInt(privateHeader1);
+    const privateBodyHash = await cellHashInt(privateBody);
+    const privateMessageBody = cellBoc(tonCell.beginCell()
+      .uint(0xA4F862C0n, 32, 'op')
+      .uint(1n, 64, 'bounce_id')
+      .uint(2n, 160, 'bounce_tag')
+      .uint(0xcafen, 256, 'publish_id')
+      .uint(1n, 8, 'size_class')
+      .uint(2n, 8, 'crypto_suite')
+      .uint(privateHeader0Hash, 256, 'header_0_hash')
+      .ref(tonCell.beginCell()
+        .uint(privateHeader1Hash, 256, 'header_1_hash')
+        .uint(privateBodyHash, 256, 'body_hash')
+        .ref(privateHeader0, 'header_0')
+        .ref(privateHeader1, 'header_1')
+        .ref(privateBody, 'body')
+        .uint(10_000_000n, 128, 'protocol_fee_paid')
+        .endCell(), 'payload')
+      .endCell());
+    const entry = {
+      exists: true,
+      entry_id: 16n,
+      entry_uid: 0x1616n,
+      publish_id: 0xcafen,
+      author_wallet: VAULT,
+      created_at: 1_700_000_123n,
+      header_0_hash: privateHeader0Hash,
+      header_1_hash: privateHeader1Hash,
+      body_hash: privateBodyHash,
+      header_0_boc: cellBoc(privateHeader0),
+      header_1_boc: cellBoc(privateHeader1),
+      body_boc: null,
+    };
+    const calls: string[] = [];
+    const transport = createFallbackTonRpcTransport({
+      transports: [
+        {
+          kind: 'wrong-source-history',
+          async getMessages(params: any) {
+            calls.push(`wrong:${params.body_hash ? 'exact' : 'broad'}:${params.source ?? 'no-source'}`);
+            return { messages: [{ source: wrongVault, message_content: { body: privateMessageBody } }] };
+          },
+        },
+        {
+          kind: 'archive-history',
+          async getMessages(params: any) {
+            calls.push(`archive:${params.body_hash ? 'exact' : 'broad'}:${params.source ?? 'no-source'}`);
+            return { messages: [{ source: VAULT, message_content: { body: privateMessageBody } }] };
+          },
+        },
+      ],
+    });
+    const provider = createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport });
+
+    await expect(provider.resolvePrivateEntryBody(entry, { vaultAddress: VAULT })).resolves.toMatchObject({
+      body_boc: cellBoc(privateBody),
+    });
+    expect(calls).toEqual([
+      'wrong:exact:no-source',
+      'archive:exact:no-source',
+    ]);
   });
 });

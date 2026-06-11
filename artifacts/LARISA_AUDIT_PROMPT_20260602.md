@@ -48,7 +48,7 @@ messages start from 0.0337 TON
 ```text
 public 1K exact current net example: 0.0337 TON
 hybrid private 1K exact current net example: 0.0347 TON
-larger private size classes cost more
+larger public or private size classes cost more
 ```
 
 Не считай конфликтом, если public copy говорит `from 0.0337 TON`, а technical pricing table показывает `0.0337/0.0347 TON`, при условии что docs ясно различают product label и exact canonical examples.
@@ -392,7 +392,7 @@ Accepted economics:
 - ATH may discount the protocol-fee component after unlock;
 - product label may be `from 0.0337 TON`;
 - exact no-discount examples may be `0.0337/0.0347 TON`;
-- larger private classes cost more.
+- larger public or private classes cost more.
 
 Do not propose removing ATH publish discounts or lowering/raising protocol fee unless current code/docs contradict this accepted model or create real accounting risk.
 

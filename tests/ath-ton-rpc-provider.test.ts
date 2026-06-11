@@ -63,9 +63,9 @@ describe('ATH TON RPC providers', () => {
   });
 
   it('ATH-RPC-02: reads ATHWallet balance and pending notification', async () => {
-    const calls: Array<{ method: string; address: string; stack: any[] }> = [];
+    const calls: Array<{ method: string; address: string; stack: any[]; verify?: boolean; priority?: string; cacheTtlMs?: number }> = [];
     const transport = {
-      async runGetMethod(call: { method: string; address: string; stack: any[] }) {
+      async runGetMethod(call: { method: string; address: string; stack: any[]; verify?: boolean; priority?: string; cacheTtlMs?: number }) {
         calls.push(call);
         if (call.method === 'get_wallet_data') {
           return {
@@ -92,7 +92,11 @@ describe('ATH TON RPC providers', () => {
     };
     const provider = createAthWalletTonRpcProvider({ athWalletAddress: WALLET, transport });
 
-    await expect(provider.getWalletData()).resolves.toMatchObject({
+    await expect(provider.getWalletData({
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    })).resolves.toMatchObject({
       balance: 777n,
       owner_address: OWNER,
       ath_master_address: MASTER,
@@ -105,6 +109,7 @@ describe('ATH TON RPC providers', () => {
     });
 
     expect(calls.map((call) => call.method)).toEqual(['get_wallet_data', 'get_pending_notification']);
+    expect(calls[0]).toMatchObject({ verify: true, priority: 'critical', cacheTtlMs: 0 });
     expect(calls[1].stack).toEqual([{ type: 'num', value: '0x9' }, { type: 'num', value: '0xa' }]);
   });
 

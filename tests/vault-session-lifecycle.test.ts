@@ -4,8 +4,14 @@ import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
   DepositTon,
-  WithdrawTon,
 } from '../build/Vault/Vault_Vault';
+import {
+  registerVaultSigningKeys,
+  sendVaultWithdrawTonExternal,
+} from './helpers/vault-receive-intent-external';
+
+const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
+const WITHDRAW_TON_EXEC_RESERVE = 2_000_000n;
 
 async function setup() {
   const blockchain = await Blockchain.create();
@@ -17,8 +23,7 @@ async function setup() {
   const attacker = await blockchain.treasury('attacker');
   const capsuleHub = await blockchain.treasury('capsule-hub');
 
-  const genesisHash = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
-  const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, genesisHash, true, true, 0n);
+  const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
   const address = contractAddress(0, init);
 
   await blockchain.setShardAccount(
@@ -33,7 +38,7 @@ async function setup() {
   );
 
   const vault = blockchain.openContract(new Vault(address, init));
-  return { vault, user, recipient, attacker };
+  return { blockchain, vault, user, recipient, attacker };
 }
 
 async function deposit(vault: any, user: any, amount: bigint) {
@@ -63,26 +68,21 @@ describe('Vault milestone 1: direct balances without publish sessions', () => {
   });
 
   it('VAULT-HAPPY-04/REJECT-02B: TON withdrawal debits balance and rejected overdraw cannot leave negative state', async () => {
-    const { vault, user, recipient } = await setup();
+    const { blockchain, vault, user, recipient } = await setup();
+    const signingKey = await registerVaultSigningKeys(vault, user, 31);
     await deposit(vault, user, toNano('1'));
 
     const beforeRecipient = await recipient.getBalance();
-    await vault.send(user.getSender(), { value: toNano('0.1') }, {
-      $$type: 'WithdrawTon',
-      amount: toNano('0.4'),
-      recipient: recipient.address,
-    } as WithdrawTon);
+    await sendVaultWithdrawTonExternal(blockchain, vault, user, signingKey, GENESIS_HASH, toNano('0.4'), recipient.address);
 
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('0.6'));
+    let expected = toNano('1') - toNano('0.4') - WITHDRAW_TON_EXEC_RESERVE;
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(expected);
     expect(await recipient.getBalance()).toBeGreaterThan(beforeRecipient);
 
-    await vault.send(user.getSender(), { value: toNano('0.1') }, {
-      $$type: 'WithdrawTon',
-      amount: toNano('2'),
-      recipient: recipient.address,
-    } as WithdrawTon);
+    await sendVaultWithdrawTonExternal(blockchain, vault, user, signingKey, GENESIS_HASH, toNano('2'), recipient.address);
+    expected -= WITHDRAW_TON_EXEC_RESERVE;
 
-    expect((await vault.getGetUser(user.address)).ton_balance).toBe(toNano('0.6'));
+    expect((await vault.getGetUser(user.address)).ton_balance).toBe(expected);
   });
 
   it('NO-ADMIN: empty fallback is rejected and cannot mutate Vault accounting', async () => {

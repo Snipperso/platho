@@ -115,6 +115,8 @@ export interface M20FStonfiLiveCollectorInput {
     stonfiApiSimulationCapture: string;
     stonfiSdkOrApiTxParamsCapture: string;
     routerPoolPtonCodeHashes: string;
+    athNotificationQueryIdPropagationProof: string;
+    refundExcessBodyShapeProof: string;
     successExcessProof: string;
     minOutFailureRefundProof: string;
     ptonRefundProof: string;
@@ -237,6 +239,8 @@ export function createM20FStonfiLiveCollectorInputTemplate(): M20FStonfiLiveColl
       stonfiApiSimulationCapture: shaRef('STON.fi API simulation capture'),
       stonfiSdkOrApiTxParamsCapture: shaRef('official STON.fi SDK/API tx params capture'),
       routerPoolPtonCodeHashes: shaRef('router/pool/pTON code hash proof'),
+      athNotificationQueryIdPropagationProof: shaRef('ATH notification query_id propagation and BuybackBurn burn finalization proof'),
+      refundExcessBodyShapeProof: shaRef('refund/excess/failure body shape proof matching BuybackBurn handlers'),
       successExcessProof: shaRef('success excess proof returning to BuybackBurn'),
       minOutFailureRefundProof: shaRef('min_out failure refund proof returning to BuybackBurn'),
       ptonRefundProof: shaRef('pTON refund proof returning to BuybackBurn'),
@@ -462,6 +466,8 @@ function buildM19EInput(
         sdkTxParams: input.proofRefs.stonfiSdkOrApiTxParamsCapture,
         liveQuote: input.proofRefs.stonfiApiSimulationCapture,
         stonfiAthSourceWalletDerivation: input.proofRefs.stonfiAthSourceWalletDerivationVector,
+        athNotificationQueryIdPropagation: input.proofRefs.athNotificationQueryIdPropagationProof,
+        refundExcessBodyShape: input.proofRefs.refundExcessBodyShapeProof,
         successExcess: input.proofRefs.successExcessProof,
         minOutFailureRefund: input.proofRefs.minOutFailureRefundProof,
         ptonRefund: input.proofRefs.ptonRefundProof,

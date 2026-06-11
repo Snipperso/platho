@@ -139,14 +139,20 @@ describe('ProfileRegistry TON RPC provider', () => {
     };
     const provider = createProfileRegistryTonRpcProvider({ profileRegistryAddress: REGISTRY, transport });
 
-    await expect(provider.getGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0 })).resolves.toMatchObject({
+    await expect(provider.getGlobal({
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    })).resolves.toMatchObject({
       vault_bound: true,
       vault_address: VAULT,
       official_ath_wallet_address: OFFICIAL,
     });
     expect(seenCall).toMatchObject({
       method: 'get_global',
-      verify: true,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
       priority: 'critical',
       cacheTtlMs: 0,
     });
@@ -181,7 +187,7 @@ describe('ProfileRegistry TON RPC provider', () => {
       },
     };
     const provider = createProfileRegistryTonRpcProvider({ profileRegistryAddress: REGISTRY, transport });
-    const critical = { verify: true, priority: 'critical', cacheTtlMs: 0 };
+    const critical = { verify: false, allowUnverifiedCriticalRead: true, priority: 'critical', cacheTtlMs: 0 };
 
     await expect(provider.getAvatar(OWNER, critical)).resolves.toMatchObject({ exists: true });
     await expect(provider.getAvatarVersion(OWNER, 7n, critical)).resolves.toMatchObject({ version: 7n });

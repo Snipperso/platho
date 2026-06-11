@@ -14,7 +14,7 @@ PROGRAM{
   DECLPROC $MockVaultAckSink$_fun_get_state
   DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
   DECLPROC $PublishPrivateFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid
-  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid
+  DECLPROC $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid
   86957 DECLMETHOD %get_state
   DECLPROC recv_internal
   DECLGLOBVAR __tact_context
@@ -56,17 +56,19 @@ PROGRAM{
     $PublishPrivateFromVault$_store INLINECALLDICT
     ENDC
   }>
-  $PublishPublicFromVault$_store PROCINLINE:<{
+  $PublishPublicFromVault$_store PROCREF:<{
     2351593143 PUSHINT
-    s0 s11 XCHG2
+    s0 s12 XCHG2
     32 STU
-    s1 s9 XCHG
+    s1 s10 XCHG
     64 STU
-    s1 s7 XCHG
+    s1 s8 XCHG
     160 STU
-    s1 s5 XCHG
+    s1 s6 XCHG
     256 STU
-    s1 s3 XCHG
+    s1 s4 XCHG
+    8 STU
+    s1 s2 XCHG
     152 STU
     STSLICE
     SWAP
@@ -83,7 +85,7 @@ PROGRAM{
     STBREFR
   }>
   $PublishPublicFromVault$_store_cell PROCINLINE:<{
-    10 -ROLL
+    11 -ROLL
     $PublishPublicFromVault$_store INLINECALLDICT
     ENDC
   }>
@@ -142,7 +144,7 @@ PROGRAM{
   }>
   $PublishPrivateFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_crypto_suite_header_0_hash_header_1_hash_body_hash_header_0_header_1_body_protocol_fee_paid PROCINLINE:<{
   }>
-  $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid PROCINLINE:<{
+  $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid PROCINLINE:<{
   }>
   %get_state PROC:<{
     $MockVaultAckSink$_contract_load INLINECALLDICT
@@ -254,6 +256,7 @@ PROGRAM{
       64 LDU
       160 LDU
       256 LDU
+      8 LDU
       152 LDU
       LDREF
       DROP
@@ -269,20 +272,21 @@ PROGRAM{
       CTOS
       128 LDU
       DROP
+      s8 s11 XCHG
       s7 s10 XCHG
       s6 s9 XCHG
-      s5 s8 XCHG
+      s5 s11 XCHG
       s4 s10 XCHG
       s3 s9 XCHG
-      s8 s10 s0 XCHG3
+      s11 s10 s0 XCHG3
       TRUE
-      s10 s9 XCHG2
+      s10 s12 XCHG2
       0 PUSHINT
       s0 s12 XCHG
-      $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid INLINECALLDICT
+      $PublishPublicFromVault$_constructor_bounce_id_bounce_tag_publish_id_size_class_marketing_note_author_wallet_header_hash_body_hash_header_body_protocol_fee_paid INLINECALLDICT
       NEWC
       $PublishPublicFromVault$_store_cell INLINECALLDICT
-      s1 s3 s0 XCHG3
+      s3 s3 s0 XCHG3
       $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true

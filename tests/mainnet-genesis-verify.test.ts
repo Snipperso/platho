@@ -754,6 +754,16 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('ATH_MASTER_TOTAL_SUPPLY_MISMATCH');
   });
 
+  it('rejects final genesis when ATHMaster treasury supply has not been deployed', () => {
+    const input = finalInput();
+    input.snapshot.ath_master.treasury_supply_deployed = false;
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('ATH_TREASURY_SUPPLY_NOT_DEPLOYED');
+  });
+
   it('rejects a self-consistent manifest with a non-100M ATH total supply constant', () => {
     const input = finalInput();
     input.manifest.constants!.ath_total_supply_atomic = '90000000000000000';
@@ -813,6 +823,16 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_BACKING_BALANCE_NOT_EXACT');
   });
 
+  it('RT-VEST-001: rejects final genesis when ATHVesting official wallet has the wrong code hash', () => {
+    const input = finalInput();
+    input.snapshot.ath_long_term_vesting_official_ath_wallet.code_hash = hash('wrong_ath_vesting_official_wallet_code');
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_OFFICIAL_ATH_WALLET_CODE_HASH_MISMATCH');
+  });
+
   it('rejects final genesis when ATHVesting already has claimed or pending state', () => {
     const input = finalInput();
     input.snapshot.ath_long_term_vesting.claimed_ath = '1';
@@ -835,6 +855,18 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_PENDING_AMOUNT_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_PENDING_CREATED_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_LAST_TERMINAL_QUERY_NOT_ZERO_AT_GENESIS');
+  });
+
+  it('RT-VEST-005: rejects final genesis if ATHVesting start time is stale enough to unlock immediately', () => {
+    const input = finalInput();
+    input.snapshot.ath_long_term_vesting.vested_ath = '100000000000000';
+    input.snapshot.ath_long_term_vesting.claimable_ath = '100000000000000';
+
+    const report = verifyMainnetGenesisSnapshot(input);
+
+    expect(report.mainnet_genesis_verified).toBe(false);
+    expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_VESTED_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('ATH_LONG_TERM_VESTING_CLAIMABLE_NOT_ZERO_AT_GENESIS');
   });
 
   it('rejects final genesis when ATHVesting snapshot identity is wrong or missing', () => {
@@ -1146,6 +1178,38 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     report = verifyMainnetGenesisSnapshot(usernameInput);
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_TREASURY_RECEIVER_IS_PROTOCOL_ROLE');
+  });
+
+  it('RT-FEE-04: rejects FeeAccumulator TON treasury receiver equal to protocol-owned roles', () => {
+    const cases: Array<keyof ReturnType<typeof finalInput>['manifest']['addresses']> = [
+      'vault',
+      'capsulehub',
+      'ath_master',
+      'buyback_burn',
+      'market_stability_seller',
+      'username_registry',
+      'profile_registry',
+      'ath_long_term_vesting',
+      'vault_official_ath_wallet',
+      'buyback_burn_official_ath_wallet',
+      'market_stability_seller_official_ath_wallet',
+      'username_registry_official_ath_wallet',
+      'profile_registry_official_ath_wallet',
+      'ath_long_term_vesting_official_ath_wallet',
+      'ath_treasury_owner_ath_wallet',
+    ];
+
+    for (const addressKey of cases) {
+      const input = finalInput();
+      const protocolAddress = input.manifest.addresses[addressKey];
+      input.manifest.addresses.fee_accumulator_ton_treasury_receiver = protocolAddress;
+      input.snapshot.fee_accumulator.ton_treasury_receiver = protocolAddress;
+
+      const report = verifyMainnetGenesisSnapshot(input);
+
+      expect(report.mainnet_genesis_verified, addressKey).toBe(false);
+      expect(report.issue_codes, addressKey).toContain('FEE_ACCUMULATOR_TON_TREASURY_IS_PROTOCOL_ROLE');
+    }
   });
 
   it('rejects final genesis when UsernameRegistry treasury ATH receiver is not basechain', () => {

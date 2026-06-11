@@ -41,6 +41,8 @@ The UI must not expose manual public-key bundle exchange, QR package sharing, ra
 
 Avatars are also backend-free. The image bytes are compressed to WebP and published as public `CapsuleHub` avatar capsules. `ProfileRegistry` stores the paid wallet-level pointer and ATH accounting state. The PWA may cache reconstructed data URLs locally, but display must verify the reconstructed bytes against the `ProfileRegistry` avatar hash. If the public capsule body is pruned, missing from RPC history, or absent from local cache, the avatar is unavailable rather than trusted from an unverified source. No CDN or profile API is part of v1 delivery.
 
+The on-chain avatar registration is an owner-signed pointer trust model. `Vault`/`ProfileRegistry` validate ownership, payment route, media format, part count, and pointer shape, but they do not re-read `CapsuleHub` public entries or reassemble media bytes on-chain. The production PWA therefore must refuse to sign avatar registration until `CapsuleHub` entries for the owner are visible, all declared parts are present in one stream, and the assembled WebP SHA-256 equals the registered `avatarHash`. Reusing an already-published identical avatar is an explicit recovery path, not proof that a fresh public publish BOC was accepted.
+
 ## Local encrypted history
 
 Message history is device-local and encrypted at rest with a non-extractable WebCrypto AES-GCM key stored in IndexedDB. If IndexedDB is unavailable, the PWA falls back to encrypted in-memory history for the current session instead of writing plaintext to a weaker persistent store.

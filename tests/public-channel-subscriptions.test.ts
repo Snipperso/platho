@@ -137,6 +137,44 @@ describe('PWA public channel subscriptions', () => {
     expect(publicChannelThreadsToFeedItems(threads)[0]).not.toHaveProperty('threadId');
   });
 
+  it('PUBLIC-SUB-03B: block posts keep ordered text and images through thread/feed conversion', () => {
+    const state = normalizePublicChannelSubscriptions(null, PLATHO_APP_CONFIG.publicChannels);
+    const blocks = [
+      { type: 'text', text: 'First paragraph' },
+      { type: 'image', url: 'data:image/webp;base64,AAAA' },
+      { type: 'text', text: 'Second paragraph' },
+      { type: 'image', url: 'data:image/webp;base64,BBBB' },
+    ];
+    const feed = normalizePublicChannelFeed({
+      version: 1,
+      channelId: 'platho.app',
+      posts: [{
+        id: 'post-blocks',
+        createdAt: '2026-05-21T12:00:00.000Z',
+        author: 'platho.app',
+        authorWallet: `0:${'11'.repeat(32)}`,
+        blocks,
+        entryId: '7',
+        bodyHash: `0x${'aa'.repeat(32)}`,
+      }],
+    }, 'platho.app');
+
+    const threads = publicChannelSubscriptionsToThreads(state, PLATHO_APP_CONFIG.publicChannels, {
+      'platho.app': { feed },
+    });
+    const message = threads[0].messages[0];
+
+    expect(threads[0].preview).toBe('First paragraph');
+    expect(message.text).toBe('First paragraph');
+    expect(message.blocks).toEqual(blocks);
+    expect(message.attachment).toBeNull();
+
+    const roundtrip = publicChannelThreadsToFeedItems(threads)[0];
+    expect(roundtrip.text).toBe('First paragraph');
+    expect(roundtrip.blocks).toEqual(blocks);
+    expect(roundtrip.imageUrl).toBeNull();
+  });
+
   it('PUBLIC-CACHE-HASH-01: stored public cache loses chain-verified status until chain revalidation', () => {
     const store = new Map<string, string>();
     const storage = {

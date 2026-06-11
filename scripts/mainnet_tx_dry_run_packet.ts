@@ -728,6 +728,8 @@ async function buildDryRunPacket(draft: Draft) {
     document: 'PLATHO.V1.MAINNET_TX_DRY_RUN_PACKET',
     generated_at: new Date().toISOString(),
     production_deploy_executed: false,
+    lifecycle_stage: 'pre_execution_tx_dry_run_template',
+    lifecycle_note: 'production_deploy_executed=false means this local dry-run packet is a pre-execution template; live release truth comes from mainnet_genesis_verify_report.json after fresh verification.',
     source_draft_generated_at: draft.generated_at,
     manifest_hash_hex: mh,
     treasury_owner_ath_wallet: {
@@ -766,6 +768,9 @@ function markdown(packet: Awaited<ReturnType<typeof buildDryRunPacket>>): string
     '',
     `Generated: ${packet.generated_at}`,
     `Manifest hash: ${packet.manifest_hash_hex}`,
+    `Production deploy executed: ${packet.production_deploy_executed}`,
+    `Lifecycle stage: ${packet.lifecycle_stage}`,
+    `Lifecycle note: ${packet.lifecycle_note}`,
     '',
     '## Treasury Owner ATHWallet',
     '',

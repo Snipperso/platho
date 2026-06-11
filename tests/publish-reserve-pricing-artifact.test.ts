@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import {
+  PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
+  PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
   PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
   PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
-  publicCapsuleBaseHoldNanotons,
-  publicCapsuleBaseNetPriceNanotons,
 } from '../web/message-pricing-policy.mjs';
 
 function readJson(path: string): any {
@@ -46,10 +46,15 @@ describe('Publish reserve pricing artifacts', () => {
     expect(report.fee_config_snapshot.config_25_cell_price).toBe('436906667');
     expect(report.current_constants_nanotons.privateHybridFee).toBe('10000000');
     expect(report.current_constants_nanotons.publicFee).toBe('10000000');
-    expect(report.cases.find((item: any) => item.id === 'public_post')?.user_net_debit_nanotons).toBe('33700000');
+    expect(report.cases.find((item: any) => item.id === 'public_1k')?.user_net_debit_nanotons).toBe('33700000');
     expect(report.cases.find((item: any) => item.id === 'private_hybrid_1k')?.user_net_debit_nanotons).toBe('34700000');
     expect(report.cases.map((item: any) => item.id)).toEqual([
-      'public_post',
+      'public_1k',
+      'public_2k',
+      'public_4k',
+      'public_8k',
+      'public_16k',
+      'public_32k',
       'private_hybrid_1k',
       'private_hybrid_2k',
       'private_hybrid_4k',
@@ -72,10 +77,13 @@ describe('Publish reserve pricing artifacts', () => {
     const report = readJson('artifacts/publish_reserve_pricing_report.json');
     const cases = new Map(report.cases.map((item: any) => [item.id, item]));
 
-    const publicCase = cases.get('public_post');
-    expect(publicCase.canonical_max_charge_nanotons).toBe(publicCapsuleBaseHoldNanotons().toString());
-    expect(publicCase.user_net_debit_nanotons).toBe(publicCapsuleBaseNetPriceNanotons().toString());
-    expect(publicCase.protocol_fee_nanotons).toBe('10000000');
+    for (const [sizeClass, hold] of Object.entries(PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS)) {
+      const publicCase = cases.get(`public_${sizeClass}k`);
+      expect(publicCase, `public_${sizeClass}k`).toBeTruthy();
+      expect(publicCase.canonical_max_charge_nanotons).toBe(hold.toString());
+      expect(publicCase.user_net_debit_nanotons).toBe(PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[sizeClass].toString());
+      expect(publicCase.protocol_fee_nanotons).toBe('10000000');
+    }
 
     for (const [sizeClass, hold] of Object.entries(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS)) {
       const privateCase = cases.get(`private_hybrid_${sizeClass}k`);

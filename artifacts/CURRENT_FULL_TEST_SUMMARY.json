@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-03T18:49:51.3987392Z",
+  "generated_after_local_run": "2026-06-08T18:03:05.6726684+03:00",
   "discovered_test_files": 98,
   "executed_test_files": 98,
   "passed_test_files": 98,
   "failed_test_files": 0,
-  "total_tests": 762,
-  "passed_tests": 762,
+  "total_tests": 892,
+  "passed_tests": 892,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -50,7 +50,6 @@
     "It also includes the final archive cleanup pass: preview and production static deploy prep artifacts were regenerated from a clean environment without the local .env.testnet.local production blocker; the local env file was restored after artifact generation and is not packaged by the audit archive guard.",
     "It also includes the delta-pass cleanup after archive 20260602-162845: WEB-DEPLOY-04 was renamed and extended so static runtime selection explicitly includes public web/docs/*.md files while excluding top-level source docs, local server files, sourcemaps, and TypeScript sources.",
     "It also includes the final Section 15 hardening pass: final genesis verification now requires ATHVesting vested_ath and claimable_ath to be zero at genesis, MarketStabilitySeller reserve funder is rejected when it resolves to a protocol-owned role in draft/packet/verifier checks, and embedded wallet sends fail closed when RPC seqno cannot be read instead of silently signing with fallback seqno 0.",
-    "Production release gates are intentionally blocked in this archive: the PWA remains in preview mode and MAINNET_GENESIS_VERIFIED=false until the final mainnet genesis is verified and the PWA config is switched to the verified production manifest. Buyback route execution and MarketStabilitySeller sale activation remain intentionally staged until post-pool route/liquidity evidence is available.",
     "It also includes the PWA private-send preflight copy fix: an unactivated Platho account now shows Activate Platho account before sending, and other preflight blockers surface their concrete reason instead of generic Send blocked.",
     "It also includes the PWA publish-state copy fix: a single-capsule publish whose BOC was sent but chain confirmation is still pending now renders submitted, confirming instead of the misleading partial publish 0/1.",
     "It also includes the PWA fixed postquantum messaging cleanup: the obsolete profile encryption selector and its JS preference plumbing were removed because HYBRID_V1 is now the only private messaging suite.",
@@ -74,6 +73,14 @@
     "It also includes the Larisa Section 11 static public feed fallback guard: production PWA config validation now rejects allowUnverifiedStaticPublicFeeds=true so static JSON cannot self-declare chain-backed public content in a production package.",
     "It also includes the Larisa Section 12 public whitepaper cleanup: MarketStabilitySeller allocation is described as reserved at genesis but funded only after pool launch, evidence-bound pricing freeze, and reserve-funder notify-flow; public docs no longer claim seller reserve backing/readiness before final genesis production release.",
     "It also includes the Larisa Section 13 seam/interface cleanup: PWA_CONTRACT_INTERFACE_MATRIX now labels payment checks, profile avatar, and username mint as Vault-auth signed external flows instead of wallet-sender transactions, records the current payment-check ordering, and static tests pin Vault service signed payloads to manifest, Vault, and owner domains.",
-    "It also includes the final predeploy fresh-run checkpoint: npm.cmd test passed locally with 98/98 test files and 762/762 tests before regenerating the current mainnet manifest draft, deploy packet, tx dry-run packet, and static deploy prep evidence for the current code hashes."
+    "It also includes the public 32 KiB capsule signed-envelope hardening: Vault public signed publish payloads are bound to the signing domain, deployment manifest, target Vault address, owner wallet, public publish kind, size class, and PUBLIC_NONE suite before acceptMessage; invalid public size classes now reject before acceptMessage and before nonce/balance mutation.",
+    "It also includes the final predeploy fresh-run checkpoint: npm.cmd test passed locally with 98/98 test files and 773/773 tests before regenerating the current mainnet manifest draft, deploy packet, tx dry-run packet, and static deploy prep evidence for the current code hashes.",
+    "It also includes the fresh S9-S12 evidence refresh: npm.cmd test passed locally on 2026-06-04 with 98/98 test files and 783/783 tests after the payment-check, RPC transport, local history, avatar cache, docs/release-copy, and static deploy prep fixes; preview and production static deploy prep artifacts were regenerated for the current web runtime bundle.",
+    "It also includes the Larisa Section 13 seam cleanup: replacing a local wallet clears same-tab private runtime state, local encrypted history handles, cached Vault key-owner maps, and pending private retry/confirmation timers; Vault service signed externals for profile avatar, username mint, and messaging-key replacement now share ambiguous-broadcast handling with nonce confirmation before downstream finality checks. npm.cmd test passed locally on 2026-06-04 with 98/98 test files and 785/785 tests.",
+    "It also includes the Larisa Section 14 final checklist cleanup: importing an encrypted wallet key file now routes through wallet-scoped runtime reset before switching plathoWallet in the same tab, preventing old private threads/payment-check UI state from remaining visible after encrypted key-file wallet replacement. npm.cmd test passed locally on 2026-06-04 with 98/98 test files and 786/786 tests.",
+    "It also includes the Larisa Section 14 locked-wallet replacement cleanup: the PWA now tracks activeRuntimeWalletAddress separately from the unlocked plathoWallet object, so create/import/import-key replacement after wallet lock still clears old private runtime threads, payment-check UI state, encrypted history handles, replay store, and retry/confirmation timers before switching to the new wallet. npm.cmd test passed locally on 2026-06-04 with 98/98 test files and 787/787 tests.",
+    "It also includes the 2026-06-07 predeploy checkpoint after the Vault get_key_record ABI restoration: npm.cmd test passed locally with 98/98 test files and 880/880 tests; current mainnet final manifest draft, deploy packet, tx dry-run packet, pricing evidence, genesis verifier report, and static deploy prep artifacts were regenerated for Vault code hash 1b1dc3ee8c29358c7abfea579848769483113a465c82d8aba6583082f002c492. Production remains blocked until fresh live genesis verification passes and the PWA is intentionally flipped from preview to production.",
+    "It also includes the 2026-06-07 full-redeploy seed refresh: ATH metadata deployment_id is platho-mainnet-20260607-clean-03, mainnet manifest hash is d7024ba567a81204fdad8d612885c7438078d2fe5dbfb22c1d540d474b784c87, Tonkeeper live preflight passed for 9/9 fresh deploy targets, M20F address derivation was realigned to the new ATHMaster address, and npm.cmd test passed locally with 98/98 test files and 881/881 tests.",
+    "The 2026-06-07 final genesis and production PWA checkpoint is superseded by the 2026-06-08 Vault publish pre-accept gas fix: Vault code hash is now cb0adbd4ac2c934af6e92ffed4673b87fc2c996de45c05bfe7bf2f1741948019, MAINNET_GENESIS_VERIFIED is false until fresh live genesis verification is collected for the new final manifest, web/platho-config.mjs is back in preview mode with signedBundlePurpose=pwa-mainnet-preview, static deploy prep artifacts were refreshed in blocked/preview state, and npm.cmd test passed locally with 98/98 test files and 892/892 tests."
   ]
 }

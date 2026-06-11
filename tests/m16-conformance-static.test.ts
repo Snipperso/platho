@@ -58,6 +58,43 @@ function contractEntrypointBlock(source: string, marker: string): string {
   return source.slice(start, end);
 }
 
+function compiledVaultPreAcceptBlock(source: string, entrypoint: string): string {
+  const marker = `;; Receive ${entrypoint} message`;
+  const start = source.indexOf(marker);
+  expect(start, `${marker} must exist in compiled Vault FunC`).toBeGreaterThanOrEqual(0);
+  const accept = source.indexOf('$global_acceptMessage();', start);
+  expect(accept, `${entrypoint} must call acceptMessage in compiled Vault FunC`).toBeGreaterThan(start);
+  return source.slice(start, accept);
+}
+
+function compiledFunCLines(source: string): string[] {
+  return source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith(';;'));
+}
+
+function compiledPreAcceptWeight(line: string): number {
+  let weight = 1;
+  if (/__tact_context_get\(/.test(line)) weight += 8;
+  if (/__tact_verify_address\(/.test(line)) weight += 5;
+  if (/__tact_address_eq\(/.test(line)) weight += 4;
+  if (/__tact_not_null\(/.test(line)) weight += 3;
+  if (/__tact_dict_get/.test(line)) weight += 22;
+  if (/~?load_msg_addr\(/.test(line)) weight += 8;
+  if (/~?load_ref\(/.test(line)) weight += 8;
+  if (/~?load_bits\(/.test(line)) weight += 6;
+  if (/~?load_uint\(/.test(line)) weight += 3;
+  if (/~?load_int\(/.test(line)) weight += 3;
+  if (/cell_hash\(/.test(line)) weight += 20;
+  if (/slice_hash\(/.test(line)) weight += 18;
+  if (/checkSignature|check_signature/.test(line)) weight += 70;
+  if (/throw_unless\(/.test(line)) weight += 2;
+  if (/throw_if\(/.test(line)) weight += 2;
+  if (/my_address\(/.test(line)) weight += 5;
+  return weight;
+}
+
 function builtCodeHash(contractDir: string, artifactName: string): string {
   const boc = readFileSync(join('build', contractDir, `${artifactName}.code.boc`));
   return Cell.fromBoc(boc)[0].hash().toString('hex');
@@ -117,21 +154,107 @@ describe('M16 production conformance static checks', () => {
 
   it('M16-CONF-01B2: Vault-auth service external payloads bind manifest, Vault, and owner domains', () => {
     const vault = contractSource('Vault.tact');
-    const serviceEntrypoints = [
+    const hashBoundEntrypoints = [
       'CreateReceiveIntent',
       'ClaimReceiveIntent',
       'CancelReceiveIntent',
+      'PublishPrivateFromVaultBalance',
+      'PublishPublicFromVaultBalance',
+      'ReplaceMessagingKeys',
+    ];
+    const addressBoundEntrypoints = [
+      'WithdrawTonFromVaultBalance',
+      'WithdrawAthFromVaultBalance',
       'SetProfileAvatarFromVaultBalance',
       'MintUsernameFromVaultBalance',
     ];
 
-    for (const entrypoint of serviceEntrypoints) {
+    for (const entrypoint of hashBoundEntrypoints) {
+      const block = contractEntrypointBlock(vault, `external(msg: ${entrypoint})`);
+      expect(block, `${entrypoint} must verify deployment manifest`).toMatch(/signedManifestHash[\s\S]*self\.deployment_manifest_hash/);
+      expect(block, `${entrypoint} signed payload must include Vault address hash`).toMatch(/signedVaultHash:\s*Int\s*=\s*signedPayload\.loadUint\(256\)/);
+      expect(block, `${entrypoint} signed Vault hash must match current Vault`).toMatch(/signedVaultHash\s*==\s*vaultAddressSlice\.loadUint\(256\)/);
+      expect(block, `${entrypoint} signed payload must include owner wallet hash`).toMatch(/signedOwnerHash:\s*Int\s*=\s*signedPayload\.loadUint\(256\)/);
+      expect(block, `${entrypoint} signed owner hash must match outer owner`).toMatch(/signedOwnerHash\s*==\s*ownerPrefix\.loadUint\(256\)/);
+    }
+
+    for (const entrypoint of addressBoundEntrypoints) {
       const block = contractEntrypointBlock(vault, `external(msg: ${entrypoint})`);
       expect(block, `${entrypoint} must verify deployment manifest`).toMatch(/signedManifestHash[\s\S]*self\.deployment_manifest_hash/);
       expect(block, `${entrypoint} signed payload must include owner wallet`).toMatch(/signedOwner:\s*Address\s*=\s*signedPayload\.loadAddress\(\)/);
       expect(block, `${entrypoint} signed owner must match outer owner`).toMatch(/signedOwner\s*==\s*msg\.owner_wallet/);
       expect(block, `${entrypoint} signed payload must include Vault address`).toMatch(/signedVaultAddress:\s*Address\s*=\s*signedPayload\.loadAddress\(\)/);
       expect(block, `${entrypoint} signed Vault must match current Vault`).toMatch(/signedVaultAddress\s*==\s*myAddress\(\)/);
+    }
+  });
+
+  it('M16-CONF-01B3: Vault-balance publish avoids full budget checks before acceptMessage', () => {
+    const vault = contractSource('Vault.tact');
+    const publishEntrypoints = [
+      'PublishPrivateFromVaultBalance',
+      'PublishPublicFromVaultBalance',
+    ];
+
+    for (const entrypoint of publishEntrypoints) {
+      const block = contractEntrypointBlock(vault, `external(msg: ${entrypoint})`);
+      const acceptIndex = block.indexOf('acceptMessage();');
+      expect(acceptIndex, `${entrypoint} must accept after auth gates`).toBeGreaterThanOrEqual(0);
+      const preAccept = block.slice(0, acceptIndex);
+      const postAccept = block.slice(acceptIndex);
+      expect(preAccept, `${entrypoint} must not compare full maxCharge before accept`).not.toMatch(/user\.ton_balance\s*>=\s*maxCharge/);
+      expect(preAccept, `${entrypoint} must not compare maxCharge to local reserve before accept`).not.toMatch(/maxCharge\s*>=\s*localExecReserve/);
+      expect(preAccept, `${entrypoint} must still require local reserve backing before accept`).toMatch(/user\.ton_balance\s*>=\s*localExecReserve/);
+      expect(postAccept, `${entrypoint} must gate CapsuleHub send on remaining publish budget`).toMatch(/remainingCharge:\s*Int\s*=\s*maxCharge\s*-\s*localExecReserve[\s\S]*user\.ton_balance\s*>=\s*remainingCharge/);
+    }
+  });
+
+  it('M16-CONF-01B4: Vault external pre-accept FunC stays inside the audited gas envelope', () => {
+    const vaultFunC = file(join('build', 'Vault', 'Vault_Vault.fc'));
+    const budgets = [
+      { entrypoint: 'WithdrawTonFromVaultBalance', maxLines: 23, maxWeight: 166, maxDictReads: 1 },
+      { entrypoint: 'WithdrawAthFromVaultBalance', maxLines: 23, maxWeight: 166, maxDictReads: 1 },
+      { entrypoint: 'ReplaceMessagingKeys', maxLines: 30, maxWeight: 199, maxDictReads: 1 },
+      { entrypoint: 'CreateReceiveIntent', maxLines: 28, maxWeight: 192, maxDictReads: 1 },
+      { entrypoint: 'ClaimReceiveIntent', maxLines: 33, maxWeight: 229, maxDictReads: 2 },
+      { entrypoint: 'CancelReceiveIntent', maxLines: 31, maxWeight: 222, maxDictReads: 2 },
+      { entrypoint: 'PublishPrivateFromVaultBalance', maxLines: 47, maxWeight: 226, maxDictReads: 1 },
+      { entrypoint: 'PublishPublicFromVaultBalance', maxLines: 46, maxWeight: 223, maxDictReads: 1 },
+      { entrypoint: 'SetProfileAvatarFromVaultBalance', maxLines: 24, maxWeight: 170, maxDictReads: 1 },
+      { entrypoint: 'MintUsernameFromVaultBalance', maxLines: 24, maxWeight: 170, maxDictReads: 1 },
+    ];
+
+    for (const budget of budgets) {
+      const block = compiledVaultPreAcceptBlock(vaultFunC, budget.entrypoint);
+      const lines = compiledFunCLines(block);
+      const weight = lines.reduce((sum, line) => sum + compiledPreAcceptWeight(line), 0);
+      const dictReads = lines.filter((line) => /__tact_dict_get/.test(line)).length;
+      const signatureChecks = lines.filter((line) => /checkSignature|check_signature/.test(line)).length;
+      const stateWrites = lines.filter((line) => /__tact_dict_set|global_commit|send_raw_message|__tact_send/.test(line));
+      const builders = lines.filter((line) => /\bbegin_cell\(/.test(line));
+
+      expect(lines.length, `${budget.entrypoint} pre-accept compiled line count changed`).toBeLessThanOrEqual(budget.maxLines);
+      expect(weight, `${budget.entrypoint} pre-accept compiled weight changed`).toBeLessThanOrEqual(budget.maxWeight);
+      expect(dictReads, `${budget.entrypoint} pre-accept dictionary reads changed`).toBeLessThanOrEqual(budget.maxDictReads);
+      expect(signatureChecks, `${budget.entrypoint} must keep exactly one auth signature check before accept`).toBe(1);
+      expect(stateWrites, `${budget.entrypoint} must not mutate state or send messages before accept`).toHaveLength(0);
+      expect(builders, `${budget.entrypoint} must not build cells before accept`).toHaveLength(0);
+    }
+  });
+
+  it('M16-CONF-01B5: receive-intent externals keep owner and Vault binding hash-only before acceptMessage', () => {
+    const vaultFunC = file(join('build', 'Vault', 'Vault_Vault.fc'));
+    const receiveIntentEntrypoints = [
+      'CreateReceiveIntent',
+      'ClaimReceiveIntent',
+      'CancelReceiveIntent',
+    ];
+
+    for (const entrypoint of receiveIntentEntrypoints) {
+      const block = compiledVaultPreAcceptBlock(vaultFunC, entrypoint);
+      expect(block, `${entrypoint} must not re-add a pre-accept owner basechain throw`).not.toMatch(/ownerPrefix~load_uint\(11\)\s*==\s*1024/);
+      expect(block, `${entrypoint} must not re-add a pre-accept Vault basechain throw`).not.toMatch(/vaultAddressPrefix\s*==\s*1024/);
+      expect(block, `${entrypoint} must still hash-bind signed Vault address before accept`).toMatch(/signedVaultHash[\s\S]*vaultAddressSlice~load_uint\(256\)/);
+      expect(block, `${entrypoint} must still hash-bind signed owner before accept`).toMatch(/signedOwnerHash[\s\S]*ownerPrefix~load_uint\(256\)/);
     }
   });
 
@@ -205,7 +328,15 @@ describe('M16 production conformance static checks', () => {
         expect(source).toMatch(/CapsuleHub v1 accepts retrievable publish body cells/);
         expect(source).toMatch(/body_hash[\s\S]*accepted publish transaction body/);
         expect(source).toMatch(/verified mainnet manifest/);
-        expect(source).toMatch(/is pinned to the verified mainnet manifest/);
+        expect(source).toMatch(/must be pinned to the verified mainnet manifest/);
+        const genesisVerified = readFileSync('artifacts/MAINNET_GENESIS_VERIFIED.txt', 'utf8').trim().toLowerCase() === 'true';
+        if (genesisVerified) {
+          expect(source).toMatch(/is pinned now and must be pinned to the verified mainnet manifest/);
+          expect(source).not.toMatch(/current archive may still be preview-blocked/i);
+        } else {
+          expect(source).toMatch(/current archive may still be preview-blocked/i);
+          expect(source).not.toMatch(/is pinned to the verified mainnet manifest/);
+        }
         expect(source).not.toMatch(/a26530cd84ff29b49e3e305eedeead677584ac335277d92cfddb33b665265cdd/);
         expect(source).toMatch(/must remain untracked and absent from release\/audit archives/);
         expect(source).not.toMatch(/points the UI at testnet preview data/);

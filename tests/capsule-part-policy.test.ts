@@ -91,7 +91,10 @@ describe('PWA capsule part policy', () => {
     expect(appSource.match(/function privateTextCapsulePartsForSend\s*\(/g) ?? []).toHaveLength(1);
     expect(appSource).not.toMatch(/function privateTextPartsForSend\s*\(/);
     expect(appSource).toMatch(/function privateTextCapsulePartsForSend\s*\([^)]*\)[\s\S]*return splitUtf8ToCapsuleParts\(text, MAX_CAPSULE_USEFUL_BYTES,\s*\{/);
-    expect(appSource).toMatch(/perPartOverheadBytes: privateSenderWalletPayloadOverhead\(options\)/);
-    expect(appSource).toMatch(/createPrivateComposerCapsules[\s\S]*privateTextCapsulePartsForSend\(text, options\)/);
+    expect(appSource).toMatch(/perPartOverheadBytes: privateCompactPayloadOverhead\(options\)/);
+    expect(appSource).toMatch(/function createPrivateComposerCapsules[\s\S]*messageDocumentBytesFromDraft\(text, attachments/);
+    expect(appSource).toMatch(/function createPrivateComposerCapsules[\s\S]*splitBytesToCapsuleParts\(documentBytes, MAX_CAPSULE_USEFUL_BYTES,\s*\{/);
+    expect(appSource).toMatch(/function createPrivateComposerCapsules[\s\S]*perPartOverheadBytes: privateCompactPayloadOverhead\(options\)/);
+    expect(appSource).not.toMatch(/function createPrivateComposerCapsules[\s\S]*splitUtf8ToParts\(text, SINGLE_CAPSULE_USEFUL_BYTES/);
   });
 });

@@ -730,6 +730,7 @@ export type PublishPublicFromVault = {
     bounce_id: bigint;
     bounce_tag: bigint;
     publish_id: bigint;
+    size_class: bigint;
     marketing_note: bigint;
     author_wallet: Address;
     header_hash: bigint;
@@ -746,6 +747,7 @@ export function storePublishPublicFromVault(src: PublishPublicFromVault) {
         b_0.storeUint(src.bounce_id, 64);
         b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
+        b_0.storeUint(src.size_class, 8);
         b_0.storeUint(src.marketing_note, 152);
         b_0.storeAddress(src.author_wallet);
         const b_1 = new Builder();
@@ -764,6 +766,7 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const _bounce_id = sc_0.loadUintBig(64);
     const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
+    const _size_class = sc_0.loadUintBig(8);
     const _marketing_note = sc_0.loadUintBig(152);
     const _author_wallet = sc_0.loadAddress();
     const sc_1 = sc_0.loadRef().beginParse();
@@ -772,13 +775,14 @@ export function loadPublishPublicFromVault(slice: Slice) {
     const _header = sc_1.loadRef();
     const _body = sc_1.loadRef();
     const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _size_class = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _header_hash = source.readBigNumber();
@@ -786,13 +790,14 @@ export function loadTuplePublishPublicFromVault(source: TupleReader) {
     const _header = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _size_class = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _header_hash = source.readBigNumber();
@@ -800,7 +805,7 @@ export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
     const _header = source.readCell();
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
 }
 
 export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
@@ -808,6 +813,7 @@ export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault)
     builder.writeNumber(source.bounce_id);
     builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
+    builder.writeNumber(source.size_class);
     builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
     builder.writeNumber(source.header_hash);
@@ -1025,6 +1031,7 @@ export type ForwardVaultPublic = {
     bounce_id: bigint;
     bounce_tag: bigint;
     publish_id: bigint;
+    size_class: bigint;
     marketing_note: bigint;
     author_wallet: Address;
     header_hash: bigint;
@@ -1043,6 +1050,7 @@ export function storeForwardVaultPublic(src: ForwardVaultPublic) {
         b_0.storeUint(src.bounce_id, 64);
         b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
+        b_0.storeUint(src.size_class, 8);
         b_0.storeUint(src.marketing_note, 152);
         const b_1 = new Builder();
         b_1.storeAddress(src.author_wallet);
@@ -1065,6 +1073,7 @@ export function loadForwardVaultPublic(slice: Slice) {
     const _bounce_id = sc_0.loadUintBig(64);
     const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
+    const _size_class = sc_0.loadUintBig(8);
     const _marketing_note = sc_0.loadUintBig(152);
     const sc_1 = sc_0.loadRef().beginParse();
     const _author_wallet = sc_1.loadAddress();
@@ -1075,7 +1084,7 @@ export function loadForwardVaultPublic(slice: Slice) {
     const _protocol_fee_paid = sc_1.loadUintBig(128);
     const sc_2 = sc_1.loadRef().beginParse();
     const _value_to_capsule = sc_2.loadUintBig(128);
-    return { $$type: 'ForwardVaultPublic' as const, capsule_hub_address: _capsule_hub_address, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid, value_to_capsule: _value_to_capsule };
+    return { $$type: 'ForwardVaultPublic' as const, capsule_hub_address: _capsule_hub_address, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid, value_to_capsule: _value_to_capsule };
 }
 
 export function loadTupleForwardVaultPublic(source: TupleReader) {
@@ -1083,6 +1092,7 @@ export function loadTupleForwardVaultPublic(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _size_class = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _header_hash = source.readBigNumber();
@@ -1091,7 +1101,7 @@ export function loadTupleForwardVaultPublic(source: TupleReader) {
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
     const _value_to_capsule = source.readBigNumber();
-    return { $$type: 'ForwardVaultPublic' as const, capsule_hub_address: _capsule_hub_address, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid, value_to_capsule: _value_to_capsule };
+    return { $$type: 'ForwardVaultPublic' as const, capsule_hub_address: _capsule_hub_address, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid, value_to_capsule: _value_to_capsule };
 }
 
 export function loadGetterTupleForwardVaultPublic(source: TupleReader) {
@@ -1099,6 +1109,7 @@ export function loadGetterTupleForwardVaultPublic(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
+    const _size_class = source.readBigNumber();
     const _marketing_note = source.readBigNumber();
     const _author_wallet = source.readAddress();
     const _header_hash = source.readBigNumber();
@@ -1107,7 +1118,7 @@ export function loadGetterTupleForwardVaultPublic(source: TupleReader) {
     const _body = source.readCell();
     const _protocol_fee_paid = source.readBigNumber();
     const _value_to_capsule = source.readBigNumber();
-    return { $$type: 'ForwardVaultPublic' as const, capsule_hub_address: _capsule_hub_address, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid, value_to_capsule: _value_to_capsule };
+    return { $$type: 'ForwardVaultPublic' as const, capsule_hub_address: _capsule_hub_address, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid, value_to_capsule: _value_to_capsule };
 }
 
 export function storeTupleForwardVaultPublic(source: ForwardVaultPublic) {
@@ -1116,6 +1127,7 @@ export function storeTupleForwardVaultPublic(source: ForwardVaultPublic) {
     builder.writeNumber(source.bounce_id);
     builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
+    builder.writeNumber(source.size_class);
     builder.writeNumber(source.marketing_note);
     builder.writeAddress(source.author_wallet);
     builder.writeNumber(source.header_hash);
@@ -1278,7 +1290,7 @@ function initMockVaultAckSink_init_args(src: MockVaultAckSink_init_args) {
 }
 
 async function MockVaultAckSink_init() {
-    const __code = Cell.fromHex('b5ee9c7241020b01000222000114ff00f4a413f4bcf2c80b01020162020904d6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd33fd3ffd33fd3ff55306c14953070547000e205925f05e07024d74920c21f953104d31f05de218210fa001001bae302218210fa001002bae302218210874e576abae30235c00004c12114b00305070801d85b03fa40d33fd39fd3ffd307d307d430d0d3ffd3ffd3ffd4d4d4d37fd430d0d37f30109c108b107a106c105b104a103c4ba07f50dc700cc855b0db3cc94343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004003c87f01ca0055305034cb3fcbffcb3fcbffc9ed540400588210a4f862c0500dcb1f1bcb3f19cb9f17cbff15cb0713cb07cbff01c8cbff12cbff12cc12cc12cc12cb7fcd01ee5b03fa40d33fd39fd3ffd397d430d0fa40d3ffd3ffd4d4d37fd430d0d37f30107a10691058104a103948a07f50a9700cc8559082108c2a76b7500bcb1f19cb3f17cb9f15cbff13cb97ce01c8cbff12cbff12cc12cc12cb7fcdc941304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004003060028c87f01ca0055305034cb3fcbffcb3fcbffc9ed5400425f0432d3ffd33fd3ff3003a403c87f01ca0055305034cb3fcbffcb3fcbffc9ed5400468e1b815207f2f04003c87f01ca0055305034cb3fcbffcb3fcbffc9ed54e05f04f2c0820141a0a75bda89a1a4000339a67fa7ffa67fa7feaa60d8292a60e0a8e001c5b678d8890a000854732123ac10f674');
+    const __code = Cell.fromHex('b5ee9c7241020b0100022b000114ff00f4a413f4bcf2c80b01020162020904d6d001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019cd33fd3ffd33fd3ff55306c14953070547000e205925f05e07024d74920c21f953104d31f05de218210fa001001bae302218210fa001002bae302218210874e576abae30235c00004c12114b00305070801d85b03fa40d33fd39fd3ffd307d307d430d0d3ffd3ffd3ffd4d4d4d37fd430d0d37f30109c108b107a106c105b104a103c4ba07f50dc700cc855b0db3cc94343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004003c87f01ca0055305034cb3fcbffcb3fcbffc9ed540400588210a4f862c0500dcb1f1bcb3f19cb9f17cbff15cb0713cb07cbff01c8cbff12cbff12cc12cc12cc12cb7fcd01d65b03fa40d33fd39fd3ffd307d397d430d0fa40d3ffd3ffd4d4d37fd430d0d37f30108b107a1069105b104a10394ba07f50ac700cc855a0db3cc943304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004003c87f01ca0055305034cb3fcbffcb3fcbffc9ed5406005282108c2a76b7500ccb1f1acb3f18cb9f16cbff14cb0712cb97ce01c8cbff12cbff12cc12cc12cb7fcd00425f0432d3ffd33fd3ff3003a403c87f01ca0055305034cb3fcbffcb3fcbffc9ed5400468e1b815207f2f04003c87f01ca0055305034cb3fcbffcb3fcbffc9ed54e05f04f2c0820141a0a75bda89a1a4000339a67fa7ffa67fa7feaa60d8292a60e0a8e001c5b678d8890a0008547321231f660dc4');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initMockVaultAckSink_init_args({ $$type: 'MockVaultAckSink_init_args' })(builder);
@@ -1376,10 +1388,10 @@ const MockVaultAckSink_types: ABIType[] = [
     {"name":"VarAddress","header":null,"fields":[{"name":"workchain","type":{"kind":"simple","type":"int","optional":false,"format":32}},{"name":"address","type":{"kind":"simple","type":"slice","optional":false}}]},
     {"name":"BasechainAddress","header":null,"fields":[{"name":"hash","type":{"kind":"simple","type":"int","optional":true,"format":257}}]},
     {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"ForwardVaultPrivate","header":4194308097,"fields":[{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"value_to_capsule","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"ForwardVaultPublic","header":4194308098,"fields":[{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"value_to_capsule","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
+    {"name":"ForwardVaultPublic","header":4194308098,"fields":[{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"value_to_capsule","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"MockVaultStateView","header":null,"fields":[{"name":"ack_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_publish_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_entry_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"last_entry_uid","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"MockVaultAckSink$Data","header":null,"fields":[{"name":"ack_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"last_publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"last_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"last_entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
 ]
