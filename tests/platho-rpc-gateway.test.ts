@@ -68,6 +68,45 @@ describe('Platho RPC gateway', () => {
     expect(config).not.toMatch(/PLATHO_RPC_TONCENTER_API_KEY|X-API-Key|toncenter-mainnet\.key|apiKey:/);
   });
 
+  it('RPC-GATEWAY-02D: toncenter read failures fall back to anonymous TON Access for get-methods and account only', () => {
+    const gateway = readFileSync(gatewayPath, 'utf8');
+    const envExample = readFileSync('deploy/platho-rpc-gateway.env.example', 'utf8');
+    const runGetMethodBranch = gateway.slice(
+      gateway.indexOf('if kind == "run_get_method":'),
+      gateway.indexOf('if kind == "message":'),
+    );
+    const messageBranch = gateway.slice(
+      gateway.indexOf('if kind == "message":'),
+      gateway.indexOf('if kind == "messages":'),
+    );
+    const messagesBranch = gateway.slice(
+      gateway.indexOf('if kind == "messages":'),
+      gateway.indexOf('if kind == "account":'),
+    );
+    const accountBranch = gateway.slice(
+      gateway.indexOf('if kind == "account":'),
+      gateway.indexOf('except ValueError as error:'),
+    );
+
+    expect(gateway).toMatch(/PLATHO_RPC_TON_ACCESS_READ_FALLBACK/);
+    expect(gateway).toMatch(/def read_fallback_reason\(error\)/);
+    // Only connectivity-level upstream trouble is fallback-worthy; ordinary
+    // 4xx request errors propagate unchanged.
+    expect(gateway).toMatch(/error\.code == 429 or error\.code >= 500/);
+    expect(gateway).toMatch(/def log_upstream_fallback\(kind, reason\)/);
+    expect(gateway).toMatch(/upstream_fallback route=\{kind\} upstream=ton-access-v2/);
+    expect(runGetMethodBranch).toMatch(/read_fallback_reason\(error\)/);
+    expect(runGetMethodBranch).toMatch(/log_upstream_fallback\(kind, reason\)/);
+    expect(runGetMethodBranch).toMatch(/normalize_run_get_method_response\(upstream\)/);
+    expect(accountBranch).toMatch(/read_fallback_reason\(error\)/);
+    expect(accountBranch).toMatch(/log_upstream_fallback\(kind, reason\)/);
+    // Broadcast and message history have no TON Access v2 equivalent and must
+    // never silently change upstream.
+    expect(messageBranch).not.toMatch(/ton_access_base|read_fallback_reason/);
+    expect(messagesBranch).not.toMatch(/ton_access_base|read_fallback_reason/);
+    expect(envExample).toMatch(/PLATHO_RPC_TON_ACCESS_READ_FALLBACK=1/);
+  });
+
   it('RPC-GATEWAY-02C: message history allowlist tracks the production Vault and CapsuleHub', () => {
     const envExample = readFileSync('deploy/platho-rpc-gateway.env.example', 'utf8');
     const destinations = envValue(envExample, 'PLATHO_RPC_ALLOWED_MESSAGE_DESTINATIONS').split(',');

@@ -93,6 +93,11 @@ TON_ACCESS_HOST = os.getenv("PLATHO_RPC_TON_ACCESS_HOST", "ton.access.orbs.netwo
 TON_ACCESS_NETWORK = os.getenv("PLATHO_RPC_TON_ACCESS_NETWORK", "mainnet")
 TON_ACCESS_MANAGER_PATH = os.getenv("PLATHO_RPC_TON_ACCESS_MANAGER_PATH", "/mngr/nodes?npm_version=2.3.0")
 TON_ACCESS_NODE_TTL_MS = int(os.getenv("PLATHO_RPC_TON_ACCESS_NODE_TTL_MS", "60000"))
+# Read-method resilience: when the primary toncenter-v3 upstream times out or
+# fails server-side, get-method and account reads retry once through the
+# anonymous TON Access (Orbs) v2 path. Broadcast and message history have no
+# v2 equivalent and intentionally never fall back.
+TON_ACCESS_READ_FALLBACK = os.getenv("PLATHO_RPC_TON_ACCESS_READ_FALLBACK", "1").strip().lower() not in ("0", "false", "off", "no")
 TONCENTER_V3_BASE = os.getenv("PLATHO_RPC_TONCENTER_V3_BASE", "https://toncenter.com/api/v3").rstrip("/")
 TONCENTER_V2_BASE = os.getenv("PLATHO_RPC_TONCENTER_V2_BASE", "https://toncenter.com/api/v2").rstrip("/")
 TONCENTER_API_KEY = os.getenv("PLATHO_RPC_TONCENTER_API_KEY", "").strip()
@@ -180,6 +185,25 @@ def http_error_detail(error):
 def log_upstream_error(kind, error, detail=""):
     safe_detail = f" detail={detail}" if detail else ""
     print(f"upstream_error route={kind} status={getattr(error, 'code', 'unknown')}{safe_detail}", file=sys.stderr, flush=True)
+
+
+def log_upstream_fallback(kind, reason):
+    print(f"upstream_fallback route={kind} upstream=ton-access-v2 reason={reason}", file=sys.stderr, flush=True)
+
+
+def read_fallback_reason(error):
+    # Only connectivity-level upstream trouble is fallback-worthy. Client
+    # errors (4xx other than 429) describe the request, not the upstream,
+    # and must propagate unchanged.
+    if isinstance(error, HTTPError):
+        if error.code == 429 or error.code >= 500:
+            return f"http_{error.code}"
+        return None
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, URLError):
+        return "network"
+    return None
 
 
 def weighted_node(nodes):
@@ -508,11 +532,20 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
                 body = self.read_body()
                 if UPSTREAM_KIND == "toncenter-v3":
                     request = load_run_get_method_payload(body)
-                    status, upstream = fetch_toncenter_json(
-                        f"{TONCENTER_V3_BASE}/runGetMethod",
-                        method="POST",
-                        body=request,
-                    )
+                    try:
+                        status, upstream = fetch_toncenter_json(
+                            f"{TONCENTER_V3_BASE}/runGetMethod",
+                            method="POST",
+                            body=request,
+                        )
+                    except (HTTPError, URLError, TimeoutError) as error:
+                        reason = read_fallback_reason(error)
+                        if not TON_ACCESS_READ_FALLBACK or reason is None:
+                            raise
+                        log_upstream_fallback(kind, reason)
+                        fallback_request = normalize_run_get_method(body)
+                        status, upstream = fetch_json(f"{ton_access_base()}/jsonRPC", method="POST", body=fallback_request)
+                        upstream = normalize_run_get_method_response(upstream)
                     self.send_json(status, upstream)
                 else:
                     request = normalize_run_get_method(body)
@@ -542,7 +575,15 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
             if kind == "account":
                 if UPSTREAM_KIND == "toncenter-v3":
                     target = append_original_query(f"{TONCENTER_V2_BASE}/getAddressInformation", self.path)
-                    status, upstream = fetch_toncenter_json(target)
+                    try:
+                        status, upstream = fetch_toncenter_json(target)
+                    except (HTTPError, URLError, TimeoutError) as error:
+                        reason = read_fallback_reason(error)
+                        if not TON_ACCESS_READ_FALLBACK or reason is None:
+                            raise
+                        log_upstream_fallback(kind, reason)
+                        fallback_target = append_original_query(f"{ton_access_base()}/getAddressInformation", self.path)
+                        status, upstream = fetch_json(fallback_target)
                 else:
                     target = append_original_query(f"{ton_access_base()}/getAddressInformation", self.path)
                     status, upstream = fetch_json(target)
