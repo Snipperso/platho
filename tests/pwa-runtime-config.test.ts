@@ -198,7 +198,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=19/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=20/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -254,8 +254,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v414<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v414'/);
+    expect(html).toMatch(/id="appVersionLabel">v415<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v415'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -2340,7 +2340,8 @@ describe('PWA runtime config guard', () => {
     // degraded censorship-survival mode (callWithDegradedTransportReadFallback).
     expect(helpers).toMatch(/async function readFreshConnectedVaultUserForOwnVaultAction\(provider\)[\s\S]*callWithDegradedTransportReadFallback\(/);
     expect(helpers).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
-    expect(helpers).toMatch(/async function readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)[\s\S]*return readFreshReceiveIntent\(provider, intentId\)/);
+    expect(helpers).toMatch(/async function readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)[\s\S]*callWithDegradedTransportReadFallback\(/);
+    expect(helpers).toMatch(/\(\) => readFreshReceiveIntent\(provider, intentId\)/);
     expect(helpers).not.toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false|readFreshReceiveIntent\(provider, intentId, \{ verify: false/);
     expect(app).toMatch(/if \(options\.allowOwnVaultActionReadFallback === true\) \{[\s\S]*await readConnectedVaultGlobalForOwnVaultAction\(provider\)/);
     expect(source).toMatch(/tonBalance < amount \+ createReserve \+ quotedPublish\.totalMaxCharge/);
@@ -2535,10 +2536,11 @@ describe('PWA runtime config guard', () => {
     expect(helpers).toMatch(/function readFreshConnectedVaultUserForOwnVaultAction/);
     expect(receiveIntentFallbackSource).not.toMatch(/RPC_DISAGREEMENT|isTonRpcSoftVaultGlobalReadError/);
     expect(userFallbackSource).not.toMatch(/RPC_DISAGREEMENT|isTonRpcSoftVaultGlobalReadError/);
-    expect(receiveIntentFallbackSource).toMatch(/return readFreshReceiveIntent\(provider, intentId\)/);
+    expect(receiveIntentFallbackSource).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(receiveIntentFallbackSource).toMatch(/\(\) => readFreshReceiveIntent\(provider, intentId\)/);
     expect(userFallbackSource).toMatch(/callWithDegradedTransportReadFallback\(/);
     expect(userFallbackSource).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
-    expect(receiveIntentFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
+    expect(receiveIntentFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     expect(userFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
     expect(helpers).toMatch(/Payment check disappeared but sender Vault balance was not restored/);
@@ -2672,14 +2674,21 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function readConnectedVaultGlobalForOwnVaultAction'),
     );
 
-    expect(receiveIntentHelper).toMatch(/return readFreshReceiveIntent\(provider, intentId\)/);
-    expect(receiveIntentHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
-    // Own-action pre-sign reads stay verified fail-closed in normal
-    // operation. The unverified fallback opens only when the transport
-    // reports degraded censorship-survival mode (primary gateway parked),
-    // where dual-provider verification is structurally impossible.
+    expect(receiveIntentHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(receiveIntentHelper).toMatch(/\(\) => readFreshReceiveIntent\(provider, intentId\)/);
+    expect(receiveIntentHelper).toMatch(/unverifiedCriticalChainReadOptions\(\)/);
+    expect(receiveIntentHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
+    // Own-action pre-sign reads stay verified fail-closed while verification
+    // is actually possible. The unverified fallback opens only when the
+    // transport reports structural degradation: the primary gateway is
+    // parked OR every verifier transport is dead/blocked for this network.
+    expect(app).toMatch(/function tonRpcVerificationStructurallyDegraded\(\)[\s\S]*transport\.isDegraded\(\) === true[\s\S]*transport\.isVerificationDegraded\(\) === true/);
+    expect(degradedFallbackHelper).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) return readUnverified\(\)/);
     expect(degradedFallbackHelper).toMatch(/isTonRpcVerificationUnavailableForOwnVaultActionError\(error\)\) throw error/);
-    expect(degradedFallbackHelper).toMatch(/transport\.isDegraded\(\) !== true\) throw error/);
+    expect(degradedFallbackHelper).toMatch(/if \(!tonRpcVerificationStructurallyDegraded\(\)\) throw error/);
+    // criticalChainReadOptions is the single degradation choke point for all
+    // critical reads (prepare, confirm, sync, avatars, key records).
+    expect(app).toMatch(/function criticalChainReadOptions\(\)[\s\S]*if \(tonRpcVerificationStructurallyDegraded\(\)\) return unverifiedCriticalChainReadOptions\(\)/);
     expect(userHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
     expect(userHelper).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
     expect(userHelper).toMatch(/readFreshConnectedVaultUser\(provider, unverifiedCriticalChainReadOptions\(\)\)/);
@@ -3708,25 +3717,25 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v477/);
+    expect(sw).toMatch(/platho-pwa-prototype-v478/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=414/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=70/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=34/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=26/);
+    expect(sw).toMatch(/\.\/app\.js\?v=415/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=71/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=27/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=24/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=34/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=23/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=34/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=21/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=19/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=26/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=24/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=22/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=20/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=27/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=5/);

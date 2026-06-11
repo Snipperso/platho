@@ -119,7 +119,14 @@ function noteTonRpcTransportFailure(transport, error, deadRetryMs = TON_RPC_TRAN
   const state = tonRpcTransportHealthState(transport);
   state.consecutiveHardFailures += 1;
   state.lastHardFailureAt = Date.now();
-  if (state.consecutiveHardFailures >= TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD) {
+  // 401/403 from a verifier-only transport is a deterministic policy denial
+  // (for example keyless toncenter blocked for the user's network); park it
+  // at once so verification degrades immediately instead of burning a retry
+  // ladder on every fresh session. Primaries keep the failure threshold so
+  // an app-level 4xx cannot park the main gateway by accident.
+  const status = Number(error?.status ?? 0);
+  const deterministicDenial = transport?.verifierOnly === true && (status === 401 || status === 403);
+  if (deterministicDenial || state.consecutiveHardFailures >= TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD) {
     state.deadUntil = Date.now() + finiteNonNegativeMs(deadRetryMs, TON_RPC_TRANSPORT_DEAD_RETRY_MS);
   }
 }
@@ -1612,6 +1619,16 @@ export function createFallbackTonRpcTransport(options = {}) {
     transports,
     isDegraded() {
       return transports.some((transport) => transport?.verifierOnly !== true && isTonRpcTransportDead(transport));
+    },
+    isVerificationDegraded() {
+      // Dual-provider verification needs at least two live read transports.
+      // A parked verifier (for example keyless toncenter blocked for the
+      // user's network) makes verification structurally impossible even
+      // while the primary gateway stays healthy.
+      const aliveReadCapable = transports.filter(
+        (transport) => typeof transport?.runGetMethod === 'function' && !isTonRpcTransportDead(transport),
+      );
+      return aliveReadCapable.length < 2;
     },
     healthSnapshot() {
       return transports.map((transport) => ({

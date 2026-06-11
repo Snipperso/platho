@@ -36,8 +36,8 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=70';
-import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=34';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=71';
+import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=35';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -118,19 +118,19 @@ import {
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
 } from './pwa-contract-transactions.mjs?v=24';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=21';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=22';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=34';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=23';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=19';
+} from './capsulehub-ton-rpc-provider.mjs?v=35';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=24';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=20';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=26';
+} from './username-ton-rpc-provider.mjs?v=27';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v414';
+const PLATHO_APP_RUNTIME_VERSION = 'v415';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 window.addEventListener('error', (event) => {
@@ -4998,17 +4998,27 @@ async function resolveCurrentKnownVaultKeyRecord(walletAddress, provider, option
   if (!raw) return null;
   const cached = knownVaultKeyRecordByWallet.get(raw);
   if (cached && options.allowCached !== false) return cached;
-  const readOptions = { vaultAddress: requireVaultAddress(), ...criticalChainReadOptions() };
-  const user = await provider.getUser(raw, readOptions);
-  const currentKeyId = BigInt(user.current_key_id ?? 0n);
-  if (user.exists !== true || currentKeyId === 0n) return null;
-  const keyRecord = await provider.getKeyRecord(currentKeyId, {
-    ownerWallet: raw,
-    ...readOptions,
-  });
-  await assertVaultKeyRecordMatchesOwner(raw, keyRecord, currentKeyId);
-  rememberKnownVaultKeyOwner(raw, keyRecord);
-  return keyRecord;
+  // Key trust prefers dual-provider verification. When verification is
+  // structurally impossible (no reachable verifier on this network), the
+  // record is still bound to the on-chain key id by hash recomputation in
+  // assertVaultKeyRecordMatchesOwner, and availability wins by policy.
+  const readPair = async (chainReadOptions) => {
+    const readOptions = { vaultAddress: requireVaultAddress(), ...chainReadOptions };
+    const user = await provider.getUser(raw, readOptions);
+    const currentKeyId = BigInt(user.current_key_id ?? 0n);
+    if (user.exists !== true || currentKeyId === 0n) return null;
+    const keyRecord = await provider.getKeyRecord(currentKeyId, {
+      ownerWallet: raw,
+      ...readOptions,
+    });
+    await assertVaultKeyRecordMatchesOwner(raw, keyRecord, currentKeyId);
+    rememberKnownVaultKeyOwner(raw, keyRecord);
+    return keyRecord;
+  };
+  return callWithDegradedTransportReadFallback(
+    () => readPair(criticalChainReadOptions()),
+    () => readPair(unverifiedCriticalChainReadOptions()),
+  );
 }
 
 async function assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, expectedKeyId) {
@@ -5032,15 +5042,21 @@ async function assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, expect
 async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, provider) {
   const raw = rawWalletAddress(walletAddress);
   if (!raw) return null;
-  const readOptions = { vaultAddress: requireVaultAddress(), ...criticalChainReadOptions() };
   if (vaultKeyId !== null && vaultKeyId !== undefined && BigInt(vaultKeyId) > 0n) {
-    const keyRecord = await provider.getKeyRecord(BigInt(vaultKeyId), {
-      ownerWallet: raw,
-      ...readOptions,
-    });
-    await assertVaultKeyRecordMatchesOwner(raw, keyRecord, BigInt(vaultKeyId));
-    rememberKnownVaultKeyOwner(raw, keyRecord);
-    return keyRecord;
+    const readRecord = async (chainReadOptions) => {
+      const keyRecord = await provider.getKeyRecord(BigInt(vaultKeyId), {
+        ownerWallet: raw,
+        vaultAddress: requireVaultAddress(),
+        ...chainReadOptions,
+      });
+      await assertVaultKeyRecordMatchesOwner(raw, keyRecord, BigInt(vaultKeyId));
+      rememberKnownVaultKeyOwner(raw, keyRecord);
+      return keyRecord;
+    };
+    return callWithDegradedTransportReadFallback(
+      () => readRecord(criticalChainReadOptions()),
+      () => readRecord(unverifiedCriticalChainReadOptions()),
+    );
   }
   return resolveCurrentKnownVaultKeyRecord(raw, provider, { allowCached: false });
 }
@@ -11635,7 +11651,10 @@ async function readFreshReceiveIntent(provider, intentId, options = {}) {
 }
 
 async function readFreshReceiveIntentForOwnVaultAction(provider, intentId) {
-  return readFreshReceiveIntent(provider, intentId);
+  return callWithDegradedTransportReadFallback(
+    () => readFreshReceiveIntent(provider, intentId),
+    () => readFreshReceiveIntent(provider, intentId, unverifiedCriticalChainReadOptions()),
+  );
 }
 
 async function readFreshReceiveIntentForCancel(provider, intentId) {
@@ -11671,18 +11690,27 @@ async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
   }
 }
 
+function tonRpcVerificationStructurallyDegraded() {
+  const transport = globalThis.plathoTonRpcTransport;
+  if (typeof transport?.isDegraded === 'function' && transport.isDegraded() === true) return true;
+  // A dead verifier (for example keyless toncenter blocked for the user's
+  // network) breaks dual-provider verification just as hard as a dead
+  // primary gateway does.
+  return typeof transport?.isVerificationDegraded === 'function' && transport.isVerificationDegraded() === true;
+}
+
 async function callWithDegradedTransportReadFallback(readStrict, readUnverified) {
   // Own-action pre-sign reads fail closed on any verification trouble while
-  // the primary RPC gateway is healthy. The unverified fallback opens only
-  // in censorship-survival mode: the transport reports a parked primary, so
-  // dual-provider verification is structurally impossible and the keyless
-  // emergency provider must keep the messenger usable on its own.
+  // dual-provider verification is actually possible. The unverified fallback
+  // opens only when the transport reports that verification is structurally
+  // impossible: the primary gateway is parked (censorship survival) or every
+  // verifier transport is dead/blocked for this network.
+  if (tonRpcVerificationStructurallyDegraded()) return readUnverified();
   try {
     return await readStrict();
   } catch (error) {
     if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
-    const transport = globalThis.plathoTonRpcTransport;
-    if (typeof transport?.isDegraded !== 'function' || transport.isDegraded() !== true) throw error;
+    if (!tonRpcVerificationStructurallyDegraded()) throw error;
     return readUnverified();
   }
 }
@@ -12092,6 +12120,13 @@ function requireVaultUsernameMintRoute(global) {
 }
 
 function criticalChainReadOptions() {
+  // Critical reads are dual-provider verified while verification is actually
+  // possible. When every verifier transport is dead or blocked for this
+  // network (for example keyless toncenter answering 403), fail-closed
+  // verification would freeze the whole messenger, so reads degrade to the
+  // single live provider; entry/key payloads stay hash-bound to local
+  // expectations and availability wins by explicit product policy.
+  if (tonRpcVerificationStructurallyDegraded()) return unverifiedCriticalChainReadOptions();
   return { verify: true, priority: 'critical', cacheTtlMs: 0 };
 }
 
