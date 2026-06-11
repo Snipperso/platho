@@ -4,7 +4,7 @@
  * See [RFC 9591](https://datatracker.ietf.org/doc/rfc9591/) and [frost.zfnd.org](https://frost.zfnd.org).
  * @module
  */
-import { utf8ToBytes } from '@noble/hashes/utils.js';
+import { utf8ToBytes } from '../../hashes/utils.js';
 import { bytesToHex, bytesToNumberBE, bytesToNumberLE, concatBytes, hexToBytes, randomBytes, validateObject, } from "../utils.js";
 import { pippenger, validatePointCons } from "./curve.js";
 import { poly } from "./fft.js";

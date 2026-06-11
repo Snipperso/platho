@@ -7,8 +7,8 @@
  * @module
  */
 /*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-import { shake256 } from '@noble/hashes/sha3.js';
-import { concatBytes, hexToBytes, createHasher as wrapConstructor } from '@noble/hashes/utils.js';
+import { shake256 } from '../hashes/sha3.js';
+import { concatBytes, hexToBytes, createHasher as wrapConstructor } from '../hashes/utils.js';
 import { eddsa, edwards, PrimeEdwardsPoint, } from "./abstract/edwards.js";
 import { createFROST } from "./abstract/frost.js";
 import { _DST_scalar, createHasher, expand_message_xof, } from "./abstract/hash-to-curve.js";

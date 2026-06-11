@@ -27,10 +27,10 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import { hmac } from '@noble/hashes/hmac.js';
-import { sha256, sha512 } from '@noble/hashes/sha2.js';
-import { shake256 } from '@noble/hashes/sha3.js';
-import { bytesToHex, concatBytes, createView, hexToBytes, } from '@noble/hashes/utils.js';
+import { hmac } from '../hashes/hmac.js';
+import { sha256, sha512 } from '../hashes/sha2.js';
+import { shake256 } from '../hashes/sha3.js';
+import { bytesToHex, concatBytes, createView, hexToBytes, } from '../hashes/utils.js';
 import { abytes, checkHash, cleanBytes, copyBytes, equalBytes, getMask, getMessage, getMessagePrehash, randomBytes, splitCoder, validateSigOpts, validateVerOpts, vecCoder, } from "./utils.js";
 /** Winternitz signature params. */
 /**

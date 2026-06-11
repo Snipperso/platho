@@ -77,7 +77,7 @@ Filecoin uses little endian byte arrays for secret keys - make sure to reverse b
  * @module
  */
 /*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-import { sha256 } from '@noble/hashes/sha2.js';
+import { sha256 } from '../hashes/sha2.js';
 import { bls } from "./abstract/bls.js";
 import { Field } from "./abstract/modular.js";
 import { abytes, bitLen, bitMask, bytesToHex, bytesToNumberBE, concatBytes, copyBytes, hexToBytes, numberToBytesBE, randomBytes, } from "./utils.js";

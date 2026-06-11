@@ -6,8 +6,8 @@
  * @module
  */
 /*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-import { sha512 } from '@noble/hashes/sha2.js';
-import { abytes, concatBytes, hexToBytes } from '@noble/hashes/utils.js';
+import { sha512 } from '../hashes/sha2.js';
+import { abytes, concatBytes, hexToBytes } from '../hashes/utils.js';
 import {} from "./abstract/curve.js";
 import { eddsa, edwards, PrimeEdwardsPoint, } from "./abstract/edwards.js";
 import { createFROST } from "./abstract/frost.js";

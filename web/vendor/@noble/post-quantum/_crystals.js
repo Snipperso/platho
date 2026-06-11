@@ -3,8 +3,8 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import { FFTCore, reverseBits } from '@noble/curves/abstract/fft.js';
-import { shake128, shake256 } from '@noble/hashes/sha3.js';
+import { FFTCore, reverseBits } from '../curves/abstract/fft.js';
+import { shake128, shake256 } from '../hashes/sha3.js';
 import { cleanBytes, getMask, } from "./utils.js";
 /**
  * Creates shared modular arithmetic, NTT, and packing helpers for CRYSTALS schemes.

@@ -74,16 +74,16 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import {} from '@noble/curves/abstract/edwards.js';
-import {} from '@noble/curves/abstract/montgomery.js';
-import {} from '@noble/curves/abstract/weierstrass.js';
-import { x25519 } from '@noble/curves/ed25519.js';
-import { p256, p384 } from '@noble/curves/nist.js';
-import { asciiToBytes, bytesToNumberBE, bytesToNumberLE, concatBytes, numberToBytesBE, } from '@noble/curves/utils.js';
-import { expand, extract } from '@noble/hashes/hkdf.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { sha3_256, shake256 } from '@noble/hashes/sha3.js';
-import { abytes, ahash, anumber } from '@noble/hashes/utils.js';
+import {} from '../curves/abstract/edwards.js';
+import {} from '../curves/abstract/montgomery.js';
+import {} from '../curves/abstract/weierstrass.js';
+import { x25519 } from '../curves/ed25519.js';
+import { p256, p384 } from '../curves/nist.js';
+import { asciiToBytes, bytesToNumberBE, bytesToNumberLE, concatBytes, numberToBytesBE, } from '../curves/utils.js';
+import { expand, extract } from '../hashes/hkdf.js';
+import { sha256 } from '../hashes/sha2.js';
+import { sha3_256, shake256 } from '../hashes/sha3.js';
+import { abytes, ahash, anumber } from '../hashes/utils.js';
 import { ml_kem1024, ml_kem768 } from "./ml-kem.js";
 import { cleanBytes, copyBytes, randomBytes, splitCoder, validateSigOpts, validateVerOpts, } from "./utils.js";
 // Can re-use if decide to signatures support, on other hand getSecretKey is specific and ugly

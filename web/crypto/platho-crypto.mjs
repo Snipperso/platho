@@ -692,14 +692,14 @@ function uintLikeToBigInt(value, name) {
 }
 
 function recordField(record, snakeName, camelName = snakeName) {
-  if (record && Object.hasOwn(record, snakeName)) return record[snakeName];
-  if (record && Object.hasOwn(record, camelName)) return record[camelName];
+  if (record && Object.prototype.hasOwnProperty.call(record, snakeName)) return record[snakeName];
+  if (record && Object.prototype.hasOwnProperty.call(record, camelName)) return record[camelName];
   throw new Error(`Vault key record missing ${snakeName}`);
 }
 
 function optionalRecordField(record, ...names) {
   for (const name of names) {
-    if (record && Object.hasOwn(record, name)) return record[name];
+    if (record && Object.prototype.hasOwnProperty.call(record, name)) return record[name];
   }
   return undefined;
 }
@@ -2811,7 +2811,9 @@ export async function runPlathoCryptoSelfTest() {
     throw new Error('private capsule crypto suite draft failed');
   }
 
-  const tampered = structuredClone(hybridEnvelope);
+  // Shallow copy: the tamper check only rewrites a top-level field, and
+  // structuredClone is missing on older Safari (iOS < 15.4).
+  const tampered = { ...hybridEnvelope };
   tampered.recipientKeyId = `${tampered.recipientKeyId}.tampered`;
   let tamperChecks = 0;
   async function expectReject(label, fn) {

@@ -20,14 +20,14 @@ import {
   tuplehash256, parallelhash256,
   keccakprg
 } from '@noble/hashes/sha3-addons.js';
-import { blake3 } from '@noble/hashes/blake3.js';
-import { blake2b, blake2s } from '@noble/hashes/blake2.js';
-import { hmac } from '@noble/hashes/hmac.js';
-import { hkdf } from '@noble/hashes/hkdf.js';
-import { pbkdf2, pbkdf2Async } from '@noble/hashes/pbkdf2.js';
-import { scrypt, scryptAsync } from '@noble/hashes/scrypt.js';
-import { md5, ripemd160, sha1 } from '@noble/hashes/legacy.js';
-import * as utils from '@noble/hashes/utils.js';
+import { blake3 } from '../hashes/blake3.js';
+import { blake2b, blake2s } from '../hashes/blake2.js';
+import { hmac } from '../hashes/hmac.js';
+import { hkdf } from '../hashes/hkdf.js';
+import { pbkdf2, pbkdf2Async } from '../hashes/pbkdf2.js';
+import { scrypt, scryptAsync } from '../hashes/scrypt.js';
+import { md5, ripemd160, sha1 } from '../hashes/legacy.js';
+import * as utils from '../hashes/utils.js';
 ```
  */
 throw new Error('root module cannot be imported: import submodules instead. Check out README');

@@ -24,13 +24,13 @@ Before a production package can pass, `web/platho-config.mjs` must be switched t
 Production hosting must keep the security headers from `deploy/Caddyfile` or `deploy/nginx-platho.app.conf`, including:
 
 - `Content-Security-Policy` with `default-src 'self'`, `object-src 'none'`, `base-uri 'none'`, and `frame-ancestors 'none'`;
-- `script-src 'self' 'wasm-unsafe-eval' 'sha256-SLdbJxH1ETsf/Yx+7SyKot6BP+1toqgkV32YAmD36K0=' 'sha256-RaSAaXmdhJXw3EBibZEVWPjFAFKOuUWWQUpb+UMMJDw='` for the bundled WebP encoder and inline import map in `web/index.html`; both import-map hashes are intentionally listed so Windows CRLF and production LF packaging stay CSP-compatible;
+- `script-src 'self' 'wasm-unsafe-eval'` for the bundled WebP encoder; the bundle has no inline scripts and no inline import map (vendor modules use relative imports), so `script-src` carries no content hashes;
 - `connect-src` limited to same-origin plus the approved production TON RPC hosts (`https://toncenter.com`, `https://*.toncenter.com`, and `https://rpc.platho.app`);
 - `X-Content-Type-Options: nosniff`;
 - `Referrer-Policy: no-referrer`;
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
 
-If the import map or production RPC host list changes, update the CSP before publishing. A production PWA with local wallet storage must not be served without these headers.
+If the production RPC host list changes, update the CSP before publishing. A production PWA with local wallet storage must not be served without these headers.
 
 Generated files:
 
