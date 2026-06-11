@@ -1085,6 +1085,74 @@ describe('Vault TON RPC provider', () => {
     expect(toncenterCalls).toHaveLength(2);
   });
 
+  it('VAULT-RPC-04I8: a 403 verifier parks immediately and reports structural verification degradation', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-rpc',
+      fallbackProviderIds: [],
+      providers: [
+        {
+          id: 'platho-rpc',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+        },
+        {
+          id: 'toncenter-direct',
+          kind: 'toncenter-v3',
+          verifierOnly: true,
+          emergencyFallback: true,
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `verifier-403-${Math.random()}`,
+      transportDeadRetryMs: 60_000,
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+      fetch: async (url: string) => {
+        const endpoint = String(url);
+        calls.push(endpoint);
+        if (endpoint.includes('toncenter.example')) {
+          // Deterministic policy denial, e.g. keyless toncenter blocked for
+          // the user's network/region.
+          return {
+            ok: false,
+            status: 403,
+            async json() {
+              return { ok: false };
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(7n)] };
+          },
+        };
+      },
+    });
+
+    expect(transport?.isVerificationDegraded()).toBe(false);
+    const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
+    // The very first verified read parks the 403 verifier (no failure-count
+    // warm-up) so the app can degrade within the same user action.
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    expect(transport?.isVerificationDegraded()).toBe(true);
+    // Primary stays healthy: this is verification degradation, not the
+    // censorship-survival primary-parked mode.
+    expect(transport?.isDegraded()).toBe(false);
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
+    expect(toncenterCalls).toHaveLength(1);
+    // Unverified reads keep flowing through the healthy primary.
+    await expect(transport?.runGetMethod({
+      ...call,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+    })).resolves.toMatchObject({ stack: [num(7n)] });
+  });
+
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {
     const primary = {
       kind: 'primary-rpc',
