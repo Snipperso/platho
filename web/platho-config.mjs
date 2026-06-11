@@ -94,9 +94,14 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           id: 'toncenter-mainnet',
           kind: 'toncenter-v3',
           verifierOnly: true,
+          // Censorship survival: if the Platho RPC gateway is blocked or
+          // unreachable, keyless TonCenter (~1 rps) takes over reads, sends,
+          // and message history until the gateway recovers. It is never a
+          // normal read/send fallback while a primary transport is healthy.
+          emergencyFallback: true,
           runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
-          sendBocEndpoint: false,
-          messagesEndpoint: false,
+          sendBocEndpoint: 'https://toncenter.com/api/v3/message',
+          messagesEndpoint: 'https://toncenter.com/api/v3/messages',
           walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
           requestSpacingMs: 1500,
         },
@@ -111,8 +116,8 @@ export const PLATHO_APP_CONFIG = deepFreeze({
         },
       ],
       requestSpacingMs: 250,
-      rateLimitBackoffMs: 60000,
-      rateLimitRetries: 0,
+      rateLimitBackoffMs: 7000,
+      rateLimitRetries: 1,
       requestTimeoutMs: 15000,
       runGetMethodCacheTtlMs: 15000,
       runGetMethodCacheMaxEntries: 512,
@@ -123,7 +128,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: '0f54ea7d319aaad69cfba922e7779e25fca683de15c8caf7fe444e2dc99dc610',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=33',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=34',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -133,7 +138,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=18',
+      moduleUrl: './ton-dns-provider.mjs?v=19',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
@@ -297,13 +302,32 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         );
       }
       for (const rpcProvider of tonRpcProviders) {
-        if (/toncenter/i.test(String(rpcProvider?.id ?? rpcProvider?.kind ?? '')) && rpcProvider?.sendBocEndpoint) {
+        const isEmergencyFallbackProvider = rpcProvider?.verifierOnly === true && rpcProvider?.emergencyFallback === true;
+        if (
+          /toncenter/i.test(String(rpcProvider?.id ?? rpcProvider?.kind ?? ''))
+          && rpcProvider?.sendBocEndpoint
+          && !isEmergencyFallbackProvider
+        ) {
           addFinding(
             findings,
             'PWA_TONCENTER_DIRECT_SEND_FORBIDDEN',
-            'Production PWA must broadcast through the Platho RPC gateway, not direct TonCenter sendBoc.',
+            'Production PWA must broadcast through the Platho RPC gateway; direct TonCenter sendBoc is allowed only on a verifier-only emergency fallback provider.',
           );
         }
+      }
+      const hasEmergencyFallbackProvider = tonRpcProviders.some((rpcProvider) => (
+        rpcProvider?.verifierOnly === true
+        && rpcProvider?.emergencyFallback === true
+        && hasConcreteTonRpcReadProvider(rpcProvider)
+        && hasConcreteTonRpcSendProvider(rpcProvider)
+        && hasConcreteTonRpcMessageHistoryProvider(rpcProvider)
+      ));
+      if (!hasEmergencyFallbackProvider) {
+        addFinding(
+          findings,
+          'PWA_TON_RPC_EMERGENCY_FALLBACK_REQUIRED',
+          'Production PWA config must include a verifier-only emergency fallback provider with read, send, and message-history endpoints so the messenger survives a blocked primary gateway.',
+        );
       }
       const fallbackIds = new Set((config?.network?.tonRpc?.fallbackProviderIds ?? config?.network?.tonRpc?.fallbackProviders ?? []).map(String));
       for (const rpcProvider of tonRpcProviders) {

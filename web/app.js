@@ -36,8 +36,8 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=69';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=33';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=70';
+import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=34';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -118,19 +118,19 @@ import {
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
 } from './pwa-contract-transactions.mjs?v=24';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=20';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=21';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=33';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=22';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=18';
+} from './capsulehub-ton-rpc-provider.mjs?v=34';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=23';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=19';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=25';
+} from './username-ton-rpc-provider.mjs?v=26';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v413';
+const PLATHO_APP_RUNTIME_VERSION = 'v414';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 window.addEventListener('error', (event) => {
@@ -459,6 +459,11 @@ let messageAutoSyncLoadingFrame = 0;
 let privateOutboundWorkDepth = 0;
 let vaultPublishSendLock = Promise.resolve();
 let vaultPublishSendWaiters = 0;
+// Resolves when the most recently broadcast vault external is reflected in
+// the on-chain publish nonce. Pre-sign user/nonce reads await it so that
+// back-to-back signed actions cannot race the strictly sequential contract
+// nonce while the previous external is still propagating.
+let pendingVaultPublishNonceBarrier = null;
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
@@ -490,6 +495,9 @@ const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
 const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000, 90_000, 180_000];
 const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
+// Survival mode: with the primary RPC gateway parked the keyless fallback has
+// a ~1 rps budget, so background sync slows down to protect the send path.
+const MESSAGE_AUTO_SYNC_DEGRADED_MS = 180 * 1000;
 const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
 const TON_RPC_CONNECTING_STATUS = 'RPC busy - retrying';
 const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
@@ -506,7 +514,10 @@ const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
 const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
-const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 12 * 1000;
+// Publish + CapsuleHub ACK realistically spans 2-3 basechain blocks; the hot
+// window must cover that plus the read round-trips or every send degrades
+// into the slow recovery/retry path.
+const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 25 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 4 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 * 1000;
@@ -576,7 +587,7 @@ const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
   32: 67_600_000n,
 });
 const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
-const VAULT_PUBLISH_NONCE_POLL_MS = 1_500;
+const VAULT_PUBLISH_NONCE_POLL_MS = 1_000;
 const VAULT_ATH_WITHDRAW_CONFIRM_TIMEOUT_MS = 90_000;
 const VAULT_ATH_WITHDRAW_POLL_MS = 1_500;
 const PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS = 90_000;
@@ -6305,10 +6316,30 @@ async function enterVaultPublishSendLock() {
   };
 }
 
+async function awaitVaultPublishNonceBarrier() {
+  while (pendingVaultPublishNonceBarrier) {
+    const barrier = pendingVaultPublishNonceBarrier;
+    await barrier.catch(() => {});
+    if (pendingVaultPublishNonceBarrier === barrier) pendingVaultPublishNonceBarrier = null;
+  }
+}
+
+function installVaultPublishNonceBarrier(task) {
+  const barrier = Promise.resolve(task).catch(() => {});
+  pendingVaultPublishNonceBarrier = barrier;
+  barrier.then(() => {
+    if (pendingVaultPublishNonceBarrier === barrier) pendingVaultPublishNonceBarrier = null;
+  });
+  return barrier;
+}
+
 function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   clearMessageAutoSyncTimer();
   if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair || document.hidden) return;
-  const effectiveDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
+  const transport = globalThis.plathoTonRpcTransport;
+  const degradedTransport = typeof transport?.isDegraded === 'function' && transport.isDegraded();
+  const requestedDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
+  const effectiveDelayMs = degradedTransport ? Math.max(requestedDelayMs, MESSAGE_AUTO_SYNC_DEGRADED_MS) : requestedDelayMs;
   messageAutoSyncPhase = messageAutoSyncLastErrorLabel ? 'delayed' : (messageAutoSyncLastResult ? 'synced' : 'scheduled');
   messageAutoSyncAt = Date.now() + effectiveDelayMs;
   scheduleMessageAutoSyncCountdownUi();
@@ -11612,6 +11643,9 @@ async function readFreshReceiveIntentForCancel(provider, intentId) {
 }
 
 async function readFreshConnectedVaultUser(provider, options = {}) {
+  // Signed vault actions derive their client nonce from this read; wait for
+  // any in-flight publish nonce to land so the next signature stays valid.
+  await awaitVaultPublishNonceBarrier();
   return loadConnectedVaultUser({
     provider,
     verify: options.verify !== false,
@@ -11622,7 +11656,10 @@ async function readFreshConnectedVaultUser(provider, options = {}) {
 }
 
 async function readFreshConnectedVaultUserForOwnVaultAction(provider) {
-  return readFreshConnectedVaultUser(provider);
+  return callWithDegradedTransportReadFallback(
+    () => readFreshConnectedVaultUser(provider),
+    () => readFreshConnectedVaultUser(provider, unverifiedCriticalChainReadOptions()),
+  );
 }
 
 async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
@@ -11630,6 +11667,22 @@ async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
     return await readStrict();
   } catch (error) {
     if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
+    return readUnverified();
+  }
+}
+
+async function callWithDegradedTransportReadFallback(readStrict, readUnverified) {
+  // Own-action pre-sign reads fail closed on any verification trouble while
+  // the primary RPC gateway is healthy. The unverified fallback opens only
+  // in censorship-survival mode: the transport reports a parked primary, so
+  // dual-provider verification is structurally impossible and the keyless
+  // emergency provider must keep the messenger usable on its own.
+  try {
+    return await readStrict();
+  } catch (error) {
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
+    const transport = globalThis.plathoTonRpcTransport;
+    if (typeof transport?.isDegraded !== 'function' || transport.isDegraded() !== true) throw error;
     return readUnverified();
   }
 }
@@ -11644,16 +11697,23 @@ async function callWithVerificationUnavailableReadFallback(readStrict, readUnver
 }
 
 async function readConnectedVaultGlobalForOwnVaultAction(provider) {
-  return loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() });
+  return callWithDegradedTransportReadFallback(
+    () => loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
+    () => loadConnectedVaultGlobal({ provider, ...unverifiedCriticalChainReadOptions() }),
+  );
 }
 
 async function readCanonicalPublishChargeForOwnVaultAction(provider, owner, publishKind, sizeClass, cryptoSuite) {
-  return provider.getCanonicalPublishCharge(
+  const readCharge = (readOptions) => provider.getCanonicalPublishCharge(
     owner,
     BigInt(publishKind),
     BigInt(sizeClass),
     BigInt(cryptoSuite),
-    { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
+    { vaultAddress: requireVaultAddress(), ...readOptions },
+  );
+  return callWithDegradedTransportReadFallback(
+    () => readCharge({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
+    () => readCharge(unverifiedCriticalChainReadOptions()),
   );
 }
 
@@ -13580,7 +13640,7 @@ async function submitVaultMessage(type, params, options = {}) {
   return result;
 }
 
-async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, user, buildExternal, allowUnverifiedNonceWait = false }) {
+async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, user, buildExternal }) {
   const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
   const external = await buildExternal(clientNonce);
   let result = null;
@@ -13595,10 +13655,7 @@ async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, u
   }
   let nonceWaitError = null;
   try {
-    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
-      verify: allowUnverifiedNonceWait !== true,
-      allowUnverifiedCriticalRead: allowUnverifiedNonceWait === true,
-    });
+    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
   } catch (error) {
     if (ambiguousBroadcast || result) {
       nonceWaitError = error;
@@ -13676,12 +13733,7 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   }
   const provider = options.provider ?? await resolveVaultChainProvider();
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const user = options.user ?? await loadConnectedVaultUser({
-    provider,
-    verify: true,
-    priority: 'critical',
-    cacheTtlMs: 0,
-  });
+  const user = options.user ?? await readFreshConnectedVaultUser(provider);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before using payment checks');
   }
@@ -13717,10 +13769,7 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   };
   let nonceWaitError = null;
   try {
-    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
-      verify: options.allowUnverifiedNonceWait !== true,
-      allowUnverifiedCriticalRead: options.allowUnverifiedNonceWait === true,
-    });
+    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
   } catch (error) {
     if (ambiguousBroadcast || result) {
       nonceWaitError = error;
@@ -13802,7 +13851,6 @@ async function submitVaultWithdrawTonAmount(amount) {
     provider,
     owner,
     user,
-    allowUnverifiedNonceWait: true,
     buildExternal: (clientNonce) => buildVaultWithdrawTonExternalBoc({
       owner_wallet: owner,
       amount,
@@ -13872,7 +13920,6 @@ async function submitVaultWithdrawAthAmount(amount) {
     provider,
     owner,
     user,
-    allowUnverifiedNonceWait: true,
     buildExternal: (clientNonce) => buildVaultWithdrawAthExternalBoc({
       owner_wallet: owner,
       amount,
@@ -14401,8 +14448,7 @@ async function attemptPrivatePaymentCheckPublish(context) {
     }, {
       provider,
       user: initialUser,
-      allowUnverifiedNonceWait: true,
-    });
+      });
     intentCreateSubmitted = true;
     context.paymentIntentCreated = true;
     message.paymentIntentCreated = true;
@@ -14580,7 +14626,6 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
     provider,
     user: beforeUser,
     allowPendingServiceWorkerUpdate: true,
-    allowUnverifiedNonceWait: true,
   });
   setText(identitySubtitle, 'claim confirming');
   await options.onStatus?.('check claim submitted, confirming');
@@ -14615,7 +14660,6 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
     provider,
     user: beforeUser,
     allowPendingServiceWorkerUpdate: true,
-    allowUnverifiedNonceWait: true,
   });
   setText(identitySubtitle, 'cancel confirming');
   await options.onStatus?.('check cancel submitted, confirming');
@@ -15127,13 +15171,22 @@ function publishConfirmationHistoryTransports() {
   const transports = Array.isArray(transport?.transports) && transport.transports.length > 0
     ? transport.transports
     : [transport];
-  const out = [];
+  const primary = [];
+  const emergency = [];
   for (const item of transports) {
     const resolved = item?.transport ?? item;
     if (!resolved?.getMessages || resolved.supportsMessageHistory === false) continue;
-    if (!out.includes(resolved)) out.push(resolved);
+    // Verifier-only transports (keyless toncenter) carry a ~1 rps budget and
+    // serve message history only when no live primary history transport
+    // exists — the censorship-survival path.
+    const bucket = resolved.verifierOnly === true ? emergency : primary;
+    if (!bucket.includes(resolved)) bucket.push(resolved);
   }
-  return out;
+  const alivePrimary = primary.filter((item) => !isTonRpcTransportDead(item));
+  if (alivePrimary.length > 0) return alivePrimary;
+  const aliveEmergency = emergency.filter((item) => !isTonRpcTransportDead(item));
+  if (aliveEmergency.length > 0) return aliveEmergency;
+  return primary.length > 0 ? primary : emergency;
 }
 
 function vaultPublishAckHistoryParams(capsuleHubAddress, pageIndex = 0) {
@@ -15243,8 +15296,19 @@ function capsuleHubConfirmationProviderCandidates(baseProvider, address, options
   if (options.scanAvailableTransports !== true) return providers;
   const transport = globalThis.plathoCapsuleHubRpcTransport ?? globalThis.plathoTonRpcTransport;
   const transports = Array.isArray(transport?.transports) ? transport.transports : [];
+  const primary = [];
+  const emergency = [];
   for (const item of transports) {
     if (!item?.runGetMethod) continue;
+    (item.verifierOnly === true ? emergency : primary).push(item);
+  }
+  const alivePrimary = primary.filter((item) => !isTonRpcTransportDead(item));
+  const candidates = alivePrimary.length > 0
+    ? alivePrimary
+    : (emergency.filter((item) => !isTonRpcTransportDead(item)).length > 0
+      ? emergency.filter((item) => !isTonRpcTransportDead(item))
+      : (primary.length > 0 ? primary : emergency));
+  for (const item of candidates) {
     providers.push(createCapsuleHubTonRpcProvider({ capsuleHubAddress: address, transport: item }));
   }
   return providers;
@@ -15547,6 +15611,7 @@ function shouldConfirmVaultPublishNonceAfterSend(index, total, options = {}) {
 
 async function readVaultPublishNonce(provider, owner, options = {}) {
   if (!provider?.getUser) return null;
+  if (options.ignoreNonceBarrier !== true) await awaitVaultPublishNonceBarrier();
   const user = await provider.getUser(owner, {
     vaultAddress: requireVaultAddress(),
     verify: options.verify !== false,
@@ -15560,7 +15625,14 @@ async function readVaultPublishNonce(provider, owner, options = {}) {
 }
 
 async function readVaultPublishNonceForOwnVaultAction(provider, owner, options = {}) {
-  return readVaultPublishNonce(provider, owner, options);
+  // Pre-sign nonce reads stay verified fail-closed in normal operation; the
+  // unverified path opens only in degraded survival mode, where the primary
+  // gateway is parked and dual-provider verification is structurally
+  // impossible. A wrong nonce can only produce a cleanly rejected external.
+  return callWithDegradedTransportReadFallback(
+    () => readVaultPublishNonce(provider, owner, options),
+    () => readVaultPublishNonce(provider, owner, { ...options, ...unverifiedCriticalChainReadOptions() }),
+  );
 }
 
 async function waitForVaultPublishNonce(provider, owner, expectedNonce, options = {}) {
@@ -15568,32 +15640,50 @@ async function waitForVaultPublishNonce(provider, owner, expectedNonce, options 
   const deadline = Date.now() + (Number.isFinite(timeoutMs) && timeoutMs > 0
     ? Math.floor(timeoutMs)
     : VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS);
-  let lastNonce = await readVaultPublishNonce(provider, owner, options);
-  while (lastNonce !== null && lastNonce < expectedNonce && Date.now() < deadline) {
-    await delay(VAULT_PUBLISH_NONCE_POLL_MS);
-    lastNonce = await readVaultPublishNonce(provider, owner, options);
+  // Post-broadcast nonce polling is observational: the publish outcome is
+  // re-authenticated by CapsuleHub confirmation, while dual-provider reads
+  // of a value that changes during the hot window turn legitimate
+  // block-height skew into RPC_DISAGREEMENT failures. Poll unverified.
+  const readOptions = {
+    ...options,
+    ignoreNonceBarrier: true,
+    verify: false,
+    allowUnverifiedCriticalRead: true,
+  };
+  let lastNonce = null;
+  let lastError = null;
+  let sawNonceRead = false;
+  for (;;) {
+    try {
+      lastNonce = await readVaultPublishNonce(provider, owner, readOptions);
+      lastError = null;
+      sawNonceRead = true;
+      if (lastNonce === null || lastNonce >= expectedNonce) break;
+    } catch (error) {
+      // The external is already broadcast; transient RPC trouble (rate
+      // limits, provider disagreement, a blocked gateway failing over) must
+      // not fail the publish. Keep polling until the deadline decides.
+      if (!isTonRpcRecoverableReadError(error) && !isTonRpcRateLimitError(error)) throw error;
+      lastError = error;
+    }
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    let pollMs = VAULT_PUBLISH_NONCE_POLL_MS;
+    if (lastError && isTonRpcRateLimitError(lastError)) {
+      pollMs = Math.max(pollMs, Math.min(tonRpcLimitBackoffMs(lastError), remainingMs));
+    }
+    await delay(Math.max(250, Math.min(pollMs, remainingMs)));
   }
-  if (lastNonce !== null && lastNonce < expectedNonce) {
-    const error = new Error('Vault publish was not confirmed after broadcast');
-    error.code = 'NETWORK_ERROR';
-    throw error;
-  }
-  return lastNonce;
+  if (lastNonce !== null && lastNonce >= expectedNonce) return lastNonce;
+  if (sawNonceRead && lastNonce === null) return lastNonce;
+  const error = new Error('Vault publish was not confirmed after broadcast');
+  error.code = 'NETWORK_ERROR';
+  if (lastError) error.cause = lastError;
+  throw error;
 }
 
 async function waitForVaultPublishNonceForOwnVaultAction(provider, owner, expectedNonce, options = {}) {
-  try {
-    return await waitForVaultPublishNonce(provider, owner, expectedNonce, options.allowUnverifiedNonceRead === true
-      ? { ...options, verify: false, allowUnverifiedCriticalRead: true }
-      : options);
-  } catch (error) {
-    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
-    return waitForVaultPublishNonce(provider, owner, expectedNonce, {
-      ...options,
-      verify: false,
-      allowUnverifiedCriticalRead: true,
-    });
-  }
+  return waitForVaultPublishNonce(provider, owner, expectedNonce, options);
 }
 
 async function readVaultPublishNonceForBroadcastRetry(provider, owner, options = {}) {
@@ -15711,6 +15801,7 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
   let lastResult = null;
   const sendTurn = await enterVaultPublishSendLock();
   try {
+    await awaitVaultPublishNonceBarrier();
     for (let index = 0; index < results.length; index += 1) {
       const item = results[index];
       const existingPart = publishState.parts?.[item.partIndex];
@@ -15754,21 +15845,35 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
         notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
         if (shouldConfirmVaultPublishNonceAfterSend(index, results.length, options)) {
           const nonceWaitOptions = {
-            ...options,
             timeoutMs: options.timeoutMs ?? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,
+            requestTimeoutMs: options.requestTimeoutMs,
+            queueTimeoutMs: options.queueTimeoutMs,
           };
-          if (options.allowOwnVaultActionReadFallback === true) {
-            await waitForVaultPublishNonceForOwnVaultAction(provider, owner, clientNonce + 1n, nonceWaitOptions);
+          if (index < results.length - 1) {
+            // Middle parts: the contract consumes one strictly sequential
+            // nonce per accepted external, so the next part cannot be signed
+            // until this one is reflected on-chain.
+            await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, nonceWaitOptions);
+            notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
           } else {
-            await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
-              verify: options.allowUnverifiedNonceRead !== true,
-              allowUnverifiedCriticalRead: options.allowUnverifiedNonceRead === true,
-              timeoutMs: nonceWaitOptions.timeoutMs,
-              requestTimeoutMs: nonceWaitOptions.requestTimeoutMs,
-              queueTimeoutMs: nonceWaitOptions.queueTimeoutMs,
-            });
+            // Final part: do not block CapsuleHub confirmation on the nonce
+            // poll. Track it in the background; the barrier serializes any
+            // following signed vault action instead of this await.
+            const partIndex = item.partIndex;
+            const expectedNonce = clientNonce + 1n;
+            installVaultPublishNonceBarrier((async () => {
+              try {
+                await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions);
+                const part = publishState.parts?.[partIndex];
+                if (part && part.status === PUBLISH_PART_STATUS_SENT) {
+                  notifyPublishState(options, publishState, setPublishPartStatus(publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+                }
+              } catch {
+                // Confirmation retries re-broadcast and re-check this part;
+                // a failed background nonce poll must not surface here.
+              }
+            })());
           }
-          notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
         }
       } catch (error) {
         const sentBeforeFailure = Boolean(item.result);

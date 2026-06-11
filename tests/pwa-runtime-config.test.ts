@@ -36,9 +36,10 @@ const productionConfig = {
           id: 'toncenter',
           kind: 'toncenter-v3',
           verifierOnly: true,
+          emergencyFallback: true,
           runGetMethodEndpoint: 'https://toncenter-2.example/api/v3/runGetMethod',
-          sendBocEndpoint: false,
-          messagesEndpoint: false,
+          sendBocEndpoint: 'https://toncenter-2.example/api/v3/message',
+          messagesEndpoint: 'https://toncenter-2.example/api/v3/messages',
         },
       ],
       requestTimeoutMs: 15000,
@@ -138,7 +139,8 @@ describe('PWA runtime config guard', () => {
     }
     expect(PLATHO_APP_CONFIG.network.chain).toBe('mainnet');
     expect(PLATHO_APP_CONFIG.network.tonRpc.requestSpacingMs).toBe(250);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.rateLimitBackoffMs).toBe(60000);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.rateLimitBackoffMs).toBe(7000);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.rateLimitRetries).toBe(1);
     expect(PLATHO_APP_CONFIG.network.tonRpc.requestTimeoutMs).toBe(15000);
     expect(PLATHO_APP_CONFIG.network.tonRpc.runGetMethodCacheTtlMs).toBe(15000);
     expect(PLATHO_APP_CONFIG.network.tonRpc.runGetMethodCacheMaxEntries).toBe(512);
@@ -158,9 +160,10 @@ describe('PWA runtime config guard', () => {
     });
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')).toMatchObject({
       verifierOnly: true,
+      emergencyFallback: true,
       runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
-      sendBocEndpoint: false,
-      messagesEndpoint: false,
+      sendBocEndpoint: 'https://toncenter.com/api/v3/message',
+      messagesEndpoint: 'https://toncenter.com/api/v3/messages',
       walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
       requestSpacingMs: 1500,
     });
@@ -195,7 +198,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=18/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=19/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -251,8 +254,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v413<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v413'/);
+    expect(html).toMatch(/id="appVersionLabel">v414<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v414'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1087,8 +1090,9 @@ describe('PWA runtime config guard', () => {
     const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(item.external)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
     const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(index, results.length, options)');
-    const nonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {');
+    const middleNonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, nonceWaitOptions)');
     const submittedStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_VAULT_SUBMITTED');
+    const finalBarrierIndex = sendSource.indexOf('installVaultPublishNonceBarrier');
     const partialIndex = sendSource.indexOf('vaultPublishPartialError');
     const clientNonceSource = sendSource.slice(
       sendSource.indexOf('const clientNonce = options.allowOwnVaultActionReadFallback === true'),
@@ -1108,15 +1112,26 @@ describe('PWA runtime config guard', () => {
     expect(sendIndex).toBeGreaterThan(buildIndex);
     expect(sentStatusIndex).toBeGreaterThan(sendIndex);
     expect(confirmNonceIndex).toBeGreaterThan(sentStatusIndex);
-    expect(nonceIndex).toBeGreaterThan(confirmNonceIndex);
-    expect(submittedStatusIndex).toBeGreaterThan(nonceIndex);
+    expect(middleNonceIndex).toBeGreaterThan(confirmNonceIndex);
+    expect(submittedStatusIndex).toBeGreaterThan(middleNonceIndex);
+    expect(finalBarrierIndex).toBeGreaterThan(submittedStatusIndex);
+    // Back-to-back signed actions serialize on the publish nonce barrier
+    // instead of blocking the final part's CapsuleHub confirmation.
+    expect(sendSource).toMatch(/await awaitVaultPublishNonceBarrier\(\)/);
+    expect(sendSource).toMatch(/installVaultPublishNonceBarrier\(\(async \(\) => \{/);
+    expect(sendSource).toMatch(/if \(part && part\.status === PUBLISH_PART_STATUS_SENT\)/);
     expect(sendSource).toMatch(/readVaultPublishNonceForOwnVaultAction\(provider, owner\)/);
     expect(clientNonceSource).not.toMatch(/allowUnverifiedNonceRead|allowUnverifiedCriticalRead|verify:/);
     expect(sendSource).toMatch(/partWithPublishId\.externalBoc = item\.external\.boc/);
     expect(sendSource).toMatch(/partWithPublishId\.lastBroadcastAt = new Date\(\)\.toISOString\(\)/);
-    expect(sendSource).toMatch(/waitForVaultPublishNonceForOwnVaultAction\(provider, owner, clientNonce \+ 1n, nonceWaitOptions\)/);
-    expect(ownNonceWaitSource).toMatch(/\.\.\.options,\s*verify: false,\s*allowUnverifiedCriticalRead: true/);
-    expect(ownNonceWaitSource).not.toMatch(/:\s*\{\s*\}\)/);
+    // Post-broadcast nonce polling is unverified, cache-bypassing, and
+    // tolerant of transient RPC trouble until the deadline decides.
+    expect(nonceWaitSource).toMatch(/ignoreNonceBarrier: true/);
+    expect(nonceWaitSource).toMatch(/verify: false/);
+    expect(nonceWaitSource).toMatch(/allowUnverifiedCriticalRead: true/);
+    expect(nonceWaitSource).toMatch(/isTonRpcRecoverableReadError\(error\)/);
+    expect(nonceWaitSource).toMatch(/isTonRpcRateLimitError\(error\)/);
+    expect(ownNonceWaitSource).toMatch(/return waitForVaultPublishNonce\(provider, owner, expectedNonce, options\)/);
     expect(sendSource).toMatch(/clientNonce === null[\s\S]*Vault publish nonce could not be read before signing/);
     expect(nonceWaitSource).toMatch(/Vault publish was not confirmed after broadcast/);
     expect(nonceWaitSource).toMatch(/error\.code = 'NETWORK_ERROR'/);
@@ -1131,7 +1146,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = \[1_000, 2_000, 3_000, 5_000, 8_000, 13_000, 21_000, 30_000\]/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 \* 60 \* 1000/);
-    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 12 \* 1000/);
+    // Publish + CapsuleHub ACK spans 2-3 basechain blocks; the hot window
+    // covers that so sends do not degrade into the recovery/retry path.
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 25 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 4 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 \* 1000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 \* 1000/);
@@ -1142,7 +1159,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const publishCallbacks = \{[\s\S]*allowOwnVaultActionReadFallback: true,\s*confirmFinalNonce: true,/);
     expect(app).toMatch(/sendPreparedCapsulesThroughVault\(preparedPublish, \{[\s\S]*publishState,\s*confirmFinalNonce: true,/);
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]*confirmFinalNonce: options\.confirmFinalNonce \?\? true/);
-    expect(sendSource).toMatch(/const nonceWaitOptions = \{\s*\.\.\.options,\s*timeoutMs: options\.timeoutMs \?\? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,\s*\}/);
+    expect(sendSource).toMatch(/const nonceWaitOptions = \{\s*timeoutMs: options\.timeoutMs \?\? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,\s*requestTimeoutMs: options\.requestTimeoutMs,\s*queueTimeoutMs: options\.queueTimeoutMs,\s*\}/);
     expect(sendSource).not.toMatch(/needsQueuedNonce|VAULT_PUBLISH_QUEUE_NONCE_CONFIRM_TIMEOUT_MS/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000/);
     expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6/);
@@ -2317,11 +2334,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function documentPaymentContent\(payment, options = \{\}\)[\s\S]*paymentSecret32Bytes\(payment\)[\s\S]*options\.allowMissingPaymentSecret === true[\s\S]*new Uint8Array\(32\)/);
     expect(app).toMatch(/function privateComposerSendPlan[\s\S]*messageDocumentBytesFromDraft\([\s\S]*allowMissingPaymentSecret:\s*true/);
     expect(source).toMatch(/allowOwnVaultActionReadFallback:\s*true/);
-    expect(source).toMatch(/allowUnverifiedNonceWait:\s*true/);
-    expect(source).not.toMatch(/allowUnverifiedNonceRead:\s*true/);
+    expect(source).not.toMatch(/allowUnverifiedNonceRead:\s*true|allowUnverifiedNonceWait/);
     expect(helpers).toMatch(/async function readConnectedVaultGlobalForOwnVaultAction[\s\S]*criticalChainReadOptions\(\)/);
-    expect(helpers).not.toMatch(/async function readConnectedVaultGlobalForOwnVaultAction[\s\S]*allowUnverifiedCriticalRead:\s*true/);
-    expect(helpers).toMatch(/async function readFreshConnectedVaultUserForOwnVaultAction\(provider\)[\s\S]*return readFreshConnectedVaultUser\(provider\)/);
+    // Pre-sign own-action reads fail closed unless the transport reports
+    // degraded censorship-survival mode (callWithDegradedTransportReadFallback).
+    expect(helpers).toMatch(/async function readFreshConnectedVaultUserForOwnVaultAction\(provider\)[\s\S]*callWithDegradedTransportReadFallback\(/);
+    expect(helpers).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
     expect(helpers).toMatch(/async function readFreshReceiveIntentForOwnVaultAction\(provider, intentId\)[\s\S]*return readFreshReceiveIntent\(provider, intentId\)/);
     expect(helpers).not.toMatch(/readFreshConnectedVaultUser\(provider, \{ verify: false|readFreshReceiveIntent\(provider, intentId, \{ verify: false/);
     expect(app).toMatch(/if \(options\.allowOwnVaultActionReadFallback === true\) \{[\s\S]*await readConnectedVaultGlobalForOwnVaultAction\(provider\)/);
@@ -2458,7 +2476,7 @@ describe('PWA runtime config guard', () => {
     expect(flashIndex).toBeGreaterThan(waitIndex);
     expect(claimSource).not.toMatch(/readFreshConnectedVaultUser\(provider\)\.catch/);
     expect(claimSource).toMatch(/allowPendingServiceWorkerUpdate:\s*true/);
-    expect(claimSource).toMatch(/allowUnverifiedNonceWait:\s*true/);
+    expect(claimSource).not.toMatch(/allowUnverifiedNonceWait/);
     expect(claimSource).toMatch(/secret32:\s*paymentSecret32\(payment\)/);
     expect(claimSource).toMatch(/markPendingPaymentCheckLedgerRecord\(payment, \{[\s\S]*status:\s*'claim_submitted'/);
     expect(claimSource).toMatch(/const confirmed = await waitForPaymentCheckClaimConfirmation\(provider, payment, beforeUser\)/);
@@ -2518,9 +2536,10 @@ describe('PWA runtime config guard', () => {
     expect(receiveIntentFallbackSource).not.toMatch(/RPC_DISAGREEMENT|isTonRpcSoftVaultGlobalReadError/);
     expect(userFallbackSource).not.toMatch(/RPC_DISAGREEMENT|isTonRpcSoftVaultGlobalReadError/);
     expect(receiveIntentFallbackSource).toMatch(/return readFreshReceiveIntent\(provider, intentId\)/);
-    expect(userFallbackSource).toMatch(/return readFreshConnectedVaultUser\(provider\)/);
+    expect(userFallbackSource).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(userFallbackSource).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
     expect(receiveIntentFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
-    expect(userFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
+    expect(userFallbackSource).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     expect(helpers).toMatch(/lastIntent\?\.exists === false && balance >= expectedBalance/);
     expect(helpers).toMatch(/Payment check disappeared but sender Vault balance was not restored/);
     expect(readUserIndex).toBeGreaterThanOrEqual(0);
@@ -2530,7 +2549,7 @@ describe('PWA runtime config guard', () => {
     expect(waitIndex).toBeGreaterThan(submitIndex);
     expect(flashIndex).toBeGreaterThan(waitIndex);
     expect(cancelSource).toMatch(/allowPendingServiceWorkerUpdate:\s*true/);
-    expect(cancelSource).toMatch(/allowUnverifiedNonceWait:\s*true/);
+    expect(cancelSource).not.toMatch(/allowUnverifiedNonceWait/);
     expect(cancelSource).toMatch(/markPendingPaymentCheckLedgerRecord\(payment, \{[\s\S]*status:\s*'cancel_submitted'/);
     expect(cancelSource).toMatch(/const confirmed = await waitForPaymentCheckCancelConfirmation\(provider, payment, beforeUser\)/);
     expect(cancelSource).toMatch(/await removePendingPaymentCheckLedgerRecord\(payment\)/);
@@ -2648,24 +2667,44 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function readFreshPendingAthWithdrawalForOwnVaultAction'),
     );
 
+    const degradedFallbackHelper = app.slice(
+      app.indexOf('async function callWithDegradedTransportReadFallback'),
+      app.indexOf('async function readConnectedVaultGlobalForOwnVaultAction'),
+    );
+
     expect(receiveIntentHelper).toMatch(/return readFreshReceiveIntent\(provider, intentId\)/);
     expect(receiveIntentHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
-    expect(userHelper).toMatch(/return readFreshConnectedVaultUser\(provider\)/);
-    expect(userHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
-    expect(globalHelper).toMatch(/return loadConnectedVaultGlobal\(\{ provider, \.\.\.criticalChainReadOptions\(\) \}\)/);
-    expect(globalHelper).not.toMatch(/allowUnverifiedCriticalRead|isTonRpcSoftVaultGlobalReadError/);
+    // Own-action pre-sign reads stay verified fail-closed in normal
+    // operation. The unverified fallback opens only when the transport
+    // reports degraded censorship-survival mode (primary gateway parked),
+    // where dual-provider verification is structurally impossible.
+    expect(degradedFallbackHelper).toMatch(/isTonRpcVerificationUnavailableForOwnVaultActionError\(error\)\) throw error/);
+    expect(degradedFallbackHelper).toMatch(/transport\.isDegraded\(\) !== true\) throw error/);
+    expect(userHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(userHelper).toMatch(/\(\) => readFreshConnectedVaultUser\(provider\)/);
+    expect(userHelper).toMatch(/readFreshConnectedVaultUser\(provider, unverifiedCriticalChainReadOptions\(\)\)/);
+    expect(userHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
+    expect(globalHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(globalHelper).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.criticalChainReadOptions\(\) \}\)/);
+    expect(globalHelper).toMatch(/loadConnectedVaultGlobal\(\{ provider, \.\.\.unverifiedCriticalChainReadOptions\(\) \}\)/);
+    expect(globalHelper).not.toMatch(/isTonRpcSoftVaultGlobalReadError/);
     expect(canonicalHelper).toMatch(/verify:\s*true/);
-    expect(canonicalHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead/);
+    expect(canonicalHelper).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(canonicalHelper).not.toMatch(/verify:\s*false|allowUnverifiedCriticalRead:/);
     expect(capsuleRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(profileRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(usernameRoute).not.toMatch(/allowUnverifiedRead|callWithVerificationUnavailableReadFallback/);
     expect(depositSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
     expect(registerSource).toMatch(/readFreshConnectedVaultUser\(provider\)/);
-    expect(nonceReadSource).toMatch(/return readVaultPublishNonce\(provider, owner, options\)/);
-    expect(nonceReadSource).not.toMatch(/allowUnverifiedCriticalRead|allowUnverifiedNonceRead|verify:\s*false/);
+    expect(nonceReadSource).toMatch(/callWithDegradedTransportReadFallback\(/);
+    expect(nonceReadSource).toMatch(/\(\) => readVaultPublishNonce\(provider, owner, options\)/);
+    expect(nonceReadSource).toMatch(/unverifiedCriticalChainReadOptions\(\)/);
+    expect(nonceReadSource).not.toMatch(/allowUnverifiedCriticalRead:|allowUnverifiedNonceRead|verify:\s*false/);
     expect(clientNonceSource).not.toMatch(/allowUnverifiedCriticalRead|allowUnverifiedNonceRead|verify:/);
-    expect(authExternalSource).toMatch(/allowUnverifiedNonceWait/);
-    expect(authExternalSource).toMatch(/allowUnverifiedCriticalRead:\s*allowUnverifiedNonceWait === true/);
+    // Post-broadcast nonce waits are observational and always unverified;
+    // the publish outcome is re-authenticated by CapsuleHub confirmation.
+    expect(authExternalSource).toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n\)/);
+    expect(authExternalSource).not.toMatch(/allowUnverifiedNonceWait/);
   });
 
   it('PWA-CONFIG-01E: public publishing uses the shared composer and explicit feed controls', () => {
@@ -3181,6 +3220,45 @@ describe('PWA runtime config guard', () => {
     expect(missingVerifierFlagReport.findings.map((finding) => finding.id)).toContain('PWA_TONCENTER_DIRECT_READ_VERIFIER_ONLY_REQUIRED');
   });
 
+  it('PWA-CONFIG-04AF: production config requires a full-capability emergency fallback provider', () => {
+    const withoutEmergencyFlag = validatePlathoAppConfig({
+      ...productionConfig,
+      network: {
+        ...productionConfig.network,
+        tonRpc: {
+          ...productionConfig.network.tonRpc,
+          providers: productionConfig.network.tonRpc.providers.map((provider) => {
+            if (provider.id !== 'toncenter') return provider;
+            const { emergencyFallback, ...rest } = provider as Record<string, unknown>;
+            return rest;
+          }),
+        },
+      },
+    });
+    expect(withoutEmergencyFlag.ok).toBe(false);
+    expect(withoutEmergencyFlag.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_EMERGENCY_FALLBACK_REQUIRED');
+    // A toncenter sendBoc endpoint without the explicit emergency-fallback
+    // marker also stays forbidden as a direct send route.
+    expect(withoutEmergencyFlag.findings.map((finding) => finding.id)).toContain('PWA_TONCENTER_DIRECT_SEND_FORBIDDEN');
+
+    const withoutSendEndpoint = validatePlathoAppConfig({
+      ...productionConfig,
+      network: {
+        ...productionConfig.network,
+        tonRpc: {
+          ...productionConfig.network.tonRpc,
+          providers: productionConfig.network.tonRpc.providers.map((provider) => (
+            provider.id === 'toncenter'
+              ? { ...provider, sendBocEndpoint: false, messagesEndpoint: false }
+              : provider
+          )),
+        },
+      },
+    });
+    expect(withoutSendEndpoint.ok).toBe(false);
+    expect(withoutSendEndpoint.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_EMERGENCY_FALLBACK_REQUIRED');
+  });
+
   it('PWA-AVATAR-PART-SCAN-INTERLEAVE-01: avatar media recovery tolerates heavily interleaved public entries', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const readAvatarPartsSource = app.slice(
@@ -3630,25 +3708,25 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v476/);
+    expect(sw).toMatch(/platho-pwa-prototype-v477/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=413/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=69/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/app\.js\?v=414/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=70/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=34/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=26/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=24/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=22/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=20/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=34/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=23/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=34/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=21/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=19/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=26/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=5/);

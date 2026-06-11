@@ -59,6 +59,10 @@ Production key trust must be anchored to Vault contract state, not to a local UI
 
 The provider can use a configured `globalThis.plathoTonRpcTransport` or TON Center v3 compatible endpoints. In production, critical reads require enough concrete configured providers for cross-checking; a missing host custom transport is not the same thing as a user-selected RPC. If the transport, Vault address, getter response, or record binding is missing or malformed, the PWA stays fail-closed.
 
+## Censorship survival mode
+
+The static bundle must keep working if the Platho RPC gateway host is blocked by a network operator or state. The production config therefore carries a keyless direct TonCenter provider that is verifier-only in normal operation and a full emergency fallback (reads, `sendBoc` broadcast, and message history) when every primary transport hard-fails. The transport layer parks a primary after repeated connectivity failures, routes traffic through the emergency provider at its ~1 rps public budget with strict request prioritization (send path before background sync), stretches background message sync intervals, and periodically re-probes the parked gateway so normal service resumes automatically. In this degraded single-provider mode dual-provider verification is structurally impossible: own-action pre-sign reads fall back to unverified reads behind an explicit degraded-transport gate, post-broadcast nonce polling is always unverified and tolerant, and publish confirmation continues through the Vault ACK history path. Recipient key-record trust gates keep their fail-closed verification requirements. Slow but alive beats fail-closed dead for the messenger itself; features that strictly require cross-checked reads degrade until the gateway returns.
+
 ## TON DNS recipient lookup
 
 `.ton` recipient routes are resolved in the static PWA before Vault key lookup. The runtime includes `ton-dns-provider.mjs`, which calls TON DNS `dnsresolve` through the same replaceable TON `runGetMethod` transport model:

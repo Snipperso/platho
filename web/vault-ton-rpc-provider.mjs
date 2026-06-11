@@ -81,6 +81,64 @@ const toncenterRunGetMethodInFlight = new Map();
 const toncenterRunGetMethodCache = new Map();
 const toncenterMessagesInFlight = new Map();
 const toncenterMessagesCache = new Map();
+// Censorship-survival transport health: a primary provider that hard-fails
+// repeatedly (blocked host, DNS reset, 5xx) is parked for a retry window and
+// verifier-only providers are promoted to full emergency duty meanwhile.
+const TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD = 2;
+const TON_RPC_TRANSPORT_DEAD_RETRY_MS = 30_000;
+const tonRpcTransportHealth = new Map();
+
+function tonRpcTransportHealthState(transport) {
+  let state = tonRpcTransportHealth.get(transport);
+  if (!state) {
+    state = { consecutiveHardFailures: 0, deadUntil: 0, lastHardFailureAt: 0, lastOkAt: 0 };
+    tonRpcTransportHealth.set(transport, state);
+  }
+  return state;
+}
+
+export function isTonRpcTransportDead(transport, now = Date.now()) {
+  const state = tonRpcTransportHealth.get(transport);
+  return Boolean(state && state.deadUntil > now);
+}
+
+function isTonRpcHardTransportError(error) {
+  // Rate limiting and local queue congestion mean the provider is alive;
+  // only connectivity-level failures count toward parking a transport.
+  const status = Number(error?.status ?? 0);
+  const code = String(error?.code ?? '').toUpperCase();
+  if (status === 429 || code === 'RATE_LIMITED' || code === 'QUEUE_TIMEOUT' || code === 'RPC_DISAGREEMENT') return false;
+  if (code === 'TIMEOUT' || code === 'NETWORK_ERROR') return true;
+  if (status >= 400) return true;
+  if (String(error?.name ?? '') === 'TypeError') return true;
+  return /failed to fetch|network|dns|connection|load failed/i.test(String(error?.message ?? error ?? ''));
+}
+
+function noteTonRpcTransportFailure(transport, error, deadRetryMs = TON_RPC_TRANSPORT_DEAD_RETRY_MS) {
+  if (!transport || !isTonRpcHardTransportError(error)) return;
+  const state = tonRpcTransportHealthState(transport);
+  state.consecutiveHardFailures += 1;
+  state.lastHardFailureAt = Date.now();
+  if (state.consecutiveHardFailures >= TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD) {
+    state.deadUntil = Date.now() + finiteNonNegativeMs(deadRetryMs, TON_RPC_TRANSPORT_DEAD_RETRY_MS);
+  }
+}
+
+function noteTonRpcTransportSuccess(transport) {
+  if (!transport) return;
+  const state = tonRpcTransportHealthState(transport);
+  state.consecutiveHardFailures = 0;
+  state.deadUntil = 0;
+  state.lastOkAt = Date.now();
+}
+
+export function resetTonRpcTransportHealthForTests() {
+  tonRpcTransportHealth.clear();
+}
+
+function isEmergencyFallbackTransport(transport) {
+  return transport?.verifierOnly === true && transport?.emergencyFallback !== false;
+}
 
 function assertString(value, name) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -1346,6 +1404,7 @@ function withRunGetMethodCapabilities(transport, provider = {}, defaults = {}) {
   const supportedGetMethods = stringSet(provider.supportedGetMethods ?? provider.allowedGetMethods ?? defaults.supportedGetMethods ?? defaults.allowedGetMethods);
   const unsupportedGetMethods = stringSet(provider.unsupportedGetMethods ?? provider.blockedGetMethods ?? defaults.unsupportedGetMethods ?? defaults.blockedGetMethods);
   const verifierOnly = provider.verifierOnly === true || provider.verifyOnly === true || transport.verifierOnly === true;
+  const emergencyFallback = provider.emergencyFallback ?? transport.emergencyFallback;
   if (!verifierOnly && !supportedGetMethods && !unsupportedGetMethods && typeof transport.supportsRunGetMethod === 'function') return transport;
   const baseSupports = typeof transport.supportsRunGetMethod === 'function'
     ? (method) => transport.supportsRunGetMethod(method)
@@ -1353,6 +1412,7 @@ function withRunGetMethodCapabilities(transport, provider = {}, defaults = {}) {
   return {
     ...transport,
     verifierOnly,
+    ...(emergencyFallback === undefined ? {} : { emergencyFallback: emergencyFallback === true }),
     supportedGetMethods: supportedGetMethods ? [...supportedGetMethods] : transport.supportedGetMethods,
     unsupportedGetMethods: unsupportedGetMethods ? [...unsupportedGetMethods] : transport.unsupportedGetMethods,
     supportsRunGetMethod(method) {
@@ -1416,6 +1476,28 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   return withRunGetMethodCapabilities(transport, provider, defaults);
 }
 
+function orderedTonRpcTransportCandidates(transports, isEligible) {
+  const now = Date.now();
+  const alivePrimary = [];
+  const aliveEmergency = [];
+  const deadPrimary = [];
+  const deadEmergency = [];
+  for (const transport of transports) {
+    if (!isEligible(transport)) continue;
+    if (transport?.verifierOnly === true && !isEmergencyFallbackTransport(transport)) continue;
+    const dead = isTonRpcTransportDead(transport, now);
+    if (isEmergencyFallbackTransport(transport)) {
+      (dead ? deadEmergency : aliveEmergency).push(transport);
+    } else {
+      (dead ? deadPrimary : alivePrimary).push(transport);
+    }
+  }
+  // Verifier-only transports stay out of normal duty while a primary is
+  // healthy, then serve as the censorship-survival path when primaries fail.
+  // Parked transports come last so the app never strands itself entirely.
+  return [...alivePrimary, ...aliveEmergency, ...deadPrimary, ...deadEmergency];
+}
+
 export function createFallbackTonRpcTransport(options = {}) {
   const transports = (options.transports ?? [])
     .map((transport) => transport?.transport ?? transport)
@@ -1423,6 +1505,7 @@ export function createFallbackTonRpcTransport(options = {}) {
   if (transports.length === 0) return null;
   const criticalMethods = new Set((options.criticalMethods ?? TON_RPC_CRITICAL_METHODS).map(String));
   const verifyCriticalReads = options.verifyCriticalReads === true;
+  const transportDeadRetryMs = finiteNonNegativeMs(options.transportDeadRetryMs, TON_RPC_TRANSPORT_DEAD_RETRY_MS);
   const kind = options.kind ?? `fallback(${transports.map((transport) => transport.kind ?? 'ton-rpc').join(',')})`;
 
   async function callRead(methodName, args, requestOptions = {}) {
@@ -1431,18 +1514,22 @@ export function createFallbackTonRpcTransport(options = {}) {
     let primaryTransport = null;
     let lastError = null;
     const call = args[0] ?? {};
-    for (const transport of transports) {
-      if (transport?.verifierOnly === true) continue;
-      if (!transportSupportsReadMethod(transport, methodName, call)) continue;
+    const candidates = orderedTonRpcTransportCandidates(
+      transports,
+      (transport) => transportSupportsReadMethod(transport, methodName, call),
+    );
+    for (const transport of candidates) {
       try {
         primaryResult = await withTonRpcOperationTimeout(
           () => transport[methodName](...args),
           operationTimeoutMs,
         );
+        noteTonRpcTransportSuccess(transport);
         primaryTransport = transport;
         break;
       } catch (error) {
         lastError = error;
+        noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
       }
     }
     if (!primaryTransport) throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
@@ -1460,11 +1547,15 @@ export function createFallbackTonRpcTransport(options = {}) {
     let verifyError = null;
     for (const transport of transports) {
       if (transport === primaryTransport || !transportSupportsReadMethod(transport, methodName, call)) continue;
+      // A parked verifier would add a full request timeout to every critical
+      // read; let callers fall back to unverified reads instead.
+      if (isTonRpcTransportDead(transport)) continue;
       try {
         const verifierResult = await withTonRpcOperationTimeout(
           () => transport[methodName](...args),
           operationTimeoutMs,
         );
+        noteTonRpcTransportSuccess(transport);
         verified = true;
         if (normalizeTonRpcResultForCompare(verifierResult, method) !== primaryComparable) {
           throw tonRpcDisagreementError(method, primaryTransport.kind, transport.kind);
@@ -1473,6 +1564,7 @@ export function createFallbackTonRpcTransport(options = {}) {
       } catch (error) {
         verifyError = error;
         if (error?.code === 'RPC_DISAGREEMENT') throw error;
+        noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
       }
     }
     if (mustVerify && !verified) {
@@ -1487,22 +1579,29 @@ export function createFallbackTonRpcTransport(options = {}) {
   async function callSend(methodName, args) {
     const operationTimeoutMs = tonRpcOperationTimeoutMs(args[0] ?? {}, options);
     let lastError = null;
-    for (const transport of transports) {
-      if (transport?.verifierOnly === true) continue;
-      if (typeof transport?.[methodName] !== 'function') continue;
-      if (methodName === 'sendBoc' && transport.supportsSendBoc === false) continue;
+    const candidates = orderedTonRpcTransportCandidates(transports, (transport) => {
+      if (typeof transport?.[methodName] !== 'function') return false;
+      if (methodName === 'sendBoc' && transport.supportsSendBoc === false) return false;
+      return true;
+    });
+    for (const transport of candidates) {
       try {
         const result = await withTonRpcOperationTimeout(
           () => transport[methodName](...args),
           operationTimeoutMs,
         );
+        noteTonRpcTransportSuccess(transport);
         clearToncenterRunGetMethodCache();
         clearToncenterMessagesCache();
         return result;
       } catch (error) {
         lastError = error;
         if (methodName === 'sendBoc' && isSendBocTransportUnavailableError(error)) continue;
-        if (!isRetryableTonRpcError(error)) throw error;
+        noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
+        // Re-broadcasting the same BOC is idempotent on TON, so connectivity
+        // failures (including 4xx host blocks) fall through to the next
+        // transport; only definitive application-level rejections stop here.
+        if (!isRetryableTonRpcError(error) && !isTonRpcHardTransportError(error)) throw error;
       }
     }
     throw lastError ?? new VaultTonRpcProviderError(`TON RPC ${methodName} transport is not configured`);
@@ -1511,6 +1610,18 @@ export function createFallbackTonRpcTransport(options = {}) {
   return {
     kind,
     transports,
+    isDegraded() {
+      return transports.some((transport) => transport?.verifierOnly !== true && isTonRpcTransportDead(transport));
+    },
+    healthSnapshot() {
+      return transports.map((transport) => ({
+        kind: transport?.kind ?? 'ton-rpc',
+        verifierOnly: transport?.verifierOnly === true,
+        emergencyFallback: isEmergencyFallbackTransport(transport),
+        dead: isTonRpcTransportDead(transport),
+        consecutiveHardFailures: tonRpcTransportHealth.get(transport)?.consecutiveHardFailures ?? 0,
+      }));
+    },
     async runGetMethod(call) {
       return callRead('runGetMethod', [call], call ?? {});
     },
@@ -1539,6 +1650,7 @@ export function createTonRpcTransport(config = {}, options = {}) {
     verifyCriticalReads: config.verifyCriticalReads,
     criticalMethods: config.criticalMethods,
     requestTimeoutMs: config.requestTimeoutMs,
+    transportDeadRetryMs: config.transportDeadRetryMs ?? options.transportDeadRetryMs,
   });
 }
 
