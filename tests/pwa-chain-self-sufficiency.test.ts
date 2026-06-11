@@ -92,9 +92,14 @@ describe('PWA on-chain self-sufficiency', () => {
     ]);
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('platho-rpc-mainnet');
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).not.toContain('toncenter-mainnet');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.sendBocEndpoint).toBe(false);
+    // Keyless TonCenter is a verifier in normal operation and a full
+    // censorship-survival fallback (reads, sends, history) when the Platho
+    // RPC gateway is blocked; it is never a normal config-order fallback.
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.verifierOnly).toBe(true);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.messagesEndpoint).toBe(false);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.emergencyFallback).toBe(true);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.sendBocEndpoint).toBe('https://toncenter.com/api/v3/message');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.messagesEndpoint).toBe('https://toncenter.com/api/v3/messages');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.apiKey).toBeUndefined();
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'platho-rpc-mainnet')?.sendBocEndpoint).toBe('https://rpc.platho.app/api/v3/message');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_canonical_publish_charge');
   });

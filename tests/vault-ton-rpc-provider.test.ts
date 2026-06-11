@@ -827,7 +827,7 @@ describe('Vault TON RPC provider', () => {
     ]);
   });
 
-  it('VAULT-RPC-04I4: verifier-only providers verify critical reads but are not normal read or send fallbacks', async () => {
+  it('VAULT-RPC-04I4: verifier-only providers verify critical reads and serve reads only as emergency fallback', async () => {
     const calls: string[] = [];
     const transport = createTonRpcTransport({
       primaryProviderId: 'platho-rpc',
@@ -843,6 +843,7 @@ describe('Vault TON RPC provider', () => {
           id: 'toncenter-direct',
           kind: 'toncenter-v3',
           verifierOnly: true,
+          emergencyFallback: true,
           runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
           sendBocEndpoint: 'https://toncenter.example/api/v3/message',
         },
@@ -890,19 +891,198 @@ describe('Vault TON RPC provider', () => {
       stack: [],
       verify: true,
     })).resolves.toMatchObject({ stack: [num(7n)] });
+    // A failing primary read falls through to the verifier-only transport in
+    // emergency-fallback mode instead of failing the read outright.
     await expect(transport?.runGetMethod({
       address: VAULT,
       method: 'get_receive_intent',
       stack: [],
-    })).rejects.toMatchObject({ status: 503 });
+    })).resolves.toMatchObject({ stack: [num(7n)] });
+    // Sends still prefer the healthy primary; the verifier stays out of
+    // normal broadcast duty.
     await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
 
     expect(calls).toEqual([
       'https://rpc.platho.example/api/v3/runGetMethod:get_user',
       'https://toncenter.example/api/v3/runGetMethod:get_user',
       'https://rpc.platho.example/api/v3/runGetMethod:get_receive_intent',
+      'https://toncenter.example/api/v3/runGetMethod:get_receive_intent',
       'https://rpc.platho.example/api/v3/message',
     ]);
+  });
+
+  it('VAULT-RPC-04I5: broadcasts through the emergency verifier-only transport when the primary send fails', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-rpc',
+      fallbackProviderIds: [],
+      providers: [
+        {
+          id: 'platho-rpc',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://rpc.platho.example/api/v3/message',
+        },
+        {
+          id: 'toncenter-direct',
+          kind: 'toncenter-v3',
+          verifierOnly: true,
+          emergencyFallback: true,
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.example/api/v3/message',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `emergency-send-${Math.random()}`,
+      fetch: async (url: string) => {
+        const endpoint = String(url);
+        calls.push(endpoint);
+        if (endpoint.includes('rpc.platho.example')) {
+          // A state-level block typically surfaces as an HTTP error or a
+          // connection failure; both must fall through to the emergency path.
+          return {
+            ok: false,
+            status: 403,
+            async json() {
+              return { ok: false };
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { ok: true };
+          },
+        };
+      },
+    });
+
+    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
+    expect(calls).toEqual([
+      'https://rpc.platho.example/api/v3/message',
+      'https://toncenter.example/api/v3/message',
+    ]);
+  });
+
+  it('VAULT-RPC-04I6: parks a hard-failing primary transport and probes it again after the retry window', async () => {
+    const calls: string[] = [];
+    let plathoFailures = 0;
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-rpc',
+      fallbackProviderIds: [],
+      providers: [
+        {
+          id: 'platho-rpc',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+        },
+        {
+          id: 'toncenter-direct',
+          kind: 'toncenter-v3',
+          verifierOnly: true,
+          emergencyFallback: true,
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `transport-parking-${Math.random()}`,
+      transportDeadRetryMs: 50,
+      fetch: async (url: string) => {
+        const endpoint = String(url);
+        calls.push(endpoint);
+        if (endpoint.includes('rpc.platho.example')) {
+          if (plathoFailures < 2) {
+            plathoFailures += 1;
+            throw new TypeError('failed to fetch');
+          }
+          return {
+            ok: true,
+            status: 200,
+            async json() {
+              return { exit_code: 0, stack: [num(1n)] };
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(9n)] };
+          },
+        };
+      },
+    });
+
+    const call = { address: VAULT, method: 'get_receive_intent', stack: [], cacheTtlMs: 0 };
+    // Two consecutive hard failures fall through to the emergency transport.
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(9n)] });
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(9n)] });
+    // Parked: the dead primary is skipped entirely while the window lasts.
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(9n)] });
+    expect(transport?.isDegraded()).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 70));
+    // Past the retry window the primary is probed and recovers.
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(1n)] });
+    expect(transport?.isDegraded()).toBe(false);
+
+    expect(calls).toEqual([
+      'https://rpc.platho.example/api/v3/runGetMethod',
+      'https://toncenter.example/api/v3/runGetMethod',
+      'https://rpc.platho.example/api/v3/runGetMethod',
+      'https://toncenter.example/api/v3/runGetMethod',
+      'https://toncenter.example/api/v3/runGetMethod',
+      'https://rpc.platho.example/api/v3/runGetMethod',
+    ]);
+  });
+
+  it('VAULT-RPC-04I7: skips a parked verifier instead of paying its timeout on every critical read', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-rpc',
+      fallbackProviderIds: [],
+      providers: [
+        {
+          id: 'platho-rpc',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+        },
+        {
+          id: 'toncenter-direct',
+          kind: 'toncenter-v3',
+          verifierOnly: true,
+          emergencyFallback: true,
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `dead-verifier-${Math.random()}`,
+      transportDeadRetryMs: 60_000,
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+      fetch: async (url: string) => {
+        const endpoint = String(url);
+        calls.push(endpoint);
+        if (endpoint.includes('toncenter.example')) {
+          throw new TypeError('failed to fetch');
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(7n)] };
+          },
+        };
+      },
+    });
+
+    const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+
+    const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
+    expect(toncenterCalls).toHaveLength(2);
   });
 
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {

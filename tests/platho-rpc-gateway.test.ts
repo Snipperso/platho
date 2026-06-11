@@ -60,9 +60,12 @@ describe('Platho RPC gateway', () => {
     expect(envExample).toMatch(/PLATHO_RPC_ALLOWED_MESSAGE_OPCODES=0xa4f862c0,0x8c2a76b7,0x874e576a/);
     expect(envExample).not.toMatch(/Bearer|QuickNode|Chainstack/);
     expect(config).toMatch(/sendBocEndpoint:\s*'https:\/\/rpc\.platho\.app\/api\/v3\/message'/);
-    expect(config).toMatch(/id:\s*'toncenter-mainnet'[\s\S]*sendBocEndpoint:\s*false/);
+    // Direct TonCenter endpoints in the PWA are the keyless emergency
+    // fallback; the API key never ships in the static bundle and stays
+    // behind the Platho RPC gateway.
+    expect(config).toMatch(/id:\s*'toncenter-mainnet'[\s\S]*verifierOnly:\s*true[\s\S]*emergencyFallback:\s*true[\s\S]*sendBocEndpoint:\s*'https:\/\/toncenter\.com\/api\/v3\/message'/);
     expect(config).toMatch(/messagesEndpoint:\s*'https:\/\/rpc\.platho\.app\/api\/v3\/messages'/);
-    expect(config).not.toMatch(/PLATHO_RPC_TONCENTER_API_KEY|X-API-Key|toncenter-mainnet\.key/);
+    expect(config).not.toMatch(/PLATHO_RPC_TONCENTER_API_KEY|X-API-Key|toncenter-mainnet\.key|apiKey:/);
   });
 
   it('RPC-GATEWAY-02C: message history allowlist tracks the production Vault and CapsuleHub', () => {

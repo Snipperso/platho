@@ -9,8 +9,8 @@ Output: C:\platho\artifacts\platho-web-static-preview
 
 ```text
 fileCount=128
-totalBytes=3097138
-bundleSha256=85e829d454b21d5efeea82c6fd5787e1f173f70ceb7ee429723ed1764f59be72
+totalBytes=3125247
+bundleSha256=54eac0a44863df23a30f0bc792cea79c02bfb9ae0010b698f63b57fbd361db9c
 noBackendRuntime=true
 ```
 
@@ -21,7 +21,7 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: false
+- productionMarkersCleared: true
 
 ## Blockers
 
@@ -30,10 +30,7 @@ None
 ## Warnings
 
 - STATIC_PACKAGE_IS_NON_PRODUCTION
-- PWA_MODE_NOT_PRODUCTION
-- MAINNET_GENESIS_NOT_VERIFIED
 
 ## Production Findings
 
-- PWA_MODE_NOT_PRODUCTION: PWA config is not in production mode. (web/platho-config.mjs)
-- MAINNET_GENESIS_NOT_VERIFIED: Current release candidate has no verified final mainnet genesis evidence. (artifacts/MAINNET_GENESIS_VERIFIED.txt)
+None
