@@ -52,9 +52,9 @@ Public publish messages carry two retrievable cells in the accepted transaction 
 `body_hash`. The PWA reconstructs the body from TON message history and verifies it against `body_hash` before display or
 decryption.
 
-Public content is visible to everyone, so public bodies are not encrypted, not padded to private capsule size, and not
-assigned a postquantum profile. Public text bodies are `1..1024` UTF-8 bytes for both posts and comments. Public image
-bodies are `1..1024` compressed media bytes per entry. Public header metadata does not reduce either body budget. Public
+Public content is visible to everyone, so public bodies are not encrypted, not padded to private capsule ciphertext size, and not
+assigned a postquantum profile. Public text, image, and avatar bodies use the smallest fitting 1, 2, 4, 8, 16, or
+32 KiB public capsule size class. Public header metadata does not reduce that body budget. Public
 publish messages must also include the fixed on-chain marker:
 
 ```text
@@ -83,7 +83,7 @@ For `kind = 1` public post:
 
 ```text
 header bytes                             68
-body                                     UTF-8 text bytes, 1..1024
+body                                     UTF-8 text bytes, 1..32768 by size_class
 ```
 
 Post flags:
@@ -99,12 +99,12 @@ For `kind = 2` one-level public comment:
 parent_entry_id:uint64                   8
 parent_body_hash:uint256                 32
 header bytes                             72
-body                                     UTF-8 text bytes, 1..1024
+body                                     UTF-8 text bytes, 1..32768 by size_class
 ```
 
-For `kind = 3` public image post, the header is 68 bytes and the body is WebP image bytes, `1..1024` per part. For
+For `kind = 3` public image post, the header is 68 bytes and the body is WebP image bytes, `1..32768` by size class. For
 `kind = 4` public image comment, the header is 72 bytes and includes the same parent fields as text comments. For
-`kind = 5` public avatar media, the header is 68 bytes and the body is WebP avatar image bytes, `1..1024` per part.
+`kind = 5` public avatar media, the header is 68 bytes and the body is WebP avatar image bytes, `1..32768` by size class.
 Public v1 uses `media_format = 0` for text and `media_format = 1` for WebP image/avatar parts.
 
 `profile_version` and `avatar_hash` are wallet-profile pointers. They let a post point at the avatar version the author
@@ -113,21 +113,23 @@ their parent reference already consumes the same compact header budget; clients 
 ProfileRegistry avatar when available.
 
 Comment flags must be zero. `part_count = 1` for a one-capsule post/comment; longer public text or image data is split
-into separate entries with the same `stream_id`, increasing `part_index` from zero. The PWA groups comments under posts by
+into separate entries with the same `stream_id`, increasing `part_index` from zero, after filling each entry up to the
+smallest fitting public size class, capped at 32 KiB. The PWA groups comments under posts by
 `parent_entry_id` and `parent_body_hash` only when the parent post allows comments. CapsuleHub does not index comment
 relationships, count comments, moderate content, or enforce social semantics; it stores compact public header metadata,
 body hashes, timestamps, and indexes. Public body cells remain in accepted publish transaction bodies and are recovered
 from message history before being verified against CapsuleHub hashes.
 
-The official PWA exposes two image compression targets before splitting into 1024-byte entries:
+The official PWA exposes image compression targets before splitting into public size-class entries:
 
 - low: WebP target <= 8 KiB.
 - medium: WebP target <= 16 KiB.
 - good: WebP target <= 32 KiB.
-- maximum: WebP target <= 64 KiB, encoded as separate 1024-byte public entries when needed.
+- maximum: WebP target <= 64 KiB, encoded as two 32 KiB public entries when needed.
 
 Public product copy may say messages start from `0.0337 TON`; that is also the current exact public per-entry base
-example. Larger public images cost by entry count.
+example for a 1 KiB public entry. Larger public size classes cost more because they reserve more CapsuleHub/Vault
+execution capacity, but a 26 KiB avatar is one 32 KiB public entry rather than 26 separate 1 KiB entries.
 
 CapsuleHub does not store page counters. Clients may derive page windows from sequential `entry_id` values if they want
 paginated reads. A capsule published at a page boundary costs the same as any other capsule of the same profile; v1 must
@@ -142,9 +144,9 @@ ACK reserve, not a product "from" price:
 - public post: from `0.0337 TON`.
 - `hybrid-v1` private 1 KiB capsule: from `0.0347 TON`.
 
-Those prices include protocol fee, CapsuleHub compact-index storage endowment, Vault local execution reserve, and the
-expected ACK refund. If the PWA's current conservative fee
-estimate is greater than the included network-fee allowance of `0.005 TON`, it adds only the overage, rounded upward to `0.001 TON` steps:
+Those prices include the full Platho protocol fee of `0.01 TON`, CapsuleHub compact-index storage endowment, Vault local
+execution reserve, and the expected ACK refund. Separately, if the PWA's current conservative fee estimate is greater
+than the included network-fee allowance of `0.005 TON`, it adds only the overage, rounded upward to `0.001 TON` steps:
 
 ```text
 surcharge = ceil(max(estimated_network_fee - included_network_fee_allowance, 0) / 0.001 TON) * 0.001 TON
@@ -160,7 +162,7 @@ Current `hybrid-v1` private net prices before surcharge and ATH discount are: 1 
 4 KiB `0.0403 TON`, 8 KiB `0.0479 TON`, 16 KiB `0.0632 TON`, and 32 KiB `0.0937 TON`. The PWA must show the final hold
 and net cost for the selected content size before signing.
 
-All public and private publishes go through Vault. For Vault session publishes, the PWA signs
+All public and private publishes go through Vault. For Vault auth-signed publishes, the PWA signs
 `max_charge >= canonical_max_charge` by adding the same surcharge. The PWA must check the user's internal Vault TON
 balance against the full hold for the send plan before signing. CapsuleHub has no direct user publish ABI in final v1;
 the CapsuleHub call is always Vault -> CapsuleHub.
@@ -183,6 +185,8 @@ to FeeAccumulator as `DepositProtocolFee`. Before buyback split is enabled this 
 the split is enabled it follows the normal treasury/buyback split. Sweep is not part of the user publish path and must
 not add gas to ordinary message sending. If the sweep deposit bounces, CapsuleHub intentionally reclassifies the
 returned amount as backed `accrued_plato_fee_ton` so the value can be retried through the normal fee flush path.
+Normal partial `FlushFees` calls must be at least the current public protocol fee (`0.010 TON`); a smaller amount is
+valid only when it is the entire remaining accrued bucket, so discounted dust can still be finalized.
 
 `CapsuleHub` entries include a contract timestamp, not a client-clock timestamp. The PWA uses entry `created_at` for
 message ordering and bounded transaction-history lookup. Compact index/header entries are retained for at least the

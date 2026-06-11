@@ -236,6 +236,16 @@ describe('MarketStabilitySeller post-pool readiness gate', () => {
     expect(report.issue_codes).toContain('MARKET_STABILITY_OFFICIAL_WALLET_MASTER_MISMATCH');
   });
 
+  it('RT-MSTAB-001: rejects an official seller ATH wallet with the wrong code hash', () => {
+    const input = readyInput();
+    input.snapshot.market_stability_seller_official_ath_wallet.code_hash = hash('wrong_ath_wallet_code');
+
+    const report = verifyMarketStabilitySellerReadiness(input);
+
+    expect(report.market_stability_seller_ready).toBe(false);
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_CODE_HASH_MISMATCH');
+  });
+
   it('rejects missing seller getter snapshots without throwing', () => {
     const input = readyInput() as any;
     delete input.snapshot.market_stability_seller;

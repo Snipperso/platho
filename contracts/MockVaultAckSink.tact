@@ -17,6 +17,7 @@ message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
     bounce_tag: Int as uint160;
     publish_id: Int as uint256;
+    size_class: Int as uint8;
     marketing_note: Int as uint152;
     author_wallet: Address;
     header_hash: Int as uint256;
@@ -54,6 +55,7 @@ message(0xFA001002) ForwardVaultPublic {
     bounce_id: Int as uint64;
     bounce_tag: Int as uint160;
     publish_id: Int as uint256;
+    size_class: Int as uint8;
     marketing_note: Int as uint152;
     author_wallet: Address;
     header_hash: Int as uint256;
@@ -117,6 +119,7 @@ contract MockVaultAckSink {
                 bounce_id: msg.bounce_id,
                 bounce_tag: msg.bounce_tag,
                 publish_id: msg.publish_id,
+                size_class: msg.size_class,
                 marketing_note: msg.marketing_note,
                 author_wallet: msg.author_wallet,
                 header_hash: msg.header_hash,

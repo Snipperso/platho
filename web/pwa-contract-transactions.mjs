@@ -1,10 +1,10 @@
-import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
+import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=9';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const VAULT_OPS = Object.freeze({
   DepositTon: 716160408,
-  WithdrawTon: 1212947826,
-  WithdrawAth: 4188293172,
+  WithdrawTonFromVaultBalance: 2115981368,
+  WithdrawAthFromVaultBalance: 2115981369,
   RegisterMessagingKeys: 1383096026,
   ReplaceMessagingKeys: 2312521915,
   CreateReceiveIntent: 2115981365,
@@ -22,6 +22,16 @@ export const ATH_WALLET_OPS = Object.freeze({
   ATHTransferRequestWithNotify: 1096042516,
 });
 
+export const USERNAME_REGISTRY_OPS = Object.freeze({
+  FlushBurnAthDue: 0xE9A2C2CB,
+});
+
+export const PROFILE_REGISTRY_OPS = Object.freeze({
+  FlushProfileBurnAthDue: 0x50A61111,
+});
+
+export const REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS = 20_000_000n;
+
 export const VAULT_PUBLISH_KIND = Object.freeze({
   PRIVATE: 1n,
   PUBLIC: 2n,
@@ -30,8 +40,12 @@ export const VAULT_PUBLISH_KIND = Object.freeze({
 export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
 export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
 export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
+export const RECEIVE_INTENT_ID_DOMAIN = 0x52434944n; // "RCID"
 export const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN = 0x56524331n; // "VRC1"
+export const VAULT_WITHDRAW_TON_SIGNING_DOMAIN = 0x56545731n; // "VTW1"
+export const VAULT_WITHDRAW_ATH_SIGNING_DOMAIN = 0x56574131n; // "VWA1"
 export const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN = 0x56524B31n; // "VRK1"
+export const VAULT_KEY_ID_DOMAIN = 0x4b455949n; // "KEYI"
 
 export const VAULT_SIZE_CLASS = Object.freeze({
   KIB_1: 1n,
@@ -49,7 +63,7 @@ export const VAULT_CRYPTO_SUITE = Object.freeze({
   HYBRID: 2n,
 });
 
-export const PUBLIC_POST_BODY_MAX_BYTES = 1024;
+export const PUBLIC_POST_BODY_MAX_BYTES = 32 * 1024;
 export const PUBLIC_BODY_LAYOUT = 'platho.public-byte-layout.v1';
 export const PUBLIC_HEADER_MAGIC = 'PPH1';
 export const PUBLIC_BODY_VERSION = 1;
@@ -59,6 +73,8 @@ export const PUBLIC_BODY_KIND = Object.freeze({
   IMAGE_POST: 3,
   IMAGE_COMMENT: 4,
   AVATAR: 5,
+  DOCUMENT_POST: 6,
+  DOCUMENT_COMMENT: 7,
 });
 export const PUBLIC_BODY_FLAGS = Object.freeze({
   COMMENTS_DISABLED: 1,
@@ -76,6 +92,7 @@ export const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
 export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 30_000_000n;
 export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 61_000_000n;
 export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 63_000_000n;
+const UINT128_MOD = 1n << 128n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({
   userStateStorage: 10_000_000n,
@@ -526,6 +543,14 @@ function beginAthWalletBody(op) {
   return new TinyCellBuilder().uint(op, 32, 'op');
 }
 
+function beginUsernameRegistryBody(op) {
+  return new TinyCellBuilder().uint(op, 32, 'op');
+}
+
+function beginProfileRegistryBody(op) {
+  return new TinyCellBuilder().uint(op, 32, 'op');
+}
+
 export function beginCell() {
   return new TinyCellBuilder();
 }
@@ -555,8 +580,6 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
       + VAULT_RESERVES_NANOTONS.depositTonExec
       + (userExists ? 0n : VAULT_RESERVES_NANOTONS.userStateStorage);
   }
-  if (type === 'WithdrawTon') return VAULT_RESERVES_NANOTONS.withdrawTonExec;
-  if (type === 'WithdrawAth') return VAULT_RESERVES_NANOTONS.withdrawAthMinValue;
   if (type === 'RegisterMessagingKeys') {
     return keyRecordStorageEndowment(params.crypto_suite_mask)
       + VAULT_RESERVES_NANOTONS.stateGrowthExec
@@ -634,6 +657,25 @@ function basechainAddressHashValue(address, name) {
   return bytesToBigInt(parsed.hash);
 }
 
+export async function computeVaultMessagingKeyId(params = {}) {
+  assertObject(params, 'params');
+  const keyFields = beginCell()
+    .uint(params.enc_pubkey ?? params.encPubkey, 256, 'enc_pubkey')
+    .uint(params.sign_pubkey ?? params.signPubkey, 256, 'sign_pubkey')
+    .uint(params.pq_kem_pubkey_hash ?? params.pqKemPubkeyHash, 256, 'pq_kem_pubkey_hash')
+    .endCell();
+  const keyIdCell = beginCell()
+    .uint(VAULT_KEY_ID_DOMAIN, 32, 'key_id_domain')
+    .address(params.owner_wallet ?? params.ownerWallet, 'owner_wallet')
+    .uint(params.key_generation ?? params.keyGeneration, 32, 'key_generation')
+    .uint(params.pq_kem_pubkey_len ?? params.pqKemPubkeyLen, 16, 'pq_kem_pubkey_len')
+    .uint(params.crypto_suite_mask ?? params.cryptoSuiteMask, 16, 'crypto_suite_mask')
+    .ref(keyFields, 'key_fields')
+    .endCell();
+  const { hash } = await computeCellHashAndDepth(keyIdCell);
+  return bytesToBigInt(hash);
+}
+
 function privateVaultBalancePublishSignedDataCell(params) {
   const publish = assertObject(params.publish ?? params, 'publish');
   const payload = beginCell()
@@ -660,8 +702,32 @@ function privateVaultBalancePublishSignedDataCell(params) {
     .endCell();
 }
 
+const PUBLIC_SIZE_CLASSES = Object.freeze([1, 2, 4, 8, 16, 32]);
+
+function normalizePublicSizeClass(value, name = 'public size_class') {
+  const sizeClass = Number(toBigInt(value ?? VAULT_SIZE_CLASS.STANDARD, name));
+  if (!PUBLIC_SIZE_CLASSES.includes(sizeClass)) {
+    throw new RangeError(`${name} must be one of ${PUBLIC_SIZE_CLASSES.join(', ')}`);
+  }
+  return BigInt(sizeClass);
+}
+
+function publicSizeClassForBodyBytes(byteLength) {
+  const length = Number(byteLength);
+  if (!Number.isFinite(length) || length <= 0) return VAULT_SIZE_CLASS.STANDARD;
+  for (const sizeClass of PUBLIC_SIZE_CLASSES) {
+    if (length <= sizeClass * 1024) return BigInt(sizeClass);
+  }
+  throw new RangeError(`public body exceeds ${PUBLIC_POST_BODY_MAX_BYTES} bytes`);
+}
+
+function publicUsefulBytesForSizeClass(sizeClass) {
+  return Number(normalizePublicSizeClass(sizeClass)) * 1024;
+}
+
 function publicVaultBalancePublishSignedDataCell(params) {
   const publish = assertObject(params.publish ?? params, 'publish');
+  const sizeClass = normalizePublicSizeClass(publish.size_class ?? publish.sizeClass, 'publish.size_class');
   const payload = beginCell()
     .uint(publishHashValue(publish.header_hash ?? publish.header_0_hash, 'publish.header_hash'), 256, 'header_hash')
     .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
@@ -671,11 +737,13 @@ function publicVaultBalancePublishSignedDataCell(params) {
   return beginCell()
     .uint(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
     .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
     .uint(VAULT_PUBLISH_KIND.PUBLIC, 8, 'publish_kind')
-    .address(vaultBalancePublishOwner(params), 'owner_wallet')
+    .uint(basechainAddressHashValue(vaultBalancePublishOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+    .uint(sizeClass, 8, 'signed_size_class')
+    .uint(VAULT_CRYPTO_SUITE.PUBLIC_NONE, 8, 'signed_crypto_suite')
     .ref(payload, 'payload')
     .endCell();
 }
@@ -766,6 +834,23 @@ function vaultReceiveIntentOp(type) {
   throw new Error(`Unsupported Vault receive-intent type ${type}`);
 }
 
+export async function computeVaultReceiveIntentId(params = {}) {
+  assertObject(params, 'params');
+  const senderWallet = params.sender_wallet ?? params.senderWallet ?? params.owner_wallet ?? params.ownerWallet;
+  const recipientWallet = params.recipient_wallet ?? params.recipientWallet;
+  const clientNonce = params.client_nonce ?? params.clientNonce;
+  const cell = beginCell()
+    .uint(RECEIVE_INTENT_ID_DOMAIN, 32, 'receive_intent_id_domain')
+    .address(senderWallet, 'sender_wallet')
+    .address(recipientWallet, 'recipient_wallet')
+    .uint(params.asset, 8, 'asset')
+    .uint(params.amount, 128, 'amount')
+    .uint(clientNonce, 64, 'client_nonce')
+    .endCell();
+  const { hash } = await computeCellHashAndDepth(cell);
+  return bytesToBigInt(hash) % UINT128_MOD;
+}
+
 function vaultReceiveIntentSignedDataCell(type, params = {}) {
   let actionPayload;
   if (type === 'CreateReceiveIntent') {
@@ -791,13 +876,80 @@ function vaultReceiveIntentSignedDataCell(type, params = {}) {
   const builder = beginCell()
     .uint(VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, 32, 'domain_magic')
     .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
-    .address(vaultReceiveIntentOwner(params), 'owner_wallet')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
+    .uint(basechainAddressHashValue(vaultReceiveIntentOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
     .uint(vaultReceiveIntentAction(type), 8, 'action')
     .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
     .ref(actionPayload, 'action_payload');
 
   return builder.endCell();
+}
+
+function vaultWithdrawOwner(params) {
+  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
+}
+
+function vaultWithdrawSignedDataCell(params = {}, domain) {
+  const actionPayload = beginCell()
+    .uint(params.amount, 128, 'amount')
+    .address(params.recipient, 'recipient')
+    .endCell();
+  return beginCell()
+    .uint(domain, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
+    .address(vaultWithdrawOwner(params), 'owner_wallet')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .ref(actionPayload, 'action_payload')
+    .endCell();
+}
+
+async function buildVaultWithdrawExternalBoc(params = {}, options = {}, domain, op) {
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const signedData = vaultWithdrawSignedDataCell({
+    ...params,
+    vaultAddress,
+    deploymentManifestHash,
+  }, domain);
+  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedData);
+  const signature = ed25519.sign(hash, signingSecretKey);
+  const bodyCell = beginVaultBody(op)
+    .address(vaultWithdrawOwner(params), 'owner_wallet')
+    .bytesValue(signature, 64, 'signature')
+    .ref(signedData, 'signed_payload')
+    .endCell();
+  const root = externalInMessageCell(vaultAddress, bodyCell);
+  return {
+    bodyCell,
+    signedData,
+    signedDataHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+    boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
+export async function buildVaultWithdrawTonExternalBoc(params = {}, options = {}) {
+  return buildVaultWithdrawExternalBoc(
+    params,
+    options,
+    VAULT_WITHDRAW_TON_SIGNING_DOMAIN,
+    VAULT_OPS.WithdrawTonFromVaultBalance,
+  );
+}
+
+export async function buildVaultWithdrawAthExternalBoc(params = {}, options = {}) {
+  return buildVaultWithdrawExternalBoc(
+    params,
+    options,
+    VAULT_WITHDRAW_ATH_SIGNING_DOMAIN,
+    VAULT_OPS.WithdrawAthFromVaultBalance,
+  );
 }
 
 export async function buildVaultReceiveIntentBodyCell(type, params = {}) {
@@ -1031,17 +1183,6 @@ export function buildVaultMessageBody(type, params = {}) {
       return beginVaultBody(VAULT_OPS.DepositTon)
         .uint(params.amount, 128, 'amount')
         .toBocBase64();
-    case 'WithdrawTon':
-      return beginVaultBody(VAULT_OPS.WithdrawTon)
-        .uint(params.amount, 128, 'amount')
-        .address(params.recipient, 'recipient')
-        .toBocBase64();
-    case 'WithdrawAth':
-      return beginVaultBody(VAULT_OPS.WithdrawAth)
-        .uint(params.query_id, 64, 'query_id')
-        .uint(params.amount, 128, 'amount')
-        .address(params.recipient, 'recipient')
-        .toBocBase64();
     case 'RegisterMessagingKeys':
       return beginVaultBody(VAULT_OPS.RegisterMessagingKeys)
         .uint(params.enc_pubkey, 256, 'enc_pubkey')
@@ -1091,6 +1232,30 @@ export function buildAthWalletMessageBody(type, params = {}) {
   }
 }
 
+export function buildUsernameRegistryMessageBody(type, params = {}) {
+  assertObject(params, 'params');
+  switch (type) {
+    case 'FlushBurnAthDue':
+      return beginUsernameRegistryBody(USERNAME_REGISTRY_OPS.FlushBurnAthDue)
+        .uint(params.query_id, 64, 'query_id')
+        .toBocBase64();
+    default:
+      throw new Error(`Unsupported UsernameRegistry message type ${type}`);
+  }
+}
+
+export function buildProfileRegistryMessageBody(type, params = {}) {
+  assertObject(params, 'params');
+  switch (type) {
+    case 'FlushProfileBurnAthDue':
+      return beginProfileRegistryBody(PROFILE_REGISTRY_OPS.FlushProfileBurnAthDue)
+        .uint(params.query_id, 64, 'query_id')
+        .toBocBase64();
+    default:
+      throw new Error(`Unsupported ProfileRegistry message type ${type}`);
+  }
+}
+
 export function createVaultWalletMessage(type, params = {}, options = {}) {
   const address = assertString(options.vaultAddress, 'vaultAddress');
   const amount = options.valueNanotons !== undefined
@@ -1112,6 +1277,30 @@ export function createAthWalletMessage(type, params = {}, options = {}) {
     address,
     amount: amount.toString(),
     payload: buildAthWalletMessageBody(type, params),
+  };
+}
+
+export function createUsernameRegistryMessage(type, params = {}, options = {}) {
+  const address = assertString(options.usernameRegistryAddress, 'usernameRegistryAddress');
+  const amount = options.valueNanotons !== undefined
+    ? assertUint(options.valueNanotons, 128, 'valueNanotons')
+    : REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS;
+  return {
+    address,
+    amount: amount.toString(),
+    payload: buildUsernameRegistryMessageBody(type, params),
+  };
+}
+
+export function createProfileRegistryMessage(type, params = {}, options = {}) {
+  const address = assertString(options.profileRegistryAddress, 'profileRegistryAddress');
+  const amount = options.valueNanotons !== undefined
+    ? assertUint(options.valueNanotons, 128, 'valueNanotons')
+    : REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS;
+  return {
+    address,
+    amount: amount.toString(),
+    payload: buildProfileRegistryMessageBody(type, params),
   };
 }
 
@@ -1183,6 +1372,8 @@ function publicPayloadKind(input) {
     if (type === 'image_comment' || type === 'comment_image' || Number(input.kind) === PUBLIC_BODY_KIND.IMAGE_COMMENT) return PUBLIC_BODY_KIND.IMAGE_COMMENT;
     if (type === 'image' || type === 'image_post' || type === 'post_image' || Number(input.kind) === PUBLIC_BODY_KIND.IMAGE_POST) return PUBLIC_BODY_KIND.IMAGE_POST;
     if (type === 'avatar' || type === 'profile_avatar' || Number(input.kind) === PUBLIC_BODY_KIND.AVATAR) return PUBLIC_BODY_KIND.AVATAR;
+    if (type === 'document_comment' || type === 'comment_document' || Number(input.kind) === PUBLIC_BODY_KIND.DOCUMENT_COMMENT) return PUBLIC_BODY_KIND.DOCUMENT_COMMENT;
+    if (type === 'document' || type === 'document_post' || type === 'post_document' || Number(input.kind) === PUBLIC_BODY_KIND.DOCUMENT_POST) return PUBLIC_BODY_KIND.DOCUMENT_POST;
   }
   return PUBLIC_BODY_KIND.POST;
 }
@@ -1235,6 +1426,7 @@ function publicHeaderBytes(input) {
   const partCount = publicPartNumber(input?.partCount ?? input?.part_count ?? 1, 'public part count');
   const createdAtSec = publicCreatedAtSeconds(input);
   const isImage = kind === PUBLIC_BODY_KIND.IMAGE_POST || kind === PUBLIC_BODY_KIND.IMAGE_COMMENT;
+  const isDocument = kind === PUBLIC_BODY_KIND.DOCUMENT_POST || kind === PUBLIC_BODY_KIND.DOCUMENT_COMMENT;
   const mediaFormat = isImage
     ? Number(input?.mediaFormat ?? input?.media_format ?? input?.format ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP)
     : PUBLIC_BODY_MEDIA_FORMATS.NONE;
@@ -1264,6 +1456,15 @@ function publicHeaderBytes(input) {
       profileBytes,
     );
   }
+  if (kind === PUBLIC_BODY_KIND.DOCUMENT_POST) {
+    const flags = publicCommentsAllowed(input) ? 0 : PUBLIC_BODY_FLAGS.COMMENTS_DISABLED;
+    return concatBytes(
+      magic,
+      new Uint8Array([PUBLIC_BODY_VERSION, PUBLIC_BODY_KIND.DOCUMENT_POST, flags, PUBLIC_BODY_MEDIA_FORMATS.NONE]),
+      partBytes,
+      profileBytes,
+    );
+  }
   if (kind === PUBLIC_BODY_KIND.AVATAR) {
     return concatBytes(
       magic,
@@ -1276,7 +1477,9 @@ function publicHeaderBytes(input) {
   const object = assertObject(input, 'public comment');
   const parentEntryId = bigintToBytes(object.parentEntryId ?? object.parent_entry_id, 8, 'parent_entry_id');
   const parentHash = publicParentHashBytes(object.parentHash ?? object.parent_hash);
-  const commentKind = kind === PUBLIC_BODY_KIND.IMAGE_COMMENT ? PUBLIC_BODY_KIND.IMAGE_COMMENT : PUBLIC_BODY_KIND.COMMENT;
+  const commentKind = kind === PUBLIC_BODY_KIND.IMAGE_COMMENT
+    ? PUBLIC_BODY_KIND.IMAGE_COMMENT
+    : (isDocument ? PUBLIC_BODY_KIND.DOCUMENT_COMMENT : PUBLIC_BODY_KIND.COMMENT);
   return concatBytes(
     magic,
     new Uint8Array([PUBLIC_BODY_VERSION, commentKind, 0, mediaFormat]),
@@ -1293,6 +1496,11 @@ function publicBodyBytes(input) {
       ? input.text
       : input;
     return publicTextBytes(value, PUBLIC_POST_TEXT_MAX_BYTES, 'public post text').bytes;
+  }
+  if (kind === PUBLIC_BODY_KIND.DOCUMENT_POST || kind === PUBLIC_BODY_KIND.DOCUMENT_COMMENT) {
+    const bytes = toUint8Array(input?.bytes ?? input?.documentBytes ?? input?.document_bytes ?? new Uint8Array(), 'public document bytes');
+    if (bytes.length > PUBLIC_POST_BODY_MAX_BYTES) throw new RangeError('public document bytes exceed public body cap');
+    return bytes;
   }
   if (kind === PUBLIC_BODY_KIND.IMAGE_POST || kind === PUBLIC_BODY_KIND.IMAGE_COMMENT || kind === PUBLIC_BODY_KIND.AVATAR) {
     const bytes = toUint8Array(input?.bytes ?? input?.imageBytes ?? input?.image_bytes ?? new Uint8Array(), 'public image bytes');
@@ -1380,9 +1588,13 @@ function pqKemPubkeyCellFromParams(params) {
 }
 
 export async function createPublicPostPayload(input, options = {}) {
-  const maxBytes = options.maxBytes ?? PUBLIC_POST_BODY_MAX_BYTES;
   const headerBytes = publicHeaderBytes(input);
   const bodyBytes = publicBodyBytes(input);
+  const sizeClass = normalizePublicSizeClass(
+    options.sizeClass ?? options.size_class ?? publicSizeClassForBodyBytes(bodyBytes.length),
+    'public payload size_class',
+  );
+  const maxBytes = options.maxBytes ?? publicUsefulBytesForSizeClass(sizeClass);
   if (bodyBytes.length > maxBytes) {
     throw new RangeError(`public body exceeds ${maxBytes} bytes`);
   }
@@ -1402,6 +1614,9 @@ export async function createPublicPostPayload(input, options = {}) {
     headerBytes: headerBytes.length,
     bodyBytes: bodyBytes.length,
     bytes: bodyBytes.length,
+    sizeClass,
+    size_class: sizeClass,
+    usefulBytes: publicUsefulBytesForSizeClass(sizeClass),
     headerHash,
     header_hash: headerHash,
     bodyHash,
@@ -1548,6 +1763,31 @@ function readPublicBodyBytes(headerBytes, bodyBytes) {
     };
   }
 
+  if (kind === PUBLIC_BODY_KIND.DOCUMENT_POST) {
+    if (header.length !== PUBLIC_POST_HEADER_BYTES) throw new Error('Public document post header length mismatch');
+    if (mediaFormat !== PUBLIC_BODY_MEDIA_FORMATS.NONE) throw new Error('Unsupported public document media format');
+    if ((flags & ~PUBLIC_BODY_FLAGS.COMMENTS_DISABLED) !== 0) throw new Error('Unsupported public document post body flags');
+    const part = readMultipart();
+    const profile = readProfilePointer();
+    return {
+      layout: PUBLIC_BODY_LAYOUT,
+      kind,
+      type: 'document',
+      headerBytes: header.length,
+      bodyBytes: data.length,
+      bytes: data.length,
+      header,
+      data,
+      flags,
+      ...part,
+      ...profile,
+      commentsAllowed: (flags & PUBLIC_BODY_FLAGS.COMMENTS_DISABLED) === 0,
+      comments_allowed: (flags & PUBLIC_BODY_FLAGS.COMMENTS_DISABLED) === 0,
+      documentBytes: data,
+      document_bytes: data,
+    };
+  }
+
   if (kind === PUBLIC_BODY_KIND.IMAGE_COMMENT) {
     if (header.length !== PUBLIC_COMMENT_HEADER_BYTES) throw new Error('Public image comment header length mismatch');
     if (mediaFormat !== PUBLIC_BODY_MEDIA_FORMATS.WEBP) throw new Error('Unsupported public image media format');
@@ -1574,6 +1814,33 @@ function readPublicBodyBytes(headerBytes, bodyBytes) {
       parent_hash: `0x${bytesToHex(parentHashBytes)}`,
       imageBytes: data,
       image_bytes: data,
+    };
+  }
+
+  if (kind === PUBLIC_BODY_KIND.DOCUMENT_COMMENT) {
+    if (header.length !== PUBLIC_COMMENT_HEADER_BYTES) throw new Error('Public document comment header length mismatch');
+    if (mediaFormat !== PUBLIC_BODY_MEDIA_FORMATS.NONE) throw new Error('Unsupported public document media format');
+    if (flags !== 0) throw new Error('Unsupported public document comment body flags');
+    const part = readMultipart();
+    const parentEntryId = readBigUintBytes(header, 32, 8, 'parent_entry_id');
+    const parentHashBytes = header.slice(40, 72);
+    return {
+      layout: PUBLIC_BODY_LAYOUT,
+      kind,
+      type: 'document_comment',
+      headerBytes: header.length,
+      bodyBytes: data.length,
+      bytes: data.length,
+      header,
+      data,
+      flags,
+      ...part,
+      parentEntryId,
+      parent_entry_id: parentEntryId,
+      parentHash: `0x${bytesToHex(parentHashBytes)}`,
+      parent_hash: `0x${bytesToHex(parentHashBytes)}`,
+      documentBytes: data,
+      document_bytes: data,
     };
   }
 

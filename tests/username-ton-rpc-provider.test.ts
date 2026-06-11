@@ -156,6 +156,81 @@ describe('Username TON RPC providers', () => {
     ]);
   });
 
+  it('USERNAME-RPC-02A: get_pending_mint forwards fresh critical options', async () => {
+    const hash = 0x1234n;
+    let seenCall: any = null;
+    const transport = {
+      async runGetMethod(call: any) {
+        seenCall = call;
+        return { stack: [num(0n), num(0n), num(0n), addr(OWNER), num(hash), num(0n), addr(ITEM), num(0n), num(0n)] };
+      },
+    };
+    const provider = createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: REGISTRY, transport });
+
+    await expect(provider.getPendingMint(hash, {
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+      allowUnverifiedCriticalRead: true,
+    })).resolves.toMatchObject({ exists: false });
+
+    expect(seenCall).toMatchObject({
+      address: REGISTRY,
+      method: 'get_pending_mint',
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+      allowUnverifiedCriticalRead: true,
+    });
+  });
+
+  it('USERNAME-RPC-02D: pending flush reads forward fresh critical options', async () => {
+    const calls: any[] = [];
+    const transport = {
+      async runGetMethod(call: any) {
+        calls.push(call);
+        if (call.method === 'get_pending_treasury_flush') {
+          return { stack: [num(-1n), num(77n), addr(ATH_WALLET), num(4n)] };
+        }
+        if (call.method === 'get_pending_burn_flush') {
+          return { stack: [num(-1n), num(88n), num(5n)] };
+        }
+        throw new Error(`unexpected method ${call.method}`);
+      },
+    };
+    const provider = createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: REGISTRY, transport });
+    const readOptions = {
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+      allowUnverifiedCriticalRead: true,
+    };
+
+    await expect(provider.getPendingTreasuryFlush(2n, readOptions)).resolves.toMatchObject({
+      amount: 77n,
+      recipient_ath_wallet: ATH_WALLET,
+    });
+    await expect(provider.getPendingBurnFlush(3n, readOptions)).resolves.toMatchObject({ amount: 88n });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({
+      address: REGISTRY,
+      method: 'get_pending_treasury_flush',
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+      allowUnverifiedCriticalRead: true,
+    });
+    expect(calls[1]).toMatchObject({
+      address: REGISTRY,
+      method: 'get_pending_burn_flush',
+      verify: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+      allowUnverifiedCriticalRead: true,
+    });
+  });
+
   it('USERNAME-RPC-02B: get_global requires the current vault-bound ABI and forwards fresh critical options', async () => {
     const currentGlobalStack = [
       num(-1n),
@@ -183,7 +258,12 @@ describe('Username TON RPC providers', () => {
     };
     const provider = createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: REGISTRY, transport });
 
-    await expect(provider.getGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0 })).resolves.toMatchObject({
+    await expect(provider.getGlobal({
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    })).resolves.toMatchObject({
       vault_bound: true,
       vault_address: VAULT,
       official_ath_wallet_address: OFFICIAL,
@@ -191,7 +271,8 @@ describe('Username TON RPC providers', () => {
     });
     expect(seenCall).toMatchObject({
       method: 'get_global',
-      verify: true,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
       priority: 'critical',
       cacheTtlMs: 0,
     });
@@ -220,7 +301,7 @@ describe('Username TON RPC providers', () => {
       },
     };
     const registryProvider = createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: REGISTRY, transport: registryTransport });
-    const critical = { verify: true, priority: 'critical', cacheTtlMs: 0 };
+    const critical = { verify: false, allowUnverifiedCriticalRead: true, priority: 'critical', cacheTtlMs: 0 };
 
     await expect(registryProvider.getUsernamePrice(6n, critical)).resolves.toMatchObject({ valid_length: true });
     await expect(registryProvider.getUsernameItemAddress(hash, critical)).resolves.toBe(ITEM);
@@ -392,5 +473,169 @@ describe('Username TON RPC providers', () => {
       reason: 'item_registry_mismatch',
       record: null,
     });
+  });
+
+  it('RT-USER-003: authoritative username ownership comes from the current NFT item owner, not stale registry owner', async () => {
+    const hash = 0x7711n;
+    const originalOwner = `0:${'aa'.repeat(32)}`;
+    const transferredOwner = `0:${'bb'.repeat(32)}`;
+    const registryProvider = {
+      async getNameRecord(nameHash: bigint) {
+        expect(nameHash).toBe(hash);
+        return {
+          exists: true,
+          owner_wallet: originalOwner,
+          item_address: ITEM,
+          registered_at: 1_700_000_123n,
+        };
+      },
+    };
+    const itemProvider = {
+      async getState() {
+        return {
+          initialized: true,
+          owner_wallet: transferredOwner,
+          username_registry_address: REGISTRY,
+          name_hash: hash,
+          username_len: 7n,
+          username_cell: '',
+          tier: 3n,
+        };
+      },
+    };
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider,
+      itemProvider,
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: true,
+      reason: 'registry_item',
+      owner_wallet: transferredOwner,
+      item_address: ITEM,
+      name_hash: hash,
+    });
+  });
+
+  it('RT-UNFT-003: transferred item-only state is not authoritative before Registry record exists', async () => {
+    const hash = 0x7722n;
+    const transferredOwner = `0:${'cc'.repeat(32)}`;
+    const registryProvider = {
+      async getNameRecord(nameHash: bigint) {
+        expect(nameHash).toBe(hash);
+        return {
+          exists: false,
+          owner_wallet: OWNER,
+          item_address: ITEM,
+          registered_at: 0n,
+        };
+      },
+    };
+    const itemProvider = {
+      async getState() {
+        return {
+          initialized: true,
+          owner_wallet: transferredOwner,
+          username_registry_address: REGISTRY,
+          name_hash: hash,
+          username_len: 7n,
+          username_cell: '',
+          tier: 3n,
+        };
+      },
+    };
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider,
+      itemProvider,
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: false,
+      reason: 'missing_registry_record',
+      record: { exists: false },
+    });
+  });
+
+  it('RT-UNAMEITEM-001: predeployed uninitialized item cannot become authoritative before Registry record', async () => {
+    const hash = 0x7733n;
+    const registryProvider = {
+      async getNameRecord() {
+        throw new Error('Registry record must not be trusted or read for an uninitialized item');
+      },
+    };
+    const itemProvider = {
+      async getState() {
+        return {
+          initialized: false,
+          owner_wallet: REGISTRY,
+          username_registry_address: REGISTRY,
+          name_hash: hash,
+          username_len: 0n,
+          username_cell: '',
+          tier: 3n,
+        };
+      },
+    };
+
+    await expect(resolveAuthoritativeUsernameItemOwnership({
+      registryProvider,
+      itemProvider,
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    })).resolves.toMatchObject({
+      authoritative: false,
+      reason: 'item_not_initialized',
+      record: null,
+    });
+  });
+
+  it('RT-UNAMEITEM-004: get_nft_data-style owner is not authority without a Registry record', async () => {
+    const hash = 0x7744n;
+    const victimOwner = `0:${'dd'.repeat(32)}`;
+    let nftDataRead = false;
+    const registryProvider = {
+      async getNameRecord(nameHash: bigint) {
+        expect(nameHash).toBe(hash);
+        return {
+          exists: false,
+          owner_wallet: victimOwner,
+          item_address: ITEM,
+          registered_at: 0n,
+        };
+      },
+    };
+    const itemProvider = {
+      async getState() {
+        return {
+          initialized: true,
+          owner_wallet: victimOwner,
+          username_registry_address: REGISTRY,
+          name_hash: hash,
+          username_len: 7n,
+          username_cell: '',
+          tier: 3n,
+        };
+      },
+      async getNftData() {
+        nftDataRead = true;
+        return { owner_address: victimOwner };
+      },
+    };
+
+    const proof = await resolveAuthoritativeUsernameItemOwnership({
+      registryProvider,
+      itemProvider,
+      itemAddress: ITEM,
+      registryAddress: REGISTRY,
+    });
+    expect(proof).toMatchObject({
+      authoritative: false,
+      reason: 'missing_registry_record',
+      record: { exists: false },
+    });
+    expect(proof).not.toHaveProperty('owner_wallet');
+    expect(nftDataRead).toBe(false);
   });
 });

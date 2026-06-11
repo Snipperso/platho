@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import { ATHMaster, ATHBurnNotification } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHWallet, ATHBurn } from '../build/ATHMaster/ATHMaster_ATHWallet';
 
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
+const OP_ATH_BURN_FINALIZED = 0x41544803;
+const OP_ATH_BURN_FAILED = 0x41544804;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -76,6 +79,68 @@ describe('ATH burn finalization', () => {
     const afterWallet = await wallet.getGetWalletData();
 
     expect(beforeMaster.total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+    expect(afterMaster.total_supply).toBe(beforeMaster.total_supply - burnAmount);
+    expect(afterWallet.balance).toBe(beforeWallet.balance - burnAmount);
+  });
+
+  it('ATH-00G: ATHBurnFinalized bounce does not restore total_supply or wallet balance', async () => {
+    const blockchain = await Blockchain.create();
+    const tokenOwner = fixtureAddress('BURN_FINALIZED_BOUNCE_OWNER');
+    const treasuryOwner = fixtureAddress('BURN_FINALIZED_BOUNCE_TREASURY');
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterAddress = contractAddress(0, masterInit);
+    await blockchain.setShardAccount(
+      masterAddress,
+      createShardAccount({
+        address: masterAddress,
+        code: masterInit.code,
+        data: masterInit.data,
+        balance: toNano('1'),
+        workchain: masterAddress.workChain,
+      }),
+    );
+
+    const walletInit = await ATHWallet.init(0n, tokenOwner, masterAddress);
+    const walletStateWithBalance = await ATHWallet.init(1_000n, tokenOwner, masterAddress);
+    const walletAddress = contractAddress(tokenOwner.workChain, walletInit);
+    await blockchain.setShardAccount(
+      walletAddress,
+      createShardAccount({
+        address: walletAddress,
+        code: walletInit.code,
+        data: walletStateWithBalance.data,
+        balance: toNano('1'),
+        workchain: walletAddress.workChain,
+      }),
+    );
+
+    const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+    const wallet = blockchain.openContract(new ATHWallet(walletAddress, walletInit));
+    const burnAmount = 100n;
+    const beforeMaster = await master.getGetJettonData();
+    const beforeWallet = await wallet.getGetWalletData();
+
+    const result = await wallet.send(blockchain.sender(tokenOwner), { value: toNano('0.2') }, {
+      $$type: 'ATHBurn',
+      query_id: 7n,
+      amount: burnAmount,
+      response_destination: tokenOwner,
+    } as ATHBurn);
+
+    const afterMaster = await master.getGetJettonData();
+    const afterWallet = await wallet.getGetWalletData();
+
+    expect(findTransaction(result.transactions, {
+      from: master.address,
+      to: tokenOwner,
+      op: OP_ATH_BURN_FINALIZED,
+      success: false,
+    })).toBeDefined();
+    expect(findTransaction(result.transactions, {
+      from: wallet.address,
+      to: tokenOwner,
+      op: OP_ATH_BURN_FAILED,
+    })).toBeUndefined();
     expect(afterMaster.total_supply).toBe(beforeMaster.total_supply - burnAmount);
     expect(afterWallet.balance).toBe(beforeWallet.balance - burnAmount);
   });

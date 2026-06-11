@@ -31,13 +31,17 @@ const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 const KIND_PRIVATE = 1n;
 const KIND_PUBLIC = 2n;
-const SIZE_STANDARD = 1n;
-const PRIVATE_SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
+const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 const SUITE_PUBLIC_NONE = 0n;
 const SUITE_HYBRID = 2n;
 
 const CURRENT = {
-  vaultPublicLocalExec: 8_700_000n,
+  vaultPublic1kLocalExec: 8_700_000n,
+  vaultPublic2kLocalExec: 13_800_000n,
+  vaultPublic4kLocalExec: 17_300_000n,
+  vaultPublic8kLocalExec: 24_400_000n,
+  vaultPublic16kLocalExec: 38_900_000n,
+  vaultPublic32kLocalExec: 67_600_000n,
   vaultPrivateHybrid1kLocalExec: 12_000_000n,
   vaultPrivateHybrid2kLocalExec: 13_800_000n,
   vaultPrivateHybrid4kLocalExec: 17_300_000n,
@@ -53,7 +57,12 @@ const CURRENT = {
   privateCapsulehub8kExec: 5_000_000n,
   privateCapsulehub16kExec: 5_800_000n,
   privateCapsulehub32kExec: 7_600_000n,
-  publicExec: 2_400_000n,
+  public1kExec: 2_400_000n,
+  public2kExec: 4_300_000n,
+  public4kExec: 4_500_000n,
+  public8kExec: 5_000_000n,
+  public16kExec: 5_800_000n,
+  public32kExec: 7_600_000n,
   storageKeepalive: 1_000_000n,
   privateEntryStorage: 3_300_000n,
   publicEntryStorage: 7_400_000n,
@@ -206,6 +215,27 @@ function compactAddressHash(address: Address): bigint {
 
 function snakeCell(byteLength: number, fill: number): Cell {
   const bytes = Buffer.alloc(byteLength, fill);
+  return snakeCellFromBytes(bytes);
+}
+
+function snakeCellFromBytes(bytes: Buffer): Cell {
+  const chunks: Buffer[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 127) {
+    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
+  }
+  let tail: Cell | null = null;
+  for (let index = chunks.length - 1; index >= 0; index -= 1) {
+    const builder = beginCell().storeBuffer(chunks[index]);
+    if (tail) {
+      builder.storeRef(tail);
+    }
+    tail = builder.endCell();
+  }
+  return tail ?? beginCell().endCell();
+}
+
+function mlKemPubkeySnakeCell(byteLength: number, fill: number): Cell {
+  const bytes = Buffer.alloc(byteLength, fill);
   let tail: Cell | null = null;
   for (let offset = bytes.length; offset > 0;) {
     const start = Math.max(0, offset - 127);
@@ -299,7 +329,7 @@ async function setupBoundPair(label: string) {
 async function registerKeys(vault: any, user: any, seedByte: number) {
   const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
   const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
-  const pqKemPubkey = snakeCell(1184, 0x5a);
+  const pqKemPubkey = mlKemPubkeySnakeCell(1184, 0x5a);
   await vault.send(user.getSender(), { value: toNano('0.05') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: 1n,
@@ -338,9 +368,9 @@ function privateCells(sizeClass: bigint, cryptoSuite: bigint) {
   return { header0, header1, body };
 }
 
-function publicCells() {
+function publicCells(sizeClass: bigint) {
   const header = snakeCell(72, 0x50);
-  const body = snakeCell(1024, 0x70);
+  const body = snakeCell(Number(sizeClass) * 1024, 0x70);
   return { header, body };
 }
 
@@ -376,8 +406,8 @@ function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigi
     .endCell();
 }
 
-function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address): Cell {
-  const cells = publicCells();
+function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address, sizeClass: bigint): Cell {
+  const cells = publicCells(sizeClass);
   const payload = beginCell()
     .storeUint(cellHash(cells.header), 256)
     .storeUint(cellHash(cells.body), 256)
@@ -387,11 +417,13 @@ function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigin
   const signedDataCell = beginCell()
     .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(MANIFEST_HASH, 256)
-    .storeAddress(vaultAddress)
+    .storeUint(compactAddressHash(vaultAddress), 256)
     .storeUint(KIND_PUBLIC, 8)
-    .storeAddress(owner)
+    .storeUint(compactAddressHash(owner), 256)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
+    .storeUint(sizeClass, 8)
+    .storeUint(SUITE_PUBLIC_NONE, 8)
     .storeRef(payload)
     .endCell();
   return beginCell()
@@ -482,15 +514,16 @@ async function oneYearStorageFee(id: PublishCaseId, sizeClass: bigint, cryptoSui
   const ctx = await setupBoundPair(`storage-${id}`);
   const { blockchain, deployer, user, vault, capsule } = ctx;
   const keyPair = await registerKeys(vault, user, 80 + Number(sizeClass));
-  const maxCharge = id === 'public_post'
-    ? await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE)
+  const isPublic = id.startsWith('public_');
+  const maxCharge = isPublic
+    ? await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, sizeClass, SUITE_PUBLIC_NONE)
     : await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, sizeClass, cryptoSuite);
   await topUpVaultTon(vault, user, maxCharge * 2n);
   const before = await vault.getGetUser(user.address);
   await blockchain.sendMessage(external({
     to: vault.address,
-    body: id === 'public_post'
-      ? signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address)
+    body: isPublic
+      ? signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass)
       : signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass, cryptoSuite),
   }));
 
@@ -528,15 +561,16 @@ async function measureCase(spec: PublishCaseSpec): Promise<PublishCaseReport> {
   const ctx = await setupBoundPair(id);
   const { blockchain, user, vault, capsule } = ctx;
   const keyPair = await registerKeys(vault, user, keySeed);
-  const maxCharge = id === 'public_post'
-    ? await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, SIZE_STANDARD, SUITE_PUBLIC_NONE)
+  const isPublic = id.startsWith('public_');
+  const maxCharge = isPublic
+    ? await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, sizeClass, SUITE_PUBLIC_NONE)
     : await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, sizeClass, cryptoSuite);
   await topUpVaultTon(vault, user, maxCharge * 3n);
   const before = await vault.getGetUser(user.address);
   const result = await blockchain.sendMessage(external({
     to: vault.address,
-    body: id === 'public_post'
-      ? signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address)
+    body: isPublic
+      ? signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass)
       : signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass, cryptoSuite),
   }));
   const after = await vault.getGetUser(user.address);
@@ -550,6 +584,10 @@ async function measureCase(spec: PublishCaseSpec): Promise<PublishCaseReport> {
     vaultAddress: vault.address,
     capsuleAddress: capsule.address,
   })));
+  const capsulePublish = metrics.find((tx) => tx.role === 'capsulehub_publish');
+  if (!capsulePublish || capsulePublish.aborted || !capsulePublish.success || capsulePublish.exit_code !== 0) {
+    throw new Error(`${id}: CapsuleHub publish did not finalize successfully`);
+  }
 
   const vaultExternalFee = sumFees(metrics, 'vault_external_publish');
   const capsuleHubFee = sumFees(metrics, 'capsulehub_publish');
@@ -620,8 +658,18 @@ function renderMarkdown(report: PricingReport): string {
 }
 
 export async function runPublishReservePricing(writeArtifacts = true): Promise<PricingReport> {
+  const publicCases: PublishCaseSpec[] = [];
+  for (const sizeClass of SIZE_CLASSES) {
+    publicCases.push({
+      id: `public_${sizeClass}k`,
+      sizeClass,
+      cryptoSuite: SUITE_PUBLIC_NONE,
+      protocolFee: CURRENT.publicFee,
+      keySeed: 10 + Number(sizeClass),
+    });
+  }
   const privateCases: PublishCaseSpec[] = [];
-  for (const sizeClass of PRIVATE_SIZE_CLASSES) {
+  for (const sizeClass of SIZE_CLASSES) {
     privateCases.push({
       id: `private_hybrid_${sizeClass}k`,
       sizeClass,
@@ -631,13 +679,7 @@ export async function runPublishReservePricing(writeArtifacts = true): Promise<P
     });
   }
   const cases = [
-    await measureCase({
-      id: 'public_post',
-      sizeClass: SIZE_STANDARD,
-      cryptoSuite: SUITE_PUBLIC_NONE,
-      protocolFee: CURRENT.publicFee,
-      keySeed: 13,
-    }),
+    ...(await Promise.all(publicCases.map((item) => measureCase(item)))),
     ...(await Promise.all(privateCases.map((item) => measureCase(item)))),
   ];
   const report: PricingReport = {

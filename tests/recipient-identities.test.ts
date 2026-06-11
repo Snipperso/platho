@@ -16,7 +16,7 @@ import {
 const FRIENDLY_ADDRESS = 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c';
 
 describe('PWA recipient identity routing', () => {
-  it('RECIPIENT-ID-01: accepts only explicit wallet, .ton, or .ath routes', () => {
+  it('RECIPIENT-ID-01: accepts wallet, explicit .ton, and bare or explicit Platho routes', () => {
     expect(parseRecipientIdentity(FRIENDLY_ADDRESS)).toMatchObject({
       ok: true,
       identity: { type: RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS, label: FRIENDLY_ADDRESS },
@@ -29,12 +29,20 @@ describe('PWA recipient identity routing', () => {
       ok: true,
       identity: { type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT, label: 'alice.ath' },
     });
+    expect(parseRecipientIdentity('alice')).toMatchObject({
+      ok: true,
+      identity: {
+        type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT,
+        value: 'alice.ath',
+        label: 'alice.ath',
+        entered: 'alice',
+      },
+    });
     expect(parseRecipientIdentity('Alice_1-X.ATH')).toMatchObject({
       ok: true,
       identity: { type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT, label: 'alice_1-x.ath' },
     });
     expect(parseRecipientIdentity('@alice')).toMatchObject({ ok: false });
-    expect(parseRecipientIdentity('alice')).toMatchObject({ ok: false });
     expect(parseRecipientIdentity('alice.platho')).toMatchObject({ ok: false });
     expect(parseRecipientIdentity('bad.name.ath')).toMatchObject({ ok: false });
   });
@@ -43,6 +51,7 @@ describe('PWA recipient identity routing', () => {
     const byAddress = createRecipientThread(FRIENDLY_ADDRESS);
     const byTonDns = createRecipientThread('alice.ton');
     const byPlathoNft = createRecipientThread('alice.ath');
+    const byBarePlathoNft = createRecipientThread('alice');
 
     expect(byAddress).toMatchObject({
       ok: true,
@@ -55,6 +64,14 @@ describe('PWA recipient identity routing', () => {
     expect(byPlathoNft).toMatchObject({
       ok: true,
       thread: { name: 'alice.ath', subtitle: 'Platho NFT' },
+    });
+    expect(byBarePlathoNft).toMatchObject({
+      ok: true,
+      thread: {
+        id: 'dm:platho_nft:alice.ath',
+        name: 'alice.ath',
+        subtitle: 'Platho NFT',
+      },
     });
 
     const labeled = createRecipientThread(FRIENDLY_ADDRESS, { localLabel: 'Anonymous' });

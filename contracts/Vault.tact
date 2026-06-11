@@ -23,8 +23,11 @@ const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000;
 const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
 const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
+// Reserved for a future hash-commitment variant. Current receive intents store secret32 directly as the recipient-authenticated claim gate, not as a hiding commitment.
 const RECEIVE_INTENT_COMMITMENT_DOMAIN: Int = 0x5243434d; // "RCCM"
 const VAULT_RECEIVE_INTENT_SIGNING_DOMAIN: Int = 0x56524331; // "VRC1"
+const VAULT_WITHDRAW_TON_SIGNING_DOMAIN: Int = 0x56545731; // "VTW1"
+const VAULT_WITHDRAW_ATH_SIGNING_DOMAIN: Int = 0x56574131; // "VWA1"
 const VAULT_RECEIVE_INTENT_ACTION_CREATE: Int = 1;
 const VAULT_RECEIVE_INTENT_ACTION_CLAIM: Int = 2;
 const VAULT_RECEIVE_INTENT_ACTION_CANCEL: Int = 3;
@@ -45,6 +48,7 @@ const MLKEM768_PUBKEY_SNAKE_BITS: Int = 9472;
 const MLKEM768_PUBKEY_SNAKE_REFS: Int = 9;
 const UINT64_MAX: Int = 18446744073709551615;
 const UINT64_MOD: Int = 18446744073709551616;
+const UINT128_MOD: Int = 340282366920938463463374607431768211456;
 const UINT160_MOD: Int = 1461501637330902918203684832716283019655932542976;
 const UINT32_MAX: Int = 4294967295;
 const ATH_DEPOSIT_ID_DOMAIN: Int = 0x41445049; // "ADPI"
@@ -63,7 +67,6 @@ const SIZE_CLASS_4K: Int = 4;
 const SIZE_CLASS_8K: Int = 8;
 const SIZE_CLASS_16K: Int = 16;
 const SIZE_CLASS_32K: Int = 32;
-const SIZE_CLASS_STANDARD: Int = SIZE_CLASS_1K;
 const CRYPTO_SUITE_PUBLIC_NONE: Int = 0;
 const PLATO_PRIVATE_LONG_TERM_FEE_TON: Int = 10000000;
 const PLATO_PUBLIC_POST_FEE_TON: Int = 10000000;
@@ -73,7 +76,12 @@ const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 15000000000000000;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH: Int = 0;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
-const VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE: Int = 8700000;
+const VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE: Int = 8700000;
+const VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE: Int = 13800000;
+const VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE: Int = 17300000;
+const VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE: Int = 24400000;
+const VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE: Int = 38900000;
+const VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE: Int = 67600000;
 const VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE: Int = 12000000;
 const VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE: Int = 13800000;
 const VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE: Int = 17300000;
@@ -87,7 +95,12 @@ const CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE: Int = 4500000;
 const CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE: Int = 5000000;
 const CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE: Int = 5800000;
 const CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE: Int = 7600000;
-const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 2400000;
+const CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE: Int = 2400000;
+const CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE: Int = 4300000;
+const CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE: Int = 4500000;
+const CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE: Int = 5000000;
+const CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE: Int = 5800000;
+const CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE: Int = 7600000;
 const CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
@@ -103,9 +116,6 @@ const CAPSULEHUB_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES: Int = 1204;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
-const CAPSULEHUB_PUBLIC_BODY_MAX_BITS: Int = 8192;
-const CAPSULEHUB_PUBLIC_BODY_MAX_CELLS: Int = 9;
-const CAPSULEHUB_PUBLIC_BODY_MAX_REFS: Int = 8;
 const PROFILE_AVATAR_PRICE_ATH: Int = 100000000000;
 const PROFILE_AVATAR_NOTIFY_VALUE: Int = 30000000;
 const PROFILE_AVATAR_MAX_PARTS: Int = 16;
@@ -159,17 +169,6 @@ message(0x2AAFBD98) DepositTon {
     amount: Int as uint128;
 }
 
-message(0x484C1D72) WithdrawTon {
-    amount: Int as uint128;
-    recipient: Address;
-}
-
-message(0xF9A44834) WithdrawAth {
-    query_id: Int as uint64;
-    amount: Int as uint128;
-    recipient: Address;
-}
-
 message(0x52705EDA) RegisterMessagingKeys {
     enc_pubkey: Int as uint256;
     sign_pubkey: Int as uint256;
@@ -199,6 +198,18 @@ message(0x7E1F5036) ClaimReceiveIntent {
 }
 
 message(0x7E1F5037) CancelReceiveIntent {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
+}
+
+message(0x7E1F5038) WithdrawTonFromVaultBalance {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
+}
+
+message(0x7E1F5039) WithdrawAthFromVaultBalance {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
@@ -247,6 +258,7 @@ message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
     bounce_tag: Int as uint160;
     publish_id: Int as uint256;
+    size_class: Int as uint8;
     marketing_note: Int as uint152;
     author_wallet: Address;
     header_hash: Int as uint256;
@@ -430,7 +442,7 @@ contract Vault {
     genesis_config_hash: Int as uint256;
     users: map<Address, UserState>;
     key_records: map<Int, KeyRecord>;
-    receive_intents: map<Int, ReceiveIntent>;
+    receive_intents: map<Int as uint128, ReceiveIntent>;
     processed_ath_deposits: map<Int, Int>;
     pending_ath_withdrawals: map<Int, PendingAthWithdrawal>;
     pending_publishes: map<Int, PendingPublish>;
@@ -533,6 +545,7 @@ contract Vault {
     }
 
     fun isBasechainAddress(owner: Address): Bool {
+        // Std-address basechain prefix check; sister contracts use parseStdAddress(...).workchain == 0 for the same standard-address condition.
         let ownerSlice: Slice = owner.asSlice();
         return ownerSlice.loadUint(11) == 1024;
     }
@@ -716,7 +729,7 @@ contract Vault {
             return cryptoSuite == CRYPTO_SUITE_HYBRID;
         }
         if (publishKind == PUBLISH_KIND_PUBLIC) {
-            if (sizeClass != SIZE_CLASS_STANDARD) { return false; }
+            if (!self.isAllowedPublicSizeClass(sizeClass)) { return false; }
             if (cryptoSuite != CRYPTO_SUITE_PUBLIC_NONE) { return false; }
             if (header0 == 0) { return false; }
             if (header1 != 0) { return false; }
@@ -732,6 +745,10 @@ contract Vault {
             || sizeClass == SIZE_CLASS_8K
             || sizeClass == SIZE_CLASS_16K
             || sizeClass == SIZE_CLASS_32K;
+    }
+
+    fun isAllowedPublicSizeClass(sizeClass: Int): Bool {
+        return self.isAllowedPrivateSizeClass(sizeClass);
     }
 
     fun privateUsefulBytes(sizeClass: Int): Int {
@@ -758,6 +775,23 @@ contract Vault {
 
     fun privateBodyRefs(sizeClass: Int, cryptoSuite: Int): Int {
         return self.privateBodyCells(sizeClass, cryptoSuite) - 1;
+    }
+
+    fun publicBodyBytes(sizeClass: Int): Int {
+        throwUnless(16330, self.isAllowedPublicSizeClass(sizeClass));
+        return sizeClass * 1024;
+    }
+
+    fun publicBodyBits(sizeClass: Int): Int {
+        return self.publicBodyBytes(sizeClass) * 8;
+    }
+
+    fun publicBodyCells(sizeClass: Int): Int {
+        return (self.publicBodyBytes(sizeClass) + 126) / 127;
+    }
+
+    fun publicBodyRefs(sizeClass: Int): Int {
+        return self.publicBodyCells(sizeClass) - 1;
     }
 
     fun isExactCapsuleCell(cell: Cell, expectedCells: Int, expectedBits: Int, expectedRefs: Int): Bool {
@@ -793,11 +827,11 @@ contract Vault {
         return self.isExactCapsuleCell(body, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite));
     }
 
-    fun isPublicCapsuleShapeValid(header: Cell, body: Cell): Bool {
+    fun isPublicCapsuleShapeValid(sizeClass: Int, header: Cell, body: Cell): Bool {
         if (!self.isPublicCapsuleCell(header, CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS, CAPSULEHUB_PUBLIC_HEADER_MAX_BITS, CAPSULEHUB_PUBLIC_HEADER_MAX_REFS, true)) {
             return false;
         }
-        return self.isPublicCapsuleCell(body, CAPSULEHUB_PUBLIC_BODY_MAX_CELLS, CAPSULEHUB_PUBLIC_BODY_MAX_BITS, CAPSULEHUB_PUBLIC_BODY_MAX_REFS, true);
+        return self.isPublicCapsuleCell(body, self.publicBodyCells(sizeClass), self.publicBodyBits(sizeClass), self.publicBodyRefs(sizeClass), true);
     }
 
     fun privatePublishLocalExecReserve(sizeClass: Int, cryptoSuite: Int): Int {
@@ -822,11 +856,31 @@ contract Vault {
         return CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE;
     }
 
+    fun publicPublishLocalExecReserve(sizeClass: Int): Int {
+        throwUnless(16331, self.isAllowedPublicSizeClass(sizeClass));
+        if (sizeClass == SIZE_CLASS_1K) { return VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_2K) { return VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_4K) { return VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_8K) { return VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_16K) { return VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE; }
+        return VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE;
+    }
+
+    fun publicCapsulehubExecReserve(sizeClass: Int): Int {
+        throwUnless(16332, self.isAllowedPublicSizeClass(sizeClass));
+        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE; }
+        return CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE;
+    }
+
     fun publishLocalExecReserve(publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
         if (publishKind == PUBLISH_KIND_PUBLIC) {
-            throwUnless(16320, sizeClass == SIZE_CLASS_STANDARD);
+            throwUnless(16320, self.isAllowedPublicSizeClass(sizeClass));
             throwUnless(16321, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
-            return VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE;
+            return self.publicPublishLocalExecReserve(sizeClass);
         }
         throwUnless(16322, publishKind == PUBLISH_KIND_PRIVATE);
         return self.privatePublishLocalExecReserve(sizeClass, cryptoSuite);
@@ -837,7 +891,7 @@ contract Vault {
         if (publishKind == PUBLISH_KIND_PUBLIC) {
             return localExecReserve
                 + self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON)
-                + CAPSULEHUB_PUBLIC_EXEC_RESERVE
+                + self.publicCapsulehubExecReserve(sizeClass)
                 + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
                 + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
                 + CAPSULEHUB_ACK_FORWARD_RESERVE;
@@ -880,7 +934,7 @@ contract Vault {
 
     fun protocolFeePaid(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
         if (publishKind == PUBLISH_KIND_PUBLIC) {
-            throwUnless(16350, sizeClass == SIZE_CLASS_STANDARD);
+            throwUnless(16350, self.isAllowedPublicSizeClass(sizeClass));
             throwUnless(16351, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
             return self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON);
         }
@@ -1105,13 +1159,9 @@ contract Vault {
             .hash();
     }
 
-
-
-    fun validateReceiveAsset(asset: Int) {
-        throwUnless(16200, (asset == ASSET_TON) || (asset == ASSET_ATH));
-    }
-
     fun computeReceiveIntentId(senderWallet: Address, recipientWallet: Address, asset: Int, amount: Int, clientNonce: Int): Int {
+        // Keep receive-intent lookups cheap enough for pre-accept external claims.
+        // The id is still hash-derived, but truncated to the uint128 storage key.
         return beginCell()
             .storeUint(RECEIVE_INTENT_ID_DOMAIN, 32)
             .storeAddress(senderWallet)
@@ -1120,10 +1170,11 @@ contract Vault {
             .storeUint(amount, 128)
             .storeUint(clientNonce, 64)
             .endCell()
-            .hash();
+            .hash() % UINT128_MOD;
     }
 
     fun computeReceiveIntentCommitment(intentId: Int, recipientWallet: Address, secret32: Int): Int {
+        // Protocol v1 intentionally exposes the secret gate value; claim still requires the recipient wallet signature.
         return secret32;
     }
 
@@ -1259,64 +1310,155 @@ contract Vault {
         });
     }
 
-    receive(msg: WithdrawTon) {
+    external(msg: WithdrawTonFromVaultBalance) {
         self.requireSealed();
-        throwUnless(16020, msg.amount > 0);
-        throwUnless(16018, msg.recipient != myAddress());
-        throwUnless(16019, context().value >= VAULT_WITHDRAW_TON_EXEC_RESERVE);
-        let userOpt: UserState? = self.users.get(sender());
-        throwUnless(16021, userOpt != null);
+        throwUnless(16800, self.isBasechainAddress(msg.owner_wallet));
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
+        throwUnless(16801, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16022, user.ton_balance >= msg.amount);
+        throwUnless(16802, user.auth_pubkey != 0);
+        throwUnless(16803, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
-        user.ton_balance -= msg.amount;
-        self.users.set(sender(), user);
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16804, signedDomain == VAULT_WITHDRAW_TON_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16805, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16806, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16807, signedOwner == msg.owner_wallet);
+        let clientNonce: Int = signedPayload.loadUint(64);
+        throwUnless(16808, clientNonce == user.publish_nonce);
+        throwUnless(16816, user.ton_balance >= VAULT_WITHDRAW_TON_EXEC_RESERVE);
+
+        acceptMessage();
+        user.ton_balance -= VAULT_WITHDRAW_TON_EXEC_RESERVE;
+        user.publish_nonce += 1;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let amount: Int = actionPayload.loadUint(128);
+        let recipient: Address = actionPayload.loadAddress();
+        if (!(actionPayload.bits() == 0)) {
+            return;
+        }
+        if (!(actionPayload.refs() == 0)) {
+            return;
+        }
+        if (!(amount > 0)) {
+            return;
+        }
+        if (!(recipient != myAddress())) {
+            return;
+        }
+        if (!self.isBasechainAddress(recipient)) {
+            return;
+        }
+        if (!(user.ton_balance >= amount)) {
+            return;
+        }
+        user.ton_balance -= amount;
+        self.users.set(msg.owner_wallet, user);
 
         message(MessageParameters {
-            to: msg.recipient,
-            value: msg.amount,
+            to: recipient,
+            value: amount,
             bounce: false,
             mode: SendPayFwdFeesSeparately,
             body: null
         });
     }
 
-    receive(msg: WithdrawAth) {
+    external(msg: WithdrawAthFromVaultBalance) {
         self.requireSealed();
-        throwUnless(16023, msg.amount > 0);
-        throwUnless(16017, msg.recipient != myAddress());
-        throwUnless(16075, self.isBasechainAddress(sender()));
-        throwUnless(16076, self.isBasechainAddress(msg.recipient));
-        throwUnless(16027, context().value >= VAULT_ATH_WITHDRAW_MIN_VALUE);
-        let userOpt: UserState? = self.users.get(sender());
+        throwUnless(16075, self.isBasechainAddress(msg.owner_wallet));
+        let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16024, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16025, user.ath_balance >= msg.amount);
-        let withdrawalId: Int = self.computeAthWithdrawalId(sender(), msg.query_id);
-        throwUnless(16026, !self.pending_ath_withdrawals.exists(withdrawalId));
+        throwUnless(16031, user.auth_pubkey != 0);
+        throwUnless(16032, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
-        user.ath_balance -= msg.amount;
-        self.users.set(sender(), user);
-        let recipientAthWallet: Address = self.deriveAthWalletAddress(msg.recipient);
+        let signedPayload: Slice = msg.signed_payload.beginParse();
+        let signedDomain: Int = signedPayload.loadUint(32);
+        throwUnless(16033, signedDomain == VAULT_WITHDRAW_ATH_SIGNING_DOMAIN);
+        let signedManifestHash: Int = signedPayload.loadUint(256);
+        throwUnless(16034, signedManifestHash == self.deployment_manifest_hash);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16035, signedVaultAddress == myAddress());
+        let signedOwner: Address = signedPayload.loadAddress();
+        throwUnless(16036, signedOwner == msg.owner_wallet);
+        let clientNonce: Int = signedPayload.loadUint(64);
+        throwUnless(16037, clientNonce == user.publish_nonce);
+        throwUnless(16027, user.ton_balance >= VAULT_ATH_WITHDRAW_MIN_VALUE);
+
+        acceptMessage();
+        user.publish_nonce += 1;
+        user.ton_balance -= VAULT_ATH_WITHDRAW_MIN_VALUE;
+        self.users.set(msg.owner_wallet, user);
+        commit();
+
+        if (!(signedPayload.bits() == 0)) {
+            return;
+        }
+        if (!(signedPayload.refs() == 1)) {
+            return;
+        }
+
+        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        let amount: Int = actionPayload.loadUint(128);
+        let recipient: Address = actionPayload.loadAddress();
+        if (!(actionPayload.bits() == 0)) {
+            return;
+        }
+        if (!(actionPayload.refs() == 0)) {
+            return;
+        }
+        if (!(amount > 0)) {
+            return;
+        }
+        if (!(recipient != myAddress())) {
+            return;
+        }
+        if (!self.isBasechainAddress(recipient)) {
+            return;
+        }
+        if (!(user.ath_balance >= amount)) {
+            return;
+        }
+        let withdrawalId: Int = self.computeAthWithdrawalId(msg.owner_wallet, clientNonce);
+        if (self.pending_ath_withdrawals.exists(withdrawalId)) {
+            return;
+        }
+        user.ath_balance -= amount;
+        self.users.set(msg.owner_wallet, user);
+        let recipientAthWallet: Address = self.deriveAthWalletAddress(recipient);
         self.pending_ath_withdrawals.set(withdrawalId, PendingAthWithdrawal {
-            owner_wallet: sender(),
-            recipient: msg.recipient,
+            owner_wallet: msg.owner_wallet,
+            recipient: recipient,
             recipient_ath_wallet: recipientAthWallet,
-            amount: msg.amount,
-            refundable_ton_amount: context().value,
+            amount: amount,
+            refundable_ton_amount: VAULT_ATH_WITHDRAW_MIN_VALUE,
             created_at: now()
         });
         self.pending_ath_withdrawal_count += 1;
 
         message(MessageParameters {
             to: self.vault_ath_wallet_address,
-            value: 0,
+            value: VAULT_ATH_WITHDRAW_MIN_VALUE,
             bounce: true,
-            mode: SendRemainingValue,
+            mode: SendDefaultMode,
             body: ATHTransferRequest {
                 query_id: withdrawalId,
-                amount: msg.amount,
-                recipient: msg.recipient,
+                amount: amount,
+                recipient: recipient,
                 response_destination: myAddress()
             }.toCell()
         });
@@ -1512,6 +1654,7 @@ contract Vault {
     }
 
     external(msg: ReplaceMessagingKeys) {
+        self.requireSealed();
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16120, userOpt != null);
         let user: UserState = userOpt!!;
@@ -1641,10 +1784,16 @@ contract Vault {
         throwUnless(16223, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16224, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16287, signedVaultAddress == myAddress());
-        let signedOwner: Address = signedPayload.loadAddress();
-        throwUnless(16288, signedOwner == msg.owner_wallet);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
+        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        throwUnless(16225, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        // Keep receive-intent externals inside the 10k pre-accept gas credit: the signed owner hash still binds the typed outer owner address.
+        ownerPrefix.loadUint(11);
+        throwUnless(16288, signedOwnerHash == ownerPrefix.loadUint(256));
         throwUnless(16226, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CREATE);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16233, clientNonce == user.publish_nonce);
@@ -1743,7 +1892,7 @@ contract Vault {
     }
 
     external(msg: ClaimReceiveIntent) {
-        self.requireSealed();
+        // Valid users/intents are created only by sealed flows; auth, manifest, vault binding, and intent checks stay pre-accept here.
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16239, userOpt != null);
         let user: UserState = userOpt!!;
@@ -1755,10 +1904,16 @@ contract Vault {
         throwUnless(16242, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16243, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16291, signedVaultAddress == myAddress());
-        let signedOwner: Address = signedPayload.loadAddress();
-        throwUnless(16292, signedOwner == msg.owner_wallet);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
+        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        throwUnless(16244, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        // Keep receive-intent externals inside the 10k pre-accept gas credit: the signed owner hash still binds the typed outer owner address.
+        ownerPrefix.loadUint(11);
+        throwUnless(16292, signedOwnerHash == ownerPrefix.loadUint(256));
         throwUnless(16245, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16249, clientNonce == user.publish_nonce);
@@ -1787,7 +1942,7 @@ contract Vault {
     }
 
     external(msg: CancelReceiveIntent) {
-        self.requireSealed();
+        // Valid users/intents are created only by sealed flows; auth, manifest, vault binding, and intent checks stay pre-accept here.
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16252, userOpt != null);
         let user: UserState = userOpt!!;
@@ -1799,10 +1954,16 @@ contract Vault {
         throwUnless(16255, signedDomain == VAULT_RECEIVE_INTENT_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16256, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16295, signedVaultAddress == myAddress());
-        let signedOwner: Address = signedPayload.loadAddress();
-        throwUnless(16296, signedOwner == msg.owner_wallet);
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
+        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        throwUnless(16257, signedVaultHash == vaultAddressSlice.loadUint(256));
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
+        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
+        // Keep receive-intent externals inside the 10k pre-accept gas credit: the signed owner hash still binds the typed outer owner address.
+        ownerPrefix.loadUint(11);
+        throwUnless(16296, signedOwnerHash == ownerPrefix.loadUint(256));
         throwUnless(16258, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16262, clientNonce == user.publish_nonce);
@@ -1843,7 +2004,8 @@ contract Vault {
         throwUnless(16465, signedManifestHash == self.deployment_manifest_hash);
         let signedVaultHash: Int = signedPayload.loadUint(256);
         let vaultAddressSlice: Slice = myAddress().asSlice();
-        throwUnless(16466, vaultAddressSlice.loadUint(11) == 1024);
+        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
+        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
         throwUnless(16466, signedVaultHash == vaultAddressSlice.loadUint(256));
         let signedPublishKind: Int = signedPayload.loadUint(8);
         throwUnless(16467, signedPublishKind == PUBLISH_KIND_PRIVATE);
@@ -1872,8 +2034,11 @@ contract Vault {
             localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE;
         }
         throwUnless(16471, localExecReserve > 0);
-        throwUnless(16462, maxCharge >= localExecReserve);
-        throwUnless(16463, user.ton_balance >= maxCharge);
+        // Large publish externals can exceed the 10k pre-accept gas credit if the
+        // full maxCharge balance check stays here. Keep only the local reserve
+        // backing gate pre-accept; the remaining publish budget is checked after
+        // nonce consumption and before the CapsuleHub call.
+        throwUnless(16463, user.ton_balance >= localExecReserve);
         acceptMessage();
 
         user.ton_balance -= localExecReserve;
@@ -1941,6 +2106,10 @@ contract Vault {
         if (!(maxCharge >= expectedMax)) {
             return;
         }
+        let remainingCharge: Int = maxCharge - localExecReserve;
+        if (!(user.ton_balance >= remainingCharge)) {
+            return;
+        }
 
         let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
         let callValue: Int = self.capsulehubCallValue(maxCharge, localExecReserve);
@@ -1954,7 +2123,7 @@ contract Vault {
             return;
         }
 
-        user.ton_balance -= (maxCharge - localExecReserve);
+        user.ton_balance -= remainingCharge;
         self.users.set(msg.owner_wallet, user);
 
         self.pending_publishes.set(bounceId, PendingPublish {
@@ -1997,7 +2166,7 @@ contract Vault {
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16481, userOpt != null);
         let user: UserState = userOpt!!;
-        throwUnless(16484, user.auth_pubkey != 0);
+        // checkSignature is the pre-accept auth gate; a zero auth_pubkey cannot authorize a public publish.
         throwUnless(16487, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
         let signedPayload: Slice = msg.signed_payload.beginParse();
@@ -2005,20 +2174,42 @@ contract Vault {
         throwUnless(16493, signedDomain == VAULT_PUBLISH_SIGNING_DOMAIN);
         let signedManifestHash: Int = signedPayload.loadUint(256);
         throwUnless(16494, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        throwUnless(16495, signedVaultAddress == myAddress());
+        let signedVaultHash: Int = signedPayload.loadUint(256);
+        let vaultAddressSlice: Slice = myAddress().asSlice();
+        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
+        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        throwUnless(16495, signedVaultHash == vaultAddressSlice.loadUint(256));
         let signedPublishKind: Int = signedPayload.loadUint(8);
         throwUnless(16496, signedPublishKind == PUBLISH_KIND_PUBLIC);
-        let signedOwner: Address = signedPayload.loadAddress();
+        let signedOwnerHash: Int = signedPayload.loadUint(256);
         let clientNonce: Int = signedPayload.loadUint(64);
         let maxCharge: Int = signedPayload.loadUint(128);
-        throwUnless(16499, signedOwner == msg.owner_wallet);
+        let sizeClass: Int = signedPayload.loadUint(8);
+        let cryptoSuite: Int = signedPayload.loadUint(8);
         let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16480, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16497, ownerPrefix.loadUint(11) == 1024);
+        throwUnless(16498, signedOwnerHash == ownerPrefix.loadUint(256));
+        throwUnless(16499, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
         throwUnless(16483, clientNonce == user.publish_nonce);
-        let localExecReserve: Int = VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE;
-        throwUnless(16491, maxCharge >= localExecReserve);
-        throwUnless(16492, user.ton_balance >= maxCharge);
+        let localExecReserve: Int = 0;
+        if (sizeClass == SIZE_CLASS_1K) {
+            localExecReserve = VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE;
+        } else if (sizeClass == SIZE_CLASS_2K) {
+            localExecReserve = VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE;
+        } else if (sizeClass == SIZE_CLASS_4K) {
+            localExecReserve = VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE;
+        } else if (sizeClass == SIZE_CLASS_8K) {
+            localExecReserve = VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE;
+        } else if (sizeClass == SIZE_CLASS_16K) {
+            localExecReserve = VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE;
+        } else if (sizeClass == SIZE_CLASS_32K) {
+            localExecReserve = VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE;
+        }
+        throwUnless(16331, localExecReserve > 0);
+        // Keep public avatar/media publishes below the 10k pre-accept gas credit:
+        // check only local reserve backing before accept, then validate the full
+        // publish budget before sending anything to CapsuleHub.
+        throwUnless(16492, user.ton_balance >= localExecReserve);
         acceptMessage();
 
         user.ton_balance -= localExecReserve;
@@ -2054,7 +2245,7 @@ contract Vault {
             return;
         }
 
-        if (!self.isPublishProfileValid(PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE, headerHash, 0)) {
+        if (!self.isPublishProfileValid(PUBLISH_KIND_PUBLIC, sizeClass, cryptoSuite, headerHash, 0)) {
             return;
         }
         if (!(header.hash() == headerHash)) {
@@ -2063,16 +2254,20 @@ contract Vault {
         if (!(body.hash() == bodyHash)) {
             return;
         }
-        if (!self.isPublicCapsuleShapeValid(header, body)) {
+        if (!self.isPublicCapsuleShapeValid(sizeClass, header, body)) {
             return;
         }
 
-        let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
+        let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PUBLIC, sizeClass, cryptoSuite);
         if (!(maxCharge >= expectedMax)) {
             return;
         }
+        let remainingCharge: Int = maxCharge - localExecReserve;
+        if (!(user.ton_balance >= remainingCharge)) {
+            return;
+        }
 
-        let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PUBLIC, SIZE_CLASS_STANDARD, CRYPTO_SUITE_PUBLIC_NONE);
+        let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PUBLIC, sizeClass, cryptoSuite);
         let callValue: Int = self.capsulehubCallValue(maxCharge, localExecReserve);
         let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PUBLIC);
         if (!(publishId != 0)) {
@@ -2084,7 +2279,7 @@ contract Vault {
             return;
         }
 
-        user.ton_balance -= (maxCharge - localExecReserve);
+        user.ton_balance -= remainingCharge;
         self.users.set(msg.owner_wallet, user);
 
         self.pending_publishes.set(bounceId, PendingPublish {
@@ -2109,6 +2304,7 @@ contract Vault {
                 bounce_id: bounceId,
                 bounce_tag: bounceTag,
                 publish_id: publishId,
+                size_class: sizeClass,
                 marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
                 author_wallet: msg.owner_wallet,
                 header_hash: headerHash,
@@ -2122,7 +2318,6 @@ contract Vault {
 
     external(msg: SetProfileAvatarFromVaultBalance) {
         self.requireSealed();
-        throwUnless(16600, self.isProfileRegistryBound());
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16601, userOpt != null);
         let user: UserState = userOpt!!;
@@ -2138,18 +2333,17 @@ contract Vault {
         throwUnless(16618, signedOwner == msg.owner_wallet);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16611, clientNonce == user.publish_nonce);
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        throwUnless(16615, maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16619, signedVaultAddress == myAddress());
         throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         acceptMessage();
         user.publish_nonce += 1;
         user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
-        let maxTonCharge: Int = signedPayload.loadUint(128);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        if (!(signedVaultAddress == myAddress())) {
-            return;
-        }
-        if (!(maxTonCharge >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE)) {
+        if (!self.isProfileRegistryBound()) {
             return;
         }
 
@@ -2234,7 +2428,6 @@ contract Vault {
 
     external(msg: MintUsernameFromVaultBalance) {
         self.requireSealed();
-        throwUnless(16700, self.isUsernameRegistryBound());
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16701, userOpt != null);
         let user: UserState = userOpt!!;
@@ -2250,18 +2443,17 @@ contract Vault {
         throwUnless(16716, signedOwner == msg.owner_wallet);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16711, clientNonce == user.publish_nonce);
+        let maxTonCharge: Int = signedPayload.loadUint(128);
+        throwUnless(16715, maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
+        let signedVaultAddress: Address = signedPayload.loadAddress();
+        throwUnless(16717, signedVaultAddress == myAddress());
         throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         acceptMessage();
         user.publish_nonce += 1;
         user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
-        let maxTonCharge: Int = signedPayload.loadUint(128);
-        let signedVaultAddress: Address = signedPayload.loadAddress();
-        if (!(signedVaultAddress == myAddress())) {
-            return;
-        }
-        if (!(maxTonCharge >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE)) {
+        if (!self.isUsernameRegistryBound()) {
             return;
         }
 

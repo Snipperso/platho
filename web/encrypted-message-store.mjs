@@ -1,9 +1,13 @@
 const DEFAULT_DB_NAME = 'platho-local-message-history-v1';
 const KEY_STORE_NAME = 'historyKeys';
 const MESSAGE_STORE_NAME = 'encryptedMessages';
+const PENDING_PAYMENT_CHECK_STORE_NAME = 'pendingPaymentChecks';
 const DEFAULT_KEY_ID = 'device-history-key-v1';
 const MESSAGE_HISTORY_VERSION = 1;
+const MESSAGE_HISTORY_DB_VERSION = 2;
 const MESSAGE_HISTORY_DOMAIN = 'PLATHO.LOCAL.MESSAGE_HISTORY.V1';
+const PENDING_PAYMENT_CHECK_THREAD_ID = 'pending-payment-check-ledger';
+const PENDING_PAYMENT_CHECK_MESSAGE_TYPE = 'payment-check-pending';
 const AES_GCM_NONCE_BYTES = 12;
 export const DEFAULT_MESSAGE_HISTORY_MAX_RECORDS = 500;
 
@@ -98,6 +102,29 @@ function normalizeMessageRecordInput(input) {
   };
 }
 
+function normalizePendingPaymentCheckInput(input) {
+  const record = safeClone(assertObject(input, 'pending payment check input'));
+  const id = assertString(
+    record.id ?? record.ledgerId ?? record.intentIdHex ?? record.intentId,
+    'pending payment check id',
+  );
+  const createdAtInput = Number(record.createdAtMs ?? record.createdAt);
+  const createdAt = Number.isFinite(createdAtInput) && createdAtInput > 0 ? createdAtInput : Date.now();
+  return {
+    id,
+    threadId: PENDING_PAYMENT_CHECK_THREAD_ID,
+    createdAt,
+    thread: null,
+    message: {
+      ...record,
+      type: PENDING_PAYMENT_CHECK_MESSAGE_TYPE,
+      id,
+      ledgerId: id,
+      createdAt,
+    },
+  };
+}
+
 function recordAad(record) {
   return utf8(stableStringify({
     domain: MESSAGE_HISTORY_DOMAIN,
@@ -180,6 +207,35 @@ export async function openMessageHistoryRecord(key, record) {
   };
 }
 
+async function openMessageHistoryRecords(key, records) {
+  const opened = [];
+  const failed = [];
+  for (const record of records) {
+    try {
+      opened.push(await openMessageHistoryRecord(key, record));
+    } catch (error) {
+      failed.push({
+        id: record?.id ?? null,
+        threadId: record?.threadId ?? null,
+        createdAt: record?.createdAt ?? null,
+        error: String(error?.message ?? error ?? 'record blocked'),
+      });
+    }
+  }
+  opened.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  return { messages: opened, failed };
+}
+
+function pendingPaymentCheckFromOpenedRecord(record) {
+  const message = assertObject(record.message, 'pending payment check record');
+  return {
+    ...safeClone(message),
+    id: record.id,
+    ledgerId: record.id,
+    createdAt: message.createdAt ?? record.createdAt,
+  };
+}
+
 function requestToPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -197,7 +253,7 @@ function transactionDone(transaction) {
 
 async function openHistoryDb(dbName) {
   if (!globalThis.indexedDB) throw new Error('IndexedDB is unavailable');
-  const openRequest = indexedDB.open(dbName, 1);
+  const openRequest = indexedDB.open(dbName, MESSAGE_HISTORY_DB_VERSION);
   openRequest.onupgradeneeded = () => {
     const db = openRequest.result;
     if (!db.objectStoreNames.contains(KEY_STORE_NAME)) {
@@ -206,6 +262,10 @@ async function openHistoryDb(dbName) {
     if (!db.objectStoreNames.contains(MESSAGE_STORE_NAME)) {
       const store = db.createObjectStore(MESSAGE_STORE_NAME, { keyPath: 'id' });
       store.createIndex('threadId', 'threadId');
+      store.createIndex('createdAt', 'createdAt');
+    }
+    if (!db.objectStoreNames.contains(PENDING_PAYMENT_CHECK_STORE_NAME)) {
+      const store = db.createObjectStore(PENDING_PAYMENT_CHECK_STORE_NAME, { keyPath: 'id' });
       store.createIndex('createdAt', 'createdAt');
     }
   };
@@ -265,6 +325,9 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
       return { id: record.id, threadId: record.threadId, createdAt: record.createdAt };
     },
     async listMessages(filter = {}) {
+      return (await this.listMessagesDetailed(filter)).messages;
+    },
+    async listMessagesDetailed(filter = {}) {
       const tx = db.transaction(MESSAGE_STORE_NAME, 'readonly');
       const store = tx.objectStore(MESSAGE_STORE_NAME);
       const source = filter.threadId
@@ -272,8 +335,36 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
         : store.getAll();
       const records = await requestToPromise(source);
       await transactionDone(tx);
-      const opened = await Promise.all(records.map((record) => openMessageHistoryRecord(key, record)));
-      return opened.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+      return openMessageHistoryRecords(key, records);
+    },
+    async putPendingPaymentCheck(input) {
+      const record = await sealMessageHistoryRecord(key, normalizePendingPaymentCheckInput(input));
+      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readwrite');
+      tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).put(record);
+      await transactionDone(tx);
+      return { id: record.id, createdAt: record.createdAt };
+    },
+    async getPendingPaymentCheck(id) {
+      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readonly');
+      const record = await requestToPromise(tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).get(id));
+      await transactionDone(tx);
+      if (!record) return null;
+      return pendingPaymentCheckFromOpenedRecord(await openMessageHistoryRecord(key, record));
+    },
+    async listPendingPaymentChecks() {
+      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readonly');
+      const records = await requestToPromise(tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).getAll());
+      await transactionDone(tx);
+      const opened = await openMessageHistoryRecords(key, records);
+      return {
+        records: opened.messages.map(pendingPaymentCheckFromOpenedRecord),
+        failed: opened.failed,
+      };
+    },
+    async removePendingPaymentCheck(id) {
+      const tx = db.transaction(PENDING_PAYMENT_CHECK_STORE_NAME, 'readwrite');
+      tx.objectStore(PENDING_PAYMENT_CHECK_STORE_NAME).delete(id);
+      await transactionDone(tx);
     },
     get type() {
       return 'indexeddb';
@@ -290,6 +381,7 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
 export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
   const key = options.key ?? await createHistoryKey();
   const records = new Map();
+  const pendingPaymentChecks = new Map();
   const maxRecords = options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_RECORDS;
 
   function prune() {
@@ -307,13 +399,54 @@ export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
       return { id: record.id, threadId: record.threadId, createdAt: record.createdAt };
     },
     async listMessages(filter = {}) {
+      return (await this.listMessagesDetailed(filter)).messages;
+    },
+    async listMessagesDetailed(filter = {}) {
       const selected = [...records.values()]
         .filter((record) => !filter.threadId || record.threadId === filter.threadId)
         .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-      return Promise.all(selected.map((record) => openMessageHistoryRecord(key, record)));
+      return openMessageHistoryRecords(key, selected);
     },
     dumpEncryptedRecords() {
       return safeClone([...records.values()]);
+    },
+    replaceEncryptedRecords(recordsInput = []) {
+      records.clear();
+      for (const record of recordsInput ?? []) {
+        if (!record?.id) continue;
+        records.set(record.id, safeClone(record));
+      }
+      prune();
+    },
+    async putPendingPaymentCheck(input) {
+      const record = await sealMessageHistoryRecord(key, normalizePendingPaymentCheckInput(input));
+      pendingPaymentChecks.set(record.id, record);
+      return { id: record.id, createdAt: record.createdAt };
+    },
+    async getPendingPaymentCheck(id) {
+      const record = pendingPaymentChecks.get(id);
+      if (!record) return null;
+      return pendingPaymentCheckFromOpenedRecord(await openMessageHistoryRecord(key, record));
+    },
+    async listPendingPaymentChecks() {
+      const opened = await openMessageHistoryRecords(key, [...pendingPaymentChecks.values()]);
+      return {
+        records: opened.messages.map(pendingPaymentCheckFromOpenedRecord),
+        failed: opened.failed,
+      };
+    },
+    async removePendingPaymentCheck(id) {
+      pendingPaymentChecks.delete(id);
+    },
+    dumpEncryptedPendingPaymentCheckRecords() {
+      return safeClone([...pendingPaymentChecks.values()]);
+    },
+    replaceEncryptedPendingPaymentCheckRecords(recordsInput = []) {
+      pendingPaymentChecks.clear();
+      for (const record of recordsInput ?? []) {
+        if (!record?.id) continue;
+        pendingPaymentChecks.set(record.id, safeClone(record));
+      }
     },
     get type() {
       return 'memory';

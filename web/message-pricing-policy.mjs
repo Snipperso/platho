@@ -7,7 +7,14 @@ export const MANUAL_NETWORK_FEE_SURCHARGE_OVERRIDE_NANOTONS = 50_000_000n;
 export const PUBLIC_MESSAGE_BASE_PRICE_NANOTONS = 33_700_000n;
 export const HYBRID_MESSAGE_BASE_PRICE_NANOTONS = 34_700_000n;
 export const SUCCESSFUL_PUBLISH_ACK_REFUND_NANOTONS = 25_800_000n;
-export const PUBLIC_CAPSULE_HOLD_NANOTONS = 59_500_000n;
+export const PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze({
+  1: 59_500_000n,
+  2: 66_500_000n,
+  4: 70_200_000n,
+  8: 77_800_000n,
+  16: 93_100_000n,
+  32: 123_600_000n,
+});
 export const PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze({
   1: 60_500_000n,
   2: 62_400_000n,
@@ -24,6 +31,12 @@ export const PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS = Object.freeze({
   16: 63_200_000n,
   32: 93_700_000n,
 });
+export const PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS = Object.freeze(Object.fromEntries(
+  Object.entries(PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).map(([sizeClass, hold]) => [
+    sizeClass,
+    hold - SUCCESSFUL_PUBLISH_ACK_REFUND_NANOTONS,
+  ]),
+));
 
 export const MESSAGE_PRICE_SUITES = Object.freeze({
   PUBLIC_V1: 'public-v1',
@@ -132,12 +145,18 @@ export function normalizePrivateCapsuleSizeClass(sizeClass) {
   throw new RangeError(`Unsupported private capsule size class: ${String(sizeClass)}`);
 }
 
-export function publicCapsuleBaseHoldNanotons() {
-  return PUBLIC_CAPSULE_HOLD_NANOTONS;
+export function normalizePublicCapsuleSizeClass(sizeClass) {
+  const normalized = Number(integerLikeToBigInt(sizeClass, 1n));
+  if ([1, 2, 4, 8, 16, 32].includes(normalized)) return normalized;
+  throw new RangeError(`Unsupported public capsule size class: ${String(sizeClass)}`);
 }
 
-export function publicCapsuleBaseNetPriceNanotons() {
-  return PUBLIC_CAPSULE_HOLD_NANOTONS - SUCCESSFUL_PUBLISH_ACK_REFUND_NANOTONS;
+export function publicCapsuleBaseHoldNanotons(sizeClass = 1) {
+  return PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS[normalizePublicCapsuleSizeClass(sizeClass)];
+}
+
+export function publicCapsuleBaseNetPriceNanotons(sizeClass = 1) {
+  return PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[normalizePublicCapsuleSizeClass(sizeClass)];
 }
 
 export function privateCapsuleBaseHoldNanotons(sizeClass) {

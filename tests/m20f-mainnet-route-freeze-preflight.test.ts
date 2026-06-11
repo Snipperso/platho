@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { describe, expect, it } from 'vitest';
@@ -38,6 +38,8 @@ function completeInput(overrides: Partial<M20FMainnetRouteFreezeInput> = {}): M2
       stonfiApiSimulationCapture: 'sha256:stonfi-api-simulation-mainnet',
       stonfiSdkOrApiTxParamsCapture: 'sha256:stonfi-sdk-tx-params-mainnet',
       routerPoolPtonCodeHashes: 'sha256:router-pool-pton-code-hashes-mainnet',
+      athNotificationQueryIdPropagationProof: 'tx:ath-notification-query-id-propagation-mainnet',
+      refundExcessBodyShapeProof: 'tx:refund-excess-body-shape-mainnet',
       successExcessProof: 'tx:success-excess-mainnet',
       minOutFailureRefundProof: 'tx:min-out-refund-mainnet',
       ptonRefundProof: 'tx:pton-refund-mainnet',
@@ -145,6 +147,53 @@ describe('M20F mainnet STON.fi route-freeze preflight', () => {
     }
   });
 
+  it('RT-BUY-001/RT-BUY-002: requires query_id propagation and refund/excess body shape proofs', () => {
+    const artifactsDir = withM20TArtifact();
+    try {
+      const base = completeInput();
+      const report = createM20FMainnetRouteFreezePreflight({
+        artifactsDir,
+        input: completeInput({
+          evidenceRefs: {
+            ...base.evidenceRefs,
+            athNotificationQueryIdPropagationProof: 'required: query id propagation proof',
+            refundExcessBodyShapeProof: 'required: refund/excess body shape proof',
+          },
+        }),
+        m19fRouteFreezeReady: true,
+      });
+
+      expect(report.route_freeze_ready).toBe(false);
+      expect(report.status).toBe('BLOCKED_MISSING_FINAL_MAINNET_INPUTS');
+      expect(report.missingInputs).toContain('athNotificationQueryIdPropagationProof');
+      expect(report.missingInputs).toContain('refundExcessBodyShapeProof');
+    } finally {
+      rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
+  it('RT-BUY-003: rejects a source ATH wallet that does not match the ask jetton wallet', () => {
+    const artifactsDir = withM20TArtifact();
+    try {
+      const report = createM20FMainnetRouteFreezePreflight({
+        artifactsDir,
+        input: completeInput({
+          addresses: {
+            stonfiAthSourceWalletAddress: address('derivedSourceWallet'),
+            askJettonWalletAddress: address('differentAskWallet'),
+          } as any,
+        }),
+        m19fRouteFreezeReady: true,
+      });
+
+      expect(report.route_freeze_ready).toBe(false);
+      expect(report.status).toBe('BLOCKED_MISSING_FINAL_MAINNET_INPUTS');
+      expect(report.missingInputs).toContain('STONFI_ATH_SOURCE_WALLET_ASK_WALLET_MISMATCH');
+    } finally {
+      rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
   it('blocks final route input when buyback ATH notify value proof is below the safe upstream bound', () => {
     const artifactsDir = withM20TArtifact();
     try {
@@ -202,5 +251,39 @@ describe('M20F mainnet STON.fi route-freeze preflight', () => {
     } finally {
       rmSync(artifactsDir, { recursive: true, force: true });
     }
+  });
+
+  it('RT-BROUTE-001/002/005: checked-in M20F artifacts keep route freeze blocked until mainnet route proofs exist', () => {
+    const routeReady = readFileSync('artifacts/M20F_ROUTE_FREEZE_READY.txt', 'utf8').trim();
+    const m19fReady = readFileSync('artifacts/STONFI_ROUTE_FREEZE_READY_M19F.txt', 'utf8').trim();
+    const preflight = JSON.parse(readFileSync('artifacts/m20f_mainnet_route_freeze_preflight.json', 'utf8'));
+    const collector = JSON.parse(readFileSync('artifacts/m20f_stonfi_live_collector.json', 'utf8'));
+    const dossier = JSON.parse(readFileSync('artifacts/stonfi_route_evidence_dossier_m19f.json', 'utf8'));
+
+    expect(routeReady).toBe('false');
+    expect(m19fReady).toBe('false');
+    expect(preflight.route_freeze_ready).toBe(false);
+    expect(preflight.production_buyback_burn_unlocked).toBe(false);
+    expect(preflight.status).toBe('BLOCKED_MISSING_FINAL_MAINNET_INPUTS');
+    expect(preflight.blockers).toContain('MISSING_FINAL_MAINNET_M20F_INPUTS');
+    expect(preflight.blockers).toContain('M19F_ROUTE_EVIDENCE_DOSSIER_NOT_READY');
+    expect(preflight.missingInputs).toContain('ATH_NOTIFICATION_QUERY_ID_PROPAGATION_PROOF');
+    expect(preflight.missingInputs).toContain('REFUND_EXCESS_BODY_SHAPE_PROOF');
+    expect(preflight.missingInputs).toContain('MAINNET_REFUND_EXCESS_AND_FAILURE_PROOFS');
+
+    const requiredNextInputs = preflight.requiredNextInputs.join('\n');
+    expect(requiredNextInputs).toMatch(/router, pool, pTON, ATH master, and ATH wallet code hashes/i);
+    expect(requiredNextInputs).toMatch(/query_id/i);
+    expect(requiredNextInputs).toMatch(/refund\/excess\/failure body shapes/i);
+
+    expect(collector.status).toBe('WAITING_FOR_FINAL_MAINNET_INPUT');
+    expect(collector.route_freeze_ready).toBe(false);
+    expect(collector.issue_codes).toContain('MISSING_INPUT');
+
+    expect(dossier.status).toBe('WAITING_FOR_REAL_STONFI_EVIDENCE_DOSSIER');
+    expect(dossier.route_freeze_ready).toBe(false);
+    expect(dossier.template_report.issue_codes).toContain('CHECKLIST_ATHNOTIFICATIONQUERYIDPROPAGATESTOBUYBACKBURN_NOT_TRUE');
+    expect(dossier.template_report.issue_codes).toContain('CHECKLIST_REFUNDEXCESSBODYSHAPESMATCHBUYBACKBURNHANDLERS_NOT_TRUE');
+    expect(dossier.template_report.issue_codes).toContain('MISSING_EVIDENCE_REF_CODEHASHPROOFS');
   });
 });

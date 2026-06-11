@@ -86,7 +86,7 @@ from 0.0337 TON
 ```text
 public 1K net: 0.0337 TON
 private hybrid 1K net: 0.0347 TON
-larger private classes cost more
+larger public or private size classes cost more
 ```
 
 Это не конфликт, если docs различают product label и exact canonical examples.

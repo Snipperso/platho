@@ -45,6 +45,21 @@ const SUITE_HYBRID = 2n;
 
 function snakeCell(byteLength: number, fill = 0x61): Cell {
   const bytes = Buffer.alloc(byteLength, fill);
+  const chunks: Buffer[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 127) {
+    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
+  }
+  let tail: Cell | null = null;
+  for (let index = chunks.length - 1; index >= 0; index -= 1) {
+    const builder = beginCell().storeBuffer(chunks[index]);
+    if (tail) builder.storeRef(tail);
+    tail = builder.endCell();
+  }
+  return tail ?? beginCell().endCell();
+}
+
+function mlKemPubkeySnakeCell(byteLength: number, fill = 0x5a): Cell {
+  const bytes = Buffer.alloc(byteLength, fill);
   let tail: Cell | null = null;
   for (let offset = bytes.length; offset > 0;) {
     const start = Math.max(0, offset - 127);
@@ -304,6 +319,7 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
     bounce_id: 17_102n,
     bounce_tag: 17_102n,
     publish_id: GENESIS_HASH + 1n,
+    size_class: 1n,
     author_wallet: author.address,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     header_hash: BigInt(`0x${CAPSULE_PUBLIC_HEADER_CELL.hash().toString('hex')}`),
@@ -505,7 +521,7 @@ async function activateVaultWallet(vault: any, user: any, seed: bigint) {
   const seedByte = Number(seed & 0xffn);
   const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
   const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
-  const pqKemPubkey = snakeCell(1184, 0x5a);
+  const pqKemPubkey = mlKemPubkeySnakeCell(1184, 0x5a);
   await vault.send(user.getSender(), { value: toNano('0.1') }, {
     $$type: 'RegisterMessagingKeys',
     enc_pubkey: seed,

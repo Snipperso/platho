@@ -12,6 +12,7 @@ import {
   ATHTransferRequest,
   ATHTransferRequestWithNotify,
   AthTransferNotificationAck,
+  AthTransferNotificationRefund,
   PruneStaleNotification,
   storeATHInternalTransfer,
   storeATHInternalTransferVaultMintUsername,
@@ -204,6 +205,49 @@ describe('ATH wallet transfer profile', () => {
     }
   });
 
+  it('ATH-XFER-03D: non-canonical ATHWallet with init balance cannot credit a canonical wallet', async () => {
+    const blockchain = await Blockchain.create();
+    const attackerOwner = fixtureAddress('ATH_FAKE_INIT_BALANCE_OWNER');
+    const victimOwner = await blockchain.treasury('ath-fake-init-victim-owner');
+    const master = fixtureAddress('ATH_FAKE_INIT_BALANCE_MASTER');
+    const amount = 1_000_000_000n;
+
+    const victimWallet = await deployWallet(blockchain, victimOwner.address, master, 0n);
+    const canonicalAttackerInit = await ATHWallet.init(0n, attackerOwner, master);
+    const canonicalAttackerWalletAddress = contractAddress(attackerOwner.workChain, canonicalAttackerInit);
+    const fakeWalletAddress = fixtureAddress('ATH_FAKE_INIT_BALANCE_NON_CANONICAL_WALLET');
+    const fakeDataInit = await ATHWallet.init(amount, attackerOwner, master);
+    expect(fakeWalletAddress.equals(canonicalAttackerWalletAddress)).toBe(false);
+    await blockchain.setShardAccount(fakeWalletAddress, createShardAccount({
+      address: fakeWalletAddress,
+      code: canonicalAttackerInit.code,
+      data: fakeDataInit.data,
+      balance: toNano('1'),
+      workchain: fakeWalletAddress.workChain,
+    }));
+
+    const forgedCredit = await victimWallet.send(blockchain.sender(fakeWalletAddress), { value: toNano('0.05') }, {
+      $$type: 'ATHInternalTransfer',
+      query_id: 306n,
+      amount,
+      sender_owner: attackerOwner,
+      response_destination: attackerOwner,
+    } as ATHInternalTransfer);
+
+    expect(findTransaction(forgedCredit.transactions, {
+      from: fakeWalletAddress,
+      to: victimWallet.address,
+      success: false,
+      exitCode: 14211,
+    })).toBeDefined();
+    expect(findTransaction(forgedCredit.transactions, {
+      from: victimWallet.address,
+      to: fakeWalletAddress,
+      success: true,
+    })).toBeUndefined();
+    expect((await victimWallet.getGetWalletData()).balance).toBe(0n);
+  });
+
   it('ATH-XFER-03C: legitimate recipient bounce restores once and consumes outgoing proof', async () => {
     const blockchain = await Blockchain.create();
     const sourceOwner = await blockchain.treasury('ath-legit-bounce-source');
@@ -386,6 +430,66 @@ describe('ATH wallet transfer profile', () => {
 
     expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+  });
+
+  it('ATH-XFER-05A: processed notification tombstone blocks duplicate refund after ACK', async () => {
+    const blockchain = await Blockchain.create();
+    const sourceOwner = await blockchain.treasury('ath-transfer-ack-tombstone-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-ack-tombstone-recipient');
+    const master = fixtureAddress('ATH_TRANSFER_ACK_TOMBSTONE_MASTER');
+    const queryId = 509n;
+    const amount = 100n;
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 1_000n);
+    const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
+    const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
+    const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
+    const key = senderKey(sourceOwner.address, queryId);
+
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: queryId,
+      amount,
+      recipient: recipientOwner.address,
+      response_destination: sourceOwner.address,
+      notify_destination: recipientOwner.address,
+      notify_value: toNano('0.03'),
+    } as ATHTransferRequestWithNotify);
+
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    await recipientWallet.send(recipientOwner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'AthTransferNotificationAck',
+      query_id: queryId,
+      amount,
+      sender_key: key,
+    } as AthTransferNotificationAck);
+
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+
+    const duplicateRefund = await recipientWallet.send(recipientOwner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'AthTransferNotificationRefund',
+      query_id: queryId,
+      amount,
+      sender_key: key,
+    } as AthTransferNotificationRefund);
+
+    expect(findTransaction(duplicateRefund.transactions, {
+      from: recipientOwner.address,
+      to: recipientWallet.address,
+      success: false,
+      exitCode: 14332,
+    })).toBeDefined();
+    expect(findTransaction(duplicateRefund.transactions, {
+      from: recipientWallet.address,
+      to: sourceWallet.address,
+      success: true,
+    })).toBeUndefined();
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(900n);
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
   });
 
@@ -629,6 +733,58 @@ describe('ATH wallet transfer profile', () => {
     })).toBeDefined();
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
     expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(false);
+  });
+
+  it('ATH-XFER-05C2: Vault/system notification cannot be pruned after TTL', async () => {
+    const blockchain = await Blockchain.create();
+    blockchain.now = 1_700_250_000;
+    const sourceOwner = await blockchain.treasury('ath-transfer-system-prune-source');
+    const recipientOwner = await blockchain.treasury('ath-transfer-system-prune-recipient');
+    const pruner = await blockchain.treasury('ath-transfer-system-prune-pruner');
+    const master = fixtureAddress('ATH_TRANSFER_SYSTEM_PRUNE_MASTER');
+    const queryId = 526n;
+    const amount = 100n;
+    const username = Buffer.from('platho', 'ascii');
+
+    const sourceWallet = await deployWallet(blockchain, sourceOwner.address, master, 0n);
+    const recipientWallet = await deployWallet(blockchain, recipientOwner.address, master, 0n);
+    const key = senderKey(sourceOwner.address, queryId);
+
+    await blockchain.sendMessage(internal({
+      from: sourceWallet.address,
+      to: recipientWallet.address,
+      value: toNano('0.05'),
+      body: beginCell().store(storeATHInternalTransferVaultMintUsername({
+        $$type: 'ATHInternalTransferVaultMintUsername',
+        query_id: queryId,
+        amount,
+        sender_owner: sourceOwner.address,
+        response_destination: sourceOwner.address,
+        notify_value: toNano('0.03'),
+        owner_wallet: recipientOwner.address,
+        username_len: BigInt(username.length),
+        username: beginCell().storeBuffer(username).endCell().beginParse(),
+      } as ATHInternalTransferVaultMintUsername)).endCell(),
+    }));
+
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
+
+    blockchain.now = (blockchain.now ?? 0) + ATH_PENDING_NOTIFICATION_TTL + 1;
+    const pruneSystemPending = await recipientWallet.send(pruner.getSender(), { value: toNano('0.05') }, {
+      $$type: 'PruneStaleNotification',
+      query_id: queryId,
+      sender_key: key,
+    } as PruneStaleNotification);
+
+    expect(findTransaction(pruneSystemPending.transactions, {
+      from: pruner.address,
+      to: recipientWallet.address,
+      success: false,
+      exitCode: 14353,
+    })).toBeDefined();
+    expect((await recipientWallet.getGetWalletData()).balance).toBe(amount);
+    expect((await recipientWallet.getGetPendingNotification(queryId, key)).exists).toBe(true);
   });
 
   it('ATH-XFER-05D: bounced profile-avatar notification refunds ATH to original sender wallet', async () => {

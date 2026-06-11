@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
 import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
@@ -48,6 +49,7 @@ const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30_000_000n;
 const BUYBACK_ROUTE_NOTIFY_MIN_VALUE = 35_000_000n;
 const BUYBACK_ROUTE_ATH_NOTIFY_FORWARD_GAS = 40_000_000n;
 const OP_PTON_TON_TRANSFER = 0x01f3835d;
+const OP_ACCEPT_BURN_RESERVE = 0x594BA505;
 const UINT64_MAX = 18446744073709551615n;
 
 function routeRefundCredit(value: bigint): bigint {
@@ -287,6 +289,17 @@ function inboundValue(tx: any): bigint {
 }
 
 describe('Production BuybackBurn candidate', () => {
+  it('RT-BROUTE-DL-003: routeFreeze test fixture has no duplicate route endpoint keys', () => {
+    const source = readFileSync('tests/buybackburn-production.test.ts', 'utf8');
+    const routeFreezeBase = source.match(/function routeFreeze[\s\S]*?const base: FreezeBuybackRoute = \{([\s\S]*?)\n  \};/)?.[1] ?? '';
+    const keys = [...routeFreezeBase.matchAll(/^\s+([a-zA-Z_][a-zA-Z0-9_]*):/gm)].map((match) => match[1]);
+    const duplicateKeys = keys.filter((key, index) => keys.indexOf(key) !== index);
+
+    expect(routeFreezeBase).not.toBe('');
+    expect(duplicateKeys).toEqual([]);
+    expect(keys.filter((key) => key === 'stonfi_pton_wallet_address')).toHaveLength(1);
+  });
+
   it('BUYBACK-01: derives the official ATH wallet after the BuybackBurn address exists', async () => {
     const env = await setup();
     const expectedOfficial = await athWalletAddress(env.buyback.address, env.athMasterAddress);
@@ -526,7 +539,91 @@ describe('Production BuybackBurn candidate', () => {
     expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
   });
 
-  it('BUYBACK-03C: production FeeAccumulator flush before route freeze bounces and restores buyback due', async () => {
+  it('RT-FB-004: production FeeAccumulator can flush two exact buyback envelopes and rejects a third underfunded due', async () => {
+    const env = await setup();
+    const productionFeeAccumulator = await deployFeeAccumulator(
+      env.blockchain,
+      env.controller.address,
+      env.buyback.address,
+    );
+
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackFeeAccumulator',
+      deployment_manifest_hash: MANIFEST_HASH,
+      fee_accumulator_address: productionFeeAccumulator.address,
+    } as BindBuybackFeeAccumulator);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindBuybackOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: env.officialAthWallet,
+    } as BindBuybackOfficialAthWallet);
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, routeFreeze(env));
+    await env.buyback.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealBuybackBurnGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealBuybackBurnGenesis);
+
+    await productionFeeAccumulator.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'EnableBuybackSplit',
+    } as EnableBuybackSplit);
+
+    const protocolFeePrincipal = ENVELOPE * 4n;
+    await productionFeeAccumulator.send(env.operator.getSender(), { value: protocolFeePrincipal + toNano('0.1') }, {
+      $$type: 'DepositProtocolFee',
+      amount: protocolFeePrincipal,
+    } as DepositProtocolFee);
+    await productionFeeAccumulator.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'SplitAccumulated',
+    } as SplitAccumulated);
+    expect((await productionFeeAccumulator.getGetState()).buyback_due_ton).toBe(ENVELOPE * 2n);
+
+    const firstFlush = await productionFeeAccumulator.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'FlushBuybackDue',
+      amount: ENVELOPE,
+    } as FlushBuybackDue);
+    const firstAccept = findTransaction(firstFlush.transactions, {
+      from: productionFeeAccumulator.address,
+      to: env.buyback.address,
+      op: OP_ACCEPT_BURN_RESERVE,
+      success: true,
+    });
+    expect(firstAccept).toBeDefined();
+    expect(inboundValue(firstAccept)).toBe(ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE);
+    expect((await productionFeeAccumulator.getGetState()).buyback_due_ton).toBe(ENVELOPE);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE);
+    expect((await env.buyback.getGetBuybackBurnTotals()).accepted_reserve_count).toBe(1n);
+
+    const secondFlush = await productionFeeAccumulator.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'FlushBuybackDue',
+      amount: ENVELOPE,
+    } as FlushBuybackDue);
+    const secondAccept = findTransaction(secondFlush.transactions, {
+      from: productionFeeAccumulator.address,
+      to: env.buyback.address,
+      op: OP_ACCEPT_BURN_RESERVE,
+      success: true,
+    });
+    expect(secondAccept).toBeDefined();
+    expect(inboundValue(secondAccept)).toBe(ENVELOPE + ACCEPT_RESERVE_EXEC_RESERVE);
+    expect((await productionFeeAccumulator.getGetState()).buyback_due_ton).toBe(0n);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE * 2n);
+    expect((await env.buyback.getGetBuybackBurnTotals()).accepted_reserve_count).toBe(2n);
+
+    const thirdFlush = await productionFeeAccumulator.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'FlushBuybackDue',
+      amount: ENVELOPE,
+    } as FlushBuybackDue);
+    expect(findTransaction(thirdFlush.transactions, {
+      from: productionFeeAccumulator.address,
+      to: env.buyback.address,
+      op: OP_ACCEPT_BURN_RESERVE,
+    })).toBeUndefined();
+    expect((await productionFeeAccumulator.getGetState()).buyback_due_ton).toBe(0n);
+    expect((await env.buyback.getGetBuybackBurnState()).reserve_due_ton).toBe(ENVELOPE * 2n);
+    expect((await env.buyback.getGetBuybackBurnTotals()).accepted_reserve_count).toBe(2n);
+  });
+
+  it('RT-FEE-002/BUYBACK-03C: production FeeAccumulator flush before route freeze bounces and restores buyback due', async () => {
     const env = await setup();
     const productionFeeAccumulator = await deployFeeAccumulator(
       env.blockchain,
@@ -1097,7 +1194,7 @@ describe('Production BuybackBurn candidate', () => {
     expect((await officialWallet.getGetWalletData()).balance).toBe(0n);
   });
 
-  it('BUYBACK-06B: multiple failed burns aggregate into one exact retry burn', async () => {
+  it('RT-BUY-004/BUYBACK-06B: multiple failed burns aggregate into one exact retry burn', async () => {
     const env = await setup({ deployAthMaster: false });
     await freezeAndSeal(env);
     await acceptReserve(env);

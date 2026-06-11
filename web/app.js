@@ -5,7 +5,11 @@ import {
   encodeCompactPayload,
   exportSignedPublicKeyBundle,
   openPrivateCapsuleChainEntry,
+  privateCapsuleFromChainEntry,
+  PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
+  PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
   PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
+  PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES,
   PLATHO_COMPACT_IMAGE_FORMATS,
   parseTonAddress,
   publicKeyBundleFromVaultKeyRecord,
@@ -13,7 +17,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=6';
+} from './crypto/platho-crypto.mjs?v=11';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -23,17 +27,17 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=10';
+} from './platho-wallet.mjs?v=12';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
-} from './encrypted-message-store.mjs?v=3';
+} from './encrypted-message-store.mjs?v=4';
 import {
   VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=3';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=51';
-import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=22';
+} from './vault-chain-provider.mjs?v=5';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=69';
+import { createTonRpcTransport } from './vault-ton-rpc-provider.mjs?v=33';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -47,7 +51,7 @@ import {
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-} from './public-channel-subscriptions.mjs?v=6';
+} from './public-channel-subscriptions.mjs?v=7';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -62,15 +66,13 @@ import {
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=4';
+} from './recipient-identities.mjs?v=6';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
   splitBytesToCapsuleParts,
   messagePartCount,
-  splitBytesToParts,
   splitUtf8ToCapsuleParts,
-  splitUtf8ToParts,
 } from './capsule-part-policy.mjs?v=3';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
@@ -82,42 +84,53 @@ import {
   networkFeeSurchargeNanotons,
   rawNetworkFeeSurchargeNanotons,
   resolveNetworkFeeEstimateNanotons,
-} from './message-pricing-policy.mjs?v=10';
+} from './message-pricing-policy.mjs?v=11';
 import {
+  createProfileRegistryMessage,
   createAthWalletMessage,
   createPublicPostPayload,
+  createUsernameRegistryMessage,
   createWalletTransaction,
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarExternalBoc,
   buildVaultReceiveIntentExternalBoc,
   buildVaultReplaceMessagingKeysExternalBoc,
+  buildVaultWithdrawAthExternalBoc,
+  buildVaultWithdrawTonExternalBoc,
   buildVaultUsernameMintExternalBoc,
+  computeVaultMessagingKeyId,
+  computeVaultReceiveIntentId,
   createVaultWalletMessage,
   estimateVaultAttachedValueNanotons,
   PROFILE_AVATAR_PRICE_ATH,
   PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
   PUBLIC_BODY_MEDIA_FORMATS,
+  PUBLIC_POST_BODY_MAX_BYTES,
   PUBLIC_COMMENT_TEXT_MAX_BYTES,
   PUBLIC_POST_TEXT_MAX_BYTES,
   readPublicPostPayload,
   RECEIVE_ASSETS,
+  REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
+  tonCell,
   USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
+  VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=18';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=11';
+} from './pwa-contract-transactions.mjs?v=24';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=20';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=18';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=14';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=11';
+} from './capsulehub-ton-rpc-provider.mjs?v=33';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=22';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=18';
 import {
+  computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=16';
+} from './username-ton-rpc-provider.mjs?v=25';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -125,6 +138,17 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
+const PLATHO_APP_RUNTIME_VERSION = 'v413';
+
+document.documentElement.dataset.plathoAppJs = 'started';
+window.addEventListener('error', (event) => {
+  document.documentElement.dataset.plathoAppJs = 'error';
+  document.documentElement.dataset.plathoAppError = String(event.error?.message ?? event.message ?? 'runtime error').slice(0, 180);
+});
+window.addEventListener('unhandledrejection', (event) => {
+  document.documentElement.dataset.plathoAppJs = 'error';
+  document.documentElement.dataset.plathoAppError = String(event.reason?.message ?? event.reason ?? 'unhandled rejection').slice(0, 180);
+});
 
 function installConfiguredTonRuntime(config = appConfig) {
   const rpc = config?.network?.tonRpc ?? {};
@@ -157,6 +181,9 @@ function installConfiguredTonRuntime(config = appConfig) {
   }
   if (config?.capsuleHub?.address) {
     globalThis.plathoCapsuleHubAddress = config.capsuleHub.address;
+  }
+  if (config?.feeAccumulator?.address) {
+    globalThis.plathoFeeAccumulatorAddress = config.feeAccumulator.address;
   }
   if (config?.ath?.masterAddress) {
     globalThis.plathoAthMasterAddress = config.ath.masterAddress;
@@ -222,6 +249,8 @@ const messageStrip = document.querySelector('#messageStrip');
 const activeAvatar = document.querySelector('#activeAvatar');
 const activeTitle = document.querySelector('#activeTitle');
 const activeSubtitle = document.querySelector('#activeSubtitle');
+const privateDebugLog = document.querySelector('#privateDebugLog');
+const copyPrivateDebugButton = document.querySelector('#copyPrivateDebugButton');
 const backToChatsButton = document.querySelector('#backToChatsButton');
 const identityMenuButton = document.querySelector('#identityMenuButton');
 const search = document.querySelector('#threadSearch');
@@ -302,11 +331,15 @@ const messageSyncStatus = document.querySelector('#messageSyncStatus');
 const publicSyncWindowSelect = document.querySelector('#publicSyncWindowSelect');
 const publicCommentsDefaultSelect = document.querySelector('#publicCommentsDefaultSelect');
 const setAvatarButton = document.querySelector('#setAvatarButton');
+const setAvatarStatus = document.querySelector('#setAvatarStatus');
 const profileAvatarInput = document.querySelector('#profileAvatarInput');
 const mintUsernameButton = document.querySelector('#mintUsernameButton');
+const mintUsernameStatus = document.querySelector('#mintUsernameStatus');
 const linkUsernameButton = document.querySelector('#linkUsernameButton');
 const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
 const burnAthButton = document.querySelector('#burnAthButton');
+const flushAthButton = document.querySelector('#flushAthButton');
+const flushAthStatus = document.querySelector('#flushAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
@@ -361,6 +394,7 @@ const identitySubtitle = document.querySelector('#identitySubtitle');
 const walletRuntimeLabel = document.querySelector('#walletRuntimeLabel');
 const localStateLabel = document.querySelector('#localStateLabel');
 const networkRuntimeLabel = document.querySelector('#networkRuntimeLabel');
+const appVersionLabel = document.querySelector('#appVersionLabel');
 
 let threads = [];
 let customPublicChannels = [];
@@ -379,7 +413,9 @@ let localSignedPublicBundle = null;
 let localVaultDraft = null;
 const knownVaultKeyOwnerBySignPubkey = new Map();
 const knownVaultKeyRecordByWallet = new Map();
+const verifiedPlathoUsernameOwnerCache = new Map();
 let plathoWallet = null;
+let activeRuntimeWalletAddress = null;
 let localReplayStore = createMemoryReplayStore();
 let encryptedMessageStore = null;
 let vaultProviderLoadPromise = null;
@@ -391,10 +427,12 @@ let publicChannelSearchQuery = '';
 let publicCommentTarget = null;
 let privateImageAttachments = [];
 let privatePaymentCheckDraft = null;
-let publicImageAttachment = null;
+let publicImageAttachments = [];
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
+const profileAvatarPublishRecoveryJobs = new Map();
+let profileAvatarPublishRecoverySeq = 0;
 let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
 let deferredInstallPrompt = null;
 let installedRelatedPwaDetected = false;
@@ -418,6 +456,9 @@ let messageAutoSyncPhase = 'idle';
 let messageAutoSyncLastResult = null;
 let messageAutoSyncLastErrorLabel = null;
 let messageAutoSyncLoadingFrame = 0;
+let privateOutboundWorkDepth = 0;
+let vaultPublishSendLock = Promise.resolve();
+let vaultPublishSendWaiters = 0;
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
@@ -435,6 +476,7 @@ const PLATHO_WALLET_LEGACY_STORAGE_KIND = 'platho.wallet.mnemonic.v1';
 const PLATHO_WALLET_ENCRYPTED_PAYLOAD_KIND = 'platho.wallet.mnemonic.payload.v1';
 const PLATHO_WALLET_KEY_BACKUP_KIND = 'platho.wallet.key.backup.v1';
 const PLATHO_STORAGE_PERSISTENCE_KEY = 'platho.storage.persistence.v1';
+const PAYMENT_CHECK_PENDING_LEDGER_KIND = 'platho.paymentCheck.pendingIntent.v1';
 const PLATHO_WALLET_PASSWORD_MANAGER_USERNAME = 'platho-local-wallet';
 const PLATHO_WALLET_KDF_NAME = 'PBKDF2-SHA256';
 const PLATHO_WALLET_CIPHER_NAME = 'AES-GCM-256';
@@ -445,27 +487,46 @@ const WALLET_AUTO_LOCK_MS = 10 * 60 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
+const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000, 90_000, 180_000];
 const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
 const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
-const TON_RPC_CONNECTING_STATUS = 'Connecting...';
+const TON_RPC_CONNECTING_STATUS = 'RPC busy - retrying';
 const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
 const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
 const MESSAGE_SYNC_COUNTDOWN_TICK_MS = 1_000;
-const PRIVATE_SEND_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+const PRIVATE_SEND_RETRY_DELAYS_MS = [8_000, 20_000, 45_000, 60_000];
 const PRIVATE_SEND_RETRY_MAX_ATTEMPTS = 8;
-const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 15_000, 30_000];
-const PRIVATE_CHAIN_SCAN_STORAGE_PREFIX = 'platho.private.chain.scan.v1';
+const PRIVATE_SEND_PARTIAL_RETRY_MAX_ATTEMPTS = 16;
+const PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS = 15 * 60 * 1000;
+const PRIVATE_SEND_RPC_RETRY_MAX_ATTEMPTS = 90;
+const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [1_000, 2_000, 3_000, 5_000, 8_000, 13_000, 21_000, 30_000];
+const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24;
+const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
+const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS = 12 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS = 4 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS = 30 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS = 8 * 1000;
+const PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS = 2 * 60 * 1000;
+const PRIVATE_OUTBOUND_SYNC_PAUSE_MS = 5 * 1000;
+const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho.private.chain.index.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
+const PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS = 3 * 60 * 1000;
+const PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT = 2;
+const PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT = 16;
+const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho.private.chain.head.repair.v1';
+const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8;
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 400;
 const LEGACY_MESSAGE_HISTORY_DB_NAME = 'platho-local-message-history-v1';
 const LEGACY_REPLAY_DB_NAME = 'platho-local-security-v1';
-const PRIVATE_CHAIN_RESCAN_OVERLAP = 25;
 const PUBLIC_CHAIN_READ_LIMIT = 128;
-const PRIVATE_CHAIN_READ_LIMIT = 50;
-const PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT = 50;
+const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
+const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v2';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
@@ -476,12 +537,21 @@ const LINKED_PLATHO_USERNAME_STORAGE_PREFIX = 'platho.wallet.linkedPlathoUsernam
 const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho.privateSenderMode.v1';
 const PROFILE_AVATAR_POINTER_STORAGE_PREFIX = 'platho.profile.avatar.v1';
 const PROFILE_AVATAR_MEDIA_CACHE_PREFIX = 'platho.profile.avatar.media.v1';
-const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 96;
-const PROFILE_AVATAR_FALLBACK_SCAN_LIMIT = 400;
-const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 20;
-const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 1500;
+const PROFILE_AVATAR_PUBLISH_RECOVERY_STORAGE_PREFIX = 'platho.profile.avatar.publishRecovery.v1';
+const PROFILE_AVATAR_ENTRY_SCAN_PADDING = 2048;
+const PROFILE_AVATAR_FALLBACK_SCAN_LIMIT = 2048;
+const PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS = 60;
+const PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS = 2000;
+const PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT = 512;
+const PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS = 120 * 1000;
+const PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000];
+const PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 180_000];
+const PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS = 15 * 60 * 1000;
 const USERNAME_MINT_CONFIRM_ATTEMPTS = 20;
 const USERNAME_MINT_CONFIRM_DELAY_MS = 1500;
+const USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS = 240;
+const USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS = 15_000;
+const USERNAME_MINT_LOCAL_PENDING_MS = USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS * USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS;
 const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 15_000_000_000_000_000n;
@@ -489,7 +559,14 @@ const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 0n;
 const USERNAME_PRICE_4_CHARS_ATOMIC = 10_000_000_000_000n;
 const USERNAME_PRICE_5_CHARS_ATOMIC = 1_000_000_000_000n;
 const USERNAME_PRICE_6_PLUS_CHARS_ATOMIC = 100_000_000_000n;
-const VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE_NANOTONS = 8_700_000n;
+const VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
+  1: 8_700_000n,
+  2: 13_800_000n,
+  4: 17_300_000n,
+  8: 24_400_000n,
+  16: 38_900_000n,
+  32: 67_600_000n,
+});
 const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
   1: 12_000_000n,
   2: 13_800_000n,
@@ -500,6 +577,8 @@ const VAULT_PUBLISH_PRIVATE_HYBRID_LOCAL_EXEC_RESERVE_NANOTONS = Object.freeze({
 });
 const VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS = 90_000;
 const VAULT_PUBLISH_NONCE_POLL_MS = 1_500;
+const VAULT_ATH_WITHDRAW_CONFIRM_TIMEOUT_MS = 90_000;
+const VAULT_ATH_WITHDRAW_POLL_MS = 1_500;
 const PAYMENT_CHECK_CLAIM_CONFIRM_TIMEOUT_MS = 90_000;
 const PAYMENT_CHECK_CLAIM_POLL_MS = 1_500;
 const PLATO_PRIVATE_LONG_TERM_FEE_NANOTONS = 10_000_000n;
@@ -515,8 +594,16 @@ const CAPSULEHUB_PRIVATE_HYBRID_EXEC_RESERVE_NANOTONS = Object.freeze({
   16: 5_800_000n,
   32: 7_600_000n,
 });
+const CAPSULEHUB_PUBLIC_EXEC_RESERVE_NANOTONS = Object.freeze({
+  1: 2_400_000n,
+  2: 4_300_000n,
+  4: 4_500_000n,
+  8: 5_000_000n,
+  16: 5_800_000n,
+  32: 7_600_000n,
+});
 const CAPSULEHUB_PRIVATE_STORAGE_CHARGE_NANOTONS = 1_000_000n + 3_300_000n + CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS;
-const CAPSULEHUB_PUBLIC_FIXED_CHARGE_NANOTONS = 2_400_000n + 1_000_000n + 7_400_000n + CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS;
+const CAPSULEHUB_PUBLIC_STORAGE_CHARGE_NANOTONS = 1_000_000n + 7_400_000n + CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS;
 const VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS = 50_000_000n;
 const DEFAULT_IMAGE_COMPRESSION_MODE_ID = 'good';
 const IMAGE_COMPRESSION_MODES = Object.freeze({
@@ -557,6 +644,14 @@ let vaultProtocolState = {
 let athProtocolState = {
   total_supply: null,
 };
+let athFlushState = {
+  username_burn_due_ath: null,
+  profile_burn_due_ath: null,
+  username_pending_burn_flush_count: null,
+  profile_pending_burn_flush_count: null,
+  busy: false,
+  error: null,
+};
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
@@ -577,12 +672,26 @@ function scopedIndexedDbName(baseName) {
   return `${baseName}.${deploymentStorageSuffix()}`;
 }
 
-function currentMessageHistoryDbName() {
-  return scopedIndexedDbName(LEGACY_MESSAGE_HISTORY_DB_NAME);
+function walletIndexedDbSuffix(walletAddress = plathoWallet?.address) {
+  if (!walletAddress) return 'wallet-locked';
+  try {
+    const parsed = parseTonAddress(walletAddress).raw;
+    return String(parsed).replace(/[^a-z0-9_-]/gi, '').slice(-18) || 'wallet-unknown';
+  } catch {
+    return String(walletAddress).replace(/[^a-z0-9_-]/gi, '').slice(-18) || 'wallet-unknown';
+  }
 }
 
-function currentReplayDbName() {
-  return scopedIndexedDbName(LEGACY_REPLAY_DB_NAME);
+function walletScopedIndexedDbName(baseName, walletAddress = plathoWallet?.address) {
+  return `${scopedIndexedDbName(baseName)}.${walletIndexedDbSuffix(walletAddress)}`;
+}
+
+function currentMessageHistoryDbName(walletAddress = plathoWallet?.address) {
+  return walletScopedIndexedDbName(LEGACY_MESSAGE_HISTORY_DB_NAME, walletAddress);
+}
+
+function currentReplayDbName(walletAddress = plathoWallet?.address) {
+  return walletScopedIndexedDbName(LEGACY_REPLAY_DB_NAME, walletAddress);
 }
 
 function deploymentScopedStorage(storage, scopedKeys) {
@@ -723,7 +832,7 @@ function refreshInstallButtons() {
       ? 'Safari does not let Platho open the install sheet directly. Tap Share, choose Add to Home Screen, then launch Platho from the Home Screen. It runs in a cleaner app window and is less fragile than a normal Safari tab, but keep your encrypted wallet key backup anyway.'
       : state === 'instructions'
       ? 'If Platho is already installed, use the open-app button in the address bar, launcher, dock, or app list. If it is not installed yet, use the browser menu install action. Browsers do not always expose installed-app status to web pages.'
-      : 'Platho is a static PWA. After installation, the app shell, docs, and bounded local encrypted history are cached on this device. The cache improves recovery, but it is not a universal backup. Network access is still required for contract reads, verified public feed updates, message-history retrieval, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.';
+      : 'Platho is a static PWA. After installation, the app shell, docs, and bounded local encrypted history cache are stored on this device. The cache improves recovery, but it is not a universal backup. Network access is still required for contract reads, verified public feed updates, message-history retrieval, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.';
   }
   setInstallSteps(state === 'ios-instructions'
     ? [
@@ -825,6 +934,15 @@ function profileAvatarStorageKey(owner = plathoWallet?.address) {
   return owner ? `${PROFILE_AVATAR_POINTER_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${owner}` : null;
 }
 
+function profileAvatarPublishRecoveryStorageKey(owner, avatarHash) {
+  try {
+    const normalizedOwner = requireBasechainAddress(owner, 'Avatar owner');
+    return `${PROFILE_AVATAR_PUBLISH_RECOVERY_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${normalizedOwner}:${normalizeAvatarHashHex(avatarHash).toLowerCase()}`;
+  } catch {
+    return null;
+  }
+}
+
 function zeroAvatarHashHex() {
   return `0x${'00'.repeat(32)}`;
 }
@@ -901,13 +1019,32 @@ function profileAvatarMediaCacheKey(avatarHash) {
   }
 }
 
-function readProfileAvatarMediaCache(avatarHash) {
+function webpDataUrlToBytes(dataUrl) {
+  const prefix = 'data:image/webp;base64,';
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith(prefix)) return null;
+  try {
+    const binary = atob(dataUrl.slice(prefix.length));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+async function readProfileAvatarMediaCache(avatarHash) {
   const key = profileAvatarMediaCacheKey(avatarHash);
   if (!key) return null;
   try {
     const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null');
     if (!parsed || parsed.hash !== normalizeAvatarHashHex(avatarHash)) return null;
-    if (typeof parsed.url !== 'string' || !parsed.url.startsWith('data:image/webp;base64,')) return null;
+    const bytes = webpDataUrlToBytes(parsed.url);
+    if (!bytes) return null;
+    const computedHash = await sha256Hex(bytes);
+    if (computedHash.toLowerCase() !== normalizeAvatarHashHex(avatarHash).toLowerCase()) {
+      localStorageOrNull()?.removeItem(key);
+      return null;
+    }
     return parsed.url;
   } catch {
     return null;
@@ -1068,6 +1205,75 @@ function rawWalletAddress(address) {
   }
 }
 
+function walletAddressChanged(previousWallet, nextWallet) {
+  if (!previousWallet?.address || !nextWallet?.address) return false;
+  return !sameWalletAddress(previousWallet.address, nextWallet.address);
+}
+
+function activeWalletRuntimeAddress() {
+  return activeRuntimeWalletAddress ?? plathoWallet?.address ?? null;
+}
+
+function walletScopedRuntimeChanged(nextWallet) {
+  const currentAddress = activeWalletRuntimeAddress();
+  if (!currentAddress || !nextWallet?.address) return false;
+  return !sameWalletAddress(currentAddress, nextWallet.address);
+}
+
+function prepareWalletScopedRuntimeForWallet(wallet, reason = 'wallet replaced') {
+  if (walletScopedRuntimeChanged(wallet)) {
+    clearWalletScopedRuntimeState(reason);
+  }
+  if (wallet?.address) activeRuntimeWalletAddress = wallet.address;
+}
+
+function clearWalletScopedRuntimeState(reason = 'wallet changed') {
+  for (const job of privateSendRetryJobs.values()) {
+    if (job?.timer) window.clearTimeout(job.timer);
+  }
+  privateSendRetryJobs.clear();
+  privateSendRetrySeq = 0;
+  for (const job of privatePublishConfirmJobs.values()) {
+    if (job?.timer) window.clearTimeout(job.timer);
+  }
+  privatePublishConfirmJobs.clear();
+  privatePublishConfirmSeq = 0;
+  activeRuntimeWalletAddress = null;
+  clearMessageAutoSyncTimer();
+  clearMessageAutoSyncCountdownTimer();
+  privateChainSyncPromise = null;
+  messageAutoSyncAt = 0;
+  messageAutoSyncPhase = 'idle';
+  messageAutoSyncLastResult = null;
+  messageAutoSyncLastErrorLabel = null;
+  threads = [];
+  activeThreadId = null;
+  if (appShell) appShell.dataset.chatOpen = 'false';
+  localIdentity = null;
+  localVaultAuthKeyPair = null;
+  localRecipientKeyPair = null;
+  localSignedPublicBundle = null;
+  localVaultDraft = null;
+  localReplayStore = createMemoryReplayStore();
+  encryptedMessageStore = null;
+  knownVaultKeyOwnerBySignPubkey.clear();
+  knownVaultKeyRecordByWallet.clear();
+  privateImageAttachments = [];
+  privatePaymentCheckDraft = null;
+  localProfileAvatarPointer = null;
+  profileAvatarLoadPromises.clear();
+  delete globalThis.plathoVaultBinding;
+  delete globalThis.plathoLastEncryptedHistoryRestore;
+  globalThis.plathoLastWalletScopedRuntimeReset = {
+    reason,
+    at: new Date().toISOString(),
+  };
+  updateImageAttachmentUi('private');
+  refreshComposerCostStatus();
+  renderThreads();
+  renderConversation();
+}
+
 function displayWalletAddress(address) {
   try {
     return formatTonUserFriendlyAddress(address, { bounceable: false, testOnly: false });
@@ -1080,6 +1286,9 @@ function displayIdentityLabel(identity) {
   if (!identity) return '';
   if (identity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
     return shortAddress(identity.value ?? identity.label);
+  }
+  if (identity.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT) {
+    return String(identity.label ?? identity.value ?? '').replace(/\.ath$/i, '');
   }
   return identity.label ?? identity.value ?? '';
 }
@@ -1139,15 +1348,23 @@ function currentPrivateSenderMode() {
 }
 
 function currentPrivateSenderOptions() {
+  const includeSenderWalletMetadata = currentPrivateSenderMode() !== PRIVATE_SENDER_MODES.ANONYMOUS;
+  const linkedUsername = includeSenderWalletMetadata ? readLinkedPlathoUsername(plathoWallet?.address) : null;
   return {
-    includeSenderWalletMetadata: currentPrivateSenderMode() !== PRIVATE_SENDER_MODES.ANONYMOUS,
+    includeSenderWalletMetadata,
+    senderUsername: linkedUsername?.label ?? undefined,
   };
 }
 
+function privateSenderModeToggleBlockReason() {
+  if (!plathoWallet) return 'Wallet required';
+  if (pendingServiceWorkerAppShellReload === true) return 'Update ready - reload app';
+  if (composer?.dataset.readOnly === 'true') return 'Read-only channel';
+  return null;
+}
+
 function canTogglePrivateSenderMode() {
-  return Boolean(plathoWallet)
-    && pendingServiceWorkerAppShellReload !== true
-    && composer?.dataset.readOnly !== 'true';
+  return privateSenderModeToggleBlockReason() === null;
 }
 
 function updatePrivateSenderModeUi() {
@@ -1159,12 +1376,16 @@ function updatePrivateSenderModeUi() {
   }
   if (privateAnonymousButton) {
     const icon = privateAnonymousButton.querySelector('.icon');
-    privateAnonymousButton.disabled = !canTogglePrivateSenderMode();
+    const blockReason = privateSenderModeToggleBlockReason();
+    privateAnonymousButton.disabled = Boolean(blockReason);
     privateAnonymousButton.setAttribute('aria-pressed', anonymous ? 'true' : 'false');
-    privateAnonymousButton.setAttribute('aria-label', anonymous ? 'Share wallet address' : 'Send anonymously');
-    privateAnonymousButton.title = anonymous
-      ? 'Recipient will not see your wallet address'
-      : 'Recipient will see your wallet address';
+    privateAnonymousButton.setAttribute(
+      'aria-label',
+      anonymous ? 'Share wallet address' : 'Send pseudonymously without wallet address',
+    );
+    privateAnonymousButton.title = blockReason ?? (anonymous
+      ? 'Pseudonymous: wallet address hidden, sender key may still link messages'
+      : 'Recipient will see your wallet address');
     if (icon) {
       icon.classList.toggle('icon-eye', !anonymous);
       icon.classList.toggle('icon-eye-off', anonymous);
@@ -1266,6 +1487,24 @@ function renderWalletIdentity(status = null) {
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
 }
 
+function setProfileActionStatus(node, text, state = '') {
+  if (!node) return;
+  setText(node, text);
+  if (state) {
+    node.dataset.state = state;
+  } else {
+    delete node.dataset.state;
+  }
+}
+
+function setProfileAvatarStatus(text, state = 'busy') {
+  setProfileActionStatus(setAvatarStatus, text, state);
+}
+
+function setUsernameMintStatus(text, state = 'busy') {
+  setProfileActionStatus(mintUsernameStatus, text, state);
+}
+
 function flashWalletIdentityStatus(status, durationMs = 1400) {
   if (walletIdentityFlashTimer) {
     clearTimeout(walletIdentityFlashTimer);
@@ -1340,10 +1579,32 @@ function schedulePendingServiceWorkerAppShellReload(delayMs = 250) {
   return true;
 }
 
-function handleServiceWorkerControllerChange() {
+async function liveAppRuntimeVersion() {
+  try {
+    const response = await fetch(`./?platho_version_check=${Date.now()}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match = html.match(/id="appVersionLabel">v(\d+)<\/span>/);
+    return match ? `v${match[1]}` : null;
+  } catch {
+    return null;
+  }
+}
+
+async function handleServiceWorkerControllerChange() {
+  const liveVersion = await liveAppRuntimeVersion();
+  if (!liveVersion || liveVersion === PLATHO_APP_RUNTIME_VERSION) {
+    pendingServiceWorkerAppShellReload = false;
+    refreshMessagingControls();
+    return;
+  }
   if (shouldDeferServiceWorkerReload()) {
     pendingServiceWorkerAppShellReload = true;
     flashWalletIdentityStatus('Update ready - reload before sending');
+    refreshMessagingControls();
     return;
   }
   window.location.reload();
@@ -1477,29 +1738,70 @@ function appendIcon(parent, icon) {
   parent.append(span);
 }
 
-function setIdentityLabel(node, thread, baseClass = 'identity-label') {
-  if (thread?.localLabel) {
-    node.textContent = thread.localLabel;
-    node.className = baseClass;
-    return;
-  }
-  const identity = primaryThreadIdentity(thread);
-  node.textContent = displayIdentityLabel(identity) || thread?.name || '';
-  node.className = `${baseClass}${identity ? ` identity-label-${identityTone(identity)}` : ''}`;
+function threadSelectedIdentity(thread) {
+  const displayIdentity = primaryThreadIdentity({ displayIdentity: thread?.displayIdentity });
+  if (displayIdentity) return displayIdentity;
+  if (thread?.localLabel) return null;
+  return primaryThreadIdentity(thread);
 }
 
-function identityVariantRow(identity, selected, onSelect) {
+function threadDisplayLabel(thread) {
+  const identity = threadSelectedIdentity(thread);
+  if (identity) return displayIdentityLabel(identity);
+  if (thread?.localLabel) return thread.localLabel;
+  return thread?.name ?? '';
+}
+
+function threadDisplayTone(thread) {
+  const identity = threadSelectedIdentity(thread);
+  return identity ? identityTone(identity) : null;
+}
+
+function routeIdentitySubtitle(thread) {
+  const identity = primaryThreadIdentity(thread);
+  if (!identity) return thread?.subtitle ?? '';
+  const label = displayIdentityLabel(identity);
+  return label ? `${identityTypeLabel(identity)} - ${label}` : identityTypeLabel(identity);
+}
+
+function applyThreadDisplayFields(thread) {
+  if (!thread) return thread;
+  const label = threadDisplayLabel(thread);
+  const identity = threadSelectedIdentity(thread);
+  if (label) {
+    thread.name = label;
+    thread.avatar = String(label || 'P').slice(0, 1).toUpperCase() || thread.avatar || 'P';
+  }
+  thread.subtitle = identity ? identityTypeLabel(identity) : routeIdentitySubtitle(thread);
+  return thread;
+}
+
+function persistThreadDisplayPreference(thread) {
+  if (!thread?.messages?.length) return;
+  Promise.all((thread.messages ?? [])
+    .filter((message) => message?.localHistoryId)
+    .map((message) => updateMessageInEncryptedHistory(thread, message)))
+    .catch((error) => console.error(error));
+}
+
+function setIdentityLabel(node, thread, baseClass = 'identity-label') {
+  const tone = threadDisplayTone(thread);
+  node.textContent = threadDisplayLabel(thread);
+  node.className = `${baseClass}${tone ? ` identity-label-${tone}` : ''}`;
+}
+
+function identityVariantRow(option, selected, onSelect) {
   const row = document.createElement('button');
   row.type = 'button';
-  row.className = `identity-variant identity-label-${identityTone(identity)}`;
+  row.className = `identity-variant${option.identity ? ` identity-label-${identityTone(option.identity)}` : ''}`;
   row.setAttribute('role', 'menuitemradio');
   row.setAttribute('aria-checked', selected ? 'true' : 'false');
   const label = document.createElement('strong');
-  label.textContent = displayIdentityLabel(identity);
+  label.textContent = option.label;
   const type = document.createElement('span');
-  type.textContent = selected ? `${identityTypeLabel(identity)} - selected` : identityTypeLabel(identity);
+  type.textContent = selected ? `${option.subtitle} - selected` : option.subtitle;
   row.append(label, type);
-  row.addEventListener('click', () => onSelect(identity));
+  row.addEventListener('click', () => onSelect(option));
   return row;
 }
 
@@ -1524,6 +1826,35 @@ function uniqueDisplayIdentityVariants(thread) {
   return out;
 }
 
+function identityDisplayOptions(thread) {
+  const options = [];
+  if (thread?.localLabel) {
+    options.push({
+      key: 'local-label',
+      label: thread.localLabel,
+      subtitle: 'Local name',
+      identity: null,
+    });
+  }
+  for (const identity of uniqueDisplayIdentityVariants(thread)) {
+    const key = identityDisplayKey(identity);
+    if (!key) continue;
+    options.push({
+      key,
+      label: displayIdentityLabel(identity),
+      subtitle: identityTypeLabel(identity),
+      identity,
+    });
+  }
+  return options;
+}
+
+function selectedIdentityDisplayOptionKey(thread) {
+  const selected = threadSelectedIdentity(thread);
+  if (selected) return identityDisplayKey(selected);
+  return thread?.localLabel ? 'local-label' : null;
+}
+
 function ensureIdentityPopover() {
   if (identityPopover) return identityPopover;
   identityPopover = document.createElement('div');
@@ -1539,9 +1870,9 @@ function hideIdentityPopover() {
 }
 
 function showIdentityPopover(thread, anchor) {
-  const variants = uniqueDisplayIdentityVariants(thread);
-  if (variants.length === 0 || !anchor) return;
-  const selectedKey = identityDisplayKey(primaryThreadIdentity(thread));
+  const options = identityDisplayOptions(thread);
+  if (options.length === 0 || !anchor) return;
+  const selectedKey = selectedIdentityDisplayOptionKey(thread);
   const popover = ensureIdentityPopover();
   popover.setAttribute('role', 'menu');
   popover.replaceChildren();
@@ -1549,14 +1880,14 @@ function showIdentityPopover(thread, anchor) {
   title.className = 'identity-popover-title';
   title.textContent = 'Display as';
   popover.append(title);
-  for (const variant of variants) {
-    popover.append(identityVariantRow(variant, identityDisplayKey(variant) === selectedKey, (selected) => {
-      thread.displayIdentity = selected;
-      thread.name = displayIdentityLabel(selected) || selected.label || selected.value;
-      thread.subtitle = identityTypeLabel(selected);
+  for (const option of options) {
+    popover.append(identityVariantRow(option, option.key === selectedKey, (selected) => {
+      thread.displayIdentity = selected.identity ?? null;
+      applyThreadDisplayFields(thread);
       hideIdentityPopover();
       renderThreads();
       renderConversation();
+      persistThreadDisplayPreference(thread);
     }));
   }
   const rect = anchor.getBoundingClientRect();
@@ -1567,27 +1898,24 @@ function showIdentityPopover(thread, anchor) {
 }
 
 function renderConversationIdentity(thread) {
-  if (thread?.localLabel) {
-    activeTitle.textContent = thread.localLabel;
-    if (identityMenuButton) {
-      identityMenuButton.hidden = true;
-      identityMenuButton.setAttribute('aria-expanded', 'false');
-    }
-    return;
-  }
-  const identity = primaryThreadIdentity(thread);
+  const identity = threadSelectedIdentity(thread);
+  const labelText = threadDisplayLabel(thread);
   if (!identity) {
-    activeTitle.textContent = thread.name;
-    if (identityMenuButton) identityMenuButton.hidden = true;
+    activeTitle.textContent = labelText;
+    if (identityMenuButton) {
+      identityMenuButton.hidden = identityDisplayOptions(thread).length <= 1;
+      identityMenuButton.setAttribute('aria-label', `Choose display name for ${labelText}`);
+      identityMenuButton.setAttribute('title', 'Choose display name');
+    }
     return;
   }
   const label = document.createElement('span');
   label.className = `identity-title-label identity-label-${identityTone(identity)}`;
-  label.textContent = displayIdentityLabel(identity);
+  label.textContent = labelText;
   activeTitle.replaceChildren(label);
   if (identityMenuButton) {
-    identityMenuButton.hidden = uniqueDisplayIdentityVariants(thread).length <= 1;
-    identityMenuButton.setAttribute('aria-label', `Choose display name for ${displayIdentityLabel(identity)}`);
+    identityMenuButton.hidden = identityDisplayOptions(thread).length <= 1;
+    identityMenuButton.setAttribute('aria-label', `Choose display name for ${labelText}`);
     identityMenuButton.setAttribute('title', 'Choose display name');
   }
 }
@@ -1618,10 +1946,195 @@ function conversationSubtitleText(thread) {
   return messageAutoSyncCountdownText() ?? thread?.subtitle ?? '';
 }
 
+function debugTiny(value, fallback = '-') {
+  const text = String(value ?? '').trim();
+  if (!text) return fallback;
+  return text.length > 18 ? `${text.slice(0, 8)}...${text.slice(-6)}` : text;
+}
+
+function debugCountdown(isoValue) {
+  const parsed = Date.parse(isoValue ?? '');
+  if (!Number.isFinite(parsed)) return '-';
+  const delta = parsed - Date.now();
+  return delta > 0 ? `${Math.ceil(delta / 1000)}s` : 'due';
+}
+
+function debugDurationMs(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms < 0) return '-';
+  if (ms < 60_000) return `${Math.ceil(ms / 1000)}s`;
+  return `${Math.ceil(ms / 60_000)}m`;
+}
+
+function privateDebugPublishMessages(thread) {
+  const withPublish = (thread?.messages ?? []).filter((message) => message?.publishState);
+  const pending = withPublish.filter((message) => (
+    message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+  ));
+  const source = pending.length > 0 ? pending : withPublish;
+  return source.slice(-5);
+}
+
+function privateDebugMessageLabel(thread, message) {
+  const index = Math.max(0, (thread?.messages ?? []).indexOf(message));
+  const text = String(message?.text ?? '').trim();
+  const shortText = text ? debugTiny(text.replace(/\s+/g, ' '), '') : (message?.attachment ? 'image' : 'msg');
+  return `m${index}${shortText ? `:${shortText}` : ''}`;
+}
+
+function privateDebugPartStatus(part) {
+  const status = String(part?.status ?? '-');
+  if (status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) return 'ok';
+  if (status === PUBLISH_PART_STATUS_VAULT_SUBMITTED) return 'vault';
+  if (status === PUBLISH_PART_STATUS_SENDING) return 'send';
+  if (status === PUBLISH_PART_STATUS_SENT) return 'sent';
+  if (status === PUBLISH_PART_STATUS_UNKNOWN) return 'unk';
+  if (status === PUBLISH_PART_STATUS_FAILED) return 'fail';
+  if (status === PUBLISH_PART_STATUS_BUILT) return 'built';
+  return debugTiny(status, '-');
+}
+
+function privateDebugPartLine(part) {
+  const index = Number(part?.index ?? 0);
+  const nonce = part?.clientNonce !== undefined && part?.clientNonce !== null ? ` n=${part.clientNonce}` : '';
+  const boc = typeof part?.externalBoc === 'string' && part.externalBoc.length > 0 ? ' boc=y' : '';
+  const pid = publishIdForPart(part) ? ` pid=${debugTiny(publishIdForPart(part), '-')}` : '';
+  const previous = part?.retryPreviousStatus ? ` prev=${privateDebugPartStatus({ status: part.retryPreviousStatus })}` : '';
+  const retry = Number(part?.broadcastRetryCount ?? 0) || 0;
+  const retryText = retry > 0 ? ` br=${retry}` : '';
+  const error = part?.error ?? part?.lastBroadcastRetryError ?? part?.retryReason;
+  const err = error ? ` err=${debugTiny(error, '-')}` : '';
+  return `p${index}:${privateDebugPartStatus(part)}${previous}${nonce}${boc}${pid}${retryText}${err}`;
+}
+
+function privateDebugStoredCapsuleCount(message) {
+  if (Array.isArray(message?.capsules)) return message.capsules.filter(Boolean).length;
+  return message?.capsule ? 1 : 0;
+}
+
+function privateDebugPublishDetailLines(thread) {
+  return privateDebugPublishMessages(thread).map((message) => {
+    const sendKey = message.privateSendRetryKey;
+    const confirmKey = message.privatePublishConfirmRetryKey;
+    const sendJob = sendKey && privateSendRetryJobs.has(sendKey) ? 'job' : 'idle';
+    const confirmJob = confirmKey && privatePublishConfirmJobs.has(confirmKey) ? 'job' : 'idle';
+    const sendNext = debugCountdown(message.privateSendRetryNextAt);
+    const confirmNext = debugCountdown(message.privatePublishConfirmNextAt);
+    const expectedCapsules = Number(message.publishState?.partCount ?? message.publishState?.parts?.length ?? 0) || 0;
+    const storedCapsules = privateDebugStoredCapsuleCount(message);
+    const sendAttempt = Number(message.privateSendRetryAttempt ?? 0) || 0;
+    const confirmAttempt = Number(message.privatePublishConfirmAttempt ?? 0) || 0;
+    const stopped = `${message.privateSendRetryStopped === true ? ' sendStop=1' : ''}${message.privatePublishConfirmStopped === true ? ' confStop=1' : ''}`;
+    const parts = (message.publishState?.parts ?? []).map((part) => privateDebugPartLine(part)).join(' ');
+    const retryable = publishStateHasRetryableSendParts(message.publishState) ? ' retryable=1' : '';
+    const partialAge = privateMessageHasPartialRetryablePublish(message)
+      ? ` pAge=${debugDurationMs(privatePartialSendRetryAgeMs(message))}`
+      : '';
+    const partialExpired = privatePartialSendRetryExpired(message) ? ' pExpired=1' : '';
+    const stateError = message.publishState?.lastBroadcastRetryError
+      ? ` stateErr=${debugTiny(message.publishState.lastBroadcastRetryError, '-')}`
+      : '';
+    return `${privateDebugMessageLabel(thread, message)} caps=${storedCapsules}/${expectedCapsules || '-'} send=${sendJob}/${sendNext} sA=${sendAttempt} conf=${confirmJob}/${confirmNext} cA=${confirmAttempt}${stopped}${retryable}${partialAge}${partialExpired}${stateError} ${parts || 'parts=-'}`;
+  });
+}
+
+function privateDebugPublishLine(thread) {
+  const items = privateDebugPublishMessages(thread)
+    .map((message) => {
+      const state = message.publishState ?? {};
+      const status = publishStateMeta(state);
+      const total = Math.max(1, Number(state.partCount) || 1);
+      const counts = total > 1
+        ? ` c${Number(state.confirmedCount ?? 0)}/${total} s${Number(state.submittedCount ?? 0)}/${total}`
+        : '';
+      const updated = state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) : '-';
+      const attempt = Number(message.privatePublishConfirmAttempt ?? 0) || 0;
+      const nextAt = Date.parse(message.privatePublishConfirmNextAt ?? '');
+      const next = Number.isFinite(nextAt) && nextAt > Date.now()
+        ? `${Math.ceil((nextAt - Date.now()) / 1000)}s`
+        : '-';
+      const last = debugTiny(message.privatePublishConfirmLastResult ?? message.privatePublishConfirmLastError, '-');
+      const retry = Number((state.parts ?? []).reduce((sum, part) => sum + (Number(part?.broadcastRetryCount ?? 0) || 0), 0));
+      const confirm = attempt > 0 || next !== '-' || last !== '-' || retry > 0
+        ? ` a${attempt} next=${next} last=${last} br=${retry}`
+        : '';
+      return `${privateDebugMessageLabel(thread, message)} ${status}${counts}@${updated}${confirm}`;
+    });
+  return items.length > 0 ? items.join(' | ') : '-';
+}
+
+function privateDebugLines(thread = activeThread()) {
+  if (!thread) return [];
+  const sync = globalThis.plathoLastPrivateSync ?? {};
+  const reason = sync.reason ?? (sync.unchanged ? 'unchanged' : 'ok');
+  const phase = messageAutoSyncPhase || 'idle';
+  const error = messageAutoSyncLastErrorLabel ? ` err=${debugTiny(messageAutoSyncLastErrorLabel, '-')}` : '';
+  const scanLog = Array.isArray(sync.scanLog) && sync.scanLog.length > 0
+    ? sync.scanLog.join(' ')
+    : '-';
+  const recipientCursor = sync.recipientCursor ?? {};
+  const senderCursor = sync.senderCursor ?? {};
+  const indexError = sync.indexReadError ? ` idxErr=${debugTiny(sync.indexReadError, '-')}` : '';
+  return [
+    `${PLATHO_APP_RUNTIME_VERSION} key=${shortKeyId(localRecipientKeyPair?.keyId)} phase=${phase}${error}`,
+    `idx=${sync.indexKeyId ?? '-'} rh=${sync.recipientHead ?? '-'} sh=${sync.senderHead ?? '-'} mode=${sync.mode ?? '-'}`,
+    `rc=${recipientCursor.processedHeadLink ?? '-'}:${recipientCursor.resumeLink ?? '-'} sc=${senderCursor.processedHeadLink ?? '-'}:${senderCursor.resumeLink ?? '-'}`,
+    `imp=${sync.imported ?? 0} skip=${sync.skipped ?? 0} inc=${sync.incompletePrivateStreamCount ?? 0} catch=${sync.catchUpRemaining ?? 0}`,
+    `reason=${reason}${indexError} block=${sync.blockedEntryId ?? '-'} body=${sync.historyUnavailableCount ?? 0} scanned=${sync.indexEntriesScanned ?? 0} repair=${sync.headRepairScanned ?? 0} retry=${sync.historyRetryScanned ?? 0}`,
+    `entries ${scanLog}`,
+    `publish ${privateDebugPublishLine(thread)}`,
+    ...privateDebugPublishDetailLines(thread),
+  ];
+}
+
+function refreshPrivateDebugLog() {
+  if (!privateDebugLog) return;
+  const thread = activeThread();
+  if (!thread || !isChatsViewActive()) {
+    privateDebugLog.hidden = true;
+    privateDebugLog.textContent = '';
+    if (copyPrivateDebugButton) copyPrivateDebugButton.disabled = true;
+    return;
+  }
+  privateDebugLog.hidden = false;
+  privateDebugLog.textContent = privateDebugLines(thread).join('\n');
+  if (copyPrivateDebugButton) copyPrivateDebugButton.disabled = privateDebugLog.textContent.trim().length === 0;
+}
+
+let privateDebugCopyStatusTimer = null;
+
+function setPrivateDebugCopyButtonStatus(label, durationMs = 1400) {
+  if (!copyPrivateDebugButton) return;
+  if (privateDebugCopyStatusTimer) {
+    window.clearTimeout(privateDebugCopyStatusTimer);
+    privateDebugCopyStatusTimer = null;
+  }
+  copyPrivateDebugButton.setAttribute('aria-label', label);
+  copyPrivateDebugButton.title = label;
+  privateDebugCopyStatusTimer = window.setTimeout(() => {
+    privateDebugCopyStatusTimer = null;
+    copyPrivateDebugButton.setAttribute('aria-label', 'Copy debug text');
+    copyPrivateDebugButton.title = 'Copy debug text';
+  }, durationMs);
+}
+
+async function copyPrivateDebugText() {
+  refreshPrivateDebugLog();
+  const text = privateDebugLog?.textContent?.trim() ?? '';
+  if (!text) throw new Error('No debug text to copy');
+  await copyTextToClipboard(text);
+  setPrivateDebugCopyButtonStatus('Debug copied');
+}
+
 function refreshConversationSubtitle() {
   const thread = activeThread();
   if (!thread || !activeSubtitle) return;
   activeSubtitle.textContent = conversationSubtitleText(thread);
+  refreshPrivateDebugLog();
 }
 
 function clearMessageAutoSyncCountdownTimer() {
@@ -1657,26 +2170,36 @@ function beginMessageSyncUi() {
   messageAutoSyncLoadingFrame = 0;
   setText(messageSyncStatus, 'syncing');
   scheduleMessageAutoSyncCountdownUi();
+  refreshPrivateDebugLog();
 }
 
 function completeMessageSyncUi(result) {
-  messageAutoSyncPhase = 'synced';
   messageAutoSyncLastResult = result ?? null;
-  messageAutoSyncLastErrorLabel = null;
+  const status = privateSyncStatusText(result);
+  const complete = result
+    && result.ok !== false
+    && result.scanComplete === true
+    && result.rateLimited !== true
+    && Number(result.historyUnavailableCount ?? 0) === 0
+    && !['body_history_unavailable', 'catch_up_pending'].includes(String(result.reason ?? ''));
+  messageAutoSyncPhase = complete ? 'synced' : 'delayed';
+  messageAutoSyncLastErrorLabel = complete ? null : status;
   refreshConversationSubtitle();
+  refreshPrivateDebugLog();
 }
 
 function failMessageSyncUi(label) {
   messageAutoSyncPhase = 'delayed';
   messageAutoSyncLastErrorLabel = label || 'Sync delayed';
   refreshConversationSubtitle();
+  refreshPrivateDebugLog();
 }
 
 function openNewChatDialog() {
   if (!newChatDialog || !recipientInput || !recipientHint) return;
   recipientInput.value = '';
   if (recipientLocalLabel) recipientLocalLabel.value = '';
-  recipientHint.textContent = 'Use a wallet address, xxxx.ton, or xxxx.ath. Local label is only shown on this device. Bare @xxxx is not accepted.';
+  recipientHint.textContent = 'Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device. Bare @alex is not accepted.';
   recipientHint.dataset.tone = 'muted';
   newChatDialog.hidden = false;
   requestAnimationFrame(() => recipientInput.focus());
@@ -2172,9 +2695,11 @@ function selectOrCreateRecipientThread(input, options = {}) {
   if (existing) {
     if (result.thread.localLabel) {
       existing.localLabel = result.thread.localLabel;
+      existing.displayIdentity = null;
       existing.name = result.thread.name;
       existing.avatar = result.thread.avatar;
       existing.subtitle = result.thread.subtitle;
+      persistThreadDisplayPreference(existing);
     }
     activeThreadId = existing.id;
   } else {
@@ -2506,9 +3031,13 @@ function publicFeedItemMatchesSearch(item, query) {
   const needle = String(query ?? '').trim().toLowerCase();
   if (!needle) return true;
   const channel = publicChannelRegistry.find((entry) => entry.id === item.channelId) ?? null;
+  const blockText = (blocks = []) => (blocks ?? [])
+    .filter((block) => block?.type === 'text')
+    .map((block) => block.text ?? '');
   const haystack = [
     item.title,
     item.text,
+    ...blockText(item.blocks),
     item.author,
     item.authorWallet,
     item.bodyHash,
@@ -2521,6 +3050,7 @@ function publicFeedItemMatchesSearch(item, query) {
       comment.author,
       comment.authorWallet,
       comment.text,
+      ...blockText(comment.blocks),
     ])),
   ].filter(Boolean).join(' ').toLowerCase();
   return haystack.includes(needle);
@@ -2536,6 +3066,41 @@ function renderPublicEmpty(titleText, bodyText) {
   text.textContent = bodyText;
   empty.append(title, text);
   publicFeed.append(empty);
+}
+
+function appendPublicItemContent(container, item) {
+  const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
+  if (blocks.length > 0) {
+    for (const block of blocks) {
+      if (block?.type === 'text' && block.text) {
+        const text = document.createElement('p');
+        text.className = 'feed-block-text';
+        text.textContent = block.text;
+        container.append(text);
+      } else if (block?.type === 'image' && block.url) {
+        const image = document.createElement('img');
+        image.className = 'feed-image feed-block-image';
+        image.src = block.url;
+        image.alt = '';
+        image.loading = 'lazy';
+        container.append(image);
+      }
+    }
+    return;
+  }
+  if (item?.text) {
+    const text = document.createElement('p');
+    text.textContent = item.text;
+    container.append(text);
+  }
+  if (item?.imageUrl) {
+    const image = document.createElement('img');
+    image.className = 'feed-image';
+    image.src = item.imageUrl;
+    image.alt = '';
+    image.loading = 'lazy';
+    container.append(image);
+  }
 }
 
 function appendPublicItemComments(article, item) {
@@ -2557,19 +3122,7 @@ function appendPublicItemComments(article, item) {
     commentMeta.textContent = [comment.author, comment.createdAt?.slice?.(0, 10)].filter(Boolean).join(' - ');
     commentAuthorRow.append(commentAvatar, commentMeta);
     row.append(commentAuthorRow);
-    if (comment.text) {
-      const commentText = document.createElement('p');
-      commentText.textContent = comment.text;
-      row.append(commentText);
-    }
-    if (comment.imageUrl) {
-      const image = document.createElement('img');
-      image.className = 'feed-image';
-      image.src = comment.imageUrl;
-      image.alt = '';
-      image.loading = 'lazy';
-      row.append(image);
-    }
+    appendPublicItemContent(row, comment);
     commentList.append(row);
   }
   article.append(commentList);
@@ -2659,97 +3212,9 @@ function renderPublicFeed(items, options = {}) {
       title.textContent = item.title;
       article.append(title);
     }
-    if (item.text) {
-      const text = document.createElement('p');
-      text.textContent = item.text;
-      article.append(text);
-    }
-    if (item.imageUrl) {
-      const image = document.createElement('img');
-      image.className = 'feed-image';
-      image.src = item.imageUrl;
-      image.alt = '';
-      image.loading = 'lazy';
-      article.append(image);
-    }
-    const comments = Array.isArray(item.comments) ? item.comments : [];
-    if (comments.length > 0) {
-      const commentList = document.createElement('div');
-      commentList.className = 'comment-list';
-      for (const comment of comments) {
-        const row = document.createElement('article');
-        row.className = 'comment-item';
-        const commentAuthorRow = document.createElement('div');
-        commentAuthorRow.className = 'feed-author-row';
-        const commentAvatar = document.createElement('div');
-        commentAvatar.className = 'avatar feed-avatar';
-        commentAvatar.setAttribute('aria-hidden', 'true');
-        setAvatarNode(commentAvatar, String(comment.author ?? 'P').slice(0, 1), comment.avatarImageUrl);
-        const commentMeta = document.createElement('div');
-        commentMeta.className = 'feed-meta';
-        commentMeta.textContent = [comment.author, comment.createdAt?.slice?.(0, 10)].filter(Boolean).join(' - ');
-        commentAuthorRow.append(commentAvatar, commentMeta);
-        row.append(commentAuthorRow);
-        if (comment.text) {
-          const commentText = document.createElement('p');
-          commentText.textContent = comment.text;
-          row.append(commentText);
-        }
-        if (comment.imageUrl) {
-          const image = document.createElement('img');
-          image.className = 'feed-image';
-          image.src = comment.imageUrl;
-          image.alt = '';
-          image.loading = 'lazy';
-          row.append(image);
-        }
-        commentList.append(row);
-      }
-      article.append(commentList);
-    }
-    const actions = document.createElement('div');
-    actions.className = 'feed-actions';
-    const commentButton = document.createElement('button');
-    commentButton.type = 'button';
-    const commentsAllowed = item.commentsAllowed !== false;
-    const hasChainCommentTarget = item.entryId !== undefined
-      && item.entryId !== null
-      && /^0x[0-9a-fA-F]{64}$/.test(String(item.bodyHash ?? ''));
-    const canComment = Boolean(commentsAllowed && plathoWallet && hasChainCommentTarget);
-    if (!commentsAllowed) {
-      commentButton.textContent = 'Comments off';
-    } else if (!hasChainCommentTarget) {
-      commentButton.textContent = 'Preview only';
-    } else if (!plathoWallet) {
-      commentButton.textContent = 'Create wallet';
-    } else {
-      commentButton.textContent = 'Comment';
-    }
-    commentButton.disabled = !canComment;
-    commentButton.title = !commentsAllowed
-      ? 'The author closed comments for this post'
-      : (!hasChainCommentTarget
-          ? 'This preview post is not an on-chain capsule yet'
-          : (canComment ? 'Write one immutable public comment' : 'Create or import a Platho wallet to comment'));
-    commentButton.addEventListener('click', async () => {
-      if (!canComment) return;
-      setPublicCommentTarget(item);
-    });
-    actions.append(commentButton);
-    const privateButton = document.createElement('button');
-    privateButton.type = 'button';
-    privateButton.textContent = 'Private chat';
-    const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
-    privateButton.disabled = !authorWallet;
-    privateButton.title = authorWallet
-      ? 'Open this author in Private'
-      : 'Author wallet is not available for this public item';
-    privateButton.addEventListener('click', () => {
-      if (!authorWallet) return;
-      openPrivateThreadForWallet(authorWallet);
-    });
-    actions.append(privateButton);
-    article.append(actions);
+    appendPublicItemContent(article, item);
+    appendPublicItemComments(article, item);
+    appendPublicItemActions(article, item);
     publicFeed.append(article);
   }
   if (options.anchorUnread) scrollPublicToOldestUnread();
@@ -2779,19 +3244,7 @@ function appendPublicChannelPost(container, item) {
     title.textContent = item.title;
     article.append(title);
   }
-  if (item.text) {
-    const text = document.createElement('p');
-    text.textContent = item.text;
-    article.append(text);
-  }
-  if (item.imageUrl) {
-    const image = document.createElement('img');
-    image.className = 'feed-image';
-    image.src = item.imageUrl;
-    image.alt = '';
-    image.loading = 'lazy';
-    article.append(image);
-  }
+  appendPublicItemContent(article, item);
   appendPublicItemComments(article, item);
   appendPublicItemActions(article, item);
   container.append(article);
@@ -3041,6 +3494,7 @@ function renderLedgerRows(rows) {
 function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
   setText(brandNetworkLabel, ui.brandNetworkLabel ?? appConfig.network?.label ?? appConfig.mode);
+  setText(appVersionLabel, PLATHO_APP_RUNTIME_VERSION);
   renderPaneHeaders();
   setText(identityName, ui.identityName);
   setText(identitySubtitle, ui.identitySubtitle);
@@ -3087,6 +3541,13 @@ function configuredCapsuleHubAddress() {
   return appConfig.capsuleHub?.address
     ?? globalThis.plathoCapsuleHubAddress
     ?? globalThis.PLATHO_CAPSULEHUB_ADDRESS
+    ?? null;
+}
+
+function configuredFeeAccumulatorAddress() {
+  return appConfig.feeAccumulator?.address
+    ?? globalThis.plathoFeeAccumulatorAddress
+    ?? globalThis.PLATHO_FEE_ACCUMULATOR_ADDRESS
     ?? null;
 }
 
@@ -3150,13 +3611,15 @@ async function resolvePublicEntryPayload(provider, entry, address, options = {})
   return payload;
 }
 
-async function resolvePrivateEntryBody(provider, entry, address) {
+async function resolvePrivateEntryBody(provider, entry, address, options = {}) {
   if (entry?.body_boc || !provider?.resolvePrivateEntryBody) return entry;
   return provider.resolvePrivateEntryBody(entry, {
     capsuleHubAddress: address,
     vaultAddress: appConfig.vault?.address ?? null,
-    messageCacheTtlMs: 0,
-    priority: 'critical',
+    messageCacheTtlMs: options.messageCacheTtlMs ?? 0,
+    priority: options.priority ?? 'critical',
+    verify: options.verify,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead,
   });
 }
 
@@ -3194,14 +3657,182 @@ function profileAvatarPointerFromRecord(record) {
   };
 }
 
+function diagnosticBigIntString(value) {
+  if (value === undefined || value === null) return null;
+  try {
+    return BigInt(value).toString();
+  } catch {
+    return String(value);
+  }
+}
+
+function diagnosticBigIntOrNull(value) {
+  if (value === undefined || value === null) return null;
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
+
+function profileAvatarPublishDiagnosticParts(publishState) {
+  return (publishState?.parts ?? []).map((part) => ({
+    index: Number(part?.index ?? 0),
+    status: part?.status ?? null,
+    publishKind: part?.publishKind ?? part?.publish_kind ?? null,
+    clientNonce: part?.clientNonce !== undefined && part?.clientNonce !== null ? String(part.clientNonce) : null,
+    publishId: part?.publishId !== undefined && part?.publishId !== null ? String(part.publishId) : null,
+    entryId: part?.entryId !== undefined && part?.entryId !== null ? String(part.entryId) : null,
+    bodyHash: part?.bodyHash ?? part?.body_hash ?? null,
+    headerHash: part?.header0Hash ?? part?.headerHash ?? part?.header_hash ?? null,
+    error: part?.error ?? null,
+    externalBocLength: typeof part?.externalBoc === 'string' ? part.externalBoc.length : null,
+    broadcastRetryCount: Number(part?.broadcastRetryCount ?? 0) || 0,
+    lastBroadcastAt: part?.lastBroadcastAt ?? null,
+  }));
+}
+
+function profileAvatarPublishPayloadDiagnostics(payloads) {
+  return (payloads ?? []).map((payload, index) => ({
+    index,
+    kind: payload?.kind ?? null,
+    type: payload?.type ?? null,
+    sizeClass: payload?.sizeClass ?? payload?.size_class ?? null,
+    usefulBytes: payload?.usefulBytes ?? null,
+    headerBytes: payload?.headerBytes ?? null,
+    bodyBytes: payload?.bodyBytes ?? payload?.bytes ?? null,
+    headerBocLength: typeof payload?.headerBoc === 'string' ? payload.headerBoc.length : null,
+    bodyBocLength: typeof payload?.bodyBoc === 'string' ? payload.bodyBoc.length : null,
+    headerHash: payload?.headerHash ?? payload?.header_hash ?? null,
+    bodyHash: payload?.bodyHash ?? payload?.body_hash ?? null,
+  }));
+}
+
+function profileAvatarPublishBroadcastErrorStatus(diagnostics) {
+  const snapshots = [...(diagnostics?.snapshots ?? [])].reverse();
+  for (const snapshot of snapshots) {
+    const part = (snapshot?.parts ?? []).find((item) => item?.error);
+    if (part?.error) return shortUiErrorText({ message: part.error }, 'TON RPC broadcast failed');
+  }
+  if (diagnostics?.initialPublishError) {
+    return shortUiErrorText({ message: diagnostics.initialPublishError }, 'TON RPC broadcast failed');
+  }
+  return null;
+}
+
+async function readProfileAvatarPublishChainSnapshot(ownerWallet, publishState, label) {
+  const snapshot = {
+    label,
+    at: new Date().toISOString(),
+    ownerWallet,
+    vaultAddress: null,
+    capsuleHubAddress: null,
+    userPublishNonce: null,
+    userTonBalance: null,
+    vaultPendingPublishCount: null,
+    capsulePublicLatestId: null,
+    capsulePrivateLatestId: null,
+    publishStateStatus: publishState?.status ?? null,
+    publishStateConfirmedCount: Number(publishState?.confirmedCount ?? 0) || 0,
+    publishStateSubmittedCount: Number(publishState?.submittedCount ?? 0) || 0,
+    parts: profileAvatarPublishDiagnosticParts(publishState),
+    vaultError: null,
+    capsuleHubError: null,
+  };
+  try {
+    snapshot.vaultAddress = requireVaultAddress();
+    const provider = await resolveVaultChainProvider();
+    if (provider?.getUser) {
+      const user = await provider.getUser(ownerWallet, {
+        vaultAddress: snapshot.vaultAddress,
+        verify: true,
+        priority: 'critical',
+        cacheTtlMs: 0,
+      });
+      snapshot.userPublishNonce = diagnosticBigIntString(user?.publish_nonce ?? user?.publishNonce);
+      snapshot.userTonBalance = diagnosticBigIntString(user?.ton_balance ?? user?.tonBalance);
+    }
+    if (provider?.getGlobal) {
+      const global = await provider.getGlobal({
+        vaultAddress: snapshot.vaultAddress,
+        verify: true,
+        priority: 'critical',
+        cacheTtlMs: 0,
+      });
+      snapshot.vaultPendingPublishCount = diagnosticBigIntString(global?.pending_publish_count ?? global?.pendingPublishCount);
+    }
+  } catch (error) {
+    snapshot.vaultError = String(error?.message ?? error);
+  }
+  try {
+    const resolved = await resolveCapsuleHubProvider();
+    snapshot.capsuleHubAddress = resolved?.address ?? null;
+    if (resolved?.provider?.getState) {
+      const state = await resolved.provider.getState(criticalCapsuleHubReadOptions(resolved.address));
+      snapshot.capsulePublicLatestId = diagnosticBigIntString(state?.public_latest_id ?? state?.publicLatestId);
+      snapshot.capsulePrivateLatestId = diagnosticBigIntString(state?.private_latest_id ?? state?.privateLatestId);
+    }
+  } catch (error) {
+    snapshot.capsuleHubError = String(error?.message ?? error);
+  }
+  return snapshot;
+}
+
+function profileAvatarPublishDiagnosticStatus(diagnostics) {
+  const snapshots = diagnostics?.snapshots ?? [];
+  const before = snapshots.find((item) => item.label === 'before-public-publish');
+  const after = snapshots.findLast?.((item) => item.label === 'after-avatar-not-visible')
+    ?? [...snapshots].reverse().find((item) => item.label === 'after-avatar-not-visible');
+  if (!before || !after) return null;
+  const beforeNonce = diagnosticBigIntOrNull(before.userPublishNonce);
+  const afterNonce = diagnosticBigIntOrNull(after.userPublishNonce);
+  const beforePublic = diagnosticBigIntOrNull(before.capsulePublicLatestId);
+  const afterPublic = diagnosticBigIntOrNull(after.capsulePublicLatestId);
+  const beforePending = diagnosticBigIntOrNull(before.vaultPendingPublishCount);
+  const afterPending = diagnosticBigIntOrNull(after.vaultPendingPublishCount);
+  if (afterPublic !== null && beforePublic !== null && afterPublic > beforePublic) {
+    return 'CapsuleHub entry appeared; avatar search failed';
+  }
+  if (afterPending !== null && beforePending !== null && afterPending > beforePending) {
+    return 'Vault publish pending; CapsuleHub ACK not seen yet';
+  }
+  if (afterNonce !== null && beforeNonce !== null && afterNonce > beforeNonce) {
+    return 'Vault accepted publish, but CapsuleHub entry was not created';
+  }
+  const broadcastError = profileAvatarPublishBroadcastErrorStatus(diagnostics);
+  if (broadcastError) return `TON RPC broadcast failed: ${broadcastError}`;
+  return null;
+}
+
 function publicAvatarPartMatches(payload, ownerWallet, pointer) {
   if (payload?.type !== 'avatar') return false;
   if (String(payload.avatarHash ?? payload.avatar_hash ?? '').toLowerCase() !== pointer.avatarHash.toLowerCase()) return false;
-  if (pointer.avatarStreamId && String(payload.stream_id ?? '').toLowerCase() !== pointer.avatarStreamId.toLowerCase()) return false;
+  const pointerStreamId = pointer.avatarStreamId ?? pointer.avatar_stream_id ?? null;
+  if (pointerStreamId && String(payload.stream_id ?? '').toLowerCase() !== String(pointerStreamId).toLowerCase()) return false;
   if (pointer.profileVersion && Number(payload.profileVersion ?? payload.profile_version ?? 0) !== Number(pointer.profileVersion)) return false;
   if (pointer.avatarPartCount && Number(payload.partCount ?? payload.part_count ?? 0) !== Number(pointer.avatarPartCount)) return false;
   if (ownerWallet && payload.authorWallet && !sameWalletAddress(payload.authorWallet, ownerWallet)) return false;
   return true;
+}
+
+function avatarPartStreamId(part) {
+  return String(part?.stream_id ?? part?.streamId ?? '').toLowerCase();
+}
+
+function avatarPartsCompleteForPointer(parts, pointer) {
+  const expected = Number(pointer.avatarPartCount ?? pointer.partCount ?? 0);
+  if (!Number.isSafeInteger(expected) || expected <= 0) return false;
+  const groups = new Map();
+  for (const part of parts ?? []) {
+    const index = Number(part.partIndex ?? part.part_index ?? -1);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= expected) continue;
+    const streamId = avatarPartStreamId(part);
+    const group = groups.get(streamId) ?? new Set();
+    group.add(index);
+    groups.set(streamId, group);
+    if (group.size >= expected) return true;
+  }
+  return false;
 }
 
 function assembleAvatarParts(parts, pointer) {
@@ -3226,6 +3857,26 @@ function assembleAvatarParts(parts, pointer) {
   return bytes;
 }
 
+async function assembledAvatarPartGroup(parts, pointer) {
+  const groups = new Map();
+  for (const part of parts ?? []) {
+    const streamId = avatarPartStreamId(part);
+    const group = groups.get(streamId) ?? [];
+    group.push(part);
+    groups.set(streamId, group);
+  }
+  for (const groupParts of groups.values()) {
+    const imageUrl = await cacheAssembledAvatarParts(groupParts, pointer);
+    if (!imageUrl) continue;
+    return {
+      imageUrl,
+      parts: groupParts,
+      streamId: groupParts[0]?.stream_id ?? groupParts[0]?.streamId ?? null,
+    };
+  }
+  return null;
+}
+
 async function cacheAssembledAvatarParts(parts, pointer) {
   const bytes = assembleAvatarParts(parts, pointer);
   if (!bytes) return null;
@@ -3237,7 +3888,7 @@ async function cacheAssembledAvatarParts(parts, pointer) {
 }
 
 async function readAvatarPartsFromCapsuleHub(ownerWallet, pointer, options = {}) {
-  const cached = readProfileAvatarMediaCache(pointer?.avatarHash);
+  const cached = await readProfileAvatarMediaCache(pointer?.avatarHash);
   if (cached) return cached;
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved || !pointer) return null;
@@ -3251,7 +3902,7 @@ async function readAvatarPartsFromCapsuleHub(ownerWallet, pointer, options = {})
       try {
         const entry = await provider.getPublicEntry(entryId, readOptions);
         if (entry.exists !== true) continue;
-        const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES });
+        const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
         if (!payload) continue;
         payload.authorWallet = String(entry.author_wallet ?? '');
         if (!publicAvatarPartMatches(payload, ownerWallet, pointer)) continue;
@@ -3260,18 +3911,22 @@ async function readAvatarPartsFromCapsuleHub(ownerWallet, pointer, options = {})
           entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
           imageBytes: payload.imageBytes ?? payload.image_bytes,
         });
-        if (parts.length >= Number(pointer.avatarPartCount ?? 0)) break;
+        if (avatarPartsCompleteForPointer(parts, pointer)) break;
       } catch (error) {
         if (!/not found|missing|does not exist/i.test(String(error?.message ?? error))) console.error(error);
       }
     }
-    const assembled = await cacheAssembledAvatarParts(parts, pointer);
-    if (assembled) return assembled;
+    const assembled = await assembledAvatarPartGroup(parts, pointer);
+    if (assembled?.imageUrl) return assembled.imageUrl;
   }
 
   const state = await provider.getState(readOptions);
   const latest = BigInt(state.public_latest_id ?? 0n);
-  const limit = BigInt(options.scanLimit ?? appConfig.capsuleHub?.publicAvatarReadLimit ?? PROFILE_AVATAR_FALLBACK_SCAN_LIMIT);
+  const configuredLimit = Number(options.scanLimit ?? appConfig.capsuleHub?.publicAvatarReadLimit ?? 0);
+  const limit = BigInt(Math.max(
+    PROFILE_AVATAR_FALLBACK_SCAN_LIMIT,
+    Number.isFinite(configuredLimit) ? Math.max(0, Math.floor(configuredLimit)) : 0,
+  ));
   const floor = latest > limit ? latest - limit : 0n;
   for (let entryId = latest - 1n; entryId >= floor; entryId -= 1n) {
     const entry = await provider.getPublicEntry(entryId, readOptions);
@@ -3279,7 +3934,7 @@ async function readAvatarPartsFromCapsuleHub(ownerWallet, pointer, options = {})
       if (entryId === 0n) break;
       continue;
     }
-    const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES });
+    const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
     if (!payload) {
       if (entryId === 0n) break;
       continue;
@@ -3291,11 +3946,11 @@ async function readAvatarPartsFromCapsuleHub(ownerWallet, pointer, options = {})
         entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
         imageBytes: payload.imageBytes ?? payload.image_bytes,
       });
-      if (parts.length >= Number(pointer.avatarPartCount ?? 0)) break;
+      if (avatarPartsCompleteForPointer(parts, pointer)) break;
     }
     if (entryId === 0n) break;
   }
-  return cacheAssembledAvatarParts(parts, pointer);
+  return (await assembledAvatarPartGroup(parts, pointer))?.imageUrl ?? null;
 }
 
 async function findPublishedAvatarEntries(ownerWallet, pointer) {
@@ -3313,7 +3968,7 @@ async function findPublishedAvatarEntries(ownerWallet, pointer) {
   for (let entryId = latest - 1n; entryId >= floor; entryId -= 1n) {
     const entry = await provider.getPublicEntry(entryId, readOptions);
     if (entry.exists === true) {
-      const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES });
+      const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
       if (!payload) {
         if (entryId === 0n) break;
         continue;
@@ -3325,44 +3980,144 @@ async function findPublishedAvatarEntries(ownerWallet, pointer) {
           entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
           imageBytes: payload.imageBytes ?? payload.image_bytes,
         });
-        if (parts.length >= expectedParts) break;
+        if (avatarPartsCompleteForPointer(parts, pointer)) break;
       }
     }
     if (entryId === 0n) break;
   }
-  const imageUrl = await cacheAssembledAvatarParts(parts, pointer);
-  if (!imageUrl) return null;
-  const firstEntryId = parts.reduce((min, part) => {
+  const assembled = await assembledAvatarPartGroup(parts, pointer);
+  if (!assembled?.imageUrl) return null;
+  const firstEntryId = assembled.parts.reduce((min, part) => {
     const value = publicEntryIdBigInt(part.entryId) ?? min;
     return value < min ? value : min;
-  }, publicEntryIdBigInt(parts[0]?.entryId) ?? 0n);
-  const streamId = parts[0]?.stream_id ?? parts[0]?.streamId ?? null;
-  return { imageUrl, firstEntryId, parts, streamId };
+  }, publicEntryIdBigInt(assembled.parts[0]?.entryId) ?? 0n);
+  return {
+    imageUrl: assembled.imageUrl,
+    firstEntryId,
+    parts: assembled.parts,
+    streamId: assembled.streamId,
+    confirmedBy: 'recovered_from_existing_identical_payload',
+  };
+}
+
+async function findConfirmedAvatarEntriesFromPublishState(ownerWallet, pointer, publishState) {
+  const expectedParts = Number(pointer?.avatarPartCount ?? pointer?.partCount ?? 0);
+  if (!Number.isSafeInteger(expectedParts) || expectedParts <= 0) return null;
+  const confirmedParts = (publishState?.parts ?? []).filter((part) => (
+    publishPartKind(part) === 'public'
+    && part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
+    && part.entryId !== undefined
+    && part.entryId !== null
+  )).sort((left, right) => Number(left?.index ?? 0) - Number(right?.index ?? 0));
+  if (confirmedParts.length === 0) return null;
+  if (confirmedParts.length >= expectedParts) {
+    const byIndex = new Map();
+    for (const part of confirmedParts) {
+      const index = Number(part.index ?? -1);
+      if (!Number.isSafeInteger(index) || index < 0 || index >= expectedParts) continue;
+      byIndex.set(index, part);
+    }
+    if (byIndex.size >= expectedParts) {
+      const ordered = [...byIndex.values()].sort((left, right) => Number(left.index ?? 0) - Number(right.index ?? 0));
+      const firstEntryId = ordered.reduce((min, part) => {
+        const value = publicEntryIdBigInt(part.entryId) ?? min;
+        return value < min ? value : min;
+      }, publicEntryIdBigInt(ordered[0]?.entryId) ?? 0n);
+      return {
+        imageUrl: await readProfileAvatarMediaCache(pointer.avatarHash),
+        firstEntryId,
+        parts: ordered.map((part) => ({
+          entryId: String(part.entryId),
+          partIndex: Number(part.index ?? 0),
+          part_count: expectedParts,
+          partCount: expectedParts,
+          bodyHash: part.bodyHash ?? null,
+          headerHash: part.header0Hash ?? null,
+          stream_id: pointer.avatarStreamId ?? pointer.avatar_stream_id ?? null,
+          streamId: pointer.avatarStreamId ?? pointer.avatar_stream_id ?? null,
+          avatarHash: pointer.avatarHash,
+          avatar_hash: pointer.avatarHash,
+        })),
+        streamId: pointer.avatarStreamId ?? pointer.avatar_stream_id ?? null,
+        confirmedBy: 'publish_state_hashes',
+      };
+    }
+  }
+  const resolved = await resolveCapsuleHubProvider();
+  if (!resolved) return null;
+  const { provider, address } = resolved;
+  const readOptions = criticalCapsuleHubReadOptions(address);
+  const parts = [];
+  for (const part of confirmedParts) {
+    const entryId = publicEntryIdBigInt(part.entryId);
+    if (entryId === null || entryId < 0n) continue;
+    const entry = await provider.getPublicEntry(entryId, readOptions);
+    if (entry.exists !== true) continue;
+    const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
+    if (!payload) continue;
+    payload.authorWallet = String(entry.author_wallet ?? '');
+    if (!publicAvatarPartMatches(payload, ownerWallet, pointer)) continue;
+    parts.push({
+      ...payload,
+      entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
+      imageBytes: payload.imageBytes ?? payload.image_bytes,
+    });
+  }
+  const assembled = await assembledAvatarPartGroup(parts, pointer);
+  if (!assembled?.imageUrl) return null;
+  const firstEntryId = assembled.parts.reduce((min, part) => {
+    const value = publicEntryIdBigInt(part.entryId) ?? min;
+    return value < min ? value : min;
+  }, publicEntryIdBigInt(assembled.parts[0]?.entryId) ?? 0n);
+  return {
+    imageUrl: assembled.imageUrl,
+    firstEntryId,
+    parts: assembled.parts,
+    streamId: assembled.streamId,
+  };
 }
 
 async function waitForPublishedAvatarEntries(ownerWallet, pointer) {
+  let lastTransientError = null;
   for (let attempt = 0; attempt < PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS; attempt += 1) {
-    const found = await findPublishedAvatarEntries(ownerWallet, pointer);
-    if (found) return found;
+    try {
+      const found = await findPublishedAvatarEntries(ownerWallet, pointer);
+      if (found) return found;
+      lastTransientError = null;
+    } catch (error) {
+      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) throw error;
+      lastTransientError = error;
+    }
     await delay(PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS);
   }
-  throw new Error('Avatar capsules are not visible on-chain yet');
+  if (lastTransientError) throw lastTransientError;
+  const error = new Error('Avatar capsules are not visible on-chain yet');
+  error.code = 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE';
+  throw error;
 }
 
 async function waitForProfileAvatarRegistryUpdate(ownerWallet, avatarHash) {
   const expectedHash = normalizeAvatarHashHex(avatarHash);
+  let lastTransientError = null;
   for (let attempt = 0; attempt < PROFILE_AVATAR_PUBLISH_CONFIRM_ATTEMPTS; attempt += 1) {
-    const pointer = await readCurrentProfileAvatarPointerFromChain(ownerWallet, { required: true });
-    if (pointer?.avatarHash?.toLowerCase() === expectedHash.toLowerCase()) return pointer;
+    try {
+      const pointer = await readCurrentProfileAvatarPointerFromChain(ownerWallet, { required: true });
+      if (pointer?.avatarHash?.toLowerCase() === expectedHash.toLowerCase()) return pointer;
+      lastTransientError = null;
+    } catch (error) {
+      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) throw error;
+      lastTransientError = error;
+    }
     await delay(PROFILE_AVATAR_PUBLISH_CONFIRM_DELAY_MS);
   }
+  if (lastTransientError) throw lastTransientError;
   throw new Error('Avatar registry update is not visible on-chain yet');
 }
 
 async function loadProfileAvatarImage(ownerWallet, pointer = null) {
   if (!ownerWallet) return null;
   const requestedPointer = pointer ? avatarPointerFromFields(pointer.profileVersion ?? pointer.profile_version, pointer.avatarHash ?? pointer.avatar_hash) : null;
-  const cached = requestedPointer ? readProfileAvatarMediaCache(requestedPointer.avatarHash) : null;
+  const cached = requestedPointer ? await readProfileAvatarMediaCache(requestedPointer.avatarHash) : null;
   if (cached) return cached;
   const key = `${ownerWallet}:${requestedPointer?.profileVersion ?? 'current'}:${requestedPointer?.avatarHash ?? 'current'}`;
   if (profileAvatarLoadPromises.has(key)) return profileAvatarLoadPromises.get(key);
@@ -3493,7 +4248,7 @@ async function syncPublicChannelFromChain() {
     ? Math.max(1, Math.floor(configuredLimit))
     : PUBLIC_CHAIN_READ_LIMIT;
   const syncWindow = readPublicSyncWindow();
-  const minEntryId = syncWindow === 'all' ? 0 : Math.max(0, latest - readLimit);
+  const minEntryId = syncWindow === 'long' ? 0 : Math.max(0, latest - readLimit);
   const retryEntryIds = publicBodyHistoryRetryEntryIds(address, latestId, BigInt(minEntryId));
   const retryEntryIdSet = new Set(retryEntryIds.map((id) => id.toString()));
   const entryIdsToScan = [];
@@ -3517,7 +4272,7 @@ async function syncPublicChannelFromChain() {
     }
     let payload = null;
     try {
-      payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES });
+      payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
     } catch (error) {
       if (isBodyHistoryUnavailableError(error)) {
         rememberPublicBodyHistoryUnavailable(address, entry, entryIdValue);
@@ -3550,6 +4305,7 @@ async function syncPublicChannelFromChain() {
       type: payload.type,
       text: payload.text ?? '',
       imageBytes: payload.imageBytes ?? payload.image_bytes,
+      documentBytes: payload.documentBytes ?? payload.document_bytes,
       createdAt,
       author: publicAuthorLabel(authorWallet),
       authorWallet,
@@ -3567,7 +4323,7 @@ async function syncPublicChannelFromChain() {
         ...base,
         imageBytes: payload.imageBytes ?? payload.image_bytes,
       });
-    } else if (payload.type === 'comment' || payload.type === 'image_comment') {
+    } else if (payload.type === 'comment' || payload.type === 'image_comment' || payload.type === 'document_comment') {
       commentParts.push({
         ...base,
         parentEntryId: payload.parentEntryId.toString(),
@@ -3612,18 +4368,35 @@ async function syncPublicChannelFromChain() {
           offset += item.imageBytes.length;
         }
       }
+      const documentParts = ordered.filter((item) => item.documentBytes?.length);
+      const documentBytes = documentParts.length > 0
+        ? new Uint8Array(documentParts.reduce((sum, item) => sum + item.documentBytes.length, 0))
+        : null;
+      if (documentBytes) {
+        let offset = 0;
+        for (const item of documentParts) {
+          documentBytes.set(item.documentBytes, offset);
+          offset += item.documentBytes.length;
+        }
+      }
+      const documentBlocks = documentBytes
+        ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes))
+        : [];
       const readEntryId = ordered.reduce((max, item) => {
         const value = publicEntryIdBigInt(item.entryId) ?? -1n;
         return value > max ? value : max;
       }, -1n);
       const item = {
         ...first,
-        text: ordered.filter((part) => !part.imageBytes?.length).map((part) => part.text ?? '').join(''),
+        text: documentBlocks.length > 0
+          ? messagePreviewFromBlocks(documentBlocks)
+          : ordered.filter((part) => !part.imageBytes?.length && !part.documentBytes?.length).map((part) => part.text ?? '').join(''),
+        blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
         readEntryId: readEntryId >= 0n ? readEntryId.toString() : first.entryId,
         partCount: group.expected,
-        avatarImageUrl: readProfileAvatarMediaCache(first.avatarHash),
+        avatarImageUrl: null,
       };
-      if (imageBytes) {
+      if (imageBytes && documentBlocks.length === 0) {
         item.imageUrl = bytesToImageDataUrl(imageBytes, 'image/webp');
         item.imageBytes = undefined;
       }
@@ -3693,7 +4466,7 @@ async function syncPublicChannelFromChain() {
     minEntryId: String(minEntryId),
     scanned,
     readLimit,
-    allTime: syncWindow === 'all',
+    allTime: syncWindow === 'long',
     retryEntryCount: retryEntryIds.length,
     historyUnavailableCount: unavailableEntries.length,
     unavailableEntries,
@@ -3790,7 +4563,6 @@ function collectPublicAvatarRequests() {
     const pointer = avatarPointerFromFields(item?.profileVersion ?? item?.profile_version, item?.avatarHash ?? item?.avatar_hash);
     if (!ownerWallet || item.avatarImageUrl) return;
     if (!pointer && !options.allowCurrent) return;
-    if (pointer && readProfileAvatarMediaCache(pointer.avatarHash)) return;
     const key = `${ownerWallet}:${pointer?.profileVersion ?? 'current'}:${pointer?.avatarHash ?? 'current'}`;
     if (seen.has(key)) return;
     seen.add(key);
@@ -3824,27 +4596,82 @@ async function hydratePublicAvatars() {
   return true;
 }
 
-function privateChainScanStorageKey(address = configuredCapsuleHubAddress()) {
+function privateKeyIdIndexValue(keyId) {
+  const bytes = base64UrlToBytes(keyId);
+  if (bytes.length !== 32) throw new Error('Private messaging key id must be 32 bytes');
+  return bytesToBigIntValue(bytes);
+}
+
+function privateChainIndexStorageKey(address = configuredCapsuleHubAddress(), role = 'recipient') {
   const hub = address ?? 'no-capsulehub';
   const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
-  return `${PRIVATE_CHAIN_SCAN_STORAGE_PREFIX}:${hub}:${keyId}`;
+  return `${PRIVATE_CHAIN_INDEX_STORAGE_PREFIX}:${hub}:${keyId}:${role}`;
 }
 
-function readPrivateChainScanCursor(address) {
-  try {
-    const raw = localStorageOrNull()?.getItem(privateChainScanStorageKey(address));
-    if (raw && /^[0-9]+$/.test(raw)) return BigInt(raw);
-  } catch {
-    // Non-persistent mode rescans the configured read window.
+function normalizePrivateChainIndexCursor(cursor) {
+  const normalized = {
+    processedHeadLink: 0n,
+    targetHeadLink: 0n,
+    resumeLink: 0n,
+  };
+  if (!cursor || typeof cursor !== 'object') return normalized;
+  for (const field of Object.keys(normalized)) {
+    const raw = cursor[field];
+    try {
+      if (raw !== null && raw !== undefined && /^[0-9]+$/.test(String(raw))) normalized[field] = BigInt(raw);
+    } catch {
+      normalized[field] = 0n;
+    }
   }
-  return null;
+  return normalized;
 }
 
-function writePrivateChainScanCursor(address, nextEntryId) {
+function readPrivateChainIndexCursor(address, role) {
   try {
-    localStorageOrNull()?.setItem(privateChainScanStorageKey(address), BigInt(nextEntryId).toString());
+    const raw = localStorageOrNull()?.getItem(privateChainIndexStorageKey(address, role));
+    if (!raw) return normalizePrivateChainIndexCursor(null);
+    return normalizePrivateChainIndexCursor(JSON.parse(raw));
   } catch {
-    // Best-effort cursor only; encrypted history still dedupes by capsule id.
+    // Non-persistent mode starts from the current indexed head.
+  }
+  return normalizePrivateChainIndexCursor(null);
+}
+
+function writePrivateChainIndexCursor(address, role, cursor) {
+  try {
+    const normalized = normalizePrivateChainIndexCursor(cursor);
+    localStorageOrNull()?.setItem(privateChainIndexStorageKey(address, role), JSON.stringify({
+      processedHeadLink: normalized.processedHeadLink.toString(),
+      targetHeadLink: normalized.targetHeadLink.toString(),
+      resumeLink: normalized.resumeLink.toString(),
+    }));
+  } catch {
+    // Encrypted history still dedupes by capsule id when local storage is unavailable.
+  }
+}
+
+function privateChainHeadRepairStorageKey(address = configuredCapsuleHubAddress(), role = 'recipient') {
+  const hub = address ?? 'no-capsulehub';
+  const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
+  return `${PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX}:${hub}:${keyId}:${role}`;
+}
+
+function readPrivateChainHeadRepairLink(address, role) {
+  try {
+    const raw = localStorageOrNull()?.getItem(privateChainHeadRepairStorageKey(address, role));
+    if (!/^[0-9]+$/.test(String(raw ?? ''))) return 0n;
+    return BigInt(raw);
+  } catch {
+    return 0n;
+  }
+}
+
+function writePrivateChainHeadRepairLink(address, role, link) {
+  try {
+    const normalized = privateIndexLinkValue(link);
+    localStorageOrNull()?.setItem(privateChainHeadRepairStorageKey(address, role), normalized.toString());
+  } catch {
+    // Repair scans are opportunistic; normal chain cursors still gate steady-state sync.
   }
 }
 
@@ -4013,17 +4840,25 @@ function clearPrivateBodyHistoryUnavailable(address, entryId) {
   writePrivateBodyHistoryUnavailable(address, remaining);
 }
 
-function privateBodyHistoryRetryEntryIds(address, latest, start, scanEnd) {
+function privateBodyHistoryRetryEntryIds(address, options = {}) {
   const ids = [];
-  for (const record of readPrivateBodyHistoryUnavailable(address)) {
+  const records = readPrivateBodyHistoryUnavailable(address);
+  const force = options.forceHistoryRetry === true;
+  const retryLimit = force ? PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT;
+  const now = Date.now();
+  for (const record of records) {
+    if (!force) {
+      const lastSeenMs = Date.parse(record.lastSeenAt ?? '');
+      if (Number.isFinite(lastSeenMs) && now - lastSeenMs < PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS) continue;
+    }
     try {
       const id = BigInt(record.entryId);
-      if (id < 0n || id >= latest) continue;
-      if (id >= start && id < scanEnd) continue;
+      if (id < 0n) continue;
       ids.push(id);
     } catch {
       // Ignore corrupt local retry records.
     }
+    if (ids.length >= retryLimit) break;
   }
   return ids;
 }
@@ -4073,6 +4908,38 @@ function privateWalletIdentityVariants(walletAddress) {
   ]);
 }
 
+function plathoUsernameIdentity(label) {
+  const parsed = parseRecipientIdentity(label);
+  return parsed.ok && parsed.identity.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT ? parsed.identity : null;
+}
+
+async function verifiedPlathoUsernameIdentityForWallet(label, walletAddress) {
+  const rawWallet = rawWalletAddress(walletAddress);
+  const identity = plathoUsernameIdentity(label);
+  if (!rawWallet || !identity) return null;
+  const key = `${identity.value}:${rawWallet}`;
+  if (verifiedPlathoUsernameOwnerCache.has(key)) return verifiedPlathoUsernameOwnerCache.get(key);
+  try {
+    const resolved = await resolvePlathoUsernameOwner(identity.value);
+    const verified = sameWalletAddress(resolved.ownerWallet, rawWallet)
+      ? plathoUsernameIdentity(resolved.label)
+      : null;
+    verifiedPlathoUsernameOwnerCache.set(key, verified);
+    return verified;
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) {
+      console.warn('Unable to verify private sender username', identity.value, error);
+    }
+    return null;
+  }
+}
+
+async function privateWalletIdentityVariantsWithUsername(walletAddress, usernameLabel) {
+  const base = privateWalletIdentityVariants(walletAddress);
+  const username = await verifiedPlathoUsernameIdentityForWallet(usernameLabel, walletAddress);
+  return normalizeIdentityVariants([username, ...base]);
+}
+
 function knownPrivateWalletCandidates() {
   const wallets = new Map();
   for (const thread of threads) {
@@ -4085,6 +4952,34 @@ function knownPrivateWalletCandidates() {
     }
   }
   return [...wallets.values()];
+}
+
+function knownPrivateWalletForSigningPubkey(signPubkey) {
+  let key = null;
+  try {
+    key = signPubkey ? BigInt(signPubkey).toString() : null;
+  } catch {
+    return null;
+  }
+  if (!key) return null;
+  const remembered = knownVaultKeyOwnerBySignPubkey.get(key);
+  if (remembered) return remembered;
+  for (const thread of threads) {
+    const wallet = rawWalletAddress(ownerWalletFromThread(thread));
+    if (!wallet) continue;
+    for (const message of thread.messages ?? []) {
+      if (message?.type !== 'in') continue;
+      const capsules = [
+        message.capsule,
+        ...(message.capsules ?? []),
+      ].filter(Boolean);
+      if (capsules.some((capsule) => senderSigningPublicKeyValue({ capsule }) === key)) {
+        knownVaultKeyOwnerBySignPubkey.set(key, wallet);
+        return wallet;
+      }
+    }
+  }
+  return null;
 }
 
 async function resolveCurrentKnownVaultKeyRecord(walletAddress, provider, options = {}) {
@@ -4100,8 +4995,27 @@ async function resolveCurrentKnownVaultKeyRecord(walletAddress, provider, option
     ownerWallet: raw,
     ...readOptions,
   });
+  await assertVaultKeyRecordMatchesOwner(raw, keyRecord, currentKeyId);
   rememberKnownVaultKeyOwner(raw, keyRecord);
   return keyRecord;
+}
+
+async function assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, expectedKeyId) {
+  const expected = BigInt(expectedKeyId ?? 0n);
+  if (expected === 0n) throw new Error('Vault key id is required');
+  const computedKeyId = await computeVaultMessagingKeyId({
+    owner_wallet: requireBasechainAddress(walletAddress, 'Vault key owner'),
+    key_generation: keyRecord?.key_generation ?? keyRecord?.keyGeneration,
+    enc_pubkey: keyRecord?.enc_pubkey ?? keyRecord?.encPubkey,
+    sign_pubkey: keyRecord?.sign_pubkey ?? keyRecord?.signPubkey,
+    pq_kem_pubkey_hash: keyRecord?.pq_kem_pubkey_hash ?? keyRecord?.pqKemPubkeyHash,
+    pq_kem_pubkey_len: keyRecord?.pq_kem_pubkey_len ?? keyRecord?.pqKemPubkeyLen,
+    crypto_suite_mask: keyRecord?.crypto_suite_mask ?? keyRecord?.cryptoSuiteMask,
+  });
+  if (computedKeyId !== expected) {
+    throw new Error('Vault key record does not belong to this wallet');
+  }
+  return computedKeyId;
 }
 
 async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, provider) {
@@ -4113,9 +5027,7 @@ async function resolveVaultKeyRecordForSenderWallet(walletAddress, vaultKeyId, p
       ownerWallet: raw,
       ...readOptions,
     });
-    if (!sameWalletAddress(keyRecord?.owner_wallet, raw)) {
-      throw new Error('Private sender key record owner mismatch');
-    }
+    await assertVaultKeyRecordMatchesOwner(raw, keyRecord, BigInt(vaultKeyId));
     rememberKnownVaultKeyOwner(raw, keyRecord);
     return keyRecord;
   }
@@ -4142,6 +5054,8 @@ async function resolveClaimedPrivateSenderWallet(opened, provider, signPubkey) {
 async function resolveKnownPrivateSenderWallet(opened, options = {}) {
   const signPubkey = senderSigningPublicKeyValue(opened);
   if (!signPubkey) return null;
+  const localMatch = knownPrivateWalletForSigningPubkey(signPubkey);
+  if (localMatch) return localMatch;
   const remembered = knownVaultKeyOwnerBySignPubkey.get(signPubkey);
   const candidates = [...new Set([
     remembered,
@@ -4176,6 +5090,32 @@ async function resolvePrivateCapsuleSenderWallet(opened, entry) {
   return await resolveKnownPrivateSenderWallet(opened) ?? privateEntryPublisherWallet(entry);
 }
 
+async function threadForOpenedSenderCapsule(opened) {
+  const recipientWallet = rawWalletAddress(opened?.payload?.recipientWallet ?? opened?.payload?.recipient_wallet);
+  if (recipientWallet) {
+    const variants = privateWalletIdentityVariants(recipientWallet);
+    const identityThread = findThreadByIdentityVariants(threads, variants);
+    if (identityThread) return refreshThreadIdentityFromVariants(identityThread, variants);
+    const created = createRecipientThread(recipientWallet);
+    if (created?.ok && created.thread) {
+      const existingById = threads.find((thread) => thread.id === created.thread.id);
+      if (existingById) return refreshThreadIdentityFromVariants(existingById, variants);
+      threads.push(created.thread);
+      return refreshThreadIdentityFromVariants(created.thread, variants);
+    }
+  }
+  const recipientKeyId = opened?.capsule?.header0?.recipientKeyId ?? opened?.payload?.recipientKeyId ?? opened?.payload?.recipient_key_id;
+  const fallback = createInboundPeerThread({
+    senderKeyId: recipientKeyId,
+    keyId: recipientKeyId,
+    label: 'Recovered sent',
+  });
+  const existingById = threads.find((thread) => thread.id === fallback.id);
+  if (existingById) return existingById;
+  threads.push(fallback);
+  return fallback;
+}
+
 function findMessageByCapsuleId(capsuleId) {
   if (!capsuleId) return null;
   for (const thread of threads) {
@@ -4188,28 +5128,115 @@ function findMessageByCapsuleId(capsuleId) {
   return null;
 }
 
+function messageBlocksForHistory(message) {
+  if (!Array.isArray(message?.blocks) || message.blocks.length <= 0) return null;
+  return safeJsonClone(message.blocks) ?? null;
+}
+
+function valuesJsonEqual(a, b) {
+  try {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  } catch {
+    return false;
+  }
+}
+
+function mergeOpenedPrivateMessage(existingMessage, incomingMessage) {
+  if (!existingMessage || !incomingMessage) return false;
+  let changed = false;
+  const assignIfPresent = (field) => {
+    const value = incomingMessage[field];
+    if (value === undefined || value === null) return;
+    if (valuesJsonEqual(existingMessage[field], value)) return;
+    existingMessage[field] = safeJsonClone(value) ?? value;
+    changed = true;
+  };
+  const incomingBlocks = Array.isArray(incomingMessage.blocks) && incomingMessage.blocks.length > 0
+    ? incomingMessage.blocks
+    : null;
+  if (incomingBlocks && !valuesJsonEqual(existingMessage.blocks, incomingBlocks)) {
+    existingMessage.blocks = safeJsonClone(incomingBlocks) ?? incomingBlocks;
+    changed = true;
+  }
+  for (const field of [
+    'text',
+    'payment',
+    'attachment',
+    'capsule',
+    'capsules',
+    'chainEntryId',
+    'chainLastEntryId',
+    'createdAt',
+    'createdAtMs',
+    'meta',
+    'profileVersion',
+    'avatarHash',
+  ]) {
+    assignIfPresent(field);
+  }
+  if (/published/i.test(String(incomingMessage.meta ?? ''))) {
+    if (existingMessage.privatePublishConfirmStopped === true) changed = true;
+    if (existingMessage.privateSendRetryStopped === true) changed = true;
+    if (existingMessage.privateManualRetryAvailable === true) changed = true;
+    if (existingMessage.privateCancelAvailable === true) changed = true;
+    if (existingMessage.privateSendLastError) changed = true;
+    existingMessage.privateSendRetryStopped = false;
+    existingMessage.privateSendRetryAttempt = 0;
+    existingMessage.privatePublishConfirmStopped = false;
+    existingMessage.privatePublishConfirmAttempt = 0;
+    clearPrivateSendRetry(existingMessage);
+    clearPrivatePublishConfirmRetry(existingMessage);
+    clearPrivateMessageManualRecovery(existingMessage);
+  }
+  return changed;
+}
+
+async function upsertOpenedPrivateMessage(existing, targetThread, incomingMessage) {
+  if (!existing?.message || !targetThread || !incomingMessage) return false;
+  const relocated = relocateExistingCapsuleMessage(existing, targetThread);
+  const changed = mergeOpenedPrivateMessage(existing.message, incomingMessage);
+  if (relocated || changed) {
+    refreshThreadAfterMessageChange(existing.thread);
+    refreshThreadAfterMessageChange(targetThread);
+    await updateMessageInEncryptedHistory(targetThread, existing.message);
+  }
+  return relocated || changed;
+}
+
 function refreshThreadIdentityFromVariants(thread, variants) {
   if (!thread || variants.length === 0) return thread;
-  const preferred = preferredInboundIdentity(variants);
+  const normalizedVariants = normalizeIdentityVariants(variants);
+  const preferred = preferredInboundIdentity(normalizedVariants);
+  const existingIdentity = thread.identity ? primaryThreadIdentity({ identity: thread.identity }) : null;
+  const nextIdentity = existingIdentity ?? preferred;
+  thread.pendingIdentityResolution = false;
+  thread.pendingIdentityResolutionAt = null;
   thread.identityVariants = normalizeIdentityVariants([
-    preferred,
+    nextIdentity,
     ...(thread.identityVariants ?? []),
-    ...variants,
+    ...normalizedVariants,
   ]);
-  if (!thread.localLabel && preferred) {
-    const label = displayIdentityLabel(preferred);
-    thread.identity = preferred;
+  if (!existingIdentity && nextIdentity) {
+    thread.identity = nextIdentity;
+  }
+  if (!thread.localLabel && !thread.displayIdentity && nextIdentity) {
+    const label = displayIdentityLabel(nextIdentity);
     thread.name = label;
-    thread.subtitle = identityTypeLabel(preferred);
+    thread.subtitle = identityTypeLabel(nextIdentity);
     thread.avatar = String(label || 'P').slice(0, 1).toUpperCase() || thread.avatar || 'P';
   }
   return thread;
 }
 
 async function threadForChainCapsule(opened, entry) {
+  if (opened?.openedAs === 'sender') {
+    const target = await threadForOpenedSenderCapsule(opened);
+    if (target) return target;
+  }
   const senderKeyId = opened?.capsule?.header0?.senderKeyId;
   const senderWallet = await resolvePrivateCapsuleSenderWallet(opened, entry);
-  const variants = privateWalletIdentityVariants(senderWallet);
+  const senderUsername = opened?.payload?.senderUsername ?? opened?.payload?.sender_username;
+  const variants = await privateWalletIdentityVariantsWithUsername(senderWallet, senderUsername);
   const identityThread = findThreadByIdentityVariants(threads, variants);
   if (identityThread) return refreshThreadIdentityFromVariants(identityThread, variants);
   const created = createInboundPeerThread({
@@ -4220,8 +5247,18 @@ async function threadForChainCapsule(opened, entry) {
     identity: preferredInboundIdentity(variants),
     identityVariants: variants,
   });
+  if (!senderWallet) {
+    created.pendingIdentityResolution = true;
+    created.pendingIdentityResolutionAt = new Date().toISOString();
+  }
   const existingById = threads.find((thread) => thread.id === created.id);
-  if (existingById) return refreshThreadIdentityFromVariants(existingById, variants);
+  if (existingById) {
+    if (!senderWallet && isAnonymousPeerThread(existingById)) {
+      existingById.pendingIdentityResolution = true;
+      existingById.pendingIdentityResolutionAt = existingById.pendingIdentityResolutionAt ?? new Date().toISOString();
+    }
+    return refreshThreadIdentityFromVariants(existingById, variants);
+  }
   threads.push(created);
   return created;
 }
@@ -4238,7 +5275,7 @@ function avatarPointerFromPrivateHeader(header0) {
 
 async function hydrateThreadAvatarFromPointer(thread, ownerWallet, pointer) {
   if (!thread || !ownerWallet) return false;
-  const cached = pointer ? readProfileAvatarMediaCache(pointer.avatarHash) : null;
+  const cached = pointer ? await readProfileAvatarMediaCache(pointer.avatarHash) : null;
   const imageUrl = cached ?? await loadProfileAvatarImage(ownerWallet, pointer);
   if (!imageUrl || thread.avatarImageUrl === imageUrl) return false;
   thread.avatarImageUrl = imageUrl;
@@ -4321,10 +5358,10 @@ function privateEntryCreatedAtMs(entry) {
 }
 
 function messageCreatedAtMs(message) {
-  const direct = Number(message?.createdAtMs);
-  if (Number.isFinite(direct) && direct > 0) return direct;
   const local = Number(message?.localCreatedAtMs ?? message?.localHistoryCreatedAt);
   if (Number.isFinite(local) && local > 0) return local;
+  const direct = Number(message?.createdAtMs);
+  if (Number.isFinite(direct) && direct > 0) return direct;
   const parsed = Date.parse(message?.createdAt ?? '');
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
@@ -4381,15 +5418,23 @@ function insertThreadMessage(thread, message) {
 }
 
 function messageFromOpenedCapsule(opened, meta, entry) {
+  const isOutgoing = opened?.openedAs === 'sender';
   const payment = paymentFromCompactPayload(opened.payload);
   const isImage = opened.payload?.type === 'image';
-  const text = payment ? paymentMessageText(payment) : (isImage ? '' : opened.plaintext);
+  const isDocument = opened.payload?.type === 'document';
+  const documentBlocks = isDocument ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(opened.payload.bytes)) : [];
+  const documentPayment = paymentFromDocumentBlocks(documentBlocks);
+  const effectivePayment = payment ?? documentPayment;
+  const text = isDocument
+    ? messagePreviewFromBlocks(documentBlocks)
+    : (payment ? paymentMessageText(payment) : (isImage ? '' : opened.plaintext));
   const message = {
-    type: 'in',
+    type: isOutgoing ? 'out' : 'in',
     text,
     meta,
     ...privateChainMessageOrderFields(entry),
-    payment,
+    payment: effectivePayment,
+    blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
     capsule: opened.capsule,
     profileVersion: opened.capsule?.header0?.profileVersion ?? 0,
     avatarHash: opened.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
@@ -4405,16 +5450,20 @@ function messageFromOpenedCapsule(opened, meta, entry) {
 }
 
 function privateChainMessageMeta(entry, parts = 1) {
+  if (entry?.openedAs === 'sender') return parts > 1 ? `published (${parts} parts)` : 'published';
   return parts > 1 ? `received (${parts} parts)` : 'received';
 }
 
 function privatePartKey(opened, entry) {
   const streamId = opened?.payload?.stream_id ?? 'single';
-  const sender = rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet)
+  const peer = opened?.openedAs === 'sender'
+    ? rawWalletAddress(opened?.payload?.recipientWallet ?? opened?.payload?.recipient_wallet)
+    : rawWalletAddress(opened?.payload?.senderWallet ?? opened?.payload?.sender_wallet);
+  const identity = peer
     ?? privateEntryPublisherWallet(entry)
     ?? opened?.capsule?.header0?.senderKeyId
     ?? 'unknown';
-  return `${sender}:${streamId}`;
+  return `${opened?.openedAs ?? 'unknown'}:${identity}:${streamId}`;
 }
 
 function messageFromOpenedPrivateParts(parts, meta) {
@@ -4428,9 +5477,23 @@ function messageFromOpenedPrivateParts(parts, meta) {
     return entryA < entryB ? -1 : 1;
   });
   const first = ordered[0]?.opened;
+  const isOutgoing = first?.openedAs === 'sender';
   const firstEntry = orderedByChain[0]?.entry;
   const lastEntry = orderedByChain[orderedByChain.length - 1]?.entry;
   const chainLastEntryId = privateEntryIdText(lastEntry);
+  const documentParts = ordered.filter((part) => part.opened?.payload?.type === 'document');
+  const documentBytes = documentParts.length > 0
+    ? new Uint8Array(documentParts.reduce((sum, part) => sum + (part.opened?.payload?.bytes?.length ?? 0), 0))
+    : null;
+  if (documentBytes) {
+    let offset = 0;
+    for (const part of documentParts) {
+      documentBytes.set(part.opened.payload.bytes, offset);
+      offset += part.opened.payload.bytes.length;
+    }
+  }
+  const documentBlocks = documentBytes ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes)) : [];
+  const documentPayment = paymentFromDocumentBlocks(documentBlocks);
   const text = ordered
     .filter((part) => part.opened?.payload?.type === 'text')
     .map((part) => part.opened?.payload?.text ?? part.opened?.plaintext ?? '')
@@ -4447,19 +5510,21 @@ function messageFromOpenedPrivateParts(parts, meta) {
     }
   }
   const message = {
-    type: 'in',
-    text,
+    type: isOutgoing ? 'out' : 'in',
+    text: documentBlocks.length > 0 ? messagePreviewFromBlocks(documentBlocks) : text,
     meta,
     ...privateChainMessageOrderFields(firstEntry),
     capsule: first?.capsule,
     capsules: ordered.map((part) => part.opened?.capsule).filter(Boolean),
+    payment: documentPayment,
+    blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
     profileVersion: first?.capsule?.header0?.profileVersion ?? 0,
     avatarHash: first?.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
   };
   if (chainLastEntryId && chainLastEntryId !== message.chainEntryId) {
     message.chainLastEntryId = chainLastEntryId;
   }
-  if (imageBytes) {
+  if (imageBytes && documentBlocks.length === 0) {
     message.attachment = {
       type: 'image',
       url: bytesToImageDataUrl(imageBytes, 'image/webp'),
@@ -4474,7 +5539,9 @@ function refreshThreadAfterMessageChange(thread) {
   sortThreadMessages(thread);
   const last = thread.messages?.[thread.messages.length - 1] ?? null;
   const status = messageStatusKey(last);
-  thread.preview = last ? (last.text || (last.attachment ? 'Image' : '')) : 'No messages yet';
+  thread.preview = last
+    ? (messagePreviewFromBlocks(last.blocks) || last.text || (last.attachment ? 'Image' : ''))
+    : 'No messages yet';
   thread.time = last ? (status === 'sending' ? 'sending' : 'now') : 'new';
   thread.state = status === 'failed'
     ? 'blocked'
@@ -4514,6 +5581,11 @@ function markIncomingThreadMessage(thread) {
 function messageMetaText(message) {
   const text = String(message?.meta ?? '').trim();
   if (!text) return '';
+  if (privateMessageHasAutoRecoveryPending(message)) {
+    if (/not sent|failed|blocked|retrying send|checking rpc/i.test(text)) {
+      return message?.publishState ? publishStateMeta(message.publishState) : 'sending';
+    }
+  }
   if (/chain #\d+/i.test(text)) return text.includes('parts') ? 'received parts' : 'received';
   if (/local capsule/i.test(text)) return 'sending';
   return text;
@@ -4521,31 +5593,73 @@ function messageMetaText(message) {
 
 function messageStatusKey(message) {
   const text = messageMetaText(message).toLowerCase();
-  if (text.includes('sending') || text.includes('submitted') || text.includes('confirming') || text.includes('retrying')) return 'sending';
-  if (text.includes('failed') || text.includes('blocked') || text.includes('not sent') || text.includes('cancel required')) return 'failed';
+  if (
+    text.includes('sending')
+    || text.includes('submitted')
+    || text.includes('confirming')
+    || text.includes('retrying')
+    || text.includes('waiting for chain confirmation')
+  ) return 'sending';
+  if (
+    text.includes('failed')
+    || text.includes('blocked')
+    || text.includes('not sent')
+    || text.includes('not confirmed')
+    || text.includes('cancel required')
+  ) return 'failed';
   if (text.includes('published') || text.includes('sent')) return 'sent';
   if (text.includes('received')) return 'received';
   return 'info';
 }
 
+function isAnonymousPeerThread(thread) {
+  return Boolean(
+    thread
+      && String(thread.id ?? '').startsWith('peer:')
+      && !thread.localLabel
+      && !primaryThreadIdentity(thread),
+  );
+}
+
+function isPendingIdentityResolutionThread(thread) {
+  return isAnonymousPeerThread(thread) && thread.pendingIdentityResolution === true;
+}
+
+function pruneEmptyAnonymousPeerThreads() {
+  let changed = false;
+  for (let index = threads.length - 1; index >= 0; index -= 1) {
+    const thread = threads[index];
+    if (!isAnonymousPeerThread(thread) || (thread.messages ?? []).length > 0) continue;
+    threads.splice(index, 1);
+    changed = true;
+    if (activeThreadId === thread.id) activeThreadId = threads[0]?.id ?? null;
+  }
+  return changed;
+}
+
 function relocateExistingCapsuleMessage(existing, targetThread) {
   if (!existing?.thread || !existing?.message || !targetThread || existing.thread === targetThread) return false;
+  const hadUnread = threadUnreadCount(existing.thread) > 0 && existing.message.type !== 'out';
   existing.thread.messages = (existing.thread.messages ?? []).filter((message) => message !== existing.message);
+  if (hadUnread) existing.thread.unreadCount = Math.max(0, threadUnreadCount(existing.thread) - 1);
   if (!(targetThread.messages ?? []).includes(existing.message)) {
     insertThreadMessage(targetThread, existing.message);
+    if (hadUnread) targetThread.unreadCount = threadUnreadCount(targetThread) + 1;
   }
   refreshThreadAfterMessageChange(existing.thread);
   refreshThreadAfterMessageChange(targetThread);
+  pruneEmptyAnonymousPeerThreads();
   return true;
 }
 
 async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
-  const existing = findMessageByCapsuleId(opened.capsule?.id);
-  if (existing) return relocateExistingCapsuleMessage(existing, targetThread);
+  if (!targetThread) throw new Error('Private chain message target thread could not be resolved');
   const message = messageFromOpenedCapsule(opened, meta, entry);
+  const existing = findMessageByCapsuleId(opened.capsule?.id);
+  if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
-  markIncomingThreadMessage(targetThread);
+  if (message.type !== 'out') markIncomingThreadMessage(targetThread);
   await persistMessageToEncryptedHistory(targetThread, message);
   hydrateThreadAvatarFromPointer(
     targetThread,
@@ -4556,12 +5670,13 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
 }
 
 async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
-  const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean);
-  if (existing) return relocateExistingCapsuleMessage(existing, targetThread);
+  if (!targetThread) throw new Error('Private chain multipart target thread could not be resolved');
   const message = messageFromOpenedPrivateParts(parts, meta);
+  const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean);
+  if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
-  markIncomingThreadMessage(targetThread);
+  if (message.type !== 'out') markIncomingThreadMessage(targetThread);
   await persistMessageToEncryptedHistory(targetThread, message);
   const firstOpened = parts[0]?.opened;
   hydrateThreadAvatarFromPointer(
@@ -4578,6 +5693,16 @@ function isBodyHistoryUnavailableError(error) {
     || /body was not found in message history|cannot read CapsuleHub message history/i.test(String(error?.message ?? error ?? ''));
 }
 
+function isPrivateOpenKeyMismatchError(error) {
+  return /recipient|decrypt|key mismatch|expired|operation-specific|unavailable/i.test(String(error?.message ?? error ?? ''));
+}
+
+function isPrivateUnreadableCapsuleError(error) {
+  if (isPrivateOpenKeyMismatchError(error)) return true;
+  const message = String(error?.message ?? error ?? '');
+  return /private capsule|platho private capsule|capsulehub private entry|compact body|header0|header1|sender signature|magic mismatch|body size mismatch|suite mismatch|hash mismatch|invalid platho private capsule/i.test(message);
+}
+
 function privateSyncResult(fields = {}) {
   return {
     ok: fields.ok !== false,
@@ -4590,8 +5715,57 @@ function privateSyncResult(fields = {}) {
     historyUnavailableCount: Number(fields.historyUnavailableCount ?? 0),
     historyUnavailableEntries: Array.isArray(fields.historyUnavailableEntries) ? fields.historyUnavailableEntries : [],
     rateLimited: fields.rateLimited === true,
+    rpcDelayed: fields.rpcDelayed === true,
     unchanged: fields.unchanged === true,
   };
+}
+
+function privateIndexLinkValue(value) {
+  try {
+    const link = BigInt(value ?? 0n);
+    return link > 0n ? link : 0n;
+  } catch {
+    return 0n;
+  }
+}
+
+function privateIndexLatestLink(index) {
+  return privateIndexLinkValue(index?.latest_entry_link ?? 0n);
+}
+
+function privateIndexPreviousLink(entry, role) {
+  return privateIndexLinkValue(
+    role === 'sender'
+      ? entry?.sender_prev_link
+      : entry?.recipient_prev_link,
+  );
+}
+
+function privateIndexEntryIdFromLink(link) {
+  const normalized = privateIndexLinkValue(link);
+  return normalized > 0n ? normalized - 1n : null;
+}
+
+function privateIndexCursorDebug(cursor) {
+  const normalized = normalizePrivateChainIndexCursor(cursor);
+  return {
+    processedHeadLink: normalized.processedHeadLink.toString(),
+    targetHeadLink: normalized.targetHeadLink.toString(),
+    resumeLink: normalized.resumeLink.toString(),
+  };
+}
+
+function privateIndexSyncReadLimit(options = {}) {
+  const configured = Number(
+    options.readLimit
+      ?? appConfig.capsuleHub?.privateIndexReadLimit
+      ?? (options.mode === 'auto' || options.fast === true
+        ? PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT
+        : PRIVATE_CHAIN_INDEX_READ_LIMIT),
+  );
+  return Number.isFinite(configured)
+    ? Math.max(1, Math.floor(configured))
+    : PRIVATE_CHAIN_INDEX_READ_LIMIT;
 }
 
 function privateSyncImported(result) {
@@ -4602,17 +5776,28 @@ function privateSyncImported(result) {
 function privateSyncStatusText(result) {
   if (typeof result === 'boolean') return result ? 'new messages' : 'up to date';
   if (!result) return 'up to date';
-  if (result.rateLimited) return 'sync delayed';
+  if (result.rateLimited || result.rpcDelayed) return 'sync delayed';
   if (Number(result.historyUnavailableCount ?? 0) > 0) {
     return result.imported > 0 ? 'new messages, history gaps' : `history gaps ${result.historyUnavailableCount}`;
   }
   if (result.reason === 'body_history_unavailable') {
     return result.blockedEntryId ? `history unavailable #${result.blockedEntryId}` : 'history unavailable';
   }
+  if (result.reason === 'private_key_open_failed') {
+    return result.blockedEntryId ? `message key mismatch #${result.blockedEntryId}` : 'message key mismatch';
+  }
+  if (result.reason === 'private_index_unavailable') {
+    return 'message index unavailable';
+  }
+  if (result.reason === 'private_index_read_failed') {
+    return 'sync delayed';
+  }
+  if (result.reason === 'partial_stream_pending') {
+    return 'message parts pending';
+  }
   if (result.reason === 'catch_up_pending') {
     return result.imported > 0 ? 'new messages, catch-up pending' : `catch-up ${result.catchUpRemaining ?? 0} left`;
   }
-  if (result.reason === 'partial_private_stream') return 'partial stream pending';
   if (result.ok === false || result.scanComplete === false) return 'sync incomplete';
   return result.imported > 0 ? 'new messages' : 'up to date';
 }
@@ -4622,71 +5807,115 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
   const { provider, address } = resolved;
-  const readOptions = criticalCapsuleHubReadOptions(address);
-  const state = await provider.getState(readOptions);
-  const latest = BigInt(state.private_latest_id ?? 0n);
-  const storedCursor = readPrivateChainScanCursor(address);
-  const pendingHistoryUnavailable = readPrivateBodyHistoryUnavailable(address);
-  if (storedCursor !== null && options.forceRecentRescan !== true && latest <= storedCursor && pendingHistoryUnavailable.length === 0) {
+  if (!provider?.getPrivateRecipientIndex || !provider?.getPrivateSenderIndex || !provider?.getPrivateEntry) {
+    const result = privateSyncResult({ ok: false, reason: 'private_index_unavailable', scanComplete: false });
     globalThis.plathoLastPrivateSync = {
       capsuleHub: address,
       keyId: localRecipientKeyPair?.keyId ?? null,
-      start: latest.toString(),
-      latest: latest.toString(),
       imported: 0,
       skipped: 0,
-      scanComplete: true,
-      rateLimited: false,
-      forced: false,
-      unchanged: true,
+      scanComplete: false,
+      reason: result.reason,
+      mode: options.mode === 'auto' || options.fast === true ? 'auto' : 'recovery',
+      scanLog: ['index-unavailable'],
     };
-    refreshMessagingControls();
-    return privateSyncResult({ scanComplete: true, unchanged: true });
+    refreshPrivateDebugLog();
+    return result;
   }
-  if (latest <= 0n) {
-    writePrivateChainScanCursor(address, latest);
-    return privateSyncResult({ scanComplete: true });
+  const quickSync = options.mode === 'auto' || options.fast === true;
+  const allowUnverifiedPrivateIndexRead = options.allowUnverifiedPrivateIndexRead === true
+    || (quickSync && options.allowUnverifiedPrivateIndexRead !== false);
+  const readOptions = allowUnverifiedPrivateIndexRead
+    ? capsuleHubMessageSyncReadOptions(address)
+    : criticalCapsuleHubReadOptions(address);
+  const canPersistPrivateIndexCursor = readOptions.verify === true
+    && readOptions.allowUnverifiedCriticalRead !== true;
+  const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
+  let recipientIndex = null;
+  let senderIndex = null;
+  try {
+    [recipientIndex, senderIndex] = await Promise.all([
+      provider.getPrivateRecipientIndex(keyIdIndex, readOptions),
+      provider.getPrivateSenderIndex(keyIdIndex, readOptions),
+    ]);
+  } catch (error) {
+    const rateLimited = noteTonRpcRateLimit(error);
+    const rpcDelayed = !rateLimited && isTonRpcTransientError(error);
+    const result = privateSyncResult({
+      ok: false,
+      reason: 'private_index_read_failed',
+      scanComplete: false,
+      rateLimited,
+      rpcDelayed,
+    });
+    const indexReadError = shortUiErrorText(error, 'private index read failed');
+    globalThis.plathoLastPrivateSync = {
+      capsuleHub: address,
+      keyId: localRecipientKeyPair?.keyId ?? null,
+      indexKeyId: keyIdIndex.toString(),
+      imported: 0,
+      skipped: 0,
+      scanComplete: false,
+      pageComplete: false,
+      reason: result.reason,
+      mode: quickSync ? 'auto' : 'recovery',
+      indexReadError,
+      rateLimited,
+      rpcDelayed,
+      scanLog: ['index-read-error'],
+    };
+    refreshPrivateDebugLog();
+    if (rpcDelayed) return result;
+    throw error;
   }
-  const limit = Math.max(1, Number(appConfig.capsuleHub?.privateReadLimit ?? PRIVATE_CHAIN_READ_LIMIT));
-  const configuredOverlap = Number(options.rescanOverlap ?? appConfig.capsuleHub?.privateRescanOverlap ?? PRIVATE_CHAIN_RESCAN_OVERLAP);
-  const overlap = Number.isFinite(configuredOverlap) ? Math.max(0, Math.floor(configuredOverlap)) : PRIVATE_CHAIN_RESCAN_OVERLAP;
-  let start = storedCursor === null ? 0n : storedCursor;
-  if (options.forceRecentRescan === true && storedCursor !== null) start = storedCursor - BigInt(overlap);
-  if (start < 0n) start = 0n;
-  if (start > latest) start = latest;
-  const scanEnd = start + BigInt(limit) < latest ? start + BigInt(limit) : latest;
-  const linearEntryIds = [];
-  for (let entryId = start; entryId < scanEnd; entryId += 1n) linearEntryIds.push(entryId);
-  const linearEntryIdSet = new Set(linearEntryIds.map((entryId) => entryId.toString()));
-  const retryEntryIds = privateBodyHistoryRetryEntryIds(address, latest, start, scanEnd);
-  const entryIdsToScan = [...new Set([...retryEntryIds, ...linearEntryIds].map((entryId) => entryId.toString()))]
-    .map((entryId) => BigInt(entryId))
-    .sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0)));
-
-  let effectiveScanEnd = scanEnd;
+  const recipientHead = privateIndexLatestLink(recipientIndex);
+  const senderHead = privateIndexLatestLink(senderIndex);
+  const limit = privateIndexSyncReadLimit(options);
+  const retryEntryIds = privateBodyHistoryRetryEntryIds(address, {
+    forceHistoryRetry: options.forceHistoryRetry === true,
+  });
   let imported = 0;
   let skipped = 0;
   let scanComplete = true;
   let rateLimitError = null;
   let bodyHistoryError = null;
+  let privateKeyOpenError = null;
   let blockedEntryId = null;
   const historyUnavailableEntries = [];
-  let partialPrivateStream = false;
+  let incompletePrivateStreamCount = 0;
   const privatePartGroups = new Map();
   const scannedPrivateEntryIds = new Set();
-  const scanPrivateEntryId = async (entryId, { advanceCursor = false } = {}) => {
+  const privateEntryCache = new Map();
+  const cursorWrites = [];
+  const headRepairWrites = [];
+  const scanLog = [];
+  const rememberPrivateScanLog = (entryId, status) => {
+    const item = `${entryId.toString()}:${String(status ?? 'seen')}`;
+    scanLog.push(item);
+    if (scanLog.length > 14) scanLog.shift();
+  };
+  const readPrivateEntryCached = async (entryId) => {
     const entryIdKey = entryId.toString();
-    if (scannedPrivateEntryIds.has(entryIdKey)) return true;
-    scannedPrivateEntryIds.add(entryIdKey);
-    if (advanceCursor && entryId >= effectiveScanEnd && entryId < latest) effectiveScanEnd = entryId + 1n;
+    if (privateEntryCache.has(entryIdKey)) return privateEntryCache.get(entryIdKey);
+    const entry = await provider.getPrivateEntry(entryId, readOptions);
+    privateEntryCache.set(entryIdKey, entry);
+    return entry;
+  };
+  const scanPrivateEntryId = async (entryId, { source = 'index' } = {}) => {
+    const entryIdKey = entryId.toString();
+    if (scannedPrivateEntryIds.has(entryIdKey)) return { ok: true, entry: privateEntryCache.get(entryIdKey) ?? null };
     let entry = null;
     try {
-      entry = await provider.getPrivateEntry(entryId, readOptions);
+      entry = await readPrivateEntryCached(entryId);
       if (entry.exists !== true) {
+        scannedPrivateEntryIds.add(entryIdKey);
+        rememberPrivateScanLog(entryId, 'empty');
         clearPrivateBodyHistoryUnavailable(address, entryId);
-        return true;
+        return { ok: true, entry };
       }
-      entry = await resolvePrivateEntryBody(provider, entry, address);
+      entry = await resolvePrivateEntryBody(provider, entry, address, readOptions);
+      privateEntryCache.set(entryIdKey, entry);
+      scannedPrivateEntryIds.add(entryIdKey);
       clearPrivateBodyHistoryUnavailable(address, entryId);
       const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair, {
         now: Date.now(),
@@ -4695,26 +5924,41 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       const partCount = Number(opened.payload?.partCount ?? 1);
       if (partCount > 1) {
         const key = privatePartKey(opened, entry);
-        const existing = privatePartGroups.get(key) ?? { targetThread, parts: [], partCount };
-        existing.parts.push({ opened, entry, entryId });
+        const existing = privatePartGroups.get(key) ?? {
+          targetThread,
+          parts: [],
+          partCount,
+          maxCreatedAtMs: 0,
+          hasIndexedPart: false,
+        };
+        if (isPendingIdentityResolutionThread(existing.targetThread) && !isPendingIdentityResolutionThread(targetThread)) {
+          existing.targetThread = targetThread;
+        }
+        existing.parts.push({ opened, entry, entryId, targetThread });
         existing.partCount = Math.max(existing.partCount, partCount);
+        existing.hasIndexedPart = existing.hasIndexedPart || source !== 'history-retry';
+        existing.maxCreatedAtMs = Math.max(existing.maxCreatedAtMs, privateEntryCreatedAtMs(entry) ?? 0);
         privatePartGroups.set(key, existing);
       } else {
         const added = await appendOpenedCapsuleMessage(
           opened,
           targetThread,
-          privateChainMessageMeta(entry),
+          privateChainMessageMeta({ ...entry, openedAs: opened.openedAs }),
           entry,
         );
         if (added) imported += 1;
       }
+      rememberPrivateScanLog(entryId, `open-${opened.openedAs ?? 'ok'}`);
+      return { ok: true, entry };
     } catch (error) {
       const message = String(error?.message ?? error);
       if (noteTonRpcRateLimit(error)) {
         rateLimitError = error;
         scanComplete = false;
-        return false;
+        return { ok: false, entry };
       } else if (isBodyHistoryUnavailableError(error)) {
+        scannedPrivateEntryIds.add(entryIdKey);
+        rememberPrivateScanLog(entryId, 'body-gap');
         bodyHistoryError = error;
         blockedEntryId = entryId;
         historyUnavailableEntries.push({
@@ -4723,52 +5967,145 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         });
         rememberPrivateBodyHistoryUnavailable(address, entry, entryId);
         skipped += 1;
-        return true;
-      } else if (/recipient|decrypt|key mismatch|expired|operation-specific/i.test(message)) {
+        return { ok: true, entry };
+      } else if (isPrivateUnreadableCapsuleError(error)) {
+        scannedPrivateEntryIds.add(entryIdKey);
         clearPrivateBodyHistoryUnavailable(address, entryId);
+        privateKeyOpenError = error;
+        blockedEntryId = entryId;
+        rememberPrivateScanLog(entryId, 'unreadable');
         skipped += 1;
+        globalThis.plathoLastPrivateSyncKeyOpenError = {
+          entryId: entryId.toString(),
+          localKeyId: localRecipientKeyPair?.keyId ?? null,
+          type: 'unreadable_capsule',
+          message,
+          at: new Date().toISOString(),
+        };
+        return { ok: true, entry };
       } else {
+        rememberPrivateScanLog(entryId, 'error');
         console.error(error);
         scanComplete = false;
-        return false;
+        return { ok: false, entry };
       }
     }
-    return true;
   };
 
-  for (const entryId of entryIdsToScan) {
-    if (!(await scanPrivateEntryId(entryId, { advanceCursor: linearEntryIdSet.has(entryId.toString()) }))) break;
+  let indexEntriesScanned = 0;
+  let headRepairScanned = 0;
+  let historyRetryScanned = 0;
+  let catchUpRemaining = 0;
+  const walkIndexedRole = async (role, latestHeadLink) => {
+    const cursor = readPrivateChainIndexCursor(address, role);
+    const hasResume = cursor.resumeLink > 0n;
+    const targetHeadLink = hasResume ? cursor.targetHeadLink : latestHeadLink;
+    const stopLink = cursor.processedHeadLink;
+    let currentLink = hasResume ? cursor.resumeLink : latestHeadLink;
+    if (latestHeadLink === 0n) {
+      if (cursor.processedHeadLink !== 0n || cursor.targetHeadLink !== 0n || cursor.resumeLink !== 0n) {
+        cursorWrites.push({ role, cursor: normalizePrivateChainIndexCursor(null) });
+      }
+      return;
+    }
+    if (!hasResume && latestHeadLink === stopLink) return;
+    let scannedForRole = 0;
+    let nextLink = currentLink;
+    while (currentLink > 0n && currentLink !== stopLink && scannedForRole < limit) {
+      const entryId = privateIndexEntryIdFromLink(currentLink);
+      if (entryId === null) {
+        nextLink = 0n;
+        break;
+      }
+      const result = await scanPrivateEntryId(entryId, { source: role });
+      if (!result.ok) {
+        scanComplete = false;
+        return;
+      }
+      indexEntriesScanned += 1;
+      scannedForRole += 1;
+      const previousLink = privateIndexPreviousLink(result.entry, role);
+      nextLink = previousLink;
+      if (previousLink === currentLink) {
+        scanComplete = false;
+        return;
+      }
+      currentLink = previousLink;
+    }
+    if (currentLink > 0n && currentLink !== stopLink) {
+      catchUpRemaining += 1;
+      cursorWrites.push({
+        role,
+        cursor: {
+          processedHeadLink: stopLink,
+          targetHeadLink,
+          resumeLink: nextLink,
+        },
+      });
+      return;
+    }
+    cursorWrites.push({
+      role,
+      cursor: {
+        processedHeadLink: targetHeadLink,
+        targetHeadLink: 0n,
+        resumeLink: 0n,
+      },
+    });
+  };
+
+  const walkRecentIndexedRoleForRepair = async (role, latestHeadLink) => {
+    const latestLink = privateIndexLinkValue(latestHeadLink);
+    if (latestLink === 0n) return;
+    if (readPrivateChainHeadRepairLink(address, role) === latestLink) return;
+    let currentLink = latestLink;
+    let scannedForRole = 0;
+    while (currentLink > 0n && scannedForRole < PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT) {
+      const entryId = privateIndexEntryIdFromLink(currentLink);
+      if (entryId === null) break;
+      const result = await scanPrivateEntryId(entryId, { source: `${role}-head-repair` });
+      if (!result.ok) {
+        scanComplete = false;
+        return;
+      }
+      headRepairScanned += 1;
+      scannedForRole += 1;
+      const previousLink = privateIndexPreviousLink(result.entry, role);
+      if (previousLink === currentLink) {
+        scanComplete = false;
+        return;
+      }
+      currentLink = previousLink;
+    }
+    headRepairWrites.push({ role, link: latestLink });
+  };
+
+  for (const entryId of retryEntryIds) {
+    const result = await scanPrivateEntryId(entryId, { source: 'history-retry' });
+    historyRetryScanned += 1;
+    if (!result.ok) break;
+  }
+  if (!rateLimitError && scanComplete) {
+    await walkIndexedRole('recipient', recipientHead);
+  }
+  if (!rateLimitError && scanComplete) {
+    await walkIndexedRole('sender', senderHead);
+  }
+  if (!rateLimitError && scanComplete) {
+    await walkRecentIndexedRoleForRepair('recipient', recipientHead);
+  }
+  if (!rateLimitError && scanComplete) {
+    await walkRecentIndexedRoleForRepair('sender', senderHead);
   }
 
-  const incompletePrivatePartGroups = () => [...privatePartGroups.values()].filter((group) => {
+  const incompletePrivatePartGroups = [...privatePartGroups.values()].filter((group) => {
     const uniqueParts = new Set();
     for (const part of group.parts) {
       uniqueParts.add(Number(part.opened?.payload?.partIndex ?? 0));
     }
-    return uniqueParts.size !== group.partCount;
+    if (uniqueParts.size === group.partCount) return false;
+    return group.hasIndexedPart === true;
   });
-
-  let multipartLookaheadScanned = 0;
-  if (scanComplete) {
-    const configuredLookaheadLimit = Number(
-      options.multipartLookaheadLimit
-        ?? appConfig.capsuleHub?.privateMultipartLookaheadLimit
-        ?? PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT,
-    );
-    const lookaheadLimit = Number.isFinite(configuredLookaheadLimit)
-      ? Math.max(0, Math.floor(configuredLookaheadLimit))
-      : PRIVATE_CHAIN_MULTIPART_LOOKAHEAD_LIMIT;
-    let lookaheadEntryId = scanEnd;
-    while (
-      incompletePrivatePartGroups().length > 0
-      && lookaheadEntryId < latest
-      && multipartLookaheadScanned < lookaheadLimit
-    ) {
-      if (!(await scanPrivateEntryId(lookaheadEntryId, { advanceCursor: true }))) break;
-      lookaheadEntryId += 1n;
-      multipartLookaheadScanned += 1;
-    }
-  }
 
   for (const group of privatePartGroups.values()) {
     const uniqueParts = new Map();
@@ -4782,8 +6119,12 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         }
         continue;
       }
-      scanComplete = false;
-      partialPrivateStream = true;
+      const ageMs = group.maxCreatedAtMs > 0 ? Date.now() - group.maxCreatedAtMs : Number.POSITIVE_INFINITY;
+      if (ageMs <= PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS) {
+        scanComplete = false;
+      }
+      incompletePrivateStreamCount += 1;
+      skipped += uniqueParts.size;
       continue;
     }
     const ordered = [...uniqueParts.values()].sort((a, b) => {
@@ -4794,69 +6135,110 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     });
     const firstEntry = ordered[0]?.entry;
     const firstOpened = ordered[0]?.opened;
-    const added = await appendOpenedPrivatePartsMessage(
-      ordered,
-      group.targetThread,
-      privateChainMessageMeta(firstEntry, ordered.length),
-    );
-    if (added) imported += 1;
+    try {
+      const added = await appendOpenedPrivatePartsMessage(
+        ordered,
+        group.targetThread,
+        privateChainMessageMeta({ ...firstEntry, openedAs: firstOpened?.openedAs }, ordered.length),
+      );
+      pruneEmptyAnonymousPeerThreads();
+      if (added) imported += 1;
+    } catch (error) {
+      skipped += ordered.length;
+      globalThis.plathoLastPrivateSyncGroupError = {
+        message: String(error?.message ?? error ?? 'private multipart blocked'),
+        entryId: privateEntryIdText(firstEntry),
+        partCount: ordered.length,
+        at: new Date().toISOString(),
+      };
+      console.error(error);
+    }
   }
-  const catchUpRemaining = effectiveScanEnd < latest ? Number(latest - effectiveScanEnd) : 0;
-  if (scanComplete) {
-    const previousCursor = storedCursor ?? 0n;
-    const nextCursor = effectiveScanEnd > previousCursor ? effectiveScanEnd : previousCursor;
-    writePrivateChainScanCursor(address, nextCursor);
+  const publishConfirmations = await confirmPendingPrivatePublishMessagesFromEntries(
+    [...privateEntryCache.values()],
+    'private_sync_index',
+  );
+  const hasFreshPartial = incompletePrivatePartGroups.some((group) => {
+    const ageMs = group.maxCreatedAtMs > 0 ? Date.now() - group.maxCreatedAtMs : Number.POSITIVE_INFINITY;
+    return ageMs <= PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS;
+  });
+  if (canPersistPrivateIndexCursor && !rateLimitError && scanComplete && !hasFreshPartial && bodyHistoryError === null) {
+    for (const write of cursorWrites) writePrivateChainIndexCursor(address, write.role, write.cursor);
+    for (const write of headRepairWrites) writePrivateChainHeadRepairLink(address, write.role, write.link);
+  } else if (canPersistPrivateIndexCursor && !rateLimitError && !hasFreshPartial && catchUpRemaining > 0 && bodyHistoryError === null) {
+    for (const write of cursorWrites) writePrivateChainIndexCursor(address, write.role, write.cursor);
+    for (const write of headRepairWrites) writePrivateChainHeadRepairLink(address, write.role, write.link);
   }
   const reason = bodyHistoryError
     ? 'body_history_unavailable'
-    : (partialPrivateStream
-      ? 'partial_private_stream'
-      : (scanComplete && effectiveScanEnd < latest ? 'catch_up_pending' : null));
+    : privateKeyOpenError
+      ? 'private_key_open_failed'
+      : hasFreshPartial
+        ? 'partial_stream_pending'
+        : (catchUpRemaining > 0 ? 'catch_up_pending' : null);
+  const recipientCursor = readPrivateChainIndexCursor(address, 'recipient');
+  const senderCursor = readPrivateChainIndexCursor(address, 'sender');
   globalThis.plathoLastPrivateSync = {
     capsuleHub: address,
     keyId: localRecipientKeyPair?.keyId ?? null,
-    start: start.toString(),
-    scanEnd: effectiveScanEnd.toString(),
-    baseScanEnd: scanEnd.toString(),
-    latest: latest.toString(),
+    indexKeyId: keyIdIndex.toString(),
+    recipientHead: recipientHead.toString(),
+    senderHead: senderHead.toString(),
+    recipientCursor: privateIndexCursorDebug(recipientCursor),
+    senderCursor: privateIndexCursorDebug(senderCursor),
+    cursorPersistence: canPersistPrivateIndexCursor ? 'verified' : 'disabled_unverified',
     imported,
     skipped,
-    scanComplete: scanComplete && effectiveScanEnd >= latest,
+    scanComplete: scanComplete && catchUpRemaining === 0 && !hasFreshPartial,
     pageComplete: scanComplete,
-    multipartLookaheadScanned,
+    indexEntriesScanned,
+    headRepairScanned,
+    historyRetryScanned,
+    publishConfirmations,
     rateLimited: rateLimitError !== null,
     bodyHistoryUnavailable: bodyHistoryError !== null,
+    privateKeyOpenFailed: privateKeyOpenError !== null,
     blockedEntryId: blockedEntryId?.toString?.() ?? null,
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
+    incompletePrivateStreamCount,
     catchUpRemaining,
     reason,
-    forced: options.forceRecentRescan === true,
+    mode: quickSync ? 'auto' : 'recovery',
+    scanLog,
   };
   const result = privateSyncResult({
     imported,
     skipped,
-    scanComplete: scanComplete && effectiveScanEnd >= latest,
+    scanComplete: scanComplete && catchUpRemaining === 0 && !hasFreshPartial,
     reason,
     blockedEntryId: blockedEntryId?.toString?.() ?? null,
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
     catchUpRemaining,
     rateLimited: rateLimitError !== null,
-    ok: scanComplete,
+    ok: rateLimitError === null,
   });
   if (imported > 0) {
     refreshMessagingControls();
     renderThreads();
     renderConversation();
+    refreshPrivateDebugLog();
+    resumePendingPrivatePublishConfirmations();
+    resumePendingPrivateSendRetries();
     return result;
   }
   if (!scanComplete) {
     refreshMessagingControls();
+    refreshPrivateDebugLog();
+    resumePendingPrivateSendRetries();
     if (rateLimitError) throw rateLimitError;
     return result;
   }
   refreshMessagingControls();
+  refreshPrivateDebugLog();
+  resumePendingPrivatePublishConfirmations();
+  resumePendingPrivateSendRetries();
   return result;
 }
 
@@ -4889,6 +6271,40 @@ function clearMessageAutoSyncTimer() {
   refreshConversationSubtitle();
 }
 
+function privateOutboundWorkActive() {
+  return privateOutboundWorkDepth > 0;
+}
+
+function beginPrivateOutboundWork() {
+  privateOutboundWorkDepth += 1;
+  return () => {
+    privateOutboundWorkDepth = Math.max(0, privateOutboundWorkDepth - 1);
+    if (privateOutboundWorkDepth === 0 && isChatsViewActive() && !messageAutoSyncTimer) {
+      scheduleMessageAutoSync(PRIVATE_OUTBOUND_SYNC_PAUSE_MS);
+    }
+  };
+}
+
+async function enterVaultPublishSendLock() {
+  vaultPublishSendWaiters += 1;
+  const previous = vaultPublishSendLock;
+  let releaseLock = () => {};
+  vaultPublishSendLock = new Promise((resolve) => {
+    releaseLock = resolve;
+  });
+  await previous.catch(() => {});
+  vaultPublishSendWaiters = Math.max(0, vaultPublishSendWaiters - 1);
+  let released = false;
+  return {
+    hasWaiters: () => vaultPublishSendWaiters > 0,
+    release() {
+      if (released) return;
+      released = true;
+      releaseLock();
+    },
+  };
+}
+
 function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   clearMessageAutoSyncTimer();
   if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair || document.hidden) return;
@@ -4899,29 +6315,42 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   messageAutoSyncTimer = window.setTimeout(async () => {
     messageAutoSyncTimer = null;
     messageAutoSyncAt = 0;
+    let nextSyncDelayMs = MESSAGE_AUTO_SYNC_MS;
+    if (privateOutboundWorkActive()) {
+      scheduleMessageAutoSync(PRIVATE_OUTBOUND_SYNC_PAUSE_MS);
+      return;
+    }
     beginMessageSyncUi();
     try {
-      const result = await syncPrivateCapsulesFromChainOnce();
+      const result = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' });
       completeMessageSyncUi(result);
+      if (result?.scanComplete === false || result?.reason === 'catch_up_pending') {
+        nextSyncDelayMs = 2_000;
+      }
       if (privateSyncImported(result)) {
         setText(messageSyncStatus, 'new messages');
       } else if (messageSyncStatus?.textContent === 'syncing') {
         setText(messageSyncStatus, privateSyncStatusText(result));
       }
-      resumePendingPrivatePublishConfirmations();
     } catch (error) {
       const rateLimited = noteTonRpcRateLimit(error);
       const label = rateLimited ? 'Sync delayed' : 'Sync failed';
       failMessageSyncUi(label);
       setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
       if (!rateLimited) console.error(error);
+      if (rateLimited) nextSyncDelayMs = tonRpcLimitBackoffMs(error);
     } finally {
-      scheduleMessageAutoSync();
+      scheduleMessageAutoSync(nextSyncDelayMs);
     }
   }, effectiveDelayMs);
 }
 
 async function bootReplayStore() {
+  if (!plathoWallet?.address) {
+    localReplayStore = createMemoryReplayStore();
+    setText(replayStoreStatus, hasStoredPlathoWalletRecord() ? 'unlock required' : 'memory');
+    return;
+  }
   try {
     localReplayStore = await createIndexedDbReplayStore({ dbName: currentReplayDbName() });
     setText(replayStoreStatus, 'device db');
@@ -4934,7 +6363,9 @@ async function bootReplayStore() {
 function historyStatusLabel() {
   if (!encryptedMessageStore) return 'history off';
   const limit = encryptedMessageStore.maxRecords ? `last ${encryptedMessageStore.maxRecords}` : 'local';
-  return encryptedMessageStore.persistent === false ? `encrypted memory (${limit})` : `encrypted db (${limit})`;
+  return encryptedMessageStore.persistent === false
+    ? `device-encrypted memory cache (${limit})`
+    : `device-encrypted local cache (${limit})`;
 }
 
 function serializeMessageForHistory(message) {
@@ -4948,11 +6379,23 @@ function serializeMessageForHistory(message) {
     chainLastEntryId: message.chainLastEntryId ?? null,
     localCreatedAtMs: message.localCreatedAtMs ?? null,
     localHistoryCreatedAt: message.localHistoryCreatedAt ?? null,
-    payment: message.payment ?? null,
+    payment: paymentForHistory(message.payment),
+    paymentDraft: paymentDraftForHistory(message.paymentDraft),
+    paymentCheckLedgerId: message.paymentCheckLedgerId ?? null,
+    blocks: messageBlocksForHistory(message),
     capsule: message.capsule ?? null,
     capsules: message.capsules ?? null,
     publishState: message.publishState ?? null,
+    recipientWallet: message.recipientWallet ?? null,
+    vaultCreateIntent: safeJsonClone(message.vaultCreateIntent) ?? null,
+    vaultPublish: safeJsonClone(message.vaultPublish) ?? null,
+    vaultCancelIntent: safeJsonClone(message.vaultCancelIntent) ?? null,
+    privateSendRetryAttempt: Number(message.privateSendRetryAttempt ?? 0) || 0,
+    privateSendRetryStopped: message.privateSendRetryStopped === true,
+    privateSendRetryStoppedAt: message.privateSendRetryStoppedAt ?? null,
     privatePublishConfirmAttempt: Number(message.privatePublishConfirmAttempt ?? 0) || 0,
+    privatePublishConfirmStopped: message.privatePublishConfirmStopped === true,
+    privatePublishConfirmStoppedAt: message.privatePublishConfirmStoppedAt ?? null,
     attachment: message.attachment ?? null,
     profileVersion: message.profileVersion ?? 0,
     avatarHash: message.avatarHash ?? zeroAvatarHashHex(),
@@ -4961,11 +6404,23 @@ function serializeMessageForHistory(message) {
 
 function safeJsonClone(value) {
   try {
-    return JSON.parse(JSON.stringify(value));
+    return JSON.parse(JSON.stringify(value, (_key, item) => (
+      typeof item === 'bigint' ? item.toString() : item
+    )));
   } catch {
     return null;
   }
 }
+
+function safeDiagnosticsJson(value) {
+  return JSON.stringify(value ?? null, (_key, item) => (
+    typeof item === 'bigint' ? item.toString() : item
+  ), 2);
+}
+
+globalThis.plathoProfileAvatarPublishDiagnosticsJson = () => safeDiagnosticsJson(
+  globalThis.plathoLastProfileAvatarPublishDiagnostics,
+);
 
 function serializeThreadForHistory(thread) {
   if (!thread?.id) return null;
@@ -5074,7 +6529,11 @@ async function writeMessageToEncryptedHistory(thread, message) {
 async function restoreEncryptedMessageHistory() {
   if (!encryptedMessageStore) return;
   try {
-    const restored = await encryptedMessageStore.listMessages();
+    const result = encryptedMessageStore.listMessagesDetailed
+      ? await encryptedMessageStore.listMessagesDetailed()
+      : { messages: await encryptedMessageStore.listMessages(), failed: [] };
+    const restored = result.messages ?? [];
+    const failed = result.failed ?? [];
     let changed = false;
     for (const item of restored) {
       const thread = ensureHistoryThread(item.threadId, item.thread, item.message);
@@ -5092,13 +6551,22 @@ async function restoreEncryptedMessageHistory() {
         ownerWalletFromThread(thread),
         avatarPointerFromFields(message.profileVersion, message.avatarHash),
       ).catch((error) => console.error(error));
-      changed = true;
+        changed = true;
     }
-    setText(localStateLabel, restored.length > 0 ? `${historyStatusLabel()} ${restored.length}` : historyStatusLabel());
+    globalThis.plathoLastEncryptedHistoryRestore = {
+      restored: restored.length,
+      failed: failed.length,
+      failedRecords: failed,
+      dbName: currentMessageHistoryDbName(),
+      walletAddress: plathoWallet?.address ?? null,
+    };
+    const restoredLabel = restored.length > 0 ? `${historyStatusLabel()} ${restored.length}` : historyStatusLabel();
+    setText(localStateLabel, failed.length > 0 ? `${restoredLabel} · ${failed.length} blocked` : restoredLabel);
     if (changed) {
       renderThreads();
       renderConversation();
       resumePendingPrivatePublishConfirmations();
+      resumePendingPrivateSendRetries();
     }
   } catch (error) {
     setText(localStateLabel, 'history blocked');
@@ -5106,7 +6574,207 @@ async function restoreEncryptedMessageHistory() {
   }
 }
 
+function paymentCheckIntentIdText(payment) {
+  try {
+    return paymentIntentId(payment).toString();
+  } catch {
+    return String(payment?.intentId ?? payment?.intentIdHex ?? '');
+  }
+}
+
+function paymentCheckPendingLedgerId(payment) {
+  const hex = String(payment?.intentIdHex ?? '').replace(/^0x/i, '').toLowerCase();
+  if (/^[0-9a-f]{64}$/.test(hex)) return `payment-check:${hex}`;
+  return `payment-check:${paymentCheckIntentIdText(payment)}`;
+}
+
+function paymentCheckPendingLedgerStatusText(record) {
+  const status = String(record?.status ?? '').toLowerCase();
+  if (status.includes('cancel') && status.includes('submitted')) return 'check cancel submitted, confirming';
+  if (status.includes('cancel')) return 'check cancelled';
+  if (status.includes('claim') && status.includes('submitted')) return 'check claim submitted, confirming';
+  if (status.includes('claim')) return 'check claimed';
+  if (status.includes('publish') && status.includes('submitted')) return 'message submitted, confirming';
+  if (status.includes('publish') && status.includes('failed')) return 'check not delivered, refund required';
+  if (status.includes('publish') && status.includes('retry')) return 'checking RPC, retrying';
+  if (status.includes('publish') && status.includes('partial')) return 'submitted, retrying';
+  if (status.includes('publish')) return 'publishing message';
+  if (status.includes('intent') || status.includes('create')) return 'payment check created, publishing message';
+  return 'check recovery pending';
+}
+
+function isTerminalPaymentCheckLedgerRecord(record) {
+  return /^(published_confirmed|claim_confirmed|claimed|cancel_confirmed|cancelled|removed)$/i.test(String(record?.status ?? ''));
+}
+
+function findPaymentCheckMessageByIntentId(intentIdText) {
+  for (const thread of threads) {
+    for (const message of thread.messages ?? []) {
+      if (!message?.payment) continue;
+      if (paymentCheckIntentIdText(message.payment) === intentIdText) return { thread, message };
+    }
+  }
+  return null;
+}
+
+function ensurePendingPaymentCheckLedgerThread(record, payment) {
+  if (record?.threadId) return ensureHistoryThread(record.threadId, record.thread, record.message);
+  const recipientWallet = payment?.recipientWallet ?? record?.recipientWallet;
+  if (recipientWallet) {
+    const created = createRecipientThread(recipientWallet, {
+      preview: 'payment check recovery',
+      state: 'pending',
+      time: 'local',
+    });
+    if (created?.ok) {
+      const existing = threads.find((thread) => thread.id === created.thread.id);
+      if (existing) return existing;
+      threads.push(created.thread);
+      return created.thread;
+    }
+  }
+  return ensureHistoryThread(`payment-check:${record?.id ?? Date.now()}`, record?.thread, record?.message);
+}
+
+function upsertPendingPaymentCheckLedgerMessage(record) {
+  if (isTerminalPaymentCheckLedgerRecord(record)) return false;
+  const payment = normalizePaymentForMessage(record.payment ?? record);
+  const intentIdText = paymentCheckIntentIdText(payment);
+  const existing = findPaymentCheckMessageByIntentId(intentIdText);
+  if (existing) {
+    existing.message.paymentCheckLedgerId = record.id ?? record.ledgerId ?? existing.message.paymentCheckLedgerId;
+    existing.message.vaultCreateIntent = record.vaultCreateIntent ?? existing.message.vaultCreateIntent;
+    existing.message.vaultPublish = record.vaultPublish ?? existing.message.vaultPublish;
+    existing.message.vaultCancelIntent = record.vaultCancelIntent ?? existing.message.vaultCancelIntent;
+    if (!existing.message.meta || /recovery pending/i.test(existing.message.meta)) {
+      existing.message.meta = paymentCheckPendingLedgerStatusText(record);
+    }
+    refreshThreadAfterMessageChange(existing.thread);
+    return false;
+  }
+  const thread = ensurePendingPaymentCheckLedgerThread(record, payment);
+  const snapshot = record.message && typeof record.message === 'object'
+    ? (safeJsonClone(record.message) ?? {})
+    : {};
+  const message = {
+    ...snapshot,
+    type: snapshot.type ?? 'out',
+    text: snapshot.text ?? paymentMessageText(payment),
+    meta: paymentCheckPendingLedgerStatusText(record),
+    payment,
+    paymentDraft: null,
+    paymentCheckLedgerId: record.id ?? record.ledgerId ?? paymentCheckPendingLedgerId(payment),
+    recipientWallet: payment.recipientWallet ?? record.recipientWallet ?? snapshot.recipientWallet ?? null,
+    vaultCreateIntent: record.vaultCreateIntent ?? snapshot.vaultCreateIntent ?? null,
+    vaultPublish: record.vaultPublish ?? snapshot.vaultPublish ?? null,
+    vaultCancelIntent: record.vaultCancelIntent ?? snapshot.vaultCancelIntent ?? null,
+  };
+  ensureMessageOrderFields(message, Number(record.createdAtMs ?? record.createdAt) || Date.now());
+  insertThreadMessage(thread, message);
+  refreshThreadAfterMessageChange(thread);
+  return true;
+}
+
+async function restorePendingPaymentCheckLedger() {
+  if (!encryptedMessageStore?.listPendingPaymentChecks) return;
+  try {
+    const result = await encryptedMessageStore.listPendingPaymentChecks();
+    const records = result.records ?? [];
+    let restored = 0;
+    let skipped = 0;
+    for (const record of records) {
+      if (isTerminalPaymentCheckLedgerRecord(record)) {
+        skipped += 1;
+        continue;
+      }
+      if (upsertPendingPaymentCheckLedgerMessage(record)) restored += 1;
+    }
+    globalThis.plathoLastPaymentCheckPendingLedger = {
+      restored,
+      skipped,
+      failed: result.failed ?? [],
+      records: records.length,
+      dbName: currentMessageHistoryDbName(),
+      walletAddress: plathoWallet?.address ?? null,
+    };
+    if (restored > 0) {
+      renderThreads();
+      renderConversation();
+    }
+  } catch (error) {
+    globalThis.plathoLastPaymentCheckPendingLedger = {
+      error: String(error?.message ?? error ?? 'pending payment check ledger blocked'),
+      dbName: currentMessageHistoryDbName(),
+      walletAddress: plathoWallet?.address ?? null,
+    };
+    console.error(error);
+  }
+}
+
+async function rememberPendingPaymentCheckLedgerRecord(thread, message, payment, fields = {}, options = {}) {
+  if (!encryptedMessageStore?.putPendingPaymentCheck) return null;
+  const id = paymentCheckPendingLedgerId(payment);
+  if (message) message.paymentCheckLedgerId = id;
+  try {
+    const existing = encryptedMessageStore.getPendingPaymentCheck
+      ? await encryptedMessageStore.getPendingPaymentCheck(id).catch(() => null)
+      : null;
+    const fieldSnapshot = safeJsonClone(fields) ?? {};
+    const now = new Date().toISOString();
+    const record = {
+      ...(existing ?? {}),
+      kind: PAYMENT_CHECK_PENDING_LEDGER_KIND,
+      id,
+      ledgerId: id,
+      intentId: paymentCheckIntentIdText(payment),
+      intentIdHex: payment.intentIdHex ?? existing?.intentIdHex ?? null,
+      payment: normalizePaymentForMessage(payment),
+      senderWallet: payment.senderWallet ?? existing?.senderWallet ?? null,
+      recipientWallet: payment.recipientWallet ?? existing?.recipientWallet ?? null,
+      threadId: thread?.id ?? existing?.threadId ?? null,
+      thread: thread ? serializeThreadForHistory(thread) : existing?.thread ?? null,
+      messageLocalHistoryId: message?.localHistoryId ?? existing?.messageLocalHistoryId ?? null,
+      message: message ? serializeMessageForHistory(message) : existing?.message ?? null,
+      publishState: message?.publishState ?? fieldSnapshot.publishState ?? existing?.publishState ?? null,
+      vaultCreateIntent: message?.vaultCreateIntent ?? fieldSnapshot.vaultCreateIntent ?? existing?.vaultCreateIntent ?? null,
+      vaultPublish: message?.vaultPublish ?? fieldSnapshot.vaultPublish ?? existing?.vaultPublish ?? null,
+      vaultCancelIntent: message?.vaultCancelIntent ?? fieldSnapshot.vaultCancelIntent ?? existing?.vaultCancelIntent ?? null,
+      createdAt: existing?.createdAt ?? messageCreatedAtMs(message) ?? Date.now(),
+      updatedAt: now,
+      ...fieldSnapshot,
+      status: fieldSnapshot.status ?? existing?.status ?? 'prepared',
+    };
+    const stored = await encryptedMessageStore.putPendingPaymentCheck(record);
+    return { ...record, id: stored.id, createdAt: stored.createdAt };
+  } catch (error) {
+    if (options.required === true) throw error;
+    console.error(error);
+    return null;
+  }
+}
+
+async function markPendingPaymentCheckLedgerRecord(payment, fields = {}) {
+  return rememberPendingPaymentCheckLedgerRecord(null, null, payment, fields);
+}
+
+async function removePendingPaymentCheckLedgerRecord(payment, options = {}) {
+  if (!encryptedMessageStore?.removePendingPaymentCheck) return null;
+  try {
+    await encryptedMessageStore.removePendingPaymentCheck(paymentCheckPendingLedgerId(payment));
+    return true;
+  } catch (error) {
+    if (options.required === true) throw error;
+    console.error(error);
+    return null;
+  }
+}
+
 async function bootEncryptedMessageHistory() {
+  if (!plathoWallet?.address) {
+    encryptedMessageStore = null;
+    setText(localStateLabel, hasStoredPlathoWalletRecord() ? 'history locked' : 'history off');
+    return;
+  }
   try {
     encryptedMessageStore = await createIndexedDbEncryptedMessageHistoryStore({ dbName: currentMessageHistoryDbName() });
   } catch (indexedDbError) {
@@ -5121,6 +6789,13 @@ async function bootEncryptedMessageHistory() {
     }
   }
   await restoreEncryptedMessageHistory();
+  await restorePendingPaymentCheckLedger();
+}
+
+async function bootWalletScopedLocalStores() {
+  await bootReplayStore();
+  await bootEncryptedMessageHistory();
+  if (plathoWallet?.address) activeRuntimeWalletAddress = plathoWallet.address;
 }
 
 function shortKeyId(keyId) {
@@ -5540,6 +7215,7 @@ async function loadPlathoWallet() {
   clearWalletUnlockPromptTimer();
   walletUnlockPromise = (async () => {
     const wallet = await readStoredPlathoWallet();
+    if (wallet) prepareWalletScopedRuntimeForWallet(wallet, 'wallet unlocked');
     plathoWallet = wallet;
     localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet?.address);
     if (wallet) {
@@ -5562,6 +7238,7 @@ async function loadPlathoWallet() {
 }
 
 async function setPlathoWallet(wallet, { password } = {}) {
+  prepareWalletScopedRuntimeForWallet(wallet, 'wallet replaced');
   plathoWallet = wallet;
   markWalletUnlocked();
   localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
@@ -5806,9 +7483,13 @@ function shortUiErrorText(error, fallback = 'Blocked') {
 function privateSendPreflightStatusText(error) {
   const message = shortUiErrorText(error, 'Send blocked');
   if (/not enough vault ton/i.test(message)) return message;
+  if (/persistent encrypted local history/i.test(message)) return 'Local encrypted history unavailable; reload Platho before creating a check';
+  if (/payment check recovery record could not be saved|payment check pending ledger could not be saved/i.test(message)) {
+    return 'Payment check recovery could not be saved; reload Platho and try again';
+  }
   if (/activate platho account before publishing/i.test(message)) return 'Activate Platho account before sending';
   if (/network surcharge .* exceeds the production cap/i.test(message)) return message;
-  if (/RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message)) return 'RPC verification unavailable';
+  if (isTonRpcVerificationSoftReadError(error)) return 'RPC verification pending';
   if (/Vault chain provider|TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
   return message;
 }
@@ -5817,27 +7498,60 @@ function privateSendBlockedStatusText(error) {
   return `not sent: ${privateSendPreflightStatusText(error)}`;
 }
 
+function vaultActionBlockedStatusText(error, fallback = 'move blocked') {
+  const message = shortUiErrorText(error, fallback);
+  if (/unlock and activate your platho account before moving ton from vault/i.test(message)) {
+    return 'Activate Platho account before moving TON from Vault';
+  }
+  if (/local vault auth key is not ready/i.test(message)) {
+    return 'Unlock and activate Platho account before Vault actions';
+  }
+  return message;
+}
+
 function canEditPrivateComposerDraft(thread = activeThread()) {
   return Boolean(thread)
     && thread.readOnly !== true
     && Boolean(plathoWallet);
 }
 
+function privateSendBlockReason(thread = activeThread(), options = {}) {
+  if (!thread) return 'Choose a private chat';
+  if (thread.readOnly === true) return 'Read-only channel';
+  if (!plathoWallet) return 'Wallet required';
+  if (pendingServiceWorkerAppShellReload === true) return 'Update ready - reload app';
+  if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
+    return 'Unlock and activate Platho account before sending';
+  }
+  if (options.includeVaultShortfall !== false && privateComposerKnownVaultTonShortfall()) {
+    return 'Vault TON hold required';
+  }
+  return null;
+}
+
 function canAttemptPrivateSend(thread = activeThread()) {
   return canEditPrivateComposerDraft(thread)
     && Boolean(localIdentity && localRecipientKeyPair && localSignedPublicBundle)
     && pendingServiceWorkerAppShellReload !== true
-    && !tonRpcLimited()
     && !privateComposerKnownVaultTonShortfall();
 }
 
 function isTonRpcTransientError(error) {
   const message = String(error?.message ?? error ?? '');
   return isTonRpcRateLimitError(error)
+    || Number(error?.status ?? error?.response?.status ?? 0) >= 500
     || error?.code === 'TIMEOUT'
     || error?.code === 'NETWORK_ERROR'
     || error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
-    || /timeout|network|failed to fetch|fetch failed|backoff|temporar(?:y|ily)|verification unavailable|provider unavailable|rpc busy|request aborted/i.test(message);
+    || error?.code === 'RPC_DISAGREEMENT'
+    || /HTTP 5\d\d|timeout|network|failed to fetch|fetch failed|backoff|temporar(?:y|ily)|verification unavailable|rpc disagreement|provider unavailable|rpc busy|request aborted|bad gateway|service unavailable|gateway timeout|upstream request failed/i.test(message);
+}
+
+function isTonRpcVerificationUnavailableError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
+    || error?.code === 'RPC_DISAGREEMENT'
+    || /RPC_VERIFICATION_UNAVAILABLE|verification unavailable|TON RPC disagreement|RPC_DISAGREEMENT/i.test(message);
 }
 
 function isFatalPrivateSendError(error) {
@@ -5855,9 +7569,10 @@ function isAmbiguousTonRpcBroadcastError(error) {
   const message = String(error?.message ?? error ?? '');
   if (/rejected|bad request|invalid boc|invalid message|exit code|not enough vault ton|nonce/i.test(message)) return false;
   if (isTonRpcRateLimitError(error)) return false;
+  if (Number(error?.status ?? error?.response?.status ?? 0) >= 500) return true;
   return error?.code === 'TIMEOUT'
     || error?.code === 'NETWORK_ERROR'
-    || /timeout|network|failed to fetch|fetch failed|backoff|request aborted/i.test(message);
+    || /HTTP 5\d\d|timeout|network|failed to fetch|fetch failed|backoff|request aborted|bad gateway|service unavailable|gateway timeout|upstream request failed/i.test(message);
 }
 
 function privateSendRetryDelayMs(error = null, attempt = 0) {
@@ -5867,12 +7582,26 @@ function privateSendRetryDelayMs(error = null, attempt = 0) {
 }
 
 function privateSendRetryMeta(error = null) {
+  if (isTonRpcVerificationSoftReadError(error)) return 'checking RPC, retrying';
   return isTonRpcRateLimitError(error) ? 'retrying after RPC busy' : 'retrying send';
 }
 
 function privateSendRetryExhaustedStatusText(error = null) {
+  if (error?.code === 'STALE_PRIVATE_PUBLISH') return 'not sent: retry window expired';
+  if (error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED') {
+    return /limit/i.test(String(error?.message ?? ''))
+      ? 'not sent: partial publish retry limit reached'
+      : 'not sent: partial publish retry window expired';
+  }
+  if (isTonRpcVerificationSoftReadError(error)) return 'not sent: RPC verification stayed unavailable';
   if (isTonRpcRateLimitError(error)) return 'not sent: RPC stayed busy';
   return 'not sent: retry limit reached';
+}
+
+function privateSendRetryMaxAttempts(error = null, message = null) {
+  if (privateMessageHasPartialRetryablePublish(message)) return PRIVATE_SEND_PARTIAL_RETRY_MAX_ATTEMPTS;
+  if (isTonRpcVerificationSoftReadError(error) || isTonRpcRateLimitError(error)) return PRIVATE_SEND_RPC_RETRY_MAX_ATTEMPTS;
+  return PRIVATE_SEND_RETRY_MAX_ATTEMPTS;
 }
 
 function messageDiscountUnlocked() {
@@ -5933,6 +7662,19 @@ function privateCapsulehubChargeNanotons(sizeClass = 1) {
   return execReserve + CAPSULEHUB_PRIVATE_STORAGE_CHARGE_NANOTONS;
 }
 
+function publicLocalExecReserveNanotons(sizeClass = 1) {
+  const normalizedSizeClass = normalizePrivateSizeClass(sizeClass);
+  const table = VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE_NANOTONS;
+  return table[normalizedSizeClass] ?? table[1];
+}
+
+function publicCapsulehubChargeNanotons(sizeClass = 1) {
+  const normalizedSizeClass = normalizePrivateSizeClass(sizeClass);
+  const execReserve = CAPSULEHUB_PUBLIC_EXEC_RESERVE_NANOTONS[normalizedSizeClass]
+    ?? CAPSULEHUB_PUBLIC_EXEC_RESERVE_NANOTONS[1];
+  return execReserve + CAPSULEHUB_PUBLIC_STORAGE_CHARGE_NANOTONS;
+}
+
 function privateComposerPublishProfile(suite = currentOutgoingPrivateSuite(), sizeClass = 1) {
   const normalizedSuite = normalizeCryptoSuite(suite);
   const normalizedSizeClass = normalizePrivateSizeClass(sizeClass);
@@ -5946,15 +7688,21 @@ function privateComposerPublishProfile(suite = currentOutgoingPrivateSuite(), si
   };
 }
 
-function publicComposerPublishProfile() {
+function publicComposerPublishProfile(sizeClass = 1) {
+  const normalizedSizeClass = normalizePrivateSizeClass(sizeClass);
   return {
     publishKind: VAULT_PUBLISH_KIND.PUBLIC,
-    sizeClass: VAULT_SIZE_CLASS.STANDARD,
+    sizeClass: BigInt(normalizedSizeClass),
     cryptoSuite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
     priceSuite: MESSAGE_PRICE_SUITES.PUBLIC_V1,
-    fixedCharge: VAULT_PUBLISH_PUBLIC_LOCAL_EXEC_RESERVE_NANOTONS + CAPSULEHUB_PUBLIC_FIXED_CHARGE_NANOTONS,
+    fixedCharge: publicLocalExecReserveNanotons(normalizedSizeClass) + publicCapsulehubChargeNanotons(normalizedSizeClass),
     protocolFee: PLATO_PUBLIC_POST_FEE_NANOTONS,
   };
+}
+
+function publicComposerPublishProfilesForPlan(plan) {
+  const parts = Array.isArray(plan) && plan.length > 0 ? plan : [{ sizeClass: 1 }];
+  return parts.map((part) => publicComposerPublishProfile(part.sizeClass));
 }
 
 function composerPartCount(text, maxTextBytes = SINGLE_CAPSULE_USEFUL_BYTES) {
@@ -5967,7 +7715,7 @@ function imageCompressionMode(modeId) {
 
 function imageAttachmentPartCount(attachment) {
   if (!attachment?.bytes?.length) return 0;
-  return splitBytesToParts(attachment.bytes, SINGLE_CAPSULE_USEFUL_BYTES).length;
+  return splitBytesToCapsuleParts(attachment.bytes, MAX_CAPSULE_USEFUL_BYTES).length;
 }
 
 function privateImageAttachmentPartCount(attachment, options = currentPrivateSenderOptions()) {
@@ -5980,28 +7728,35 @@ function normalizePrivateImageAttachments(attachments = privateImageAttachments)
   return attachments?.bytes?.length ? [attachments] : [];
 }
 
-function privateSenderWalletPayloadOverhead(options = {}) {
-  return options.includeSenderWalletMetadata === false ? 0 : PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES;
+function normalizePublicImageAttachments(attachments = publicImageAttachments) {
+  return normalizePrivateImageAttachments(attachments);
+}
+
+function privateCompactPayloadOverhead(options = {}) {
+  return PLATHO_COMPACT_SENDER_RECOVERY_BYTES
+    + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES
+    + (options.includeSenderWalletMetadata === false ? 0 : PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES)
+    + privateSenderUsernameMetadataBytes(options);
 }
 
 function privateTextCapsulePartsForSend(text, options = {}) {
   return splitUtf8ToCapsuleParts(text, MAX_CAPSULE_USEFUL_BYTES, {
-    perPartOverheadBytes: privateSenderWalletPayloadOverhead(options),
+    perPartOverheadBytes: privateCompactPayloadOverhead(options),
   });
 }
 
 function privateImageCapsulePartsForSend(attachment, options = {}) {
   if (!attachment?.bytes?.length) return [];
   return splitBytesToCapsuleParts(attachment.bytes, MAX_CAPSULE_USEFUL_BYTES, {
-    perPartOverheadBytes: privateSenderWalletPayloadOverhead(options),
+    perPartOverheadBytes: privateCompactPayloadOverhead(options),
   });
 }
 
 function privateComposerRetrievalPartLimit() {
-  const configuredLimit = Number(appConfig.capsuleHub?.privateReadLimit ?? PRIVATE_CHAIN_READ_LIMIT);
+  const configuredLimit = Number(appConfig.capsuleHub?.privateIndexReadLimit ?? PRIVATE_CHAIN_INDEX_READ_LIMIT);
   return Number.isFinite(configuredLimit)
     ? Math.max(1, Math.floor(configuredLimit))
-    : PRIVATE_CHAIN_READ_LIMIT;
+    : PRIVATE_CHAIN_INDEX_READ_LIMIT;
 }
 
 function privateComposerPartLimitMessage(partCount) {
@@ -6016,20 +7771,29 @@ function assertPrivateComposerPartLimit(partCount) {
   if (message) throw new Error(message);
 }
 
+function privateSenderUsernameMetadataLabel(options = {}) {
+  if (options.includeSenderWalletMetadata === false) return null;
+  const explicit = normalizeLinkedPlathoUsername(options.senderUsername ?? options.sender_username);
+  if (explicit) return explicit.label;
+  return readLinkedPlathoUsername(plathoWallet?.address)?.label ?? null;
+}
+
+function privateSenderUsernameMetadataBytes(options = {}) {
+  const label = privateSenderUsernameMetadataLabel(options);
+  if (!label) return 0;
+  return PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES + new TextEncoder().encode(label).length;
+}
+
 function privateComposerSendPlan(text, attachments = privateImageAttachments, options = currentPrivateSenderOptions(), extras = {}) {
   const plan = [];
-  if (String(text ?? '').trim().length > 0) {
-    for (const part of privateTextCapsulePartsForSend(text, options)) {
-      plan.push({ type: 'text', text: part.text, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
-    }
-  }
-  for (const attachment of normalizePrivateImageAttachments(attachments)) {
-    for (const part of privateImageCapsulePartsForSend(attachment, options)) {
-      plan.push({ type: 'image', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
-    }
-  }
-  if (extras.paymentCheck ?? privatePaymentCheckDraft) {
-    plan.push({ type: 'payment', sizeClass: 1, usefulBytes: SINGLE_CAPSULE_USEFUL_BYTES });
+  const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.paymentCheck ?? privatePaymentCheckDraft, {
+    allowMissingPaymentSecret: true,
+  });
+  if (!documentBytes) return plan;
+  for (const part of splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
+    perPartOverheadBytes: privateCompactPayloadOverhead(options),
+  })) {
+    plan.push({ type: 'document', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
   }
   return plan;
 }
@@ -6253,13 +8017,12 @@ function privateComposerKnownVaultTonShortfall() {
 }
 
 function publicComposerKnownVaultTonShortfall() {
-  const publicLimit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
-  const parts = composerTotalPartCount(publicMessageInput?.value ?? '', publicImageAttachment, publicLimit);
-  return composerKnownVaultTonShortfall(publicComposerPublishProfile(), parts);
+  const plan = publicComposerSendPlan(publicMessageInput?.value ?? '', publicImageAttachments);
+  return composerKnownVaultTonShortfall(publicComposerPublishProfilesForPlan(plan), 1);
 }
 
 function composerPublishProfileForDraft(publish) {
-  if (BigInt(publish?.publish_kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC) return publicComposerPublishProfile();
+  if (BigInt(publish?.publish_kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC) return publicComposerPublishProfile(Number(publish?.size_class ?? 1));
   return privateComposerPublishProfile(currentOutgoingPrivateSuite(), Number(publish?.size_class ?? 1));
 }
 
@@ -6333,7 +8096,9 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
 function refreshPrivateSendButtonState() {
   if (!sendButton) return;
   const thread = activeThread();
-  sendButton.disabled = !canAttemptPrivateSend(thread);
+  const reason = privateSendBlockReason(thread);
+  sendButton.disabled = Boolean(reason);
+  sendButton.title = reason ?? 'Send private message';
 }
 
 function refreshPublicSendButtonState() {
@@ -6362,8 +8127,9 @@ function estimatedUsernameMintTonFeeNanotons() {
 }
 
 function estimatedProfileAvatarTonFeeNanotons(attachment) {
-  const parts = Math.max(1, imageAttachmentPartCount(attachment));
-  return composerEstimatedMaxChargeNanotons(publicComposerPublishProfile(), parts)
+  const plan = imagePartsForSend(attachment, 'profile avatar');
+  const pricedProfiles = publicComposerPublishProfilesForPlan(plan);
+  return composerEstimatedMaxChargeNanotons(pricedProfiles, 1)
     + PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS;
 }
 
@@ -6384,9 +8150,16 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
       parts,
     };
   }
-  if (tonRpcLimited()) {
+  if (options.ignoreTonRpcLimit !== true && tonRpcLimited()) {
     return {
       text: TON_RPC_CONNECTING_STATUS,
+      state: 'short',
+      parts,
+    };
+  }
+  if (pendingServiceWorkerAppShellReload === true) {
+    return {
+      text: 'Update ready - reload app',
       state: 'short',
       parts,
     };
@@ -6419,7 +8192,10 @@ function refreshComposerCostStatus() {
       paymentCheck: privatePaymentCheckDraft,
     });
     const limitMessage = privateComposerPartLimitMessage(privatePlan.length);
-    const status = limitMessage
+    const blockReason = privateSendBlockReason(activeThread(), { includeVaultShortfall: false });
+    const status = blockReason
+      ? { text: blockReason, state: 'short' }
+      : limitMessage
       ? { text: limitMessage, state: 'short' }
       : composerCostStatusText(
         privateComposerPublishProfile(),
@@ -6429,6 +8205,7 @@ function refreshComposerCostStatus() {
         {
           parts: Math.max(1, privatePlan.length),
           pricedProfile: privateComposerPublishProfilesForPlan(currentOutgoingPrivateSuite(), privatePlan),
+          ignoreTonRpcLimit: true,
         },
       );
     const paymentDraftText = privatePaymentCheckDraft
@@ -6439,12 +8216,16 @@ function refreshComposerCostStatus() {
   }
   refreshPrivateSendButtonState();
   if (publicComposerCostStatus) {
-    const publicLimit = publicCommentTarget ? PUBLIC_COMMENT_TEXT_MAX_BYTES : PUBLIC_POST_TEXT_MAX_BYTES;
+    const publicPlan = publicComposerSendPlan(publicMessageInput?.value ?? '', publicImageAttachments);
     const status = composerCostStatusText(
       publicComposerPublishProfile(),
       publicMessageInput?.value ?? '',
-      publicLimit,
-      publicImageAttachment,
+      PUBLIC_POST_TEXT_MAX_BYTES,
+      publicImageAttachments,
+      {
+        parts: Math.max(1, publicPlan.length),
+        pricedProfile: publicComposerPublishProfilesForPlan(publicPlan),
+      },
     );
     publicComposerCostStatus.textContent = status.text;
     publicComposerCostStatus.dataset.state = status.state;
@@ -6453,15 +8234,16 @@ function refreshComposerCostStatus() {
 }
 
 function normalizePublicSyncWindow(value) {
-  const text = String(value ?? '7').toLowerCase();
-  return ['7', '30', '90', 'all'].includes(text) ? text : '7';
+  const text = String(value ?? 'short').toLowerCase();
+  if (text === 'all' || text === 'long') return 'long';
+  return 'short';
 }
 
 function readPublicSyncWindow() {
   try {
     return normalizePublicSyncWindow(localStorageOrNull()?.getItem(PUBLIC_SYNC_WINDOW_STORAGE_KEY));
   } catch {
-    return '7';
+    return 'short';
   }
 }
 
@@ -6510,13 +8292,12 @@ function updatePublicCommentsDefaultUi() {
 
 function publicSyncWindowLabel(value = readPublicSyncWindow()) {
   const normalized = normalizePublicSyncWindow(value);
-  return normalized === 'all' ? 'retained history' : `${normalized} days`;
+  return normalized === 'long' ? 'long public history' : 'short public history';
 }
 
 function publicSyncCutoffMs(value = readPublicSyncWindow()) {
-  const normalized = normalizePublicSyncWindow(value);
-  if (normalized === 'all') return null;
-  return Date.now() - Number(normalized) * 24 * 60 * 60 * 1000;
+  normalizePublicSyncWindow(value);
+  return null;
 }
 
 function updatePublicSyncWindowUi() {
@@ -6599,6 +8380,16 @@ function updatePrivateAttachmentUi() {
     const label = document.createElement('span');
     label.className = 'composer-attachment-label';
     label.textContent = `Payment check - ${paymentAssetLabel(privatePaymentCheckDraft.asset)} ${formatAtomicAmount(privatePaymentCheckDraft.amount)}`;
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', async () => {
+      const paymentDetails = await requestPaymentCheckDetails(privatePaymentCheckDraft);
+      if (!paymentDetails) return;
+      privatePaymentCheckDraft = paymentDetails;
+      updateImageAttachmentUi('private');
+      refreshComposerCostStatus();
+    });
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = 'Remove';
@@ -6607,7 +8398,7 @@ function updatePrivateAttachmentUi() {
       updateImageAttachmentUi('private');
       refreshComposerCostStatus();
     });
-    row.append(label, remove);
+    row.append(label, edit, remove);
     rows.push(row);
   }
   panel.replaceChildren(...rows);
@@ -6618,13 +8409,16 @@ function updateImageAttachmentUi(kind) {
     updatePrivateAttachmentUi();
     return;
   }
-  const attachment = publicImageAttachment;
+  const attachments = normalizePublicImageAttachments(publicImageAttachments);
+  const attachment = attachments[0] ?? null;
   const panel = kind === 'public' ? publicAttachmentPanel : privateAttachmentPanel;
   const label = kind === 'public' ? publicAttachmentLabel : privateAttachmentLabel;
   const modeSelect = kind === 'public' ? publicImageModeSelect : privateImageModeSelect;
-  if (panel) panel.hidden = !attachment;
+  if (panel) panel.hidden = attachments.length === 0;
   if (label) {
-    label.textContent = attachment
+    label.textContent = attachments.length > 1
+      ? `${attachments.length} images attached`
+      : attachment
       ? `${attachment.name} - ${Math.ceil(attachment.bytes.length / 1024)} KiB ${attachment.mode.label.toLowerCase()}`
       : 'No image';
   }
@@ -6658,15 +8452,17 @@ async function setImageAttachment(kind, file, modeId) {
       return;
     }
     if (kind === 'public') {
-      publicImageAttachment = attachment;
+      publicImageAttachments = [...publicImageAttachments, attachment];
+      insertImageMarkerForComposer('public', publicImageAttachments.length);
     } else {
       privateImageAttachments = [...privateImageAttachments, attachment];
+      insertImageMarkerForComposer('private', privateImageAttachments.length);
     }
     updateImageAttachmentUi(kind);
     refreshComposerPublishPolicy();
   } catch (error) {
     if (kind === 'public') {
-      publicImageAttachment = null;
+      publicImageAttachments = [];
     }
     updateImageAttachmentUi(kind);
     if (status) {
@@ -6705,11 +8501,14 @@ async function recompressPrivateImageAttachment(index, modeId) {
 }
 
 async function recompressImageAttachment(kind) {
-  const attachment = kind === 'public' ? publicImageAttachment : privateImageAttachments[0];
+  const attachment = kind === 'public' ? normalizePublicImageAttachments(publicImageAttachments)[0] : privateImageAttachments[0];
   const modeSelect = kind === 'public' ? publicImageModeSelect : privateImageModeSelect;
   if (!attachment?.sourceFile || !modeSelect) return;
   if (kind === 'public') {
-    await setImageAttachment(kind, attachment.sourceFile, modeSelect.value);
+    const next = await compressImageFile(attachment.sourceFile, modeSelect.value);
+    publicImageAttachments = publicImageAttachments.map((item, index) => (index === 0 ? next : item));
+    updateImageAttachmentUi('public');
+    refreshComposerCostStatus();
   } else {
     await recompressPrivateImageAttachment(0, modeSelect.value);
   }
@@ -6789,24 +8588,121 @@ function togglePrivateComposerAddMenu() {
   else showPrivateComposerAddMenu();
 }
 
-function privateComposerDraftMessageItems(text, attachments = privateImageAttachments, paymentDraft = privatePaymentCheckDraft) {
-  const messageText = String(text ?? '').trim();
+function composerBlocksFromDraft(text, attachments = [], paymentDraft = null) {
+  const source = String(text ?? '');
   const images = normalizePrivateImageAttachments(attachments);
-  const items = [];
-  if (messageText) {
-    items.push({
-      text: messageText,
-      attachment: images[0] ?? null,
+  const usedImages = new Set();
+  let usedPayment = false;
+  const blocks = [];
+  const pushText = (value) => {
+    const trimmed = String(value ?? '').trim();
+    if (trimmed) blocks.push({ type: 'text', text: trimmed });
+  };
+  const pushImage = (index) => {
+    const imageIndex = Number(index) - 1;
+    const attachment = images[imageIndex];
+    if (!attachment || usedImages.has(imageIndex)) return;
+    usedImages.add(imageIndex);
+    blocks.push({
+      type: 'image',
+      attachment,
+      bytes: attachment.bytes,
+      width: attachment.width,
+      height: attachment.height,
+      format: attachment.mediaFormat ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
+      url: attachment.dataUrl,
+      mode: attachment.mode?.id,
+      modeLabel: attachment.mode?.label,
     });
-    for (let index = 1; index < images.length; index += 1) {
-      items.push({ text: '', attachment: images[index] });
-    }
-    if (paymentDraft) items.push({ text: paymentMessageText(paymentDraft), paymentDraft });
-    return items;
+  };
+  const pushPayment = () => {
+    if (!paymentDraft || usedPayment) return;
+    usedPayment = true;
+    blocks.push({ type: 'payment', paymentDraft, payment: paymentDraft });
+  };
+  let cursor = 0;
+  COMPOSER_MARKER_RE.lastIndex = 0;
+  for (const match of source.matchAll(COMPOSER_MARKER_RE)) {
+    pushText(source.slice(cursor, match.index));
+    if (match[1] !== undefined) pushImage(match[1]);
+    else pushPayment();
+    cursor = match.index + match[0].length;
   }
-  for (const attachment of images) items.push({ text: '', attachment });
-  if (paymentDraft) items.push({ text: paymentMessageText(paymentDraft), paymentDraft });
-  return items;
+  pushText(source.slice(cursor));
+  images.forEach((_, index) => {
+    if (!usedImages.has(index)) pushImage(index + 1);
+  });
+  if (paymentDraft && !usedPayment) pushPayment();
+  return blocks;
+}
+
+function displayBlocksFromDocumentBlocks(blocks) {
+  return (blocks ?? []).map((block) => {
+    if (block.type === 'text') return { type: 'text', text: block.text ?? '' };
+    if (block.type === 'image') {
+      const bytes = block.bytes instanceof Uint8Array ? block.bytes : new Uint8Array(block.bytes ?? []);
+      return {
+        type: 'image',
+        url: block.url ?? bytesToImageDataUrl(bytes, 'image/webp'),
+        bytes: bytes.length,
+        width: block.width,
+        height: block.height,
+        mode: block.mode,
+        modeLabel: block.modeLabel,
+      };
+    }
+    if (block.type === 'payment') {
+      const payment = block.payment ?? block.paymentDraft;
+      return { type: 'payment', payment, text: payment ? paymentMessageText(payment) : 'Payment check' };
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+function messageDocumentBytesFromDraft(text, attachments = [], paymentDraft = null, options = {}) {
+  const blocks = composerBlocksFromDraft(text, attachments, paymentDraft);
+  if (blocks.length <= 0) return null;
+  return encodeMessageDocumentBlocks(blocks, options);
+}
+
+function messagePreviewFromBlocks(blocks = []) {
+  const text = blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text;
+  if (text) return String(text).trim();
+  const payment = blocks.find((block) => block?.type === 'payment')?.payment;
+  if (payment) return paymentMessageText(payment);
+  const imageCount = blocks.filter((block) => block?.type === 'image').length;
+  if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
+  return '';
+}
+
+function insertComposerMarker(textarea, marker) {
+  if (!textarea) return;
+  const value = textarea.value ?? '';
+  const start = Number.isFinite(textarea.selectionStart) ? textarea.selectionStart : value.length;
+  const end = Number.isFinite(textarea.selectionEnd) ? textarea.selectionEnd : start;
+  const before = value.slice(0, start);
+  const after = value.slice(end);
+  const prefix = before && !before.endsWith('\n') ? '\n' : '';
+  const suffix = after && !after.startsWith('\n') ? '\n' : '';
+  const insert = `${prefix}${marker}${suffix}`;
+  textarea.value = `${before}${insert}${after}`;
+  const nextCursor = before.length + insert.length;
+  textarea.focus?.();
+  textarea.setSelectionRange?.(nextCursor, nextCursor);
+  autoResizeComposerTextarea(textarea);
+}
+
+function insertImageMarkerForComposer(kind, index) {
+  const marker = `[image ${index}]`;
+  insertComposerMarker(kind === 'public' ? publicMessageInput : messageInput, marker);
+}
+
+function insertPaymentCheckMarker() {
+  if (!messageInput) return;
+  const value = messageInput.value ?? '';
+  COMPOSER_CHECK_MARKER_RE.lastIndex = 0;
+  if (COMPOSER_CHECK_MARKER_RE.test(value)) return;
+  insertComposerMarker(messageInput, '[check]');
 }
 
 function enforceComposerByteLimit() {
@@ -7020,6 +8916,7 @@ function refreshMessagingControls() {
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet || !signedActionsReady;
   refreshPublicSendButtonState();
   if (burnAthButton) burnAthButton.disabled = !plathoWallet || !signedActionsReady;
+  renderAthFlushStatus();
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
     button.disabled = !plathoWallet || !signedActionsReady;
   }
@@ -7044,10 +8941,9 @@ function setView(view) {
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
   if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
     beginMessageSyncUi();
-    syncPrivateCapsulesFromChainOnce().then((result) => {
+    syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).then((result) => {
       completeMessageSyncUi(result);
       setText(messageSyncStatus, privateSyncStatusText(result));
-      resumePendingPrivatePublishConfirmations();
       scheduleMessageAutoSync();
     }).catch((error) => {
       const rateLimited = noteTonRpcRateLimit(error);
@@ -7086,7 +8982,10 @@ function renderThreads() {
   const q = search.value.trim().toLowerCase();
   threadList.innerHTML = '';
   threads
-    .filter((thread) => `${thread.name} ${thread.preview} ${thread.state} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q))
+    .filter((thread) => {
+      if (privateChainSyncPromise && isPendingIdentityResolutionThread(thread)) return false;
+      return `${thread.name} ${thread.preview} ${thread.state} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
+    })
     .forEach((thread) => {
       const unread = threadUnreadCount(thread);
       const item = document.createElement('button');
@@ -7141,6 +9040,7 @@ function renderConversation() {
     setAvatarNode(activeAvatar, 'P', null);
     activeTitle.textContent = 'No private chat';
     activeSubtitle.textContent = 'Create or choose a chat';
+    refreshPrivateDebugLog();
     messageStrip.innerHTML = '';
     if (identityMenuButton) {
       identityMenuButton.hidden = true;
@@ -7167,6 +9067,7 @@ function renderConversation() {
   }
   renderConversationIdentity(thread);
   activeSubtitle.textContent = conversationSubtitleText(thread);
+  refreshPrivateDebugLog();
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
@@ -7193,12 +9094,48 @@ function renderConversation() {
     row.className = `message ${message.type}`;
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    if (message.text) {
+    const blocks = Array.isArray(message.blocks) ? message.blocks : [];
+    let paymentBlockElement = null;
+    if (blocks.length > 0) {
+      for (const block of blocks) {
+        if (block?.type === 'text' && block.text) {
+          const text = document.createElement('div');
+          text.className = 'message-text-block';
+          text.textContent = block.text;
+          bubble.append(text);
+        } else if (block?.type === 'image' && block.url) {
+          const image = document.createElement('img');
+          image.className = 'message-image';
+          image.src = block.url;
+          image.alt = 'Open image';
+          image.loading = 'lazy';
+          image.tabIndex = 0;
+          image.role = 'button';
+          image.title = 'Open full-size image';
+          image.dataset.fullImageSrc = block.url;
+          image.dataset.fullImageMeta = messageImageLightboxMeta(block);
+          image.addEventListener('load', () => {
+            image.dataset.fullImageMeta = messageImageLightboxMeta(block, image);
+          }, { once: true });
+          bubble.append(image);
+        } else if (block?.type === 'payment') {
+          const payment = block.payment ?? message.payment;
+          const paymentBlock = document.createElement('div');
+          paymentBlock.className = 'message-payment-block';
+          const paymentLabel = document.createElement('span');
+          paymentLabel.className = 'message-payment-label';
+          paymentLabel.textContent = payment ? paymentMessageText(payment) : 'Payment check';
+          paymentBlock.append(paymentLabel);
+          paymentBlockElement = paymentBlock;
+          bubble.append(paymentBlock);
+        }
+      }
+    } else if (message.text) {
       const text = document.createElement('div');
       text.textContent = message.text;
       bubble.append(text);
     }
-    if (message.attachment?.type === 'image' && message.attachment.url) {
+    if (blocks.length === 0 && message.attachment?.type === 'image' && message.attachment.url) {
       const image = document.createElement('img');
       image.className = 'message-image';
       image.src = message.attachment.url;
@@ -7297,8 +9234,18 @@ function renderConversation() {
         });
         actions.append(cancel);
       }
-      if (actions.children.length > 0) bubble.append(actions);
+      if (!paymentBlockElement) {
+        paymentBlockElement = document.createElement('div');
+        paymentBlockElement.className = 'message-payment-block';
+        const paymentLabel = document.createElement('span');
+        paymentLabel.className = 'message-payment-label';
+        paymentLabel.textContent = paymentMessageText(message.payment);
+        paymentBlockElement.append(paymentLabel);
+        bubble.append(paymentBlockElement);
+      }
+      if (actions.children.length > 0) paymentBlockElement.append(actions);
     }
+    const manualActions = privateMessageManualActionsElement(thread, message);
     const metaText = messageMetaText(message);
     if (metaText) {
       row.dataset.status = messageStatusKey(message);
@@ -7309,6 +9256,7 @@ function renderConversation() {
     } else {
       row.append(bubble);
     }
+    if (manualActions) row.append(manualActions);
     messageStrip.append(row);
   });
 
@@ -7469,7 +9417,7 @@ actionGrid?.addEventListener('click', async (event) => {
     if (result) queueVaultPostTransactionRefresh();
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    setVaultStatus(rateLimited ? 'RPC busy, retrying' : 'transaction blocked');
+    setVaultStatus(rateLimited ? 'RPC busy, retrying' : vaultActionBlockedStatusText(error, 'transaction blocked'));
     if (!rateLimited) console.error(error);
   } finally {
     button.disabled = false;
@@ -7513,7 +9461,7 @@ for (const card of vaultMoveCards) {
       queueVaultPostTransactionRefresh();
     } catch (error) {
       const rateLimited = noteTonRpcRateLimit(error);
-      setVaultStatus(rateLimited ? 'RPC busy, retrying' : 'move blocked');
+      setVaultStatus(rateLimited ? 'RPC busy, retrying' : vaultActionBlockedStatusText(error, 'move blocked'));
       if (!rateLimited) console.error(error);
     } finally {
       refreshVaultMoveWidget();
@@ -7524,7 +9472,7 @@ for (const card of vaultMoveCards) {
 publicSyncWindowSelect?.addEventListener('change', async () => {
   const value = writePublicSyncWindow(publicSyncWindowSelect.value);
   updatePublicSyncWindowUi();
-  setPublicStatus(value === 'all' ? 'syncing retained history' : `syncing ${publicSyncWindowLabel(value)}`);
+  setPublicStatus(`syncing ${publicSyncWindowLabel(value)}`);
   rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   renderPublicSurface({ anchorUnread: true });
   try {
@@ -7551,14 +9499,14 @@ privateSenderModeSelect?.addEventListener('change', () => {
 mintUsernameButton?.addEventListener('click', async () => {
   try {
     if (!plathoWallet) {
-      flashWalletIdentityStatus('create wallet first');
+      setUsernameMintStatus('create wallet first', 'error');
       return;
     }
     mintUsernameButton.disabled = true;
     await submitUsernameMint();
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    flashWalletIdentityStatus(rateLimited ? TON_RPC_CONNECTING_STATUS : usernameMintStatusText(error), 4200);
+    setUsernameMintStatus(rateLimited ? TON_RPC_CONNECTING_STATUS : usernameMintStatusText(error), rateLimited ? 'busy' : 'error');
     console.error(error);
   } finally {
     mintUsernameButton.disabled = false;
@@ -7567,7 +9515,7 @@ mintUsernameButton?.addEventListener('click', async () => {
 
 linkUsernameButton?.addEventListener('click', async () => {
   if (!plathoWallet) {
-    flashWalletIdentityStatus('create wallet first');
+    setProfileAvatarStatus('create wallet first', 'error');
     return;
   }
   const previous = readWalletDisplayIdentity(plathoWallet?.address);
@@ -7601,6 +9549,24 @@ burnAthButton?.addEventListener('click', async () => {
   }
 });
 
+flushAthButton?.addEventListener('click', async () => {
+  try {
+    flushAthButton.disabled = true;
+    await submitAthDueFlush();
+  } catch (error) {
+    athFlushState = {
+      ...athFlushState,
+      busy: false,
+      error: String(error?.message ?? error ?? 'ATH flush blocked'),
+    };
+    renderAthFlushStatus();
+    flashWalletIdentityStatus('ATH flush blocked');
+    console.error(error);
+  } finally {
+    renderAthFlushStatus();
+  }
+});
+
 replaceVaultKeysButton?.addEventListener('click', async () => {
   try {
     replaceVaultKeysButton.disabled = true;
@@ -7619,7 +9585,11 @@ syncMessagesButton?.addEventListener('click', async () => {
     syncMessagesButton.disabled = true;
     clearMessageAutoSyncTimer();
     beginMessageSyncUi();
-    const result = await syncPrivateCapsulesFromChainOnce({ forceRecentRescan: true });
+    const result = await syncPrivateCapsulesFromChainOnce({
+      mode: 'manual',
+      readLimit: PRIVATE_CHAIN_INDEX_READ_LIMIT,
+      forceHistoryRetry: true,
+    });
     completeMessageSyncUi(result);
     setText(messageSyncStatus, privateSyncStatusText(result));
   } catch (error) {
@@ -7652,13 +9622,13 @@ addPublicChannelButton?.addEventListener('click', async () => {
   try {
     const result = await openActionDialog({
       title: 'Add public channel',
-      hint: 'Use a wallet address, xxxx.ton, or xxxx.ath. Local label is only shown on this device.',
+      hint: 'Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device.',
       submitLabel: 'Add channel',
       fields: [
         {
           id: 'channelIdentity',
           label: 'Channel',
-          placeholder: 'EQ..., xxxx.ton, or xxxx.ath',
+          placeholder: 'alex, alex.ath, alex.ton, or EQ...',
           autocomplete: 'off',
         },
         {
@@ -7732,9 +9702,10 @@ paymentCheckButton?.addEventListener('click', async () => {
       return;
     }
     paymentCheckButton.disabled = true;
-    const paymentDetails = await requestPaymentCheckDetails();
+    const paymentDetails = await requestPaymentCheckDetails(privatePaymentCheckDraft);
     if (!paymentDetails) return;
     privatePaymentCheckDraft = paymentDetails;
+    insertPaymentCheckMarker();
     updateImageAttachmentUi('private');
     refreshComposerCostStatus();
   } catch (error) {
@@ -7878,9 +9849,14 @@ profileAvatarInput?.addEventListener('change', async () => {
     pendingProfileAvatarModeId = avatar.mode.id;
     await submitProfileAvatarUpdate(avatar);
   } catch (error) {
-    const message = String(error?.message ?? 'avatar blocked');
-    setText(identitySubtitle, message);
-    console.error(error);
+    const rateLimited = noteTonRpcRateLimit(error);
+    if (rateLimited || isTonRpcRecoverableReadError(error)) {
+      setProfileAvatarStatus(TON_RPC_CONNECTING_STATUS, 'busy');
+    } else {
+      const message = String(error?.avatarDiagnosticStatus ?? error?.message ?? 'avatar blocked');
+      setProfileAvatarStatus(message, 'error');
+      console.error(error);
+    }
   } finally {
     if (profileAvatarInput) profileAvatarInput.value = '';
     setAvatarButton?.toggleAttribute('disabled', false);
@@ -7895,7 +9871,7 @@ privateClearImageButton?.addEventListener('click', () => {
 });
 
 publicClearImageButton?.addEventListener('click', () => {
-  publicImageAttachment = null;
+  publicImageAttachments = [];
   updateImageAttachmentUi('public');
   refreshComposerCostStatus();
 });
@@ -7904,7 +9880,8 @@ publicComposer?.addEventListener('submit', async (event) => {
   event.preventDefault();
   enforcePublicComposerByteLimit();
   const text = publicMessageInput?.value.trim() ?? '';
-  if (!text && !publicImageAttachment) return;
+  const attachments = normalizePublicImageAttachments(publicImageAttachments);
+  if (!text && attachments.length === 0) return;
   if (!plathoWallet) {
     setPublicStatus('create wallet first');
     return;
@@ -7922,16 +9899,16 @@ publicComposer?.addEventListener('submit', async (event) => {
   send?.toggleAttribute('disabled', true);
   try {
     if (publicCommentTarget) {
-      await submitPublicCommentThroughVault(publicCommentTarget, text);
+      await submitPublicCommentThroughVault(publicCommentTarget, text, attachments);
     } else {
       await submitPublicPostThroughVault({
         text,
-        attachment: publicImageAttachment,
+        attachments,
         commentsAllowed,
       });
     }
     publicMessageInput.value = '';
-    publicImageAttachment = null;
+    publicImageAttachments = [];
     updateImageAttachmentUi('public');
     setPublicCommentTarget(null);
     autoResizeComposerTextarea(publicMessageInput);
@@ -7965,10 +9942,6 @@ composer?.addEventListener('submit', async (event) => {
     refreshMessagingControls();
     return;
   }
-  if (tonRpcLimited()) {
-    refreshComposerCostStatus();
-    return;
-  }
   if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
     if (privateComposerCostStatus) {
       privateComposerCostStatus.textContent = 'Activate Platho account before sending';
@@ -7990,65 +9963,39 @@ composer?.addEventListener('submit', async (event) => {
     refreshPrivateSendButtonState();
     return;
   }
-  if (privateComposerCostStatus) {
-    privateComposerCostStatus.textContent = 'Checking Vault balance...';
-    privateComposerCostStatus.dataset.state = 'ready';
-  }
-  if (sendButton) sendButton.disabled = true;
-  try {
-    await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
-      allowOwnVaultActionReadFallback: Boolean(paymentDraft),
-    });
-  } catch (error) {
-    const messageText = String(error?.message ?? error);
-    const rateLimited = noteTonRpcRateLimit(error);
-    if (privateComposerCostStatus) {
-      privateComposerCostStatus.textContent = rateLimited
-        ? TON_RPC_CONNECTING_STATUS
-        : privateSendPreflightStatusText(error);
-      privateComposerCostStatus.dataset.state = 'short';
-    }
-    refreshPrivateSendButtonState();
-    if (!rateLimited) console.error(error);
-    return;
-  }
-
-  const draftItems = privateComposerDraftMessageItems(text, attachments, paymentDraft);
-  const sendContexts = [];
-  for (const item of draftItems) {
-    const message = {
-      type: 'out',
-      text: item.text,
-      meta: 'sending',
-      ...localMessageOrderFields(),
-    };
-    if (item.attachment) {
-      message.attachment = {
-        type: 'image',
-        url: item.attachment.dataUrl,
-        bytes: item.attachment.bytes.length,
-        width: item.attachment.width,
-        height: item.attachment.height,
-        mode: item.attachment.mode.id,
-        modeLabel: item.attachment.mode.label,
-      };
-    }
-    if (item.paymentDraft) {
-      message.paymentDraft = item.paymentDraft;
-    }
-    insertThreadMessage(thread, message);
-    sendContexts.push({
-      thread,
-      message,
-      text: item.paymentDraft ? '' : item.text,
-      attachment: item.attachment,
-      paymentDraft: item.paymentDraft,
+  const draftBlocks = composerBlocksFromDraft(text, attachments, paymentDraft);
+  const displayBlocks = displayBlocksFromDocumentBlocks(draftBlocks);
+  const message = {
+    type: 'out',
+    text: messagePreviewFromBlocks(displayBlocks),
+    blocks: displayBlocks,
+    meta: 'sending',
+    privateDraft: {
+      text,
+      attachments,
+      paymentDraft,
       selectedSuite,
       senderOptions,
-      retryAttempt: 0,
-      confirmAttempt: 0,
-    });
+    },
+    privateManualRetryAvailable: false,
+    privateCancelAvailable: false,
+    ...localMessageOrderFields(),
+  };
+  if (paymentDraft) {
+    message.paymentDraft = paymentDraftForHistory(paymentDraft);
   }
+  insertThreadMessage(thread, message);
+  const sendContext = {
+    thread,
+    message,
+    text,
+    attachments,
+    paymentDraft,
+    selectedSuite,
+    senderOptions,
+    retryAttempt: 0,
+    confirmAttempt: 0,
+  };
   refreshThreadAfterMessageChange(thread);
   messageInput.value = '';
   privateImageAttachments = [];
@@ -8060,39 +10007,26 @@ composer?.addEventListener('submit', async (event) => {
   renderThreads();
   renderConversation();
 
-  let privateComposerCancelled = false;
-  for (let index = 0; index < sendContexts.length; index += 1) {
-    const sendContext = sendContexts[index];
-    try {
-      if (sendContext.paymentDraft) {
-        await attemptPrivatePaymentCheckPublish(sendContext);
-      } else {
-        await attemptPrivateComposerMessagePublish(sendContext);
-      }
-    } catch (error) {
-      await settlePrivateComposerSendError(sendContext, error);
-      if (isPublishPriceChangeCancelled(error)) {
-        privateComposerCancelled = true;
-        const remaining = sendContexts.slice(index + 1);
-        for (const context of remaining) {
-          context.thread.messages = (context.thread.messages ?? []).filter((item) => item !== context.message);
-        }
-        const remainingAttachments = remaining.map((context) => context.attachment).filter(Boolean);
-        if (remainingAttachments.length > 0) {
-          privateImageAttachments = [...privateImageAttachments, ...remainingAttachments];
-        }
-        const remainingPaymentDraft = remaining.find((context) => context.paymentDraft)?.paymentDraft;
-        if (remainingPaymentDraft) privatePaymentCheckDraft = remainingPaymentDraft;
-        updateImageAttachmentUi('private');
-        refreshComposerCostStatus();
-        break;
-      }
-    }
+  try {
+    await assertVaultHasPrivatePublishHold(selectedSuite, sendPlan, {
+      allowOwnVaultActionReadFallback: Boolean(paymentDraft),
+    });
+  } catch (error) {
+    await settlePrivateComposerSendError(sendContext, error);
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+    return;
   }
-  if (paymentDraft && privateComposerCancelled) {
-    privatePaymentCheckDraft = paymentDraft;
-    updateImageAttachmentUi('private');
-    refreshComposerCostStatus();
+
+  try {
+    if (sendContext.paymentDraft) {
+      await attemptPrivatePaymentCheckPublish(sendContext);
+    } else {
+      await attemptPrivateComposerMessagePublish(sendContext);
+    }
+  } catch (error) {
+    await settlePrivateComposerSendError(sendContext, error);
   }
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -8286,6 +10220,18 @@ copyWalletAddressButton?.addEventListener('click', async () => {
   } catch (error) {
     flashWalletIdentityStatus('copy blocked');
     console.error(error);
+  }
+});
+
+copyPrivateDebugButton?.addEventListener('click', async () => {
+  try {
+    copyPrivateDebugButton.disabled = true;
+    await copyPrivateDebugText();
+  } catch (error) {
+    setPrivateDebugCopyButtonStatus('Debug copy blocked');
+    console.error(error);
+  } finally {
+    refreshPrivateDebugLog();
   }
 });
 
@@ -8490,6 +10436,41 @@ function formatAthProfileAmount(value) {
   return `${groupDecimalText(formatAthAtomic(value))} ATH`;
 }
 
+function athFlushReadyAmount(state = athFlushState) {
+  return nonNegativeBigInt(state.username_burn_due_ath) + nonNegativeBigInt(state.profile_burn_due_ath);
+}
+
+function athFlushPendingCount(state = athFlushState) {
+  return nonNegativeBigInt(state.username_pending_burn_flush_count) + nonNegativeBigInt(state.profile_pending_burn_flush_count);
+}
+
+function athFlushStateKnown(state = athFlushState) {
+  return state.username_burn_due_ath !== null || state.profile_burn_due_ath !== null;
+}
+
+function athFlushStatusText(state = athFlushState) {
+  if (state.busy) return 'flushing';
+  if (state.error) return 'sync delayed';
+  if (!athFlushStateKnown(state)) return 'checking';
+  const ready = athFlushReadyAmount(state);
+  const pending = athFlushPendingCount(state);
+  if (ready > 0n && pending > 0n) return `${formatAthProfileAmount(ready)} ready + pending`;
+  if (ready > 0n) return `${formatAthProfileAmount(ready)} ready`;
+  if (pending > 0n) return 'flush pending';
+  return '0 ATH ready';
+}
+
+function renderAthFlushStatus() {
+  const ready = athFlushReadyAmount();
+  const canFlush = Boolean(plathoWallet?.address) && !athFlushState.busy && ready > 0n;
+  if (flushAthButton) flushAthButton.disabled = !canFlush;
+  setProfileActionStatus(
+    flushAthStatus,
+    !plathoWallet?.address ? 'wallet required' : athFlushStatusText(),
+    athFlushState.error ? 'error' : (athFlushState.busy ? 'busy' : ''),
+  );
+}
+
 function formatBasisPointsPercent(bps) {
   const basis = nonNegativeBigInt(bps);
   const whole = basis / 100n;
@@ -8501,6 +10482,7 @@ function formatBasisPointsPercent(bps) {
 
 function renderAthProfileStats() {
   setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
+  renderAthFlushStatus();
   const total = nonNegativeBigInt(
     vaultProtocolState?.airdrop_total_allocation_ath,
     VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
@@ -8536,6 +10518,52 @@ function localUsernameMintPriceAtomic(username) {
   if (length === 5) return USERNAME_PRICE_5_CHARS_ATOMIC;
   if (length >= 6 && length <= 16) return USERNAME_PRICE_6_PLUS_CHARS_ATOMIC;
   return null;
+}
+
+function usernameMintPendingMatches(record, username, owner) {
+  if (!record) return false;
+  const normalized = normalizeUsernameInput(username);
+  const ownerAddress = requireBasechainAddress(owner, 'Connected wallet');
+  return record.username === normalized
+    && record.expiresAt > Date.now()
+    && sameWalletAddress(record.owner, ownerAddress);
+}
+
+function pendingUsernameMintRecord(username, owner) {
+  const record = globalThis.plathoPendingUsernameMint;
+  if (usernameMintPendingMatches(record, username, owner)) return record;
+  if (record?.expiresAt && record.expiresAt <= Date.now()) {
+    globalThis.plathoPendingUsernameMint = null;
+  }
+  return null;
+}
+
+function rememberPendingUsernameMint(username, owner, submission = {}) {
+  const normalized = normalizeUsernameInput(username);
+  const now = Date.now();
+  globalThis.plathoPendingUsernameMint = {
+    username: normalized,
+    label: `${normalized}.ath`,
+    owner: requireBasechainAddress(owner, 'Connected wallet'),
+    clientNonce: submission?.clientNonce === undefined || submission?.clientNonce === null
+      ? null
+      : String(submission.clientNonce),
+    at: now,
+    expiresAt: now + USERNAME_MINT_LOCAL_PENDING_MS,
+  };
+  return globalThis.plathoPendingUsernameMint;
+}
+
+function clearPendingUsernameMint(username, owner) {
+  if (usernameMintPendingMatches(globalThis.plathoPendingUsernameMint, username, owner)) {
+    globalThis.plathoPendingUsernameMint = null;
+  }
+}
+
+function assertNoPendingUsernameMintRetry(username, owner) {
+  if (pendingUsernameMintRecord(username, owner)) {
+    throw new Error('Username mint is still finalizing; sync ownership before retrying');
+  }
 }
 
 function usernameMintPricePreview(input) {
@@ -8818,6 +10846,21 @@ async function exportEncryptedWalletKeyFile() {
   return true;
 }
 
+async function activateImportedEncryptedWalletRecord(wallet, record) {
+  prepareWalletScopedRuntimeForWallet(wallet, 'wallet key imported');
+  await writeEncryptedPlathoWalletRecord(record);
+  plathoWallet = wallet;
+  localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
+  markWalletUnlocked();
+  scheduleWalletAutoLock();
+  await bootCrypto();
+  queueVaultRefreshAfterWalletChange();
+  await refreshOwnProfileAvatar().catch((error) => console.error(error));
+  refreshMessagingControls();
+  renderWalletIdentity('Wallet key imported');
+  return true;
+}
+
 async function importEncryptedWalletKeyFile(file) {
   const parsed = await readJsonFile(file);
   const record = encryptedWalletRecordFromBackup(parsed);
@@ -8828,16 +10871,7 @@ async function importEncryptedWalletKeyFile(file) {
   });
   if (!wallet) return false;
   if (!(await confirmWalletReplacement('Import wallet key'))) return false;
-  await writeEncryptedPlathoWalletRecord(record);
-  plathoWallet = wallet;
-  localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
-  markWalletUnlocked();
-  scheduleWalletAutoLock();
-  await bootCrypto();
-  queueVaultRefreshAfterWalletChange();
-  refreshMessagingControls();
-  renderWalletIdentity('Wallet key imported');
-  return true;
+  return activateImportedEncryptedWalletRecord(wallet, record);
 }
 
 async function requestWalletDisplayIdentity(mode) {
@@ -8937,17 +10971,19 @@ async function requestProfileAvatarUploadDetails(file) {
   });
 }
 
-async function requestPaymentCheckDetails() {
+async function requestPaymentCheckDetails(initial = null) {
   let feedback = 'The encrypted check is readable by this chat only.';
   let tone = 'muted';
-  let assetValue = 'TON';
-  let amountValue = '';
+  let assetValue = BigInt(initial?.asset ?? RECEIVE_ASSETS.TON) === RECEIVE_ASSETS.ATH ? 'ATH' : 'TON';
+  let amountValue = initial?.amount
+    ? (assetValue === 'TON' ? formatTonNanotons(initial.amount) : formatAtomicAmount(initial.amount))
+    : '';
   while (true) {
     const result = await openActionDialog({
-      title: 'Create payment check',
+      title: initial ? 'Edit payment check' : 'Create payment check',
       hint: feedback,
       tone,
-      submitLabel: 'Create check',
+      submitLabel: initial ? 'Save check' : 'Create check',
       fields: [
         {
           id: 'asset',
@@ -9171,13 +11207,64 @@ function paymentMessageText(payment) {
   return `${paymentAssetLabel(payment.asset)} check ${amount}`;
 }
 
+function paymentHasIntent(payment) {
+  return Boolean(payment && (
+    payment.intentId !== undefined
+    || payment.intentIdHex !== undefined
+    || payment.intent_id !== undefined
+  ));
+}
+
+function paymentDraftForHistory(paymentDraft) {
+  if (!paymentDraft) return null;
+  const draft = {
+    asset: String(paymentDraft.asset ?? paymentDraft.asset_id ?? RECEIVE_ASSETS.TON),
+    amount: String(paymentDraft.amount ?? 0n),
+  };
+  if (paymentDraft.senderWallet ?? paymentDraft.sender_wallet) {
+    draft.senderWallet = requireBasechainAddress(paymentDraft.senderWallet ?? paymentDraft.sender_wallet, 'Payment check sender');
+  }
+  if (paymentDraft.recipientWallet ?? paymentDraft.recipient_wallet) {
+    draft.recipientWallet = requireBasechainAddress(paymentDraft.recipientWallet ?? paymentDraft.recipient_wallet, 'Payment check recipient');
+  }
+  return draft;
+}
+
+function fixedHexBytes(value, length, name = 'hex bytes') {
+  const text = String(value ?? '').trim().replace(/^0x/i, '');
+  if (!/^[0-9a-fA-F]+$/.test(text) || text.length !== length * 2) {
+    throw new Error(`${name} must be ${length} bytes`);
+  }
+  return hexToBytes(text);
+}
+
+function paymentSecret32Bytes(payment) {
+  const bytes = payment?.secret32Bytes ?? payment?.secret32_bytes;
+  if (bytes !== undefined && bytes !== null) {
+    const out = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    if (out.length !== 32) throw new Error('Payment check claim secret must be 32 bytes');
+    return out;
+  }
+  const hex = payment?.secret32Hex ?? payment?.secret32_hex ?? payment?.secret_32_hex;
+  if (hex !== undefined && hex !== null) {
+    return fixedHexBytes(hex, 32, 'Payment check claim secret');
+  }
+  const value = payment?.secret32 ?? payment?.secret_32 ?? payment?.secret;
+  if (value !== undefined && value !== null) {
+    return bigIntToFixedBytes(value, 32, 'secret32');
+  }
+  throw new Error('Payment check claim secret is missing');
+}
+
 function normalizePaymentForMessage(payment) {
+  const intentId = payment.intentId ?? payment.intent_id;
+  const intentIdHex = payment.intentIdHex ?? payment.intent_id_hex;
   const normalized = {
     asset: String(payment.asset),
     amount: String(payment.amount),
-    intentId: String(payment.intentId),
-    intentIdHex: payment.intentIdHex ?? bytesToHex(bigIntToFixedBytes(payment.intentId, 32, 'intent id')),
-    secret32Hex: payment.secret32Hex ?? bytesToHex(payment.secret32Bytes ?? bigIntToFixedBytes(payment.secret32, 32, 'secret32')),
+    intentId: String(intentId ?? (intentIdHex ? BigInt(`0x${intentIdHex}`) : 0n)),
+    intentIdHex: intentIdHex ?? bytesToHex(bigIntToFixedBytes(intentId, 32, 'intent id')),
+    secret32Hex: bytesToHex(paymentSecret32Bytes(payment)),
   };
   if (payment.senderWallet ?? payment.sender_wallet) {
     normalized.senderWallet = requireBasechainAddress(payment.senderWallet ?? payment.sender_wallet, 'Payment check sender');
@@ -9185,7 +11272,19 @@ function normalizePaymentForMessage(payment) {
   if (payment.recipientWallet ?? payment.recipient_wallet) {
     normalized.recipientWallet = requireBasechainAddress(payment.recipientWallet ?? payment.recipient_wallet, 'Payment check recipient');
   }
+  if (payment.clientNonce !== undefined || payment.client_nonce !== undefined) {
+    normalized.clientNonce = String(payment.clientNonce ?? payment.client_nonce);
+  }
   return normalized;
+}
+
+function paymentForHistory(payment) {
+  if (!payment) return null;
+  try {
+    return paymentHasIntent(payment) ? normalizePaymentForMessage(payment) : paymentDraftForHistory(payment);
+  } catch {
+    return safeJsonClone(payment);
+  }
 }
 
 function paymentFromCompactPayload(payload) {
@@ -9200,12 +11299,179 @@ function paymentFromCompactPayload(payload) {
   });
 }
 
+const PLATHO_DOCUMENT_MAGIC = new Uint8Array([0x50, 0x44, 0x43, 0x31]); // "PDC1"
+const PLATHO_DOCUMENT_VERSION = 1;
+const PLATHO_DOCUMENT_HEADER_BYTES = 8;
+const PLATHO_DOCUMENT_BLOCK_HEADER_BYTES = 6;
+const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
+  TEXT: 1,
+  IMAGE: 2,
+  PAYMENT: 3,
+});
+const COMPOSER_IMAGE_MARKER_RE = /\[(?:image|img)\s+(\d+)\]/ig;
+const COMPOSER_CHECK_MARKER_RE = /\[(?:check|payment)\]/ig;
+const COMPOSER_MARKER_RE = /\[(?:image|img)\s+(\d+)\]|\[(?:check|payment)\]/ig;
+
+function concatUint8Arrays(parts) {
+  const arrays = parts.map((part) => part instanceof Uint8Array ? part : new Uint8Array(part ?? []));
+  const out = new Uint8Array(arrays.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of arrays) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+function uint16Bytes(value, name = 'uint16') {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0 || number > 0xffff) throw new RangeError(`${name} must fit uint16`);
+  return new Uint8Array([(number >> 8) & 0xff, number & 0xff]);
+}
+
+function uint32Bytes(value, name = 'uint32') {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0 || number > 0xffffffff) throw new RangeError(`${name} must fit uint32`);
+  return new Uint8Array([
+    (number >> 24) & 0xff,
+    (number >> 16) & 0xff,
+    (number >> 8) & 0xff,
+    number & 0xff,
+  ]);
+}
+
+function readUint16FromBytes(bytes, offset, name = 'uint16') {
+  if (offset + 2 > bytes.length) throw new Error(`${name} is truncated`);
+  return (bytes[offset] << 8) | bytes[offset + 1];
+}
+
+function readUint32FromBytes(bytes, offset, name = 'uint32') {
+  if (offset + 4 > bytes.length) throw new Error(`${name} is truncated`);
+  return (((bytes[offset] << 24) >>> 0) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3]) >>> 0;
+}
+
+function documentPaymentContent(payment, options = {}) {
+  let secret32Bytes;
+  try {
+    secret32Bytes = paymentSecret32Bytes(payment);
+  } catch (error) {
+    if (options.allowMissingPaymentSecret === true) {
+      secret32Bytes = new Uint8Array(32);
+    } else {
+      throw error;
+    }
+  }
+  return concatUint8Arrays([
+    new Uint8Array([Number(BigInt(payment.asset ?? 0n)), 0]),
+    bigIntToFixedBytes(BigInt(payment.amount ?? 0n), 16, 'payment amount'),
+    bigIntToFixedBytes(BigInt(payment.intentId ?? payment.intent_id ?? 0n), 32, 'intent id'),
+    secret32Bytes,
+  ]);
+}
+
+function paymentFromDocumentContent(content) {
+  if (content.length !== 82) throw new Error('Document payment block has invalid length');
+  const intentIdBytes = content.subarray(18, 50);
+  const secret32Bytes = content.subarray(50, 82);
+  return normalizePaymentForMessage({
+    asset: BigInt(content[0]),
+    amount: bytesToBigIntValue(content.subarray(2, 18)),
+    intentId: bytesToBigIntValue(intentIdBytes),
+    intentIdHex: bytesToHex(intentIdBytes),
+    secret32Hex: bytesToHex(secret32Bytes),
+  });
+}
+
+function encodeMessageDocumentBlocks(blocks, options = {}) {
+  const normalized = (blocks ?? []).filter((block) => block && block.type);
+  if (normalized.length <= 0) throw new Error('Document message is empty');
+  if (normalized.length > 0xffff) throw new Error('Document message has too many blocks');
+  const encodedBlocks = normalized.map((block) => {
+    let type = 0;
+    let flags = 0;
+    let content = new Uint8Array();
+    if (block.type === 'text') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.TEXT;
+      content = new TextEncoder().encode(String(block.text ?? ''));
+    } else if (block.type === 'image') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.IMAGE;
+      flags = Number(block.format ?? block.mediaFormat ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP) & 0xff;
+      const bytes = block.bytes instanceof Uint8Array ? block.bytes : new Uint8Array(block.bytes ?? []);
+      content = concatUint8Arrays([
+        uint16Bytes(block.width ?? 0, 'image width'),
+        uint16Bytes(block.height ?? 0, 'image height'),
+        bytes,
+      ]);
+    } else if (block.type === 'payment') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT;
+      content = documentPaymentContent(block.payment ?? block, options);
+    } else {
+      throw new Error('Unsupported document block type');
+    }
+    return concatUint8Arrays([
+      new Uint8Array([type, flags]),
+      uint32Bytes(content.length, 'document block length'),
+      content,
+    ]);
+  });
+  return concatUint8Arrays([
+    PLATHO_DOCUMENT_MAGIC,
+    new Uint8Array([PLATHO_DOCUMENT_VERSION, 0]),
+    uint16Bytes(encodedBlocks.length, 'document block count'),
+    ...encodedBlocks,
+  ]);
+}
+
+function decodeMessageDocumentBlocks(bytesLike) {
+  const bytes = bytesLike instanceof Uint8Array ? bytesLike : new Uint8Array(bytesLike ?? []);
+  if (bytes.length < PLATHO_DOCUMENT_HEADER_BYTES) throw new Error('Document message is truncated');
+  for (let index = 0; index < PLATHO_DOCUMENT_MAGIC.length; index += 1) {
+    if (bytes[index] !== PLATHO_DOCUMENT_MAGIC[index]) throw new Error('Unsupported document message magic');
+  }
+  if (bytes[4] !== PLATHO_DOCUMENT_VERSION) throw new Error('Unsupported document message version');
+  const count = readUint16FromBytes(bytes, 6, 'document block count');
+  const blocks = [];
+  let offset = PLATHO_DOCUMENT_HEADER_BYTES;
+  for (let index = 0; index < count; index += 1) {
+    if (offset + PLATHO_DOCUMENT_BLOCK_HEADER_BYTES > bytes.length) throw new Error('Document block is truncated');
+    const type = bytes[offset];
+    const flags = bytes[offset + 1];
+    const length = readUint32FromBytes(bytes, offset + 2, 'document block length');
+    offset += PLATHO_DOCUMENT_BLOCK_HEADER_BYTES;
+    if (offset + length > bytes.length) throw new Error('Document block content is truncated');
+    const content = bytes.subarray(offset, offset + length);
+    offset += length;
+    if (type === PLATHO_DOCUMENT_BLOCK_TYPES.TEXT) {
+      blocks.push({ type: 'text', text: new TextDecoder().decode(content) });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.IMAGE) {
+      if (content.length < 4) throw new Error('Document image block is truncated');
+      blocks.push({
+        type: 'image',
+        format: flags || PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
+        bytes: content.subarray(4),
+        width: readUint16FromBytes(content, 0, 'image width'),
+        height: readUint16FromBytes(content, 2, 'image height'),
+      });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT) {
+      blocks.push({ type: 'payment', payment: paymentFromDocumentContent(content) });
+    } else {
+      throw new Error('Unsupported document block type');
+    }
+  }
+  if (offset !== bytes.length) throw new Error('Document message has trailing bytes');
+  return blocks;
+}
+
+function paymentFromDocumentBlocks(blocks) {
+  return (blocks ?? []).find((block) => block?.type === 'payment' && block.payment)?.payment ?? null;
+}
+
 function paymentIntentId(payment) {
   return BigInt(payment.intentId ?? `0x${payment.intentIdHex}`);
 }
 
 function paymentSecret32(payment) {
-  return BigInt(`0x${payment.secret32Hex}`);
+  return bytesToBigIntValue(paymentSecret32Bytes(payment));
 }
 
 function paymentAssetVaultBalance(user, asset) {
@@ -9229,6 +11495,7 @@ function paymentCheckClaimBlockedStatus(error) {
   const text = String(error?.message ?? error ?? '');
   if (/already claimed|cancelled|does not exist|not found/i.test(text)) return 'check already claimed or cancelled';
   if (/another wallet|recipient/i.test(text)) return 'check is for another wallet';
+  if (/data mismatch|claim secret|commitment|exitcode=16280|exit code 16280/i.test(text)) return 'check data mismatch';
   if (noteTonRpcRateLimit(error)) return TON_RPC_CONNECTING_STATUS;
   return `check claim blocked: ${shortUiErrorText(error, 'blocked')}`;
 }
@@ -9248,7 +11515,7 @@ function rememberPaymentCheckActionError(action, error, payment = null) {
     action,
     message: String(error?.message ?? error ?? ''),
     code: error?.code ?? null,
-    payment,
+    payment: paymentForHistory(payment),
     at: new Date().toISOString(),
   };
 }
@@ -9267,6 +11534,27 @@ function isTonRpcVerificationUnavailableForOwnVaultActionError(error) {
     || /TON RPC verification unavailable|RPC_VERIFICATION_UNAVAILABLE|verification unavailable/i.test(message);
 }
 
+function isTonRpcGetGlobalDisagreementError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return error?.code === 'RPC_DISAGREEMENT' && /get_global/i.test(message);
+}
+
+function isTonRpcSoftVaultGlobalReadError(error) {
+  return isTonRpcVerificationUnavailableForOwnVaultActionError(error)
+    || isTonRpcGetGlobalDisagreementError(error);
+}
+
+function isTonRpcVerificationSoftReadError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
+    || error?.code === 'RPC_DISAGREEMENT'
+    || /TON RPC verification unavailable|RPC_VERIFICATION_UNAVAILABLE|TON RPC disagreement|RPC_DISAGREEMENT|verification unavailable/i.test(message);
+}
+
+function isTonRpcRecoverableReadError(error) {
+  return isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error);
+}
+
 function assertReceiveIntentMatchesPayment(intent, payment) {
   if (intent?.exists !== true) throw new Error('Payment check is already claimed or cancelled');
   const connectedWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -9278,6 +11566,9 @@ function assertReceiveIntentMatchesPayment(intent, payment) {
   }
   if (BigInt(intent.amount ?? 0n) !== BigInt(payment.amount ?? 0n)) {
     throw new Error('Payment check amount mismatch');
+  }
+  if (BigInt(intent.commitment ?? -1n) !== paymentSecret32(payment)) {
+    throw new Error('Payment check data mismatch; this check cannot be claimed');
   }
 }
 
@@ -9313,12 +11604,7 @@ async function readFreshReceiveIntent(provider, intentId, options = {}) {
 }
 
 async function readFreshReceiveIntentForOwnVaultAction(provider, intentId) {
-  try {
-    return await readFreshReceiveIntent(provider, intentId);
-  } catch (error) {
-    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
-    return readFreshReceiveIntent(provider, intentId, { verify: false, allowUnverifiedCriticalRead: true });
-  }
+  return readFreshReceiveIntent(provider, intentId);
 }
 
 async function readFreshReceiveIntentForCancel(provider, intentId) {
@@ -9336,12 +11622,7 @@ async function readFreshConnectedVaultUser(provider, options = {}) {
 }
 
 async function readFreshConnectedVaultUserForOwnVaultAction(provider) {
-  try {
-    return await readFreshConnectedVaultUser(provider);
-  } catch (error) {
-    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
-    return readFreshConnectedVaultUser(provider, { verify: false, allowUnverifiedCriticalRead: true });
-  }
+  return readFreshConnectedVaultUser(provider);
 }
 
 async function callWithOwnVaultActionReadFallback(readStrict, readUnverified) {
@@ -9363,15 +11644,16 @@ async function callWithVerificationUnavailableReadFallback(readStrict, readUnver
 }
 
 async function readConnectedVaultGlobalForOwnVaultAction(provider) {
-  return callWithVerificationUnavailableReadFallback(
-    () => loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
-    () => loadConnectedVaultGlobal({
-      provider,
-      verify: false,
-      allowUnverifiedCriticalRead: true,
-      priority: 'critical',
-      cacheTtlMs: 0,
-    }),
+  return loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() });
+}
+
+async function readCanonicalPublishChargeForOwnVaultAction(provider, owner, publishKind, sizeClass, cryptoSuite) {
+  return provider.getCanonicalPublishCharge(
+    owner,
+    BigInt(publishKind),
+    BigInt(sizeClass),
+    BigInt(cryptoSuite),
+    { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
   );
 }
 
@@ -9512,7 +11794,8 @@ function isExpectedVaultProviderUnavailable(error) {
   return error instanceof VaultChainProviderUnavailableError
     || error?.name === 'VaultChainProviderUnavailableError'
     || isTonRpcRateLimitError(error)
-    || /Vault chain provider is not configured|Vault provider unavailable/i.test(message);
+    || isTonRpcVerificationUnavailableError(error)
+    || /Vault chain provider is not configured|Vault provider unavailable|verification unavailable/i.test(message);
 }
 
 function vaultProviderStatusForError(error) {
@@ -9538,10 +11821,67 @@ async function loadConnectedVaultGlobal(options = {}) {
   const global = await provider.getGlobal({
     vaultAddress: requireVaultAddress(),
     verify: options.verify === true,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: options.priority,
     cacheTtlMs: options.cacheTtlMs,
   });
   return assertVaultGlobalMatchesConfig(global);
+}
+
+function unverifiedCriticalChainReadOptions() {
+  return {
+    verify: false,
+    allowUnverifiedCriticalRead: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  };
+}
+
+async function readVaultGlobalForAthDeposit(provider, options = {}) {
+  return loadConnectedVaultGlobal({
+    provider,
+    verify: options.verify !== false,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+}
+
+async function readVaultGlobalForAthDepositWithFallback(provider) {
+  return readVaultGlobalForAthDeposit(provider);
+}
+
+async function deriveVaultAthWalletAddressFromAthMaster(vault, options = {}) {
+  const provider = await resolveAthMasterProvider();
+  if (!provider?.getWalletAddress) throw new Error('ATHMaster provider cannot derive Vault ATH wallet');
+  return provider.getWalletAddress(vault, {
+    address: requireAthMasterAddress(),
+    verify: options.verify !== false,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+}
+
+async function deriveVaultAthWalletAddressFromAthMasterWithFallback(vault) {
+  return deriveVaultAthWalletAddressFromAthMaster(vault);
+}
+
+async function requireVaultAthDepositRouteForOwnVaultAction(provider) {
+  const vault = requireBasechainAddress(requireVaultAddress(), 'Vault');
+  const global = await readVaultGlobalForAthDepositWithFallback(provider);
+  const boundOfficialWallet = global.vault_ath_wallet_address
+    ? requireBasechainAddress(global.vault_ath_wallet_address, 'Vault official ATH wallet')
+    : null;
+  if (!boundOfficialWallet) throw new Error('Vault official ATH wallet is not configured on this network');
+  const derivedOfficialWallet = requireBasechainAddress(
+    await deriveVaultAthWalletAddressFromAthMasterWithFallback(vault),
+    'Vault derived ATH wallet',
+  );
+  if (boundOfficialWallet !== derivedOfficialWallet) {
+    throw new Error('Vault official ATH wallet does not match ATHMaster-derived Vault wallet');
+  }
+  return { global, vault, vaultAthWalletAddress: boundOfficialWallet };
 }
 
 function optionalBalanceText(value, formatter) {
@@ -9699,11 +12039,86 @@ function criticalCapsuleHubReadOptions(address) {
   return { capsuleHubAddress: address, ...criticalChainReadOptions() };
 }
 
+function capsuleHubMessageSyncReadOptions(address) {
+  return {
+    capsuleHubAddress: address,
+    verify: false,
+    allowUnverifiedCriticalRead: true,
+    priority: 'messages',
+    cacheTtlMs: 0,
+    messageCacheTtlMs: 0,
+  };
+}
+
 function requireManifestHashMatch(value, label) {
   const expectedManifest = uint256ConfigValue(requireVaultDeploymentManifestHash(), 'Vault deployment manifest hash');
   if (BigInt(value ?? 0n) !== expectedManifest) {
     throw new Error(`${label} deployment manifest hash does not match this app config`);
   }
+}
+
+function assertCapsuleHubGlobalMatchesConfig(global) {
+  if (!global) throw new Error('CapsuleHub global state is missing');
+  if (global.sealed !== true) {
+    throw new Error('CapsuleHub is not sealed on this network');
+  }
+  if (global.vault_bound !== true) {
+    throw new Error('CapsuleHub Vault route is not bound on this network');
+  }
+  requireManifestHashMatch(global.deployment_manifest_hash, 'CapsuleHub');
+  const expectedVault = requireBasechainAddress(requireVaultAddress(), 'Vault');
+  const boundVault = global.vault_address
+    ? requireBasechainAddress(global.vault_address, 'CapsuleHub Vault')
+    : null;
+  if (boundVault !== expectedVault) {
+    throw new Error('CapsuleHub Vault binding does not match this app config');
+  }
+  const feeAccumulatorAddress = configuredFeeAccumulatorAddress();
+  const expectedFeeAccumulator = feeAccumulatorAddress
+    ? requireBasechainAddress(feeAccumulatorAddress, 'FeeAccumulator')
+    : null;
+  if (expectedFeeAccumulator && global.fee_accumulator_address) {
+    const boundFeeAccumulator = requireBasechainAddress(global.fee_accumulator_address, 'CapsuleHub FeeAccumulator');
+    if (boundFeeAccumulator !== expectedFeeAccumulator) {
+      throw new Error('CapsuleHub FeeAccumulator binding does not match this app config');
+    }
+  }
+  return global;
+}
+
+async function requireCapsuleHubVaultRoute(global, options = {}) {
+  const resolved = await resolveCapsuleHubProvider();
+  if (!resolved?.provider?.getState) {
+    throw new Error('CapsuleHub provider cannot verify Vault binding');
+  }
+  const providerAddress = requireBasechainAddress(resolved.address, 'CapsuleHub');
+  const configuredAddress = configuredCapsuleHubAddress();
+  const expectedCapsuleHub = configuredAddress
+    ? requireBasechainAddress(configuredAddress, 'CapsuleHub')
+    : null;
+  const vaultBoundCapsuleHub = global?.capsule_hub_address
+    ? requireBasechainAddress(global.capsule_hub_address, 'Vault CapsuleHub')
+    : null;
+  if (expectedCapsuleHub && providerAddress !== expectedCapsuleHub) {
+    throw new Error('CapsuleHub provider address does not match this app config');
+  }
+  if (vaultBoundCapsuleHub && providerAddress !== vaultBoundCapsuleHub) {
+    throw new Error('CapsuleHub provider address does not match Vault binding');
+  }
+  const readOptions = options.allowUnverifiedRead === true
+    ? {
+      capsuleHubAddress: providerAddress,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+      priority: 'critical',
+      cacheTtlMs: 0,
+    }
+    : criticalCapsuleHubReadOptions(providerAddress);
+  return assertCapsuleHubGlobalMatchesConfig(await resolved.provider.getState(readOptions));
+}
+
+async function requireCapsuleHubVaultRouteForPublish(global) {
+  return requireCapsuleHubVaultRoute(global);
 }
 
 async function requireProfileRegistryVaultRoute(global, options = {}) {
@@ -9754,10 +12169,23 @@ async function requireProfileRegistryVaultRoute(global, options = {}) {
 }
 
 async function requireProfileRegistryVaultRouteForOwnVaultAction(global) {
-  return callWithVerificationUnavailableReadFallback(
-    () => requireProfileRegistryVaultRoute(global),
-    () => requireProfileRegistryVaultRoute(global, { allowUnverifiedRead: true }),
-  );
+  return requireProfileRegistryVaultRouteWithRetry(global);
+}
+
+async function requireProfileRegistryVaultRouteWithRetry(global, options = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await requireProfileRegistryVaultRoute(global, options);
+    } catch (error) {
+      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) throw error;
+      lastError = error;
+      const delayMs = PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS[attempt];
+      if (!delayMs) break;
+      await delay(delayMs);
+    }
+  }
+  throw lastError ?? new Error('ProfileRegistry route verification is temporarily unavailable');
 }
 
 async function requireUsernameRegistryVaultRoute(global, options = {}) {
@@ -9766,6 +12194,10 @@ async function requireUsernameRegistryVaultRoute(global, options = {}) {
   if (!provider?.getGlobal || !provider.getAthWalletAddress) {
     throw new Error('UsernameRegistry provider cannot verify Vault binding');
   }
+  const expectedAthMaster = appConfig.ath?.masterAddress
+    ? requireBasechainAddress(appConfig.ath.masterAddress, 'ATHMaster')
+    : null;
+  const athMasterProvider = expectedAthMaster ? await resolveAthMasterProvider() : null;
   const readOptions = options.allowUnverifiedRead === true
     ? {
       verify: false,
@@ -9774,9 +12206,10 @@ async function requireUsernameRegistryVaultRoute(global, options = {}) {
       cacheTtlMs: 0,
     }
     : criticalChainReadOptions();
-  const [registryGlobal, derivedOfficialWallet] = await Promise.all([
+  const [registryGlobal, derivedOfficialWallet, appMasterOfficialWallet] = await Promise.all([
     provider.getGlobal({ address: registry, ...readOptions }),
     provider.getAthWalletAddress(registry, { address: registry, ...readOptions }),
+    athMasterProvider?.getWalletAddress(registry, { address: expectedAthMaster, ...readOptions }) ?? null,
   ]);
   if (registryGlobal.sealed !== true) throw new Error('UsernameRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('UsernameRegistry official ATH wallet is not bound');
@@ -9791,14 +12224,38 @@ async function requireUsernameRegistryVaultRoute(global, options = {}) {
   if (officialWallet !== derivedWallet) {
     throw new Error('UsernameRegistry official ATH wallet is not the derived registry wallet');
   }
+  if (expectedAthMaster) {
+    const appDerivedWallet = requireBasechainAddress(appMasterOfficialWallet, 'ATHMaster derived UsernameRegistry ATH wallet');
+    if (officialWallet !== appDerivedWallet) {
+      throw new Error('UsernameRegistry official ATH wallet ATHMaster binding does not match this app config');
+    }
+  }
+  let officialWalletData = null;
+  try {
+    officialWalletData = await createAthWalletTonRpcProvider({ athWalletAddress: officialWallet }).getWalletData({
+      address: officialWallet,
+      ...readOptions,
+    });
+  } catch (error) {
+    if (!isAthWalletNotDeployedError(error)) throw error;
+  }
+  if (officialWalletData) {
+    const officialWalletOwner = requireBasechainAddress(officialWalletData.owner_address, 'UsernameRegistry official ATH wallet owner');
+    if (officialWalletOwner !== registry) {
+      throw new Error('UsernameRegistry official ATH wallet owner does not match registry');
+    }
+    const walletAthMaster = officialWalletData.ath_master_address
+      ? requireBasechainAddress(officialWalletData.ath_master_address, 'UsernameRegistry official ATH wallet ATHMaster')
+      : null;
+    if (expectedAthMaster && walletAthMaster !== expectedAthMaster) {
+      throw new Error('UsernameRegistry official ATH wallet ATHMaster binding does not match this app config');
+    }
+  }
   return registry;
 }
 
 async function requireUsernameRegistryVaultRouteForOwnVaultAction(global) {
-  return callWithVerificationUnavailableReadFallback(
-    () => requireUsernameRegistryVaultRoute(global),
-    () => requireUsernameRegistryVaultRoute(global, { allowUnverifiedRead: true }),
-  );
+  return requireUsernameRegistryVaultRoute(global);
 }
 
 async function estimateVaultPublicPublishHoldNanotons(provider, owner, partCount) {
@@ -9818,8 +12275,8 @@ async function estimateVaultPublicPublishHoldNanotons(provider, owner, partCount
 async function assertVaultProfileAvatarCanStart(owner, partCount) {
   const provider = await resolveVaultChainProvider();
   const [user, global] = await Promise.all([
-    readFreshConnectedVaultUserForOwnVaultAction(provider),
-    readConnectedVaultGlobalForOwnVaultAction(provider),
+    readFreshConnectedVaultUser(provider),
+    loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
   ]);
   await requireProfileRegistryVaultRouteForOwnVaultAction(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
@@ -9867,8 +12324,8 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
   requireNoPendingServiceWorkerAppShellReload();
   const provider = await resolveVaultChainProvider();
   const [global, rawUser] = await Promise.all([
-    readConnectedVaultGlobalForOwnVaultAction(provider),
-    readFreshConnectedVaultUserForOwnVaultAction(provider),
+    loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
+    readFreshConnectedVaultUser(provider),
   ]);
   const registry = await requireProfileRegistryVaultRouteForOwnVaultAction(global);
   const user = rememberConnectedVaultUser(rawUser);
@@ -9884,33 +12341,453 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
   if (vaultAth < PROFILE_AVATAR_PRICE_ATH) {
     throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(PROFILE_AVATAR_PRICE_ATH)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
   }
-  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
-  const external = await buildVaultProfileAvatarExternalBoc({
-    owner_wallet: owner,
-    client_nonce: clientNonce,
-    max_ton_charge: PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
-    profile_registry_address: registry,
-    avatar_hash: uint256HexToBigInt(avatarHash, 'avatar_hash'),
-    avatar_entry_id: avatarEntryId,
-    avatar_stream_id: avatarStreamId,
-    avatar_part_count: avatarPartCount,
-    media_format: mediaFormat,
-    signingSecretKey: requireVaultAuthSecretKey(),
-    deploymentManifestHash: requireVaultDeploymentManifestHash(),
-  }, {
-    vaultAddress: requireVaultAddress(),
+  const submission = await submitVaultAuthExternalWithNonceConfirmation({
+    provider,
+    owner,
+    user,
+    buildExternal: (clientNonce) => buildVaultProfileAvatarExternalBoc({
+      owner_wallet: owner,
+      client_nonce: clientNonce,
+      max_ton_charge: PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
+      profile_registry_address: registry,
+      avatar_hash: uint256HexToBigInt(avatarHash, 'avatar_hash'),
+      avatar_entry_id: avatarEntryId,
+      avatar_stream_id: avatarStreamId,
+      avatar_part_count: avatarPartCount,
+      media_format: mediaFormat,
+      signingSecretKey: requireVaultAuthSecretKey(),
+      deploymentManifestHash: requireVaultDeploymentManifestHash(),
+    }, {
+      vaultAddress: requireVaultAddress(),
+    }),
   });
-  const result = await sendVaultExternalBoc(external);
-  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
   globalThis.plathoLastVaultProfileAvatarRegistration = {
-    external,
-    result,
-    clientNonce,
+    ...submission,
     owner,
     registry,
     avatarHash,
   };
-  return { external, result, clientNonce };
+  return submission;
+}
+
+async function readProfileAvatarVaultPaymentFinality(provider, submission = {}) {
+  if (submission?.confirmationPending === true) {
+    return {
+      pending: true,
+      pendingCount: null,
+      reason: 'vault_nonce_confirmation_pending',
+    };
+  }
+  const global = await loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() });
+  const pendingCount = BigInt(global.pending_profile_avatar_payment_count ?? 0n);
+  return {
+    pending: pendingCount > 0n,
+    pendingCount: pendingCount.toString(),
+    reason: pendingCount > 0n ? 'vault_pending_profile_avatar_payment_count' : null,
+  };
+}
+
+function profileAvatarPublishRecoveryKey(owner, avatarHash) {
+  const normalizedOwner = requireBasechainAddress(owner, 'Avatar owner');
+  return `${normalizedOwner}:${normalizeAvatarHashHex(avatarHash).toLowerCase()}`;
+}
+
+function profileAvatarRecoveryPublicDebug(job) {
+  if (!job) return null;
+  return {
+    key: job.key,
+    owner: shortAddress(job.owner),
+    avatarHash: `${String(job.avatarHash).slice(0, 12)}...${String(job.avatarHash).slice(-8)}`,
+    partCount: job.partCount,
+    status: job.status,
+    attempts: job.attempts,
+    nextRetryAt: job.nextRetryAt ?? null,
+    lastError: job.lastError ?? null,
+    updatedAt: job.updatedAt ?? null,
+    publishStateStatus: job.publishState?.status ?? null,
+    submittedCount: job.publishState?.submittedCount ?? null,
+    confirmedCount: job.publishState?.confirmedCount ?? null,
+    registryPending: Boolean(job.registrySubmission),
+  };
+}
+
+function refreshProfileAvatarRecoveryDebug() {
+  globalThis.plathoProfileAvatarPublishRecoveries = [...profileAvatarPublishRecoveryJobs.values()]
+    .map((job) => profileAvatarRecoveryPublicDebug(job));
+}
+
+function profileAvatarRecoveryAgeMs(job) {
+  const started = Date.parse(job?.createdAt ?? job?.updatedAt ?? '');
+  return Number.isFinite(started) ? Math.max(0, Date.now() - started) : null;
+}
+
+function serializableProfileAvatarRecovery(job) {
+  if (!job?.owner || !job?.avatarHash || !job?.pendingPointer) return null;
+  const streamIdHex = job.streamIdBytes
+    ? `0x${bytesToHex(job.streamIdBytes)}`
+    : job.pendingPointer?.avatarStreamId ?? null;
+  return {
+    version: 1,
+    owner: requireBasechainAddress(job.owner, 'Avatar owner'),
+    avatarHash: normalizeAvatarHashHex(job.avatarHash),
+    streamIdHex,
+    pendingPointer: {
+      profileVersion: Number(job.pendingPointer.profileVersion ?? job.pendingPointer.profile_version ?? 0),
+      avatarHash: normalizeAvatarHashHex(job.pendingPointer.avatarHash ?? job.pendingPointer.avatar_hash ?? job.avatarHash),
+      avatarStreamId: streamIdHex,
+      avatarPartCount: Number(job.pendingPointer.avatarPartCount ?? job.partCount ?? 0),
+    },
+    partCount: Number(job.partCount ?? job.pendingPointer.avatarPartCount ?? 0),
+    mediaFormat: String(job.mediaFormat ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP),
+    status: String(job.status ?? 'pending'),
+    createdAt: job.createdAt ?? new Date().toISOString(),
+    updatedAt: job.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function writeProfileAvatarPublishRecovery(job) {
+  const payload = serializableProfileAvatarRecovery(job);
+  const key = payload ? profileAvatarPublishRecoveryStorageKey(payload.owner, payload.avatarHash) : null;
+  if (!key || !payload?.pendingPointer?.profileVersion || !payload.partCount) return;
+  try {
+    localStorageOrNull()?.setItem(key, JSON.stringify(payload));
+  } catch {
+    // The recovery hint is best effort; the paid publish remains on-chain.
+  }
+}
+
+function readProfileAvatarPublishRecovery(owner, avatarHash) {
+  const key = profileAvatarPublishRecoveryStorageKey(owner, avatarHash);
+  if (!key) return null;
+  try {
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null');
+    if (!parsed || parsed.version !== 1) return null;
+    const normalizedOwner = requireBasechainAddress(parsed.owner, 'Avatar owner');
+    const normalizedHash = normalizeAvatarHashHex(parsed.avatarHash);
+    if (!sameWalletAddress(normalizedOwner, owner)) return null;
+    if (normalizedHash.toLowerCase() !== normalizeAvatarHashHex(avatarHash).toLowerCase()) return null;
+    const createdAt = String(parsed.createdAt ?? parsed.updatedAt ?? new Date().toISOString());
+    const ageMs = Date.now() - Date.parse(createdAt);
+    if (Number.isFinite(ageMs) && ageMs > PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS) {
+      localStorageOrNull()?.removeItem(key);
+      return null;
+    }
+    const partCount = Number(parsed.partCount ?? parsed.pendingPointer?.avatarPartCount ?? 0);
+    const pendingPointer = {
+      profileVersion: Number(parsed.pendingPointer?.profileVersion ?? parsed.pendingPointer?.profile_version ?? 0),
+      avatarHash: normalizedHash,
+      avatarStreamId: parsed.streamIdHex ?? parsed.pendingPointer?.avatarStreamId ?? null,
+      avatarPartCount: partCount,
+    };
+    if (!Number.isSafeInteger(pendingPointer.profileVersion) || pendingPointer.profileVersion <= 0 || partCount <= 0) return null;
+    return {
+      key: profileAvatarPublishRecoveryKey(normalizedOwner, normalizedHash),
+      owner: normalizedOwner,
+      avatarHash: normalizedHash,
+      streamIdBytes: pendingPointer.avatarStreamId ? hexToBytes(pendingPointer.avatarStreamId) : null,
+      pendingPointer,
+      partCount,
+      mediaFormat: String(parsed.mediaFormat ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP),
+      status: 'persisted_pending',
+      attempts: 0,
+      createdAt,
+      updatedAt: parsed.updatedAt ?? createdAt,
+      persisted: true,
+    };
+  } catch {
+    localStorageOrNull()?.removeItem(key);
+    return null;
+  }
+}
+
+function clearProfileAvatarPublishRecoveryStorage(owner, avatarHash) {
+  const key = profileAvatarPublishRecoveryStorageKey(owner, avatarHash);
+  if (!key) return;
+  try {
+    localStorageOrNull()?.removeItem(key);
+  } catch {
+    // Best effort.
+  }
+}
+
+function rememberProfileAvatarPublishRecovery(context) {
+  if (!context?.owner || !context?.avatarHash || !context?.pendingPointer) return null;
+  const key = context.key ?? profileAvatarPublishRecoveryKey(context.owner, context.avatarHash);
+  const existing = profileAvatarPublishRecoveryJobs.get(key) ?? {};
+  const job = {
+    ...existing,
+    ...context,
+    key,
+    attempts: Number(existing.attempts ?? context.attempts ?? 0) || 0,
+    createdAt: existing.createdAt ?? context.createdAt ?? new Date().toISOString(),
+    status: context.status ?? existing.status ?? 'pending',
+    updatedAt: new Date().toISOString(),
+  };
+  profileAvatarPublishRecoveryJobs.set(key, job);
+  writeProfileAvatarPublishRecovery(job);
+  refreshProfileAvatarRecoveryDebug();
+  return job;
+}
+
+function profileAvatarPublishRecoveryFor(owner, avatarHash) {
+  if (!owner || !avatarHash) return null;
+  const key = profileAvatarPublishRecoveryKey(owner, avatarHash);
+  const live = profileAvatarPublishRecoveryJobs.get(key);
+  if (live) return live;
+  const persisted = readProfileAvatarPublishRecovery(owner, avatarHash);
+  if (!persisted) return null;
+  profileAvatarPublishRecoveryJobs.set(key, persisted);
+  refreshProfileAvatarRecoveryDebug();
+  return persisted;
+}
+
+function clearProfileAvatarPublishRecovery(jobOrKey) {
+  const key = typeof jobOrKey === 'string' ? jobOrKey : jobOrKey?.key;
+  if (!key) return;
+  const job = profileAvatarPublishRecoveryJobs.get(key);
+  if (job?.timer) window.clearTimeout(job.timer);
+  profileAvatarPublishRecoveryJobs.delete(key);
+  if (job?.owner && job?.avatarHash) clearProfileAvatarPublishRecoveryStorage(job.owner, job.avatarHash);
+  refreshProfileAvatarRecoveryDebug();
+}
+
+function profileAvatarRecoveryDelayMs(job) {
+  const attempt = Math.max(0, Number(job?.attempts ?? 0) || 0);
+  const index = Math.min(attempt, PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS.length - 1);
+  return PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS[index];
+}
+
+function scheduleProfileAvatarPublishRecovery(context, delayMs = null) {
+  const job = rememberProfileAvatarPublishRecovery(context);
+  if (!job) return null;
+  if (job.timer) window.clearTimeout(job.timer);
+  const waitMs = Number.isFinite(Number(delayMs))
+    ? Math.max(0, Math.floor(Number(delayMs)))
+    : profileAvatarRecoveryDelayMs(job);
+  job.nextRetryAt = new Date(Date.now() + waitMs).toISOString();
+  job.status = 'scheduled';
+  profileAvatarPublishRecoverySeq += 1;
+  job.recoverySeq = profileAvatarPublishRecoverySeq;
+  writeProfileAvatarPublishRecovery(job);
+  job.timer = window.setTimeout(() => {
+    const current = profileAvatarPublishRecoveryJobs.get(job.key);
+    if (current) current.timer = null;
+    runProfileAvatarPublishRecovery(job.key).catch((error) => {
+      const latest = profileAvatarPublishRecoveryJobs.get(job.key);
+      if (!latest) return;
+      latest.lastError = shortUiErrorText(error, 'avatar recovery failed');
+      latest.updatedAt = new Date().toISOString();
+      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
+        setProfileAvatarStatus('avatar still confirming');
+        scheduleProfileAvatarPublishRecovery(latest);
+      } else {
+        setProfileAvatarStatus('avatar needs retry', 'error');
+        refreshProfileAvatarRecoveryDebug();
+      }
+    });
+  }, waitMs);
+  refreshProfileAvatarRecoveryDebug();
+  return job;
+}
+
+async function findProfileAvatarPublishedEntriesFromRecovery(job) {
+  const pointer = job?.pendingPointer;
+  if (!job?.owner || !pointer) return null;
+  if (job.confirmed) return job.confirmed;
+  let confirmed = await findConfirmedAvatarEntriesFromPublishState(job.owner, pointer, job.publishState)
+    .catch((error) => {
+      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
+      return null;
+    });
+  if (confirmed) return confirmed;
+  confirmed = await findPublishedAvatarEntries(job.owner, pointer)
+    .catch((error) => {
+      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
+      return null;
+    });
+  if (confirmed) return confirmed;
+  if (!job.publishState) return null;
+  await retryUnconfirmedVaultPublishBroadcasts(job.publishState, {
+    owner: job.owner,
+    deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+    readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+    sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+    queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+  });
+  await confirmCapsuleHubPublishEntries(job.publishState, {
+    scanAvailableTransports: true,
+    scanLimit: PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT,
+    deadlineMs: PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS,
+    requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
+    queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
+  });
+  confirmed = await findConfirmedAvatarEntriesFromPublishState(job.owner, pointer, job.publishState)
+    .catch((error) => {
+      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
+      return null;
+    });
+  if (confirmed) return confirmed;
+  return findPublishedAvatarEntries(job.owner, pointer)
+    .catch((error) => {
+      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) throw error;
+      return null;
+    });
+}
+
+async function finalizeProfileAvatarUpdate({
+  owner,
+  avatarHash,
+  confirmed,
+  pendingPointer,
+  partCount,
+  mediaFormat,
+  publishResult = null,
+  payloads = [],
+  streamIdBytes = null,
+  registrySubmission = null,
+}) {
+  const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: false });
+  if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
+    writeStoredProfileAvatarPointer(currentPointer, owner);
+    if (confirmed?.imageUrl) setAvatarNode(profileAvatar, 'P', confirmed.imageUrl);
+    setProfileAvatarStatus('avatar active', '');
+    return {
+      result: null,
+      registryPointer: currentPointer,
+      registryPending: false,
+      alreadyActive: true,
+    };
+  }
+  const streamIdValue = confirmed?.streamId !== undefined && confirmed?.streamId !== null
+    ? BigInt(confirmed.streamId)
+    : pendingPointer?.avatarStreamId
+      ? BigInt(pendingPointer.avatarStreamId)
+      : bytesToBigIntValue(streamIdBytes);
+  setProfileAvatarStatus('signing avatar payment');
+  const result = registrySubmission ?? await submitVaultProfileAvatarRegistration({
+    owner,
+    avatarHash,
+    avatarEntryId: confirmed.firstEntryId,
+    avatarStreamId: streamIdValue,
+    avatarPartCount: BigInt(partCount),
+    mediaFormat,
+  });
+  let registryPointer = null;
+  let registryError = null;
+  let profilePaymentFinality = null;
+  let profilePaymentFinalityError = null;
+  try {
+    setProfileAvatarStatus('confirming registry');
+    registryPointer = await waitForProfileAvatarRegistryUpdate(owner, avatarHash);
+    writeStoredProfileAvatarPointer(registryPointer, owner);
+    if (confirmed?.imageUrl) setAvatarNode(profileAvatar, 'P', confirmed.imageUrl);
+    try {
+      const provider = await resolveVaultChainProvider();
+      profilePaymentFinality = await readProfileAvatarVaultPaymentFinality(provider, result);
+    } catch (error) {
+      profilePaymentFinalityError = error;
+      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+    }
+    if (profilePaymentFinality?.pending === true) {
+      setProfileAvatarStatus('active, Vault payment pending');
+    } else {
+      setProfileAvatarStatus('avatar active', '');
+    }
+  } catch (error) {
+    registryError = error;
+    if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
+      setProfileAvatarStatus('avatar payment submitted, confirming');
+      return {
+        result,
+        registryPointer: null,
+        registryPending: true,
+        registryError,
+        profilePaymentFinality,
+      };
+    }
+    console.error(error);
+    await refreshOwnProfileAvatar().catch((refreshError) => console.error(refreshError));
+    setProfileAvatarStatus('avatar not active yet', 'error');
+  }
+  globalThis.plathoLastProfileAvatarUpdate = {
+    avatarHash,
+    streamId: pendingPointer?.avatarStreamId ?? (streamIdBytes ? `0x${bytesToHex(streamIdBytes)}` : null),
+    parts: partCount,
+    firstEntryId: confirmed.firstEntryId.toString(),
+    payloads,
+    publishResult,
+    result,
+    registryPointer,
+    registryPending: !registryPointer,
+    registryError: registryError ? String(registryError?.message ?? registryError) : null,
+    profilePaymentFinality,
+    profilePaymentPending: profilePaymentFinality?.pending === true,
+    profilePaymentFinalityError: profilePaymentFinalityError ? String(profilePaymentFinalityError?.message ?? profilePaymentFinalityError) : null,
+  };
+  return {
+    result,
+    registryPointer,
+    registryPending: !registryPointer,
+    registryError,
+    profilePaymentFinality,
+  };
+}
+
+async function runProfileAvatarPublishRecovery(key) {
+  const job = profileAvatarPublishRecoveryJobs.get(key);
+  if (!job) return null;
+  if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, job.owner)) {
+    scheduleProfileAvatarPublishRecovery(job, profileAvatarRecoveryDelayMs(job));
+    return null;
+  }
+  job.attempts = (Number(job.attempts ?? 0) || 0) + 1;
+  job.status = 'checking';
+  job.updatedAt = new Date().toISOString();
+  writeProfileAvatarPublishRecovery(job);
+  refreshProfileAvatarRecoveryDebug();
+  setProfileAvatarStatus('avatar still confirming');
+  const confirmed = await findProfileAvatarPublishedEntriesFromRecovery(job);
+  if (!confirmed) {
+    const ageMs = profileAvatarRecoveryAgeMs(job);
+    if (!job.publishState && ageMs !== null && ageMs >= PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS) {
+      clearProfileAvatarPublishRecovery(job);
+      setProfileAvatarStatus('avatar needs retry', 'error');
+      return null;
+    }
+    job.status = 'pending';
+    job.lastError = null;
+    job.updatedAt = new Date().toISOString();
+    scheduleProfileAvatarPublishRecovery(job);
+    return null;
+  }
+  job.status = 'registering';
+  job.updatedAt = new Date().toISOString();
+  refreshProfileAvatarRecoveryDebug();
+  const finality = await finalizeProfileAvatarUpdate({
+    owner: job.owner,
+    avatarHash: job.avatarHash,
+    confirmed,
+    pendingPointer: job.pendingPointer,
+    partCount: job.partCount,
+    mediaFormat: job.mediaFormat,
+    publishResult: job.publishResult,
+    payloads: job.payloads ?? [],
+    streamIdBytes: job.streamIdBytes ?? null,
+    registrySubmission: job.registrySubmission ?? null,
+  });
+  if (finality?.registryPending === true) {
+    const pendingJob = rememberProfileAvatarPublishRecovery({
+      ...job,
+      confirmed,
+      registrySubmission: finality.result ?? job.registrySubmission ?? null,
+      status: 'registry_pending',
+      lastError: finality.registryError ? shortUiErrorText(finality.registryError, 'registry pending') : null,
+    });
+    scheduleProfileAvatarPublishRecovery(pendingJob);
+    return finality;
+  }
+  clearProfileAvatarPublishRecovery(job);
+  return finality;
 }
 
 async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
@@ -9934,30 +12811,30 @@ async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   if (vaultAth < priceAtomic) {
     throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
   }
-  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
-  const external = await buildVaultUsernameMintExternalBoc({
-    owner_wallet: owner,
-    client_nonce: clientNonce,
-    max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
-    username_registry_address: registry,
-    username,
-    signingSecretKey: requireVaultAuthSecretKey(),
-    deploymentManifestHash: requireVaultDeploymentManifestHash(),
-  }, {
-    vaultAddress: requireVaultAddress(),
+  const submission = await submitVaultAuthExternalWithNonceConfirmation({
+    provider,
+    owner,
+    user,
+    buildExternal: (clientNonce) => buildVaultUsernameMintExternalBoc({
+      owner_wallet: owner,
+      client_nonce: clientNonce,
+      max_ton_charge: USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
+      username_registry_address: registry,
+      username,
+      signingSecretKey: requireVaultAuthSecretKey(),
+      deploymentManifestHash: requireVaultDeploymentManifestHash(),
+    }, {
+      vaultAddress: requireVaultAddress(),
+    }),
   });
-  const result = await sendVaultExternalBoc(external);
-  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
   globalThis.plathoLastVaultUsernameMint = {
-    external,
-    result,
-    clientNonce,
+    ...submission,
     owner,
     registry,
     username,
     priceAtomic,
   };
-  return { external, result, clientNonce };
+  return submission;
 }
 
 async function loadConnectedWalletBalances() {
@@ -10099,6 +12976,13 @@ function vaultMoveFormattedBalance(pocket, asset) {
     : formatTonNanotons(balance);
 }
 
+function navVaultBalanceHasKnownValue() {
+  return vaultPocketState.vault?.ton_balance !== null
+    && vaultPocketState.vault?.ton_balance !== undefined
+    && vaultPocketState.vault?.ath_balance !== null
+    && vaultPocketState.vault?.ath_balance !== undefined;
+}
+
 function vaultMoveMaxAmount(asset) {
   const source = vaultMoveSourcePocket(asset);
   const balance = vaultMoveBalance(source, asset);
@@ -10108,23 +12992,36 @@ function vaultMoveMaxAmount(asset) {
       ? balance - VAULT_MOVE_WALLET_TON_GAS_KEEP_NANOTONS
       : 0n;
   }
+  if (asset === 'TON' && source === 'vault') {
+    return balance > VAULT_RESERVES_NANOTONS.withdrawTonExec
+      ? balance - VAULT_RESERVES_NANOTONS.withdrawTonExec
+      : 0n;
+  }
   return balance;
 }
 
 function refreshNavVaultBalance() {
-  const loading = plathoWallet?.address && navVaultBalanceState.status === 'pending';
+  const loading = plathoWallet?.address && navVaultBalanceState.status === 'pending' && !navVaultBalanceHasKnownValue();
   if (loading) {
     navVaultTonBalances.forEach((node, index) => {
-      node.classList.add('is-loading');
-      node.hidden = index > 0;
-      node.textContent = '';
-      node.title = navVaultBalanceLoadingLabel();
-      node.setAttribute('aria-label', navVaultBalanceLoadingLabel());
+      node.hidden = false;
+      node.classList.toggle('is-loading', index === 0);
+      node.classList.toggle('is-placeholder', index > 0);
+      node.textContent = index > 0 ? '\u00a0' : '';
+      if (index === 0) {
+        node.title = navVaultBalanceLoadingLabel();
+        node.setAttribute('aria-label', navVaultBalanceLoadingLabel());
+      } else {
+        node.removeAttribute('aria-label');
+        node.removeAttribute('title');
+      }
     });
     for (const node of navVaultAthBalances) {
       node.classList.remove('is-loading');
-      node.hidden = true;
-      node.textContent = '';
+      node.classList.add('is-placeholder');
+      node.hidden = false;
+      node.textContent = '\u00a0';
+      node.setAttribute('aria-hidden', 'true');
       node.removeAttribute('aria-label');
       node.removeAttribute('title');
     }
@@ -10134,14 +13031,18 @@ function refreshNavVaultBalance() {
   const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
   for (const node of navVaultTonBalances) {
     node.classList.remove('is-loading');
+    node.classList.remove('is-placeholder');
     node.hidden = false;
+    node.removeAttribute('aria-hidden');
     node.removeAttribute('aria-label');
     node.removeAttribute('title');
     setText(node, tonBalance);
   }
   for (const node of navVaultAthBalances) {
     node.classList.remove('is-loading');
+    node.classList.remove('is-placeholder');
     node.hidden = false;
+    node.removeAttribute('aria-hidden');
     node.removeAttribute('aria-label');
     node.removeAttribute('title');
     setText(node, athBalance);
@@ -10252,21 +13153,83 @@ async function resolveAthMasterProvider() {
   return provider;
 }
 
+async function readAthBurnFlushState() {
+  const readOptions = criticalChainReadOptions();
+  const [usernameResult, profileResult] = await Promise.allSettled([
+    resolveUsernameRegistryProvider()
+      .then((provider) => provider.getGlobal({
+        address: requireUsernameRegistryAddress(),
+        ...readOptions,
+      })),
+    resolveProfileRegistryProvider()
+      .then(({ provider, address }) => provider.getGlobal({
+        address,
+        ...readOptions,
+      })),
+  ]);
+  const next = {
+    username_burn_due_ath: null,
+    profile_burn_due_ath: null,
+    username_pending_burn_flush_count: null,
+    profile_pending_burn_flush_count: null,
+    busy: athFlushState.busy,
+    error: null,
+  };
+  if (usernameResult.status === 'fulfilled') {
+    next.username_burn_due_ath = nonNegativeBigInt(usernameResult.value?.burn_due_ath);
+    next.username_pending_burn_flush_count = nonNegativeBigInt(usernameResult.value?.pending_burn_flush_count);
+  } else {
+    noteTonRpcRateLimit(usernameResult.reason);
+  }
+  if (profileResult.status === 'fulfilled') {
+    next.profile_burn_due_ath = nonNegativeBigInt(profileResult.value?.burn_due_ath);
+    next.profile_pending_burn_flush_count = nonNegativeBigInt(profileResult.value?.pending_burn_flush_count);
+  } else {
+    noteTonRpcRateLimit(profileResult.reason);
+  }
+  if (usernameResult.status === 'rejected' && profileResult.status === 'rejected') {
+    throw usernameResult.reason ?? profileResult.reason ?? new Error('ATH flush state is unavailable');
+  }
+  return next;
+}
+
+async function refreshAthFlushState() {
+  renderAthFlushStatus();
+  try {
+    athFlushState = await readAthBurnFlushState();
+    renderAthFlushStatus();
+    return athFlushState;
+  } catch (error) {
+    athFlushState = {
+      ...athFlushState,
+      busy: false,
+      error: String(error?.message ?? error ?? 'ATH flush state unavailable'),
+    };
+    renderAthFlushStatus();
+    throw error;
+  }
+}
+
 async function refreshAthProtocolStats() {
   renderAthProfileStats();
   try {
     const provider = await resolveAthMasterProvider();
-    if (!provider?.getJettonData) return athProtocolState;
+    if (!provider?.getJettonData) {
+      await refreshAthFlushState();
+      return athProtocolState;
+    }
     const data = await provider.getJettonData({ address: requireAthMasterAddress() });
     athProtocolState = {
       total_supply: data?.total_supply === null || data?.total_supply === undefined
         ? null
         : nonNegativeBigInt(data.total_supply),
     };
+    await refreshAthFlushState();
     renderAthProfileStats();
     return athProtocolState;
   } catch (error) {
     noteTonRpcRateLimit(error);
+    refreshAthFlushState().catch(() => {});
     return athProtocolState;
   }
 }
@@ -10274,6 +13237,13 @@ async function refreshAthProtocolStats() {
 function queueAthProtocolStatsRefresh() {
   refreshAthProtocolStats().catch(() => {});
   for (const delayMs of VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS) {
+    setTimeout(() => refreshAthProtocolStats().catch(() => {}), delayMs);
+  }
+}
+
+function queueAthFlushPostTransactionRefresh() {
+  refreshAthProtocolStats().catch(() => {});
+  for (const delayMs of ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS) {
     setTimeout(() => refreshAthProtocolStats().catch(() => {}), delayMs);
   }
 }
@@ -10392,25 +13362,34 @@ async function resolveUsernameRegistryProvider() {
 
 async function readUsernameMintPriceForOwnVaultAction(provider, registry, username) {
   const length = String(username ?? '').length;
-  const readPrice = (options) => provider.getUsernamePrice(length, {
+  const price = await provider.getUsernamePrice(length, {
     address: registry,
-    ...options,
+    ...criticalChainReadOptions(),
   });
-  try {
-    const price = await readPrice(criticalChainReadOptions());
-    const priceAtomic = BigInt(price?.price_ath_atomic ?? 0n);
-    if (price?.valid_length !== true || priceAtomic <= 0n) {
-      throw new Error('UsernameRegistry rejected this username length');
-    }
-    return priceAtomic;
-  } catch (error) {
-    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
-    const localPrice = localUsernameMintPriceAtomic(username);
-    if (localPrice === null || localPrice <= 0n) {
-      throw new Error('UsernameRegistry rejected this username length');
-    }
-    return localPrice;
+  const priceAtomic = BigInt(price?.price_ath_atomic ?? 0n);
+  if (price?.valid_length !== true || priceAtomic <= 0n) {
+    throw new Error('UsernameRegistry rejected this username length');
   }
+  return priceAtomic;
+}
+
+async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username) {
+  if (!provider?.getNameRecordByUsername || !provider?.getPendingMint) {
+    throw new Error('UsernameRegistry provider cannot verify username availability');
+  }
+  const readOptions = { address: registry, ...criticalChainReadOptions() };
+  const nameHash = await computeUsernameNameHash(username);
+  const [record, pending] = await Promise.all([
+    provider.getNameRecordByUsername(username, readOptions),
+    provider.getPendingMint(nameHash, readOptions),
+  ]);
+  if (record?.exists === true) {
+    throw new Error('Username is already registered');
+  }
+  if (pending?.exists === true) {
+    throw new Error('Username mint is already pending');
+  }
+  return { nameHash, record, pending };
 }
 
 async function resolveUsernameNftItemProvider() {
@@ -10456,26 +13435,28 @@ async function resolvePlathoUsernameOwner(label) {
   };
 }
 
-async function waitForPlathoUsernameOwnership(label, ownerWallet) {
+async function waitForPlathoUsernameOwnership(label, ownerWallet, options = {}) {
   const expectedOwner = requireBasechainAddress(ownerWallet, 'Expected username owner');
+  const attempts = Math.max(1, Number(options.attempts ?? USERNAME_MINT_CONFIRM_ATTEMPTS));
+  const delayMs = Math.max(250, Number(options.delayMs ?? USERNAME_MINT_CONFIRM_DELAY_MS));
   let lastError = null;
-  for (let attempt = 0; attempt < USERNAME_MINT_CONFIRM_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const identity = await resolvePlathoUsernameOwner(label);
       if (sameWalletAddress(identity.ownerWallet, expectedOwner)) return identity;
       throw new Error(`${identity.label} belongs to another wallet`);
     } catch (error) {
       lastError = error;
-      await delay(USERNAME_MINT_CONFIRM_DELAY_MS);
+      await delay(delayMs);
     }
   }
   throw lastError ?? new Error('Username mint is not visible on-chain yet');
 }
 
-async function autoLinkMintedUsername(username, ownerWallet) {
+async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
   const owner = requireBasechainAddress(ownerWallet, 'Connected wallet');
-  setText(identitySubtitle, `${username}.ath confirming`);
-  const identity = await waitForPlathoUsernameOwnership(username, owner);
+  setUsernameMintStatus(`${username}.ath finalizing`);
+  const identity = await waitForPlathoUsernameOwnership(username, owner, options);
   if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, owner)) return null;
   const linked = {
     mode: WALLET_DISPLAY_MODES.PLATHO_NFT,
@@ -10485,7 +13466,9 @@ async function autoLinkMintedUsername(username, ownerWallet) {
   writeLinkedPlathoUsername(linked, owner);
   writeWalletDisplayIdentity(linked, owner);
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.PLATHO_NFT;
-  flashWalletIdentityStatus(`Linked ${identity.label}`);
+  clearPendingUsernameMint(username, owner);
+  setUsernameMintStatus(`Linked ${identity.label}`, '');
+  renderWalletIdentity();
   return linked;
 }
 
@@ -10565,6 +13548,7 @@ async function resolveRecipientPeerEntry(thread, options = {}) {
     ownerWallet: walletAddress,
     ...recipientReadOptions,
   });
+  await assertVaultKeyRecordMatchesOwner(walletAddress, keyRecord, currentKeyId);
   rememberKnownVaultKeyOwner(walletAddress, keyRecord);
   const publicBundle = await publicKeyBundleFromVaultKeyRecord(keyRecord, {
     ownerWallet: walletAddress,
@@ -10596,6 +13580,96 @@ async function submitVaultMessage(type, params, options = {}) {
   return result;
 }
 
+async function submitVaultAuthExternalWithNonceConfirmation({ provider, owner, user, buildExternal, allowUnverifiedNonceWait = false }) {
+  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
+  const external = await buildExternal(clientNonce);
+  let result = null;
+  let ambiguousBroadcast = false;
+  let broadcastError = null;
+  try {
+    result = await sendVaultExternalBoc(external);
+  } catch (error) {
+    if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
+    ambiguousBroadcast = true;
+    broadcastError = error;
+  }
+  let nonceWaitError = null;
+  try {
+    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
+      verify: allowUnverifiedNonceWait !== true,
+      allowUnverifiedCriticalRead: allowUnverifiedNonceWait === true,
+    });
+  } catch (error) {
+    if (ambiguousBroadcast || result) {
+      nonceWaitError = error;
+    } else {
+      throw error;
+    }
+  }
+  return {
+    external,
+    result,
+    clientNonce,
+    ambiguousBroadcast,
+    broadcastError: broadcastError ? String(broadcastError?.message ?? broadcastError) : null,
+    confirmationPending: Boolean(nonceWaitError),
+    nonceWaitError: nonceWaitError ? String(nonceWaitError?.message ?? nonceWaitError) : null,
+  };
+}
+
+async function readFreshPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce, options = {}) {
+  if (!provider?.getPendingAthWithdrawalFor) throw new Error('Vault provider cannot confirm ATH withdrawal');
+  return provider.getPendingAthWithdrawalFor(owner, clientNonce, {
+    vaultAddress: requireVaultAddress(),
+    verify: options.verify !== false,
+    allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+}
+
+async function readPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce) {
+  return callWithVerificationUnavailableReadFallback(
+    () => readFreshPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce),
+    () => readFreshPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce, unverifiedCriticalChainReadOptions()),
+  );
+}
+
+async function waitForVaultAthWithdrawalCompletion(provider, owner, clientNonce) {
+  if (!provider?.getPendingAthWithdrawalFor) {
+    return {
+      pendingWithdrawal: null,
+      athTransferPending: true,
+      pendingWithdrawalError: 'Vault provider cannot confirm ATH withdrawal',
+    };
+  }
+  const deadline = Date.now() + VAULT_ATH_WITHDRAW_CONFIRM_TIMEOUT_MS;
+  let pendingWithdrawal = null;
+  let pendingWithdrawalError = null;
+  while (Date.now() <= deadline) {
+    try {
+      pendingWithdrawal = await readPendingAthWithdrawalForOwnVaultAction(provider, owner, clientNonce);
+      pendingWithdrawalError = null;
+      if (pendingWithdrawal?.exists === false) {
+        return {
+          pendingWithdrawal,
+          athTransferPending: false,
+          pendingWithdrawalError: null,
+        };
+      }
+    } catch (error) {
+      pendingWithdrawalError = error;
+      if (!noteTonRpcRateLimit(error)) break;
+    }
+    await delay(VAULT_ATH_WITHDRAW_POLL_MS);
+  }
+  return {
+    pendingWithdrawal,
+    athTransferPending: true,
+    pendingWithdrawalError: pendingWithdrawalError ? String(pendingWithdrawalError?.message ?? pendingWithdrawalError) : null,
+  };
+}
+
 async function submitVaultReceiveIntentExternal(type, params, options = {}) {
   if (options.allowPendingServiceWorkerUpdate !== true) {
     requireNoPendingServiceWorkerAppShellReload();
@@ -10622,13 +13696,46 @@ async function submitVaultReceiveIntentExternal(type, params, options = {}) {
     vaultAddress: requireVaultAddress(),
     deploymentManifestHash: requireVaultDeploymentManifestHash(),
   });
-  const result = await sendVaultExternalBoc(external);
-  globalThis.plathoLastVaultReceiveIntentExternal = { type, params, external, result, clientNonce };
-  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
-    verify: options.allowUnverifiedNonceWait !== true,
-    allowUnverifiedCriticalRead: options.allowUnverifiedNonceWait === true,
-  });
-  return { external, result, clientNonce };
+  let result = null;
+  let ambiguousBroadcast = false;
+  let broadcastError = null;
+  try {
+    result = await sendVaultExternalBoc(external);
+  } catch (error) {
+    if (!isAmbiguousTonRpcBroadcastError(error)) throw error;
+    ambiguousBroadcast = true;
+    broadcastError = error;
+  }
+  globalThis.plathoLastVaultReceiveIntentExternal = {
+    type,
+    params,
+    external,
+    result,
+    clientNonce,
+    ambiguousBroadcast,
+    broadcastError: broadcastError ? String(broadcastError?.message ?? broadcastError) : null,
+  };
+  let nonceWaitError = null;
+  try {
+    await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
+      verify: options.allowUnverifiedNonceWait !== true,
+      allowUnverifiedCriticalRead: options.allowUnverifiedNonceWait === true,
+    });
+  } catch (error) {
+    if (ambiguousBroadcast || result) {
+      nonceWaitError = error;
+    } else {
+      throw error;
+    }
+  }
+  return {
+    external,
+    result,
+    clientNonce,
+    ambiguousBroadcast,
+    confirmationPending: Boolean(nonceWaitError),
+    nonceWaitError: nonceWaitError ? String(nonceWaitError?.message ?? nonceWaitError) : null,
+  };
 }
 
 async function submitAthWalletMessage(type, params, options = {}) {
@@ -10657,7 +13764,8 @@ async function submitVaultDepositTon() {
 }
 
 async function submitVaultDepositTonAmount(amount) {
-  const user = await loadConnectedVaultUser();
+  const provider = await resolveVaultChainProvider();
+  const user = await readFreshConnectedVaultUser(provider);
   setVaultStatus('moving TON to Vault');
   const result = await submitVaultMessage('DepositTon', { amount }, {
     userExists: user.exists === true,
@@ -10674,9 +13782,37 @@ async function submitVaultWithdrawTon() {
 
 async function submitVaultWithdrawTonAmount(amount) {
   setVaultStatus('moving TON from Vault');
-  const result = await submitVaultMessage('WithdrawTon', {
-    amount,
-    recipient: requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet'),
+  requireNoPendingServiceWorkerAppShellReload();
+  const provider = await resolveVaultChainProvider();
+  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const user = await loadConnectedVaultUser({
+    provider,
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  });
+  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n || BigInt(user.auth_pubkey ?? 0n) === 0n) {
+    throw new Error('Unlock and activate your Platho account before moving TON from Vault');
+  }
+  const totalDebit = BigInt(amount) + VAULT_RESERVES_NANOTONS.withdrawTonExec;
+  if (BigInt(user.ton_balance ?? 0n) < totalDebit) {
+    throw new Error('Vault TON balance is too low for amount plus transfer reserve');
+  }
+  const result = await submitVaultAuthExternalWithNonceConfirmation({
+    provider,
+    owner,
+    user,
+    allowUnverifiedNonceWait: true,
+    buildExternal: (clientNonce) => buildVaultWithdrawTonExternalBoc({
+      owner_wallet: owner,
+      amount,
+      recipient: owner,
+      client_nonce: clientNonce,
+      signingSecretKey: requireVaultAuthSecretKey(),
+    }, {
+      vaultAddress: requireVaultAddress(),
+      deploymentManifestHash: requireVaultDeploymentManifestHash(),
+    }),
   });
   setVaultStatus('move submitted');
   return result;
@@ -10690,7 +13826,9 @@ async function submitVaultDepositAth() {
 
 async function submitVaultDepositAthAmount(amount) {
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const vault = requireBasechainAddress(requireVaultAddress(), 'Vault');
+  const provider = await resolveVaultChainProvider();
+  setVaultStatus('checking ATH Vault route');
+  const { vault } = await requireVaultAthDepositRouteForOwnVaultAction(provider);
   setVaultStatus('moving ATH to Vault');
   const result = await submitAthWalletMessage('ATHTransferRequestWithNotify', {
     query_id: nextQueryId(),
@@ -10712,13 +13850,48 @@ async function submitVaultWithdrawAth() {
 
 async function submitVaultWithdrawAthAmount(amount) {
   setVaultStatus('moving ATH from Vault');
-  const result = await submitVaultMessage('WithdrawAth', {
-    query_id: nextQueryId(),
-    amount,
-    recipient: requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet'),
+  requireNoPendingServiceWorkerAppShellReload();
+  const provider = await resolveVaultChainProvider();
+  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const user = await loadConnectedVaultUser({
+    provider,
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
   });
-  setVaultStatus('move submitted');
-  return result;
+  if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n || BigInt(user.auth_pubkey ?? 0n) === 0n) {
+    throw new Error('Unlock and activate your Platho account before moving ATH from Vault');
+  }
+  if (BigInt(user.ath_balance ?? 0n) < BigInt(amount)) {
+    throw new Error('Vault ATH balance is too low');
+  }
+  if (BigInt(user.ton_balance ?? 0n) < VAULT_RESERVES_NANOTONS.withdrawAthMinValue) {
+    throw new Error('Vault TON balance is too low for ATH transfer reserve');
+  }
+  const result = await submitVaultAuthExternalWithNonceConfirmation({
+    provider,
+    owner,
+    user,
+    allowUnverifiedNonceWait: true,
+    buildExternal: (clientNonce) => buildVaultWithdrawAthExternalBoc({
+      owner_wallet: owner,
+      amount,
+      recipient: owner,
+      client_nonce: clientNonce,
+      signingSecretKey: requireVaultAuthSecretKey(),
+    }, {
+      vaultAddress: requireVaultAddress(),
+      deploymentManifestHash: requireVaultDeploymentManifestHash(),
+    }),
+  });
+  if (result.confirmationPending) {
+    setVaultStatus('ATH transfer pending');
+    return { ...result, athTransferPending: true, pendingWithdrawal: null };
+  }
+  setVaultStatus('ATH transfer pending');
+  const athWithdrawal = await waitForVaultAthWithdrawalCompletion(provider, owner, result.clientNonce);
+  setVaultStatus(athWithdrawal.athTransferPending ? 'ATH transfer pending' : 'move submitted');
+  return { ...result, ...athWithdrawal };
 }
 
 async function submitUsernameMint() {
@@ -10728,16 +13901,23 @@ async function submitUsernameMint() {
   const registry = requireBasechainAddress(requireUsernameRegistryAddress(), 'UsernameRegistry');
   const provider = await resolveUsernameRegistryProvider();
   const priceAtomic = await readUsernameMintPriceForOwnVaultAction(provider, registry, username);
+  setUsernameMintStatus('checking availability');
+  await readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username);
+  assertNoPendingUsernameMintRetry(username, owner);
   await assertVaultUsernameMintCanStart(owner, username, priceAtomic);
-  setText(identitySubtitle, 'username signing through Vault');
+  setUsernameMintStatus('signing through Vault');
   const result = await submitVaultUsernameMint({
     owner,
     username,
     priceAtomic,
   });
-  flashWalletIdentityStatus(`${username}.ath mint submitted`);
-  autoLinkMintedUsername(username, owner).catch((error) => {
-    flashWalletIdentityStatus('mint submitted; link after sync');
+  rememberPendingUsernameMint(username, owner, result);
+  setUsernameMintStatus(result.confirmationPending === true ? 'mint submitted, finalizing' : 'mint finalizing');
+  autoLinkMintedUsername(username, owner, {
+    attempts: USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS,
+    delayMs: USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS,
+  }).catch((error) => {
+    setUsernameMintStatus('mint submitted; link after sync');
     console.error(error);
   });
   return result;
@@ -10758,24 +13938,119 @@ async function submitAthWalletBurn() {
   return result;
 }
 
+async function submitAthDueFlush() {
+  requireNoPendingServiceWorkerAppShellReload();
+  requirePlathoWallet();
+  athFlushState = {
+    ...athFlushState,
+    busy: true,
+    error: null,
+  };
+  renderAthFlushStatus();
+  const state = await readAthBurnFlushState();
+  athFlushState = {
+    ...state,
+    busy: true,
+    error: null,
+  };
+  renderAthFlushStatus();
+  const messages = [];
+  const flushedBuckets = [];
+  const usernameDue = nonNegativeBigInt(state.username_burn_due_ath);
+  const profileDue = nonNegativeBigInt(state.profile_burn_due_ath);
+  const usernamePending = nonNegativeBigInt(state.username_pending_burn_flush_count);
+  const profilePending = nonNegativeBigInt(state.profile_pending_burn_flush_count);
+  if (usernameDue > 0n && usernamePending === 0n) {
+    messages.push(createUsernameRegistryMessage('FlushBurnAthDue', {
+      query_id: nextQueryId(),
+    }, {
+      usernameRegistryAddress: requireUsernameRegistryAddress(),
+      valueNanotons: REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
+    }));
+    flushedBuckets.push('username');
+  }
+  if (profileDue > 0n && profilePending === 0n) {
+    messages.push(createProfileRegistryMessage('FlushProfileBurnAthDue', {
+      query_id: nextQueryId(),
+    }, {
+      profileRegistryAddress: requireProfileRegistryAddress(),
+      valueNanotons: REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
+    }));
+    flushedBuckets.push('profile');
+  }
+  if (messages.length === 0) {
+    const pending = athFlushPendingCount(state);
+    throw new Error(pending > 0n ? 'ATH burn flush is already pending' : 'No ATH is ready to flush');
+  }
+  const transaction = createWalletTransaction(messages);
+  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
+  athFlushState = {
+    ...state,
+    username_burn_due_ath: flushedBuckets.includes('username') ? 0n : state.username_burn_due_ath,
+    profile_burn_due_ath: flushedBuckets.includes('profile') ? 0n : state.profile_burn_due_ath,
+    username_pending_burn_flush_count: flushedBuckets.includes('username')
+      ? usernamePending + 1n
+      : state.username_pending_burn_flush_count,
+    profile_pending_burn_flush_count: flushedBuckets.includes('profile')
+      ? profilePending + 1n
+      : state.profile_pending_burn_flush_count,
+    busy: false,
+    error: null,
+  };
+  globalThis.plathoLastAthDueFlush = { state, messages, transaction, result, flushedBuckets };
+  renderAthFlushStatus();
+  queueAthFlushPostTransactionRefresh();
+  flashWalletIdentityStatus('ATH flush submitted');
+  return result;
+}
+
 async function submitProfileAvatarUpdate(avatar) {
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   if (!avatar?.bytes?.length) return null;
-  setText(identitySubtitle, 'avatar version checking');
+  const avatarHash = await sha256Hex(avatar.bytes);
+  const existingRecovery = profileAvatarPublishRecoveryFor(owner, avatarHash);
+  if (existingRecovery) {
+    setProfileAvatarStatus('avatar still confirming');
+    scheduleProfileAvatarPublishRecovery(existingRecovery, 0);
+    return existingRecovery;
+  }
+  setProfileAvatarStatus('checking current avatar');
   const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: true });
+  if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
+    writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
+    const cachedImage = await readProfileAvatarMediaCache(avatarHash);
+    if (cachedImage) setAvatarNode(profileAvatar, 'P', cachedImage);
+    setProfileAvatarStatus('avatar active', '');
+    return {
+      status: 'active',
+      registryPointer: currentPointer,
+    };
+  }
   const parts = imagePartsForSend(avatar, 'profile avatar');
   if (parts.length <= 0) throw new Error('Avatar image is empty');
   if (parts.length > 16) throw new Error('Avatar must fit 16 public capsules');
 
   let streamId = randomBytes(16);
   const createdAtSec = Math.floor(Date.now() / 1000);
-  const avatarHash = await sha256Hex(avatar.bytes);
   const nextVersion = (currentPointer?.profileVersion ?? 0) + 1;
+  const publishDiagnostics = {
+    avatarHash,
+    streamId: `0x${bytesToHex(streamId)}`,
+    partCount: parts.length,
+    profileVersion: nextVersion,
+    snapshots: [],
+  };
+  const capturePublishSnapshot = async (label, publishState = publishResult?.publishState ?? null) => {
+    const snapshot = await readProfileAvatarPublishChainSnapshot(owner, publishState, label);
+    publishDiagnostics.snapshots.push(snapshot);
+    globalThis.plathoLastProfileAvatarPublishDiagnostics = publishDiagnostics;
+    return snapshot;
+  };
   const payloads = [];
   for (let index = 0; index < parts.length; index += 1) {
     payloads.push(await createPublicPostPayload({
       type: 'avatar',
-      bytes: parts[index],
+      bytes: parts[index].bytes,
       mediaFormat: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
       streamId,
       partIndex: index,
@@ -10783,15 +14058,20 @@ async function submitProfileAvatarUpdate(avatar) {
       createdAtSec,
       profileVersion: nextVersion,
       avatarHash,
-    }, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES }));
+    }, { sizeClass: parts[index].sizeClass }));
   }
+  publishDiagnostics.payloads = profileAvatarPublishPayloadDiagnostics(payloads);
 
-  setText(identitySubtitle, 'avatar Vault balance checking');
+  setProfileAvatarStatus('checking Vault balance');
   try {
     await assertVaultProfileAvatarCanStart(owner, parts.length);
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    setText(identitySubtitle, rateLimited ? TON_RPC_CONNECTING_STATUS : String(error?.message ?? 'avatar blocked'));
+    const recoverableRpc = !rateLimited && isTonRpcRecoverableReadError(error);
+    setProfileAvatarStatus(
+      rateLimited || recoverableRpc ? TON_RPC_CONNECTING_STATUS : String(error?.message ?? 'avatar blocked'),
+      rateLimited || recoverableRpc ? 'busy' : 'error',
+    );
     throw error;
   }
 
@@ -10802,80 +14082,228 @@ async function submitProfileAvatarUpdate(avatar) {
     avatarStreamId: `0x${bytesToHex(streamId)}`,
     avatarPartCount: parts.length,
   };
-  setText(identitySubtitle, 'avatar checking chain');
+  const avatarRecoveryContext = () => ({
+    owner,
+    avatarHash,
+    streamIdBytes: streamId,
+    partCount: parts.length,
+    pendingPointer,
+    mediaFormat: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
+    publishState: publishResult?.publishState ?? null,
+    publishResult,
+    payloads,
+  });
+  setProfileAvatarStatus('checking chain');
   let publishResult = null;
   let confirmed = await findPublishedAvatarEntries(owner, {
     ...pendingPointer,
     avatarStreamId: null,
   }).catch((error) => {
-    if (!noteTonRpcRateLimit(error)) console.error(error);
+    if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
     return null;
   });
   if (confirmed?.streamId) streamId = bigIntToFixedBytes(BigInt(confirmed.streamId), 16, 'avatar stream id');
   if (confirmed) {
-    setText(identitySubtitle, 'avatar already published');
+    setProfileAvatarStatus('avatar already published');
   } else {
-    setText(identitySubtitle, 'avatar publishing');
-    publishResult = await publishPublicPayloadParts(payloads, `profile-avatar-${Date.now()}`);
-    if (publishResult?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED && publishResult?.status !== VAULT_PUBLISH_STATUS_SUBMITTED) {
-      flashWalletIdentityStatus('avatar publish blocked');
+    setProfileAvatarStatus('publishing avatar');
+    await capturePublishSnapshot('before-public-publish', null);
+    try {
+      publishResult = await publishPublicPayloadParts(payloads, `profile-avatar-${Date.now()}`);
+      globalThis.plathoLastProfileAvatarPublish = {
+        avatarHash,
+        streamId: `0x${bytesToHex(streamId)}`,
+        partCount: parts.length,
+        diagnostics: publishDiagnostics,
+        result: publishResult,
+        at: new Date().toISOString(),
+      };
+    } catch (error) {
+      if (!isVaultPublishPartialError(error)) throw error;
+      publishResult = error.publishResult;
+      publishDiagnostics.initialPublishError = shortUiErrorText(error.cause ?? error, 'avatar publish failed');
+      globalThis.plathoLastProfileAvatarPublishPartial = {
+        avatarHash,
+        streamId: `0x${bytesToHex(streamId)}`,
+        parts: parts.length,
+        diagnostics: publishDiagnostics,
+        result: publishResult,
+        cause: String(error?.cause?.message ?? error?.message ?? error),
+        at: new Date().toISOString(),
+      };
+      globalThis.plathoLastProfileAvatarPublish = globalThis.plathoLastProfileAvatarPublishPartial;
+      const broadcastStatus = profileAvatarPublishBroadcastErrorStatus(publishDiagnostics);
+      setProfileAvatarStatus(broadcastStatus ? `broadcast uncertain: ${broadcastStatus}` : 'broadcast uncertain, confirming');
+    }
+    if (publishResult?.publishState) {
+      rememberProfileAvatarPublishRecovery(avatarRecoveryContext());
+      setProfileAvatarStatus('publish submitted, confirming');
+      try {
+        await confirmCapsuleHubPublishEntries(publishResult.publishState, {
+          scanAvailableTransports: true,
+          scanLimit: PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT,
+          deadlineMs: PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS,
+          requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
+          queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
+        });
+        if (publishResult.publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+          publishResult.status = CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
+        } else if (publishResult.publishState.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
+          publishResult.status = VAULT_PUBLISH_STATUS_SUBMITTED;
+        }
+        confirmed = await findConfirmedAvatarEntriesFromPublishState(owner, pendingPointer, publishResult.publishState)
+          .catch((error) => {
+            if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+            return null;
+          });
+      } catch (error) {
+        if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+      }
+    }
+    if (
+      publishResult?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+      && publishResult?.status !== VAULT_PUBLISH_STATUS_SUBMITTED
+      && publishResult?.status !== VAULT_PUBLISH_STATUS_PARTIAL
+    ) {
+      setProfileAvatarStatus('publish blocked', 'error');
       return publishResult;
     }
-    setText(identitySubtitle, 'avatar confirming');
-    confirmed = await waitForPublishedAvatarEntries(owner, pendingPointer);
+    setProfileAvatarStatus('confirming avatar capsules');
+    try {
+      confirmed = confirmed ?? await waitForPublishedAvatarEntries(owner, pendingPointer);
+    } catch (error) {
+      if (error?.code !== 'PLATHO_AVATAR_CAPSULES_NOT_VISIBLE') throw error;
+      if (publishResult?.publishState) {
+        setProfileAvatarStatus('checking chain');
+        let broadcastRetries = 0;
+        try {
+          broadcastRetries = await retryUnconfirmedVaultPublishBroadcasts(publishResult.publishState, {
+            owner,
+            deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+            readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+            sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+            queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+          });
+          if (broadcastRetries > 0) {
+            publishResult.broadcastRetryCount = (Number(publishResult.broadcastRetryCount ?? 0) || 0) + broadcastRetries;
+            globalThis.plathoLastProfileAvatarPublishRecovery = {
+              avatarHash,
+              streamId: `0x${bytesToHex(streamId)}`,
+              broadcastRetries,
+              at: new Date().toISOString(),
+            };
+            setProfileAvatarStatus('broadcast retrying');
+          }
+          await confirmCapsuleHubPublishEntries(publishResult.publishState, {
+            scanAvailableTransports: true,
+            scanLimit: PROFILE_AVATAR_PUBLISH_CONFIRM_SCAN_LIMIT,
+            deadlineMs: PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS,
+            requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
+            queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
+          });
+          confirmed = await findConfirmedAvatarEntriesFromPublishState(owner, pendingPointer, publishResult.publishState)
+            .catch((confirmError) => {
+              if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
+              return null;
+            });
+          if (!confirmed && broadcastRetries > 0) {
+            setProfileAvatarStatus('confirming avatar capsules');
+            confirmed = await waitForPublishedAvatarEntries(owner, pendingPointer)
+              .catch((confirmError) => {
+                if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
+                return null;
+              });
+          }
+        } catch (confirmError) {
+          if (!isTonRpcRecoverableReadError(confirmError) && !noteTonRpcRateLimit(confirmError)) console.error(confirmError);
+        }
+      }
+      const looseConfirmed = await findPublishedAvatarEntries(owner, {
+        ...pendingPointer,
+        avatarStreamId: null,
+      }).catch((looseError) => {
+        if (!isTonRpcRecoverableReadError(looseError) && !noteTonRpcRateLimit(looseError)) console.error(looseError);
+        return null;
+      });
+      confirmed = looseConfirmed ?? confirmed;
+      if (confirmed) {
+        if (confirmed.streamId) streamId = bigIntToFixedBytes(BigInt(confirmed.streamId), 16, 'avatar stream id');
+      } else {
+        await capturePublishSnapshot('after-avatar-not-visible', publishResult?.publishState ?? null);
+        const diagnosticStatus = profileAvatarPublishDiagnosticStatus(publishDiagnostics);
+        if (diagnosticStatus) error.avatarDiagnosticStatus = diagnosticStatus;
+        if (publishResult?.publishState) {
+          const job = scheduleProfileAvatarPublishRecovery({
+            ...avatarRecoveryContext(),
+            lastError: diagnosticStatus ?? shortUiErrorText(error, 'avatar not visible yet'),
+          });
+          setProfileAvatarStatus('avatar still confirming');
+          return {
+            status: VAULT_PUBLISH_STATUS_SUBMITTED,
+            publishState: publishResult.publishState,
+            recoveryJob: profileAvatarRecoveryPublicDebug(job),
+          };
+        }
+        throw error;
+      }
+    }
   }
 
-  setText(identitySubtitle, 'avatar Vault signing');
-  const result = await submitVaultProfileAvatarRegistration({
-    owner,
-    avatarHash,
-    avatarEntryId: confirmed.firstEntryId,
-    avatarStreamId: bytesToBigIntValue(streamId),
-    avatarPartCount: BigInt(parts.length),
-    mediaFormat: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
-  });
-  let registryPointer = null;
-  let registryError = null;
+  let finality = null;
   try {
-    setText(identitySubtitle, 'avatar registry confirming');
-    registryPointer = await waitForProfileAvatarRegistryUpdate(owner, avatarHash);
-    writeStoredProfileAvatarPointer(registryPointer, owner);
-    setAvatarNode(profileAvatar, 'P', confirmed.imageUrl);
-    flashWalletIdentityStatus(`avatar active (${formatAthAtomic(PROFILE_AVATAR_PRICE_ATH)} ATH)`);
+    finality = await finalizeProfileAvatarUpdate({
+      owner,
+      avatarHash,
+      confirmed,
+      pendingPointer,
+      partCount: parts.length,
+      mediaFormat: PUBLIC_BODY_MEDIA_FORMATS.WEBP,
+      payloads,
+      publishResult,
+      streamIdBytes: streamId,
+    });
   } catch (error) {
-    registryError = error;
-    console.error(error);
-    await refreshOwnProfileAvatar().catch((refreshError) => console.error(refreshError));
-    setText(identitySubtitle, 'avatar not active yet');
-    flashWalletIdentityStatus('avatar registration not confirmed');
+    if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) throw error;
+    const job = scheduleProfileAvatarPublishRecovery({
+      ...avatarRecoveryContext(),
+      confirmed,
+      lastError: shortUiErrorText(error, 'avatar registry delayed'),
+    });
+    setProfileAvatarStatus('avatar still confirming');
+    return {
+      status: 'pending',
+      recoveryJob: profileAvatarRecoveryPublicDebug(job),
+    };
   }
-  globalThis.plathoLastProfileAvatarUpdate = {
-    avatarHash,
-    streamId: `0x${bytesToHex(streamId)}`,
-    parts: parts.length,
-    firstEntryId: confirmed.firstEntryId.toString(),
-    payloads,
-    publishResult,
-    result,
-    registryPointer,
-    registryPending: !registryPointer,
-    registryError: registryError ? String(registryError?.message ?? registryError) : null,
-  };
-  return result;
+  if (finality?.registryPending === true) {
+    const job = scheduleProfileAvatarPublishRecovery({
+      ...avatarRecoveryContext(),
+      confirmed,
+      registrySubmission: finality.result ?? null,
+      lastError: finality.registryError ? shortUiErrorText(finality.registryError, 'registry pending') : null,
+    });
+    return {
+      status: 'pending',
+      recoveryJob: profileAvatarRecoveryPublicDebug(job),
+    };
+  }
+  clearProfileAvatarPublishRecovery(profileAvatarPublishRecoveryKey(owner, avatarHash));
+  return finality?.result ?? finality;
 }
 
 async function attemptPrivatePaymentCheckPublish(context) {
+  const endPrivateOutboundWork = beginPrivateOutboundWork();
+  try {
   const { thread, message, paymentDraft, selectedSuite, senderOptions = currentPrivateSenderOptions() } = context;
+  clearPrivateMessageManualRecovery(message);
   if (!thread || thread.readOnly) throw new Error('Payment checks are only available in private chats');
   if (!paymentDraft) throw new Error('Payment check draft is missing');
   if (!localIdentity) throw new Error('Local encryption identity is not ready');
   const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite ?? currentOutgoingPrivateSuite() });
+  refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
   const recipientWallet = recipientEntry.walletAddress;
   const { asset, amount } = paymentDraft;
   const provider = await resolveVaultChainProvider();
-  if (!provider?.getReceiveIntentId) {
-    throw new Error('Vault provider cannot create payment checks');
-  }
   const initialUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
   if (initialUser.exists !== true || BigInt(initialUser.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before using payment checks');
@@ -10885,24 +14313,13 @@ async function attemptPrivatePaymentCheckPublish(context) {
   const clientNonce = BigInt(initialUser.publish_nonce ?? initialUser.publishNonce ?? 0n);
   const secret32Bytes = randomBytes(32);
   const secret32 = bytesToBigIntValue(secret32Bytes);
-  const intentId = await callWithOwnVaultActionReadFallback(
-    () => provider.getReceiveIntentId(
-      senderWallet,
-      recipientWallet,
-      asset,
-      amount,
-      clientNonce,
-      { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
-    ),
-    () => provider.getReceiveIntentId(
-      senderWallet,
-      recipientWallet,
-      asset,
-      amount,
-      clientNonce,
-      { vaultAddress: requireVaultAddress(), verify: false, allowUnverifiedCriticalRead: true, priority: 'critical', cacheTtlMs: 0 },
-    ),
-  );
+  const intentId = await computeVaultReceiveIntentId({
+    senderWallet,
+    recipientWallet,
+    asset,
+    amount,
+    clientNonce,
+  });
   const commitment = secret32;
   const payment = normalizePaymentForMessage({
     asset,
@@ -10911,72 +14328,70 @@ async function attemptPrivatePaymentCheckPublish(context) {
     secret32Bytes,
     senderWallet,
     recipientWallet,
+    clientNonce,
   });
-  const senderVaultKeyId = currentVaultMessagingKeyId();
-  const senderMetadata = senderOptions.includeSenderWalletMetadata === false
-    ? {}
-    : {
-      senderWallet,
-      senderVaultKeyId: senderVaultKeyId ?? undefined,
-    };
-  const payloadBytes = encodeCompactPayload({
-    type: 'payment',
-    asset: Number(asset),
-    amount,
-    sizeClass: VAULT_SIZE_CLASS.STANDARD,
-    intentId: bigIntToFixedBytes(intentId, 32, 'intent id'),
-    secret32: secret32Bytes,
-    ...senderMetadata,
-  });
-  const capsule = await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
-    payloadBytes,
-    sizeClass: VAULT_SIZE_CLASS.STANDARD,
-    threadId: thread.id,
-    ...currentProfilePointerFields(),
-  });
-  const publishState = createCapsulePublishState([capsule]);
-  message.text = paymentMessageText(payment);
+  const capsules = await createPrivateComposerCapsules(context.text ?? '', context.attachments ?? [], recipientEntry, thread.id, senderOptions, { payment });
+  const publishState = createCapsulePublishState(capsules);
+  const displayBlocks = displayBlocksFromDocumentBlocks(composerBlocksFromDraft(context.text ?? '', context.attachments ?? [], payment));
+  message.text = messagePreviewFromBlocks(displayBlocks) || paymentMessageText(payment);
+  message.blocks = displayBlocks;
   message.payment = payment;
-  message.paymentDraft = paymentDraft;
-  message.capsule = capsule;
+  message.paymentDraft = paymentDraftForHistory(paymentDraft);
+  message.capsule = capsules[0];
+  message.capsules = capsules;
   message.publishState = publishState;
   message.recipientWallet = recipientWallet;
-  message.meta = 'check pricing';
+  message.meta = 'message pricing';
   refreshThreadAfterMessageChange(thread);
   renderThreads();
   renderConversation();
 
-  if (!encryptedMessageStore || encryptedMessageStore.persistent === false) {
-    throw new Error('Persistent encrypted local history is required before creating a payment check');
-  }
-  const quotedPublish = await prepareCapsulesThroughVault([capsule], {
-    publishState,
-    allowOwnVaultActionReadFallback: true,
-  });
-  const createReserve = estimateVaultAttachedValueNanotons('CreateReceiveIntent');
-  const preparedUser = quotedPublish.user ?? initialUser;
-  const tonBalance = BigInt(preparedUser.ton_balance ?? preparedUser.tonBalance ?? 0n);
-  const athBalance = BigInt(preparedUser.ath_balance ?? preparedUser.athBalance ?? 0n);
-  if (asset === RECEIVE_ASSETS.TON) {
-    if (tonBalance < amount + createReserve + quotedPublish.totalMaxCharge) {
-      throw new Error('Not enough Vault TON for payment check and private publish hold');
+  try {
+    if (!encryptedMessageStore || encryptedMessageStore.persistent === false) {
+      throw new Error('Persistent encrypted local history is required before creating a payment check');
     }
-  } else {
-    if (athBalance < amount) throw new Error(`Not enough ${paymentAssetLabel(asset)} in Vault`);
-    if (tonBalance < createReserve + quotedPublish.totalMaxCharge) {
-      throw new Error('Not enough Vault TON for payment check private publish hold');
+    const quotedPublish = await prepareCapsulesThroughVault(capsules, {
+      publishState,
+      allowOwnVaultActionReadFallback: true,
+    });
+    const createReserve = estimateVaultAttachedValueNanotons('CreateReceiveIntent');
+    const preparedUser = quotedPublish.user ?? initialUser;
+    const tonBalance = BigInt(preparedUser.ton_balance ?? preparedUser.tonBalance ?? 0n);
+    const athBalance = BigInt(preparedUser.ath_balance ?? preparedUser.athBalance ?? 0n);
+    if (asset === RECEIVE_ASSETS.TON) {
+      if (tonBalance < amount + createReserve + quotedPublish.totalMaxCharge) {
+        throw new Error('Not enough Vault TON for payment check and private publish hold');
+      }
+    } else {
+      if (athBalance < amount) throw new Error(`Not enough ${paymentAssetLabel(asset)} in Vault`);
+      if (tonBalance < createReserve + quotedPublish.totalMaxCharge) {
+        throw new Error('Not enough Vault TON for payment check private publish hold');
+      }
     }
-  }
-  const storedRecovery = await persistMessageToEncryptedHistory(thread, message);
-  if (!storedRecovery && !message.localHistoryId) {
-    throw new Error('Payment check recovery record could not be saved');
+    const storedRecovery = await persistMessageToEncryptedHistory(thread, message);
+    if (!storedRecovery && !message.localHistoryId) {
+      throw new Error('Payment check recovery record could not be saved');
+    }
+    const pendingLedger = await rememberPendingPaymentCheckLedgerRecord(
+      thread,
+      message,
+      payment,
+      { status: 'prepared' },
+      { required: true },
+    );
+    if (!pendingLedger) {
+      throw new Error('Payment check pending ledger could not be saved');
+    }
+  } catch (error) {
+    rememberPaymentCheckActionError('pre-create', error, payment);
+    throw error;
   }
 
   let createResult = null;
   let intentCreateSubmitted = false;
   try {
-    setText(identitySubtitle, 'check signing');
-    message.meta = 'check signing';
+    setText(identitySubtitle, 'creating payment check');
+    message.meta = 'creating payment check';
     await updateMessageInEncryptedHistory(thread, message);
     createResult = await submitVaultReceiveIntentExternal('CreateReceiveIntent', {
       asset,
@@ -10990,50 +14405,91 @@ async function attemptPrivatePaymentCheckPublish(context) {
     });
     intentCreateSubmitted = true;
     context.paymentIntentCreated = true;
+    message.paymentIntentCreated = true;
     message.vaultCreateIntent = createResult;
     message.meta = 'check created, confirming';
     await updateMessageInEncryptedHistory(thread, message);
+    await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+      status: 'intent_create_submitted',
+      vaultCreateIntent: createResult,
+    });
     await waitForPaymentCheckCreateConfirmation(provider, payment);
-    message.meta = 'check created, publishing';
+    message.meta = 'payment check created, publishing message';
     await updateMessageInEncryptedHistory(thread, message);
-    const preparedPublish = { ...quotedPublish, publishState };
-    const publishResult = await sendPreparedCapsulesThroughVault(preparedPublish, {
-      allowUnverifiedNonceRead: true,
+    await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+      status: 'intent_confirmed',
+      vaultCreateIntent: createResult,
+    });
+    const preparedPublish = await prepareCapsulesThroughVault(capsules, {
       publishState,
+      allowOwnVaultActionReadFallback: true,
+    });
+    const publishResult = await sendPreparedCapsulesThroughVault(preparedPublish, {
+      publishState,
+      confirmFinalNonce: true,
       onPartState: () => {
-        message.meta = `check ${publishStateMeta(publishState)}`;
+        message.meta = publishStateMeta(publishState);
         updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
         renderConversation();
       },
     });
     clearPrivateSendRetry(message);
+    clearPrivateMessageManualRecovery(message);
     message.vaultPublish = publishResult;
     message.publishState = publishResult.publishState ?? publishState;
-    message.meta = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-      ? 'check published'
-      : 'check submitted, confirming';
+    message.meta = publishStateMeta(message.publishState);
     thread.state = publishResult.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
     await updateMessageInEncryptedHistory(thread, message);
     if (publishResult.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+      await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+        status: 'publish_submitted',
+        vaultPublish: publishResult,
+        publishState: message.publishState,
+      });
       schedulePrivatePublishConfirmationRetry(context);
     } else {
       message.privatePublishConfirmAttempt = 0;
+      message.privatePublishConfirmStopped = false;
+      message.privatePublishConfirmStoppedAt = null;
       clearPrivatePublishConfirmRetry(message);
+      await removePendingPaymentCheckLedgerRecord(payment);
     }
     refreshMessagingControls();
-    return { createResult, payment, capsule, publishResult };
+    return { createResult, payment, capsule: capsules[0], capsules, publishResult };
   } catch (error) {
     const cancelled = isPublishPriceChangeCancelled(error);
     const partial = isVaultPublishPartialError(error);
     if (!intentCreateSubmitted) {
-      message.meta = cancelled ? 'check cancelled before create' : privateSendBlockedStatusText(error);
       if (cancelled) context.cancelled = true;
+      await removePendingPaymentCheckLedgerRecord(payment);
+      if (isRecoverablePrivateSendError(error)) {
+        message.meta = privateSendRetryMeta(error);
+        thread.state = 'pending';
+        schedulePrivateSendRetry(context, error);
+      } else {
+        markPrivateMessageManualRecovery(context, error, cancelled ? 'not sent: cancelled' : privateSendBlockedStatusText(error));
+      }
     } else if (partial) {
       message.vaultPublish = error.publishResult;
       message.publishState = error.publishResult?.publishState ?? message.publishState;
-      message.meta = `check ${publishStateMeta(message.publishState)}`;
+      message.meta = publishStateMeta(message.publishState);
       thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
+      await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+        status: 'publish_partial',
+        vaultPublish: error.publishResult,
+        publishState: message.publishState,
+      });
       schedulePrivatePublishConfirmationRetry(context, error);
+    } else if (isRecoverablePrivateSendError(error)) {
+      message.meta = privateSendRetryMeta(error);
+      thread.state = 'pending';
+      context.payment = payment;
+      context.paymentIntentCreated = true;
+      await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+        status: 'publish_retry_pending',
+        publishState: message.publishState,
+      });
+      schedulePrivateSendRetry(context, error);
     } else {
       rememberPaymentCheckActionError('publish', error, payment);
       const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(payment).catch((cancelError) => {
@@ -11050,15 +14506,31 @@ async function attemptPrivatePaymentCheckPublish(context) {
         ? (cancelled ? 'check cancelled before publish' : `check publish failed, intent cancelled: ${publishErrorText}`)
         : (cancelled ? 'check publish cancelled, refund required' : 'check not delivered, refund required');
       thread.state = 'blocked';
+      if (cancelResult?.pending) {
+        await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+          status: 'cancel_submitted',
+          vaultCancelIntent: cancelResult,
+        });
+      } else if (cancelResult) {
+        await removePendingPaymentCheckLedgerRecord(payment);
+      } else {
+        await rememberPendingPaymentCheckLedgerRecord(thread, message, payment, {
+          status: 'publish_failed_refund_required',
+          publishError: privateSendPreflightStatusText(error),
+        });
+      }
     }
     refreshMessagingControls();
     if (!cancelled && !partial) console.error(error);
     await updateMessageInEncryptedHistory(thread, message);
-    return { createResult, payment, capsule, error };
+    return { createResult, payment, capsule: capsules[0], capsules, error };
   } finally {
     refreshThreadAfterMessageChange(thread);
     renderThreads();
     renderConversation();
+  }
+  } finally {
+    endPrivateOutboundWork();
   }
 }
 
@@ -11072,7 +14544,7 @@ async function submitCreatePaymentCheck(options = {}) {
     text: paymentMessageText(paymentDetails),
     meta: 'check preparing',
     ...localMessageOrderFields(),
-    paymentDraft: paymentDetails,
+    paymentDraft: paymentDraftForHistory(paymentDetails),
   };
   insertThreadMessage(thread, message);
   refreshThreadAfterMessageChange(thread);
@@ -11112,7 +14584,12 @@ async function submitVaultClaimPaymentCheck(payment, options = {}) {
   });
   setText(identitySubtitle, 'claim confirming');
   await options.onStatus?.('check claim submitted, confirming');
+  await markPendingPaymentCheckLedgerRecord(payment, {
+    status: 'claim_submitted',
+    vaultClaimIntent: result,
+  });
   const confirmed = await waitForPaymentCheckClaimConfirmation(provider, payment, beforeUser);
+  await removePendingPaymentCheckLedgerRecord(payment);
   const claimedAmountText = BigInt(payment.asset ?? 0n) === RECEIVE_ASSETS.TON
     ? formatTonNanotons(BigInt(payment.amount ?? 0n))
     : formatAtomicAmount(payment.amount);
@@ -11142,7 +14619,12 @@ async function submitVaultCancelPaymentCheck(payment, options = {}) {
   });
   setText(identitySubtitle, 'cancel confirming');
   await options.onStatus?.('check cancel submitted, confirming');
+  await markPendingPaymentCheckLedgerRecord(payment, {
+    status: 'cancel_submitted',
+    vaultCancelIntent: result,
+  });
   const confirmed = await waitForPaymentCheckCancelConfirmation(provider, payment, beforeUser);
+  await removePendingPaymentCheckLedgerRecord(payment);
   flashWalletIdentityStatus('check cancelled');
   queueVaultPostTransactionRefresh();
   return { result, confirmed };
@@ -11156,7 +14638,8 @@ async function attemptCancelPaymentCheckAfterPublishFailure(payment) {
 
 async function submitVaultRegisterMessagingKeys() {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
-  const user = await loadConnectedVaultUser();
+  const provider = await resolveVaultChainProvider();
+  const user = await readFreshConnectedVaultUser(provider);
   if (user.current_key_id && BigInt(user.current_key_id) !== 0n) {
     vaultDraftStatus.textContent = 'active';
     return null;
@@ -11230,21 +14713,23 @@ async function submitVaultReplaceMessagingKeys() {
   }
   setText(vaultRotateStatus, 'signing');
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  const clientNonce = BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
-  const external = await buildVaultReplaceMessagingKeysExternalBoc({
-    ...localVaultDraft.message,
-    owner_wallet: owner,
-    client_nonce: clientNonce,
-    signingSecretKey: requireVaultAuthSecretKey(),
-  }, {
-    vaultAddress: requireVaultAddress(),
-    deploymentManifestHash: requireVaultDeploymentManifestHash(),
+  const submission = await submitVaultAuthExternalWithNonceConfirmation({
+    provider,
+    owner,
+    user,
+    buildExternal: (clientNonce) => buildVaultReplaceMessagingKeysExternalBoc({
+      ...localVaultDraft.message,
+      owner_wallet: owner,
+      client_nonce: clientNonce,
+      signingSecretKey: requireVaultAuthSecretKey(),
+    }, {
+      vaultAddress: requireVaultAddress(),
+      deploymentManifestHash: requireVaultDeploymentManifestHash(),
+    }),
   });
-  const result = await sendVaultExternalBoc(external);
-  await waitForVaultPublishNonce(provider, owner, clientNonce + 1n);
-  globalThis.plathoLastVaultReplaceMessagingKeysExternal = { external, result, clientNonce };
-  setText(vaultRotateStatus, 'key update sent');
-  return result;
+  globalThis.plathoLastVaultReplaceMessagingKeysExternal = submission;
+  setText(vaultRotateStatus, submission.confirmationPending ? 'key update submitted, confirming' : 'key update sent');
+  return submission;
 }
 
 const VAULT_PUBLISH_STATUS_SUBMITTED = 'vault-publish-submitted';
@@ -11258,7 +14743,19 @@ const PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED = 'capsulehub_confirmed';
 const PUBLISH_PART_STATUS_FAILED = 'failed';
 const PUBLISH_PART_STATUS_UNKNOWN = 'unknown';
 const VAULT_PUBLISH_PARTIAL_ERROR_CODE = 'PLATHO_VAULT_PUBLISH_PARTIAL';
-const CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT = 120;
+const CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT = 32;
+const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
+const CAPSULEHUB_PUBLISH_ACK_OP = 0x874E576An;
+const VAULT_PUBLISH_ACK_HISTORY_LOOKUP_LIMIT = 100;
+const VAULT_PUBLISH_ACK_HISTORY_LOOKUP_MAX_PAGES = 4;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS = 4 * 1000;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS = 8 * 1000;
+const PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS = 30 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS = 30 * 1000;
+const PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS = 60 * 1000;
 
 function publishHashPlain(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -11273,23 +14770,87 @@ function publishHashPlain(value) {
   }
 }
 
+function publishHashBigInt(value, label = 'publish hash') {
+  const plain = publishHashPlain(value);
+  if (!plain) throw new Error(`${label} is missing`);
+  return BigInt(`0x${plain}`);
+}
+
+async function computeVaultPublishId(owner, clientNonce, bodyHash, publishKind) {
+  const cell = tonCell.beginCell()
+    .uint(uint256ConfigValue(requireVaultDeploymentManifestHash(), 'Vault deployment manifest hash'), 256, 'deployment_manifest_hash')
+    .address(owner, 'owner')
+    .uint(clientNonce, 64, 'client_nonce')
+    .uint(publishHashBigInt(bodyHash, 'publish body hash'), 256, 'body_hash')
+    .uint(publishKind, 8, 'publish_kind')
+    .endCell();
+  const { hash } = await tonCell.computeCellHashAndDepth(cell);
+  return tonCell.bytesToBigInt(hash).toString(16).padStart(64, '0');
+}
+
 function publishPartFromCapsule(capsule, index, total) {
   const publish = capsule.publish ?? {};
   const isPublic = BigInt(publish.publish_kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC;
+  const bodyHash = publishHashPlain(publish.body_hash ?? publish.bodyHash);
   return {
     capsuleId: capsule.id ?? null,
     index,
     partCount: total,
     status: PUBLISH_PART_STATUS_BUILT,
     publishKind: isPublic ? 'public' : 'private',
-    sizeClass: Number(publish.size_class ?? 1),
-    cryptoSuite: Number(publish.crypto_suite ?? 0),
-    bodyHash: publishHashPlain(publish.body_hash),
-    header0Hash: publishHashPlain(publish.header_0_hash ?? publish.header_hash),
-    header1Hash: publishHashPlain(publish.header_1_hash),
+    sizeClass: Number(publish.size_class ?? publish.sizeClass ?? 1),
+    cryptoSuite: Number(publish.crypto_suite ?? publish.cryptoSuite ?? 0),
+    publishId: publishHashPlain(publish.publish_id ?? publish.publishId),
+    bodyHash,
+    header0Hash: publishHashPlain(publish.header_0_hash ?? publish.header0Hash ?? publish.header_hash ?? publish.headerHash),
+    header1Hash: publishHashPlain(publish.header_1_hash ?? publish.header1Hash),
     entryId: null,
     error: null,
   };
+}
+
+function publishPartBodyHash(part) {
+  return publishHashPlain(part?.bodyHash ?? part?.body_hash);
+}
+
+function publishPartHeader0Hash(part) {
+  return publishHashPlain(part?.header0Hash ?? part?.header_0_hash ?? part?.headerHash ?? part?.header_hash);
+}
+
+function publishPartHeader1Hash(part) {
+  return publishHashPlain(part?.header1Hash ?? part?.header_1_hash);
+}
+
+function publishPartKind(part) {
+  const kind = part?.publishKind ?? part?.publish_kind ?? part?.kind;
+  if (kind === 'public' || kind === 'private') return kind;
+  try {
+    return BigInt(kind ?? 0n) === VAULT_PUBLISH_KIND.PUBLIC ? 'public' : 'private';
+  } catch {
+    return 'private';
+  }
+}
+
+function publishPartHasPayloadHashes(part) {
+  if (!part) return false;
+  if (!publishPartBodyHash(part) || !publishPartHeader0Hash(part)) return false;
+  return publishPartKind(part) === 'public' || Boolean(publishPartHeader1Hash(part));
+}
+
+function publishIdForPart(part) {
+  return publishHashPlain(part?.publishId ?? part?.publish_id);
+}
+
+async function ensurePublishPartVaultPublishId(part, owner = null) {
+  if (!part || publishIdForPart(part)) return publishIdForPart(part);
+  const bodyHash = publishPartBodyHash(part);
+  if (part.clientNonce === undefined || part.clientNonce === null || !bodyHash) return null;
+  const resolvedOwner = owner ?? plathoWallet?.address ?? null;
+  if (!resolvedOwner) return null;
+  const publishKind = publishPartKind(part) === 'public' ? VAULT_PUBLISH_KIND.PUBLIC : VAULT_PUBLISH_KIND.PRIVATE;
+  const publishId = await computeVaultPublishId(resolvedOwner, BigInt(part.clientNonce), bodyHash, publishKind);
+  part.publishId = publishId;
+  return publishId;
 }
 
 function createCapsulePublishState(capsules) {
@@ -11299,6 +14860,8 @@ function createCapsulePublishState(capsules) {
     partCount: normalized.length,
     confirmedCount: 0,
     submittedCount: 0,
+    displaySubmittedCount: 0,
+    confirmSearch: {},
     updatedAt: new Date().toISOString(),
     parts: normalized.map((capsule, index) => publishPartFromCapsule(capsule, index, normalized.length)),
   };
@@ -11308,17 +14871,32 @@ function setPublishPartStatus(publishState, index, status, extra = {}) {
   const part = publishState?.parts?.[index];
   if (!part) return null;
   Object.assign(part, extra, { status });
+  if (
+    status === PUBLISH_PART_STATUS_SENT
+    || status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+    || status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
+  ) {
+    part.error = null;
+    part.retryReason = null;
+    if (status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) {
+      part.lastBroadcastRetryError = null;
+      part.lastBroadcastRetryErrorAt = null;
+    }
+  }
   publishState.submittedCount = publishState.parts.filter((item) => (
     item.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
     || item.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
   )).length;
   publishState.confirmedCount = publishState.parts.filter((item) => item.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED).length;
+  publishState.displaySubmittedCount = publishStateVisibleSubmittedCount(publishState);
   if (publishState.confirmedCount === publishState.partCount) {
     publishState.status = CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
   } else if (publishState.submittedCount > 0 || publishState.parts.some((item) => item.status === PUBLISH_PART_STATUS_SENT || item.status === PUBLISH_PART_STATUS_UNKNOWN)) {
     publishState.status = VAULT_PUBLISH_STATUS_SUBMITTED;
   } else if (publishState.parts.some((item) => item.status === PUBLISH_PART_STATUS_FAILED)) {
     publishState.status = 'failed';
+  } else {
+    publishState.status = 'built';
   }
   publishState.updatedAt = new Date().toISOString();
   return part;
@@ -11333,6 +14911,30 @@ function publishStatePendingCount(publishState) {
   )).length;
 }
 
+function publishStateBroadcastCount(publishState) {
+  return (publishState?.parts ?? []).filter((item) => (
+    item.status === PUBLISH_PART_STATUS_SENT
+    || item.status === PUBLISH_PART_STATUS_UNKNOWN
+  )).length;
+}
+
+function publishStatePriorAttemptCount(publishState) {
+  return (publishState?.parts ?? []).filter((item) => publishPartHadPriorChainAttempt(item)).length;
+}
+
+function publishStateVisibleSubmittedCount(publishState) {
+  const total = Math.max(1, Number(publishState?.partCount) || 1);
+  const previous = Math.max(0, Number(publishState?.displaySubmittedCount ?? 0) || 0);
+  const current = Math.max(
+    Number(publishState?.submittedCount ?? 0) || 0,
+    Number(publishState?.confirmedCount ?? 0) || 0,
+    publishStatePendingCount(publishState),
+    publishStateBroadcastCount(publishState),
+    publishStatePriorAttemptCount(publishState),
+  );
+  return Math.min(total, Math.max(previous, current));
+}
+
 function notifyPublishState(options, publishState, part) {
   try {
     options?.onPartState?.(part, publishState);
@@ -11345,14 +14947,19 @@ function publishStateMeta(publishState) {
   const total = Math.max(1, Number(publishState?.partCount) || 1);
   const confirmed = Math.max(0, Number(publishState?.confirmedCount) || 0);
   const submitted = Math.max(0, Number(publishState?.submittedCount) || 0);
-  const pending = Math.max(submitted, publishStatePendingCount(publishState));
+  const broadcast = Math.max(0, publishStateBroadcastCount(publishState));
+  const pending = Math.max(submitted, publishStatePendingCount(publishState), publishStateVisibleSubmittedCount(publishState));
   if (confirmed >= total) return 'published';
   if (publishState?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
     if (pending <= 0) return 'not sent';
+    if (submitted <= 0 && broadcast > 0) return total === 1 ? 'submitted, confirming' : `submitted ${broadcast}/${total}, confirming`;
     if (pending >= total) return total === 1 ? 'submitted, confirming' : `submitted ${pending}/${total}, confirming`;
     return `submitted ${pending}/${total}, retrying`;
   }
-  if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) return `submitted ${pending}/${total}, confirming`;
+  if (submitted <= 0 && broadcast > 0) return total === 1 ? 'submitted, confirming' : `submitted ${broadcast}/${total}, confirming`;
+  if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
+    return total === 1 ? 'submitted, confirming' : `submitted ${pending}/${total}, confirming`;
+  }
   if (publishState?.status === 'failed') return 'not sent';
   return total > 1 ? `sending ${total} parts` : 'sending';
 }
@@ -11369,65 +14976,538 @@ function vaultPublishPartialError(message, publishResult, cause) {
   return error;
 }
 
-function publishEntryMatchesPart(entry, part) {
+function publishEntryMatchesPartPayload(entry, part) {
   if (!entry?.exists || !part) return false;
-  if (publishHashPlain(entry.body_hash) !== part.bodyHash) return false;
-  if (part.publishKind === 'public') {
-    return publishHashPlain(entry.header_hash) === part.header0Hash;
+  if (publishHashPlain(entry.body_hash ?? entry.bodyHash) !== publishPartBodyHash(part)) return false;
+  const expectedAuthorWallet = part.authorWallet ?? part.author_wallet ?? null;
+  if (expectedAuthorWallet) {
+    const entryAuthorWallet = entry.author_wallet ?? entry.authorWallet ?? null;
+    if (!entryAuthorWallet || !sameWalletAddress(entryAuthorWallet, expectedAuthorWallet)) return false;
   }
-  return publishHashPlain(entry.header_0_hash) === part.header0Hash
-    && publishHashPlain(entry.header_1_hash) === part.header1Hash;
+  if (publishPartKind(part) === 'public') {
+    return publishHashPlain(entry.header_hash ?? entry.headerHash) === publishPartHeader0Hash(part);
+  }
+  return publishHashPlain(entry.header_0_hash ?? entry.header0Hash) === publishPartHeader0Hash(part)
+    && publishHashPlain(entry.header_1_hash ?? entry.header1Hash) === publishPartHeader1Hash(part);
 }
 
-async function confirmCapsuleHubPublishEntries(publishState) {
+function publishEntryMatchesPart(entry, part, options = {}) {
+  if (!publishEntryMatchesPartPayload(entry, part)) return false;
+  const expectedPublishId = publishIdForPart(part);
+  const entryPublishId = publishHashPlain(entry.publish_id);
+  if (options.requirePublishIdMatch === true || expectedPublishId) {
+    return Boolean(expectedPublishId && entryPublishId && entryPublishId === expectedPublishId);
+  }
+  return options.allowPublishIdMismatch === true;
+}
+
+async function confirmPendingPrivatePublishMessagesFromEntries(entries, confirmedBy = 'private_entry') {
+  const candidates = (entries ?? []).filter((entry) => entry?.exists === true);
+  if (candidates.length === 0) return 0;
+  const updates = [];
+  let changedMessages = 0;
+  let matchedParts = 0;
+  let checkedParts = 0;
+  for (const thread of threads) {
+    let threadChanged = false;
+    for (const message of thread.messages ?? []) {
+      const publishState = message?.publishState;
+      if (!publishState?.parts?.length || publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) continue;
+      let messageChanged = false;
+      for (const part of publishState.parts ?? []) {
+        if (publishPartKind(part) !== 'private') continue;
+        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+        if (!publishPartHasPayloadHashes(part)) continue;
+        checkedParts += 1;
+        const entry = candidates.find((candidate) => publishEntryMatchesPart(candidate, part, {
+          allowPublishIdMismatch: true,
+        }));
+        if (!entry) continue;
+        matchedParts += 1;
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+          entryId: String(entry.entry_id ?? ''),
+          confirmedBy,
+        });
+        messageChanged = true;
+      }
+      if (!messageChanged) continue;
+      changedMessages += 1;
+      threadChanged = true;
+      message.meta = publishStateMeta(publishState);
+      thread.state = publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
+      if (publishState.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
+        message.privatePublishConfirmAttempt = 0;
+        message.privatePublishConfirmStopped = false;
+        message.privatePublishConfirmStoppedAt = null;
+        clearPrivatePublishConfirmRetry(message);
+        if (message.payment) {
+          updates.push(removePendingPaymentCheckLedgerRecord(message.payment).catch((error) => console.error(error)));
+        }
+      }
+      updates.push(updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error)));
+    }
+    if (threadChanged) refreshThreadAfterMessageChange(thread);
+  }
+  globalThis.plathoLastPrivatePublishSyncRepair = {
+    confirmedBy,
+    candidates: candidates.length,
+    checkedParts,
+    matchedParts,
+    changedMessages,
+    at: new Date().toISOString(),
+  };
+  if (changedMessages > 0) {
+    renderThreads();
+    renderConversation();
+    await Promise.all(updates);
+  }
+  return changedMessages;
+}
+
+class PublishAckCellReader {
+  constructor(cell) {
+    if (!cell || !(cell.data instanceof Uint8Array) || !Array.isArray(cell.refs)) {
+      throw new Error('CapsuleHub ACK body is not a TON cell');
+    }
+    this.cell = cell;
+    this.bitOffset = 0;
+  }
+
+  readBit(label) {
+    if (this.bitOffset >= this.cell.bitLength) {
+      throw new Error(`CapsuleHub ACK ${label} is truncated`);
+    }
+    const byte = this.cell.data[this.bitOffset >> 3] ?? 0;
+    const bit = (byte & (1 << (7 - (this.bitOffset & 7)))) !== 0;
+    this.bitOffset += 1;
+    return bit;
+  }
+
+  readUint(bitLength, label) {
+    let out = 0n;
+    for (let index = 0; index < bitLength; index += 1) {
+      out = (out << 1n) | (this.readBit(label) ? 1n : 0n);
+    }
+    return out;
+  }
+}
+
+function parseCapsuleHubPublishAckBody(bodyBoc) {
+  if (typeof bodyBoc !== 'string' || bodyBoc.length === 0) return null;
+  try {
+    const reader = new PublishAckCellReader(tonCell.parseBocBase64(bodyBoc));
+    const op = reader.readUint(32, 'op');
+    if (op !== CAPSULEHUB_PUBLISH_ACK_OP) return null;
+    return {
+      publish_id: reader.readUint(256, 'publish_id'),
+      entry_id: reader.readUint(64, 'entry_id'),
+      entry_uid: reader.readUint(256, 'entry_uid'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function messageRecordsFromResponse(response) {
+  const records = response?.messages ?? response?.result?.messages ?? response?.result ?? [];
+  return Array.isArray(records) ? records : [];
+}
+
+function messageBodyBocFromRecord(record) {
+  return record?.message_content?.body
+    ?? record?.messageContent?.body
+    ?? record?.body
+    ?? record?.in_msg?.message_content?.body
+    ?? record?.inMsg?.messageContent?.body
+    ?? null;
+}
+
+function publishConfirmationHistoryTransports() {
+  const transport = globalThis.plathoCapsuleHubRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const transports = Array.isArray(transport?.transports) && transport.transports.length > 0
+    ? transport.transports
+    : [transport];
+  const out = [];
+  for (const item of transports) {
+    const resolved = item?.transport ?? item;
+    if (!resolved?.getMessages || resolved.supportsMessageHistory === false) continue;
+    if (!out.includes(resolved)) out.push(resolved);
+  }
+  return out;
+}
+
+function vaultPublishAckHistoryParams(capsuleHubAddress, pageIndex = 0) {
+  const limit = VAULT_PUBLISH_ACK_HISTORY_LOOKUP_LIMIT;
+  const params = {
+    destination: parseTonAddress(requireVaultAddress()).raw,
+    source: parseTonAddress(capsuleHubAddress).raw,
+    opcode: '0x874E576A',
+    exclude_externals: true,
+    limit,
+    sort: 'desc',
+  };
+  if (pageIndex > 0) params.offset = pageIndex * limit;
+  return params;
+}
+
+function publishConfirmSearchState(publishState, kind, latest) {
+  if (!publishState.confirmSearch || typeof publishState.confirmSearch !== 'object') {
+    publishState.confirmSearch = {};
+  }
+  const key = kind === 'public' ? 'public' : 'private';
+  const existing = publishState.confirmSearch[key] && typeof publishState.confirmSearch[key] === 'object'
+    ? publishState.confirmSearch[key]
+    : {};
+  const latestSeen = (() => {
+    try {
+      return BigInt(existing.latestSeen ?? 0n);
+    } catch {
+      return 0n;
+    }
+  })();
+  if (existing.exhausted === true && latest > latestSeen) {
+    delete existing.nextEntryId;
+    existing.exhausted = false;
+  }
+  if (latest > latestSeen) {
+    existing.latestSeen = String(latest);
+    existing.nextEntryId = latest > 0n ? String(latest - 1n) : null;
+    existing.exhausted = false;
+  }
+  if (existing.nextEntryId === undefined || existing.nextEntryId === null) {
+    existing.nextEntryId = latest > 0n ? String(latest - 1n) : null;
+  }
+  publishState.confirmSearch[key] = existing;
+  return existing;
+}
+
+function publishConfirmScanBounds(publishState, kind, latest, scanLimit = CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT) {
+  const search = publishConfirmSearchState(publishState, kind, latest);
+  if (search.exhausted === true || latest <= 0n) return null;
+  let start;
+  try {
+    start = BigInt(search.nextEntryId ?? (latest - 1n));
+  } catch {
+    start = latest - 1n;
+  }
+  if (start >= latest) start = latest - 1n;
+  if (start < 0n) {
+    search.exhausted = true;
+    search.nextEntryId = null;
+    return null;
+  }
+  const numericLimit = Number(scanLimit);
+  const chunk = BigInt(Number.isFinite(numericLimit) && numericLimit > 0
+    ? Math.floor(numericLimit)
+    : CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT);
+  const minEntryId = start >= chunk ? start - chunk + 1n : 0n;
+  search.lastScan = {
+    latest: String(latest),
+    from: String(start),
+    to: String(minEntryId),
+    at: new Date().toISOString(),
+  };
+  return { start, minEntryId };
+}
+
+function publishConfirmCommitScan(publishState, kind, minEntryId) {
+  const search = publishConfirmSearchState(publishState, kind, 0n);
+  if (minEntryId > 0n) {
+    search.nextEntryId = String(minEntryId - 1n);
+  } else {
+    search.nextEntryId = null;
+    search.exhausted = true;
+  }
+}
+
+function publishConfirmDeadlineAt(options = {}) {
+  const deadlineMs = Number(options.deadlineMs ?? 0);
+  return Number.isFinite(deadlineMs) && deadlineMs > 0 ? Date.now() + Math.floor(deadlineMs) : 0;
+}
+
+function publishConfirmDeadlineExpired(deadlineAt) {
+  return Number.isFinite(deadlineAt) && deadlineAt > 0 && Date.now() >= deadlineAt;
+}
+
+function publishConfirmReadOptions(address, options = {}) {
+  const out = criticalCapsuleHubReadOptions(address);
+  const timeoutMs = Number(options.requestTimeoutMs ?? options.timeoutMs ?? 0);
+  if (Number.isFinite(timeoutMs) && timeoutMs > 0) out.requestTimeoutMs = Math.floor(timeoutMs);
+  const queueTimeoutMs = Number(options.queueTimeoutMs ?? 0);
+  if (Number.isFinite(queueTimeoutMs) && queueTimeoutMs > 0) out.queueTimeoutMs = Math.floor(queueTimeoutMs);
+  return out;
+}
+
+function capsuleHubConfirmationProviderCandidates(baseProvider, address, options = {}) {
+  const providers = [baseProvider];
+  if (options.scanAvailableTransports !== true) return providers;
+  const transport = globalThis.plathoCapsuleHubRpcTransport ?? globalThis.plathoTonRpcTransport;
+  const transports = Array.isArray(transport?.transports) ? transport.transports : [];
+  for (const item of transports) {
+    if (!item?.runGetMethod) continue;
+    providers.push(createCapsuleHubTonRpcProvider({ capsuleHubAddress: address, transport: item }));
+  }
+  return providers;
+}
+
+async function readVaultPublishAckHistory(capsuleHubAddress, publishIds = null, options = {}) {
+  const transports = publishConfirmationHistoryTransports();
+  if (transports.length === 0) return [];
+  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
+  const timeoutMs = Number(options.requestTimeoutMs ?? options.timeoutMs ?? 0);
+  const queueTimeoutMs = Number(options.queueTimeoutMs ?? 0);
+  const targetPublishIds = publishIds instanceof Set
+    ? publishIds
+    : new Set((publishIds ?? []).map((value) => publishHashPlain(value)).filter(Boolean));
+  const found = [];
+  const seen = new Set();
+  for (const transport of transports) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) return found;
+    for (let pageIndex = 0; pageIndex < VAULT_PUBLISH_ACK_HISTORY_LOOKUP_MAX_PAGES; pageIndex += 1) {
+      if (publishConfirmDeadlineExpired(deadlineAt)) return found;
+      const params = vaultPublishAckHistoryParams(capsuleHubAddress, pageIndex);
+      let response;
+      try {
+        const requestOptions = {
+          priority: 'messages',
+          cacheTtlMs: 0,
+          allowUnverifiedCriticalRead: true,
+        };
+        if (Number.isFinite(timeoutMs) && timeoutMs > 0) requestOptions.requestTimeoutMs = Math.floor(timeoutMs);
+        if (Number.isFinite(queueTimeoutMs) && queueTimeoutMs > 0) requestOptions.queueTimeoutMs = Math.floor(queueTimeoutMs);
+        response = await transport.getMessages(params, requestOptions);
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) throw error;
+        break;
+      }
+      const records = messageRecordsFromResponse(response);
+      for (const record of records) {
+        if (publishConfirmDeadlineExpired(deadlineAt)) return found;
+        const ack = parseCapsuleHubPublishAckBody(messageBodyBocFromRecord(record));
+        if (!ack) continue;
+        const publishId = publishHashPlain(ack.publish_id);
+        if (targetPublishIds.size > 0 && !targetPublishIds.has(publishId)) continue;
+        const key = `${publishId}:${ack.entry_id.toString()}`;
+        if (!publishId || seen.has(key)) continue;
+        seen.add(key);
+        found.push({
+          publishId,
+          entryId: ack.entry_id,
+          entryUid: ack.entry_uid,
+        });
+        if (targetPublishIds.size > 0 && found.length >= targetPublishIds.size) return found;
+      }
+      if (records.length < VAULT_PUBLISH_ACK_HISTORY_LOOKUP_LIMIT) break;
+    }
+    if (targetPublishIds.size > 0 && found.length >= targetPublishIds.size) return found;
+  }
+  return found;
+}
+
+async function confirmCapsuleHubPublishEntriesFromVaultAckHistory(publishState, pendingParts, providerCandidates, capsuleHubAddress, readOptions, options = {}) {
+  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
+  for (const part of pendingParts) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) return;
+    try {
+      await ensurePublishPartVaultPublishId(part);
+    } catch {
+      // Older pending records may not have enough local data to reconstruct Vault publish_id.
+    }
+  }
+  const publishIds = new Set(
+    pendingParts
+      .map((part) => publishIdForPart(part))
+      .filter((value) => typeof value === 'string' && value.length > 0),
+  );
+  if (publishIds.size === 0) return;
+  let acks = [];
+  try {
+    acks = await readVaultPublishAckHistory(capsuleHubAddress, publishIds, options);
+  } catch (error) {
+    if (noteTonRpcRateLimit(error)) throw error;
+    return;
+  }
+  if (acks.length === 0) return;
+  const byPublishId = new Map();
+  for (const ack of acks) byPublishId.set(ack.publishId, ack);
+  for (const part of pendingParts) {
+    if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+    const ack = byPublishId.get(publishIdForPart(part));
+    if (!ack) continue;
+    for (const candidateProvider of providerCandidates) {
+      if (publishConfirmDeadlineExpired(deadlineAt)) return;
+      try {
+        const entry = publishPartKind(part) === 'public'
+          ? await candidateProvider.getPublicEntry(ack.entryId, readOptions)
+          : await candidateProvider.getPrivateEntry(ack.entryId, readOptions);
+        if (!publishEntryMatchesPart(entry, part)) continue;
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+          entryId: String(entry.entry_id ?? ack.entryId),
+          entryUid: ack.entryUid?.toString?.() ?? null,
+          confirmedBy: 'vault_ack_history',
+        });
+        break;
+      } catch (error) {
+        if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) continue;
+        continue;
+      }
+    }
+  }
+}
+
+async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, options = {}) {
+  const privateParts = pendingParts.filter((part) => publishPartKind(part) === 'private');
+  if (privateParts.length === 0 || !localRecipientKeyPair?.keyId) return;
+  const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
+  const scanLimit = Number.isFinite(Number(options.scanLimit)) && Number(options.scanLimit) > 0
+    ? Math.floor(Number(options.scanLimit))
+    : CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
+  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
+  for (const candidateProvider of providerCandidates) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) return;
+    if (privateParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
+    let senderIndex = null;
+    try {
+      senderIndex = await candidateProvider.getPrivateSenderIndex(keyIdIndex, readOptions);
+    } catch (error) {
+      if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) continue;
+      continue;
+    }
+    let currentLink = privateIndexLatestLink(senderIndex);
+    let scanned = 0;
+    while (currentLink > 0n && scanned < scanLimit) {
+      if (publishConfirmDeadlineExpired(deadlineAt)) return;
+      const entryId = privateIndexEntryIdFromLink(currentLink);
+      if (entryId === null) break;
+      let entry = null;
+      try {
+        entry = await candidateProvider.getPrivateEntry(entryId, readOptions);
+      } catch (error) {
+        if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) break;
+      }
+      if (!entry?.exists) break;
+      for (const part of privateParts) {
+        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+        if (!publishEntryMatchesPart(entry, part, { allowPublishIdMismatch: true })) continue;
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+          entryId: String(entry.entry_id ?? entryId),
+          confirmedBy: 'private_sender_index',
+        });
+      }
+      if (privateParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
+      const previousLink = privateIndexPreviousLink(entry, 'sender');
+      if (previousLink === currentLink) break;
+      currentLink = previousLink;
+      scanned += 1;
+    }
+  }
+}
+
+async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options = {}) {
   const pendingParts = (publishState?.parts ?? []).filter((part) => (
     part.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
     || part.status === PUBLISH_PART_STATUS_SENT
     || part.status === PUBLISH_PART_STATUS_UNKNOWN
+    || publishPartHadPriorChainAttempt(part)
   ));
   if (pendingParts.length === 0) return publishState;
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publishState;
   const { provider, address } = resolved;
-  const readOptions = criticalCapsuleHubReadOptions(address);
-  const state = await provider.getState(readOptions);
-  const groups = [
-    {
-      latest: BigInt(state.private_latest_id ?? 0n),
-      parts: pendingParts.filter((part) => part.publishKind === 'private'),
-      read: (entryId) => provider.getPrivateEntry(entryId, readOptions),
-    },
-    {
-      latest: BigInt(state.public_latest_id ?? 0n),
-      parts: pendingParts.filter((part) => part.publishKind === 'public'),
-      read: (entryId) => provider.getPublicEntry(entryId, readOptions),
-    },
-  ];
-  for (const group of groups) {
-    if (group.parts.length === 0 || group.latest <= 0n) continue;
-    const minEntryId = group.latest > BigInt(CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT)
-      ? group.latest - BigInt(CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT)
-      : 0n;
-    for (let entryId = group.latest - 1n; entryId >= minEntryId; entryId -= 1n) {
-      let entry = null;
-      try {
-        entry = await group.read(entryId);
-      } catch (error) {
-        if (noteTonRpcRateLimit(error)) throw error;
+  const readOptions = publishConfirmReadOptions(address, options);
+  const providerCandidates = capsuleHubConfirmationProviderCandidates(provider, address, {
+    scanAvailableTransports: options.scanAvailableTransports,
+  });
+  const scanLimit = options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
+  const deadlineAt = publishConfirmDeadlineAt(options);
+  if (options.skipAckHistory !== true) {
+    await confirmCapsuleHubPublishEntriesFromVaultAckHistory(publishState, pendingParts, providerCandidates, address, readOptions, {
+      deadlineAt,
+      requestTimeoutMs: readOptions.requestTimeoutMs,
+      queueTimeoutMs: readOptions.queueTimeoutMs,
+    });
+  }
+  if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
+  await confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, {
+    scanLimit,
+    deadlineAt,
+  });
+  for (const candidateProvider of providerCandidates) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
+    if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
+    try {
+      const state = await candidateProvider.getState(readOptions);
+      const groups = [
+        {
+          kind: 'private',
+          latest: BigInt(state.private_latest_id ?? 0n),
+          parts: pendingParts.filter((part) => publishPartKind(part) === 'private'),
+          read: (entryId) => candidateProvider.getPrivateEntry(entryId, readOptions),
+        },
+        {
+          kind: 'public',
+          latest: BigInt(state.public_latest_id ?? 0n),
+          parts: pendingParts.filter((part) => publishPartKind(part) === 'public'),
+          read: (entryId) => candidateProvider.getPublicEntry(entryId, readOptions),
+        },
+      ];
+      for (const group of groups) {
+        if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
+        if (group.parts.length === 0 || group.latest <= 0n) continue;
+        const scan = publishConfirmScanBounds(publishState, group.kind, group.latest, scanLimit);
+        if (!scan) continue;
+        for (let entryId = scan.start; entryId >= scan.minEntryId; entryId -= 1n) {
+          if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
+          let entry = null;
+          try {
+            entry = await group.read(entryId);
+          } catch (error) {
+            if (isTonRpcRecoverableReadError(error)) throw error;
+            if (noteTonRpcRateLimit(error)) throw error;
+            continue;
+          }
+          for (const part of group.parts) {
+            if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+            const requirePublishIdMatch = group.kind === 'public';
+            const allowPublishIdMismatch = group.kind === 'private';
+            // Public sends must confirm the current Vault BOC by publish_id; payload-only
+            // public recovery is reserved for explicit already-published lookup paths.
+            if (!publishEntryMatchesPart(entry, part, { allowPublishIdMismatch, requirePublishIdMatch })) continue;
+            setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+              entryId: String(entry.entry_id ?? entryId),
+              confirmedBy: requirePublishIdMatch ? 'confirmed_by_publish_id' : 'entry_payload_recovery',
+            });
+          }
+          if (group.parts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
+          if (entryId === 0n) break;
+        }
+        publishConfirmCommitScan(publishState, group.kind, scan.minEntryId);
+      }
+    } catch (error) {
+      if (isTonRpcRecoverableReadError(error) || noteTonRpcRateLimit(error)) {
         continue;
       }
-      for (const part of group.parts) {
-        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-        if (!publishEntryMatchesPart(entry, part)) continue;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
-          entryId: String(entry.entry_id ?? entryId),
-        });
-      }
-      if (group.parts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) break;
-      if (entryId === 0n) break;
+      throw error;
     }
   }
   return publishState;
+}
+
+function isFreshPrivatePublishConfirmation(message) {
+  const ageMs = privatePendingPublishAgeMs(message);
+  return ageMs >= 0 && ageMs <= PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS;
+}
+
+async function confirmCapsuleHubPublishEntries(publishState, options = {}) {
+  return confirmCapsuleHubPublishEntriesWithReadMode(publishState, options.hot === true
+    ? {
+      ...options,
+      scanLimit: options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT,
+      deadlineMs: options.deadlineMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS,
+      requestTimeoutMs: options.requestTimeoutMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS,
+      queueTimeoutMs: options.queueTimeoutMs ?? PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS,
+    }
+    : options);
 }
 
 async function publishCapsuleThroughVault(capsule, options = {}) {
@@ -11443,16 +15523,26 @@ async function publishCapsuleThroughVault(capsule, options = {}) {
   };
 }
 
-async function sendVaultExternalBoc(built) {
+async function sendVaultExternalBoc(built, options = {}) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
-  const result = await transport.sendBoc({ boc: built.boc, walletAddress: requireVaultAddress() });
+  const request = { boc: built.boc, walletAddress: requireVaultAddress() };
+  if (options.requestTimeoutMs !== undefined) request.requestTimeoutMs = options.requestTimeoutMs;
+  if (options.timeoutMs !== undefined) request.timeoutMs = options.timeoutMs;
+  if (options.queueTimeoutMs !== undefined) request.queueTimeoutMs = options.queueTimeoutMs;
+  if (options.skipIfRateLimited !== undefined) request.skipIfRateLimited = options.skipIfRateLimited;
+  if (options.priority !== undefined) request.priority = options.priority;
+  const result = await transport.sendBoc(request);
   markNavVaultBalancePending('Vault action submitted', {
     resetRetry: true,
     retry: true,
     retryDelayMs: 2_000,
   });
   return { ...built, result };
+}
+
+function shouldConfirmVaultPublishNonceAfterSend(index, total, options = {}) {
+  return index < total - 1 || options.confirmFinalNonce === true;
 }
 
 async function readVaultPublishNonce(provider, owner, options = {}) {
@@ -11463,21 +15553,54 @@ async function readVaultPublishNonce(provider, owner, options = {}) {
     allowUnverifiedCriticalRead: options.allowUnverifiedCriticalRead === true,
     priority: 'critical',
     cacheTtlMs: 0,
+    requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
+    queueTimeoutMs: options.queueTimeoutMs,
   });
   return BigInt(user.publish_nonce ?? user.publishNonce ?? 0n);
 }
 
+async function readVaultPublishNonceForOwnVaultAction(provider, owner, options = {}) {
+  return readVaultPublishNonce(provider, owner, options);
+}
+
 async function waitForVaultPublishNonce(provider, owner, expectedNonce, options = {}) {
-  const deadline = Date.now() + VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS;
+  const timeoutMs = Number(options.timeoutMs ?? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS);
+  const deadline = Date.now() + (Number.isFinite(timeoutMs) && timeoutMs > 0
+    ? Math.floor(timeoutMs)
+    : VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS);
   let lastNonce = await readVaultPublishNonce(provider, owner, options);
   while (lastNonce !== null && lastNonce < expectedNonce && Date.now() < deadline) {
     await delay(VAULT_PUBLISH_NONCE_POLL_MS);
     lastNonce = await readVaultPublishNonce(provider, owner, options);
   }
   if (lastNonce !== null && lastNonce < expectedNonce) {
-    throw new Error('Vault publish was not confirmed before sending the next capsule');
+    const error = new Error('Vault publish was not confirmed after broadcast');
+    error.code = 'NETWORK_ERROR';
+    throw error;
   }
   return lastNonce;
+}
+
+async function waitForVaultPublishNonceForOwnVaultAction(provider, owner, expectedNonce, options = {}) {
+  try {
+    return await waitForVaultPublishNonce(provider, owner, expectedNonce, options.allowUnverifiedNonceRead === true
+      ? { ...options, verify: false, allowUnverifiedCriticalRead: true }
+      : options);
+  } catch (error) {
+    if (!isTonRpcVerificationUnavailableForOwnVaultActionError(error)) throw error;
+    return waitForVaultPublishNonce(provider, owner, expectedNonce, {
+      ...options,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+    });
+  }
+}
+
+async function readVaultPublishNonceForBroadcastRetry(provider, owner, options = {}) {
+  return callWithOwnVaultActionReadFallback(
+    () => readVaultPublishNonceForOwnVaultAction(provider, owner, options),
+    () => readVaultPublishNonce(provider, owner, { ...options, verify: false, allowUnverifiedCriticalRead: true }),
+  );
 }
 
 async function prepareCapsulesThroughVault(capsules, options = {}) {
@@ -11492,7 +15615,13 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
     throw new Error('Vault chain provider cannot price publish');
   }
   const owner = requirePlathoWalletAddress();
-  await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
+  if (options.allowOwnVaultActionReadFallback === true) {
+    const global = await readConnectedVaultGlobalForOwnVaultAction(provider);
+    await requireCapsuleHubVaultRouteForPublish(global);
+  } else {
+    const global = await loadConnectedVaultGlobal({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
+    await requireCapsuleHubVaultRouteForPublish(global);
+  }
   const user = options.allowOwnVaultActionReadFallback === true
     ? await readFreshConnectedVaultUserForOwnVaultAction(provider)
     : await loadConnectedVaultUser({ provider, verify: true, priority: 'critical', cacheTtlMs: 0 });
@@ -11516,13 +15645,15 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
     const chargeKey = `${publish.publish_kind}:${publish.size_class}:${publish.crypto_suite}`;
     let canonicalMaxCharge = canonicalChargeCache.get(chargeKey);
     if (canonicalMaxCharge === undefined) {
-      canonicalMaxCharge = await provider.getCanonicalPublishCharge(
-        owner,
-        BigInt(publish.publish_kind),
-        BigInt(publish.size_class),
-        BigInt(publish.crypto_suite),
-        { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
-      );
+      canonicalMaxCharge = options.allowOwnVaultActionReadFallback === true
+        ? await readCanonicalPublishChargeForOwnVaultAction(provider, owner, publish.publish_kind, publish.size_class, publish.crypto_suite)
+        : await provider.getCanonicalPublishCharge(
+          owner,
+          BigInt(publish.publish_kind),
+          BigInt(publish.size_class),
+          BigInt(publish.crypto_suite),
+          { vaultAddress: requireVaultAddress(), verify: true, priority: 'critical', cacheTtlMs: 0 },
+        );
       canonicalChargeCache.set(chargeKey, canonicalMaxCharge);
     }
     const maxCharge = BigInt(canonicalMaxCharge) + surcharge;
@@ -11578,62 +15709,100 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
   } = prepared;
   await options.onReadyToSend?.(publishState);
   let lastResult = null;
-  for (let index = 0; index < results.length; index += 1) {
-    const item = results[index];
-    notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
-    try {
-      const clientNonce = await readVaultPublishNonce(provider, owner, {
-        verify: options.allowUnverifiedNonceRead !== true,
-        allowUnverifiedCriticalRead: options.allowUnverifiedNonceRead === true,
-      });
-      if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
-      item.clientNonce = clientNonce;
-      item.external = await buildVaultBalancePublishExternalBoc(item.messageType, {
-        owner_wallet: owner,
-        client_nonce: clientNonce,
-        max_charge: item.maxCharge,
-        publish: item.publish,
-        signingSecretKey: requireVaultAuthSecretKey(),
-        deploymentManifestHash: requireVaultDeploymentManifestHash(),
-      }, {
-        vaultAddress: requireVaultAddress(),
-      });
-      lastResult = await sendVaultExternalBoc(item.external);
-      item.result = lastResult;
-      notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
-      await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
-        verify: options.allowUnverifiedNonceRead !== true,
-        allowUnverifiedCriticalRead: options.allowUnverifiedNonceRead === true,
-      });
-      notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
-    } catch (error) {
-      const sentBeforeFailure = Boolean(item.result);
-      const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
-      const part = setPublishPartStatus(
-        publishState,
-        item.partIndex,
-        sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED,
-        { error: String(error?.message ?? error) },
-      );
-      if (publishState.submittedCount > 0 || sentBeforeFailure || ambiguousBroadcast) publishState.status = VAULT_PUBLISH_STATUS_PARTIAL;
-      notifyPublishState(options, publishState, part);
-      const partialResult = {
-        status: publishState.status === VAULT_PUBLISH_STATUS_PARTIAL ? VAULT_PUBLISH_STATUS_PARTIAL : 'vault-publish-failed',
-        results,
-        maxCharge: totalMaxCharge,
-        result: lastResult,
-        publishState,
-      };
-      if (publishState.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-        throw vaultPublishPartialError('Vault publish partially submitted', partialResult, error);
+  const sendTurn = await enterVaultPublishSendLock();
+  try {
+    for (let index = 0; index < results.length; index += 1) {
+      const item = results[index];
+      const existingPart = publishState.parts?.[item.partIndex];
+      if (publishPartAlreadyAttempted(existingPart)) {
+        notifyPublishState(options, publishState, existingPart);
+        continue;
       }
-      throw error;
+      notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
+      try {
+        const clientNonce = options.allowOwnVaultActionReadFallback === true
+          ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
+          : await readVaultPublishNonce(provider, owner);
+        if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
+        item.clientNonce = clientNonce;
+        const publishId = await computeVaultPublishId(owner, clientNonce, item.publish.body_hash, item.publish.publish_kind);
+        item.publishId = publishId;
+        const partWithPublishId = publishState.parts?.[item.partIndex];
+        if (partWithPublishId) {
+          partWithPublishId.publishId = publishId;
+          partWithPublishId.clientNonce = clientNonce.toString();
+          if (publishPartKind(partWithPublishId) === 'public') partWithPublishId.authorWallet = owner;
+          notifyPublishState(options, publishState, partWithPublishId);
+        }
+        item.external = await buildVaultBalancePublishExternalBoc(item.messageType, {
+          owner_wallet: owner,
+          client_nonce: clientNonce,
+          max_charge: item.maxCharge,
+          publish: item.publish,
+          signingSecretKey: requireVaultAuthSecretKey(),
+          deploymentManifestHash: requireVaultDeploymentManifestHash(),
+        }, {
+          vaultAddress: requireVaultAddress(),
+        });
+        if (partWithPublishId) {
+          partWithPublishId.externalBoc = item.external.boc;
+          partWithPublishId.maxCharge = item.maxCharge.toString();
+          partWithPublishId.lastBroadcastAt = new Date().toISOString();
+        }
+        lastResult = await sendVaultExternalBoc(item.external);
+        item.result = lastResult;
+        notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
+        if (shouldConfirmVaultPublishNonceAfterSend(index, results.length, options)) {
+          const nonceWaitOptions = {
+            ...options,
+            timeoutMs: options.timeoutMs ?? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,
+          };
+          if (options.allowOwnVaultActionReadFallback === true) {
+            await waitForVaultPublishNonceForOwnVaultAction(provider, owner, clientNonce + 1n, nonceWaitOptions);
+          } else {
+            await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, {
+              verify: options.allowUnverifiedNonceRead !== true,
+              allowUnverifiedCriticalRead: options.allowUnverifiedNonceRead === true,
+              timeoutMs: nonceWaitOptions.timeoutMs,
+              requestTimeoutMs: nonceWaitOptions.requestTimeoutMs,
+              queueTimeoutMs: nonceWaitOptions.queueTimeoutMs,
+            });
+          }
+          notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+        }
+      } catch (error) {
+        const sentBeforeFailure = Boolean(item.result);
+        const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
+        const part = setPublishPartStatus(
+          publishState,
+          item.partIndex,
+          sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED,
+          { error: String(error?.message ?? error) },
+        );
+        if (publishState.submittedCount > 0 || sentBeforeFailure || ambiguousBroadcast) publishState.status = VAULT_PUBLISH_STATUS_PARTIAL;
+        notifyPublishState(options, publishState, part);
+        const partialResult = {
+          status: publishState.status === VAULT_PUBLISH_STATUS_PARTIAL ? VAULT_PUBLISH_STATUS_PARTIAL : 'vault-publish-failed',
+          results,
+          maxCharge: totalMaxCharge,
+          result: lastResult,
+          publishState,
+        };
+        if (publishState.status === VAULT_PUBLISH_STATUS_PARTIAL) {
+          throw vaultPublishPartialError('Vault publish partially submitted', partialResult, error);
+        }
+        throw error;
+      }
     }
+  } finally {
+    sendTurn.release();
   }
   try {
-    await confirmCapsuleHubPublishEntries(publishState);
+    await confirmCapsuleHubPublishEntries(publishState, { hot: true });
   } catch (error) {
-    if (noteTonRpcRateLimit(error)) {
+    const softVerification = isTonRpcRecoverableReadError(error);
+    const rateLimited = noteTonRpcRateLimit(error);
+    if (softVerification || rateLimited) {
       publishState.status = VAULT_PUBLISH_STATUS_SUBMITTED;
     } else {
       console.error(error);
@@ -11667,12 +15836,227 @@ async function publishCapsulesThroughVault(capsules, options = {}) {
 }
 
 function privateMessageHasPublishAttempt(message) {
-  return (message?.publishState?.parts ?? []).some((part) => (
-    part.status === PUBLISH_PART_STATUS_SENT
-    || part.status === PUBLISH_PART_STATUS_UNKNOWN
-    || part.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
-    || part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED
-  ));
+  return (message?.publishState?.parts ?? []).some((part) => publishPartEligibleForChainConfirmation(part));
+}
+
+function privateMessageHasPartialRetryablePublish(message) {
+  return privateMessageHasPublishAttempt(message)
+    && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && publishStateHasRetryableSendParts(message?.publishState);
+}
+
+function privateMessageHasAutoRecoveryPending(message) {
+  if (!message || message.privateManualRetryAvailable === true) return false;
+  if (message.privateSendRetryStopped === true || message.privatePublishConfirmStopped === true) return false;
+  const hasSendJob = Boolean(message.privateSendRetryKey && privateSendRetryJobs.has(message.privateSendRetryKey));
+  const hasConfirmJob = Boolean(message.privatePublishConfirmRetryKey && privatePublishConfirmJobs.has(message.privatePublishConfirmRetryKey));
+  const hasStoredCapsules = (Array.isArray(message.capsules) && message.capsules.length > 0) || Boolean(message.capsule);
+  const sendPending = hasStoredCapsules
+    && publishStateHasRetryableSendParts(message.publishState)
+    && (!isStalePrivatePendingPublish(message) || privateMessageHasPublishAttempt(message));
+  const confirmPending = privateMessageHasPublishAttempt(message)
+    && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && !isStalePrivatePendingPublishConfirmation(message);
+  return hasSendJob || hasConfirmJob || sendPending || confirmPending;
+}
+
+function privatePartialPublishStartedAtMs(message) {
+  const times = [];
+  const createdAtMs = messageCreatedAtMs(message);
+  if (createdAtMs !== null) times.push(createdAtMs);
+  for (const part of message?.publishState?.parts ?? []) {
+    for (const value of [part?.lastBroadcastAt, part?.updatedAt]) {
+      const parsed = Date.parse(value ?? '');
+      if (Number.isFinite(parsed) && parsed > 0) times.push(parsed);
+    }
+  }
+  if (times.length > 0) return Math.min(...times);
+  return publishStateUpdatedAtMs(message?.publishState);
+}
+
+function privatePartialSendRetryAgeMs(message) {
+  const startedAtMs = privatePartialPublishStartedAtMs(message);
+  return startedAtMs === null ? null : Math.max(0, Date.now() - startedAtMs);
+}
+
+function privatePartialSendRetryExpired(message) {
+  if (!privateMessageHasPartialRetryablePublish(message)) return false;
+  const ageMs = privatePartialSendRetryAgeMs(message);
+  return ageMs !== null && ageMs >= PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS;
+}
+
+function publishPartAlreadyAttempted(part) {
+  return part?.status === PUBLISH_PART_STATUS_SENT
+    || part?.status === PUBLISH_PART_STATUS_UNKNOWN
+    || part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+    || part?.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED;
+}
+
+function publishPartHadPriorChainAttempt(part) {
+  const previousStatus = part?.retryPreviousStatus;
+  return previousStatus === PUBLISH_PART_STATUS_SENT
+    || previousStatus === PUBLISH_PART_STATUS_UNKNOWN
+    || previousStatus === PUBLISH_PART_STATUS_VAULT_SUBMITTED
+    || previousStatus === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED;
+}
+
+function publishPartEligibleForChainConfirmation(part) {
+  return publishPartAlreadyAttempted(part) || publishPartHadPriorChainAttempt(part);
+}
+
+function publishStateHasRetryableSendParts(publishState) {
+  return (publishState?.parts ?? []).some((part) => !publishPartAlreadyAttempted(part));
+}
+
+function publishPartAwaitingCapsuleHubConfirmation(part) {
+  return part?.status === PUBLISH_PART_STATUS_SENT
+    || part?.status === PUBLISH_PART_STATUS_UNKNOWN
+    || part?.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED;
+}
+
+function publishPartCanFreshSendRetry(part) {
+  if (!part || publishPartAlreadyAttempted(part)) return false;
+  if (part.clientNonce !== undefined && part.clientNonce !== null) return false;
+  if (typeof part.externalBoc === 'string' && part.externalBoc.length > 0) return false;
+  if (publishIdForPart(part)) return false;
+  return part.status === PUBLISH_PART_STATUS_BUILT
+    || part.status === PUBLISH_PART_STATUS_SENDING
+    || part.status === PUBLISH_PART_STATUS_FAILED;
+}
+
+function clearPublishPartSignedAttempt(part) {
+  if (!part) return;
+  delete part.clientNonce;
+  delete part.publishId;
+  delete part.externalBoc;
+  delete part.lastBroadcastAt;
+  delete part.lastBroadcastResult;
+  delete part.lastBroadcastRetryError;
+  delete part.lastBroadcastRetryErrorAt;
+  delete part.broadcastRetryCount;
+}
+
+function publishPartNeedsBroadcastRetry(part) {
+  return (
+    part?.status === PUBLISH_PART_STATUS_SENT
+    || part?.status === PUBLISH_PART_STATUS_UNKNOWN
+  )
+    && typeof part.externalBoc === 'string'
+    && part.externalBoc.length > 0
+    && part.clientNonce !== undefined
+    && part.clientNonce !== null;
+}
+
+function publishPartBroadcastRetryCount(part) {
+  const count = Number(part?.broadcastRetryCount ?? 0);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+
+function publishPartLastBroadcastAgeMs(part) {
+  const parsed = Date.parse(part?.lastBroadcastAt ?? '');
+  return Number.isFinite(parsed) ? Math.max(0, Date.now() - parsed) : Infinity;
+}
+
+async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}) {
+  const retryableParts = (publishState?.parts ?? []).filter((part) => publishPartNeedsBroadcastRetry(part));
+  if (retryableParts.length === 0) return 0;
+  const provider = await resolveVaultChainProvider();
+  const owner = options.owner ?? requirePlathoWalletAddress();
+  const deadlineAt = publishConfirmDeadlineAt({
+    deadlineMs: options.deadlineMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+  });
+  const readTimeoutMs = options.readTimeoutMs ?? options.requestTimeoutMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS;
+  const sendTimeoutMs = options.sendTimeoutMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS;
+  const queueTimeoutMs = options.queueTimeoutMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS;
+  let changed = 0;
+  let currentNonce = null;
+  try {
+    currentNonce = await readVaultPublishNonceForBroadcastRetry(provider, owner, {
+      requestTimeoutMs: readTimeoutMs,
+      queueTimeoutMs,
+    });
+  } catch (error) {
+    publishState.lastBroadcastRetryError = shortUiErrorText(error, 'broadcast retry read failed');
+    publishState.lastBroadcastRetryErrorAt = new Date().toISOString();
+    if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) return 0;
+    throw error;
+  }
+  for (const part of retryableParts) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) break;
+    let clientNonce = null;
+    try {
+      clientNonce = BigInt(part.clientNonce);
+    } catch {
+      continue;
+    }
+    if (currentNonce !== null && currentNonce > clientNonce) {
+      setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
+        confirmedBy: 'vault_nonce',
+        error: null,
+      });
+      changed += 1;
+      continue;
+    }
+    if (currentNonce !== null && currentNonce < clientNonce) continue;
+    const retryCount = publishPartBroadcastRetryCount(part);
+    if (retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT) continue;
+    if (publishPartLastBroadcastAgeMs(part) < PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS) continue;
+    let result = null;
+    try {
+      result = await sendVaultExternalBoc({ boc: part.externalBoc }, {
+        requestTimeoutMs: sendTimeoutMs,
+        queueTimeoutMs,
+        skipIfRateLimited: true,
+        priority: 'background',
+      });
+    } catch (error) {
+      part.lastBroadcastRetryError = shortUiErrorText(error, 'broadcast retry failed');
+      part.lastBroadcastRetryErrorAt = new Date().toISOString();
+      if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) continue;
+      throw error;
+    }
+    part.lastBroadcastResult = result?.result ?? null;
+    setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
+      broadcastRetryCount: retryCount + 1,
+      lastBroadcastAt: new Date().toISOString(),
+      error: null,
+    });
+    changed += 1;
+  }
+  return changed;
+}
+
+async function retryUnconfirmedPrivatePublishBroadcasts(publishState, options = {}) {
+  return retryUnconfirmedVaultPublishBroadcasts(publishState, options);
+}
+
+function markPublishStateAwaitingPartsForRetry(publishState, reason = 'missing CapsuleHub entry') {
+  const parts = publishState?.parts ?? [];
+  const confirmedCount = parts.filter((part) => part?.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED).length;
+  if (parts.length <= 0 || confirmedCount >= parts.length) return 0;
+  let changed = 0;
+  for (const part of parts) {
+    if (!publishPartCanFreshSendRetry(part)) continue;
+    const previousStatus = part.status;
+    clearPublishPartSignedAttempt(part);
+    setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_BUILT, {
+      error: null,
+      retryReason: reason,
+      retryPreviousStatus: previousStatus,
+    });
+    changed += 1;
+  }
+  return changed;
+}
+
+function markStaleUnconfirmedPublishPartsForRetry(message, reason = 'missing CapsuleHub entry') {
+  const publishState = message?.publishState;
+  const parts = publishState?.parts ?? [];
+  const confirmedCount = parts.filter((part) => part?.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED).length;
+  if (parts.length <= 0 || confirmedCount >= parts.length) return 0;
+  const createdAtMs = messageCreatedAtMs(message) ?? publishStateUpdatedAtMs(publishState);
+  if (createdAtMs !== null && Date.now() - createdAtMs < PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS) return 0;
+  return markPublishStateAwaitingPartsForRetry(publishState, reason);
 }
 
 function privateSendRetryKey(message) {
@@ -11716,39 +16100,85 @@ function refreshPrivateSendRetryUi(thread, message, meta) {
   updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
 }
 
+function publishStateUpdatedAtMs(publishState) {
+  const parsed = Date.parse(publishState?.updatedAt ?? '');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function privatePendingPublishAgeMs(message) {
+  const timestamp = publishStateUpdatedAtMs(message?.publishState) ?? messageCreatedAtMs(message);
+  return timestamp === null ? 0 : Math.max(0, Date.now() - timestamp);
+}
+
+function isStalePrivatePendingPublish(message) {
+  return privatePendingPublishAgeMs(message) > PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS;
+}
+
+function isStalePrivatePendingPublishConfirmation(message) {
+  return privatePendingPublishAgeMs(message) > PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS;
+}
+
+function stopPrivateSendRetry(context, error = null) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message)) return;
+  clearPrivateSendRetry(message);
+  message.privateSendRetryStopped = true;
+  message.privateSendRetryStoppedAt = new Date().toISOString();
+  message.meta = privateSendRetryExhaustedStatusText(error);
+  message.privateManualRetryAvailable = true;
+  message.privateCancelAvailable = privateMessageCanLocalCancel(message);
+  message.privateSendLastError = shortUiErrorText(error, 'send retry stopped');
+  thread.state = 'blocked';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+}
+
 function schedulePrivateSendRetry(context, error) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message)) return;
-  const attempt = Number(context.retryAttempt ?? 0);
-  if (attempt >= PRIVATE_SEND_RETRY_MAX_ATTEMPTS) {
-    clearPrivateSendRetry(message);
+  if (message.privateSendRetryStopped === true) return;
+  const attempt = Number(context.retryAttempt ?? message.privateSendRetryAttempt ?? 0) || 0;
+  if (isStalePrivatePendingPublish(message) && !privateMessageHasPublishAttempt(message)) {
+    stopPrivateSendRetry(context, { message: 'retry window expired', code: 'STALE_PRIVATE_PUBLISH' });
+    return;
+  }
+  if (privatePartialSendRetryExpired(message)) {
+    stopPartialPrivatePublishRecovery(context, { message: 'partial publish retry window expired', code: 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED' });
+    return;
+  }
+  if (attempt >= privateSendRetryMaxAttempts(error, message)) {
+    message.privateSendRetryAttempt = attempt;
     if (!message.localHistoryId && !privateMessageHasPublishAttempt(message)) {
-      restorePrivateDraftAfterUnsentMessage(context).catch((restoreError) => console.error(restoreError));
+      markPrivateMessageManualRecovery(context, error, privateSendRetryExhaustedStatusText(error));
       if (privateComposerCostStatus && thread.id === activeThreadId) {
         privateComposerCostStatus.textContent = privateSendRetryExhaustedStatusText(error);
         privateComposerCostStatus.dataset.state = 'short';
       }
       return;
     }
-    message.meta = privateSendRetryExhaustedStatusText(error);
-    thread.state = 'blocked';
-    refreshThreadAfterMessageChange(thread);
-    renderThreads();
-    renderConversation();
-    updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+    if (privateMessageHasPartialRetryablePublish(message)) {
+      stopPartialPrivatePublishRecovery(context, { message: 'partial publish retry limit reached', code: 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED' });
+    } else {
+      stopPrivateSendRetry(context, error);
+    }
     if (privateComposerCostStatus && thread.id === activeThreadId) {
       privateComposerCostStatus.textContent = privateSendRetryExhaustedStatusText(error);
       privateComposerCostStatus.dataset.state = 'short';
     }
     return;
   }
+  clearPrivateMessageManualRecovery(message);
   const delayMs = privateSendRetryDelayMs(error, attempt);
   context.retryAttempt = attempt + 1;
+  message.privateSendRetryAttempt = context.retryAttempt;
+  const scheduledAt = Date.now();
+  message.privateSendRetryLastScheduledAt = new Date(scheduledAt).toISOString();
+  message.privateSendRetryDelayMs = delayMs;
+  message.privateSendRetryNextAt = new Date(scheduledAt + delayMs).toISOString();
+  message.privateSendRetryLastError = error ? shortUiErrorText(error, 'send retry delayed') : null;
   refreshPrivateSendRetryUi(thread, message, privateSendRetryMeta(error));
-  if (privateComposerCostStatus && thread.id === activeThreadId) {
-    privateComposerCostStatus.textContent = privateSendRetryMeta(error);
-    privateComposerCostStatus.dataset.state = 'ready';
-  }
   const key = privateSendRetryKey(message);
   const previous = privateSendRetryJobs.get(key);
   if (previous?.timer) window.clearTimeout(previous.timer);
@@ -11759,19 +16189,142 @@ function schedulePrivateSendRetry(context, error) {
   privateSendRetryJobs.set(key, { timer, context });
 }
 
+function privateSendRetryContextForMessage(thread, message) {
+  const draft = message?.privateDraft ?? {};
+  const payment = message?.payment ?? null;
+  const hasPaymentIntent = paymentHasIntent(payment) || message?.paymentIntentCreated === true;
+  return {
+    thread,
+    message,
+    text: draft.text ?? message?.text ?? '',
+    attachments: normalizePrivateImageAttachments(draft.attachments ?? []),
+    paymentDraft: hasPaymentIntent ? null : (draft.paymentDraft ?? message?.paymentDraft ?? null),
+    selectedSuite: draft.selectedSuite ?? VAULT_RECEIVE_CRYPTO_SUITE,
+    senderOptions: draft.senderOptions ?? message?.senderOptions ?? null,
+    payment,
+    paymentIntentCreated: hasPaymentIntent,
+    retryAttempt: Number(message?.privateSendRetryAttempt ?? 0) || 0,
+    confirmAttempt: Number(message?.privatePublishConfirmAttempt ?? 0) || 0,
+  };
+}
+
+function revivePartialPrivateSendRetry(message) {
+  if (!privateMessageHasPartialRetryablePublish(message)) return false;
+  if (privatePartialSendRetryExpired(message)) return false;
+  if (message?.privateSendRetryStopped !== true) return false;
+  message.privateSendRetryStopped = false;
+  message.privateSendRetryStoppedAt = null;
+  message.privateSendRetryLastError = 'resuming partial publish';
+  message.privateSendRetryAttempt = 0;
+  return true;
+}
+
+function ensurePendingPrivateSendRetry(thread, message, error = { message: 'resume missing capsule parts', code: 'NETWORK_ERROR' }) {
+  const revived = revivePartialPrivateSendRetry(message);
+  if (!hasPendingPrivateSendRetry(message)) return false;
+  const existingKey = message.privateSendRetryKey;
+  if (existingKey && privateSendRetryJobs.has(existingKey)) return false;
+  schedulePrivateSendRetry(privateSendRetryContextForMessage(thread, message), revived
+    ? { message: 'resuming partial publish send', code: 'NETWORK_ERROR' }
+    : error);
+  return true;
+}
+
+function privatePublishConfirmStoppedStatusText(error = null) {
+  if (error?.code === 'STALE_PRIVATE_PUBLISH') return 'not confirmed: chain lookup expired';
+  if (error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED') {
+    return /limit/i.test(String(error?.message ?? ''))
+      ? 'not confirmed: partial publish retry limit reached'
+      : 'not confirmed: partial publish retry window expired';
+  }
+  if (isTonRpcVerificationUnavailableError(error)) return 'not confirmed: RPC verification unavailable';
+  if (isTonRpcRateLimitError(error)) return 'not confirmed: RPC stayed busy';
+  const reason = privateSendPreflightStatusText(error);
+  return reason && reason !== 'Send blocked'
+    ? `not confirmed: ${reason}`
+    : 'not confirmed: chain lookup timed out';
+}
+
+function stopPrivatePublishConfirmationRetry(context, error = null) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message)) return;
+  clearPrivatePublishConfirmRetry(message);
+  message.privatePublishConfirmStopped = true;
+  message.privatePublishConfirmStoppedAt = new Date().toISOString();
+  message.meta = privatePublishConfirmStoppedStatusText(error);
+  message.privateManualRetryAvailable = true;
+  message.privateCancelAvailable = false;
+  message.privateSendLastError = shortUiErrorText(error, 'confirmation stopped');
+  thread.state = 'blocked';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+}
+
+function stopPartialPrivatePublishRecovery(context, error = { message: 'partial publish retry window expired', code: 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED' }) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message)) return false;
+  if (!privateMessageHasPartialRetryablePublish(message)) return false;
+  const forcedStop = error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED'
+    && /limit/i.test(String(error?.message ?? ''));
+  if (!privatePartialSendRetryExpired(message) && !forcedStop) return false;
+  clearPrivateSendRetry(message);
+  clearPrivatePublishConfirmRetry(message);
+  message.privateSendRetryStopped = true;
+  message.privateSendRetryStoppedAt = new Date().toISOString();
+  message.privateSendRetryLastError = shortUiErrorText(error, 'partial publish expired');
+  message.privatePublishConfirmStopped = true;
+  message.privatePublishConfirmStoppedAt = new Date().toISOString();
+  message.privatePublishConfirmLastResult = 'partial-expired';
+  message.privatePublishConfirmLastError = shortUiErrorText(error, 'partial publish expired');
+  message.meta = privatePublishConfirmStoppedStatusText(error);
+  message.privateManualRetryAvailable = true;
+  message.privateCancelAvailable = false;
+  message.privateSendLastError = shortUiErrorText(error, 'partial publish expired');
+  thread.state = 'blocked';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+  return true;
+}
+
 function schedulePrivatePublishConfirmationRetry(context, error = null) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
   const attempt = Number(context.confirmAttempt ?? message.privatePublishConfirmAttempt ?? 0);
+  if (message.privatePublishConfirmStopped === true) return;
+  if (stopPartialPrivatePublishRecovery(context)) return;
+  if (isStalePrivatePendingPublishConfirmation(message)) {
+    stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
+    return;
+  }
+  clearPrivateMessageManualRecovery(message);
   const delayMs = isTonRpcRateLimitError(error)
     ? tonRpcLimitBackoffMs(error)
-    : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)];
+    : (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
+      ? PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS
+      : PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS[Math.min(attempt, PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS.length - 1)]);
   context.confirmAttempt = attempt + 1;
   message.privatePublishConfirmAttempt = context.confirmAttempt;
+  const scheduledAt = Date.now();
+  message.privatePublishConfirmLastScheduledAt = new Date(scheduledAt).toISOString();
+  message.privatePublishConfirmDelayMs = delayMs;
+  message.privatePublishConfirmNextAt = new Date(scheduledAt + delayMs).toISOString();
+  message.privatePublishConfirmLastError = error ? shortUiErrorText(error, 'confirm retry delayed') : null;
   const baseMeta = publishStateMeta(message.publishState);
-  message.meta = attempt >= 3 && baseMeta.includes('confirming')
-    ? `${baseMeta} · still checking`
+  message.meta = attempt >= 6 && baseMeta.includes('confirming')
+    ? `${baseMeta} - still checking`
     : baseMeta;
+  globalThis.plathoLastPrivatePublishConfirmSchedule = {
+    attempt: context.confirmAttempt,
+    delayMs,
+    meta: message.meta,
+    error: message.privatePublishConfirmLastError,
+    at: message.privatePublishConfirmLastScheduledAt,
+    nextAt: message.privatePublishConfirmNextAt,
+  };
   thread.state = 'pending';
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -11787,11 +16340,120 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   privatePublishConfirmJobs.set(key, { timer, context });
 }
 
+function shouldRunImmediatePrivatePublishConfirmation(message) {
+  const parts = message?.publishState?.parts ?? [];
+  return hasPendingPrivatePublishConfirmation(message)
+    && (isFreshPrivatePublishConfirmation(message)
+      || privatePendingPublishAgeMs(message) >= PRIVATE_PUBLISH_MISSING_PART_RETRY_AFTER_MS)
+    && parts.some((part) => publishPartAwaitingCapsuleHubConfirmation(part) || publishPartHadPriorChainAttempt(part));
+}
+
+function scheduleImmediatePrivatePublishConfirmation(context) {
+  const { thread, message } = context;
+  if (!thread?.messages?.includes(message) || !shouldRunImmediatePrivatePublishConfirmation(message)) return false;
+  const key = privatePublishConfirmRetryKey(message);
+  const previous = privatePublishConfirmJobs.get(key);
+  if (previous?.timer) window.clearTimeout(previous.timer);
+  context.confirmAttempt = 0;
+  message.privatePublishConfirmAttempt = 0;
+  const scheduledAt = Date.now();
+  message.privatePublishConfirmLastScheduledAt = new Date(scheduledAt).toISOString();
+  message.privatePublishConfirmDelayMs = 0;
+  message.privatePublishConfirmNextAt = new Date(scheduledAt).toISOString();
+  message.privatePublishConfirmLastResult = 'immediate';
+  const timer = window.setTimeout(() => {
+    privatePublishConfirmJobs.delete(key);
+    runPrivatePublishConfirmationRetry(context).catch((confirmError) => console.error(confirmError));
+  }, 0);
+  privatePublishConfirmJobs.set(key, { timer, context });
+  return true;
+}
+
 async function runPrivatePublishConfirmationRetry(context) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message) || !privateMessageHasPublishAttempt(message)) return;
+  if (stopPartialPrivatePublishRecovery(context)) return;
+  if (isStalePrivatePendingPublishConfirmation(message)) {
+    stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
+    return;
+  }
+  if (privateChainSyncPromise) {
+    const key = privatePublishConfirmRetryKey(message);
+    const previous = privatePublishConfirmJobs.get(key);
+    if (previous?.timer) window.clearTimeout(previous.timer);
+    const scheduledAt = Date.now();
+    message.privatePublishConfirmLastRunAt = new Date(scheduledAt).toISOString();
+    message.privatePublishConfirmLastResult = 'sync-busy';
+    message.privatePublishConfirmDelayMs = 2_500;
+    message.privatePublishConfirmNextAt = new Date(scheduledAt + 2_500).toISOString();
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+    updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+    const timer = window.setTimeout(() => {
+      privatePublishConfirmJobs.delete(key);
+      runPrivatePublishConfirmationRetry(context).catch((confirmError) => console.error(confirmError));
+    }, 2_500);
+    privatePublishConfirmJobs.set(key, { timer, context });
+    return;
+  }
+  const endPrivateOutboundWork = beginPrivateOutboundWork();
   try {
-    await confirmCapsuleHubPublishEntries(message.publishState);
+    const runAt = Date.now();
+    message.privatePublishConfirmLastRunAt = new Date(runAt).toISOString();
+    message.privatePublishConfirmRunCount = (Number(message.privatePublishConfirmRunCount ?? 0) || 0) + 1;
+    message.privatePublishConfirmLastResult = 'checking';
+    message.privatePublishConfirmNextAt = null;
+    const broadcastRetries = await retryUnconfirmedPrivatePublishBroadcasts(message.publishState, {
+      deadlineMs: PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
+      readTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_READ_TIMEOUT_MS,
+      sendTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_SEND_TIMEOUT_MS,
+      queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS,
+    });
+    if (broadcastRetries > 0 && publishStateHasRetryableSendParts(message.publishState)) {
+      message.privatePublishConfirmLastResult = `rebroadcast=${broadcastRetries}`;
+      message.meta = publishStateMeta(message.publishState);
+      thread.state = 'pending';
+      await updateMessageInEncryptedHistory(thread, message);
+      refreshThreadAfterMessageChange(thread);
+      renderThreads();
+      renderConversation();
+      clearPrivatePublishConfirmRetry(message);
+      schedulePrivateSendRetry(context, {
+        code: 'NETWORK_ERROR',
+        message: 'Retrying unsent capsule parts',
+      });
+      return;
+    }
+    const freshConfirmation = isFreshPrivatePublishConfirmation(message);
+    const confirmOptions = freshConfirmation
+      ? { hot: true }
+      : {
+        deadlineMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS,
+        requestTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_REQUEST_TIMEOUT_MS,
+        queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
+      };
+    const confirmStartedAt = Date.now();
+    await confirmCapsuleHubPublishEntries(message.publishState, confirmOptions);
+    const retryableMissingParts = markStaleUnconfirmedPublishPartsForRetry(message, 'missing CapsuleHub entry');
+    const sendRetryScheduled = ensurePendingPrivateSendRetry(thread, message, {
+      code: 'NETWORK_ERROR',
+      message: retryableMissingParts > 0
+        ? `Retrying ${retryableMissingParts} missing CapsuleHub part${retryableMissingParts === 1 ? '' : 's'}`
+        : 'Retrying unsent capsule parts',
+    });
+    const statusAfterConfirm = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+      ? 'confirmed'
+      : `pending c${Number(message.publishState?.confirmedCount ?? 0)}/${Math.max(1, Number(message.publishState?.partCount) || 1)}`;
+    const confirmDeadlineMs = freshConfirmation
+      ? PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS
+      : PRIVATE_PUBLISH_CONFIRM_RECOVERY_DEADLINE_MS;
+    const confirmTimedOut = message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+      && Date.now() - confirmStartedAt >= Math.max(1000, confirmDeadlineMs - 500);
+    const statusResult = confirmTimedOut ? `${statusAfterConfirm} timeout` : statusAfterConfirm;
+    message.privatePublishConfirmLastResult = broadcastRetries > 0
+      ? `${statusResult} rebroadcast=${broadcastRetries}`
+      : (sendRetryScheduled ? `${statusResult} send-retry` : statusResult);
     message.meta = publishStateMeta(message.publishState);
     thread.state = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED ? 'sealed' : 'pending';
     await updateMessageInEncryptedHistory(thread, message);
@@ -11802,28 +16464,56 @@ async function runPrivatePublishConfirmationRetry(context) {
       schedulePrivatePublishConfirmationRetry(context);
     } else {
       message.privatePublishConfirmAttempt = 0;
+      message.privatePublishConfirmStopped = false;
+      message.privatePublishConfirmStoppedAt = null;
       clearPrivatePublishConfirmRetry(message);
+      if (message.payment) await removePendingPaymentCheckLedgerRecord(message.payment);
     }
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
-    if (!rateLimited) console.error(error);
+    const softVerification = isTonRpcRecoverableReadError(error);
+    if (!rateLimited && !softVerification) console.error(error);
+    message.privatePublishConfirmLastRunAt = new Date().toISOString();
+    message.privatePublishConfirmLastResult = softVerification ? 'rpc delayed' : 'error';
+    message.privatePublishConfirmLastError = shortUiErrorText(error, 'confirm failed');
     schedulePrivatePublishConfirmationRetry(context, error);
+  } finally {
+    endPrivateOutboundWork();
   }
 }
 
 function hasPendingPrivatePublishConfirmation(message) {
   return privateMessageHasPublishAttempt(message)
-    && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && messageStatusKey(message) === 'sending';
+    && message?.privatePublishConfirmStopped !== true
+    && !privatePartialSendRetryExpired(message)
+    && !isStalePrivatePendingPublishConfirmation(message)
+    && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED;
 }
 
 function resumePendingPrivatePublishConfirmations() {
   if (document.hidden) return;
   for (const thread of threads) {
     for (const message of thread.messages ?? []) {
+      if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
+      ensurePendingPrivateSendRetry(thread, message, {
+        message: 'resume missing capsule parts',
+        code: 'NETWORK_ERROR',
+      });
+      if (privateMessageHasPublishAttempt(message)
+        && message?.privatePublishConfirmStopped !== true
+        && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+        && isStalePrivatePendingPublishConfirmation(message)) {
+        stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
+        continue;
+      }
       if (!hasPendingPrivatePublishConfirmation(message)) continue;
       const existingKey = message.privatePublishConfirmRetryKey;
       if (existingKey && privatePublishConfirmJobs.has(existingKey)) continue;
+      if (scheduleImmediatePrivatePublishConfirmation({
+        thread,
+        message,
+        confirmAttempt: 0,
+      })) continue;
       schedulePrivatePublishConfirmationRetry({
         thread,
         message,
@@ -11833,34 +16523,195 @@ function resumePendingPrivatePublishConfirmations() {
   }
 }
 
-async function restorePrivateDraftAfterUnsentMessage(context) {
-  const { thread, message, text, attachment, paymentDraft } = context;
-  thread.messages = (thread.messages ?? []).filter((item) => item !== message);
-  if (messageInput && !messageInput.value.trim()) messageInput.value = text;
-  privateImageAttachments = attachment ? [attachment] : [];
-  if (paymentDraft) privatePaymentCheckDraft = paymentDraft;
-  updateImageAttachmentUi('private');
-  autoResizeComposerTextarea(messageInput);
+function hasPendingPrivateSendRetry(message) {
+  const hasStoredCapsules = (Array.isArray(message?.capsules) && message.capsules.length > 0) || Boolean(message?.capsule);
+  return messageStatusKey(message) !== 'failed'
+    && message?.privateSendRetryStopped !== true
+    && (!isStalePrivatePendingPublish(message) || privateMessageHasPublishAttempt(message))
+    && publishStateHasRetryableSendParts(message?.publishState)
+    && hasStoredCapsules;
+}
+
+function resumePendingPrivateSendRetries() {
+  if (document.hidden) return;
+  for (const thread of threads) {
+    for (const message of thread.messages ?? []) {
+      if (stopPartialPrivatePublishRecovery({ thread, message })) continue;
+      if (message?.privateSendRetryStopped !== true
+        && publishStateHasRetryableSendParts(message?.publishState)
+        && isStalePrivatePendingPublish(message)
+        && !privateMessageHasPublishAttempt(message)) {
+        stopPrivateSendRetry({ thread, message }, { message: 'retry window expired', code: 'STALE_PRIVATE_PUBLISH' });
+        continue;
+      }
+      if (!hasPendingPrivateSendRetry(message)) continue;
+      ensurePendingPrivateSendRetry(thread, message, { message: 'resume pending capsule send', code: 'NETWORK_ERROR' });
+    }
+  }
+}
+
+function clearPrivateMessageManualRecovery(message) {
+  if (!message) return;
+  message.privateManualRetryAvailable = false;
+  message.privateCancelAvailable = false;
+  message.privateSendLastError = null;
+}
+
+function privateMessageCanLocalCancel(message) {
+  return Boolean(message)
+    && !privateMessageHasPublishAttempt(message)
+    && !message.localHistoryId
+    && message.paymentIntentCreated !== true
+    && !paymentHasIntent(message.payment);
+}
+
+function markPrivateMessageManualRecovery(context, error = null, metaText = null) {
+  const { thread, message } = context ?? {};
+  if (!thread?.messages?.includes(message)) return;
+  clearPrivateSendRetry(message);
+  clearPrivatePublishConfirmRetry(message);
+  message.privateSendRetryStopped = true;
+  message.privateSendRetryStoppedAt = new Date().toISOString();
+  message.privateManualRetryAvailable = true;
+  message.privateCancelAvailable = privateMessageCanLocalCancel(message);
+  message.privateSendLastError = shortUiErrorText(error, 'send stopped');
+  message.meta = metaText ?? privateSendBlockedStatusText(error);
+  thread.state = 'blocked';
   refreshThreadAfterMessageChange(thread);
   renderThreads();
   renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((historyError) => console.error(historyError));
+}
+
+function privateMessageShouldShowManualActions(message) {
+  if (!message?.privateManualRetryAvailable) return false;
+  if (message.privateSendRetryKey && privateSendRetryJobs.has(message.privateSendRetryKey)) return false;
+  if (message.privatePublishConfirmRetryKey && privatePublishConfirmJobs.has(message.privatePublishConfirmRetryKey)) return false;
+  if (message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) return false;
+  if (messageStatusKey(message) !== 'failed') return false;
+  const meta = String(message.meta ?? '').toLowerCase();
+  if (meta.includes('published')
+    || meta.includes('sending')
+    || meta.includes('submitted')
+    || meta.includes('confirming')
+    || meta.includes('retrying send')
+    || meta.includes('checking rpc')) {
+    return false;
+  }
+  return message.privateSendRetryStopped === true || message.privatePublishConfirmStopped === true;
+}
+
+function privateMessageManualActionsElement(thread, message) {
+  if (!privateMessageShouldShowManualActions(message)) return null;
+  const actions = document.createElement('div');
+  actions.className = 'message-actions';
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.textContent = 'Retry';
+  retry.addEventListener('click', async () => {
+    retry.disabled = true;
+    await retryPrivateMessageFromUi(thread, message).catch((error) => {
+      markPrivateMessageManualRecovery({ thread, message }, error);
+      console.error(error);
+    });
+  });
+  actions.append(retry);
+  if (message.privateCancelAvailable === true && privateMessageCanLocalCancel(message)) {
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', () => {
+      cancelPrivateMessageFromUi(thread, message);
+    });
+    actions.append(cancel);
+  }
+  return actions.children.length > 0 ? actions : null;
+}
+
+async function retryPrivateMessageFromUi(thread, message) {
+  if (!thread?.messages?.includes(message)) return;
+  clearPrivateSendRetry(message);
+  clearPrivatePublishConfirmRetry(message);
+  clearPrivateMessageManualRecovery(message);
+  message.privateSendRetryStopped = false;
+  message.privateSendRetryStoppedAt = null;
+  message.privatePublishConfirmStopped = false;
+  message.privatePublishConfirmStoppedAt = null;
+  message.privateSendRetryAttempt = 0;
+  message.privatePublishConfirmAttempt = 0;
+  message.meta = privateMessageHasPublishAttempt(message)
+    ? publishStateMeta(message.publishState)
+    : 'sending';
+  thread.state = 'pending';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+
+  const context = privateSendRetryContextForMessage(thread, message);
+  try {
+    if (privateMessageHasPublishAttempt(message) && !publishStateHasRetryableSendParts(message.publishState)) {
+      await runPrivatePublishConfirmationRetry(context);
+      return;
+    }
+    if (!privateMessageHasPublishAttempt(message) && !context.paymentIntentCreated) {
+      const plan = privateComposerSendPlan(context.text, context.attachments, context.senderOptions, {
+        paymentCheck: context.paymentDraft,
+      });
+      await assertVaultHasPrivatePublishHold(context.selectedSuite, plan, {
+        allowOwnVaultActionReadFallback: Boolean(context.paymentDraft),
+      });
+    }
+    await runPrivateSendRetry(context);
+  } catch (error) {
+    await settlePrivateComposerSendError(context, error);
+  } finally {
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
+  }
+}
+
+function cancelPrivateMessageFromUi(thread, message) {
+  if (!thread?.messages?.includes(message) || !privateMessageCanLocalCancel(message)) return;
+  clearPrivateSendRetry(message);
+  clearPrivatePublishConfirmRetry(message);
+  thread.messages = (thread.messages ?? []).filter((item) => item !== message);
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  if (privateComposerCostStatus && thread.id === activeThreadId) {
+    privateComposerCostStatus.textContent = 'Message cancelled';
+    privateComposerCostStatus.dataset.state = 'ready';
+  }
 }
 
 async function attemptPrivateComposerMessagePublish(context) {
-  const { thread, message, text, attachment, selectedSuite, senderOptions } = context;
-  const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
-  const capsules = await createPrivateComposerCapsules(text, attachment, recipientEntry, thread.id, senderOptions);
+  const endPrivateOutboundWork = beginPrivateOutboundWork();
+  try {
+  const { thread, message, text, attachments, attachment, selectedSuite, senderOptions, payment } = context;
+  clearPrivateMessageManualRecovery(message);
+  let capsules = Array.isArray(message.capsules) && message.capsules.length > 0
+    ? message.capsules
+    : (message.capsule ? [message.capsule] : null);
+  if (!capsules) {
+    const recipientEntry = await resolveRecipientPeerEntry(thread, { suite: selectedSuite });
+    refreshThreadIdentityFromVariants(thread, privateWalletIdentityVariants(recipientEntry.walletAddress));
+    capsules = await createPrivateComposerCapsules(text, attachments ?? (attachment ? [attachment] : []), recipientEntry, thread.id, senderOptions, { payment });
+    message.recipientWallet = recipientEntry.walletAddress;
+  }
   const capsule = capsules[0];
-  const publishState = createCapsulePublishState(capsules);
+  const existingPublishState = message.publishState;
+  const publishState = existingPublishState?.partCount === capsules.length ? existingPublishState : createCapsulePublishState(capsules);
   message.capsule = capsule;
   message.capsules = capsules;
   message.publishState = publishState;
-  message.recipientWallet = recipientEntry.walletAddress;
   message.meta = publishStateMeta(publishState);
   refreshThreadAfterMessageChange(thread);
   renderConversation();
   const publishCallbacks = {
     publishState,
+    allowOwnVaultActionReadFallback: true,
+    confirmFinalNonce: true,
     onReadyToSend: async () => {
       await persistMessageToEncryptedHistory(thread, message);
     },
@@ -11874,6 +16725,10 @@ async function attemptPrivateComposerMessagePublish(context) {
     ? await publishCapsulesThroughVault(capsules, publishCallbacks)
     : await publishCapsuleThroughVault(capsule, publishCallbacks);
   clearPrivateSendRetry(message);
+  clearPrivateMessageManualRecovery(message);
+  message.privateSendRetryAttempt = 0;
+  message.privateSendRetryStopped = false;
+  message.privateSendRetryStoppedAt = null;
   message.vaultPublish = publishResult;
   message.publishState = publishResult.publishState ?? publishState;
   message.meta = publishStateMeta(message.publishState);
@@ -11883,10 +16738,15 @@ async function attemptPrivateComposerMessagePublish(context) {
     schedulePrivatePublishConfirmationRetry(context);
   } else {
     message.privatePublishConfirmAttempt = 0;
+    message.privatePublishConfirmStopped = false;
+    message.privatePublishConfirmStoppedAt = null;
     clearPrivatePublishConfirmRetry(message);
   }
   refreshMessagingControls();
   return publishResult;
+  } finally {
+    endPrivateOutboundWork();
+  }
 }
 
 async function settlePrivateComposerSendError(context, error) {
@@ -11894,6 +16754,21 @@ async function settlePrivateComposerSendError(context, error) {
   const cancelled = isPublishPriceChangeCancelled(error);
   const partial = isVaultPublishPartialError(error);
   const rateLimited = noteTonRpcRateLimit(error);
+  globalThis.plathoLastPrivateComposerSendError = {
+    message: String(error?.message ?? error ?? ''),
+    code: error?.code ?? null,
+    phase: message?.meta ?? null,
+    hasPaymentDraft: Boolean(context.paymentDraft),
+    paymentDraft: paymentDraftForHistory(context.paymentDraft),
+    payment: paymentForHistory(message?.payment),
+    paymentIntentCreated: context.paymentIntentCreated === true,
+    hasPublishAttempt: privateMessageHasPublishAttempt(message),
+    hasLocalHistory: Boolean(message?.localHistoryId),
+    at: new Date().toISOString(),
+  };
+  if (context.paymentDraft && context.paymentIntentCreated !== true && !privateMessageHasPublishAttempt(message)) {
+    rememberPaymentCheckActionError('pre-create', error, message?.payment ?? context.paymentDraft);
+  }
   if (partial) {
     clearPrivateSendRetry(message);
     message.vaultPublish = error.publishResult;
@@ -11901,34 +16776,77 @@ async function settlePrivateComposerSendError(context, error) {
     message.meta = publishStateMeta(message.publishState);
     thread.state = privateMessageHasPublishAttempt(message) ? 'pending' : 'blocked';
     await updateMessageInEncryptedHistory(thread, message);
-    schedulePrivatePublishConfirmationRetry(context, error);
+    if (publishStateHasRetryableSendParts(message.publishState) && isRecoverablePrivateSendError(error.cause ?? error)) {
+      schedulePrivateSendRetry(context, error.cause ?? error);
+    } else {
+      schedulePrivatePublishConfirmationRetry(context, error);
+    }
   } else if (cancelled) {
-    clearPrivateSendRetry(message);
-    clearPrivatePublishConfirmRetry(message);
-    await restorePrivateDraftAfterUnsentMessage(context);
+    markPrivateMessageManualRecovery(context, error, 'not sent: cancelled');
+  } else if (context.paymentIntentCreated && message.payment && !privateMessageHasPublishAttempt(message)) {
+    if (isRecoverablePrivateSendError(error)) {
+      message.meta = privateSendRetryMeta(error);
+      thread.state = 'pending';
+      await updateMessageInEncryptedHistory(thread, message);
+      await rememberPendingPaymentCheckLedgerRecord(thread, message, message.payment, {
+        status: 'publish_retry_pending',
+        publishState: message.publishState,
+      });
+      schedulePrivateSendRetry(context, error);
+    } else {
+      rememberPaymentCheckActionError('publish', error, message.payment);
+      const cancelResult = await attemptCancelPaymentCheckAfterPublishFailure(message.payment).catch((cancelError) => {
+        rememberPaymentCheckActionError('auto-cancel', cancelError, message.payment);
+        if (isPaymentCheckCancelPending(cancelError)) return { pending: true };
+        console.error(cancelError);
+        return null;
+      });
+      message.vaultCancelIntent = cancelResult;
+      message.meta = cancelResult?.pending
+        ? 'check cancel submitted, confirming'
+        : cancelResult
+        ? `check publish failed, intent cancelled: ${privateSendPreflightStatusText(error)}`
+        : 'check not delivered, refund required';
+      thread.state = 'blocked';
+      if (cancelResult?.pending) {
+        await rememberPendingPaymentCheckLedgerRecord(thread, message, message.payment, {
+          status: 'cancel_submitted',
+          vaultCancelIntent: cancelResult,
+        });
+      } else if (cancelResult) {
+        await removePendingPaymentCheckLedgerRecord(message.payment);
+      } else {
+        await rememberPendingPaymentCheckLedgerRecord(thread, message, message.payment, {
+          status: 'publish_failed_refund_required',
+          publishError: privateSendPreflightStatusText(error),
+        });
+      }
+      await updateMessageInEncryptedHistory(thread, message);
+    }
   } else if (isRecoverablePrivateSendError(error) && !privateMessageHasPublishAttempt(message)) {
     schedulePrivateSendRetry(context, error);
+  } else if (isRecoverablePrivateSendError(error) && privateMessageHasPublishAttempt(message)) {
+    message.meta = publishStateMeta(message.publishState);
+    thread.state = 'pending';
+    await updateMessageInEncryptedHistory(thread, message);
+    schedulePrivatePublishConfirmationRetry(context, error);
   } else if (!privateMessageHasPublishAttempt(message) && !message.localHistoryId) {
-    clearPrivateSendRetry(message);
-    clearPrivatePublishConfirmRetry(message);
-    await restorePrivateDraftAfterUnsentMessage(context);
+    markPrivateMessageManualRecovery(context, error, privateSendBlockedStatusText(error));
     if (privateComposerCostStatus) {
       privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
       privateComposerCostStatus.dataset.state = 'short';
     }
   } else {
-    clearPrivateSendRetry(message);
-    message.meta = privateSendBlockedStatusText(error);
-    thread.state = 'blocked';
-    await updateMessageInEncryptedHistory(thread, message);
+    markPrivateMessageManualRecovery(context, error, privateSendBlockedStatusText(error));
   }
   if (privateComposerCostStatus) {
-    privateComposerCostStatus.textContent = cancelled
-      ? 'Send cancelled'
-      : (partial || privateMessageHasPublishAttempt(message)
-        ? publishStateMeta(message.publishState)
-        : (rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error)));
-    privateComposerCostStatus.dataset.state = cancelled ? 'ready' : 'short';
+    const recoverable = isRecoverablePrivateSendError(error);
+    if (cancelled || recoverable || partial || privateMessageHasPublishAttempt(message)) {
+      refreshComposerCostStatus();
+    } else {
+      privateComposerCostStatus.textContent = rateLimited ? TON_RPC_CONNECTING_STATUS : privateSendPreflightStatusText(error);
+      privateComposerCostStatus.dataset.state = 'short';
+    }
   }
   refreshMessagingControls();
   if (!rateLimited && !cancelled && !partial && !isRecoverablePrivateSendError(error)) console.error(error);
@@ -11942,10 +16860,14 @@ async function runPrivateSendRetry(context) {
     return;
   }
   try {
-    if (context.paymentDraft) {
+    if (context.paymentDraft && !(context.paymentIntentCreated && message.payment && Array.isArray(message.capsules))) {
       await attemptPrivatePaymentCheckPublish(context);
     } else {
-      await attemptPrivateComposerMessagePublish(context);
+      await attemptPrivateComposerMessagePublish({
+        ...context,
+        payment: context.payment ?? message.payment ?? null,
+        paymentDraft: null,
+      });
     }
   } catch (error) {
     await settlePrivateComposerSendError(context, error);
@@ -11965,16 +16887,19 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
   const feed = cached?.version === 1 && cached?.channelId === channelId
     ? { ...cached, posts: [...(cached.posts ?? [])] }
     : { version: 1, channelId, updatedAt: null, posts: [] };
+  const attachments = normalizePublicImageAttachments(attachment);
+  const blocks = options.blocks ?? displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(text, attachments));
   feed.posts.push({
     id: `local-${Date.now()}`,
-    text,
-    imageUrl: attachment?.dataUrl,
+    text: messagePreviewFromBlocks(blocks) || text,
+    blocks,
+    imageUrl: blocks.length > 0 ? undefined : attachments[0]?.dataUrl,
     createdAt: new Date().toISOString(),
     author: 'you',
     authorWallet: plathoWallet?.address ?? null,
     profileVersion: profilePointer.profileVersion,
     avatarHash: profilePointer.avatarHash,
-    avatarImageUrl: readProfileAvatarMediaCache(profilePointer.avatarHash),
+    avatarImageUrl: null,
     bodyHash,
     publishStatus: options.publishStatus ?? null,
     publishState: options.publishState ?? null,
@@ -12005,19 +16930,22 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
   ));
   if (index >= 0) {
     const post = { ...feed.posts[index], comments: [...(feed.posts[index].comments ?? [])] };
+    const attachments = normalizePublicImageAttachments(attachment);
+    const blocks = options.blocks ?? displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(text, attachments));
     post.comments.push({
       id: `local-comment-${Date.now()}`,
       entryId: null,
       parentEntryId: String(parent.entryId),
       parentHash: parent.bodyHash,
-      text,
-      imageUrl: attachment?.dataUrl,
+      text: messagePreviewFromBlocks(blocks) || text,
+      blocks,
+      imageUrl: blocks.length > 0 ? undefined : attachments[0]?.dataUrl,
       createdAt: new Date().toISOString(),
       author: 'you',
       authorWallet: plathoWallet?.address ?? null,
       profileVersion: profilePointer.profileVersion,
       avatarHash: profilePointer.avatarHash,
-      avatarImageUrl: readProfileAvatarMediaCache(profilePointer.avatarHash),
+      avatarImageUrl: null,
       bodyHash,
       publishStatus: options.publishStatus ?? null,
       publishState: options.publishState ?? null,
@@ -12034,65 +16962,74 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
   renderPublicSurface({ anchorUnread: false });
 }
 
-function publicTextPartsForSend(text) {
-  return splitUtf8ToParts(text, SINGLE_CAPSULE_USEFUL_BYTES);
-}
-
 function imagePartsForSend(attachment, label = 'image') {
   if (!attachment?.bytes?.length) return [];
-  return splitBytesToParts(attachment.bytes, SINGLE_CAPSULE_USEFUL_BYTES);
+  return splitBytesToCapsuleParts(attachment.bytes, MAX_CAPSULE_USEFUL_BYTES);
 }
 
-async function createPrivateComposerCapsules(text, attachment, recipientEntry, threadId, options = currentPrivateSenderOptions()) {
+function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments) {
+  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), null)
+    .filter((block) => block.type !== 'payment');
+}
+
+function publicDocumentBytesFromDraft(text, attachments = publicImageAttachments) {
+  const blocks = publicDocumentBlocksFromDraft(text, attachments);
+  if (blocks.length <= 0) return null;
+  return encodeMessageDocumentBlocks(blocks);
+}
+
+function publicComposerSendPlan(text, attachments = publicImageAttachments) {
+  const plan = [];
+  const documentBytes = publicDocumentBytesFromDraft(text, attachments);
+  if (!documentBytes) return plan;
+  for (const part of splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES)) {
+    plan.push({ type: 'document', bytes: part.bytes, sizeClass: part.sizeClass, usefulBytes: part.usefulBytes });
+  }
+  return plan;
+}
+
+async function createPrivateComposerCapsules(text, attachments, recipientEntry, threadId, options = currentPrivateSenderOptions(), extras = {}) {
   const senderWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
+  const recipientWallet = requireBasechainAddress(recipientEntry?.walletAddress, 'Recipient wallet');
   const senderVaultKeyId = currentVaultMessagingKeyId();
+  const senderUsername = privateSenderUsernameMetadataLabel(options);
   const senderMetadata = options.includeSenderWalletMetadata === false
     ? {}
     : {
       senderWallet,
       senderVaultKeyId: senderVaultKeyId ?? undefined,
+      senderUsername: senderUsername ?? undefined,
     };
-  const textParts = String(text ?? '').trim().length > 0 ? privateTextCapsulePartsForSend(text, options) : [];
-  const imageParts = privateImageCapsulePartsForSend(attachment, options);
-  const totalParts = textParts.length + imageParts.length;
-  if (totalParts <= 0) return [];
+  const recipientMetadata = {
+    recipientWallet,
+  };
+  const documentBytes = messageDocumentBytesFromDraft(text, attachments, extras.payment ?? extras.paymentDraft ?? null);
+  if (!documentBytes) return [];
+  const documentParts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES, {
+    perPartOverheadBytes: privateCompactPayloadOverhead(options),
+  });
+  const totalParts = documentParts.length;
   assertPrivateComposerPartLimit(totalParts);
   const streamId = randomBytes(16);
   const capsules = [];
-  for (let index = 0; index < textParts.length; index += 1) {
-    const part = textParts[index];
+  for (let index = 0; index < documentParts.length; index += 1) {
+    const part = documentParts[index];
     const payloadBytes = encodeCompactPayload({
-      type: 'text',
-      text: part.text,
+      type: 'document',
+      bytes: part.bytes,
       sizeClass: part.sizeClass,
       streamId,
       partIndex: index,
       partCount: totalParts,
       ...senderMetadata,
+      ...recipientMetadata,
+      reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
     });
     capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
       payloadBytes,
       sizeClass: part.sizeClass,
       threadId,
-      ...currentProfilePointerFields(),
-    }));
-  }
-  for (let index = 0; index < imageParts.length; index += 1) {
-    const part = imageParts[index];
-    const payloadBytes = encodeCompactPayload({
-      type: 'image',
-      bytes: part.bytes,
-      sizeClass: part.sizeClass,
-      format: attachment.mediaFormat ?? PLATHO_COMPACT_IMAGE_FORMATS.WEBP,
-      streamId,
-      partIndex: textParts.length + index,
-      partCount: totalParts,
-      ...senderMetadata,
-    });
-    capsules.push(await createEncryptedPrivateCapsuleFromPublicBundle('', recipientEntry.publicBundle, localIdentity, {
-      payloadBytes,
-      sizeClass: part.sizeClass,
-      threadId,
+      senderRecovery: true,
       ...currentProfilePointerFields(),
     }));
   }
@@ -12102,7 +17039,7 @@ async function createPrivateComposerCapsules(text, attachment, recipientEntry, t
 function publicPublishDraftFromPayload(payload) {
   return {
     publish_kind: VAULT_PUBLISH_KIND.PUBLIC,
-    size_class: VAULT_SIZE_CLASS.STANDARD,
+    size_class: BigInt(payload.size_class ?? payload.sizeClass ?? VAULT_SIZE_CLASS.STANDARD),
     crypto_suite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
     header_0_hash: payload.headerHash,
     body_hash: payload.bodyHash,
@@ -12111,17 +17048,16 @@ function publicPublishDraftFromPayload(payload) {
   };
 }
 
-async function publishPublicPayloadParts(payloads, idPrefix) {
+async function publishPublicPayloadParts(payloads, idPrefix, options = {}) {
   return publishCapsulesThroughVault(payloads.map((payload, index) => ({
     id: `${idPrefix}-${index}`,
     publish: publicPublishDraftFromPayload(payload),
-  })));
+  })), { ...options, allowOwnVaultActionReadFallback: true, confirmFinalNonce: options.confirmFinalNonce ?? true });
 }
 
-async function createPublicPayloadParts({ type, text, attachment, commentsAllowed = true, parent = null }) {
-  const textParts = String(text ?? '').trim().length > 0 ? publicTextPartsForSend(text) : [];
-  const imageParts = imagePartsForSend(attachment, 'public images');
-  const totalParts = textParts.length + imageParts.length;
+async function createPublicPayloadParts({ type, text, attachments = publicImageAttachments, commentsAllowed = true, parent = null }) {
+  const documentParts = publicComposerSendPlan(text, attachments);
+  const totalParts = documentParts.length;
   if (totalParts <= 0) return [];
   const streamId = randomBytes(16);
   const createdAtSec = Math.floor(Date.now() / 1000);
@@ -12133,10 +17069,11 @@ async function createPublicPayloadParts({ type, text, attachment, commentsAllowe
         parentHash: parent.bodyHash,
       }
     : {};
-  for (let index = 0; index < textParts.length; index += 1) {
+  for (let index = 0; index < documentParts.length; index += 1) {
+    const part = documentParts[index];
     payloads.push(await createPublicPostPayload({
-      type,
-      text: textParts[index],
+      type: type === 'comment' ? 'document_comment' : 'document',
+      bytes: part.bytes,
       commentsAllowed,
       streamId,
       partIndex: index,
@@ -12144,21 +17081,7 @@ async function createPublicPayloadParts({ type, text, attachment, commentsAllowe
       createdAtSec,
       ...profilePointer,
       ...commentBase,
-    }, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES }));
-  }
-  for (let index = 0; index < imageParts.length; index += 1) {
-    payloads.push(await createPublicPostPayload({
-      type: type === 'comment' ? 'image_comment' : 'image',
-      bytes: imageParts[index],
-      mediaFormat: attachment.mediaFormat ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP,
-      commentsAllowed,
-      streamId,
-      partIndex: textParts.length + index,
-      partCount: totalParts,
-      createdAtSec,
-      ...profilePointer,
-      ...commentBase,
-    }, { maxBytes: SINGLE_CAPSULE_USEFUL_BYTES }));
+    }, { sizeClass: part.sizeClass }));
   }
   return payloads;
 }
@@ -12166,15 +17089,17 @@ async function createPublicPayloadParts({ type, text, attachment, commentsAllowe
 async function submitPublicPostThroughVault(draft = null) {
   const resolvedDraft = draft ?? {
     text: publicMessageInput?.value?.trim() ?? '',
-    attachment: publicImageAttachment,
+    attachments: publicImageAttachments,
     commentsAllowed: publicComposerCommentsCheckbox?.checked !== false,
   };
-  if (!resolvedDraft.text && !resolvedDraft.attachment) return null;
+  const attachments = normalizePublicImageAttachments(resolvedDraft.attachments ?? resolvedDraft.attachment);
+  if (!resolvedDraft.text && attachments.length === 0) return null;
   setPublicStatus('public publish signing');
+  const blocks = displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(resolvedDraft.text, attachments));
   const payloads = await createPublicPayloadParts({
     type: 'post',
     text: resolvedDraft.text,
-    attachment: resolvedDraft.attachment,
+    attachments,
     commentsAllowed: resolvedDraft.commentsAllowed,
   });
   let result;
@@ -12185,16 +17110,18 @@ async function submitPublicPostThroughVault(draft = null) {
     result = error.publishResult;
   }
   if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, resolvedDraft.attachment);
+    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, { blocks });
     setPublicStatus('public published');
   } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, resolvedDraft.attachment, {
+    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
+      blocks,
       publishStatus: 'partial public publish',
       publishState: result.publishState ?? null,
     });
     setPublicStatus('partial public publish');
   } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, resolvedDraft.attachment, {
+    rememberLocalPublicPost(resolvedDraft.text, payloads[0]?.bodyHash, resolvedDraft.commentsAllowed, attachments, {
+      blocks,
       publishStatus: 'public publish submitted',
       publishState: result.publishState ?? null,
     });
@@ -12202,22 +17129,23 @@ async function submitPublicPostThroughVault(draft = null) {
   } else {
     setPublicStatus('publish ready');
   }
-  globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result };
+  globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result };
   return result;
 }
 
-async function submitPublicCommentThroughVault(parent, bodyText = null) {
+async function submitPublicCommentThroughVault(parent, bodyText = null, draftAttachments = publicImageAttachments) {
   if (parent?.entryId === undefined || parent?.entryId === null) throw new Error('Public comment parent is not synced from chain');
   if (!/^0x[0-9a-fA-F]{64}$/.test(String(parent.bodyHash ?? ''))) throw new Error('Public comment parent hash is missing');
   if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
   const text = bodyText?.trim() ?? publicMessageInput?.value?.trim() ?? '';
-  const attachment = publicImageAttachment;
-  if (!text && !attachment) return null;
+  const attachments = normalizePublicImageAttachments(draftAttachments);
+  if (!text && attachments.length === 0) return null;
   setPublicStatus('comment signing');
+  const blocks = displayBlocksFromDocumentBlocks(publicDocumentBlocksFromDraft(text, attachments));
   const payloads = await createPublicPayloadParts({
     type: 'comment',
     text,
-    attachment,
+    attachments,
     parent,
   });
   let result;
@@ -12228,16 +17156,18 @@ async function submitPublicCommentThroughVault(parent, bodyText = null) {
     result = error.publishResult;
   }
   if (result?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) {
-    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachment);
+    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, { blocks });
     setPublicStatus('comment published');
   } else if (result?.status === VAULT_PUBLISH_STATUS_PARTIAL) {
-    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachment, {
+    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
+      blocks,
       publishStatus: 'partial comment publish',
       publishState: result.publishState ?? null,
     });
     setPublicStatus('partial comment publish');
   } else if (result?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
-    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachment, {
+    rememberLocalPublicComment(parent, text, payloads[0]?.bodyHash, attachments, {
+      blocks,
       publishStatus: 'comment submitted',
       publishState: result.publishState ?? null,
     });
@@ -12245,7 +17175,7 @@ async function submitPublicCommentThroughVault(parent, bodyText = null) {
   } else {
     setPublicStatus('publish ready');
   }
-  globalThis.plathoLastPublicComment = { parent, text, payloads, result };
+  globalThis.plathoLastPublicComment = { parent, text, blocks, payloads, result };
   return result;
 }
 
@@ -12263,6 +17193,7 @@ globalThis.plathoVaultTransactions = {
   submitUsernameMint,
   submitVaultUsernameMint,
   submitAthWalletBurn,
+  submitAthDueFlush,
   submitProfileAvatarUpdate,
   submitCreatePaymentCheck,
   submitVaultClaimPaymentCheck,
@@ -12343,6 +17274,7 @@ async function refreshVaultActivationStatus(options = {}) {
       priority: 'critical',
       cacheTtlMs: 0,
     });
+    await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
     const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
       ownerWallet: plathoWallet.address,
       currentKeyId: user.current_key_id,
@@ -12383,6 +17315,7 @@ async function bootCrypto() {
     if (!plathoWallet) {
       const hasStoredWallet = hasStoredPlathoWalletRecord();
       const requiredStatus = hasStoredWallet ? 'unlock required' : 'wallet required';
+      await bootWalletScopedLocalStores();
       localIdentity = null;
       localVaultAuthKeyPair = null;
       localRecipientKeyPair = null;
@@ -12401,6 +17334,7 @@ async function bootCrypto() {
       refreshComposerPublishPolicy();
       return null;
     }
+    await bootWalletScopedLocalStores();
     renderWalletIdentity();
     localProfileAvatarPointer = readStoredProfileAvatarPointer(plathoWallet.address);
     localVaultAuthKeyPair = await deriveVaultAuthKeyPairFromWallet(plathoWallet);
@@ -12426,7 +17360,7 @@ async function bootCrypto() {
     setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
     if (appShell?.dataset?.view === 'chats') {
       beginMessageSyncUi();
-      const syncResult = await syncPrivateCapsulesFromChainOnce().catch((error) => {
+      const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {
         refreshMessagingControls();
         if (noteTonRpcRateLimit(error)) {
           failMessageSyncUi('Sync delayed');
@@ -12535,6 +17469,7 @@ window.addEventListener('pagehide', () => {
 });
 window.addEventListener('pageshow', () => {
   resumePendingPrivatePublishConfirmations();
+  resumePendingPrivateSendRetries();
   scheduleWalletUnlockPrompt();
   if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
@@ -12548,6 +17483,7 @@ window.addEventListener('pageshow', () => {
 });
 window.addEventListener('focus', () => {
   resumePendingPrivatePublishConfirmations();
+  resumePendingPrivateSendRetries();
   if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
     refreshVaultNow({ includeActivation: true }).catch((error) => {
@@ -12589,8 +17525,7 @@ if (activeThreadId) {
 renderThreads();
 renderConversation();
 refreshMessagingControls();
-bootReplayStore();
-bootEncryptedMessageHistory();
+document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
   .then(() => setTimeout(() => {
     promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import {
   ATHTransferAck,
@@ -49,6 +50,16 @@ function senderKey(owner: Address, queryId: bigint): bigint {
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.MARKET.STABILITY.${label}`).digest());
+}
+
+async function contractBalance(blockchain: Blockchain, address: Address): Promise<bigint> {
+  return (await blockchain.getContract(address)).balance;
+}
+
+function inboundValue(tx: any): bigint {
+  const info = tx?.inMessage?.info;
+  if (info?.type !== 'internal') throw new Error('missing inbound internal value');
+  return info.value.coins;
 }
 
 async function deployAthWallet(
@@ -334,6 +345,52 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerConfig()).pricing_frozen).toBe(true);
   });
 
+  it('RT-MSTAB-002: post-freeze controller hash is cleared and privileged genesis calls stay extinct', async () => {
+    const env = await setup();
+    await bindCore(env);
+    await sealOnly(env);
+    await freezePricing(env);
+
+    const frozen = await env.seller.getGetMarketStabilitySellerConfig();
+    expect(frozen.pricing_frozen).toBe(true);
+    expect(frozen.genesis_config_hash).toBe(0n);
+
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'FreezeMarketStabilityPricing',
+      deployment_manifest_hash: MANIFEST_HASH,
+      base_tranche_price_nanotons: BASE_TRANCHE_PRICE,
+      evidence_x1_tranche_quote_nanotons: BASE_TRANCHE_PRICE,
+      pricing_evidence_hash: PRICING_EVIDENCE_HASH + 1n,
+    } as FreezeMarketStabilityPricing);
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindMarketStabilityReserveFunder',
+      deployment_manifest_hash: MANIFEST_HASH,
+      reserve_funder_address: env.attacker.address,
+    } as BindMarketStabilityReserveFunder);
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindMarketStabilityOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: env.attacker.address,
+    } as BindMarketStabilityOfficialAthWallet);
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindMarketStabilityTreasury',
+      deployment_manifest_hash: MANIFEST_HASH,
+      ton_treasury_receiver_address: env.attacker.address,
+    } as BindMarketStabilityTreasury);
+    await env.seller.send(env.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealMarketStabilityGenesis',
+      deployment_manifest_hash: MANIFEST_HASH,
+    } as SealMarketStabilityGenesis);
+
+    const after = await env.seller.getGetMarketStabilitySellerConfig();
+    expect(after.genesis_config_hash).toBe(0n);
+    expect(after.pricing_frozen).toBe(true);
+    expect(after.pricing_evidence_hash).toBe(PRICING_EVIDENCE_HASH);
+    expect(after.reserve_funder_address.equals(env.reserveFunder.address)).toBe(true);
+    expect(after.official_ath_wallet_address.equals(env.officialAthWallet)).toBe(true);
+    expect(after.ton_treasury_receiver_address.equals(env.treasury.address)).toBe(true);
+  });
+
   it('MSTAB-02: sells only at the current tranche floor, advances x2 to x3, and flushes TON to treasury', async () => {
     const env = await setup();
     await bindFreezeSeal(env);
@@ -407,7 +464,7 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerTotals()).treasury_flushed_ton_total).toBe(x2Price);
   });
 
-  it('MSTAB-02B: failed ATH delivery restores reserve and refunds buyer principal', async () => {
+  it('RT-MSTAB-004/MSTAB-02B: failed ATH delivery restores reserve, refunds buyer principal, and preserves treasury backing', async () => {
     const env = await setup();
     await bindFreezeSeal(env);
     await fundReserve(env, TRANCHE);
@@ -473,6 +530,66 @@ describe('MarketStabilitySeller', () => {
     expect(state.last_terminal_query_id).toBe(2n);
     expect(totals.sold_ath_total).toBe(TRANCHE);
     expect((await successRecipientWallet.getGetWalletData()).balance).toBe(TRANCHE);
+  });
+
+  it('RT-MSTAB-004B: failed delivery leaves existing treasury due raw-backed while refunding only the failed buyer payment', async () => {
+    const env = await setup();
+    await bindFreezeSeal(env);
+    await fundReserve(env, TRANCHE);
+
+    const officialWallet = await officialSellerAthWallet(env);
+    const firstAmount = 1n;
+    const firstPrice = await env.seller.getGetQuoteTonForAmount(firstAmount);
+    await env.seller.send(env.buyer.getSender(), { value: firstPrice + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 1n,
+      amount: firstAmount,
+      recipient: env.recipient.address,
+    } as BuyMarketStabilityAth);
+
+    const treasuryDueBeforeFailure = (await env.seller.getGetMarketStabilitySellerState()).treasury_due_ton;
+    const soldBeforeFailure = (await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total;
+    const officialBeforeFailure = (await officialWallet.getGetWalletData()).balance;
+    expect(treasuryDueBeforeFailure).toBe(firstPrice);
+    expect(soldBeforeFailure).toBe(firstAmount);
+
+    const failingAmount = TRANCHE - firstAmount;
+    const failingRecipientOwner = env.attacker.address;
+    const failingRecipientWalletAddress = await athWalletAddress(failingRecipientOwner, env.athMaster);
+    const failingRecipientWallet = await deployWrongMasterAthWalletAt(
+      env.blockchain,
+      failingRecipientWalletAddress,
+      failingRecipientOwner,
+      env.athMaster,
+      fixtureAddress('ATH_MASTER_REJECTING_SECOND_RECIPIENT'),
+      77n,
+    );
+    const recipientBefore = (await failingRecipientWallet.getGetWalletData()).balance;
+    const failingPrice = await env.seller.getGetQuoteTonForAmount(failingAmount);
+    const result = await env.seller.send(env.buyer.getSender(), { value: failingPrice + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
+      $$type: 'BuyMarketStabilityAth',
+      query_id: 2n,
+      amount: failingAmount,
+      recipient: failingRecipientOwner,
+    } as BuyMarketStabilityAth);
+
+    const refundTx = findTransaction(result.transactions, {
+      from: env.seller.address,
+      to: env.buyer.address,
+      success: true,
+    });
+    expect(refundTx).toBeDefined();
+    expect(inboundValue(refundTx)).toBe(failingPrice);
+
+    const state = await env.seller.getGetMarketStabilitySellerState();
+    const totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.phase).toBe(0n);
+    expect(state.treasury_due_ton).toBe(treasuryDueBeforeFailure);
+    expect(state.reserve_due_ath).toBe(TRANCHE - firstAmount);
+    expect(totals.sold_ath_total).toBe(soldBeforeFailure);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(officialBeforeFailure);
+    expect((await failingRecipientWallet.getGetWalletData()).balance).toBe(recipientBefore);
+    expect(await contractBalance(env.blockchain, env.seller.address)).toBeGreaterThanOrEqual(treasuryDueBeforeFailure);
   });
 
   it('MSTAB-02C: accepted transfer request without ATHWallet callback leaves sale pending and blocks new sales', async () => {
@@ -620,16 +737,18 @@ describe('MarketStabilitySeller', () => {
     expect((await env.seller.getGetMarketStabilitySellerTotals()).sold_ath_total).toBe(0n);
   });
 
-  it('MSTAB-06: sells through the x21 tranche and rejects post-sellout buys', async () => {
+  it('RT-MSTAB-003/MSTAB-06: sells through x21, accounts exact treasury sum, flushes all, and rejects post-sellout buys', async () => {
     const env = await setup();
     await bindFreezeSeal(env);
     await fundReserve(env, TOTAL_RESERVE);
+    let expectedTreasuryDue = 0n;
 
     for (let i = 0; i < 20; i += 1) {
       const queryId = BigInt(i + 1);
       const multiplier = BigInt(i + 2);
       const price = await env.seller.getGetQuoteTonForAmount(TRANCHE);
       expect(price).toBe(BASE_TRANCHE_PRICE * multiplier);
+      expectedTreasuryDue += price;
       const recipient = fixtureAddress(`SELLOUT_RECIPIENT_${i}`);
       await env.seller.send(env.buyer.getSender(), { value: price + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
         $$type: 'BuyMarketStabilityAth',
@@ -643,7 +762,11 @@ describe('MarketStabilitySeller', () => {
     let totals = await env.seller.getGetMarketStabilitySellerTotals();
     expect(state.reserve_due_ath).toBe(0n);
     expect(state.completed_tranche_count).toBe(20n);
+    expect(state.treasury_due_ton).toBe(expectedTreasuryDue);
+    expect(expectedTreasuryDue).toBe(BASE_TRANCHE_PRICE * 230n);
     expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
+    expect(totals.treasury_flushed_ton_total).toBe(0n);
+    expect((await (await officialSellerAthWallet(env)).getGetWalletData()).balance).toBe(0n);
 
     await env.seller.send(env.buyer.getSender(), { value: BASE_TRANCHE_PRICE * 22n + BUY_TRANSFER_REQUEST_VALUE + BUY_EXEC_RESERVE }, {
       $$type: 'BuyMarketStabilityAth',
@@ -655,7 +778,27 @@ describe('MarketStabilitySeller', () => {
     state = await env.seller.getGetMarketStabilitySellerState();
     totals = await env.seller.getGetMarketStabilitySellerTotals();
     expect(state.reserve_due_ath).toBe(0n);
+    expect(state.treasury_due_ton).toBe(expectedTreasuryDue);
     expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
     expect(state.last_terminal_query_id).toBe(20n);
+
+    const flush = await env.seller.send(env.flusher.getSender(), { value: toNano('0.01') }, {
+      $$type: 'FlushMarketStabilityTreasuryTon',
+      amount: expectedTreasuryDue,
+    } as FlushMarketStabilityTreasuryTon);
+    const treasuryTx = findTransaction(flush.transactions, {
+      from: env.seller.address,
+      to: env.treasury.address,
+      success: true,
+    });
+    expect(treasuryTx).toBeDefined();
+    expect(inboundValue(treasuryTx)).toBe(expectedTreasuryDue);
+
+    state = await env.seller.getGetMarketStabilitySellerState();
+    totals = await env.seller.getGetMarketStabilitySellerTotals();
+    expect(state.reserve_due_ath).toBe(0n);
+    expect(state.treasury_due_ton).toBe(0n);
+    expect(totals.sold_ath_total).toBe(TOTAL_RESERVE);
+    expect(totals.treasury_flushed_ton_total).toBe(expectedTreasuryDue);
   });
 });

@@ -11,11 +11,31 @@ const OFFICIAL_ATH_WALLET_KEYS = [
   'profile_registry_official_ath_wallet',
 ];
 
+const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
+
 function readJson(path: string): any {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 describe('mainnet transaction dry-run packet', () => {
+  it('H-DEP-DRYRUN-00: generated local packet is a production-only pre-execution template', () => {
+    if (!existsSync('artifacts/local/mainnet_tx_dry_run_packet.json')) return;
+
+    const packet = readJson('artifacts/local/mainnet_tx_dry_run_packet.json');
+    const deployedTargets = (packet.deploy_contracts ?? []).map((step: any) => [
+      step.id,
+      step.action,
+      step.contract,
+      step.message,
+    ].filter(Boolean).join(' '));
+
+    expect(packet.production_deploy_executed).toBe(false);
+    expect(packet.lifecycle_stage).toBe('pre_execution_tx_dry_run_template');
+    expect(packet.lifecycle_note).toMatch(/pre-execution template/);
+    expect(packet.lifecycle_note).toMatch(/mainnet_genesis_verify_report\.json/);
+    expect(deployedTargets).not.toEqual(expect.arrayContaining([expect.stringMatching(TEST_DEPLOY_TARGET_RE)]));
+  });
+
   it('H-DEP-DRYRUN-01: script derives every official ATHWallet StateInit used by final genesis', () => {
     const script = readFileSync('scripts/mainnet_tx_dry_run_packet.ts', 'utf8');
 
@@ -44,5 +64,16 @@ describe('mainnet transaction dry-run packet', () => {
       expect(walletStateInits[key]?.owner_address).toMatch(/^UQ/);
       expect(walletStateInits[key]?.state_init?.cell_hash_hex).toBe(draft.manifest.state_init_hashes[key]);
     }
+  });
+
+  it('H-DEP-DRYRUN-03: Tonkeeper console live preflight allows safe deploy resume only for expected targets', () => {
+    const script = readFileSync('scripts/mainnet_tonkeeper_console.mjs', 'utf8');
+
+    expect(script).toContain('const ok = clean || expectedActive;');
+    expect(script).toContain('active with expected deploy code/state; resume allowed');
+    expect(script).toContain('active target has unexpected deploy code/state');
+    expect(script).toContain('All deploy targets are fresh.');
+    expect(script).toContain('LIVE_PREFLIGHT_RESUME');
+    expect(script).toContain('LIVE_PREFLIGHT_DEPLOYED');
   });
 });

@@ -10,6 +10,7 @@ import {
   addressRaw,
   buildStonfiTonToJettonTxParamsV21,
   cellBocBase64,
+  cellHashHex,
   createBuybackRouteNotifyPayload,
   deterministicAddress,
   PLATHO_BUYBACK_STONFI_M19B,
@@ -70,6 +71,8 @@ function completeInput(overrides: Partial<M20FStonfiLiveCollectorInput> = {}): M
       stonfiApiSimulationCapture: 'sha256:stonfi-api-simulation-mainnet',
       stonfiSdkOrApiTxParamsCapture: 'sha256:stonfi-sdk-txparams-mainnet',
       routerPoolPtonCodeHashes: 'sha256:router-pool-pton-codehashes-mainnet',
+      athNotificationQueryIdPropagationProof: 'tx:ath-notification-query-id-propagation-mainnet',
+      refundExcessBodyShapeProof: 'tx:refund-excess-body-shape-mainnet',
       successExcessProof: 'tx:success-excess-mainnet',
       minOutFailureRefundProof: 'tx:minout-refund-mainnet',
       ptonRefundProof: 'tx:pton-refund-mainnet',
@@ -214,6 +217,29 @@ describe('M20F STON.fi live collector', () => {
     expect(report.issue_codes).toContain('NON_BASECHAIN_ADDRESS_STONFIATHSOURCEOWNERADDRESS');
   });
 
+  it('RT-BUY-001/RT-BUY-002: refuses final collection without query_id and body-shape proofs', async () => {
+    let called = false;
+    const input = completeInput({
+      proofRefs: {
+        ...completeInput().proofRefs,
+        athNotificationQueryIdPropagationProof: 'required: query_id propagation proof',
+        refundExcessBodyShapeProof: 'required: refund/excess body shape proof',
+      },
+    });
+    const report = await collectM20FStonfiLiveEvidence(input, {
+      capturedAt: () => 'TEST_TIME',
+      simulateSwap: async () => {
+        called = true;
+        return simulationFor(input);
+      },
+    });
+
+    expect(called).toBe(false);
+    expect(report.status).toBe('BLOCKED_INPUT_NOT_READY');
+    expect(report.issue_codes).toContain('MISSING_PROOF_REF_ATHNOTIFICATIONQUERYIDPROPAGATIONPROOF');
+    expect(report.issue_codes).toContain('MISSING_PROOF_REF_REFUNDEXCESSBODYSHAPEPROOF');
+  });
+
   it('builds M19E input from STON.fi simulation and official tx params while preserving BuybackBurn refund/excess receivers', async () => {
     const input = completeInput();
     const report = await collectM20FStonfiLiveEvidence(input, {
@@ -236,6 +262,44 @@ describe('M20F STON.fi live collector', () => {
     expect(report.decoded?.stonfiSwapPayload?.details.dexCustomPayloadForwardGasAmount).toBe(PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS.toString());
     expect(report.decoded?.stonfiSwapPayload?.details.hasDexCustomPayload).toBe(true);
     expect(report.m19eReport?.route_freeze_ready).toBe(true);
+  });
+
+  it('RT-BROUTE-DL-002: routerAddress is evidence-only; pTON wallet remains the tx target and body authority', () => {
+    const input = completeInput();
+    const simulation = simulationFor(input);
+    const buyback = Address.parse(input.addresses.buybackBurnAddress);
+    const officialWallet = Address.parse(input.addresses.buybackBurnOfficialAthWalletAddress);
+    const askWallet = Address.parse(simulation.askJettonWallet);
+    const ptonWallet = Address.parse(simulation.router.ptonWalletAddress);
+    const common = {
+      queryId: input.routeControls.queryId,
+      offerAmount: PLATHO_BUYBACK_STONFI_M19B.BUYBACK_OFFER_AMOUNT,
+      minAskAmount: simulation.minAskUnits,
+      ptonWalletAddress: ptonWallet,
+      askJettonWalletAddress: askWallet,
+      receiverAddress: officialWallet,
+      refundAddress: buyback,
+      excessesAddress: buyback,
+      deadline: BigInt(input.routeControls.deadline),
+      forwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_ROUTE_FORWARD_GAS,
+      dexCustomPayloadForwardGasAmount: PLATHO_BUYBACK_STONFI_M19B.ROUTE_ATH_NOTIFY_FORWARD_GAS,
+      dexCustomPayload: createBuybackRouteNotifyPayload(input.routeControls.queryId),
+      ptonTonTransferGas: PLATHO_BUYBACK_STONFI_M19B.CONSERVATIVE_PTON_TRANSFER_GAS,
+    };
+
+    const withPinnedRouter = buildStonfiTonToJettonTxParamsV21({
+      ...common,
+      routerAddress: simulation.router.address,
+    });
+    const withDifferentRouter = buildStonfiTonToJettonTxParamsV21({
+      ...common,
+      routerAddress: addr('differentRouter'),
+    });
+
+    expect(addressRaw(withPinnedRouter.to)).toBe(addressRaw(ptonWallet));
+    expect(addressRaw(withDifferentRouter.to)).toBe(addressRaw(ptonWallet));
+    expect(cellHashHex(withDifferentRouter.body)).toBe(cellHashHex(withPinnedRouter.body));
+    expect(cellHashHex(withDifferentRouter.forwardPayload)).toBe(cellHashHex(withPinnedRouter.forwardPayload));
   });
 
   it('blocks an API-selected router that is not the currently pinned v2.1 route', async () => {

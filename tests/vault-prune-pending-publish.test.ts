@@ -157,11 +157,13 @@ function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigin
   const signedPayload = beginCell()
     .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(GENESIS_HASH, 256)
-    .storeAddress(vaultAddress)
+    .storeUint(addressHash(vaultAddress), 256)
     .storeUint(KIND_PUBLIC, 8)
-    .storeAddress(owner)
+    .storeUint(addressHash(owner), 256)
     .storeUint(nonce, 64)
     .storeUint(maxCharge, 128)
+    .storeUint(SIZE_STANDARD, 8)
+    .storeUint(SUITE_PUBLIC_NONE, 8)
     .storeRef(payload)
     .endCell();
   return beginCell()
@@ -201,7 +203,7 @@ async function createPendingPublicPublish() {
 }
 
 describe('Vault milestone 14: stale PendingPublish prune', () => {
-  it('VAULT-M14-01: stale PendingPublish prune keeps tombstone so late ACK refunds and credits airdrop', async () => {
+  it('VAULT-M14-01/RT-VCAPS-003: stale PendingPublish prune late ACK credits once only', async () => {
     const ctx = await createPendingPublish();
     const afterPendingUser = await ctx.vault.getGetUser(ctx.user.address);
     const beforePruneGlobal = await ctx.vault.getGetGlobal();
@@ -238,6 +240,19 @@ describe('Vault milestone 14: stale PendingPublish prune', () => {
     expect(afterLateAckGlobal.pending_publish_count).toBe(0n);
     expect(afterLateAckUser.ath_balance).toBe(afterPendingUser.ath_balance + VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH);
     expect(afterLateAckGlobal.airdrop_remaining_ath).toBe(beforePruneGlobal.airdrop_remaining_ath - VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH);
+
+    await ctx.vault.send(ctx.capsuleHub.getSender(), { value: toNano('0.01') }, {
+      $$type: 'CapsuleHubPublishAck',
+      publish_id: ctx.publishId,
+      entry_id: 1n,
+      entry_uid: 0xaaaabbbbccccddddn,
+    } as CapsuleHubPublishAck);
+
+    const afterDuplicateAckUser = await ctx.vault.getGetUser(ctx.user.address);
+    const afterDuplicateAckGlobal = await ctx.vault.getGetGlobal();
+    expect(afterDuplicateAckGlobal.pending_publish_count).toBe(0n);
+    expect(afterDuplicateAckUser.ath_balance).toBe(afterLateAckUser.ath_balance);
+    expect(afterDuplicateAckGlobal.airdrop_remaining_ath).toBe(afterLateAckGlobal.airdrop_remaining_ath);
   });
 
   it('VAULT-M14-02: non-stale PendingPublish cannot be pruned and remains pending', async () => {

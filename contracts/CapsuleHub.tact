@@ -11,7 +11,6 @@ const SIZE_CLASS_4K: Int = 4;
 const SIZE_CLASS_8K: Int = 8;
 const SIZE_CLASS_16K: Int = 16;
 const SIZE_CLASS_32K: Int = 32;
-const SIZE_CLASS_STANDARD: Int = SIZE_CLASS_1K;
 const CRYPTO_SUITE_HYBRID: Int = 2;
 
 const CAPSULEHUB_INDEX_STORAGE_YEARS: Int = 1;
@@ -23,7 +22,12 @@ const CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE: Int = 4500000;
 const CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE: Int = 5000000;
 const CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE: Int = 5800000;
 const CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE: Int = 7600000;
-const CAPSULEHUB_PUBLIC_EXEC_RESERVE: Int = 2400000;
+const CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE: Int = 2400000;
+const CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE: Int = 4300000;
+const CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE: Int = 4500000;
+const CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE: Int = 5000000;
+const CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE: Int = 5800000;
+const CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE: Int = 7600000;
 const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
 const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 7400000;
@@ -47,9 +51,6 @@ const CAPSULEHUB_PRIVATE_HYBRID_BODY_OVERHEAD_BYTES: Int = 1204;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576; // 72 bytes
 const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
-const CAPSULEHUB_PUBLIC_BODY_MAX_BITS: Int = 8192; // 1024 bytes
-const CAPSULEHUB_PUBLIC_BODY_MAX_CELLS: Int = 9;
-const CAPSULEHUB_PUBLIC_BODY_MAX_REFS: Int = 8;
 
 
 const ENTRY_UID_DOMAIN_VAULT_PRIVATE: Int = 0xD1190201;
@@ -86,6 +87,7 @@ message(0x8C2A76B7) PublishPublicFromVault {
     bounce_id: Int as uint64;
     bounce_tag: Int as uint160;
     publish_id: Int as uint256;
+    size_class: Int as uint8;
     marketing_note: Int as uint152;
     author_wallet: Address;
     header_hash: Int as uint256;
@@ -160,6 +162,8 @@ struct PrivateCapsuleEntry {
     publish_id: Int as uint256;
     created_at: Int as uint32;
     body_hash: Int as uint256;
+    sender_prev_link: Int as uint64;
+    recipient_prev_link: Int as uint64;
     header_0: Cell;
     header_1: Cell;
 }
@@ -175,6 +179,8 @@ struct PublicCapsuleEntry {
 struct PrivateCapsuleEntryView {
     exists: Bool;
     entry_id: Int;
+    sender_prev_link: Int;
+    recipient_prev_link: Int;
     entry_uid: Int;
     publish_id: Int;
     author_wallet: Address;
@@ -186,6 +192,19 @@ struct PrivateCapsuleEntryView {
     body_hash: Int;
     header_0: Cell;
     header_1: Cell;
+}
+
+struct PrivateCapsuleKeyIndex {
+    latest_entry_link: Int as uint64;
+    entry_count: Int as uint64;
+}
+
+struct PrivateCapsuleKeyIndexView {
+    exists: Bool;
+    key_id: Int;
+    latest_entry_id: Int;
+    latest_entry_link: Int;
+    entry_count: Int;
 }
 
 struct PublicCapsuleEntryView {
@@ -216,6 +235,8 @@ contract CapsuleHub {
     accrued_plato_fee_ton: Int as uint128;
     private_entries: map<Int as uint64, PrivateCapsuleEntry>;
     public_entries: map<Int as uint64, PublicCapsuleEntry>;
+    private_sender_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
+    private_recipient_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
 
     init(fee_accumulator_address: Address, vault_address: Address, vault_bound: Bool, sealed: Bool, deployment_manifest_hash: Int, genesis_controller_address: Address) {
         self.fee_accumulator_address = fee_accumulator_address;
@@ -231,6 +252,8 @@ contract CapsuleHub {
         self.accrued_plato_fee_ton = 0;
         self.private_entries = emptyMap();
         self.public_entries = emptyMap();
+        self.private_sender_index = emptyMap();
+        self.private_recipient_index = emptyMap();
     }
 
     fun requireSealed() {
@@ -259,6 +282,10 @@ contract CapsuleHub {
             || sizeClass == SIZE_CLASS_32K;
     }
 
+    fun isAllowedPublicSizeClass(sizeClass: Int): Bool {
+        return self.isAllowedPrivateSizeClass(sizeClass);
+    }
+
     fun privateFullFee(cryptoSuite: Int): Int {
         if (cryptoSuite == CRYPTO_SUITE_HYBRID) {
             return PLATO_PRIVATE_LONG_TERM_FEE_TON;
@@ -275,6 +302,16 @@ contract CapsuleHub {
         if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE; }
         if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE; }
         return CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE;
+    }
+
+    fun publicExecReserve(sizeClass: Int): Int {
+        throwUnless(12949, self.isAllowedPublicSizeClass(sizeClass));
+        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE; }
+        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE; }
+        return CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE;
     }
 
     fun privateIndexStorageReservePerEntry(): Int {
@@ -316,15 +353,32 @@ contract CapsuleHub {
         }
     }
 
-    fun requirePublicPayloadCell(cell: Cell, expectedHash: Int, hashExit: Int, sizeExit: Int) {
+    fun publicBodyBytes(sizeClass: Int): Int {
+        throwUnless(12950, self.isAllowedPublicSizeClass(sizeClass));
+        return sizeClass * 1024;
+    }
+
+    fun publicBodyBits(sizeClass: Int): Int {
+        return self.publicBodyBytes(sizeClass) * 8;
+    }
+
+    fun publicBodyCells(sizeClass: Int): Int {
+        return (self.publicBodyBytes(sizeClass) + 126) / 127;
+    }
+
+    fun publicBodyRefs(sizeClass: Int): Int {
+        return self.publicBodyCells(sizeClass) - 1;
+    }
+
+    fun requirePublicPayloadCell(cell: Cell, expectedHash: Int, sizeClass: Int, hashExit: Int, sizeExit: Int) {
         throwUnless(hashExit, cell.hash() == expectedHash);
         try {
-            let size: DataSize = cell.computeDataSize(CAPSULEHUB_PUBLIC_BODY_MAX_CELLS);
-            throwUnless(sizeExit, size.cells <= CAPSULEHUB_PUBLIC_BODY_MAX_CELLS);
+            let size: DataSize = cell.computeDataSize(self.publicBodyCells(sizeClass));
+            throwUnless(sizeExit, size.cells <= self.publicBodyCells(sizeClass));
             throwUnless(sizeExit, size.bits > 0);
-            throwUnless(sizeExit, size.bits <= CAPSULEHUB_PUBLIC_BODY_MAX_BITS);
+            throwUnless(sizeExit, size.bits <= self.publicBodyBits(sizeClass));
             throwUnless(sizeExit, size.bits % 8 == 0);
-            throwUnless(sizeExit, size.refs <= CAPSULEHUB_PUBLIC_BODY_MAX_REFS);
+            throwUnless(sizeExit, size.refs <= self.publicBodyRefs(sizeClass));
         } catch (exitCode) {
             throw(sizeExit);
         }
@@ -378,10 +432,6 @@ contract CapsuleHub {
         return entryId % CAPSULEHUB_PAGE_SIZE;
     }
 
-    fun needsNewPage(entryId: Int): Bool {
-        return self.pageOffset(entryId) == 0;
-    }
-
     fun pageCount(latestId: Int): Int {
         if (latestId == 0) {
             return 0;
@@ -410,6 +460,97 @@ contract CapsuleHub {
             return 0;
         }
         return self.pageNextEntryId(pageId, latestId) - self.pageFirstEntryId(pageId);
+    }
+
+    fun entryLink(entryId: Int): Int {
+        return entryId + 1;
+    }
+
+    fun entryIdFromLink(entryLink: Int): Int {
+        return entryLink - 1;
+    }
+
+    fun privateHeaderSenderKeyId(header0: Cell): Int {
+        let header: Slice = header0.beginParse();
+        header.loadUint(64);
+        return header.loadUint(256);
+    }
+
+    fun privateHeaderRecipientKeyId(header0: Cell): Int {
+        let header: Slice = header0.beginParse();
+        header.loadUint(64);
+        header.loadUint(256);
+        return header.loadUint(256);
+    }
+
+    fun pushPrivateSenderIndex(keyId: Int, entryLink: Int): Int {
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_sender_index.get(keyId);
+        let prevLink: Int = 0;
+        let count: Int = 0;
+        if (indexOpt != null) {
+            let index: PrivateCapsuleKeyIndex = indexOpt!!;
+            prevLink = index.latest_entry_link;
+            count = index.entry_count;
+        }
+        self.private_sender_index.set(keyId, PrivateCapsuleKeyIndex {
+            latest_entry_link: entryLink,
+            entry_count: count + 1
+        });
+        return prevLink;
+    }
+
+    fun pushPrivateRecipientIndex(keyId: Int, entryLink: Int): Int {
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_recipient_index.get(keyId);
+        let prevLink: Int = 0;
+        let count: Int = 0;
+        if (indexOpt != null) {
+            let index: PrivateCapsuleKeyIndex = indexOpt!!;
+            prevLink = index.latest_entry_link;
+            count = index.entry_count;
+        }
+        self.private_recipient_index.set(keyId, PrivateCapsuleKeyIndex {
+            latest_entry_link: entryLink,
+            entry_count: count + 1
+        });
+        return prevLink;
+    }
+
+    fun prunePrivateSenderIndex(keyId: Int, entryLink: Int, prevLink: Int) {
+        // Private key indexes are retained-history hints. Pruning an expired middle entry can truncate older expired tail traversal; archive recovery should use page/body-history scans.
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_sender_index.get(keyId);
+        if (indexOpt != null) {
+            let index: PrivateCapsuleKeyIndex = indexOpt!!;
+            if (index.latest_entry_link == entryLink) {
+                index.latest_entry_link = prevLink;
+            }
+            if (index.entry_count > 0) {
+                index.entry_count -= 1;
+            }
+            if (index.entry_count == 0) {
+                self.private_sender_index.del(keyId);
+            } else {
+                self.private_sender_index.set(keyId, index);
+            }
+        }
+    }
+
+    fun prunePrivateRecipientIndex(keyId: Int, entryLink: Int, prevLink: Int) {
+        // Same retained-history contract as sender index: do not spend gas rewiring middle links beyond the pruned expired entry.
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_recipient_index.get(keyId);
+        if (indexOpt != null) {
+            let index: PrivateCapsuleKeyIndex = indexOpt!!;
+            if (index.latest_entry_link == entryLink) {
+                index.latest_entry_link = prevLink;
+            }
+            if (index.entry_count > 0) {
+                index.entry_count -= 1;
+            }
+            if (index.entry_count == 0) {
+                self.private_recipient_index.del(keyId);
+            } else {
+                self.private_recipient_index.set(keyId, index);
+            }
+        }
     }
 
     fun computeVaultPrivateEntryUid(entryId: Int, publishId: Int, header0: Int, header1: Int, bodyHash: Int): Int {
@@ -475,6 +616,7 @@ contract CapsuleHub {
         throwUnless(13304, msg.header_0_hash != 0);
         throwUnless(13305, msg.header_1_hash != 0);
         throwUnless(13306, msg.body_hash != 0);
+        // CapsuleHub enforces immutable cell shape and hashes; encrypted payload semantics are verified fail-closed by the PWA/RPC crypto layer.
         self.requireExactPayloadCell(msg.header_0, msg.header_0_hash, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13311, 13312);
         self.requireExactPayloadCell(msg.header_1, msg.header_1_hash, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13313, 13314);
         self.requireExactPayloadCell(msg.body, msg.body_hash, self.privateBodyCells(msg.size_class, msg.crypto_suite), self.privateBodyBits(msg.size_class, msg.crypto_suite), self.privateBodyRefs(msg.size_class, msg.crypto_suite), 13315, 13316);
@@ -489,11 +631,18 @@ contract CapsuleHub {
         throwUnless(13310, context().value >= required);
         let ackValue: Int = CAPSULEHUB_ACK_FORWARD_RESERVE;
 
+        let entryLink: Int = self.entryLink(entryId);
+        let senderKeyId: Int = self.privateHeaderSenderKeyId(msg.header_0);
+        let recipientKeyId: Int = self.privateHeaderRecipientKeyId(msg.header_0);
+        let senderPrevLink: Int = self.pushPrivateSenderIndex(senderKeyId, entryLink);
+        let recipientPrevLink: Int = self.pushPrivateRecipientIndex(recipientKeyId, entryLink);
         let uid: Int = self.computeVaultPrivateEntryUid(entryId, msg.publish_id, msg.header_0_hash, msg.header_1_hash, msg.body_hash);
         self.private_entries.set(entryId, PrivateCapsuleEntry {
             publish_id: msg.publish_id,
             created_at: now(),
             body_hash: msg.body_hash,
+            sender_prev_link: senderPrevLink,
+            recipient_prev_link: recipientPrevLink,
             header_0: msg.header_0,
             header_1: msg.header_1
         });
@@ -516,16 +665,18 @@ contract CapsuleHub {
         throwUnless(13400, sender() == self.vault_address);
         throwUnless(13401, self.public_latest_id < 18446744073709551615);
         throwUnless(13402, msg.publish_id != 0);
+        throwUnless(13413, self.isAllowedPublicSizeClass(msg.size_class));
         throwUnless(13407, msg.marketing_note == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
         throwUnless(13410, msg.header_hash != 0);
         throwUnless(13403, msg.body_hash != 0);
+        // Public semantic fields stay in the PWA/provider layer; the contract keeps gas bounded with byte alignment, refs, size, and hash truth.
         self.requirePublicHeaderCell(msg.header, msg.header_hash, 13411, 13412);
-        self.requirePublicPayloadCell(msg.body, msg.body_hash, 13408, 13409);
+        self.requirePublicPayloadCell(msg.body, msg.body_hash, msg.size_class, 13408, 13409);
         throwUnless(13404, msg.protocol_fee_paid >= 0);
         throwUnless(13405, msg.protocol_fee_paid <= PLATO_PUBLIC_POST_FEE_TON);
 
         let entryId: Int = self.public_latest_id;
-        let required: Int = msg.protocol_fee_paid + CAPSULEHUB_PUBLIC_EXEC_RESERVE + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT + CAPSULEHUB_ACK_FORWARD_RESERVE;
+        let required: Int = msg.protocol_fee_paid + self.publicExecReserve(msg.size_class) + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT + CAPSULEHUB_ACK_FORWARD_RESERVE;
         throwUnless(13406, context().value >= required);
         let ackValue: Int = CAPSULEHUB_ACK_FORWARD_RESERVE;
 
@@ -557,6 +708,8 @@ contract CapsuleHub {
         throwUnless(13201, msg.amount <= self.accrued_plato_fee_ton);
         throwUnless(13205, msg.amount >= CAPSULEHUB_MIN_FEE_FLUSH_TON || msg.amount == self.accrued_plato_fee_ton);
         throwUnless(13202, context().value >= CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE + CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE);
+        let effectiveBalance: Int = myBalance() - context().value;
+        throwUnless(13206, effectiveBalance >= self.protectedReserve());
 
         self.accrued_plato_fee_ton -= msg.amount;
 
@@ -573,6 +726,7 @@ contract CapsuleHub {
         self.requireSealed();
         throwUnless(13203, sender() == self.fee_accumulator_address);
         throwUnless(13204, msg.amount > 0);
+        // Flush bounces restore debited accrued fees; reserve-sweep bounces reclassify returned excess as backed accrued due for the normal flush path.
         self.accrued_plato_fee_ton += msg.amount;
     }
 
@@ -610,6 +764,11 @@ contract CapsuleHub {
             let entry: PrivateCapsuleEntry = entryOpt!!;
             throwUnless(13501, entry.publish_id == msg.publish_id);
             throwUnless(13502, now() >= entry.created_at + CAPSULEHUB_INDEX_RETENTION_SECONDS);
+            let entryLink: Int = self.entryLink(msg.entry_id);
+            let senderKeyId: Int = self.privateHeaderSenderKeyId(entry.header_0);
+            let recipientKeyId: Int = self.privateHeaderRecipientKeyId(entry.header_0);
+            self.prunePrivateSenderIndex(senderKeyId, entryLink, entry.sender_prev_link);
+            self.prunePrivateRecipientIndex(recipientKeyId, entryLink, entry.recipient_prev_link);
             self.private_entries.del(msg.entry_id);
             self.private_live_count -= 1;
         } else {
@@ -633,6 +792,8 @@ contract CapsuleHub {
             return PrivateCapsuleEntryView {
                 exists: false,
                 entry_id: entryId,
+                sender_prev_link: 0,
+                recipient_prev_link: 0,
                 entry_uid: 0,
                 publish_id: 0,
                 author_wallet: myAddress(),
@@ -652,6 +813,8 @@ contract CapsuleHub {
         return PrivateCapsuleEntryView {
             exists: true,
             entry_id: entryId,
+            sender_prev_link: entry.sender_prev_link,
+            recipient_prev_link: entry.recipient_prev_link,
             entry_uid: self.computeVaultPrivateEntryUid(entryId, entry.publish_id, header0Hash, header1Hash, entry.body_hash),
             publish_id: entry.publish_id,
             author_wallet: self.vault_address,
@@ -663,6 +826,48 @@ contract CapsuleHub {
             body_hash: entry.body_hash,
             header_0: entry.header_0,
             header_1: entry.header_1
+        };
+    }
+
+    get fun get_private_sender_index(keyId: Int): PrivateCapsuleKeyIndexView {
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_sender_index.get(keyId);
+        if (indexOpt == null) {
+            return PrivateCapsuleKeyIndexView {
+                exists: false,
+                key_id: keyId,
+                latest_entry_id: 0,
+                latest_entry_link: 0,
+                entry_count: 0
+            };
+        }
+        let index: PrivateCapsuleKeyIndex = indexOpt!!;
+        return PrivateCapsuleKeyIndexView {
+            exists: true,
+            key_id: keyId,
+            latest_entry_id: self.entryIdFromLink(index.latest_entry_link),
+            latest_entry_link: index.latest_entry_link,
+            entry_count: index.entry_count
+        };
+    }
+
+    get fun get_private_recipient_index(keyId: Int): PrivateCapsuleKeyIndexView {
+        let indexOpt: PrivateCapsuleKeyIndex? = self.private_recipient_index.get(keyId);
+        if (indexOpt == null) {
+            return PrivateCapsuleKeyIndexView {
+                exists: false,
+                key_id: keyId,
+                latest_entry_id: 0,
+                latest_entry_link: 0,
+                entry_count: 0
+            };
+        }
+        let index: PrivateCapsuleKeyIndex = indexOpt!!;
+        return PrivateCapsuleKeyIndexView {
+            exists: true,
+            key_id: keyId,
+            latest_entry_id: self.entryIdFromLink(index.latest_entry_link),
+            latest_entry_link: index.latest_entry_link,
+            entry_count: index.entry_count
         };
     }
 

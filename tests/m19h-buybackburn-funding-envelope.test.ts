@@ -116,6 +116,19 @@ describe('M19H BuybackBurn funding envelope profile', () => {
     expect(profile.values.feeAccumulatorFlushAmountNanotons).toBe(toNano('51.05').toString());
   });
 
+  it('RT-FB-002: FeeAccumulator and BuybackBurn pin the same AcceptBurnReserve execution reserve', () => {
+    const feeAccumulatorSource = readFileSync(join(process.cwd(), 'contracts/FeeAccumulator.tact'), 'utf8');
+    const buybackBurnSource = readFileSync(join(process.cwd(), 'contracts/BuybackBurn.tact'), 'utf8');
+
+    const feeAccumulatorReserve = feeAccumulatorSource.match(/const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = (\d+);/)?.[1];
+    const buybackBurnReserve = buybackBurnSource.match(/const BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE: Int = (\d+);/)?.[1];
+
+    expect(feeAccumulatorReserve).toBe('2000000');
+    expect(buybackBurnReserve).toBe(feeAccumulatorReserve);
+    expect(feeAccumulatorSource).toContain('value: msg.amount + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE');
+    expect(buybackBurnSource).toContain('context().value >= msg.amount + BUYBACK_ACCEPT_RESERVE_EXEC_RESERVE');
+  });
+
   it('M19H-05: FeeAccumulator rejects 50 TON offer principal even when buyback_due_ton can fund a full envelope', async () => {
     const buyback = fixtureAddress('BUYBACK_M19H_RAW_50_REJECTED');
     const { fee, capsuleHub, operator, treasury } = await setupFeeAccumulator(buyback);

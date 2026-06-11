@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Address, beginCell, Cell } from '@ton/core';
 import { ed25519 } from '../web/vendor/@noble/curves/ed25519.js';
 import { describe, expect, it } from 'vitest';
@@ -6,14 +7,18 @@ import {
   storeMintUsernameFromVaultBalance,
   storeRegisterMessagingKeys,
   storeSetProfileAvatarFromVaultBalance,
-  storeWithdrawAth,
-  storeWithdrawTon,
 } from '../build/Vault/Vault_Vault';
 import {
   storeATHBurn,
   storeATHTransferRequest,
   storeATHTransferRequestWithNotify,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import {
+  storeFlushProfileBurnAthDue,
+} from '../build/ProfileRegistry/ProfileRegistry_ProfileRegistry';
+import {
+  storeFlushBurnAthDue,
+} from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   ATH_WALLET_RESERVES_NANOTONS,
   PUBLIC_BODY_FLAGS,
@@ -25,28 +30,40 @@ import {
   PROFILE_AVATAR_PRICE_ATH,
   PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS,
   RECEIVE_ASSETS,
+  RECEIVE_INTENT_ID_DOMAIN,
   USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS,
+  VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN,
   VAULT_CRYPTO_SUITE,
   VAULT_PROFILE_AVATAR_SIGNING_DOMAIN,
   VAULT_PUBLISH_KIND,
   VAULT_RECEIVE_INTENT_SIGNING_DOMAIN,
   VAULT_SIZE_CLASS,
+  VAULT_WITHDRAW_ATH_SIGNING_DOMAIN,
+  VAULT_WITHDRAW_TON_SIGNING_DOMAIN,
   VAULT_USERNAME_MINT_SIGNING_DOMAIN,
   buildAthWalletMessageBody,
+  buildProfileRegistryMessageBody,
+  buildUsernameRegistryMessageBody,
   buildVaultBalancePublishBodyCell,
   buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarBodyCell,
   buildVaultProfileAvatarExternalBoc,
   buildVaultReceiveIntentExternalBoc,
   buildVaultReplaceMessagingKeysExternalBoc,
+  buildVaultWithdrawAthExternalBoc,
+  buildVaultWithdrawTonExternalBoc,
   buildVaultUsernameMintBodyCell,
   buildVaultUsernameMintExternalBoc,
+  computeVaultReceiveIntentId,
   buildVaultMessageBody,
   createAthWalletMessage,
+  createProfileRegistryMessage,
   createPublicPostPayload,
+  createUsernameRegistryMessage,
   createWalletTransaction,
   createVaultWalletMessage,
   estimateAthWalletAttachedValueNanotons,
+  REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
   estimateVaultAttachedValueNanotons,
   readPublicPostPayload,
   tonCell,
@@ -87,6 +104,15 @@ function expectReceiveSignedDataEnvelope(cell: any, domain: bigint, owner: strin
   const slice = tonCellToCoreCell(cell).beginParse();
   expect(slice.loadUintBig(32)).toBe(domain);
   expect(slice.loadUintBig(256)).toBe(BigInt(DEPLOYMENT_MANIFEST_HASH));
+  expect(slice.loadUintBig(256)).toBe(addressHashValue(VAULT));
+  expect(slice.loadUintBig(256)).toBe(addressHashValue(owner));
+  return slice;
+}
+
+function expectVaultAddressSignedDataEnvelope(cell: any, domain: bigint, owner: string) {
+  const slice = tonCellToCoreCell(cell).beginParse();
+  expect(slice.loadUintBig(32)).toBe(domain);
+  expect(slice.loadUintBig(256)).toBe(BigInt(DEPLOYMENT_MANIFEST_HASH));
   expect(slice.loadAddress()?.equals(Address.parseRaw(VAULT))).toBe(true);
   expect(slice.loadAddress()?.equals(Address.parseRaw(owner))).toBe(true);
   return slice;
@@ -100,6 +126,32 @@ function expectRegistrySignedDataEnvelope(cell: any, domain: bigint, owner: stri
   slice.loadUintBig(64);
   slice.loadUintBig(128);
   expect(slice.loadAddress()?.equals(Address.parseRaw(VAULT))).toBe(true);
+  return slice;
+}
+
+function addressHashValue(raw: string) {
+  return BigInt(`0x${Address.parseRaw(raw).hash.toString('hex')}`);
+}
+
+function expectPublishSignedDataEnvelope(
+  cell: any,
+  kind: bigint,
+  owner: string,
+  sizeClass: bigint,
+  cryptoSuite: bigint,
+) {
+  const slice = tonCellToCoreCell(cell).beginParse();
+  expect(slice.loadUintBig(32)).toBe(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN);
+  expect(slice.loadUintBig(256)).toBe(BigInt(DEPLOYMENT_MANIFEST_HASH));
+  expect(slice.loadUintBig(256)).toBe(addressHashValue(VAULT));
+  expect(slice.loadUintBig(8)).toBe(kind);
+  expect(slice.loadUintBig(256)).toBe(addressHashValue(owner));
+  slice.loadUintBig(64);
+  slice.loadUintBig(128);
+  expect(slice.loadUintBig(8)).toBe(sizeClass);
+  expect(slice.loadUintBig(8)).toBe(cryptoSuite);
+  expect(slice.remainingBits).toBe(0);
+  expect(slice.remainingRefs).toBe(1);
   return slice;
 }
 
@@ -161,21 +213,6 @@ describe('PWA contract transaction builders', () => {
       storeDepositTon({ $$type: 'DepositTon', amount: 123_000_000n }),
     ],
     [
-      'WithdrawTon',
-      { amount: 44_000_000n, recipient: RECIPIENT },
-      storeWithdrawTon({ $$type: 'WithdrawTon', amount: 44_000_000n, recipient: Address.parseRaw(RECIPIENT) }),
-    ],
-    [
-      'WithdrawAth',
-      { query_id: 77n, amount: 500n, recipient: RECIPIENT },
-      storeWithdrawAth({
-        $$type: 'WithdrawAth',
-        query_id: 77n,
-        amount: 500n,
-        recipient: Address.parseRaw(RECIPIENT),
-      }),
-    ],
-    [
       'RegisterMessagingKeys',
       {
         enc_pubkey: 0x11n,
@@ -201,12 +238,14 @@ describe('PWA contract transaction builders', () => {
     expect(buildVaultMessageBody(type, params)).toBe(generatedBody(store));
   });
 
-  it('PWA-TX-01B: payment checks and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
+  it('PWA-TX-01B: payment checks, TON withdrawal, and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
     const signingSecretKey = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
     expect(() => buildVaultMessageBody('CreateReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('ClaimReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('CancelReceiveIntent', {})).toThrow(/Unsupported Vault message type/);
     expect(() => buildVaultMessageBody('ReplaceMessagingKeys', {})).toThrow(/Unsupported Vault message type/);
+    expect(() => buildVaultMessageBody('WithdrawTonFromVaultBalance', {})).toThrow(/Unsupported Vault message type/);
+    expect(() => buildVaultMessageBody('WithdrawAthFromVaultBalance', {})).toThrow(/Unsupported Vault message type/);
 
     const createExternal = await buildVaultReceiveIntentExternalBoc('CreateReceiveIntent', {
       owner_wallet: OWNER,
@@ -249,12 +288,48 @@ describe('PWA contract transaction builders', () => {
       pq_kem_pubkey: PQ_PUBKEY_BYTES,
       crypto_suite_mask: 2n,
     });
+    const withdrawExternal = await buildVaultWithdrawTonExternalBoc({
+      owner_wallet: OWNER,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
+      signingSecretKey,
+      client_nonce: 13n,
+      amount: 55_000_000n,
+      recipient: RECIPIENT,
+    });
+    const withdrawAthExternal = await buildVaultWithdrawAthExternalBoc({
+      owner_wallet: OWNER,
+      vaultAddress: VAULT,
+      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
+      signingSecretKey,
+      client_nonce: 14n,
+      amount: 500n,
+      recipient: RECIPIENT,
+    });
 
     expectReceiveSignedDataEnvelope(createExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, OWNER);
     expectReceiveSignedDataEnvelope(claimExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, RECIPIENT);
     expectReceiveSignedDataEnvelope(cancelExternal.signedData, VAULT_RECEIVE_INTENT_SIGNING_DOMAIN, OWNER);
+    const withdrawSlice = expectVaultAddressSignedDataEnvelope(withdrawExternal.signedData, VAULT_WITHDRAW_TON_SIGNING_DOMAIN, OWNER);
+    expect(withdrawSlice.loadUintBig(64)).toBe(13n);
+    expect(withdrawSlice.remainingBits).toBe(0);
+    expect(withdrawSlice.remainingRefs).toBe(1);
+    const withdrawAction = withdrawSlice.loadRef().beginParse();
+    expect(withdrawAction.loadUintBig(128)).toBe(55_000_000n);
+    expect(withdrawAction.loadAddress()?.equals(Address.parseRaw(RECIPIENT))).toBe(true);
+    expect(withdrawAction.remainingBits).toBe(0);
+    expect(withdrawAction.remainingRefs).toBe(0);
+    const withdrawAthSlice = expectVaultAddressSignedDataEnvelope(withdrawAthExternal.signedData, VAULT_WITHDRAW_ATH_SIGNING_DOMAIN, OWNER);
+    expect(withdrawAthSlice.loadUintBig(64)).toBe(14n);
+    expect(withdrawAthSlice.remainingBits).toBe(0);
+    expect(withdrawAthSlice.remainingRefs).toBe(1);
+    const withdrawAthAction = withdrawAthSlice.loadRef().beginParse();
+    expect(withdrawAthAction.loadUintBig(128)).toBe(500n);
+    expect(withdrawAthAction.loadAddress()?.equals(Address.parseRaw(RECIPIENT))).toBe(true);
+    expect(withdrawAthAction.remainingBits).toBe(0);
+    expect(withdrawAthAction.remainingRefs).toBe(0);
 
-    for (const external of [createExternal, claimExternal, cancelExternal, replaceExternal]) {
+    for (const external of [createExternal, claimExternal, cancelExternal, replaceExternal, withdrawExternal, withdrawAthExternal]) {
       expect(external.vaultAddress).toBe(VAULT);
       expect(external.boc).toMatch(/^te6/);
       expect(external.signedDataHash).toMatch(/^[0-9a-f]{64}$/);
@@ -267,6 +342,38 @@ describe('PWA contract transaction builders', () => {
     }
   });
 
+  it('PWA-TX-01C: computes receive-intent id locally with the Vault RCID formula', async () => {
+    const intentId = await computeVaultReceiveIntentId({
+      senderWallet: OWNER,
+      recipientWallet: RECIPIENT,
+      asset: RECEIVE_ASSETS.TON,
+      amount: 120_000_000n,
+      clientNonce: 9n,
+    });
+    const expectedHash = BigInt(`0x${beginCell()
+      .storeUint(RECEIVE_INTENT_ID_DOMAIN, 32)
+      .storeAddress(Address.parseRaw(OWNER))
+      .storeAddress(Address.parseRaw(RECIPIENT))
+      .storeUint(RECEIVE_ASSETS.TON, 8)
+      .storeUint(120_000_000n, 128)
+      .storeUint(9n, 64)
+      .endCell()
+      .hash()
+      .toString('hex')}`);
+    const expected = expectedHash % (1n << 128n);
+    const otherNonce = await computeVaultReceiveIntentId({
+      senderWallet: OWNER,
+      recipientWallet: RECIPIENT,
+      asset: RECEIVE_ASSETS.TON,
+      amount: 120_000_000n,
+      clientNonce: 10n,
+    });
+
+    expect(intentId).toBe(expected);
+    expect(intentId).toBeLessThan(1n << 128n);
+    expect(otherNonce).not.toBe(intentId);
+  });
+
   it('PWA-TX-02: quotes exact explicit Vault reserve values used by the PWA', () => {
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: false })).toBe(12_001_000n);
     expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: true })).toBe(2_001_000n);
@@ -274,23 +381,21 @@ describe('PWA contract transaction builders', () => {
     expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
     expect(estimateVaultAttachedValueNanotons('CreateReceiveIntent')).toBe(9_000_000n);
     expect(estimateVaultAttachedValueNanotons('ClaimReceiveIntent')).toBe(0n);
-    expect(estimateVaultAttachedValueNanotons('WithdrawAth')).toBe(40_000_000n);
   });
 
   it('PWA-TX-03: creates embedded wallet transaction messages with decimal nanotons and payload', () => {
-    const message = createVaultWalletMessage('WithdrawTon', {
+    const message = createVaultWalletMessage('DepositTon', {
       amount: 44_000_000n,
-      recipient: OWNER,
     }, {
       vaultAddress: VAULT,
+      userExists: true,
     });
 
     expect(message.address).toBe(VAULT);
-    expect(message.amount).toBe('2000000');
-    expect(message.payload).toBe(generatedBody(storeWithdrawTon({
-      $$type: 'WithdrawTon',
+    expect(message.amount).toBe('46000000');
+    expect(message.payload).toBe(generatedBody(storeDepositTon({
+      $$type: 'DepositTon',
       amount: 44_000_000n,
-      recipient: Address.parseRaw(OWNER),
     })));
 
     expect(createWalletTransaction(message, { nowMs: 1_700_000_000_000, ttlSeconds: 60 })).toEqual({
@@ -377,6 +482,51 @@ describe('PWA contract transaction builders', () => {
     })).toThrow(/Unsupported ATHWallet message type/);
   });
 
+  it('PWA-TX-06D: builds permissionless registry ATH burn flush messages', () => {
+    const usernamePayload = buildUsernameRegistryMessageBody('FlushBurnAthDue', {
+      query_id: 31n,
+    });
+    const profilePayload = buildProfileRegistryMessageBody('FlushProfileBurnAthDue', {
+      query_id: 32n,
+    });
+    expect(usernamePayload).toBe(generatedBody(storeFlushBurnAthDue({
+      $$type: 'FlushBurnAthDue',
+      query_id: 31n,
+    })));
+    expect(profilePayload).toBe(generatedBody(storeFlushProfileBurnAthDue({
+      $$type: 'FlushProfileBurnAthDue',
+      query_id: 32n,
+    })));
+
+    const usernameMessage = createUsernameRegistryMessage('FlushBurnAthDue', {
+      query_id: 31n,
+    }, {
+      usernameRegistryAddress: USERNAME_REGISTRY,
+    });
+    const profileMessage = createProfileRegistryMessage('FlushProfileBurnAthDue', {
+      query_id: 32n,
+    }, {
+      profileRegistryAddress: PROFILE_REGISTRY,
+    });
+    expect(usernameMessage).toMatchObject({
+      address: USERNAME_REGISTRY,
+      amount: REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS.toString(),
+      payload: usernamePayload,
+    });
+    expect(profileMessage).toMatchObject({
+      address: PROFILE_REGISTRY,
+      amount: REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS.toString(),
+      payload: profilePayload,
+    });
+    expect(createWalletTransaction([usernameMessage, profileMessage], {
+      nowMs: 1_700_000_000_000,
+      ttlSeconds: 60,
+    })).toEqual({
+      validUntil: 1_700_000_060,
+      messages: [usernameMessage, profileMessage],
+    });
+  });
+
   it('PWA-TX-07: quotes exact ATHWallet generic values used by the PWA', () => {
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(30_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
@@ -384,6 +534,39 @@ describe('PWA contract transaction builders', () => {
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductMintUsername', { notify_value: 32_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductProfileAvatar', { notify_value: 30_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(30_000_000n);
+  });
+
+  it('PWA-TX-07B: Vault ATH deposit uses the current 32m notify envelope', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const depositFlow = app.match(/async function submitVaultDepositAthAmount[\s\S]*?async function submitVaultWithdrawAth/);
+    expect(depositFlow?.[0]).toContain('notify_value: 32_000_000n');
+
+    const depositNotifyValue = 32_000_000n;
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', {
+      notify_value: depositNotifyValue,
+    })).toBe(53_000_000n);
+
+    const athMessage = createAthWalletMessage('ATHTransferRequestWithNotify', {
+      query_id: 16n,
+      amount: 1_000_000_000n,
+      recipient: VAULT,
+      response_destination: OWNER,
+      notify_destination: VAULT,
+      notify_value: depositNotifyValue,
+    }, {
+      athWalletAddress: ATH_WALLET,
+    });
+
+    expect(athMessage.amount).toBe('53000000');
+    expect(athMessage.payload).toBe(generatedBody(storeATHTransferRequestWithNotify({
+      $$type: 'ATHTransferRequestWithNotify',
+      query_id: 16n,
+      amount: 1_000_000_000n,
+      recipient: Address.parseRaw(VAULT),
+      response_destination: Address.parseRaw(OWNER),
+      notify_destination: Address.parseRaw(VAULT),
+      notify_value: depositNotifyValue,
+    })));
   });
 
   it('PWA-TX-08: builds generic ATHWallet wallet messages only', () => {
@@ -424,6 +607,13 @@ describe('PWA contract transaction builders', () => {
       Buffer.from(built.signedDataHash, 'hex'),
       ed25519.getPublicKey(signingSecretKey),
     )).toBe(true);
+    expectPublishSignedDataEnvelope(
+      built.signedData,
+      VAULT_PUBLISH_KIND.PRIVATE,
+      OWNER,
+      VAULT_SIZE_CLASS.STANDARD,
+      VAULT_CRYPTO_SUITE.HYBRID,
+    );
     expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toMatch(/^te6/);
   });
 
@@ -508,6 +698,17 @@ describe('PWA contract transaction builders', () => {
     expectRegistrySignedDataEnvelope(external.signedData, VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, OWNER);
   });
 
+  it('PWA-TX-04D2: profile avatar route verifies the derived ProfileRegistry ATH wallet', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const route = app.match(/async function requireProfileRegistryVaultRoute[\s\S]*?async function requireProfileRegistryVaultRouteForOwnVaultAction/);
+
+    expect(route?.[0]).toContain('resolved.provider.getAthWalletAddress(registry');
+    expect(route?.[0]).toContain('registryGlobal.official_ath_wallet_address');
+    expect(route?.[0]).toContain('ProfileRegistry official ATH wallet is not the derived registry wallet');
+    expect(route?.[0]).toContain('ProfileRegistry Vault binding does not match this app config');
+    expect(route?.[0]).toContain('ProfileRegistry ATHMaster binding does not match this app config');
+  });
+
   it('PWA-TX-04E: creates signed Vault-funded username mint messages', async () => {
     const signingSecretKey = new Uint8Array(32).fill(0x44);
     const built = await buildVaultUsernameMintBodyCell({
@@ -570,6 +771,20 @@ describe('PWA contract transaction builders', () => {
     expectRegistrySignedDataEnvelope(separatorPolicyExternal.signedData, VAULT_USERNAME_MINT_SIGNING_DOMAIN, OWNER);
   });
 
+  it('PWA-USERNAME-ROUTE-ATHMASTER-01: username route verifies official ATH wallet owner and ATHMaster', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const route = app.match(/async function requireUsernameRegistryVaultRoute[\s\S]*?async function requireUsernameRegistryVaultRouteForOwnVaultAction/);
+
+    expect(route?.[0]).toContain('provider.getAthWalletAddress(registry');
+    expect(route?.[0]).toContain('registryGlobal.official_ath_wallet_address');
+    expect(route?.[0]).toContain('createAthWalletTonRpcProvider({ athWalletAddress: officialWallet }).getWalletData');
+    expect(route?.[0]).toContain('if (!isAthWalletNotDeployedError(error)) throw error');
+    expect(route?.[0]).not.toContain('isMissingAthWalletOwnerError');
+    expect(route?.[0]).toContain('UsernameRegistry official ATH wallet is not the derived registry wallet');
+    expect(route?.[0]).toContain('UsernameRegistry official ATH wallet owner does not match registry');
+    expect(route?.[0]).toContain('UsernameRegistry official ATH wallet ATHMaster binding does not match this app config');
+  });
+
   it('PWA-TX-09: creates public post payload cells and signed Vault-balance public publish messages', async () => {
     const bodyText = 'p'.repeat(PUBLIC_POST_TEXT_MAX_BYTES);
     const payload = await createPublicPostPayload(bodyText);
@@ -599,7 +814,7 @@ describe('PWA contract transaction builders', () => {
 
     const publish = {
       publish_kind: VAULT_PUBLISH_KIND.PUBLIC,
-      size_class: VAULT_SIZE_CLASS.STANDARD,
+      size_class: payload.size_class,
       crypto_suite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
       header_0_hash: payload.headerHash,
       header_hash: payload.headerHash,
@@ -622,6 +837,14 @@ describe('PWA contract transaction builders', () => {
     expect(built.vaultAddress).toBe(VAULT);
     expect(built.boc).toMatch(/^te6/);
     expect(built.signature).toHaveLength(128);
+    expectPublishSignedDataEnvelope(
+      built.signedData,
+      VAULT_PUBLISH_KIND.PUBLIC,
+      OWNER,
+      VAULT_SIZE_CLASS.KIB_32,
+      VAULT_CRYPTO_SUITE.PUBLIC_NONE,
+    );
+    expect(payload.size_class).toBe(VAULT_SIZE_CLASS.KIB_32);
   });
 
   it('PWA-TX-09B: public comments use compact binary parent references', async () => {
@@ -651,8 +874,8 @@ describe('PWA contract transaction builders', () => {
       parentHash,
       text: 'x'.repeat(PUBLIC_COMMENT_TEXT_MAX_BYTES + 1),
     })).rejects.toThrow(/public comment text exceeds/i);
-    expect(PUBLIC_POST_TEXT_MAX_BYTES).toBe(1024);
-    expect(PUBLIC_COMMENT_TEXT_MAX_BYTES).toBe(1024);
+    expect(PUBLIC_POST_TEXT_MAX_BYTES).toBe(32 * 1024);
+    expect(PUBLIC_COMMENT_TEXT_MAX_BYTES).toBe(32 * 1024);
   });
 
   it('PWA-TX-09C: public posts can close immutable comments in binary flags', async () => {
@@ -672,7 +895,7 @@ describe('PWA contract transaction builders', () => {
     expect(parsed.header[6]).toBe(PUBLIC_BODY_FLAGS.COMMENTS_DISABLED);
   });
 
-  it('PWA-TX-09D: public header carries multipart stream metadata outside the 1024-byte body', async () => {
+  it('PWA-TX-09D: public header carries multipart stream metadata outside the size-class body', async () => {
     const streamId = new Uint8Array(16).fill(0x42);
     const payload = await createPublicPostPayload({
       type: 'post',
@@ -709,6 +932,7 @@ describe('PWA contract transaction builders', () => {
       type: 'image',
       kind: PUBLIC_BODY_KIND.IMAGE_POST,
       bodyBytes: 1024,
+      size_class: VAULT_SIZE_CLASS.STANDARD,
     });
     expect(parsedPost).toMatchObject({
       type: 'image',
@@ -739,8 +963,51 @@ describe('PWA contract transaction builders', () => {
     expect(parsedComment.imageBytes).toHaveLength(333);
   });
 
+  it('PWA-TX-09E2: public document posts and comments store compact raw document parts', async () => {
+    const documentBytes = new Uint8Array([0x50, 0x44, 0x43, 0x31, 1, 0, 0, 1, 1, 0, 0, 0, 0, 2, 0x68, 0x69]);
+    const post = await createPublicPostPayload({
+      type: 'document',
+      bytes: documentBytes,
+      commentsAllowed: false,
+      partIndex: 1,
+      partCount: 2,
+    });
+    const parsedPost = readPublicPostPayload(post);
+
+    expect(post).toMatchObject({
+      type: 'document',
+      kind: PUBLIC_BODY_KIND.DOCUMENT_POST,
+      bodyBytes: documentBytes.length,
+      size_class: VAULT_SIZE_CLASS.STANDARD,
+    });
+    expect(parsedPost).toMatchObject({
+      type: 'document',
+      commentsAllowed: false,
+      partIndex: 1,
+      partCount: 2,
+    });
+    expect([...parsedPost.documentBytes]).toEqual([...documentBytes]);
+
+    const parentHash = `0x${'ef'.repeat(32)}`;
+    const comment = await createPublicPostPayload({
+      type: 'document_comment',
+      parentEntryId: 77n,
+      parentHash,
+      bytes: documentBytes,
+    });
+    const parsedComment = readPublicPostPayload(comment);
+
+    expect(comment.kind).toBe(PUBLIC_BODY_KIND.DOCUMENT_COMMENT);
+    expect(parsedComment).toMatchObject({
+      type: 'document_comment',
+      parentEntryId: 77n,
+      parentHash,
+    });
+    expect([...parsedComment.documentBytes]).toEqual([...documentBytes]);
+  });
+
   it('PWA-TX-09F: public avatar capsules and profile pointers use compact binary headers', async () => {
-    const imageBytes = new Uint8Array(777).fill(0xa7);
+    const imageBytes = new Uint8Array(26 * 1024).fill(0xa7);
     const avatarHash = `0x${'12'.repeat(32)}`;
     const streamId = new Uint8Array(16).fill(0x7a);
     const payload = await createPublicPostPayload({
@@ -758,7 +1025,8 @@ describe('PWA contract transaction builders', () => {
       type: 'avatar',
       kind: PUBLIC_BODY_KIND.AVATAR,
       headerBytes: 68,
-      bodyBytes: 777,
+      bodyBytes: 26 * 1024,
+      size_class: VAULT_SIZE_CLASS.KIB_32,
     });
     expect(readPublicPostPayload(payload)).toMatchObject({
       type: 'avatar',

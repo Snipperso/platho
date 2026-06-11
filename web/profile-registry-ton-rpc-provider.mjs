@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=6';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=22';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=9';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=32';
 
 export class ProfileRegistryTonRpcProviderError extends Error {
   constructor(message) {
@@ -98,7 +98,7 @@ function stackNumber(value) {
 
 function criticalCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify']) {
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;

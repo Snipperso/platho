@@ -90,8 +90,12 @@ describe('PWA on-chain self-sufficiency', () => {
       'toncenter-v3',
       'platho-rpc',
     ]);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('toncenter-mainnet');
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('platho-rpc-mainnet');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).not.toContain('toncenter-mainnet');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.sendBocEndpoint).toBe(false);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.verifierOnly).toBe(true);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.messagesEndpoint).toBe(false);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'platho-rpc-mainnet')?.sendBocEndpoint).toBe('https://rpc.platho.app/api/v3/message');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_canonical_publish_charge');
   });
 });

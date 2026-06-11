@@ -3,13 +3,15 @@ import { createServer } from 'node:http';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { URL } from 'node:url';
-import { Address } from '@ton/core';
+import { Address, Cell, beginCell, storeStateInit } from '@ton/core';
 
 const DEFAULT_PACKET_PATH = 'artifacts/local/mainnet_tx_dry_run_packet.json';
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 8787;
 const DEFAULT_TONCONNECT_MANIFEST_URL = 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
 const LONG_LINK_WARNING_THRESHOLD = 18000;
+const LIVE_PREFLIGHT_RPC_BASE = 'https://rpc.platho.app';
+const LIVE_PREFLIGHT_TIMEOUT_MS = 12000;
 
 function argValue(name, fallback) {
   const idx = process.argv.indexOf(name);
@@ -83,6 +85,8 @@ function collectTransactions(packet) {
         value_ton: nanotonsToTon(valueNanotons),
         body_hash: item.body?.boc_sha256_hex || null,
         state_init_hash: item.state_init?.cell_hash_hex || item.state_init?.boc_sha256_hex || null,
+        state_init_code_hash: item.state_init?.code_hash_hex || null,
+        state_init_data_hash: item.state_init?.data_hash_hex || null,
         body_bits: item.body?.bits ?? null,
         state_init_bits: item.state_init?.bits ?? null,
         safety_check: item.safety_check || null,
@@ -179,6 +183,181 @@ function packetPayload() {
   };
 }
 
+function deployPreflightTargets(packet) {
+  return collectTransactions(packet)
+    .filter((tx) => tx.group === 'deploy_contracts' && tx.state_init_hash)
+    .map((tx) => ({
+      sequence: tx.sequence,
+      id: tx.id,
+      label: tx.label,
+      address: tx.target_address,
+      expected_state_init_hash: tx.state_init_hash,
+      expected_code_hash: tx.state_init_code_hash,
+    }));
+}
+
+async function fetchJsonWithTimeout(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LIVE_PREFLIGHT_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${text.slice(0, 180)}`);
+    }
+    return JSON.parse(text);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function cellFromAccountBase64(value) {
+  if (!value || typeof value !== 'string' || !value.trim()) return null;
+  try {
+    return Cell.fromBase64(value);
+  } catch {
+    try {
+      return Cell.fromBoc(Buffer.from(value, 'base64'))[0] ?? null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function stateInitHashFromAccountCells(code, data) {
+  if (!code || !data) return null;
+  try {
+    return beginCell().store(storeStateInit({ code, data })).endCell().hash().toString('hex');
+  } catch {
+    return null;
+  }
+}
+
+function parseAccountInfo(payload) {
+  const result = payload?.result ?? payload;
+  const state = String(result?.state ?? result?.account_state ?? result?.status ?? '').toLowerCase();
+  const code = result?.code ?? result?.account?.code ?? result?.data?.code ?? null;
+  const codeHash = result?.code_hash ?? result?.codeHash ?? result?.account?.code_hash ?? null;
+  const codeCell = cellFromAccountBase64(code);
+  const dataCell = cellFromAccountBase64(result?.data ?? result?.account?.data ?? result?.account_data ?? null);
+  const computedCodeHash = codeCell ? codeCell.hash().toString('hex') : null;
+  const computedDataHash = dataCell ? dataCell.hash().toString('hex') : null;
+  const computedStateInitHash = stateInitHashFromAccountCells(codeCell, dataCell);
+  let balance = 0n;
+  const balanceRaw = result?.balance ?? result?.account?.balance;
+  if (balanceRaw !== undefined && balanceRaw !== null && String(balanceRaw).trim() !== '') {
+    try {
+      balance = BigInt(String(balanceRaw));
+    } catch {
+      balance = -1n;
+    }
+  }
+  const hasCode = Boolean(code && String(code).trim() && String(code).trim() !== 'null')
+    || Boolean(codeHash && String(codeHash).trim());
+  const active = state === 'active' || hasCode;
+  return {
+    state: state || 'unknown',
+    hasCode,
+    active,
+    balance,
+    codeHash: String(codeHash || computedCodeHash || '').toLowerCase() || null,
+    computedCodeHash,
+    computedDataHash,
+    computedStateInitHash,
+  };
+}
+
+async function livePreflightPayload() {
+  const packet = parseJsonFile(packetPath);
+  const targets = deployPreflightTargets(packet);
+  const checks = [];
+  const errors = [];
+
+  for (const target of targets) {
+    try {
+      const payload = await fetchJsonWithTimeout(`${LIVE_PREFLIGHT_RPC_BASE}/api/v2/getAddressInformation?address=${encodeURIComponent(target.address)}`);
+      const info = parseAccountInfo(payload);
+      const clean = !info.active && info.balance === 0n;
+      const inactiveFunded = !info.active && info.balance > 0n && !info.hasCode;
+      const expectedCodeHash = String(target.expected_code_hash || '').toLowerCase() || null;
+      const expectedStateInitHash = String(target.expected_state_init_hash || '').toLowerCase() || null;
+      const codeMatches = Boolean(info.active && expectedCodeHash && info.codeHash === expectedCodeHash);
+      const stateInitMatches = Boolean(info.active && expectedStateInitHash && info.computedStateInitHash === expectedStateInitHash);
+      const expectedActive = codeMatches || stateInitMatches;
+      const ok = clean || inactiveFunded || expectedActive;
+      const reason = clean
+        ? 'fresh target'
+        : inactiveFunded
+          ? 'inactive target has balance but no code; deploy retry allowed'
+          : expectedActive
+            ? 'active with expected deploy code/state; resume allowed'
+            : info.active
+              ? 'active target has unexpected deploy code/state'
+              : 'inactive target has non-zero balance';
+      checks.push({
+        ...target,
+        ok,
+        clean,
+        inactive_funded: inactiveFunded,
+        expected_active: expectedActive,
+        code_matches: codeMatches,
+        state_init_matches: stateInitMatches,
+        state: info.state,
+        has_code: info.hasCode,
+        balance_nanotons: info.balance.toString(),
+        live_code_hash: info.codeHash,
+        live_state_init_hash: info.computedStateInitHash,
+        reason,
+      });
+    } catch (error) {
+      errors.push({
+        ...target,
+        error: error?.message || String(error),
+      });
+    }
+  }
+
+  const failures = checks.filter((check) => !check.ok);
+  const blocking = errors.length > 0 || failures.length > 0;
+  const cleanCount = checks.filter((check) => check.clean).length;
+  const inactiveFundedCount = checks.filter((check) => check.inactive_funded).length;
+  const expectedActiveCount = checks.filter((check) => check.expected_active).length;
+  const status = errors.length
+    ? 'LIVE_PREFLIGHT_UNAVAILABLE'
+    : failures.length
+      ? 'LIVE_PREFLIGHT_BLOCKED'
+      : inactiveFundedCount > 0
+        ? 'LIVE_PREFLIGHT_RETRY'
+      : expectedActiveCount > 0 && cleanCount > 0
+        ? 'LIVE_PREFLIGHT_RESUME'
+        : expectedActiveCount > 0
+          ? 'LIVE_PREFLIGHT_DEPLOYED'
+          : 'LIVE_PREFLIGHT_PASS';
+  const message = errors.length
+    ? 'Live preflight could not verify deploy targets. Transaction buttons are disabled.'
+    : failures.length
+      ? 'At least one deploy target is occupied by unexpected code/state. Transaction buttons are disabled.'
+      : inactiveFundedCount > 0
+        ? 'Some deploy targets have balance but no code. Retry those deploy transactions only.'
+      : expectedActiveCount > 0 && cleanCount > 0
+        ? 'Some deploy targets are already active with expected code/state and the rest are fresh. Resume deploy is allowed.'
+        : expectedActiveCount > 0
+          ? 'Deploy targets are active with expected code/state. Continue with post-deploy transactions.'
+          : 'All deploy targets are fresh.';
+  return {
+    ok: !blocking,
+    blocking,
+    status,
+    rpc_base: LIVE_PREFLIGHT_RPC_BASE,
+    checked_at: new Date().toISOString(),
+    checked_deploy_targets: checks.length,
+    checks,
+    errors,
+    failures,
+    message,
+  };
+}
+
 const html = String.raw`<!doctype html>
 <html lang="en">
 <head>
@@ -211,6 +390,10 @@ const html = String.raw`<!doctype html>
     .sender span { display: block; color: #b6c6bc; font-size: 12px; overflow-wrap: anywhere; }
     .warn { border: 1px solid #6e5132; background: #241d15; color: #f3d5ad; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; margin: 0 0 12px; }
     .notice { border: 1px solid #335b4f; background: #13251f; color: #bdebd7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; margin: 0 0 12px; }
+    .preflight { border: 1px solid #56655f; background: #171f1c; color: #e9f2ed; border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.45; margin: 0 0 14px; }
+    .preflight.pass { border-color: #2c775e; background: #10231d; color: #baf3d6; }
+    .preflight.blocked { border-color: #8b3f43; background: #271518; color: #ffd0d3; }
+    .preflight code { overflow-wrap: anywhere; white-space: normal; }
     .muted { color: #b6c6bc; }
     .tx-grid { display: grid; gap: 12px; }
     .tx { border: 1px solid #2f4038; border-radius: 8px; background: #16201c; padding: 14px; display: grid; gap: 11px; }
@@ -247,11 +430,21 @@ const html = String.raw`<!doctype html>
       <button id="all" class="active">Show all transactions</button>
     </aside>
     <section>
+      <div id="preflight"></div>
       <div class="tx-grid" id="txs"></div>
     </section>
   </main>
   <script>
-    const state = { data: null, sender: 'all', query: '' };
+    const state = {
+      data: null,
+      sender: 'all',
+      query: '',
+      preflight: {
+        blocking: true,
+        status: 'LIVE_PREFLIGHT_LOADING',
+        message: 'Checking deploy targets...',
+      },
+    };
     let tonConnectUI = null;
     const doneKey = (tx) => 'platho-mainnet-tx-done:' + state.data.manifest_hash_hex + ':' + tx.sequence + ':' + tx.id;
 
@@ -267,6 +460,34 @@ const html = String.raw`<!doctype html>
         '<span class="pill">manifest: ' + esc(d.manifest_hash_hex) + '</span>',
         '<span class="pill">tx: ' + d.transactions.length + '</span>'
       ].join('');
+    }
+
+    function preflightBlocks() {
+      return !state.preflight || state.preflight.blocking !== false;
+    }
+
+    function renderPreflight() {
+      const target = document.getElementById('preflight');
+      const p = state.preflight || {
+        blocking: true,
+        status: 'LIVE_PREFLIGHT_LOADING',
+        message: 'Checking deploy targets...',
+      };
+      const cls = p.blocking ? 'blocked' : 'pass';
+      const failures = Array.isArray(p.failures) ? p.failures : [];
+      const errors = Array.isArray(p.errors) ? p.errors : [];
+      let details = '';
+      if (failures.length) {
+        details += '<div style="margin-top:8px">Blocking targets:</div>' + failures.map((item) =>
+          '<div><code>' + esc(item.id) + ' ' + esc(item.address) + '</code> · state ' + esc(item.state) + ' · balance ' + esc(item.balance_nanotons) + ' · ' + esc(item.reason) + '</div>'
+        ).join('');
+      }
+      if (errors.length) {
+        details += '<div style="margin-top:8px">RPC errors:</div>' + errors.map((item) =>
+          '<div><code>' + esc(item.id) + ' ' + esc(item.address) + '</code> · ' + esc(item.error) + '</div>'
+        ).join('');
+      }
+      target.innerHTML = '<div class="preflight ' + cls + '"><b>' + esc(p.status) + '</b><br>' + esc(p.message || '') + details + '</div>';
     }
 
     function renderSenders() {
@@ -370,9 +591,12 @@ const html = String.raw`<!doctype html>
         const longWarning = tx.long_deeplink
           ? '<div class="warn">Long Tonkeeper deeplink (' + tx.link_length + ' chars). Use TonConnect for this row; the direct deeplink can fail before Tonkeeper opens.</div>'
           : '';
+        const blocked = preflightBlocks();
+        const disabled = blocked ? ' disabled' : '';
+        const blockedLabel = blocked ? 'Preflight blocked' : '';
         const primaryButton = tx.long_deeplink
-          ? '<button class="tonconnect" data-tonconnect="' + tx.sequence + '">Send via TonConnect</button>'
-          : '<button class="tonkeeper" data-open="' + esc(href) + '">Open Tonkeeper</button>';
+          ? '<button class="tonconnect" data-tonconnect="' + tx.sequence + '"' + disabled + '>' + (blockedLabel || 'Send via TonConnect') + '</button>'
+          : '<button class="tonkeeper" data-open="' + esc(href) + '"' + disabled + '>' + (blockedLabel || 'Open Tonkeeper') + '</button>';
         return '<article class="tx' + (done ? ' done' : '') + '" data-seq="' + tx.sequence + '">' +
           '<div class="tx-head">' +
             '<div><h2 class="tx-title">#' + tx.sequence + ' · ' + esc(tx.id) + ' · ' + esc(tx.label) + '</h2>' +
@@ -391,15 +615,21 @@ const html = String.raw`<!doctype html>
           longWarning +
           '<div class="actions">' +
             primaryButton +
-            (tx.long_deeplink ? '<button data-open="' + esc(href) + '">Try direct deeplink</button>' : '') +
+            (tx.long_deeplink ? '<button data-open="' + esc(href) + '"' + disabled + '>Try direct deeplink</button>' : '') +
             '<button data-copy="' + esc(href) + '">Copy Tonkeeper link</button>' +
             '<button data-copy="' + esc(tx.links.ton) + '">Copy ton:// link</button>' +
             '<button data-copy="' + esc(tx.target_address) + '">Copy target</button>' +
           '</div>' +
         '</article>';
       }).join('');
-      document.querySelectorAll('[data-open]').forEach((btn) => btn.addEventListener('click', () => window.open(btn.dataset.open, '_blank', 'noopener')));
-      document.querySelectorAll('[data-tonconnect]').forEach((btn) => btn.addEventListener('click', () => sendViaTonConnect(btn.dataset.tonconnect, btn)));
+      document.querySelectorAll('[data-open]').forEach((btn) => btn.addEventListener('click', () => {
+        if (preflightBlocks()) return;
+        window.open(btn.dataset.open, '_blank', 'noopener');
+      }));
+      document.querySelectorAll('[data-tonconnect]').forEach((btn) => btn.addEventListener('click', () => {
+        if (preflightBlocks()) return;
+        sendViaTonConnect(btn.dataset.tonconnect, btn);
+      }));
       document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
         await copy(btn.dataset.copy);
         const old = btn.textContent;
@@ -419,6 +649,7 @@ const html = String.raw`<!doctype html>
 
     function render() {
       renderMeta();
+      renderPreflight();
       renderSenders();
       renderTxs();
     }
@@ -430,6 +661,17 @@ const html = String.raw`<!doctype html>
         state.query = event.target.value;
         renderTxs();
       });
+      render();
+      return fetch('/api/live-preflight').then((r) => r.json());
+    }).then((preflight) => {
+      state.preflight = preflight;
+      render();
+    }).catch((error) => {
+      state.preflight = {
+        blocking: true,
+        status: 'LIVE_PREFLIGHT_UNAVAILABLE',
+        message: error?.message || String(error),
+      };
       render();
     });
   </script>
@@ -451,6 +693,21 @@ const server = createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: error?.message || String(error) }));
     }
+    return;
+  }
+  if (url.pathname === '/api/live-preflight') {
+    livePreflightPayload().then((payload) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    }).catch((error) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: false,
+        blocking: true,
+        status: 'LIVE_PREFLIGHT_UNAVAILABLE',
+        message: error?.message || String(error),
+      }));
+    });
     return;
   }
   if (url.pathname.startsWith('/api/tx/')) {

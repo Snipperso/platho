@@ -45,10 +45,15 @@ export const PLATHO_BINARY_HEADER0_BYTES = 140;
 export const PLATHO_BINARY_HEADER1_BYTES = 30;
 export const PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES = 32;
 export const PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES = 69;
+export const PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES = 5;
+export const PLATHO_COMPACT_SENDER_USERNAME_METADATA_MAX_BYTES = 25;
+export const PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES = 37;
+export const PLATHO_COMPACT_SENDER_RECOVERY_BYTES = 64;
 export const PLATHO_COMPACT_CONTENT_TYPES = Object.freeze({
   TEXT: 1,
   IMAGE: 2,
   PAYMENT: 3,
+  DOCUMENT: 4,
 });
 export const PLATHO_COMPACT_IMAGE_FORMATS = Object.freeze({
   WEBP: 1,
@@ -78,10 +83,19 @@ const COMPACT_BODY_MAGIC = new Uint8Array([0x50, 0x4c, 0x42, 0x31]); // "PLB1"
 const COMPACT_CHUNK_MAGIC = new Uint8Array([0x50, 0x4c, 0x43, 0x31]); // "PLC1"
 const COMPACT_PAYLOAD_MAGIC = new Uint8Array([0x50, 0x43, 0x50, 0x31]); // "PCP1"
 const COMPACT_SENDER_WALLET_MAGIC = new Uint8Array([0x50, 0x53, 0x57, 0x31]); // "PSW1"
+const COMPACT_SENDER_USERNAME_MAGIC = new Uint8Array([0x50, 0x53, 0x4e, 0x31]); // "PSN1"
+const COMPACT_RECIPIENT_WALLET_MAGIC = new Uint8Array([0x50, 0x52, 0x57, 0x31]); // "PRW1"
+const COMPACT_SENDER_RECOVERY_MAGIC = new Uint8Array([0x50, 0x53, 0x52, 0x31]); // "PSR1"
 const COMPACT_PAYLOAD_FLAG_SENDER_WALLET = 1;
+const COMPACT_PAYLOAD_FLAG_RECIPIENT_WALLET = 2;
+const COMPACT_PAYLOAD_FLAG_SENDER_USERNAME = 4;
+const COMPACT_BODY_FLAG_SENDER_RECOVERY = 1;
 const PRIVATE_CAPSULE_HEADER0_MAGIC = new Uint8Array([0x50, 0x48, 0x30, 0x42]); // "PH0B"
 const PRIVATE_CAPSULE_HEADER1_MAGIC = new Uint8Array([0x50, 0x48, 0x31, 0x42]); // "PH1B"
 const COMPACT_BODY_AAD_DOMAIN = 'PLATHO.COMPACT_BODY.AAD.V1';
+const COMPACT_SENDER_RECOVERY_AAD_DOMAIN = 'PLATHO.COMPACT_BODY.SENDER_RECOVERY.AAD.V1';
+const COMPACT_SENDER_RECOVERY_KEY_DOMAIN = 'PLATHO.SENDER_RECOVERY.KEY.V1';
+const COMPACT_SENDER_RECOVERY_SALT_DOMAIN = 'PLATHO.SENDER_RECOVERY.SALT.V1';
 const COMPACT_STANDARD_CHUNK_WIRE_BYTES = 2048;
 const COMPACT_HYBRID_CHUNK_WIRE_BYTES = 4096;
 const COMPACT_CHUNK_HEADER_BYTES = 24;
@@ -875,6 +889,12 @@ function normalizeRequestedSuite(value) {
 }
 
 async function recipientKeyIdForSuite(recipientKeyPair, suite) {
+  if (!recipientKeyPair || typeof recipientKeyPair !== 'object') {
+    throw new Error(`Recipient key pair is unavailable for ${suite}`);
+  }
+  if (!recipientKeyPair.suite) {
+    throw new Error(`Recipient key suite is unavailable for ${suite}`);
+  }
   if (recipientKeyPair.suite === suite) return recipientKeyPair.keyId;
   if (recipientKeyPair.suite === CRYPTO_SUITES.HYBRID_V1 && suite === CRYPTO_SUITES.CLASSICAL_V1) {
     return computeClassicalKeyId(assertBytes('recipient.x25519PublicKey', recipientKeyPair.x25519PublicKey, X25519_PUBLIC_KEY_BYTES));
@@ -918,6 +938,30 @@ async function deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash) {
   return getCrypto().subtle.deriveKey(
     { name: 'HKDF', hash: 'SHA-256', salt, info },
     hkdfKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+async function deriveAesGcmKeyBytesFromTranscriptHash(sharedParts, transcriptHash, options = {}) {
+  const ikm = concatBytes(...sharedParts);
+  const saltDomain = options.saltDomain ?? MESSAGE_SALT_DOMAIN;
+  const keyDomain = options.keyDomain ?? MESSAGE_KEY_DOMAIN;
+  const salt = await sha256(utf8(saltDomain), transcriptHash);
+  const info = concatBytes(utf8(keyDomain), transcriptHash);
+  const hkdfKey = await getCrypto().subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await getCrypto().subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt, info },
+    hkdfKey,
+    256,
+  ));
+}
+
+async function importAesGcmKeyBytes(keyBytes) {
+  return getCrypto().subtle.importKey(
+    'raw',
+    assertBytes('AES-GCM key bytes', keyBytes, 32),
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt'],
@@ -977,25 +1021,43 @@ function compactHashBytes(hashHex, name) {
   return hexToBytes(assertHashHex(name, hashHex), 32, name);
 }
 
+function normalizeCompactPayloadReservedTailBytes(options = {}) {
+  const raw = options.reservedTailBytes ?? options.payloadReservedBytes ?? options.reserved_tail_bytes ?? 0;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Compact payload reserved tail bytes must be a non-negative safe integer');
+  }
+  return value;
+}
+
 function compactPayloadUsefulBytes(contentLength, options = {}) {
   if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
     throw new Error('Compact payload content length is invalid');
   }
+  const reservedTailBytes = normalizeCompactPayloadReservedTailBytes(options);
   const requestedSizeClass = options.sizeClass ?? options.size_class;
   const sizeClass = requestedSizeClass === undefined
-    ? sizeClassForPayloadByteLength(contentLength)
+    ? sizeClassForPayloadByteLength(contentLength + reservedTailBytes)
     : normalizeCapsuleSizeClass(requestedSizeClass);
   const usefulBytes = usefulBytesForCapsuleSizeClass(sizeClass);
-  if (contentLength > usefulBytes) {
-    throw new Error(`Compact payload exceeds selected capsule size: ${contentLength} > ${usefulBytes}`);
+  const availableBytes = usefulBytes - reservedTailBytes;
+  if (availableBytes < 0) throw new Error('Compact payload reserved tail exceeds selected capsule size');
+  if (contentLength > availableBytes) {
+    throw new Error(`Compact payload exceeds selected capsule size: ${contentLength} > ${availableBytes}`);
   }
-  return { sizeClass, usefulBytes, blocks: usefulBytes / PLATHO_COMPACT_TEXT_BLOCK_BYTES };
+  return {
+    sizeClass,
+    usefulBytes,
+    availableBytes,
+    reservedTailBytes,
+    blocks: usefulBytes / PLATHO_COMPACT_TEXT_BLOCK_BYTES,
+  };
 }
 
 function encodeFixedCompactPayload(type, flags, content, options = {}) {
   const contentBytes = toUint8Array(content);
-  const { usefulBytes } = compactPayloadUsefulBytes(contentBytes.length, options);
-  const out = new Uint8Array(PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + usefulBytes);
+  const { usefulBytes, availableBytes, reservedTailBytes } = compactPayloadUsefulBytes(contentBytes.length, options);
+  const out = new Uint8Array(PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + availableBytes);
   const streamId = options.streamId
     ? assertBytes('compact payload stream id', options.streamId, 16)
     : randomBytes(16);
@@ -1009,6 +1071,9 @@ function encodeFixedCompactPayload(type, flags, content, options = {}) {
   out.set(uint16Bytes(options.partCount ?? 1, 'compact payload part count'), 26);
   out.set(uint16Bytes(contentBytes.length, 'compact payload content length'), 28);
   out.set(contentBytes, PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES);
+  if (reservedTailBytes > 0 && out.length !== PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + usefulBytes - reservedTailBytes) {
+    throw new Error('Compact payload reserved tail size drift');
+  }
   return out;
 }
 
@@ -1028,17 +1093,74 @@ function compactSenderWalletMetadataBytes(options = {}) {
   );
 }
 
+function compactRecipientWalletMetadataBytes(options = {}) {
+  const wallet = options.recipientWallet ?? options.recipient_wallet;
+  if (wallet === undefined || wallet === null || wallet === '') return null;
+  const parsed = parseTonAddress(wallet);
+  if (parsed.workchain < -128 || parsed.workchain > 127) {
+    throw new Error('recipient wallet workchain must fit int8');
+  }
+  return concatBytes(
+    COMPACT_RECIPIENT_WALLET_MAGIC,
+    new Uint8Array([parsed.workchain & 0xff]),
+    assertBytes('recipient wallet hash', parsed.hash, 32),
+  );
+}
+
+function normalizeCompactPlathoUsername(value) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  const label = raw.endsWith('.ath') ? raw : `${raw}.ath`;
+  if (!/^[a-z0-9_-]{4,16}\.ath$/.test(label)) {
+    throw new Error('sender username must be a valid .ath name');
+  }
+  return label;
+}
+
+function compactSenderUsernameMetadataBytes(options = {}) {
+  const username = normalizeCompactPlathoUsername(options.senderUsername ?? options.sender_username);
+  if (!username) return null;
+  const bytes = utf8(username);
+  if (bytes.length > PLATHO_COMPACT_SENDER_USERNAME_METADATA_MAX_BYTES - PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES) {
+    throw new Error('sender username metadata is too long');
+  }
+  return concatBytes(
+    COMPACT_SENDER_USERNAME_MAGIC,
+    new Uint8Array([bytes.length]),
+    bytes,
+  );
+}
+
 function encodeCompactPayloadContentWithMetadata(content, options = {}) {
   const walletMetadata = compactSenderWalletMetadataBytes(options);
-  if (!walletMetadata) return { flags: 0, content: toUint8Array(content) };
+  const usernameMetadata = compactSenderUsernameMetadataBytes(options);
+  const recipientMetadata = compactRecipientWalletMetadataBytes(options);
+  if (!walletMetadata && !usernameMetadata && !recipientMetadata) return { flags: 0, content: toUint8Array(content) };
+  let flags = 0;
+  const metadata = [];
+  if (walletMetadata) {
+    flags |= COMPACT_PAYLOAD_FLAG_SENDER_WALLET;
+    metadata.push(walletMetadata);
+  }
+  if (usernameMetadata) {
+    flags |= COMPACT_PAYLOAD_FLAG_SENDER_USERNAME;
+    metadata.push(usernameMetadata);
+  }
+  if (recipientMetadata) {
+    flags |= COMPACT_PAYLOAD_FLAG_RECIPIENT_WALLET;
+    metadata.push(recipientMetadata);
+  }
   return {
-    flags: COMPACT_PAYLOAD_FLAG_SENDER_WALLET,
-    content: concatBytes(walletMetadata, toUint8Array(content)),
+    flags,
+    content: concatBytes(...metadata, toUint8Array(content)),
   };
 }
 
 function decodeCompactPayloadMetadata(content, flags) {
-  const unsupportedFlags = flags & ~COMPACT_PAYLOAD_FLAG_SENDER_WALLET;
+  const supportedFlags = COMPACT_PAYLOAD_FLAG_SENDER_WALLET
+    | COMPACT_PAYLOAD_FLAG_RECIPIENT_WALLET
+    | COMPACT_PAYLOAD_FLAG_SENDER_USERNAME;
+  const unsupportedFlags = flags & ~supportedFlags;
   if (unsupportedFlags !== 0) throw new Error('Unsupported compact payload flags');
   let remaining = toUint8Array(content);
   const metadata = {};
@@ -1062,12 +1184,47 @@ function decodeCompactPayloadMetadata(content, flags) {
     }
     remaining = remaining.subarray(PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES);
   }
+  if ((flags & COMPACT_PAYLOAD_FLAG_SENDER_USERNAME) !== 0) {
+    if (remaining.length < PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES) {
+      throw new Error('Compact payload sender username metadata is truncated');
+    }
+    if (!bytesEqual(remaining.subarray(0, 4), COMPACT_SENDER_USERNAME_MAGIC)) {
+      throw new Error('Compact payload sender username metadata magic mismatch');
+    }
+    const usernameLength = remaining[4];
+    const metadataLength = PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES + usernameLength;
+    if (usernameLength <= 0 || metadataLength > PLATHO_COMPACT_SENDER_USERNAME_METADATA_MAX_BYTES || remaining.length < metadataLength) {
+      throw new Error('Compact payload sender username metadata has invalid length');
+    }
+    const senderUsername = normalizeCompactPlathoUsername(fromUtf8(remaining.subarray(
+      PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES,
+      metadataLength,
+    )));
+    metadata.senderUsername = senderUsername;
+    metadata.sender_username = senderUsername;
+    remaining = remaining.subarray(metadataLength);
+  }
+  if ((flags & COMPACT_PAYLOAD_FLAG_RECIPIENT_WALLET) !== 0) {
+    if (remaining.length < PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES) {
+      throw new Error('Compact payload recipient wallet metadata is truncated');
+    }
+    const prefix = remaining.subarray(0, PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES);
+    if (!bytesEqual(prefix.subarray(0, 4), COMPACT_RECIPIENT_WALLET_MAGIC)) {
+      throw new Error('Compact payload recipient wallet metadata magic mismatch');
+    }
+    const rawWorkchain = prefix[4] >= 0x80 ? prefix[4] - 0x100 : prefix[4];
+    const recipientWallet = `${rawWorkchain}:${bytesToHex(prefix.subarray(5, 37))}`;
+    metadata.recipientWallet = recipientWallet;
+    metadata.recipient_wallet = recipientWallet;
+    remaining = remaining.subarray(PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES);
+  }
   return { content: remaining, metadata };
 }
 
-function compactPayloadContent(bytesLike) {
+function compactPayloadContent(bytesLike, options = {}) {
   const bytes = toUint8Array(bytesLike);
-  const usefulBytes = bytes.length - PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES;
+  const reservedTailBytes = normalizeCompactPayloadReservedTailBytes(options);
+  const usefulBytes = bytes.length - PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES + reservedTailBytes;
   if (!PLATHO_CAPSULE_USEFUL_SIZE_CLASSES.includes(usefulBytes)) {
     throw new Error('Compact payload must use a supported useful slot size');
   }
@@ -1100,13 +1257,14 @@ function compactPayloadContent(bytesLike) {
     content: bytes.subarray(contentStart, contentEnd),
     sizeClass,
     usefulBytes,
+    reservedTailBytes,
     blocks,
   };
 }
 
 function assertCompactPayloadBytes(bytesLike, options = {}) {
   const bytes = toUint8Array(bytesLike);
-  const payload = compactPayloadContent(bytes);
+  const payload = compactPayloadContent(bytes, options);
   const requestedSizeClass = options.sizeClass ?? options.size_class;
   if (requestedSizeClass !== undefined && payload.sizeClass !== normalizeCapsuleSizeClass(requestedSizeClass)) {
     throw new Error('Compact payload size class mismatch');
@@ -1138,10 +1296,15 @@ export function encodeCompactPayload(input, options = {}) {
     ), payloadOptions);
     return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.PAYMENT, content.flags, content.content, payloadOptions);
   }
+  if (payload.type === 'document' || payload.type === PLATHO_COMPACT_CONTENT_TYPES.DOCUMENT) {
+    const bytes = toUint8Array(payload.bytes ?? payload.documentBytes ?? payload.document_bytes ?? new Uint8Array());
+    const encoded = encodeCompactPayloadContentWithMetadata(bytes, payloadOptions);
+    return encodeFixedCompactPayload(PLATHO_COMPACT_CONTENT_TYPES.DOCUMENT, encoded.flags, encoded.content, payloadOptions);
+  }
   throw new Error('Unsupported Platho compact payload type');
 }
 
-export function decodeCompactPayload(bytesLike) {
+function decodeCompactPayloadBytes(bytesLike, options = {}) {
   const {
     type,
     flags,
@@ -1150,7 +1313,7 @@ export function decodeCompactPayload(bytesLike) {
     streamId,
     partIndex,
     partCount,
-  } = compactPayloadContent(bytesLike);
+  } = compactPayloadContent(bytesLike, options);
   const decoded = decodeCompactPayloadMetadata(content, flags);
   const part = {
     streamId,
@@ -1183,7 +1346,18 @@ export function decodeCompactPayload(bytesLike) {
       ...part,
     };
   }
+  if (type === PLATHO_COMPACT_CONTENT_TYPES.DOCUMENT) {
+    return {
+      type: 'document',
+      bytes: decoded.content,
+      ...part,
+    };
+  }
   throw new Error('Unsupported Platho compact payload type');
+}
+
+export function decodeCompactPayload(bytesLike) {
+  return decodeCompactPayloadBytes(bytesLike);
 }
 
 function compactBodyAad(bodyPrefix, hashes) {
@@ -1193,6 +1367,82 @@ function compactBodyAad(bodyPrefix, hashes) {
     compactHashBytes(hashes.header0Hash, 'header0Hash'),
     compactHashBytes(hashes.header1Hash, 'header1Hash'),
   );
+}
+
+function compactSenderRecoveryAad(bodyPrefix, hashes) {
+  return concatBytes(
+    utf8(COMPACT_SENDER_RECOVERY_AAD_DOMAIN),
+    bodyPrefix,
+    compactHashBytes(hashes.header0Hash, 'header0Hash'),
+    compactHashBytes(hashes.header1Hash, 'header1Hash'),
+    base64urlFixedBytes(hashes.senderKeyId, 32, 'senderKeyId'),
+    base64urlFixedBytes(hashes.recipientKeyId, 32, 'recipientKeyId'),
+  );
+}
+
+function compactSenderRecoverySection(sectionBytesLike) {
+  const section = assertBytes('sender recovery section', sectionBytesLike, PLATHO_COMPACT_SENDER_RECOVERY_BYTES);
+  if (!bytesEqual(section.subarray(0, 4), COMPACT_SENDER_RECOVERY_MAGIC)) {
+    throw new Error('Compact sender recovery magic mismatch');
+  }
+  return {
+    nonce: section.subarray(4, 16),
+    wrappedPayloadKey: section.subarray(16, 64),
+  };
+}
+
+function senderRecoverySecretParts(senderKeyPair, suite) {
+  const keyPair = senderKeyPair?.encryptionKeyPair ?? senderKeyPair;
+  if (!keyPair) throw new Error('Sender recovery key pair is required');
+  if (keyPair.suite !== suite) throw new Error('Sender recovery key suite mismatch');
+  const parts = [
+    assertBytes('sender.x25519SecretKey', keyPair.x25519SecretKey, X25519_SECRET_KEY_BYTES),
+  ];
+  if (suite === CRYPTO_SUITES.HYBRID_V1) {
+    parts.push(assertBytes('sender.mlKem768SecretKey', keyPair.mlKem768SecretKey, 2400));
+  }
+  return parts;
+}
+
+async function deriveSenderRecoveryKey(senderKeyPair, suite, aad) {
+  const transcriptHash = await sha256(aad);
+  const keyBytes = await deriveAesGcmKeyBytesFromTranscriptHash(
+    senderRecoverySecretParts(senderKeyPair, suite),
+    transcriptHash,
+    {
+      saltDomain: COMPACT_SENDER_RECOVERY_SALT_DOMAIN,
+      keyDomain: COMPACT_SENDER_RECOVERY_KEY_DOMAIN,
+    },
+  );
+  return importAesGcmKeyBytes(keyBytes);
+}
+
+async function encryptSenderRecoverySection(payloadKeyBytes, senderKeyPair, suite, bodyPrefix, hashes) {
+  const nonce = randomBytes(AES_GCM_NONCE_BYTES);
+  const aad = compactSenderRecoveryAad(bodyPrefix, hashes);
+  const key = await deriveSenderRecoveryKey(senderKeyPair, suite, aad);
+  const wrapped = new Uint8Array(await getCrypto().subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce, additionalData: aad, tagLength: 128 },
+    key,
+    assertBytes('payload key bytes', payloadKeyBytes, 32),
+  ));
+  if (wrapped.length !== 48) throw new Error('Sender recovery wrapped key size drift');
+  return concatBytes(COMPACT_SENDER_RECOVERY_MAGIC, nonce, wrapped);
+}
+
+async function decryptSenderRecoveryPayloadKey(info, recipientKeyPair, hashes) {
+  const expectedSenderKeyId = await recipientKeyIdForSuite(recipientKeyPair, info.suite);
+  if (!hashes.senderKeyId || expectedSenderKeyId !== hashes.senderKeyId) {
+    throw new Error('Compact body sender key mismatch');
+  }
+  const section = compactSenderRecoverySection(info.senderRecoverySection);
+  const aad = compactSenderRecoveryAad(info.prefix, hashes);
+  const key = await deriveSenderRecoveryKey(recipientKeyPair, info.suite, aad);
+  return new Uint8Array(await getCrypto().subtle.decrypt(
+    { name: 'AES-GCM', iv: section.nonce, additionalData: aad, tagLength: 128 },
+    key,
+    section.wrappedPayloadKey,
+  ));
 }
 
 async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, options) {
@@ -1211,9 +1461,11 @@ async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, o
     kemParts.push(assertBytes('mlKem768Ciphertext', encapsulated.cipherText, MLKEM768_CIPHERTEXT_BYTES));
     sharedParts.push(assertBytes('mlKem768SharedSecret', encapsulated.sharedSecret, 32));
   }
+  const senderRecovery = options.senderRecovery !== false && options.senderKeyPair;
+  const bodyFlags = senderRecovery ? COMPACT_BODY_FLAG_SENDER_RECOVERY : 0;
   const bodyPrefix = concatBytes(
     COMPACT_BODY_MAGIC,
-    new Uint8Array([PROTOCOL_VERSION, suiteByte, 0, 0]),
+    new Uint8Array([PROTOCOL_VERSION, suiteByte, bodyFlags, 0]),
     messageId,
     nonce,
     assertBytes('x25519EphemeralPublicKey', ephemeralPublicKey, X25519_PUBLIC_KEY_BYTES),
@@ -1221,13 +1473,21 @@ async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBundle, o
   );
   const aad = compactBodyAad(bodyPrefix, options.hashes);
   const transcriptHash = await sha256(aad);
-  const key = await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+  const keyBytes = senderRecovery
+    ? await deriveAesGcmKeyBytesFromTranscriptHash(sharedParts, transcriptHash)
+    : null;
+  const key = keyBytes
+    ? await importAesGcmKeyBytes(keyBytes)
+    : await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
   const ciphertext = await getCrypto().subtle.encrypt(
     { name: 'AES-GCM', iv: nonce, additionalData: aad, tagLength: 128 },
     key,
     toUint8Array(payloadBytes),
   );
-  return concatBytes(bodyPrefix, new Uint8Array(ciphertext));
+  const recoverySection = senderRecovery
+    ? await encryptSenderRecoverySection(keyBytes, options.senderKeyPair, suite, bodyPrefix, options.hashes)
+    : new Uint8Array();
+  return concatBytes(bodyPrefix, recoverySection, new Uint8Array(ciphertext));
 }
 
 function inspectCompactBodyBytes(bodyBytesLike) {
@@ -1240,16 +1500,23 @@ function inspectCompactBodyBytes(bodyBytesLike) {
   const suite = suiteForByte(bodyBytes[5]);
   const prefixBytes = compactBodyPrefixBytesForSuite(suite);
   if (bodyBytes.length < prefixBytes + COMPACT_BODY_TAG_BYTES) throw new Error('Compact body is truncated');
+  const flags = bodyBytes[6];
+  if ((flags & ~COMPACT_BODY_FLAG_SENDER_RECOVERY) !== 0) throw new Error('Unsupported Platho compact body flags');
+  const hasSenderRecovery = (flags & COMPACT_BODY_FLAG_SENDER_RECOVERY) !== 0;
+  const ciphertextOffset = prefixBytes + (hasSenderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+  if (bodyBytes.length < ciphertextOffset + COMPACT_BODY_TAG_BYTES) throw new Error('Compact body is truncated');
   return {
     suite,
     suiteByte: bodyBytes[5],
-    flags: bodyBytes[6],
+    flags,
+    hasSenderRecovery,
     messageId: bodyBytes.subarray(8, 24),
     nonce: bodyBytes.subarray(24, 36),
     ephemeralPublicKey: bodyBytes.subarray(36, 68),
     mlKem768Ciphertext: suite === CRYPTO_SUITES.HYBRID_V1 ? bodyBytes.subarray(68, 68 + MLKEM768_CIPHERTEXT_BYTES) : null,
     prefix: bodyBytes.subarray(0, prefixBytes),
-    ciphertext: bodyBytes.subarray(prefixBytes),
+    senderRecoverySection: hasSenderRecovery ? bodyBytes.subarray(prefixBytes, ciphertextOffset) : null,
+    ciphertext: bodyBytes.subarray(ciphertextOffset),
   };
 }
 
@@ -1257,25 +1524,43 @@ async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes) 
   const bodyBytes = toUint8Array(bodyBytesLike);
   const info = inspectCompactBodyBytes(bodyBytes);
   const expectedRecipientKeyId = await recipientKeyIdForSuite(recipientKeyPair, info.suite);
-  if (expectedRecipientKeyId && hashes.recipientKeyId && expectedRecipientKeyId !== hashes.recipientKeyId) {
+  const openedAsRecipient = expectedRecipientKeyId && hashes.recipientKeyId && expectedRecipientKeyId === hashes.recipientKeyId;
+  const openedAsSender = !openedAsRecipient
+    && info.hasSenderRecovery
+    && hashes.senderKeyId
+    && expectedRecipientKeyId === hashes.senderKeyId;
+  if (!openedAsRecipient && !openedAsSender) {
     throw new Error('Compact body recipient key mismatch');
   }
-  const sharedParts = [deriveX25519SharedSecret(recipientKeyPair.x25519SecretKey, info.ephemeralPublicKey)];
-  if (info.suite === CRYPTO_SUITES.HYBRID_V1) {
-    sharedParts.push(ml_kem768.decapsulate(
-      assertBytes('mlKem768Ciphertext', info.mlKem768Ciphertext, MLKEM768_CIPHERTEXT_BYTES),
-      assertBytes('recipient.mlKem768SecretKey', recipientKeyPair.mlKem768SecretKey, 2400),
-    ));
-  }
   const aad = compactBodyAad(info.prefix, hashes);
-  const transcriptHash = await sha256(aad);
-  const key = await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+  let key = null;
+  if (openedAsSender) {
+    key = await importAesGcmKeyBytes(await decryptSenderRecoveryPayloadKey(info, recipientKeyPair, hashes));
+  } else {
+    const sharedParts = [deriveX25519SharedSecret(recipientKeyPair.x25519SecretKey, info.ephemeralPublicKey)];
+    if (info.suite === CRYPTO_SUITES.HYBRID_V1) {
+      sharedParts.push(ml_kem768.decapsulate(
+        assertBytes('mlKem768Ciphertext', info.mlKem768Ciphertext, MLKEM768_CIPHERTEXT_BYTES),
+        assertBytes('recipient.mlKem768SecretKey', recipientKeyPair.mlKem768SecretKey, 2400),
+      ));
+    }
+    const transcriptHash = await sha256(aad);
+    key = info.hasSenderRecovery
+      ? await importAesGcmKeyBytes(await deriveAesGcmKeyBytesFromTranscriptHash(sharedParts, transcriptHash))
+      : await deriveAesGcmKeyFromTranscriptHash(sharedParts, transcriptHash);
+  }
   const plaintext = await getCrypto().subtle.decrypt(
     { name: 'AES-GCM', iv: info.nonce, additionalData: aad, tagLength: 128 },
     key,
     info.ciphertext,
   );
-  return decodeCompactPayload(new Uint8Array(plaintext));
+  return {
+    payload: decodeCompactPayloadBytes(new Uint8Array(plaintext), {
+      reservedTailBytes: info.hasSenderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0,
+    }),
+    openedAs: openedAsSender ? 'sender' : 'recipient',
+    keyId: expectedRecipientKeyId,
+  };
 }
 
 function compactChunkDataBytesForSuite(suite) {
@@ -1589,12 +1874,6 @@ export async function verifySignedPublicKeyBundle(signedBundle, options = {}) {
 export async function publicKeyBundleFromVaultKeyRecord(keyRecord, options = {}) {
   if (!keyRecord || keyRecord.exists !== true) throw new Error('Vault key record does not exist');
   const requestedSuite = normalizeRequestedSuite(options.suite ?? options.requestedSuite);
-  if (options.ownerWallet !== undefined && options.ownerWallet !== null) {
-    const recordOwner = recordField(keyRecord, 'owner_wallet', 'ownerWallet');
-    if (!compareAddressLike(recordOwner, options.ownerWallet)) {
-      throw new Error('Vault key record owner does not match wallet owner');
-    }
-  }
   if (uintLikeToBigInt(recordField(keyRecord, 'revoked_lt', 'revokedLt'), 'revoked_lt') !== 0n) {
     throw new Error('Vault key record is revoked');
   }
@@ -1782,12 +2061,6 @@ export async function verifyVaultKeyRecordBinding(signedBundle, keyRecord, optio
   const draft = await createVaultMessagingKeyDraft(verifiedBundle.bundle, verifiedBundle.signingPublicKey);
 
   const expectedOwner = options.ownerWallet ?? signedBundle.ownerWallet;
-  if (expectedOwner !== null && expectedOwner !== undefined) {
-    const recordOwner = recordField(keyRecord, 'owner_wallet', 'ownerWallet');
-    if (!compareAddressLike(recordOwner, expectedOwner)) {
-      throw new Error('Vault key record owner does not match wallet owner');
-    }
-  }
   if (options.currentKeyId !== undefined && options.recordKeyId !== undefined) {
     const currentKeyId = uintLikeToBigInt(options.currentKeyId, 'currentKeyId');
     const recordKeyId = uintLikeToBigInt(options.recordKeyId, 'recordKeyId');
@@ -2111,10 +2384,15 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
   const now = options.now ?? Date.now();
   const suite = assertSupportedPrivateSuite(recipient.suite);
   const cryptoSuite = recipient.contractSuite;
+  const senderRecovery = options.senderRecovery !== false;
+  const payloadReservedBytes = senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0;
   const payloadBytes = options.payloadBytes
-    ? assertCompactPayloadBytes(options.payloadBytes, options)
-    : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext }, options);
-  const payloadInfo = compactPayloadContent(payloadBytes);
+    ? assertCompactPayloadBytes(options.payloadBytes, { ...options, reservedTailBytes: payloadReservedBytes })
+    : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext }, {
+      ...options,
+      reservedTailBytes: payloadReservedBytes,
+    });
+  const payloadInfo = compactPayloadContent(payloadBytes, { reservedTailBytes: payloadReservedBytes });
   const sizeClass = normalizeCapsuleSizeClass(options.sizeClass ?? options.size_class ?? payloadInfo.sizeClass);
   if (payloadInfo.sizeClass !== sizeClass) throw new Error('Private capsule payload size class mismatch');
   assertAllowedPrivateCapsulePair(sizeClass, cryptoSuite);
@@ -2154,8 +2432,14 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
 
   const partialHashes = await computePrivateCapsuleHeaderHashes(header0, header1);
   const bodyBytes = await encryptCompactPayloadBytes(payloadBytes, recipient.bundle, {
-    hashes: partialHashes,
+    hashes: {
+      ...partialHashes,
+      senderKeyId: header0.senderKeyId,
+      recipientKeyId: header0.recipientKeyId,
+    },
     messageId: options.messageId,
+    senderRecovery,
+    senderKeyPair: senderIdentity.encryptionKeyPair,
   });
   assertPrivateBodyMatchesHeader(header0, bodyBytes);
   const body = {
@@ -2254,15 +2538,19 @@ export async function openEncryptedPrivateCapsule(capsule, recipientKeyPair, opt
   if (replayCache && await replayCache.has(verified.capsule.id)) {
     throw new Error('Private capsule replay detected');
   }
-  const payload = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
+  const decrypted = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
     header0Hash: verified.capsule.hashes.header0Hash,
     header1Hash: verified.capsule.hashes.header1Hash,
+    senderKeyId: verified.capsule.header0.senderKeyId,
     recipientKeyId: verified.capsule.header0.recipientKeyId,
   });
+  const payload = decrypted.payload;
   if (replayCache) await replayCache.add(verified.capsule.id, verified.capsule.header1.expiresAt);
   return {
     plaintext: payload.type === 'text' ? payload.text : '',
     payload,
+    openedAs: decrypted.openedAs,
+    openedKeyId: decrypted.keyId,
     capsule: verified.capsule,
     publish: verified.publish,
     senderSigningPublicKey: verified.senderSigningPublicKey,
@@ -2339,15 +2627,19 @@ export async function openPrivateCapsuleChainEntry(entry, recipientKeyPair, opti
   if (replayCache && await replayCache.has(verified.capsule.id)) {
     throw new Error('Private capsule replay detected');
   }
-  const payload = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
+  const decrypted = await decryptCompactBodyBytes(verified.bodyBytes, recipientKeyPair, {
     header0Hash: verified.capsule.hashes.header0Hash,
     header1Hash: verified.capsule.hashes.header1Hash,
+    senderKeyId: verified.capsule.header0.senderKeyId,
     recipientKeyId: verified.capsule.header0.recipientKeyId,
   });
+  const payload = decrypted.payload;
   if (replayCache) await replayCache.add(verified.capsule.id, verified.capsule.header1.expiresAt);
   return {
     plaintext: payload.type === 'text' ? payload.text : '',
     payload,
+    openedAs: decrypted.openedAs,
+    openedKeyId: decrypted.keyId,
     capsule: verified.capsule,
     publish: verified.publish,
     senderSigningPublicKey: verified.senderSigningPublicKey,
@@ -2476,7 +2768,6 @@ export async function runPlathoCryptoSelfTest() {
   }
   const activeVaultKeyRecord = {
     exists: true,
-    owner_wallet: walletAddress,
     key_generation: 0n,
     enc_pubkey: vaultDraft.message.enc_pubkey,
     sign_pubkey: vaultDraft.message.sign_pubkey,
@@ -2565,12 +2856,6 @@ export async function runPlathoCryptoSelfTest() {
 
   await expectReject('signed public key bundle expiry', () => verifySignedPublicKeyBundle(signedBundle, {
     now: 1_700_003_600_001,
-  }));
-
-  const ownerMismatchRecord = { ...activeVaultKeyRecord, owner_wallet: 'testnet:attacker-wallet-placeholder' };
-  await expectReject('Vault key record owner mismatch', () => verifyVaultKeyRecordBinding(signedBundle, ownerMismatchRecord, {
-    now: 1_700_000_001_000,
-    ownerWallet: walletAddress,
   }));
 
   const revokedRecord = { ...activeVaultKeyRecord, revoked_lt: 2n };

@@ -30,6 +30,14 @@ const PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS = new Map<bigint, bigint>([
   [32n, 7_600_000n],
 ]);
 const PUBLIC_EXEC = 2_400_000n;
+const PUBLIC_EXEC_BY_SIZE_CLASS = new Map<bigint, bigint>([
+  [1n, 2_400_000n],
+  [2n, 4_300_000n],
+  [4n, 4_500_000n],
+  [8n, 5_000_000n],
+  [16n, 5_800_000n],
+  [32n, 7_600_000n],
+]);
 const KEEPALIVE = 1_000_000n;
 const PRIVATE_ENTRY_STORAGE = 3_300_000n;
 const PUBLIC_ENTRY_STORAGE = 7_400_000n;
@@ -119,6 +127,7 @@ function vaultPrivate(overrides?: Partial<PublishPrivateFromVault>): PublishPriv
 }
 
 function vaultPublic(author: Address, overrides?: Partial<PublishPublicFromVault>): PublishPublicFromVault {
+  const sizeClass = overrides?.size_class ?? 1n;
   const header = overrides?.header ?? finalPublicHeaderCell(0x50);
   const body = overrides?.body ?? finalPublicBodyCell(0x79);
   return {
@@ -126,6 +135,7 @@ function vaultPublic(author: Address, overrides?: Partial<PublishPublicFromVault
     bounce_id: 2n,
     bounce_tag: 2n,
     publish_id: hash256('vault-public-publish'),
+    size_class: sizeClass,
     author_wallet: author,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     header_hash: cellHash(header),
@@ -147,6 +157,16 @@ function privateRequired(sizeClass = 1n): bigint {
   return PRIVATE_HYBRID_FEE + privateExecReserve(sizeClass) + KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
 }
 
+function publicExecReserve(sizeClass = 1n): bigint {
+  const value = PUBLIC_EXEC_BY_SIZE_CLASS.get(sizeClass);
+  if (value === undefined) throw new Error(`missing public exec reserve for size class ${sizeClass}`);
+  return value;
+}
+
+function publicRequired(sizeClass = 1n): bigint {
+  return PUBLIC_FEE + publicExecReserve(sizeClass) + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
+}
+
 describe('CapsuleHub value/storage boundary negative matrix', () => {
   it('CAPSULE-BND-01: Vault private publish rejects min-1 and accepts exact/surcharge fixed reserve', async () => {
     const { blockchain, capsule, mockVaultAddress } = await setup();
@@ -164,6 +184,32 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
     expect(state.private_latest_id).toBe(2n);
     expect(state.private_page_count).toBe(1n);
     expect(state.accrued_plato_fee_ton).toBe(PRIVATE_HYBRID_FEE * 2n);
+  });
+
+  it.each([
+    ['private', 1_000_000n],
+    ['private', 50_000_000n],
+    ['public', 1_000_000n],
+    ['public', 50_000_000n],
+  ] as const)('RT-VCAPS-004: %s publish surcharge %s never increases accrued_plato_fee_ton', async (kind, surcharge) => {
+    const { blockchain, capsule, mockVaultAddress, author } = await setup();
+
+    if (kind === 'private') {
+      await capsule.send(blockchain.sender(mockVaultAddress), { value: privateRequired(1n) + surcharge }, vaultPrivate({
+        publish_id: hash256(`rt-vcaps-004-private-${surcharge}`),
+      }));
+      const state = await capsule.getGetState();
+      expect(state.private_latest_id).toBe(1n);
+      expect(state.accrued_plato_fee_ton).toBe(PRIVATE_HYBRID_FEE);
+      return;
+    }
+
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: publicRequired(1n) + surcharge }, vaultPublic(author.address, {
+      publish_id: hash256(`rt-vcaps-004-public-${surcharge}`),
+    }));
+    const state = await capsule.getGetState();
+    expect(state.public_latest_id).toBe(1n);
+    expect(state.accrued_plato_fee_ton).toBe(PUBLIC_FEE);
   });
 
   it('CAPSULE-BND-02: long-term private and public Vault exact boundaries are enforced', async () => {
@@ -333,13 +379,16 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
     expect(state.accrued_plato_fee_ton).toBe(0n);
   }, 30000);
 
-  it('CAPSULE-PAYLOAD-03: public publish accepts variable bodies up to 1024 bytes and rejects larger bodies', async () => {
+  it('CAPSULE-PAYLOAD-03: public publish accepts selected 1-32 KiB size classes and rejects larger bodies', async () => {
     const { blockchain, capsule, mockVaultAddress, author } = await setup();
     const firstPageRequired = PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
     const samePageRequired = PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + ACK_RESERVE;
+    const public32kRequired = publicRequired(32n);
     const tinyBody = payloadCell('public-short');
     const maxBody = snakeCell(1024, 0x6f);
     const tooLargeBody = snakeCell(1025, 0x6e);
+    const public32kBody = snakeCell(32 * 1024, 0x5a);
+    const publicTooLarge32kBody = snakeCell((32 * 1024) + 1, 0x5b);
 
     await capsule.send(blockchain.sender(mockVaultAddress), { value: firstPageRequired }, vaultPublic(author.address, {
       publish_id: hash256('public-tiny'),
@@ -357,11 +406,23 @@ describe('CapsuleHub value/storage boundary negative matrix', () => {
       body_hash: cellHash(tooLargeBody),
       body: tooLargeBody,
     }));
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: public32kRequired }, vaultPublic(author.address, {
+      publish_id: hash256('public-32k'),
+      size_class: 32n,
+      body_hash: cellHash(public32kBody),
+      body: public32kBody,
+    }));
+    await capsule.send(blockchain.sender(mockVaultAddress), { value: public32kRequired }, vaultPublic(author.address, {
+      publish_id: hash256('public-too-large-32k'),
+      size_class: 32n,
+      body_hash: cellHash(publicTooLarge32kBody),
+      body: publicTooLarge32kBody,
+    }));
 
     const state = await capsule.getGetState();
-    expect(state.public_latest_id).toBe(2n);
+    expect(state.public_latest_id).toBe(3n);
     expect(state.public_page_count).toBe(1n);
-    expect(state.accrued_plato_fee_ton).toBe(PUBLIC_FEE * 2n);
+    expect(state.accrued_plato_fee_ton).toBe(PUBLIC_FEE * 3n);
   }, 30000);
 
   it('CAPSULE-PAYLOAD-04: public header is bounded to one byte-aligned cell without refs', async () => {

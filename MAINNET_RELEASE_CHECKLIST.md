@@ -113,9 +113,13 @@ is a registration snapshot for legacy/reporting context, not the current owner a
 the owner for messaging, payments, profile display, username transfer checks, or wallet identity after the item has
 become transferable.
 
-## Command Gates
+Username mint finality is intentionally conservative: production release evidence must verify the
+`UsernameNFTItem` code hash, deterministic item address derivation, and the registry item
+deployment ACK/bounce path before treating Vault-funded username mints as live.
 
-Run these before producing the final archive or calling any mainnet transaction:
+## Command Gates Before Production PWA Release
+
+Run these before producing the final archive, publishing the production PWA, or calling any mainnet transaction:
 
 ```powershell
 npm.cmd run build
@@ -124,21 +128,29 @@ node scripts\hash_codes.js
 $env:TS_NODE_COMPILER_OPTIONS='{ "module": "CommonJS" }'; npx.cmd ts-node scripts\deployment_manifest_m15.ts
 $env:TS_NODE_COMPILER_OPTIONS='{ "module": "CommonJS" }'; npx.cmd ts-node scripts\conformance_m16.ts
 $env:TS_NODE_COMPILER_OPTIONS='{ "module": "CommonJS" }'; npx.cmd ts-node scripts\artifact_integrity_m18.ts
+npm.cmd run mainnet:manifest:draft
+npm.cmd run mainnet:deploy:packet
+npm.cmd run mainnet:tx:dry-run
+npm.cmd run mainnet:genesis:verify
+npm.cmd run preprod:check
+npm.cmd run web:deploy:prepare:prod
 npm.cmd run audit:archive
 ```
 
-Run these only with final live inputs:
+Any hard failure stops the release. A script that is waiting for final mainnet input is not a pass.
+
+## Post-Pool Command Gates
+
+Run these only after `mainnet:genesis:verify` has passed, the production PWA is released, the full activity airdrop has been distributed, and the initial ATH/TON pool exists:
 
 ```powershell
-npm.cmd run mainnet:genesis:verify
 npm.cmd run m20f:collect
 npm.cmd run m20f:preflight
 npm.cmd run market-stability:readiness
 npm.cmd run buyback:enable-preflight
-npm.cmd run web:deploy:prepare:prod
 ```
 
-Any hard failure stops the release. A script that is waiting for final mainnet input is not a pass.
+Any hard failure stops the post-pool launch phase. A script that is waiting for final pool input is not a pass.
 
 ## Authorities To Name Honestly
 

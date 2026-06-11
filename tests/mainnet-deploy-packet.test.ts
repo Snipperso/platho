@@ -30,6 +30,8 @@ function fakeHash(seed: string): string {
   return seed.padEnd(64, '0').slice(0, 64);
 }
 
+const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
+
 function draft() {
   const addresses = {
     ath_master: ADDR.athMaster,
@@ -144,6 +146,23 @@ function draft() {
 }
 
 describe('mainnet deploy packet funding semantics', () => {
+  it('H-DEP-LIFECYCLE-01: deploy packet is explicitly a pre-execution template and deploys production targets only', () => {
+    const packet = buildPacket(draft());
+    const deployedTargets = packet.phase_1_deploy_contracts.map((step: any) => [
+      step.id,
+      step.action,
+      step.contract,
+      step.message,
+      step.target_is,
+    ].filter(Boolean).join(' '));
+
+    expect(packet.production_deploy_executed).toBe(false);
+    expect(packet.lifecycle_stage).toBe('pre_execution_deploy_packet_template');
+    expect(packet.lifecycle_note).toMatch(/pre-execution template/);
+    expect(packet.lifecycle_note).toMatch(/mainnet_genesis_verify_report\.json/);
+    expect(deployedTargets).not.toEqual(expect.arrayContaining([expect.stringMatching(TEST_DEPLOY_TARGET_RE)]));
+  });
+
   it('H-DEP-FUND-01: funding steps target the Treasury Owner ATHWallet and keep official wallets as expected balance wallets only', () => {
     const packet = buildPacket(draft());
     const funding = packet.phase_3_pre_seal_funding;
@@ -202,6 +221,17 @@ describe('mainnet deploy packet funding semantics', () => {
       ['ProfileRegistry.BindProfileOfficialAthWallet', ADDR.profileOfficialWallet],
       ['ProfileRegistry.BindProfileVault', ADDR.vault],
     ]);
+  });
+
+  it('RT-MSTAB-005: deploy packet keeps official MarketStabilitySeller buy tooling gated by readiness', () => {
+    const packet = buildPacket(draft());
+
+    expect(packet.post_genesis_not_in_this_packet).toContain(
+      'Keep official MarketStabilitySeller buy tooling disabled until MARKET_STABILITY_SELLER_READY.txt is true.',
+    );
+    expect(packet.post_genesis_not_in_this_packet.indexOf('Run market_stability_seller_readiness.')).toBeLessThan(
+      packet.post_genesis_not_in_this_packet.indexOf('Keep official MarketStabilitySeller buy tooling disabled until MARKET_STABILITY_SELLER_READY.txt is true.'),
+    );
   });
 
   it('H-DEP-BIND-02: deploy packet refuses missing, duplicate, unknown, or mismatched pre-seal bindings', () => {

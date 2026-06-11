@@ -20,6 +20,7 @@ import { MockAthWalletNoAck } from '../build/MockAthWalletNoAck/MockAthWalletNoA
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import {
   ATHWallet,
+  ATHTransferRequestVaultProfileAvatar,
 } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const MANIFEST_HASH = 0x50524f46494c45524547495354525900000000000000000000000000000001n;
@@ -29,6 +30,8 @@ const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const ATH_TRANSFER_NOTIFY_ID_DOMAIN = 0x41544E49n;
 const ATH_SENDER_KEY_MOD = 1n << 160n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
+const OP_ATH_INTERNAL_TRANSFER = 0x41544812;
+const OP_PROFILE_AVATAR_VAULT_NOTIFICATION = 0xA11A7002;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.PROFILE.${label}`).digest());
@@ -280,6 +283,20 @@ async function sendAcceptedAvatar(
   await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
     query_id: queryId,
   }));
+}
+
+async function deployAthWallet(blockchain: Blockchain, owner: Address, athMaster: Address, tokenBalance: bigint) {
+  const zeroInit = await ATHWallet.init(0n, owner, athMaster);
+  const dataInit = await ATHWallet.init(tokenBalance, owner, athMaster);
+  const address = contractAddress(owner.workChain, zeroInit);
+  await blockchain.setShardAccount(address, createShardAccount({
+    address,
+    code: zeroInit.code,
+    data: dataInit.data,
+    balance: toNano('3'),
+    workchain: address.workChain,
+  }));
+  return blockchain.openContract(new ATHWallet(address, zeroInit));
 }
 
 describe('ProfileRegistry wallet avatar pointers', () => {
@@ -675,6 +692,56 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(global.burn_due_ath).toBe(0n);
   });
 
+  it('PROFILE-09: treasury due flushes can overlap with new avatar payments without losing due', async () => {
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: 0n,
+      deployMaster: false,
+      mockOfficial: true,
+    });
+    const ownerA = fixtureAddress('OVERLAP_FLUSH_OWNER_A');
+    const ownerB = fixtureAddress('OVERLAP_FLUSH_OWNER_B');
+    const treasuryAthWalletAddress = await ctx.registry.getGetAthWalletAddress(ctx.treasuryAthReceiver);
+
+    await sendAcceptedAvatar(ctx, ownerA, 901n);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileTreasuryAthDue',
+      query_id: 902n,
+    } as FlushProfileTreasuryAthDue);
+
+    let global = await ctx.registry.getGetGlobal();
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.pending_treasury_flush_count).toBe(1n);
+
+    await sendAcceptedAvatar(ctx, ownerB, 903n);
+    await ctx.registry.send(ctx.flusher.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushProfileTreasuryAthDue',
+      query_id: 904n,
+    } as FlushProfileTreasuryAthDue);
+
+    global = await ctx.registry.getGetGlobal();
+    expect(global.profile_count).toBe(2n);
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.burn_due_ath).toBe(PROFILE_AVATAR_PRICE_ATH);
+    expect(global.pending_treasury_flush_count).toBe(2n);
+
+    await ctx.registry.send(ctx.blockchain.sender(treasuryAthWalletAddress), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferAck',
+      query_id: 902n,
+      amount: HALF_AVATAR_PRICE_ATH,
+    } as ATHTransferAck);
+    await ctx.registry.send(ctx.blockchain.sender(treasuryAthWalletAddress), { value: toNano('0.05') }, {
+      $$type: 'ATHTransferAck',
+      query_id: 904n,
+      amount: HALF_AVATAR_PRICE_ATH,
+    } as ATHTransferAck);
+
+    global = await ctx.registry.getGetGlobal();
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.pending_treasury_flush_count).toBe(0n);
+    expect((await ctx.registry.getGetPendingTreasuryFlush(902n)).exists).toBe(false);
+    expect((await ctx.registry.getGetPendingTreasuryFlush(904n)).exists).toBe(false);
+  });
+
   it('PROFILE-12: accepts Vault-funded avatar notification only from the bound Vault payer', async () => {
     const ctx = await deployProfileRegistryWithAthSystem({
       officialWalletBalance: 0n,
@@ -706,5 +773,62 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(global.avatar_record_count).toBe(1n);
     expect(global.treasury_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
     expect(global.burn_due_ath).toBe(HALF_AVATAR_PRICE_ATH);
+  });
+
+  it('PROFILE-12B: wrong payer through real ATHWallet refunds ATH back to the source wallet', async () => {
+    const ctx = await deployProfileRegistryWithAthSystem({
+      officialWalletBalance: 0n,
+      deployMaster: true,
+    });
+    const wrongPayer = await ctx.blockchain.treasury('profile-wrong-payer-source');
+    const owner = fixtureAddress('VAULT_FUNDED_WRONG_PAYER_OWNER');
+    const queryId = 1_203n;
+    const sourceWallet = await deployAthWallet(
+      ctx.blockchain,
+      wrongPayer.address,
+      ctx.athMasterAddress,
+      PROFILE_AVATAR_PRICE_ATH,
+    );
+
+    const result = await sourceWallet.send(wrongPayer.getSender(), { value: toNano('0.3') }, {
+      $$type: 'ATHTransferRequestVaultProfileAvatar',
+      query_id: queryId,
+      amount: PROFILE_AVATAR_PRICE_ATH,
+      recipient: ctx.registry.address,
+      response_destination: wrongPayer.address,
+      notify_value: toNano('0.03'),
+      owner_wallet: owner,
+      avatar_hash: 0x1203n,
+      avatar_entry_id: 0n,
+      avatar_stream_id: 0x11223344556677889900aabbccddeeffn,
+      avatar_part_count: 2n,
+      media_format: 1n,
+    } as ATHTransferRequestVaultProfileAvatar);
+
+    const avatar = await ctx.registry.getGetAvatar(owner);
+    const global = await ctx.registry.getGetGlobal();
+    const pendingKey = senderKey(wrongPayer.address, queryId);
+
+    expect(findTransaction(result.transactions, {
+      from: ctx.officialAthWalletAddress,
+      to: ctx.registry.address,
+      op: OP_PROFILE_AVATAR_VAULT_NOTIFICATION,
+      success: false,
+      exitCode: 21161,
+    })).toBeDefined();
+    expect(findTransaction(result.transactions, {
+      from: ctx.officialAthWalletAddress,
+      to: sourceWallet.address,
+      op: OP_ATH_INTERNAL_TRANSFER,
+      success: true,
+    })).toBeDefined();
+    expect(avatar.exists).toBe(false);
+    expect(global.profile_count).toBe(0n);
+    expect(global.avatar_record_count).toBe(0n);
+    expect(global.treasury_due_ath).toBe(0n);
+    expect(global.burn_due_ath).toBe(0n);
+    expect((await sourceWallet.getGetWalletData()).balance).toBe(PROFILE_AVATAR_PRICE_ATH);
+    expect((await ctx.officialAthWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await ctx.officialAthWallet.getGetPendingNotification(queryId, pendingKey)).exists).toBe(false);
   });
 });

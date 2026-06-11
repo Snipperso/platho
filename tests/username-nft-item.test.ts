@@ -276,6 +276,47 @@ describe('UsernameNFTItem v1 milestone', () => {
     expect(body.loadBit()).toBe(false);
     expect(body.remainingBits).toBe(0);
     expect(body.remainingRefs).toBe(0);
+    expect((await item.getGetState()).owner_wallet.equals(nextOwner)).toBe(true);
+  });
+
+  it('RT-UNFT-004: forward transfer assigns ownership and notifies non-contract recipient without rollback', async () => {
+    const { blockchain, item, ownerWallet } = await deployItem();
+    const nextOwner = fixtureAddress('USERNAME_TRANSFER_NON_CONTRACT_OWNER');
+    const responseDestination = fixtureAddress('USERNAME_TRANSFER_NON_CONTRACT_RESPONSE');
+    const forwardPayload = beginCell().storeUint(0xabc, 12).endCell().beginParse();
+
+    const result = await item.send(blockchain.sender(ownerWallet), { value: 22_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 80n,
+      new_owner: nextOwner,
+      response_destination: responseDestination,
+      custom_payload: null,
+      forward_amount: 1_250_000n,
+      forward_payload: forwardPayload,
+    } as NftTransfer);
+
+    const notification = findTransaction(result.transactions, {
+      from: item.address,
+      to: nextOwner,
+      op: 0x05138D91,
+    });
+    expect(notification).toBeDefined();
+    const info = notification!.inMessage!.info;
+    expect(info.type).toBe('internal');
+    if (info.type === 'internal') {
+      expect(info.bounce).toBe(false);
+      expect(info.value.coins).toBe(1_250_000n);
+    }
+    const body = notification!.inMessage!.body.beginParse();
+    expect(body.loadUint(32)).toBe(0x05138D91);
+    expect(body.loadUintBig(64)).toBe(80n);
+    expect(body.loadAddress().equals(ownerWallet)).toBe(true);
+    expect(body.loadUint(12)).toBe(0xabc);
+    expect(body.remainingBits).toBe(0);
+    expect(body.remainingRefs).toBe(0);
+
+    const state = await item.getGetState();
+    expect(state.owner_wallet.equals(nextOwner)).toBe(true);
   });
 
   it('USERNAME-NFT-08: get_nft_data exposes TEP-64 on-chain username metadata without server URI', async () => {

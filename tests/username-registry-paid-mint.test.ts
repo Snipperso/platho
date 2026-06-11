@@ -9,6 +9,7 @@ import {
   BindUsernameVault,
   SealGenesis,
   AthTransferNotificationVaultMintUsername,
+  storeAthTransferNotificationVaultMintUsername,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import {
   NftTransfer,
@@ -25,6 +26,7 @@ const PRICE_6_PLUS = 100_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
 const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 21_000_000n + 1_000_000n + 4_000_000n;
+const USERNAME_ITEM_STORAGE_FLOOR = 15_900_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -115,6 +117,38 @@ async function sendMint(
   } as AthTransferNotificationVaultMintUsername);
 }
 
+function vaultMintNotificationBody(ownerWallet: Address, name: string, amount: bigint, payerWallet = fixtureAddress('USERNAME_REGISTRY_VAULT')) {
+  return beginCell().store(storeAthTransferNotificationVaultMintUsername({
+    $$type: 'AthTransferNotificationVaultMintUsername',
+    query_id: 1n,
+    amount,
+    sender_key: 0n,
+    payer_wallet: payerWallet,
+    owner_wallet: ownerWallet,
+    username_len: BigInt(Buffer.from(name, 'ascii').length),
+    username: usernameSlice(name),
+  })).endCell();
+}
+
+function internalMessage(from: Address, to: Address, value: bigint, body: any, bounce = true) {
+  return {
+    info: {
+      type: 'internal' as const,
+      ihrDisabled: true,
+      ihrFee: 0n,
+      bounce,
+      bounced: false,
+      src: from,
+      dest: to,
+      value: { coins: value },
+      forwardFee: 0n,
+      createdAt: 0,
+      createdLt: 0n,
+    },
+    body,
+  };
+}
+
 describe('UsernameRegistry paid mint milestone', () => {
   it('USERNAME-REG-M10-01: valid official ATH username mint deploys deterministic item, consumes pending, and credits treasury/burn due after ACK', async () => {
     const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
@@ -142,6 +176,38 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(itemState.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(itemState.username_registry_address.equals(registry.address)).toBe(true);
     expect(itemState.name_hash).toBe(hash);
+  });
+
+  it('RT-UNFT-001: predeployed canonical uninitialized item cannot hijack username mint', async () => {
+    const { blockchain, registry, officialAthWallet, attacker } = await deploySealedRegistry();
+    const ownerWallet = fixtureAddress('USERNAME_PREDEPLOY_OWNER');
+    const hash = nameHash('preokx');
+    const itemInit = await UsernameNFTItem.init(registry.address, hash);
+    const itemAddress = contractAddress(registry.address.workChain, itemInit);
+
+    await blockchain.setShardAccount(itemAddress, createShardAccount({
+      address: itemAddress,
+      code: itemInit.code,
+      data: itemInit.data,
+      balance: toNano('0.05'),
+      workchain: itemAddress.workChain,
+    }));
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress, itemInit));
+    const preMintState = await item.getGetState();
+    expect(preMintState.initialized).toBe(false);
+    expect(preMintState.owner_wallet.equals(registry.address)).toBe(true);
+
+    await sendMint(registry, officialAthWallet, ownerWallet, 'preokx', PRICE_6_PLUS);
+
+    const record = await registry.getGetNameRecord(hash);
+    const itemState = await item.getGetState();
+    expect(record.exists).toBe(true);
+    expect(record.item_address.equals(itemAddress)).toBe(true);
+    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(itemState.initialized).toBe(true);
+    expect(itemState.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(itemState.owner_wallet.equals(attacker.address)).toBe(false);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 
   it('USERNAME-REG-M10-01D: canonical usernames allow lowercase letters, digits, underscores, and hyphens only', async () => {
@@ -204,6 +270,44 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
   });
 
+  it('RT-UNFT-002: resend after finalized Registry bounces without dropping item below storage floor', async () => {
+    const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
+    const caller = await blockchain.treasury('username-registry-finalized-resend-floor-caller');
+    const ownerWallet = fixtureAddress('USERNAME_FINALIZED_RESEND_OWNER');
+    const hash = nameHash('floorx');
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
+
+    await sendMint(registry, officialAthWallet, ownerWallet, 'floorx', PRICE_6_PLUS);
+
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
+    const beforeGlobal = await registry.getGetGlobal();
+    const beforeRecord = await registry.getGetNameRecord(hash);
+    const result = await item.send(caller.getSender(), { value: 4_000_000n }, {
+      $$type: 'ResendDeployedAck',
+    } as ResendDeployedAck);
+
+    const afterGlobal = await registry.getGetGlobal();
+    const afterRecord = await registry.getGetNameRecord(hash);
+    const itemBalance = (await blockchain.getContract(itemAddress)).balance;
+
+    expect(beforeRecord.exists).toBe(true);
+    expect(afterRecord.exists).toBe(true);
+    expect(afterRecord.owner_wallet.equals(beforeRecord.owner_wallet)).toBe(true);
+    expect(afterRecord.item_address.equals(beforeRecord.item_address)).toBe(true);
+    expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
+    expect(afterGlobal.pending_mint_count).toBe(0n);
+    expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
+    expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
+    expect(itemBalance).toBeGreaterThanOrEqual(USERNAME_ITEM_STORAGE_FLOOR);
+    expect(findTransaction(result.transactions, {
+      from: item.address,
+      to: registry.address,
+      op: 0xBBA3EC19,
+      success: false,
+      exitCode: 19130,
+    })).toBeDefined();
+  });
+
   it('USERNAME-REG-M10-01C: username item transfer changes NFT owner while registry keeps the same authoritative item address', async () => {
     const { blockchain, registry, officialAthWallet } = await deploySealedRegistry();
     const ownerA = fixtureAddress('USERNAME_M10_TRANSFER_OWNER_A');
@@ -229,6 +333,112 @@ describe('UsernameRegistry paid mint milestone', () => {
     expect(record.exists).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
     expect(itemState.owner_wallet.equals(ownerB)).toBe(true);
+  });
+
+  it('RT-UNAMEITEM-002: original ACK still finalizes when item transfers before Registry processes it', async () => {
+    const { blockchain, registry, officialAthWallet, vaultAddress } = await deploySealedRegistry();
+    const ownerA = fixtureAddress('USERNAME_ACK_RACE_OWNER_A');
+    const ownerB = fixtureAddress('USERNAME_ACK_RACE_OWNER_B');
+    const hash = nameHash('ackrace');
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
+
+    const mintIterator = await blockchain.sendMessageIter(internalMessage(
+      officialAthWallet.address,
+      registry.address,
+      toNano('0.1'),
+      vaultMintNotificationBody(ownerA, 'ackrace', PRICE_6_PLUS, vaultAddress),
+    ), { allowParallel: true });
+
+    const registryMintTx = await mintIterator.next();
+    expect(registryMintTx.done).toBe(false);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(true);
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+
+    const itemInitTx = await mintIterator.next();
+    expect(itemInitTx.done).toBe(false);
+    expect((await item.getGetState()).owner_wallet.equals(ownerA)).toBe(true);
+
+    await item.send(blockchain.sender(ownerA), { value: 14_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 902n,
+      new_owner: ownerB,
+      response_destination: ownerA,
+      custom_payload: null,
+      forward_amount: 0n,
+      forward_payload: emptySlice(),
+    } as NftTransfer);
+    expect((await item.getGetState()).owner_wallet.equals(ownerB)).toBe(true);
+
+    const ackTx = await mintIterator.next();
+    expect(ackTx.done).toBe(false);
+    const record = await registry.getGetNameRecord(hash);
+    const global = await registry.getGetGlobal();
+    const itemState = await item.getGetState();
+
+    expect(record.exists).toBe(true);
+    expect(record.owner_wallet.equals(ownerA)).toBe(true);
+    expect(record.item_address.equals(itemAddress)).toBe(true);
+    expect(itemState.owner_wallet.equals(ownerB)).toBe(true);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
+    expect(global.name_record_count).toBe(1n);
+    expect(global.treasury_due_ath).toBe(PRICE_6_PLUS / 2n);
+    expect(global.burn_due_ath).toBe(PRICE_6_PLUS / 2n);
+  });
+
+  it('RT-UNAMEITEM-003: resend after transfer before finalization is rejected without mutating pending due', async () => {
+    const { blockchain, registry, officialAthWallet, vaultAddress } = await deploySealedRegistry();
+    const caller = await blockchain.treasury('username-resend-before-finalization-caller');
+    const ownerA = fixtureAddress('USERNAME_RESEND_RACE_OWNER_A');
+    const ownerB = fixtureAddress('USERNAME_RESEND_RACE_OWNER_B');
+    const hash = nameHash('resrace');
+    const itemAddress = await registry.getGetUsernameItemAddress(hash);
+    const item = blockchain.openContract(new UsernameNFTItem(itemAddress));
+
+    const mintIterator = await blockchain.sendMessageIter(internalMessage(
+      officialAthWallet.address,
+      registry.address,
+      toNano('0.1'),
+      vaultMintNotificationBody(ownerA, 'resrace', PRICE_6_PLUS, vaultAddress),
+    ), { allowParallel: true });
+
+    expect((await mintIterator.next()).done).toBe(false);
+    expect((await mintIterator.next()).done).toBe(false);
+    await item.send(blockchain.sender(ownerA), { value: 14_000_000n }, {
+      $$type: 'NftTransfer',
+      query_id: 903n,
+      new_owner: ownerB,
+      response_destination: ownerA,
+      custom_payload: null,
+      forward_amount: 0n,
+      forward_payload: emptySlice(),
+    } as NftTransfer);
+
+    const beforeGlobal = await registry.getGetGlobal();
+    const resend = await item.send(caller.getSender(), { value: 4_000_000n }, {
+      $$type: 'ResendDeployedAck',
+    } as ResendDeployedAck);
+    const afterGlobal = await registry.getGetGlobal();
+    const pending = await registry.getGetPendingMint(hash);
+
+    expect(findTransaction(resend.transactions, {
+      from: item.address,
+      to: registry.address,
+      op: 0xBBA3EC19,
+      success: false,
+      exitCode: 19136,
+    })).toBeDefined();
+    expect(pending.exists).toBe(true);
+    expect(pending.owner_wallet.equals(ownerA)).toBe(true);
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(false);
+    expect(afterGlobal.pending_mint_count).toBe(beforeGlobal.pending_mint_count);
+    expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
+    expect(afterGlobal.treasury_due_ath).toBe(beforeGlobal.treasury_due_ath);
+    expect(afterGlobal.burn_due_ath).toBe(beforeGlobal.burn_due_ath);
+
+    expect((await mintIterator.next()).done).toBe(false);
+    expect((await registry.getGetNameRecord(hash)).exists).toBe(true);
+    expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 
   it('USERNAME-REG-M10-06: accepted official mint notification sends ATH notification ACK back to official wallet', async () => {

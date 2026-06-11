@@ -36,6 +36,22 @@ describe('M19F STON.fi route evidence dossier validation', () => {
     expect(report.issue_codes).toContain('MISSING_EVIDENCE_REF_LIVEQUOTE');
   });
 
+  it('RT-BUY-001/RT-BUY-002: rejects a final dossier without query_id propagation and body-shape evidence', () => {
+    const dossier = createFixtureFinalDossierM19F();
+    dossier.requiredEvidenceChecklist.athNotificationQueryIdPropagatesToBuybackBurn = false;
+    dossier.requiredEvidenceChecklist.refundExcessBodyShapesMatchBuybackBurnHandlers = false;
+    dossier.evidenceRefs.athNotificationQueryIdPropagationProof = 'required: query_id propagation proof';
+    dossier.evidenceRefs.refundExcessBodyShapeProof = 'required: refund/excess body shape proof';
+
+    const report = validateStonfiRouteEvidenceDossierM19F(dossier);
+
+    expect(report.route_freeze_ready).toBe(false);
+    expect(report.issue_codes).toContain('CHECKLIST_ATHNOTIFICATIONQUERYIDPROPAGATESTOBUYBACKBURN_NOT_TRUE');
+    expect(report.issue_codes).toContain('CHECKLIST_REFUNDEXCESSBODYSHAPESMATCHBUYBACKBURNHANDLERS_NOT_TRUE');
+    expect(report.issue_codes).toContain('MISSING_EVIDENCE_REF_ATHNOTIFICATIONQUERYIDPROPAGATIONPROOF');
+    expect(report.issue_codes).toContain('MISSING_EVIDENCE_REF_REFUNDEXCESSBODYSHAPEPROOF');
+  });
+
   it('rejects placeholder addresses before the lower-level collector tries to decode route evidence', () => {
     const dossier = createFixtureFinalDossierM19F();
     dossier.liveEvidenceInput.addresses.stonfiPoolAddressTonAth = 'EQ... selected STON.fi TON/ATH pool address';

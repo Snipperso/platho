@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { CapsuleHub, PublishPrivateFromVault } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import {
   CRYPTO_SUITES,
+  PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
   createEncryptedPrivateCapsule,
   createMessagingIdentity,
   exportSignedPublicKeyBundle,
@@ -117,13 +118,18 @@ describe('CapsuleHub final capsule byte layout', () => {
       expiresAt: 1_700_060_000_000,
       purpose: 'capsulehub-final-layout-32k',
     });
-    const encrypted = await createEncryptedPrivateCapsule('x'.repeat(32 * 1024), bobBundle, alice, {
+    const encrypted = await createEncryptedPrivateCapsule(
+      'x'.repeat((32 * 1024) - PLATHO_COMPACT_SENDER_RECOVERY_BYTES),
+      bobBundle,
+      alice,
+      {
       now: 1_700_000_000_000,
       createdAt: 1_700_000_000_000,
       expiresAt: 1_700_060_000_000,
       clientNonce: 'BBBBBBBBBBBBBBBBBBBBBB',
       sizeClass: 32,
-    });
+      },
+    );
 
     expect(BigInt(encrypted.publish.size_class)).toBe(32n);
     expect(encrypted.publish.header_0_cell.bytes).toBe(140);

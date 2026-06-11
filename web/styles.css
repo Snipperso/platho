@@ -1,5 +1,7 @@
 :root {
   color-scheme: dark;
+  --message-media-width: 320px;
+  --message-card-width: calc(var(--message-media-width) + 28px);
   --bg: #0b0d0f;
   --panel: #111417;
   --panel-2: #151a1d;
@@ -179,6 +181,13 @@ button:disabled,
   text-transform: uppercase;
 }
 
+.app-version-label {
+  min-height: 11px;
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(48, 213, 176, 0.72);
+}
+
 .status-dot {
   width: 7px;
   height: 7px;
@@ -226,6 +235,7 @@ button:disabled,
 
 .rail-vault-balance {
   display: grid;
+  grid-template-rows: 11px 14px 14px;
   align-content: center;
   justify-items: center;
   gap: 3px;
@@ -267,6 +277,10 @@ button:disabled,
   justify-content: center;
   min-width: 14px;
   min-height: 14px;
+}
+
+.rail-vault-balance strong.is-placeholder {
+  visibility: hidden;
 }
 
 .rail-vault-balance strong.is-loading::before {
@@ -396,6 +410,26 @@ button:disabled,
   max-width: 100%;
 }
 
+.private-debug-log {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 6px 0 0;
+  max-width: 100%;
+  max-height: 118px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--accent);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(49, 211, 182, 0.24);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  user-select: text;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -446,10 +480,16 @@ button:disabled,
   display: none;
 }
 
-.docs-header-button {
+.docs-header-button,
+.debug-copy-button {
   width: 34px;
   height: 34px;
   background: #0d1012;
+}
+
+.private-debug-log,
+.debug-copy-button {
+  display: none !important;
 }
 
 .install-header-button {
@@ -567,11 +607,11 @@ button:disabled,
 }
 
 .identity-label-ton {
-  color: var(--accent-2);
+  color: #9fd3f2;
 }
 
 .identity-label-platho {
-  color: #f28a32;
+  color: #8fdcc8;
 }
 
 .thread-time {
@@ -767,7 +807,9 @@ button:disabled,
   display: grid;
   gap: 5px;
   flex: 0 0 auto;
-  max-width: min(620px, 82%);
+  min-width: 0;
+  max-width: min(var(--message-card-width), 82%);
+  overflow-wrap: anywhere;
 }
 
 .message.in {
@@ -780,7 +822,18 @@ button:disabled,
   justify-self: end;
 }
 
+.message.in .bubble {
+  justify-self: start;
+}
+
+.message.out .bubble {
+  justify-self: end;
+}
+
 .bubble {
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
   padding: 11px 13px;
   border-radius: 8px;
   background: var(--panel-3);
@@ -788,6 +841,8 @@ button:disabled,
   line-height: 1.38;
   font-size: 15px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .message.out .bubble {
@@ -829,6 +884,41 @@ button:disabled,
   color: #ff8f8f;
 }
 
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.message.out .message-actions {
+  justify-self: end;
+}
+
+.message-actions button {
+  min-height: 18px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(10, 13, 15, 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.message-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.message-actions button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
 .payment-actions {
   display: flex;
   flex-wrap: wrap;
@@ -852,6 +942,16 @@ button:disabled,
 .payment-actions button:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.message-payment-block .payment-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.message-payment-block .payment-actions button {
+  min-height: 32px;
+  white-space: nowrap;
 }
 
 .composer {
@@ -1186,13 +1286,50 @@ button:disabled,
 .feed-image {
   display: block;
   width: 100%;
-  max-width: 320px;
+  max-width: var(--message-media-width);
   max-height: 360px;
   margin-top: 8px;
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   object-fit: contain;
   background: #0d1012;
+}
+
+.message-text-block,
+.feed-block-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.message-text-block + .message-text-block,
+.message-text-block + .message-image,
+.message-image + .message-text-block,
+.feed-block-text + .feed-block-text,
+.feed-block-text + .feed-image,
+.feed-image + .feed-block-text,
+.message-payment-block {
+  margin-top: 8px;
+}
+
+.message-payment-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: min(100%, 360px);
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid rgba(48, 213, 176, 0.34);
+  border-radius: 8px;
+  background: rgba(48, 213, 176, 0.08);
+}
+
+.message-payment-label {
+  min-width: 0;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .message-image {
@@ -1538,12 +1675,17 @@ button:disabled,
 .feed-item {
   display: block;
   width: 100%;
+  max-width: 100%;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-2);
   color: var(--text);
   text-align: left;
+}
+
+.public-feed[data-public-mode="feed"] > .feed-item:not(.compact) {
+  width: min(100%, calc(var(--message-media-width) + 36px));
 }
 
 .feed-item.is-unread {
@@ -1989,6 +2131,20 @@ button.feed-item:hover {
   text-align: right;
   white-space: nowrap;
   font-size: 14px;
+}
+
+.settings-list strong.profile-action-status {
+  max-width: min(62%, 420px);
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.settings-list strong.profile-action-status[data-state="error"] {
+  color: var(--danger);
+}
+
+.settings-list strong.profile-action-status[data-state="busy"] {
+  color: var(--green);
 }
 
 .wallet-ton-group {

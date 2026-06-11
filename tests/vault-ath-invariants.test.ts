@@ -9,7 +9,6 @@ import {
   BindUsernameRegistry,
   SealGenesis,
   DepositTon,
-  WithdrawAth,
 } from '../build/Vault/Vault_Vault';
 import {
   ATHWallet,
@@ -18,6 +17,7 @@ import {
 import {
   registerVaultSigningKeys,
   sendVaultReceiveIntentExternal,
+  sendVaultWithdrawAthExternal,
 } from './helpers/vault-receive-intent-external';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
@@ -173,7 +173,11 @@ describe('Vault ATH accounting invariants', () => {
       const expectedSource = [10_000n, 10_000n, 10_000n];
       const expectedRecipient = [0n, 0n, 0n];
       const processedDeposits = new Set<string>();
-      let withdrawQuery = BigInt(seed & 0xffff) + 10_000n;
+      const signingKeys = [];
+      for (let i = 0; i < users.length; i += 1) {
+        signingKeys.push(await registerVaultSigningKeys(vault, users[i], 72 + i));
+        await depositTon(vault, users[i], toNano('3'));
+      }
       let debugContext = `seed ${seed} initial`;
 
       async function assertInvariants() {
@@ -244,20 +248,24 @@ describe('Vault ATH accounting invariants', () => {
             notifyValue: toNano('0.001'),
           });
         } else {
-          const amount = BigInt(50 + (rng() % 300));
-          const underfunded = op === 3;
-          debugContext = `seed ${seed} step ${step} withdraw user=${userIndex} amount=${amount} underfunded=${underfunded}`;
-          await vault.send(users[userIndex].getSender(), { value: underfunded ? toNano('0.003') : toNano('0.04') }, {
-            $$type: 'WithdrawAth',
-            query_id: withdrawQuery,
+          const overdraw = op === 3;
+          const amount = overdraw
+            ? expectedInternal[userIndex] + 1_000n
+            : BigInt(50 + (rng() % 300));
+          debugContext = `seed ${seed} step ${step} signed-withdraw user=${userIndex} amount=${amount} overdraw=${overdraw}`;
+          await sendVaultWithdrawAthExternal(
+            blockchain,
+            vault,
+            users[userIndex],
+            signingKeys[userIndex],
+            MANIFEST_HASH,
             amount,
-            recipient: recipients[userIndex].address,
-          } as WithdrawAth);
-          if (!underfunded && expectedInternal[userIndex] >= amount) {
+            recipients[userIndex].address,
+          );
+          if (!overdraw && expectedInternal[userIndex] >= amount) {
             expectedInternal[userIndex] -= amount;
             expectedRecipient[userIndex] += amount;
           }
-          withdrawQuery += 1n;
         }
 
         await assertInvariants();

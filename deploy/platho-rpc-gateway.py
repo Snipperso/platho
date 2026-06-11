@@ -2,6 +2,8 @@
 import json
 import os
 import random
+import re
+import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
@@ -32,6 +34,8 @@ DEFAULT_ALLOWED_GET_METHODS = [
     "get_pending_notification",
     "get_pending_treasury_flush",
     "get_private_entry",
+    "get_private_recipient_index",
+    "get_private_sender_index",
     "get_private_page",
     "get_public_entry",
     "get_public_page",
@@ -49,8 +53,31 @@ DEFAULT_ALLOWED_GET_METHODS = [
 
 ROUTES = {
     ("POST", "/api/v3/runGetMethod"): "run_get_method",
+    ("POST", "/api/v3/message"): "message",
+    ("GET", "/api/v3/messages"): "messages",
     ("GET", "/api/v2/getAddressInformation"): "account",
 }
+
+DEFAULT_ALLOWED_MESSAGE_OPCODES = [
+    "0xa4f862c0",  # PublishPrivateFromVault
+    "0x8c2a76b7",  # PublishPublicFromVault
+    "0x874e576a",  # CapsuleHub publish ACK
+]
+
+MESSAGE_QUERY_ALLOWED_KEYS = {
+    "destination",
+    "source",
+    "opcode",
+    "exclude_externals",
+    "limit",
+    "sort",
+    "body_hash",
+    "start_utime",
+    "end_utime",
+    "offset",
+}
+
+BOC_BASE64_RE = re.compile(r"^[A-Za-z0-9+/=_-]+$")
 
 
 def split_list(value, fallback):
@@ -66,13 +93,28 @@ TON_ACCESS_HOST = os.getenv("PLATHO_RPC_TON_ACCESS_HOST", "ton.access.orbs.netwo
 TON_ACCESS_NETWORK = os.getenv("PLATHO_RPC_TON_ACCESS_NETWORK", "mainnet")
 TON_ACCESS_MANAGER_PATH = os.getenv("PLATHO_RPC_TON_ACCESS_MANAGER_PATH", "/mngr/nodes?npm_version=2.3.0")
 TON_ACCESS_NODE_TTL_MS = int(os.getenv("PLATHO_RPC_TON_ACCESS_NODE_TTL_MS", "60000"))
+TONCENTER_V3_BASE = os.getenv("PLATHO_RPC_TONCENTER_V3_BASE", "https://toncenter.com/api/v3").rstrip("/")
+TONCENTER_V2_BASE = os.getenv("PLATHO_RPC_TONCENTER_V2_BASE", "https://toncenter.com/api/v2").rstrip("/")
+TONCENTER_API_KEY = os.getenv("PLATHO_RPC_TONCENTER_API_KEY", "").strip()
+TONCENTER_API_KEY_FILE = os.getenv("PLATHO_RPC_TONCENTER_API_KEY_FILE", "").strip()
+TONCENTER_AUTH_RETRY_MS = int(os.getenv("PLATHO_RPC_TONCENTER_AUTH_RETRY_MS", "60000"))
 MAX_BODY_BYTES = int(os.getenv("PLATHO_RPC_MAX_BODY_BYTES", "262144"))
 UPSTREAM_TIMEOUT_SECONDS = float(os.getenv("PLATHO_RPC_UPSTREAM_TIMEOUT_MS", "15000")) / 1000.0
+UPSTREAM_USER_AGENT = os.getenv("PLATHO_RPC_UPSTREAM_USER_AGENT", "PlathoRpcGateway/1.0 (+https://platho.app)").strip()
 RATE_LIMIT_PER_MINUTE = int(os.getenv("PLATHO_RPC_RATE_LIMIT_PER_MINUTE", "240"))
+MESSAGE_MAX_OFFSET = int(os.getenv("PLATHO_RPC_MESSAGES_MAX_OFFSET", "8000"))
 ALLOWED_ORIGINS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_ORIGINS"), DEFAULT_ALLOWED_ORIGINS))
 ALLOWED_GET_METHODS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_GET_METHODS"), DEFAULT_ALLOWED_GET_METHODS))
+ALLOWED_MESSAGE_DESTINATIONS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_MESSAGE_DESTINATIONS"), []))
+ALLOWED_MESSAGE_SOURCES = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_MESSAGE_SOURCES"), []))
+ALLOWED_MESSAGE_OPCODES = {
+    item.lower()
+    for item in split_list(os.getenv("PLATHO_RPC_ALLOWED_MESSAGE_OPCODES"), DEFAULT_ALLOWED_MESSAGE_OPCODES)
+}
 
 ton_access_nodes_cache = {"expires_at": 0, "nodes": []}
+toncenter_api_key_cache = {"path": None, "mtime": None, "value": None}
+toncenter_auth_state = {"disabled_until": 0}
 rate_limit_buckets = {}
 
 
@@ -88,8 +130,12 @@ def json_response(handler, status, payload, extra_headers=None):
     handler.wfile.write(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
 
 
-def fetch_json(url, method="GET", body=None):
+def fetch_json(url, method="GET", body=None, extra_headers=None):
     headers = {"Accept": "application/json"}
+    if UPSTREAM_USER_AGENT:
+        headers["User-Agent"] = UPSTREAM_USER_AGENT
+    if extra_headers:
+        headers.update(extra_headers)
     data = None
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -102,6 +148,40 @@ def fetch_json(url, method="GET", body=None):
         return response.status, json.loads(raw.decode("utf-8"))
 
 
+def upstream_error_detail(raw):
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        payload = json.loads(text)
+        detail = (
+            payload.get("error")
+            or payload.get("message")
+            or payload.get("description")
+            or (payload.get("result") or {}).get("error")
+            or (payload.get("result") or {}).get("message")
+            or (payload.get("result") or {}).get("description")
+        )
+        if detail:
+            return str(detail)[:1000]
+    except Exception:
+        pass
+    return text[:1000]
+
+
+def http_error_detail(error):
+    try:
+        raw = error.read().decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+    return upstream_error_detail(raw)
+
+
+def log_upstream_error(kind, error, detail=""):
+    safe_detail = f" detail={detail}" if detail else ""
+    print(f"upstream_error route={kind} status={getattr(error, 'code', 'unknown')}{safe_detail}", file=sys.stderr, flush=True)
+
+
 def weighted_node(nodes):
     total = sum(max(1, int(node.get("Weight") or 1)) for node in nodes)
     roll = random.randrange(max(1, total))
@@ -110,6 +190,47 @@ def weighted_node(nodes):
         if roll < 0:
             return node
     return nodes[0]
+
+
+def toncenter_api_key():
+    if TONCENTER_API_KEY:
+        return TONCENTER_API_KEY
+    if not TONCENTER_API_KEY_FILE:
+        return ""
+    try:
+        stat = os.stat(TONCENTER_API_KEY_FILE)
+        if (
+            toncenter_api_key_cache["path"] == TONCENTER_API_KEY_FILE
+            and toncenter_api_key_cache["mtime"] == stat.st_mtime
+            and toncenter_api_key_cache["value"] is not None
+        ):
+            return toncenter_api_key_cache["value"]
+        with open(TONCENTER_API_KEY_FILE, "r", encoding="utf-8") as handle:
+            value = handle.read().strip()
+        toncenter_api_key_cache.update({"path": TONCENTER_API_KEY_FILE, "mtime": stat.st_mtime, "value": value})
+        return value
+    except OSError:
+        return ""
+
+
+def toncenter_headers():
+    api_key = toncenter_api_key()
+    if int(time.time() * 1000) < toncenter_auth_state["disabled_until"]:
+        return {}
+    return {"X-API-Key": api_key} if api_key else {}
+
+
+def fetch_toncenter_json(url, method="GET", body=None):
+    headers = toncenter_headers()
+    if not headers:
+        return fetch_json(url, method=method, body=body)
+    try:
+        return fetch_json(url, method=method, body=body, extra_headers=headers)
+    except HTTPError as error:
+        if error.code not in (401, 403):
+            raise
+        toncenter_auth_state["disabled_until"] = int(time.time() * 1000) + TONCENTER_AUTH_RETRY_MS
+        return fetch_json(url, method=method, body=body)
 
 
 def ton_access_base():
@@ -170,11 +291,17 @@ def to_v3_stack_item(item):
     return {"type": item_type or "unsupported", "value": value}
 
 
-def normalize_run_get_method(body_bytes):
+def load_run_get_method_payload(body_bytes):
     payload = json.loads(body_bytes.decode("utf-8") if body_bytes else "{}")
     method = str(payload.get("method") or "")
     if method not in ALLOWED_GET_METHODS:
         raise PermissionError(f"GET_METHOD_NOT_ALLOWED:{method or 'missing'}")
+    return payload
+
+
+def normalize_run_get_method(body_bytes):
+    payload = load_run_get_method_payload(body_bytes)
+    method = str(payload.get("method") or "")
     return {
         "jsonrpc": "2.0",
         "id": "platho",
@@ -204,6 +331,95 @@ def append_original_query(endpoint, path):
     upstream = urlparse(endpoint)
     incoming = urlparse(path)
     return urlunparse((upstream.scheme, upstream.netloc, upstream.path, "", incoming.query, ""))
+
+
+def single_query_value(params, key, required=False):
+    values = params.get(key)
+    if not values:
+        if required:
+            raise PermissionError(f"MESSAGES_QUERY_MISSING:{key}")
+        return None
+    if len(values) != 1:
+        raise PermissionError(f"MESSAGES_QUERY_REPEATED:{key}")
+    return values[0]
+
+
+def validated_int_query(params, key, minimum=0, maximum=None, required=False):
+    value = single_query_value(params, key, required=required)
+    if value is None:
+        return None
+    if not re.fullmatch(r"[0-9]+", value):
+        raise PermissionError(f"MESSAGES_QUERY_INVALID:{key}")
+    parsed = int(value)
+    if parsed < minimum or (maximum is not None and parsed > maximum):
+        raise PermissionError(f"MESSAGES_QUERY_OUT_OF_RANGE:{key}")
+    return str(parsed)
+
+
+def validated_messages_query(path):
+    parsed = urlparse(path)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    extra_keys = set(params) - MESSAGE_QUERY_ALLOWED_KEYS
+    if extra_keys:
+        raise PermissionError(f"MESSAGES_QUERY_NOT_ALLOWED:{sorted(extra_keys)[0]}")
+    destination = single_query_value(params, "destination", required=True)
+    if destination not in ALLOWED_MESSAGE_DESTINATIONS:
+        raise PermissionError("MESSAGES_DESTINATION_NOT_ALLOWED")
+    source = single_query_value(params, "source")
+    if source is not None and (not ALLOWED_MESSAGE_SOURCES or source not in ALLOWED_MESSAGE_SOURCES):
+        raise PermissionError("MESSAGES_SOURCE_NOT_ALLOWED")
+    opcode = single_query_value(params, "opcode", required=True)
+    if opcode.lower() not in ALLOWED_MESSAGE_OPCODES:
+        raise PermissionError("MESSAGES_OPCODE_NOT_ALLOWED")
+    sort = single_query_value(params, "sort") or "desc"
+    if sort not in ("asc", "desc"):
+        raise PermissionError("MESSAGES_QUERY_INVALID:sort")
+    exclude_externals = single_query_value(params, "exclude_externals")
+    if exclude_externals is not None and exclude_externals.lower() not in ("true", "false", "1", "0"):
+        raise PermissionError("MESSAGES_QUERY_INVALID:exclude_externals")
+    body_hash = single_query_value(params, "body_hash")
+    if body_hash is not None and not re.fullmatch(r"(0x)?[0-9a-fA-F]{64}", body_hash):
+        raise PermissionError("MESSAGES_QUERY_INVALID:body_hash")
+    start_utime = validated_int_query(params, "start_utime")
+    end_utime = validated_int_query(params, "end_utime")
+    limit = validated_int_query(params, "limit", minimum=1, maximum=1000) or "100"
+    offset = validated_int_query(params, "offset", minimum=0, maximum=MESSAGE_MAX_OFFSET)
+    cleaned = {
+        "destination": destination,
+        "opcode": opcode,
+        "exclude_externals": exclude_externals if exclude_externals is not None else "true",
+        "limit": limit,
+        "sort": sort,
+    }
+    if source is not None:
+        cleaned["source"] = source
+    if body_hash is not None:
+        cleaned["body_hash"] = body_hash
+    if start_utime is not None:
+        cleaned["start_utime"] = start_utime
+    if end_utime is not None:
+        cleaned["end_utime"] = end_utime
+    if offset is not None:
+        cleaned["offset"] = offset
+    upstream = urlparse(f"{TONCENTER_V3_BASE}/messages")
+    return urlunparse((upstream.scheme, upstream.netloc, upstream.path, "", urlencode(cleaned), ""))
+
+
+def validated_send_message_payload(body_bytes):
+    payload = json.loads(body_bytes.decode("utf-8") if body_bytes else "{}")
+    if not isinstance(payload, dict):
+        raise PermissionError("MESSAGE_BODY_INVALID")
+    extra_keys = set(payload) - {"boc"}
+    if extra_keys:
+        raise PermissionError(f"MESSAGE_BODY_NOT_ALLOWED:{sorted(extra_keys)[0]}")
+    boc = str(payload.get("boc") or "").strip()
+    if not boc:
+        raise PermissionError("MESSAGE_BOC_MISSING")
+    if len(boc) > MAX_BODY_BYTES:
+        raise PermissionError("MESSAGE_BOC_TOO_LARGE")
+    if not BOC_BASE64_RE.fullmatch(boc):
+        raise PermissionError("MESSAGE_BOC_INVALID")
+    return {"boc": boc}
 
 
 def client_ip(handler):
@@ -285,18 +501,51 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
             self.send_json(404, {"ok": False, "error": "route is not allowed"})
             return
         try:
-            if UPSTREAM_KIND != "ton-access-v2":
+            if UPSTREAM_KIND not in ("ton-access-v2", "toncenter-v3"):
                 self.send_json(503, {"ok": False, "error": "unsupported upstream kind"})
                 return
             if kind == "run_get_method":
                 body = self.read_body()
-                request = normalize_run_get_method(body)
-                status, upstream = fetch_json(f"{ton_access_base()}/jsonRPC", method="POST", body=request)
-                self.send_json(status, normalize_run_get_method_response(upstream))
+                if UPSTREAM_KIND == "toncenter-v3":
+                    request = load_run_get_method_payload(body)
+                    status, upstream = fetch_toncenter_json(
+                        f"{TONCENTER_V3_BASE}/runGetMethod",
+                        method="POST",
+                        body=request,
+                    )
+                    self.send_json(status, upstream)
+                else:
+                    request = normalize_run_get_method(body)
+                    status, upstream = fetch_json(f"{ton_access_base()}/jsonRPC", method="POST", body=request)
+                    self.send_json(status, normalize_run_get_method_response(upstream))
+                return
+            if kind == "message":
+                if UPSTREAM_KIND != "toncenter-v3":
+                    self.send_json(503, {"ok": False, "error": "message broadcast is not supported by this upstream"})
+                    return
+                request = validated_send_message_payload(self.read_body())
+                status, upstream = fetch_toncenter_json(
+                    f"{TONCENTER_V3_BASE}/message",
+                    method="POST",
+                    body=request,
+                )
+                self.send_json(status, upstream)
+                return
+            if kind == "messages":
+                if UPSTREAM_KIND != "toncenter-v3":
+                    self.send_json(503, {"ok": False, "error": "message history is not supported by this upstream"})
+                    return
+                target = validated_messages_query(self.path)
+                status, upstream = fetch_toncenter_json(target)
+                self.send_json(status, upstream)
                 return
             if kind == "account":
-                target = append_original_query(f"{ton_access_base()}/getAddressInformation", self.path)
-                status, upstream = fetch_json(target)
+                if UPSTREAM_KIND == "toncenter-v3":
+                    target = append_original_query(f"{TONCENTER_V2_BASE}/getAddressInformation", self.path)
+                    status, upstream = fetch_toncenter_json(target)
+                else:
+                    target = append_original_query(f"{ton_access_base()}/getAddressInformation", self.path)
+                    status, upstream = fetch_json(target)
                 self.send_json(status, upstream)
                 return
             self.send_json(503, {"ok": False, "error": f"{kind} is not supported"})
@@ -306,7 +555,12 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
         except PermissionError as error:
             self.send_json(403, {"ok": False, "error": str(error)})
         except HTTPError as error:
-            self.send_json(error.code, {"ok": False, "error": "upstream request failed"})
+            detail = http_error_detail(error)
+            log_upstream_error(kind, error, detail)
+            payload = {"ok": False, "error": "upstream request failed", "upstream_status": error.code}
+            if detail:
+                payload["upstream_error"] = detail
+            self.send_json(error.code, payload)
         except (URLError, TimeoutError) as error:
             self.send_json(504, {"ok": False, "error": "upstream timeout"})
         except Exception:

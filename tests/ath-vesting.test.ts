@@ -142,6 +142,27 @@ describe('ATHVesting', () => {
     expect((await beneficiaryWallet.getGetWalletData()).balance).toBe(YEAR_UNLOCK_ATH * 3n);
   });
 
+  it('RT-VEST-002: permissionless claims always pay the immutable beneficiary, never the caller', async () => {
+    const env = await setup();
+    env.blockchain.now = START_TIME + YEAR_SECONDS;
+
+    const callerAthWallet = await deployAthWalletAt(env.blockchain, env.attacker.address, env.master, 0n);
+    const beneficiaryWallet = env.blockchain.openContract(
+      new ATHWallet(env.beneficiaryAthWalletAddress, await ATHWallet.init(0n, env.beneficiary.address, env.master)),
+    );
+
+    await env.vesting.send(env.attacker.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ClaimAthVesting',
+      query_id: 1n,
+      amount: YEAR_UNLOCK_ATH,
+    } as ClaimAthVesting);
+
+    expect((await env.vesting.getGetVestingState()).claimed_ath).toBe(YEAR_UNLOCK_ATH);
+    expect((await callerAthWallet.getGetWalletData()).balance).toBe(0n);
+    expect((await beneficiaryWallet.getGetWalletData()).balance).toBe(YEAR_UNLOCK_ATH);
+    expect((await env.officialWallet!.getGetWalletData()).balance).toBe(TOTAL_VESTING_ATH - YEAR_UNLOCK_ATH);
+  });
+
   it('ATH-VEST-02: caps vesting at 10M ATH and rejects over-claiming', async () => {
     const env = await setup({ startTime: 1 });
     env.blockchain.now = 1 + YEAR_SECONDS;
@@ -173,6 +194,38 @@ describe('ATHVesting', () => {
     } as ClaimAthVesting);
     expect((await env.vesting.getGetVestingState()).claimed_ath).toBe(TOTAL_VESTING_ATH);
     expect((await env.officialWallet!.getGetWalletData()).balance).toBe(0n);
+  });
+
+  it('RT-VEST-004: one full 100-year claim releases exactly 10M ATH and then rejects further claims', async () => {
+    const env = await setup({ startTime: 1 });
+    env.blockchain.now = 1 + (100 * YEAR_SECONDS);
+
+    const beneficiaryWallet = env.blockchain.openContract(
+      new ATHWallet(env.beneficiaryAthWalletAddress, await ATHWallet.init(0n, env.beneficiary.address, env.master)),
+    );
+
+    await env.vesting.send(env.caller.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ClaimAthVesting',
+      query_id: 1n,
+      amount: TOTAL_VESTING_ATH,
+    } as ClaimAthVesting);
+
+    let state = await env.vesting.getGetVestingState();
+    expect(state.claimed_ath).toBe(TOTAL_VESTING_ATH);
+    expect(state.claimable_ath).toBe(0n);
+    expect((await env.officialWallet!.getGetWalletData()).balance).toBe(0n);
+    expect((await beneficiaryWallet.getGetWalletData()).balance).toBe(TOTAL_VESTING_ATH);
+
+    await env.vesting.send(env.caller.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ClaimAthVesting',
+      query_id: 2n,
+      amount: 1n,
+    } as ClaimAthVesting);
+
+    state = await env.vesting.getGetVestingState();
+    expect(state.claimed_ath).toBe(TOTAL_VESTING_ATH);
+    expect(state.last_terminal_query_id).toBe(1n);
+    expect((await beneficiaryWallet.getGetWalletData()).balance).toBe(TOTAL_VESTING_ATH);
   });
 
   it('ATH-VEST-03: one pending claim blocks another and forged callbacks cannot clear it', async () => {
@@ -223,6 +276,41 @@ describe('ATHVesting', () => {
     expect(state.phase).toBe(0n);
     expect(state.claimed_ath).toBe(0n);
     expect(state.last_terminal_query_id).toBe(1n);
+  });
+
+  it('RT-VEST-003: failed claim clears pending and the next query id can claim without duplicate release', async () => {
+    const env = await setup({ fundOfficialWallet: false });
+    env.blockchain.now = START_TIME + YEAR_SECONDS;
+
+    await env.vesting.send(env.caller.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ClaimAthVesting',
+      query_id: 1n,
+      amount: YEAR_UNLOCK_ATH,
+    } as ClaimAthVesting);
+
+    let state = await env.vesting.getGetVestingState();
+    expect(state.phase).toBe(0n);
+    expect(state.claimed_ath).toBe(0n);
+    expect(state.claimable_ath).toBe(YEAR_UNLOCK_ATH);
+    expect(state.last_terminal_query_id).toBe(1n);
+
+    const officialWallet = await deployAthWalletAt(env.blockchain, env.vesting.address, env.master, TOTAL_VESTING_ATH);
+    const beneficiaryWallet = env.blockchain.openContract(
+      new ATHWallet(env.beneficiaryAthWalletAddress, await ATHWallet.init(0n, env.beneficiary.address, env.master)),
+    );
+
+    await env.vesting.send(env.attacker.getSender(), { value: toNano('0.2') }, {
+      $$type: 'ClaimAthVesting',
+      query_id: 2n,
+      amount: YEAR_UNLOCK_ATH,
+    } as ClaimAthVesting);
+
+    state = await env.vesting.getGetVestingState();
+    expect(state.claimed_ath).toBe(YEAR_UNLOCK_ATH);
+    expect(state.claimable_ath).toBe(0n);
+    expect(state.last_terminal_query_id).toBe(2n);
+    expect((await officialWallet.getGetWalletData()).balance).toBe(TOTAL_VESTING_ATH - YEAR_UNLOCK_ATH);
+    expect((await beneficiaryWallet.getGetWalletData()).balance).toBe(YEAR_UNLOCK_ATH);
   });
 
   it('ATH-VEST-03B: wrong beneficiary-wallet ACK amount cannot finalize a pending claim', async () => {

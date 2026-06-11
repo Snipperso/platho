@@ -78,7 +78,7 @@ is narrow, but it is not retired after seal. It must remain secured until Buybac
 `route_frozen == true` and `genesis_config_hash == 0`, and MarketStabilitySeller has
 `pricing_frozen == true` and `genesis_config_hash == 0`.
 
-## Required pre-prod commands
+## Required before production PWA release
 
 ```powershell
 npm.cmd run crypto:selftest
@@ -86,12 +86,13 @@ npm.cmd run mainnet:ath-master:derive
 npm.cmd run m20f:address-preflight
 npm.cmd run m20f:derive-addresses
 npm.cmd run m20u:readiness
-npm.cmd run market-stability:readiness
-npm.cmd run m20f:collect
-npm.cmd run m20f:preflight
 npm.cmd audit --json
 npm.cmd test
 npm.cmd run build
+npm.cmd run mainnet:manifest:draft
+npm.cmd run mainnet:deploy:packet
+npm.cmd run mainnet:tx:dry-run
+npm.cmd run mainnet:genesis:verify
 npm.cmd run preprod:check
 npm.cmd run web:deploy:prepare:prod
 ```
@@ -99,12 +100,23 @@ npm.cmd run web:deploy:prepare:prod
 `preprod:check` is a release gate. It must pass before a production static bundle is published.
 `web:deploy:prepare:prod` uses the same production blockers and must not be bypassed for the public `platho.app` bundle.
 
+## Required only after airdrop and pool launch
+
+These commands are post-pool gates. They must not be treated as blockers for the production PWA release, and they must never replace `mainnet:genesis:verify`.
+
+```powershell
+npm.cmd run m20f:collect
+npm.cmd run m20f:preflight
+npm.cmd run market-stability:readiness
+npm.cmd run buyback:enable-preflight
+```
+
 ## Current Operational Notes
 
 - `web/app.js` uses a normal 24-word TON recovery phrase as the single user secret, derives wallet and messaging keys from that phrase, and has a fail-closed Vault chain binding bridge.
 - The PWA now anchors public messaging keys in Vault records and publishes private messages through CapsuleHub payload cells. Manual public-bundle / capsule package exchange is removed from the production UI.
 - Local message history is encrypted at rest with a device-local WebCrypto key. The profile UI exports/imports only the 24-word TON recovery phrase; messaging keys are deterministically derived from that phrase and are not backed up separately.
-- `web/platho-config.mjs` is pinned to the verified mainnet manifest and production signed-bundle purpose. The current archive status is derived from `artifacts/mainnet_genesis_verify_report.json`, `artifacts/MAINNET_GENESIS_VERIFIED.txt`, and `preprod:check`.
+- `web/platho-config.mjs` must be pinned to the verified mainnet manifest and `pwa-production` signed-bundle purpose before publishing the production PWA. Until `MAINNET_GENESIS_VERIFIED.txt` returns `true`, the current archive may still be preview-blocked; treat `artifacts/mainnet_genesis_verify_report.json`, `artifacts/MAINNET_GENESIS_VERIFIED.txt`, and `preprod:check` as the source of truth.
 - `.env.testnet.local` may exist in a developer workspace for faucet/testnet work; it must remain untracked and absent from release/audit archives.
 - Full-size M20T testnet harness probe is complete: see `artifacts/m20t_testnet_evidence.json` and `artifacts/M20T_TESTNET_EVIDENCE.md`.
 - M20F STON.fi live collector is prepared: see `artifacts/m20f_stonfi_live_collector_input_template.json` and `artifacts/M20F_STONFI_LIVE_COLLECTOR.md`. It is expected to stay `WAITING_FOR_FINAL_MAINNET_INPUT` until final mainnet addresses and proof refs are supplied.

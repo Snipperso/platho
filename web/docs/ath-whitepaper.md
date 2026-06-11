@@ -130,10 +130,10 @@ Vault ATH deposits are supported only through the user's ATHWallet transfer-with
 unsupported: it can increase the raw official wallet balance, but it does not create `Vault.user.ath_balance` and must
 not be shown by the PWA as a deposit path.
 
-Vault ATH withdrawals are not TON escrow. `WithdrawAth` uses caller-provided TON for downstream ATHWallet deployment,
-transfer, storage, and ACK execution. Vault credits back only authenticated ACK/fail/bounce value it receives, minus the
-local refund reserve and capped by the original inbound value. Product copy must not promise a complete excess TON
-refund.
+Vault ATH withdrawals are signed external Vault commands. The downstream ATHWallet deployment, transfer, storage, and
+ACK execution reserve is paid from the user's internal Vault TON balance. Vault credits back only authenticated
+ACK/fail/bounce value it receives, minus the local refund reserve and capped by the reserved internal value. Product
+copy must not promise a complete excess TON refund.
 
 ## Activity Price
 
@@ -167,7 +167,7 @@ rebate, or promise that ATH will compensate the TON cost of a publish. The launc
 lower than the TON cost of the capsule, and that is intentional: users receive early network ownership for real usage,
 not a guaranteed reimbursement.
 
-Product copy may summarize capsule pricing as messages from `0.0337 TON`; current exact canonical examples are public posts from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`. Larger private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
+Product copy may summarize capsule pricing as messages from `0.0337 TON`; current exact canonical examples are 1 KiB public posts from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`. Larger public or private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
 body changes the Vault/CapsuleHub execution and storage reserve. The reward remains `10 ATH` per successfully finalized
 capsule, regardless of capsule size.
 
@@ -388,12 +388,13 @@ Profile avatar update costs:
 100 ATH
 ```
 
-The payment goes through the official ProfileRegistry ATH wallet.
+Current V1 profile avatar updates are Vault-funded. The PWA sends `SetProfileAvatarFromVaultBalance` to Vault; Vault pays through its official ATH wallet notification path into the official ProfileRegistry ATH wallet. Direct user-wallet avatar payment is not a supported V1 product flow.
 
 ProfileRegistry accepts the update only when all conditions are met:
 
 - amount is exactly `100 ATH`;
 - sender is the official ProfileRegistry ATH wallet;
+- payer wallet is the bound Vault;
 - owner wallet is in basechain;
 - avatar hash is not zero;
 - stream id is not zero;
@@ -574,6 +575,6 @@ ATH connects four layers of Platho:
 3. **Discounts** - ATH balance reduces protocol fee after the distribution gate.
 4. **Supply reduction** - part of ATH fees and buyback output is burned through ATHMaster.
 
-The model begins with fixed supply and reference valuation of `100,000 TON`. The primary user distribution is tied to real paid usage: product copy may say messages start from `0.0337 TON`, while current exact examples are `0.0337 TON` for a public post and `0.0347 TON` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
+The model begins with fixed supply and reference valuation of `100,000 TON`. The primary user distribution is tied to real paid usage: product copy may say messages start from `0.0337 TON`, while current exact examples are `0.0337 TON` for a 1 KiB public post and `0.0347 TON` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. Larger public or private size classes cost more. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
 
 ATH exists as a working token inside Platho: it is distributed through activity, used in paid actions, reduces protocol fee, is sold from reserve through a defined staircase, and is burned through on-chain burn. After the market-stability staircase, the future ATH price is determined by the market and protocol usage.

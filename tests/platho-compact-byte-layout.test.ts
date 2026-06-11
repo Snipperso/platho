@@ -7,7 +7,11 @@ import {
   PLATHO_COMPACT_BODY_LAYOUT,
   PLATHO_COMPACT_IMAGE_FORMATS,
   PLATHO_COMPACT_PAYLOAD_PREFIX_BYTES,
+  PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
+  PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
   PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
+  PLATHO_COMPACT_SENDER_USERNAME_METADATA_MAX_BYTES,
+  PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES,
   PLATHO_COMPACT_TEXT_BLOCK_BYTES,
   PLATHO_ONCHAIN_BODY_MAX_BYTES,
   PLATHO_ONCHAIN_CELL_LAYOUT,
@@ -43,7 +47,7 @@ async function signedIdentity(suite: string) {
   return { identity, signedBundle };
 }
 
-async function compactRoundtrip(suite: string, textBytes: number) {
+async function compactRoundtrip(suite: string, textBytes: number, options: Record<string, unknown> = {}) {
   const alice = await signedIdentity(suite);
   const bob = await signedIdentity(suite);
   const text = 'a'.repeat(textBytes);
@@ -52,6 +56,7 @@ async function compactRoundtrip(suite: string, textBytes: number) {
     createdAt: NOW,
     expiresAt: NOW + 60_000,
     threadId: `thread-${suite}`,
+    ...options,
   });
   const opened = await openEncryptedPrivateCapsule(capsule, bob.identity.encryptionKeyPair, {
     now: NOW + 1,
@@ -83,6 +88,8 @@ describe('Platho compact byte layout v1', () => {
       maxImageBytes: 1024,
       maxPaymentBytes: 82,
     });
+    expect(PLATHO_COMPACT_SENDER_RECOVERY_BYTES).toBe(64);
+    expect(PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES).toBe(37);
     expect(hybrid32).toMatchObject({
       sizeClass: 32,
       maxBodyBytes: 33972,
@@ -109,7 +116,10 @@ describe('Platho compact byte layout v1', () => {
 
   it('COMPACT-03: roundtrips max-size postquantum text inside the on-chain body cap', async () => {
     const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
-    const { capsule, opened, text } = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes);
+    const { capsule, opened, text } = await compactRoundtrip(
+      CRYPTO_SUITES.HYBRID_V1,
+      capacity.maxTextBytes - PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+    );
 
     expect(capsule.body.layout).toBe(PLATHO_COMPACT_BODY_LAYOUT);
     expect(capsule.body.envelope).toBeUndefined();
@@ -128,7 +138,10 @@ describe('Platho compact byte layout v1', () => {
 
   it('COMPACT-04: roundtrips max-size postquantum text inside the same useful cap', async () => {
     const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
-    const { capsule, opened, text } = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes);
+    const { capsule, opened, text } = await compactRoundtrip(
+      CRYPTO_SUITES.HYBRID_V1,
+      capacity.maxTextBytes - PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+    );
 
     expect(capsule.body.layout).toBe(PLATHO_COMPACT_BODY_LAYOUT);
     expect(capsule.body.envelope).toBeUndefined();
@@ -141,6 +154,17 @@ describe('Platho compact byte layout v1', () => {
     expect(capsule.publish.body_cell.bytes).toBe(capsule.body.byteLength);
     expect(bocHashHex(capsule.publish.body_cell.boc)).toBe(capsule.publish.body_hash);
     expect(opened.plaintext).toBe(text);
+  });
+
+  it('COMPACT-04A: sender recovery reserves payload bytes without changing exact body size', async () => {
+    const capacity = getCompactCapsuleCapacity(CRYPTO_SUITES.HYBRID_V1);
+    const oneK = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes - PLATHO_COMPACT_SENDER_RECOVERY_BYTES);
+    const twoK = await compactRoundtrip(CRYPTO_SUITES.HYBRID_V1, capacity.maxTextBytes);
+
+    expect(oneK.capsule.header0.sizeClass).toBe(1);
+    expect(oneK.capsule.body.byteLength).toBe(2228);
+    expect(twoK.capsule.header0.sizeClass).toBe(2);
+    expect(twoK.capsule.body.byteLength).toBe(3252);
   });
 
   it('COMPACT-04B: private header0 carries signed wallet avatar pointer', async () => {
@@ -180,6 +204,52 @@ describe('Platho compact byte layout v1', () => {
     expect(opened.plaintext).toBe('with sender wallet');
     expect(opened.payload.senderWallet).toBe(SENDER_WALLET);
     expect(opened.payload.senderVaultKeyId).toBe('123');
+  });
+
+  it('COMPACT-04C1: encrypted compact payload can carry sender .ath metadata', async () => {
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const capsule = await createEncryptedPrivateCapsule('with sender username', bob.signedBundle, alice.identity, {
+      now: NOW,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+      senderWallet: SENDER_WALLET,
+      senderUsername: 'platho.ath',
+    });
+    const opened = await openEncryptedPrivateCapsule(capsule, bob.identity.encryptionKeyPair, {
+      now: NOW + 1,
+    });
+
+    expect(PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES).toBe(5);
+    expect(PLATHO_COMPACT_SENDER_USERNAME_METADATA_MAX_BYTES).toBe(25);
+    expect(capsule.publish.header_0_cell.bytes).toBe(PLATHO_BINARY_HEADER0_BYTES);
+    expect(opened.plaintext).toBe('with sender username');
+    expect(opened.payload.senderWallet).toBe(SENDER_WALLET);
+    expect(opened.payload.senderUsername).toBe('platho.ath');
+  });
+
+  it('COMPACT-04C2: sender recovery lets both sides open the same on-chain body', async () => {
+    const alice = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const bob = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
+    const capsule = await createEncryptedPrivateCapsule('recoverable on both sides', bob.signedBundle, alice.identity, {
+      now: NOW,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+      recipientWallet: `0:${'34'.repeat(32)}`,
+    });
+    const openedByRecipient = await openEncryptedPrivateCapsule(capsule, bob.identity.encryptionKeyPair, {
+      now: NOW + 1,
+    });
+    const openedBySender = await openEncryptedPrivateCapsule(capsule, alice.identity.encryptionKeyPair, {
+      now: NOW + 1,
+    });
+
+    expect(openedByRecipient.plaintext).toBe('recoverable on both sides');
+    expect(openedByRecipient.openedAs).toBe('recipient');
+    expect(openedByRecipient.payload.recipientWallet).toBe(`0:${'34'.repeat(32)}`);
+    expect(openedBySender.plaintext).toBe('recoverable on both sides');
+    expect(openedBySender.openedAs).toBe('sender');
+    expect(openedBySender.payload.recipientWallet).toBe(`0:${'34'.repeat(32)}`);
   });
 
   it('COMPACT-04D: encrypted compact payload can remain anonymous without sender wallet metadata', async () => {
@@ -241,6 +311,16 @@ describe('Platho compact byte layout v1', () => {
     });
     expect([...decodedPayment.intentId]).toEqual([...new Uint8Array(32).fill(7)]);
     expect([...decodedPayment.secret32]).toEqual([...new Uint8Array(32).fill(9)]);
+
+    const documentBytes = new Uint8Array([0x50, 0x44, 0x43, 0x31, 1, 0, 0, 1, 1, 0, 0, 0, 0, 2, 0x68, 0x69]);
+    const document = encodeCompactPayload({
+      type: 'document',
+      bytes: documentBytes,
+      sizeClass: 1,
+    });
+    const decodedDocument = decodeCompactPayload(document);
+    expect(decodedDocument).toMatchObject({ type: 'document' });
+    expect([...decodedDocument.bytes]).toEqual([...documentBytes]);
   });
 
   it('COMPACT-07: rejects pre-release JSON envelope bodies', async () => {
@@ -285,13 +365,24 @@ describe('Platho compact byte layout v1', () => {
     const opened = await openPrivateCapsuleChainEntry(entry, bob.identity.encryptionKeyPair, {
       now: NOW + 120_000,
     });
+    const openedBySender = await openPrivateCapsuleChainEntry(entry, alice.identity.encryptionKeyPair, {
+      now: NOW + 120_000,
+    });
+    const charlie = await signedIdentity(CRYPTO_SUITES.HYBRID_V1);
 
     expect(opened.plaintext).toBe('stored on chain');
+    expect(opened.openedAs).toBe('recipient');
     expect(opened.capsule.id).toBe(capsule.id);
     expect(opened.publish.body_hash).toBe(capsule.publish.body_hash);
-    await expect(openPrivateCapsuleChainEntry(entry, alice.identity.encryptionKeyPair, {
+    expect(openedBySender.plaintext).toBe('stored on chain');
+    expect(openedBySender.openedAs).toBe('sender');
+    expect(openedBySender.capsule.id).toBe(capsule.id);
+    await expect(openPrivateCapsuleChainEntry(entry, charlie.identity.encryptionKeyPair, {
       now: NOW + 120_000,
-    })).rejects.toThrow(/recipient|decrypt/i);
+    })).rejects.toThrow(/recipient|sender|decrypt|key mismatch/i);
+    await expect(openPrivateCapsuleChainEntry(entry, null as any, {
+      now: NOW + 120_000,
+    })).rejects.toThrow(/Recipient key pair is unavailable/i);
   });
 
   it('COMPACT-08A: opens private entries serialized with indexed CRC BOC flags', async () => {

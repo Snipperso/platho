@@ -33,7 +33,7 @@ The launch pool target is `100,000 TON`, so the initial reference price is:
 1 ATH = 0.001 TON
 ```
 
-During the activity airdrop, each successfully finalized capsule receives `10 ATH`, regardless of public/private type or private size class. Public product copy may say messages start from `0.0337 TON`; current exact canonical examples are public capsules from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`, with larger private capsule blocks costing more because they reserve more execution/storage capacity. Extra TON pays for the selected capsule execution/storage/security profile, not for farming more ATH. The `10 ATH` reward is an activity bonus for real usage, not a refund, cashback, reimbursement, investment return, or price guarantee.
+During the activity airdrop, each successfully finalized capsule receives `10 ATH`, regardless of public/private type or size class. Public product copy may say messages start from `0.0337 TON`; current exact canonical examples are 1 KiB public capsules from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`, with larger public or private capsule blocks costing more because they reserve more execution/storage capacity. Extra TON pays for the selected capsule execution/storage/security profile, not for farming more ATH. The `10 ATH` reward is an activity bonus for real usage, not a refund, cashback, reimbursement, investment return, or price guarantee.
 
 ## Stop Rule
 
@@ -398,6 +398,9 @@ Allowed recurring operations:
 - UsernameRegistry due flushes;
 - ProfileRegistry due flushes;
 - MarketStabilitySeller treasury flush.
+
+Buyback due below one full `51.05 TON` execution envelope remains queued in FeeAccumulator until later protocol fees
+complete the next envelope. Do not send partial buyback reserve to BuybackBurn.
 
 Operational dashboards and indexers must treat buyback burn success as `ATHBurnFinalized` received by BuybackBurn from
 ATHMaster. ATHWallet sending `ATHBurnNotification`, or BuybackBurn sending an outbound burn request, is only a burn

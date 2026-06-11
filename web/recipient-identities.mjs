@@ -23,6 +23,7 @@ const FRIENDLY_TON_ADDRESS_RE = /^[A-Za-z0-9_-]{48}$/;
 const RAW_TON_ADDRESS_RE = /^-?\d+:[0-9a-fA-F]{64}$/;
 const TON_DNS_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ton$/;
 const PLATHO_NFT_RE = /^[a-z0-9_-]{4,16}\.ath$/;
+const PLATHO_BARE_NFT_RE = /^[a-z0-9_-]{4,16}$/;
 
 function normalizeInput(value) {
   return String(value ?? '').trim();
@@ -44,6 +45,10 @@ function isPlathoNft(value) {
   return PLATHO_NFT_RE.test(value);
 }
 
+function isBarePlathoNft(value) {
+  return PLATHO_BARE_NFT_RE.test(value);
+}
+
 function avatarFromLabel(label) {
   const first = String(label ?? '').replace(/^@/, '').slice(0, 1).toUpperCase();
   return first || 'P';
@@ -52,11 +57,11 @@ function avatarFromLabel(label) {
 export function parseRecipientIdentity(input) {
   const raw = normalizeInput(input);
   if (!raw) {
-    return { ok: false, error: 'Enter a wallet address, .ton, or .ath name.' };
+    return { ok: false, error: 'Enter a wallet address, Platho name, .ton, or .ath name.' };
   }
 
   if (raw.startsWith('@')) {
-    return { ok: false, error: 'Use a full suffix: xxxx.ton or xxxx.ath.' };
+    return { ok: false, error: 'Use alex, alex.ath, alex.ton, or a wallet address; do not start with @.' };
   }
 
   if (isWalletAddress(raw)) {
@@ -96,11 +101,24 @@ export function parseRecipientIdentity(input) {
     };
   }
 
+  if (isBarePlathoNft(normalized)) {
+    const label = `${normalized}.ath`;
+    return {
+      ok: true,
+      identity: {
+        type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT,
+        value: label,
+        label,
+        entered: raw,
+      },
+    };
+  }
+
   if (/\.platho$/i.test(raw)) {
     return { ok: false, error: 'Use .ath for Platho NFT names.' };
   }
 
-  return { ok: false, error: 'Use a full wallet address, xxxx.ton, or xxxx.ath.' };
+  return { ok: false, error: 'Use alex, alex.ath, alex.ton, or a wallet address.' };
 }
 
 export function identityTone(identity) {

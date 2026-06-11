@@ -248,6 +248,31 @@ describe('FeeAccumulator v1 milestone', () => {
     expect(state.buyback_due_ton).toBe(oneEnvelope);
   });
 
+  it('RT-FEE-001: sub-envelope buyback tail stays queued until future fees complete one envelope', async () => {
+    const { fee, capsuleHub, operator, treasury } = await setup({ buybackDeployed: true });
+    const oneEnvelope = BigInt(createFundingEnvelopeProfileM19H().values.feeAccumulatorFlushAmountNanotons);
+    const tail = toNano('20');
+
+    await enableBuybackSplit(fee, treasury);
+    await depositAndSplit(fee, capsuleHub, tail * 2n);
+    expect((await fee.getGetState()).buyback_due_ton).toBe(tail);
+
+    await fee.send(operator.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushBuybackDue',
+      amount: tail,
+    } as FlushBuybackDue);
+    expect((await fee.getGetState()).buyback_due_ton).toBe(tail);
+
+    await depositAndSplit(fee, capsuleHub, (oneEnvelope - tail) * 2n);
+    expect((await fee.getGetState()).buyback_due_ton).toBe(oneEnvelope);
+
+    await fee.send(operator.getSender(), { value: toNano('0.2') }, {
+      $$type: 'FlushBuybackDue',
+      amount: oneEnvelope,
+    } as FlushBuybackDue);
+    expect((await fee.getGetState()).buyback_due_ton).toBe(0n);
+  });
+
   it('NO-ADMIN: empty fallback is rejected and cannot mutate accounting', async () => {
     const { fee, attacker } = await setup();
 

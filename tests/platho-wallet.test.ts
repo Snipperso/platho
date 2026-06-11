@@ -216,7 +216,6 @@ describe('embedded Platho wallet', () => {
     const draft = await createVaultMessagingKeyDraft(verifiedBobBundle.bundle, verifiedBobBundle.signingPublicKey);
     const keyRecord = {
       exists: true,
-      owner_wallet: bob.address,
       key_generation: 0n,
       enc_pubkey: draft.message.enc_pubkey,
       sign_pubkey: draft.message.sign_pubkey,

@@ -16,8 +16,7 @@ const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 const PRIVATE_HYBRID_FEE = 10_000_000n;
 const PUBLIC_FEE = 10_000_000n;
-const PUBLIC_EXEC = 2_400_000n;
-const PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS = new Map<PrivateSizeClass, bigint>([
+const EXEC_BY_SIZE_CLASS = new Map<SizeClass, bigint>([
   [1n, 4_200_000n],
   [2n, 4_300_000n],
   [4n, 4_500_000n],
@@ -25,7 +24,7 @@ const PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS = new Map<PrivateSizeClass, bigint>([
   [16n, 5_800_000n],
   [32n, 7_600_000n],
 ]);
-const PRIVATE_SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
+const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 const KEEPALIVE = 1_000_000n;
 const PRIVATE_ENTRY_STORAGE = 3_300_000n;
 const PUBLIC_ENTRY_STORAGE = 7_400_000n;
@@ -37,10 +36,9 @@ const HEADER1_BYTES = 30;
 const HYBRID_BODY_BYTES = 2228;
 const PUBLIC_HEADER_BYTES = 68;
 const PUBLIC_HEADER_MAX_BYTES = 72;
-const PUBLIC_BODY_MAX_BYTES = 1024;
 const MINIMUM_RETAINED_MARGIN_NANOTONS = 1_000_000n;
 
-type PrivateSizeClass = typeof PRIVATE_SIZE_CLASSES[number];
+type SizeClass = typeof SIZE_CLASSES[number];
 
 export type CapsuleHubStorageCase = {
   label: string;
@@ -48,6 +46,7 @@ export type CapsuleHubStorageCase = {
   protocol_fee_delta_nanotons: string;
   balance_delta_nanotons: string;
   retained_non_fee_nanotons: string;
+  protected_retained_nanotons: string;
   required_storage_reserve_nanotons: string;
   retained_margin_nanotons: string;
   tx_count: number;
@@ -70,6 +69,7 @@ export type CapsuleHubStorageEconomicsReport = {
     hybrid_body_bytes_by_size_class: Record<string, number>;
     public_header_max_bytes: number;
     public_body_max_bytes: number;
+    public_body_bytes_by_size_class: Record<string, number>;
   };
   cases: CapsuleHubStorageCase[];
   worst_margin_nanotons: string;
@@ -81,13 +81,15 @@ function codeHash(relPath: string): string {
 
 function snakeCell(byteLength: number, fill = 0x61): Cell {
   const bytes = Buffer.alloc(byteLength, fill);
+  const chunks: Buffer[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 127) {
+    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
+  }
   let tail: Cell | null = null;
-  for (let offset = bytes.length; offset > 0;) {
-    const start = Math.max(0, offset - 127);
-    const builder = beginCell().storeBuffer(bytes.subarray(start, offset));
+  for (let index = chunks.length - 1; index >= 0; index -= 1) {
+    const builder = beginCell().storeBuffer(chunks[index]);
     if (tail) builder.storeRef(tail);
     tail = builder.endCell();
-    offset = start;
   }
   return tail ?? beginCell().endCell();
 }
@@ -150,13 +152,17 @@ function privateBodyBytes(sizeClass: bigint, cryptoSuite: bigint): number {
   return 1204 + (Number(sizeClass) * 1024);
 }
 
-function privateExecReserve(sizeClass: PrivateSizeClass): bigint {
-  const value = PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS.get(sizeClass);
-  if (value === undefined) throw new Error(`missing private exec reserve for ${sizeClass}K`);
+function execReserve(sizeClass: SizeClass): bigint {
+  const value = EXEC_BY_SIZE_CLASS.get(sizeClass);
+  if (value === undefined) throw new Error(`missing exec reserve for ${sizeClass}K`);
   return value;
 }
 
-function privateVault(sizeClass: PrivateSizeClass, cryptoSuite: 2n, fill: number): PublishPrivateFromVault {
+function publicBodyBytes(sizeClass: SizeClass): number {
+  return Number(sizeClass) * 1024;
+}
+
+function privateVault(sizeClass: SizeClass, cryptoSuite: 2n, fill: number): PublishPrivateFromVault {
   const header0 = snakeCell(HEADER0_BYTES, fill);
   const header1 = snakeCell(HEADER1_BYTES, fill + 1);
   const body = snakeCell(privateBodyBytes(sizeClass, cryptoSuite), fill + 2);
@@ -177,14 +183,15 @@ function privateVault(sizeClass: PrivateSizeClass, cryptoSuite: 2n, fill: number
   };
 }
 
-function publicVault(fill: number, author: Address): PublishPublicFromVault {
+function publicVault(sizeClass: SizeClass, fill: number, author: Address): PublishPublicFromVault {
   const header = snakeCell(PUBLIC_HEADER_BYTES, 0x50);
-  const body = snakeCell(PUBLIC_BODY_MAX_BYTES, fill);
+  const body = snakeCell(publicBodyBytes(sizeClass), fill);
   return {
     $$type: 'PublishPublicFromVault',
     bounce_id: BigInt(20_000 + fill),
     bounce_tag: BigInt(40_000 + fill),
     publish_id: hash256(`vault-public-${fill}`),
+    size_class: sizeClass,
     marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
     author_wallet: author,
     header_hash: cellHash(header),
@@ -209,31 +216,31 @@ async function measure(
   const beforeBalance = await balanceOf(ctx.blockchain, ctx.capsule.address);
   const beforeState = await ctx.capsule.getGetState();
   const result = await send(ctx);
+  const aborted = abortedCount(result);
   const afterState = await ctx.capsule.getGetState();
   const afterBalance = await balanceOf(ctx.blockchain, ctx.capsule.address);
   const balanceDelta = afterBalance - beforeBalance;
   const feeDelta = afterState.accrued_plato_fee_ton - beforeState.accrued_plato_fee_ton;
   const retainedNonFee = balanceDelta - feeDelta;
-  const margin = retainedNonFee - storageReserve;
-  if (margin < 0n) {
-    throw new Error(`${label} under-retained storage reserve by ${-margin} nanotons`);
-  }
+  const protectedRetained = balanceDelta;
+  const margin = protectedRetained - storageReserve;
   return {
     label,
     inbound_value_nanotons: String(inbound),
     protocol_fee_delta_nanotons: String(feeDelta),
     balance_delta_nanotons: String(balanceDelta),
     retained_non_fee_nanotons: String(retainedNonFee),
+    protected_retained_nanotons: String(protectedRetained),
     required_storage_reserve_nanotons: String(storageReserve),
     retained_margin_nanotons: String(margin),
     tx_count: result.transactions?.length ?? 0,
-    aborted_count: abortedCount(result),
+    aborted_count: aborted,
   };
 }
 
 export async function runCapsuleHubStorageEconomics(writeArtifacts = true): Promise<CapsuleHubStorageEconomicsReport> {
-  const privateCases = await Promise.all(PRIVATE_SIZE_CLASSES.map((sizeClass, index) => {
-    const inbound = PRIVATE_HYBRID_FEE + privateExecReserve(sizeClass) + KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
+  const privateCases = await Promise.all(SIZE_CLASSES.map((sizeClass, index) => {
+    const inbound = PRIVATE_HYBRID_FEE + execReserve(sizeClass) + KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
     return measure(
       `VAULT_PRIVATE_HYBRID_${sizeClass}K`,
       inbound,
@@ -243,20 +250,33 @@ export async function runCapsuleHubStorageEconomics(writeArtifacts = true): Prom
       }, privateVault(sizeClass, 2n, 0x70 + index)),
     );
   }));
-  const cases = [
-    ...privateCases,
-    await measure(
-      'VAULT_PUBLIC_POST',
-      PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE,
+  const publicCases = await Promise.all(SIZE_CLASSES.map((sizeClass, index) => {
+    const inbound = PUBLIC_FEE + execReserve(sizeClass) + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
+    return measure(
+      `VAULT_PUBLIC_${sizeClass}K`,
+      inbound,
       KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE,
       (ctx) => ctx.capsule.send(ctx.blockchain.sender(ctx.mockVaultAddress), {
-        value: PUBLIC_FEE + PUBLIC_EXEC + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE,
-      }, publicVault(0x80, ctx.author.address)),
-    ),
+        value: inbound,
+      }, publicVault(sizeClass, 0x80 + index, ctx.author.address)),
+    );
+  }));
+  const cases = [
+    ...privateCases,
+    ...publicCases,
   ];
+  const aborted = cases.filter((c) => c.aborted_count > 0);
+  if (aborted.length > 0) {
+    const labels = aborted.map((c) => `${c.label}:${c.aborted_count}`).join(', ');
+    throw new Error(`CapsuleHub storage economics publish aborted: ${labels}`);
+  }
   const worst = cases.map((c) => BigInt(c.retained_margin_nanotons)).reduce((a, b) => a < b ? a : b);
   if (worst < MINIMUM_RETAINED_MARGIN_NANOTONS) {
-    throw new Error(`CapsuleHub retained margin ${worst} is below gate ${MINIMUM_RETAINED_MARGIN_NANOTONS}`);
+    const failing = cases
+      .filter((c) => BigInt(c.retained_margin_nanotons) < MINIMUM_RETAINED_MARGIN_NANOTONS)
+      .map((c) => `${c.label}=${c.retained_margin_nanotons}`)
+      .join(', ');
+    throw new Error(`CapsuleHub retained margin ${worst} is below gate ${MINIMUM_RETAINED_MARGIN_NANOTONS}: ${failing}`);
   }
   const report: CapsuleHubStorageEconomicsReport = {
     profile: 'PLATHO.V1.CAPSULEHUB_STORAGE_ECONOMICS',
@@ -265,18 +285,22 @@ export async function runCapsuleHubStorageEconomics(writeArtifacts = true): Prom
     code_hashes: {
       capsulehub: codeHash(path.join('build', 'CapsuleHub', 'CapsuleHub_CapsuleHub.code.boc')),
     },
-    note: 'Sandbox evidence for canonical final CapsuleHub index cells. Body payload cells are validated in the publish transaction and authenticated by stored hashes, but only compact headers/indexes remain in CapsuleHub state. Pages are virtual ranges derived from entry ids; this is not a mainnet storage-rent oracle.',
+    note: 'Sandbox evidence for canonical final CapsuleHub index cells. Body payload cells are validated in the publish transaction and authenticated by stored hashes, but only compact headers/indexes remain in CapsuleHub state. Pages are virtual ranges derived from entry ids. Retained margin includes accrued protocol fee because FlushFees is gated by protectedReserve(), so accrued fee cannot be drained while index storage reserve is not backed. This is not a mainnet storage-rent oracle.',
     minimum_retained_margin_nanotons: String(MINIMUM_RETAINED_MARGIN_NANOTONS),
     canonical_capsule_cells: {
       header0_bytes: HEADER0_BYTES,
       header1_bytes: HEADER1_BYTES,
       hybrid_body_bytes: HYBRID_BODY_BYTES,
-      hybrid_body_bytes_by_size_class: Object.fromEntries(PRIVATE_SIZE_CLASSES.map((sizeClass) => [
+      hybrid_body_bytes_by_size_class: Object.fromEntries(SIZE_CLASSES.map((sizeClass) => [
         `${sizeClass}K`,
         privateBodyBytes(sizeClass, 2n),
       ])),
       public_header_max_bytes: PUBLIC_HEADER_MAX_BYTES,
-      public_body_max_bytes: PUBLIC_BODY_MAX_BYTES,
+      public_body_max_bytes: publicBodyBytes(32n),
+      public_body_bytes_by_size_class: Object.fromEntries(SIZE_CLASSES.map((sizeClass) => [
+        `${sizeClass}K`,
+        publicBodyBytes(sizeClass),
+      ])),
     },
     cases,
     worst_margin_nanotons: String(worst),

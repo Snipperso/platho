@@ -40,6 +40,15 @@ const DEPLOY_ACTION_TO_CONTRACT: Record<string, string> = {
   'Deploy Vault': 'Vault',
 };
 
+const POST_POOL_COMMANDS = [
+  'npm.cmd run m20f:collect',
+  'npm.cmd run m20f:preflight',
+  'npm.cmd run market-stability:readiness',
+  'npm.cmd run buyback:enable-preflight',
+];
+
+const TEST_DEPLOY_TARGET_RE = /(?:Mock|Harness|M20T)/i;
+
 function readText(path: string): string {
   return readFileSync(path, 'utf8');
 }
@@ -76,6 +85,14 @@ function parseKeyValueLines(text: string): Record<string, string> {
 
 function normalizeHash(value: unknown): string {
   return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
+}
+
+function sectionAfterHeading(text: string, heading: string): string | null {
+  const start = text.indexOf(heading);
+  if (start < 0) return null;
+  const after = text.slice(start + heading.length);
+  const nextHeading = after.search(/\n##\s+/);
+  return nextHeading >= 0 ? after.slice(0, nextHeading) : after;
 }
 
 function currentManifestCodeHashMismatches(): string[] {
@@ -147,6 +164,11 @@ describe('release truth single-source guard', () => {
       expect(normalizeHash(PLATHO_APP_CONFIG.vault?.deploymentManifestHash)).toBe(
         normalizeHash(input.manifest?.manifest_hash_hex),
       );
+    } else if (PLATHO_APP_CONFIG.mode === PLATHO_APP_MODES.PRODUCTION) {
+      const productionPrep = readJson('artifacts/web_static_deploy_prep.production.json');
+      expect(productionPrep.productionReady).toBe(false);
+      expect(productionPrep.status).toMatch(/BLOCKED/);
+      expect(productionPrep.blockers).toContain('MAINNET_GENESIS_NOT_VERIFIED');
     } else {
       expect(PLATHO_APP_CONFIG.mode).not.toBe(PLATHO_APP_MODES.PRODUCTION);
     }
@@ -221,6 +243,29 @@ describe('release truth single-source guard', () => {
     }
   });
 
+  it('keeps a production-only code hash file without mock or harness evidence keys', () => {
+    const currentCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_CODE_HASHES.txt'));
+    const productionCodeHashes = parseKeyValueLines(readText('artifacts/CURRENT_PRODUCTION_CODE_HASHES.txt'));
+    const expectedKeys = Object.keys(CURRENT_CODE_HASH_TO_MANIFEST_KEY).sort();
+
+    expect(Object.keys(productionCodeHashes).sort()).toEqual(expectedKeys);
+
+    for (const key of expectedKeys) {
+      expect(key).not.toMatch(TEST_DEPLOY_TARGET_RE);
+      expect(normalizeHash(productionCodeHashes[key]), key).toBe(normalizeHash(currentCodeHashes[key]));
+    }
+
+    const localDraftPath = 'artifacts/local/mainnet_final_manifest_draft.json';
+    if (!existsSync(localDraftPath)) return;
+
+    const draft = readJson(localDraftPath);
+    for (const [currentKey, manifestKey] of Object.entries(CURRENT_CODE_HASH_TO_MANIFEST_KEY)) {
+      expect(normalizeHash(productionCodeHashes[currentKey]), manifestKey).toBe(
+        normalizeHash(draft.manifest?.code_hashes?.[manifestKey]),
+      );
+    }
+  });
+
   it('keeps local mainnet deploy packet code hashes aligned with CURRENT_CODE_HASHES when the packet is archived', () => {
     const path = 'artifacts/local/mainnet_deploy_packet.json';
     if (!existsSync(path)) return;
@@ -249,6 +294,80 @@ describe('release truth single-source guard', () => {
       expect(normalizeHash(step.state_init?.code_hash_hex), `${step.id} ${step.contract}`).toBe(
         normalizeHash(currentCodeHashes[currentKey]),
       );
+    }
+  });
+
+  it('keeps local mainnet deploy and dry-run packets free of mock, harness, and M20T deploy targets', () => {
+    const deployPath = 'artifacts/local/mainnet_deploy_packet.json';
+    if (existsSync(deployPath)) {
+      const packet = readJson(deployPath);
+      const deployedTargets = (packet.phase_1_deploy_contracts ?? []).map((step: any) => [
+        step.id,
+        step.action,
+        step.contract,
+        step.message,
+        step.target_is,
+      ].filter(Boolean).join(' '));
+
+      expect(deployedTargets).not.toEqual(expect.arrayContaining([expect.stringMatching(TEST_DEPLOY_TARGET_RE)]));
+    }
+
+    const dryRunPath = 'artifacts/local/mainnet_tx_dry_run_packet.json';
+    if (existsSync(dryRunPath)) {
+      const packet = readJson(dryRunPath);
+      const deployedTargets = (packet.deploy_contracts ?? []).map((step: any) => [
+        step.id,
+        step.action,
+        step.contract,
+        step.message,
+      ].filter(Boolean).join(' '));
+
+      expect(deployedTargets).not.toEqual(expect.arrayContaining([expect.stringMatching(TEST_DEPLOY_TARGET_RE)]));
+    }
+  });
+
+  it('labels local mainnet draft, deploy packet, and dry-run packet as pre-execution templates', () => {
+    const expectations = [
+      ['artifacts/local/mainnet_final_manifest_draft.json', 'pre_execution_manifest_template'],
+      ['artifacts/local/mainnet_deploy_packet.json', 'pre_execution_deploy_packet_template'],
+      ['artifacts/local/mainnet_tx_dry_run_packet.json', 'pre_execution_tx_dry_run_template'],
+    ] as const;
+
+    for (const [path, stage] of expectations) {
+      if (!existsSync(path)) continue;
+      const artifact = readJson(path);
+      expect(artifact.production_deploy_executed, path).toBe(false);
+      expect(artifact.lifecycle_stage, path).toBe(stage);
+      expect(artifact.lifecycle_note, path).toMatch(/pre-execution template/);
+      expect(artifact.lifecycle_note, path).toMatch(/mainnet_genesis_verify_report\.json/);
+    }
+  });
+
+  it('keeps post-pool commands out of pre-PWA production release gates', () => {
+    const docs = [
+      {
+        file: 'PRODUCTION_READINESS.md',
+        beforeHeading: '## Required before production PWA release',
+        postHeading: '## Required only after airdrop and pool launch',
+      },
+      {
+        file: 'MAINNET_RELEASE_CHECKLIST.md',
+        beforeHeading: '## Command Gates Before Production PWA Release',
+        postHeading: '## Post-Pool Command Gates',
+      },
+    ];
+
+    for (const doc of docs) {
+      const text = readText(doc.file);
+      const before = sectionAfterHeading(text, doc.beforeHeading);
+      const post = sectionAfterHeading(text, doc.postHeading);
+
+      expect(before, doc.file).not.toBeNull();
+      expect(post, doc.file).not.toBeNull();
+      for (const command of POST_POOL_COMMANDS) {
+        expect(before, `${doc.file} before section`).not.toContain(command);
+        expect(post, `${doc.file} post section`).toContain(command);
+      }
     }
   });
 });

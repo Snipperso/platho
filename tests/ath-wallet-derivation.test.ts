@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, Cell, contractAddress, storeStateInit, toNano } from '@ton/core';
-import { Blockchain, createShardAccount } from '@ton/sandbox';
+import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { findTransaction } from '@ton/test-utils';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { ATHMaster, DeployTreasurySupply } from '../build/ATHMaster/ATHMaster_ATHMaster';
-import { ATHWallet, ATHGenesisSupplyCredit } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, ATHGenesisSupplyCredit, storeATHGenesisSupplyCredit } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const ATH_GENESIS_SUPPLY_DOWNSTREAM_VALUE = 3_000_000n;
@@ -143,6 +143,73 @@ describe('ATH wallet derivation profile', () => {
 
     expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
     expect((await master.getGetJettonData()).total_supply).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+  });
+
+  it('ATH Master forged genesis bounce cannot reopen deploy after successful treasury credit', async () => {
+    const blockchain = await Blockchain.create();
+    const treasuryOwner = await blockchain.treasury('ath-genesis-forged-bounce-owner');
+    const attacker = await blockchain.treasury('ath-genesis-forged-bounce-attacker');
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterAddress = contractAddress(0, masterInit);
+    await blockchain.setShardAccount(
+      masterAddress,
+      createShardAccount({
+        address: masterAddress,
+        code: masterInit.code,
+        data: masterInit.data,
+        balance: toNano('1'),
+        workchain: masterAddress.workChain,
+      }),
+    );
+
+    const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));
+    const treasuryWalletAddress = await master.getGetWalletAddress(treasuryOwner.address);
+    const treasuryWalletInit = await ATHWallet.init(0n, treasuryOwner.address, masterAddress);
+    const treasuryWallet = blockchain.openContract(new ATHWallet(treasuryWalletAddress, treasuryWalletInit));
+
+    await master.send(treasuryOwner.getSender(), { value: ATH_GENESIS_SUPPLY_REQUIRED_VALUE }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 37n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
+
+    const forgedBounce = await blockchain.sendMessage(internal({
+      from: attacker.address,
+      to: master.address,
+      value: toNano('0.05'),
+      bounced: true,
+      bounce: false,
+      body: beginCell()
+        .storeUint(0xffffffff, 32)
+        .store(storeATHGenesisSupplyCredit({
+          $$type: 'ATHGenesisSupplyCredit',
+          query_id: 37n,
+          amount: ATH_TOTAL_SUPPLY_ATOMIC,
+          response_destination: treasuryOwner.address,
+        } as ATHGenesisSupplyCredit))
+        .endCell(),
+    }));
+
+    expect(findTransaction(forgedBounce.transactions, {
+      from: attacker.address,
+      to: master.address,
+      success: false,
+      exitCode: 14130,
+    })).toBeDefined();
+
+    const secondDeployAttempt = await master.send(treasuryOwner.getSender(), { value: ATH_GENESIS_SUPPLY_REQUIRED_VALUE }, {
+      $$type: 'DeployTreasurySupply',
+      query_id: 38n,
+      response_destination: treasuryOwner.address,
+    } as DeployTreasurySupply);
+
+    expect(findTransaction(secondDeployAttempt.transactions, {
+      from: master.address,
+      to: treasuryWalletAddress,
+    })).toBeUndefined();
+    expect((await treasuryWallet.getGetWalletData()).balance).toBe(ATH_TOTAL_SUPPLY_ATOMIC);
   });
 
   it('ATH Master deploys treasury supply without trapping caller overpayment in the treasury ATH wallet', async () => {

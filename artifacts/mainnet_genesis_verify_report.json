@@ -4,13 +4,13 @@
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "mainnet_genesis_verified": true,
   "input_source": "artifacts/mainnet_genesis_verify_input.json",
-  "input_sha256": "f9277678ebd88a77999cf327d590931219a144e0aecbdf2dd0923ee2123555cb",
+  "input_sha256": "2d81bf88949925b4d90add5ae2c261775221cc8d13a70582bb10e7b52107ac13",
   "evidence_refs": {
-    "getterSnapshotSource": "toncenter-mainnet-v2:live-getters:2026-06-03T19:26:37.574Z",
-    "codeHashProofSource": "toncenter-mainnet-v2:account-code-hashes:2026-06-03T19:26:37.576Z",
-    "finalManifestSource": "artifacts/local/mainnet_final_manifest_draft.json#manifest_hash=43b26836c99172fe1ad91220debbb7f5751e5610f886ea0b59842ae793ea7720"
+    "getterSnapshotSource": "live-rpc/platho-toncenter/2026-06-10T16:41:41.692Z",
+    "codeHashProofSource": "artifacts/CURRENT_CODE_HASHES.txt#sha256=46afd3e62486086936326ed48ecf370ff71721249bd09b60c4274d0b4f033ce0",
+    "finalManifestSource": "artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=0f54ea7d319aaad69cfba922e7779e25fca683de15c8caf7fe444e2dc99dc610"
   },
   "issue_codes": [],
   "issues": [],
-  "checked_manifest_hash": "43b26836c99172fe1ad91220debbb7f5751e5610f886ea0b59842ae793ea7720"
+  "checked_manifest_hash": "0f54ea7d319aaad69cfba922e7779e25fca683de15c8caf7fe444e2dc99dc610"
 }

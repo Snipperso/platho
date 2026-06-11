@@ -47,12 +47,12 @@ Binary layout decision: v1 on-chain private capsule cells are fixed binary bytes
 
 Useful private capacity is selected per hybrid capsule from the final 1, 2, 4, 8, 16, or 32 KiB size classes. Small messages are zero-padded inside the selected encrypted slot. Long text and images are split into multiple independent capsules whose encrypted metadata carries `stream_id`, `part_index`, and `part_count`. A single capsule must not mix unrelated payload units; exact body sizes are listed in `artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md`.
 
-Public publish marketing marker: CapsuleHub v1 public publish messages carry a fixed byte-aligned `uint152` marker equal to ASCII `sent via Platho.App` in the transaction message body. Public publish entries store a compact public header cell separately from a raw text body cell, `1..1024` bytes in a snake cell, not padded private capsules. This is an on-chain annotation only; the official messenger UI must not render it as part of the public post text. Private publish messages do not carry the marker.
+Public publish marketing marker: CapsuleHub v1 public publish messages carry a fixed byte-aligned `uint152` marker equal to ASCII `sent via Platho.App` in the transaction message body. Public publish entries store a compact public header cell separately from a raw text/image/avatar body cell using the smallest fitting 1, 2, 4, 8, 16, or 32 KiB public size class, not padded private ciphertext capsules. This is an on-chain annotation only; the official messenger UI must not render it as part of the public post text. Private publish messages do not carry the marker.
 
 CapsuleHub does not store page counters. Clients can derive page windows from sequential entry ids. The first entry of a page must not pay a separate page-storage reserve; every capsule of the same publish profile has the same required value.
 
 PWA pricing decision: official public posts start from `0.0337 TON` net per capsule and `hybrid-v1` private 1 KiB capsules start from `0.0347 TON` net per capsule before ATH discount and network-fee overage. `classical-v1` is not exposed as a publish option in final v1.
-Both include `0.005 TON` of estimated network cost allowance, which is not a Platho protocol fee. If the current PWA estimate exceeds that allowance, the PWA adds the
+Both include the full Platho protocol fee of `0.01 TON`. Separately, both include `0.005 TON` of estimated network cost allowance, which is not a Platho protocol fee. If the current PWA estimate exceeds that allowance, the PWA adds the
 overage rounded upward to `0.001 TON` steps. Final v1 publishes are Vault-only; Vault accepts
 `maxCharge >= canonical_max_charge` so the PWA can keep v1 above cost without a contract oracle while applying ATH
 discounts to public and private messages consistently.

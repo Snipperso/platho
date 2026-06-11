@@ -75,7 +75,7 @@ M20X intentionally uses only a global cap:
 - manifest representation: `vault_activity_airdrop_per_wallet_cap_atomic = 0`.
 
 Reason: every rewarded publish requires a paid protocol action. Current final v1 pricing starts from `0.0337 TON` for
-public capsules and `0.0347 TON` for hybrid private 1 KiB capsules, with larger private capsule blocks costing more.
+1 KiB public capsules and `0.0347 TON` for hybrid private 1 KiB capsules, with larger public or private capsule blocks costing more.
 Fully exhausting the `1,500,000` publish reward pool therefore requires real
 paid usage rather than free claims. The airdrop is an early activity bonus and utility bootstrap, not a TON refund,
 cashback, reimbursement, investment return, price guarantee, or free claim campaign.

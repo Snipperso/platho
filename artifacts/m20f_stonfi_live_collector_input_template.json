@@ -47,6 +47,8 @@
     "stonfiApiSimulationCapture": "required: immutable STON.fi API simulation capture path/hash",
     "stonfiSdkOrApiTxParamsCapture": "required: immutable official STON.fi SDK/API tx params capture path/hash",
     "routerPoolPtonCodeHashes": "required: immutable router/pool/pTON code hash proof path/hash",
+    "athNotificationQueryIdPropagationProof": "required: immutable ATH notification query_id propagation and BuybackBurn burn finalization proof path/hash",
+    "refundExcessBodyShapeProof": "required: immutable refund/excess/failure body shape proof matching BuybackBurn handlers path/hash",
     "successExcessProof": "required: immutable success excess proof returning to BuybackBurn path/hash",
     "minOutFailureRefundProof": "required: immutable min_out failure refund proof returning to BuybackBurn path/hash",
     "ptonRefundProof": "required: immutable pTON refund proof returning to BuybackBurn path/hash",
