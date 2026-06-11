@@ -8,8 +8,8 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import { abool } from '@noble/curves/utils.js';
-import { shake256 } from '@noble/hashes/sha3.js';
+import { abool } from '../curves/utils.js';
+import { shake256 } from '../hashes/sha3.js';
 import { genCrystals, XOF128, XOF256 } from "./_crystals.js";
 import { abytes, checkHash, cleanBytes, equalBytes, getMessage, getMessagePrehash, randomBytes, splitCoder, validateOpts, validateSigOpts, validateVerOpts, vecCoder, } from "./utils.js";
 function validateInternalOpts(opts) {

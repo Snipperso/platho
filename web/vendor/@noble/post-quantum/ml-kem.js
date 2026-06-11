@@ -20,8 +20,8 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import { sha3_256, sha3_512, shake256 } from '@noble/hashes/sha3.js';
-import { swap32IfBE, u32 } from '@noble/hashes/utils.js';
+import { sha3_256, sha3_512, shake256 } from '../hashes/sha3.js';
+import { swap32IfBE, u32 } from '../hashes/utils.js';
 import { genCrystals, XOF128 } from "./_crystals.js";
 import { abytes, cleanBytes, copyBytes, equalBytes, getMask, randomBytes, splitCoder, vecCoder, } from "./utils.js";
 /** Key encapsulation mechanism interface */

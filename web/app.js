@@ -17,7 +17,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=11';
+} from './crypto/platho-crypto.mjs?v=12';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -27,7 +27,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=12';
+} from './platho-wallet.mjs?v=13';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -35,9 +35,9 @@ import {
 } from './encrypted-message-store.mjs?v=4';
 import {
   VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=71';
-import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=35';
+} from './vault-chain-provider.mjs?v=6';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=72';
+import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=36';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -117,20 +117,20 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=24';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=22';
+} from './pwa-contract-transactions.mjs?v=25';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=23';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=35';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=24';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=20';
+} from './capsulehub-ton-rpc-provider.mjs?v=36';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=25';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=21';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=27';
+} from './username-ton-rpc-provider.mjs?v=28';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v415';
+const PLATHO_APP_RUNTIME_VERSION = 'v416';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 window.addEventListener('error', (event) => {

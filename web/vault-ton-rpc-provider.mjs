@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=10';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=24';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=25';
 
 export class VaultTonRpcProviderError extends Error {
   constructor(message, options = {}) {

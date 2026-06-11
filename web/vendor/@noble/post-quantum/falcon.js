@@ -4,13 +4,13 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import { rngAesCtrDrbg256 } from '@noble/ciphers/aes.js';
-import { chacha20 } from '@noble/ciphers/chacha.js';
-import { FFTCore } from '@noble/curves/abstract/fft.js';
-import { invert } from '@noble/curves/abstract/modular.js';
-import { bytesToNumberLE, numberToHexUnpadded } from '@noble/curves/utils.js';
-import { shake256 } from '@noble/hashes/sha3.js';
-import { abytes, bytesToHex, createView, hexToBytes, randomBytes, swap32IfBE, u32, u8, } from '@noble/hashes/utils.js';
+import { rngAesCtrDrbg256 } from '../ciphers/aes.js';
+import { chacha20 } from '../ciphers/chacha.js';
+import { FFTCore } from '../curves/abstract/fft.js';
+import { invert } from '../curves/abstract/modular.js';
+import { bytesToNumberLE, numberToHexUnpadded } from '../curves/utils.js';
+import { shake256 } from '../hashes/sha3.js';
+import { abytes, bytesToHex, createView, hexToBytes, randomBytes, swap32IfBE, u32, u8, } from '../hashes/utils.js';
 import { genCrystals } from "./_crystals.js";
 import { baswap64If, cleanBytes, getMask, splitCoder, validateSigOpts, validateVerOpts, } from "./utils.js";
 /*

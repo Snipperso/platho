@@ -1,5 +1,5 @@
-import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs?v=9';
-import { computeVaultMessagingKeyId } from './pwa-contract-transactions.mjs?v=24';
+import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs?v=12';
+import { computeVaultMessagingKeyId } from './pwa-contract-transactions.mjs?v=25';
 
 export class VaultChainProviderUnavailableError extends Error {
   constructor(message = 'Vault chain provider is not configured') {
@@ -23,8 +23,8 @@ function uintLikeToBigInt(value, name) {
 }
 
 function field(record, snakeName, camelName = snakeName) {
-  if (record && Object.hasOwn(record, snakeName)) return record[snakeName];
-  if (record && Object.hasOwn(record, camelName)) return record[camelName];
+  if (record && Object.prototype.hasOwnProperty.call(record, snakeName)) return record[snakeName];
+  if (record && Object.prototype.hasOwnProperty.call(record, camelName)) return record[camelName];
   return undefined;
 }
 

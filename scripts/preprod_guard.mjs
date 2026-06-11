@@ -123,19 +123,6 @@ function unique(items) {
   return Array.from(new Set(items));
 }
 
-function computeInlineImportMapCspHashes() {
-  const html = readTextIfExists('web/index.html');
-  if (!html) return null;
-  const match = html.match(/<script\s+type="importmap">([\s\S]*?)<\/script>/);
-  if (!match) return null;
-  const importMap = match[1];
-  const canonicalLfImportMap = importMap.replace(/\r\n/g, '\n');
-  return unique([
-    `sha256-${sha256Base64(importMap)}`,
-    `sha256-${sha256Base64(canonicalLfImportMap)}`,
-  ]);
-}
-
 function normalizeHash(value) {
   return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : '';
 }
@@ -516,15 +503,35 @@ function validateMainnetGenesisEvidence() {
   }
 }
 
-function validateCspImportMapHash() {
-  const expectedHashes = computeInlineImportMapCspHashes();
-  if (!expectedHashes) {
-    failures.push({
-      id: 'PWA_CSP_IMPORTMAP_MISSING',
-      file: 'web/index.html',
-      message: 'web/index.html must contain the inline importmap used by the CSP hash guard.',
-    });
+function validateCspInlineScriptPolicy() {
+  // The bundle intentionally ships no inline scripts and no inline import
+  // map: vendor modules use relative imports so old Safari (no import-map
+  // support before 16.4) can still boot, and script-src stays hash-free.
+  const html = readTextIfExists('web/index.html');
+  if (!html) {
+    failures.push({ id: 'PWA_INDEX_MISSING', file: 'web/index.html', message: 'web/index.html is required.' });
     return;
+  }
+  if (/<script\s+type="importmap">/.test(html)) {
+    failures.push({
+      id: 'PWA_INLINE_IMPORTMAP_FORBIDDEN',
+      file: 'web/index.html',
+      message: 'Inline import map breaks Safari < 16.4 and re-introduces CSP hash fragility; vendor modules must use relative imports.',
+    });
+  }
+  if (/<script(?![^>]*src=)[^>]*>/.test(html.replace(/<script\s+type="importmap">[\s\S]*?<\/script>/, ''))) {
+    failures.push({
+      id: 'PWA_INLINE_SCRIPT_FORBIDDEN',
+      file: 'web/index.html',
+      message: 'Inline scripts require CSP content hashes; the production bundle must keep script-src hash-free.',
+    });
+  }
+  if (!html.includes('boot-guard.js')) {
+    failures.push({
+      id: 'PWA_BOOT_GUARD_REQUIRED',
+      file: 'web/index.html',
+      message: 'index.html must load boot-guard.js so a dead module graph shows a diagnostic screen instead of a dark shell.',
+    });
   }
 
   for (const file of ['deploy/Caddyfile', 'deploy/nginx-platho.app.conf', 'deploy/README.md', 'scripts/server/Caddyfile', 'PRODUCTION_READINESS.md']) {
@@ -533,12 +540,13 @@ function validateCspImportMapHash() {
       failures.push({ id: 'PWA_CSP_CONFIG_MISSING', file, message: 'Required CSP documentation/config is missing.' });
       continue;
     }
-    for (const expectedHash of expectedHashes) {
-      if (!text.includes(expectedHash)) {
+    const scriptSrcSections = text.match(/script-src[^;"]*/g) ?? [];
+    for (const section of scriptSrcSections) {
+      if (section.includes('sha256-')) {
         failures.push({
-          id: 'PWA_CSP_IMPORTMAP_HASH_MISMATCH',
+          id: 'PWA_CSP_STALE_SCRIPT_HASH',
           file,
-          message: `CSP importmap hash must match web/index.html, including line-ending-safe hash: ${expectedHash}.`,
+          message: 'script-src must stay hash-free: the bundle has no inline scripts, stale hashes hide CSP drift.',
         });
       }
     }
@@ -684,7 +692,7 @@ validateLocalMainnetDeployArtifacts();
 validateFeeAccumulatorHashAliases();
 validateProductionDeployPacketHasNoTestTargets();
 validateReleaseDocsPhaseOrder();
-validateCspImportMapHash();
+validateCspInlineScriptPolicy();
 validatePublishReservePricingArtifact();
 
 if (failures.length > 0) {

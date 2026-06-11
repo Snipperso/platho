@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
   PLATHO_APP_CONFIG,
@@ -97,17 +97,6 @@ function unique(items: string[]): string[] {
   return Array.from(new Set(items));
 }
 
-function currentInlineImportMapCspHashes(): string[] {
-  const html = readFileSync('web/index.html', 'utf8');
-  const match = html.match(/<script\s+type="importmap">([\s\S]*?)<\/script>/);
-  if (!match) throw new Error('web/index.html is missing the inline importmap.');
-  const importMap = match[1];
-  const canonicalLfImportMap = importMap.replace(/\r\n/g, '\n');
-  return unique([
-    `sha256-${createHash('sha256').update(importMap).digest('base64')}`,
-    `sha256-${createHash('sha256').update(canonicalLfImportMap).digest('base64')}`,
-  ]);
-}
 
 describe('PWA runtime config guard', () => {
   it('PWA-WALLET-01: receive QR generator renders a TON transfer code', async () => {
@@ -198,7 +187,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=20/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=21/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -254,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v415<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v415'/);
+    expect(html).toMatch(/id="appVersionLabel">v416<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v416'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3717,28 +3706,28 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v478/);
+    expect(sw).toMatch(/platho-pwa-prototype-v479/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=415/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=71/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=35/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=27/);
+    expect(sw).toMatch(/\.\/app\.js\?v=416/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=12/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=24/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=35/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=24/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=35/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=22/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=20/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=27/);
+    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=13/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=36/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=23/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=21/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
-    expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=11/);
-    expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=5/);
+    expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
+    expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/ed25519\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/abstract\/edwards\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/hashes\/sha2\.js/);
@@ -3761,14 +3750,15 @@ describe('PWA runtime config guard', () => {
     const readme = readFileSync('deploy/README.md', 'utf8');
     const serverCaddy = readFileSync('scripts/server/Caddyfile', 'utf8');
     const readiness = readFileSync('PRODUCTION_READINESS.md', 'utf8');
-    const importMapCspHashes = currentInlineImportMapCspHashes();
 
     for (const text of [caddy, nginx, readme, serverCaddy, readiness]) {
       expect(text).toMatch(/Content-Security-Policy/);
       expect(text).toMatch(/default-src 'self'/);
       expect(text).toMatch(/script-src 'self' 'wasm-unsafe-eval'/);
-      for (const importMapCspHash of importMapCspHashes) {
-        expect(text).toContain(`'${importMapCspHash}'`);
+      // The bundle ships no inline scripts and no inline import map, so
+      // script-src must stay hash-free: stale hashes hide CSP drift.
+      for (const scriptSrc of text.match(/script-src[^;"]*/g) ?? []) {
+        expect(scriptSrc).not.toContain('sha256-');
       }
       expect(text).toMatch(/connect-src/);
       expect(text).toMatch(/object-src 'none'/);
@@ -3778,5 +3768,38 @@ describe('PWA runtime config guard', () => {
       expect(text).toMatch(/Referrer-Policy/);
       expect(text).toMatch(/Permissions-Policy/);
     }
+  });
+
+  it('PWA-CONFIG-09B: module graph boots without an import map and ships the boot watchdog', () => {
+    const html = readFileSync('web/index.html', 'utf8');
+    const sw = readFileSync('web/sw.js', 'utf8');
+    const bootGuard = readFileSync('web/boot-guard.js', 'utf8');
+
+    // Inline import maps require Safari 16.4+ and CSP content hashes; vendor
+    // modules use relative imports instead so older iOS can still boot.
+    expect(html).not.toMatch(/type="importmap"/);
+    expect(html).not.toMatch(/<script(?![^>]*src=)[^>]*>/);
+    expect(html).toMatch(/<script src="\.\/boot-guard\.js\?v=\d+"><\/script>/);
+    expect(sw).toMatch(/\.\/boot-guard\.js\?v=\d+/);
+
+    // No reachable vendor module may keep a bare @noble specifier.
+    // curves/index.js is not reachable from the runtime graph and keeps an
+    // unresolvable upstream specifier; everything else must be relative.
+    const vendorFiles = readdirSync('web/vendor/@noble', { recursive: true })
+      .map((entry) => String(entry).replace(/\\/g, '/'))
+      .filter((entry) => entry.endsWith('.js'))
+      .filter((entry) => entry !== 'curves/index.js');
+    const offending = vendorFiles.filter((entry) => {
+      const source = readFileSync(`web/vendor/@noble/${entry}`, 'utf8');
+      return /^(?:import|export)[^'\n]*from '@noble\//m.test(source);
+    });
+    expect(offending).toEqual([]);
+
+    // The watchdog must stay plain ES5 so it runs where the module graph
+    // cannot; it only fires when the app module never started.
+    expect(bootGuard).not.toMatch(/=>|\bconst\b|\blet\b|`/);
+    expect(bootGuard).toMatch(/data-platho-app-js/);
+    expect(bootGuard).toMatch(/addEventListener\('error'/);
+    expect(bootGuard).toMatch(/unhandledrejection/);
   });
 });

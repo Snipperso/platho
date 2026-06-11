@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-11T16:08:59.312Z",
+  "generatedAt": "2026-06-11T16:29:41.407Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -8,14 +8,14 @@
   "productionReady": true,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 128,
-    "totalBytes": 3128174,
-    "bundleSha256": "16cf0e80d7d091771d9c89a88f715697b97aa10aa67350f8e4da8760b102415a",
+    "fileCount": 129,
+    "totalBytes": 3132445,
+    "bundleSha256": "01d03e84d46c166120d4547ca69e7e6063c80282cdf56de7f9259b09c89eef9c",
     "files": [
       {
         "path": "app.js",
         "bytes": 706976,
-        "sha256": "cd367003bbfde2f7bf6a687ae7fd5847bf8d053fcd814ad00174b6d36337194e"
+        "sha256": "664b1c04822f62b789814681f7c27e073e4cc0b6bca0ae51b694dae35b7c0243"
       },
       {
         "path": "assets/icons/back.svg",
@@ -159,8 +159,13 @@
       },
       {
         "path": "ath-ton-rpc-provider.mjs",
-        "bytes": 6597,
-        "sha256": "c5163c33359afd5003adb32fdba3a7c612dea1020329f7124852f8b59aa4d337"
+        "bytes": 6598,
+        "sha256": "55365b0f3f4ad3ccc8a959f5db3d264979c4df68869373dc39c0450be8979a9f"
+      },
+      {
+        "path": "boot-guard.js",
+        "bytes": 4568,
+        "sha256": "6fc8c5e019803d2691a9af40d441c6d94b604c0dd37a434406127f7867a612af"
       },
       {
         "path": "capsule-part-policy.mjs",
@@ -169,8 +174,8 @@
       },
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
-        "bytes": 32510,
-        "sha256": "54c8dc983a1becaa69a2840957aa42d19e2884f5c88567237d85baf183dee606"
+        "bytes": 32511,
+        "sha256": "34ec9f12e88fc0ff8508310521b349093359327032291f0d76973ea7b0b5b0eb"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -179,8 +184,8 @@
       },
       {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 125269,
-        "sha256": "20accc429f7866c50cd9cff4c9b80647422d09e8a9da0bcbf6f1ce7e9a58d9a3"
+        "bytes": 125463,
+        "sha256": "dee114f4474000f06a3dc7dad09d14dbbf70f0a52579ad41c0547ebac0bf13cc"
       },
       {
         "path": "docs/about-platho.md",
@@ -204,8 +209,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 31136,
-        "sha256": "63276e32cd1bc69dcf255c0c4586df6996a1af40c82bd4135e21029cbc30fca5"
+        "bytes": 31145,
+        "sha256": "ad5c5fc9ce2bd63748e6274f08f73d3a6821df9050c58a2d663f2fd4c611051a"
       },
       {
         "path": "manifest.webmanifest",
@@ -220,17 +225,17 @@
       {
         "path": "platho-config.mjs",
         "bytes": 15275,
-        "sha256": "f4ec3f5c55053b4136f097533c603c0f929e8d58135bc11cfecd3787955f7ce7"
+        "sha256": "a2a1262f3f911df99e4e2450b7423185a4acaa7ba14cbdb75a9b905d8d5916cb"
       },
       {
         "path": "platho-wallet.mjs",
-        "bytes": 21266,
-        "sha256": "da21ae78bd5b8da19bba66d4567251348ee86973788f252ac0f8c4aea0efd85d"
+        "bytes": 20999,
+        "sha256": "3737d69c3b5f3c26ce64d5cb4127083f14ff18c13eca20f2913f9df04d3f96ff"
       },
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
-        "bytes": 8260,
-        "sha256": "2f3fa0f43e6ba7beae3a3b3ee83546fca3365a02f0ebe0409bdf0291d3fd87ef"
+        "bytes": 8261,
+        "sha256": "4283327ebcd7c70860f198dbc34160b1ca6c5dfd1cbf9de94921ecd422dde7f3"
       },
       {
         "path": "public-channel-subscriptions.mjs",
@@ -239,8 +244,8 @@
       },
       {
         "path": "pwa-contract-transactions.mjs",
-        "bytes": 75046,
-        "sha256": "512a85145239fcbe2e62f488ff30e4e16296d66efaa48fb3e80eb0d0e7f7a643"
+        "bytes": 75047,
+        "sha256": "a31403b76c7a2e3b4dbc5c0beb6b0bd43bc55e163265e2e6bfcde5cd91fcfb97"
       },
       {
         "path": "qr-code.mjs",
@@ -264,13 +269,13 @@
       },
       {
         "path": "sw.js",
-        "bytes": 5249,
-        "sha256": "bc37e0d925fc20f84fb701ca87c09272b00f7b0a7f6f813f63071bbaa873d6f3"
+        "bytes": 5274,
+        "sha256": "38a8fd5f71508190193d53a83c723723b09b02b53b03fe877c78c11f24f13f03"
       },
       {
         "path": "ton-dns-provider.mjs",
-        "bytes": 11672,
-        "sha256": "5027f46a5cc31657c9a067b52399dc9c1dae9ba455a49bc066ccfc3876affd87"
+        "bytes": 11673,
+        "sha256": "a972f16fdb62b5c4394cd5a4e696a43ccaa4ab7906e895d610bcba752d8982a3"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",
@@ -279,18 +284,18 @@
       },
       {
         "path": "username-ton-rpc-provider.mjs",
-        "bytes": 17433,
-        "sha256": "7ac4d682c7bb4d0af51cab2a9b049220af1d16348dc24e9bd27f232ba6479683"
+        "bytes": 17434,
+        "sha256": "fe00f3586c053dcff2b67b53b4ff33c109100031191b6daa422e54ab055ed137"
       },
       {
         "path": "vault-chain-provider.mjs",
-        "bytes": 7768,
-        "sha256": "4aad7cb80e18bf12e0a75df5ee37d959078aae4e3f996ffd38268353d7ed66eb"
+        "bytes": 7815,
+        "sha256": "277c9a704b1df3de2f79dc171935e7145dd6ced3578eae7fdf0bbae58ce1d680"
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
         "bytes": 73479,
-        "sha256": "626b63656af3bc9206654b332f3693d0d5091ffe666b9e2de6eee80983600b3b"
+        "sha256": "ee2cea77c33b4cc233a390f8ed25d06ae9eaf9247d7025f0a75c835596bffec6"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
@@ -349,8 +354,8 @@
       },
       {
         "path": "vendor/@noble/ciphers/index.js",
-        "bytes": 1102,
-        "sha256": "38cb06129f98972c1ee031afc63e10c285d66384da60299e32d8cabd4b5625c9"
+        "bytes": 1058,
+        "sha256": "19591b4842864149c9a7eff24d4f3b61313e3a1e4f5ed2819290aa6388885513"
       },
       {
         "path": "vendor/@noble/ciphers/package.json",
@@ -399,8 +404,8 @@
       },
       {
         "path": "vendor/@noble/curves/abstract/frost.js",
-        "bytes": 36562,
-        "sha256": "30ea2d4cb60117b06ea74cd06d1ee1a1270d2df728407fa437c7d5e382946591"
+        "bytes": 36561,
+        "sha256": "f0736bb1569ed4aa0eb47fabf4a374b337de4a9df5a2979885ed67d8a47bee6a"
       },
       {
         "path": "vendor/@noble/curves/abstract/hash-to-curve.js",
@@ -434,13 +439,13 @@
       },
       {
         "path": "vendor/@noble/curves/abstract/weierstrass.js",
-        "bytes": 63508,
-        "sha256": "188310386593be023ffadfd2fefc69b5efa79a63e0362bb8c9c11f0d5f4e673b"
+        "bytes": 63506,
+        "sha256": "1fff8af9da567745e3c5d86178290355e3add2d9de62773bba714a7cb685d5f0"
       },
       {
         "path": "vendor/@noble/curves/bls12-381.js",
-        "bytes": 32572,
-        "sha256": "a3bbb0a3ed0f1350a9a5bc0d7f8a454c851c670667ca3b3aaaba0a8d7115269a"
+        "bytes": 32568,
+        "sha256": "facae09d25ecae4aa2497d8777ef3448e4168fb5da638c7699d5255934dc92c0"
       },
       {
         "path": "vendor/@noble/curves/bn254.js",
@@ -449,28 +454,28 @@
       },
       {
         "path": "vendor/@noble/curves/ed25519.js",
-        "bytes": 28545,
-        "sha256": "28c6fd6157fe2d1c69ea4751844c3d8fe3ee1a496b4f10fb7b48a51c48857a21"
+        "bytes": 28537,
+        "sha256": "f0cc0a2dbe97d0d70ec778e98cc38c7b6b1811caf4ce5ede066549a7daa8b98c"
       },
       {
         "path": "vendor/@noble/curves/ed448.js",
-        "bytes": 28149,
-        "sha256": "726f64e0d4bb2ed48d08c585c399676e45c8da672060c4edc6fe2abba816105f"
+        "bytes": 28141,
+        "sha256": "c71e52d4cbb8c5422a2543a41e29dd98dbfdf385a1f1918fafcb64b9d6e5127d"
       },
       {
         "path": "vendor/@noble/curves/index.js",
-        "bytes": 1467,
-        "sha256": "90cbdb0ee3135186dc63c6f640844d73907a4e7e2bebb7f7976fced115053fa2"
+        "bytes": 1407,
+        "sha256": "415cf2d76a58b1bf50e3f6e0f915d87894e3abdf009a257c95005535cb670701"
       },
       {
         "path": "vendor/@noble/curves/misc.js",
-        "bytes": 10649,
-        "sha256": "1afe7ddde9822da4e11357e5bc838de94af5252c11b83cf094c1b837062173cb"
+        "bytes": 10633,
+        "sha256": "dc21c0afc1287a4437a7fa8b1900f15a0c1dd1d42a5b66932dc19977afd300ff"
       },
       {
         "path": "vendor/@noble/curves/nist.js",
-        "bytes": 11300,
-        "sha256": "1e577b2c76b769a585b402ca166614f1ae3c75116406889acddebba12c72c62d"
+        "bytes": 11296,
+        "sha256": "b4adb29949d553743981f5dab82b550c93492e281b0b1833ec11ccc367e27e3e"
       },
       {
         "path": "vendor/@noble/curves/package.json",
@@ -479,13 +484,13 @@
       },
       {
         "path": "vendor/@noble/curves/secp256k1.js",
-        "bytes": 20086,
-        "sha256": "ebd20b0ca873941f2186ddb0dbffeed25dda749d182298fe5f0d58fb2c6bb486"
+        "bytes": 20078,
+        "sha256": "b72b248dc3911bc5810e3d9e26d7a97bfeaf5ad1ee54f5d995363428e1947a93"
       },
       {
         "path": "vendor/@noble/curves/utils.js",
-        "bytes": 19271,
-        "sha256": "b4847e39fbb4a93e2a3e9f3945e41eabf6d58da5898cddaf45f7ed768f0e3758"
+        "bytes": 19267,
+        "sha256": "7478a07d4afee3c906d03dc706f680d18ae2e9c32fbd57abddfefbbf753120b9"
       },
       {
         "path": "vendor/@noble/curves/webcrypto.js",
@@ -549,8 +554,8 @@
       },
       {
         "path": "vendor/@noble/hashes/index.js",
-        "bytes": 1166,
-        "sha256": "3c9667faad18381e2bb97e6cb66db21f61bd25eb38d0b433619bb25c463f0355"
+        "bytes": 1134,
+        "sha256": "5b42587017c439a0f5f64a6debfa6b902943072d59645f4d102c8d709ea785e9"
       },
       {
         "path": "vendor/@noble/hashes/legacy.js",
@@ -604,33 +609,33 @@
       },
       {
         "path": "vendor/@noble/post-quantum/_crystals.js",
-        "bytes": 7752,
-        "sha256": "7ff49f3f09213990027d5f307df5c84b36c9a47313a7d1069acd581b3e30eada"
+        "bytes": 7744,
+        "sha256": "c52aa6e3514e345a7873adc05f4ebdc3bcf9fba92f3555f7ed10854a488dff32"
       },
       {
         "path": "vendor/@noble/post-quantum/falcon.js",
-        "bytes": 126747,
-        "sha256": "19ccfacfdf97eb9330cde5628133b6ccb7e425ac9af3a48ad9c4d7fff90c0f56"
+        "bytes": 126719,
+        "sha256": "75ce5aada6ff822c2c530c921f9548cbdce4cd0e43184ed32d41da9f72a54d28"
       },
       {
         "path": "vendor/@noble/post-quantum/hybrid.js",
-        "bytes": 32893,
-        "sha256": "d34a54df90fe07baf2af075aab4c046ac5f06caf3af1998f82a9b711c727a140"
+        "bytes": 32853,
+        "sha256": "cefcd75210628451ca50a642a5d6f62242229c419260baded738a5f1f99f0330"
       },
       {
         "path": "vendor/@noble/post-quantum/index.js",
-        "bytes": 1045,
-        "sha256": "4c196731af6be58a3d86c7a79ab12778cd925c05526a927a279595600a3a3ee7"
+        "bytes": 1037,
+        "sha256": "0abfb2d93af12c5f2bc75bc962b0981dfab17f9937e88667d72366f401261a00"
       },
       {
         "path": "vendor/@noble/post-quantum/ml-dsa.js",
-        "bytes": 29265,
-        "sha256": "210a020b4933275edf89201e2a5168ee404190f2d5cfa676d0cb13b7a1072276"
+        "bytes": 29257,
+        "sha256": "6d59c438035c6e05b764442a0a3db7d2f598a150ba1fea1ee459c91e66101585"
       },
       {
         "path": "vendor/@noble/post-quantum/ml-kem.js",
-        "bytes": 20106,
-        "sha256": "c008845afa0118b39f2e37c5a4dc83cecac5bb7fef261d68fb4ca9561c58a326"
+        "bytes": 20098,
+        "sha256": "81db1a916f79ac6a6767db8441f788d1c8ead92dba9e25538b86465b251b2540"
       },
       {
         "path": "vendor/@noble/post-quantum/package.json",
@@ -639,13 +644,13 @@
       },
       {
         "path": "vendor/@noble/post-quantum/slh-dsa.js",
-        "bytes": 34525,
-        "sha256": "8f51711a4fbd32bc25efcd73f6fda77a2971af279f8d5f165fa93881cab2c1a7"
+        "bytes": 34509,
+        "sha256": "ee1971613039e85f99afefb593c02e511ce587d586e3ccc8c348f30c766827e9"
       },
       {
         "path": "vendor/@noble/post-quantum/utils.js",
-        "bytes": 15333,
-        "sha256": "b3d97248f0a16ea60119de0585def637a8aa3f27c4124d8825e1709588de53f8"
+        "bytes": 15329,
+        "sha256": "d4bf73f56c164e88957bb298d48b49f5979daf73af211f243e4b396efcda9c50"
       },
       {
         "path": "webp-encoder.mjs",

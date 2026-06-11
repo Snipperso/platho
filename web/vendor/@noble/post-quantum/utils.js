@@ -3,7 +3,7 @@
  * @module
  */
 /*! noble-post-quantum - MIT License (c) 2024 Paul Miller (paulmillr.com) */
-import { abytes, abytes as abytes_, concatBytes, isLE, randomBytes as randb, } from '@noble/hashes/utils.js';
+import { abytes, abytes as abytes_, concatBytes, isLE, randomBytes as randb, } from '../hashes/utils.js';
 /**
  * Asserts that a value is a byte array and optionally checks its length.
  * Returns the original reference unchanged on success, and currently also accepts Node `Buffer`

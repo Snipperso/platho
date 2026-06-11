@@ -4,7 +4,7 @@
  * @module
  */
 /*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-import { sha256, sha384, sha512 } from '@noble/hashes/sha2.js';
+import { sha256, sha384, sha512 } from '../hashes/sha2.js';
 import { createFROST } from "./abstract/frost.js";
 import { createHasher } from "./abstract/hash-to-curve.js";
 import { createOPRF } from "./abstract/oprf.js";
