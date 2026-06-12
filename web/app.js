@@ -138,15 +138,22 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v417';
+const PLATHO_APP_RUNTIME_VERSION = 'v418';
 
 document.documentElement.dataset.plathoAppJs = 'started';
+// 'ready' is the terminal healthy marker for the boot-guard watchdog; late
+// benign errors must not downgrade it or healthy sessions would be flagged
+// as broken boots.
 window.addEventListener('error', (event) => {
-  document.documentElement.dataset.plathoAppJs = 'error';
+  if (document.documentElement.dataset.plathoAppJs !== 'ready') {
+    document.documentElement.dataset.plathoAppJs = 'error';
+  }
   document.documentElement.dataset.plathoAppError = String(event.error?.message ?? event.message ?? 'runtime error').slice(0, 180);
 });
 window.addEventListener('unhandledrejection', (event) => {
-  document.documentElement.dataset.plathoAppJs = 'error';
+  if (document.documentElement.dataset.plathoAppJs !== 'ready') {
+    document.documentElement.dataset.plathoAppJs = 'error';
+  }
   document.documentElement.dataset.plathoAppError = String(event.reason?.message ?? event.reason ?? 'unhandled rejection').slice(0, 180);
 });
 
