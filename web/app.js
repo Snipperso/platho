@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v421';
+const PLATHO_APP_RUNTIME_VERSION = 'v422';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5772,6 +5772,7 @@ function privateSyncResult(fields = {}) {
     reason: fields.reason ?? null,
     blockedEntryId: fields.blockedEntryId ?? null,
     catchUpRemaining: fields.catchUpRemaining ?? 0,
+    indexLimitReachedWithoutCursor: fields.indexLimitReachedWithoutCursor === true,
     historyUnavailableCount: Number(fields.historyUnavailableCount ?? 0),
     historyUnavailableEntries: Array.isArray(fields.historyUnavailableEntries) ? fields.historyUnavailableEntries : [],
     rateLimited: fields.rateLimited === true,
@@ -5939,10 +5940,13 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   }
   const recipientHead = privateIndexLatestLink(recipientIndex);
   const senderHead = privateIndexLatestLink(senderIndex);
-  const limit = privateIndexSyncReadLimit(options);
   const retryEntryIds = privateBodyHistoryRetryEntryIds(address, {
     forceHistoryRetry: options.forceHistoryRetry === true,
   });
+  const baseLimit = privateIndexSyncReadLimit(options);
+  const limit = !canPersistPrivateIndexCursor && quickSync
+    ? Math.max(baseLimit, PRIVATE_CHAIN_INDEX_READ_LIMIT)
+    : baseLimit;
   let imported = 0;
   let skipped = 0;
   let scanComplete = true;
@@ -6084,6 +6088,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   let headRepairScanned = 0;
   let historyRetryScanned = 0;
   let catchUpRemaining = 0;
+  let indexLimitReachedWithoutCursor = false;
   const walkIndexedRole = async (role, latestHeadLink) => {
     const cursor = readPrivateChainIndexCursor(address, role);
     const hasResume = cursor.resumeLink > 0n;
@@ -6121,15 +6126,19 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       currentLink = previousLink;
     }
     if (currentLink > 0n && currentLink !== stopLink) {
-      catchUpRemaining += 1;
-      cursorWrites.push({
-        role,
-        cursor: {
-          processedHeadLink: stopLink,
-          targetHeadLink,
-          resumeLink: nextLink,
-        },
-      });
+      if (canPersistPrivateIndexCursor) {
+        catchUpRemaining += 1;
+        cursorWrites.push({
+          role,
+          cursor: {
+            processedHeadLink: stopLink,
+            targetHeadLink,
+            resumeLink: nextLink,
+          },
+        });
+      } else {
+        indexLimitReachedWithoutCursor = true;
+      }
       return;
     }
     cursorWrites.push({
@@ -6285,6 +6294,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     headRepairScanned,
     historyRetryScanned,
     publishConfirmations,
+    readLimit: limit,
     rateLimited: rateLimitError !== null,
     bodyHistoryUnavailable: bodyHistoryError !== null,
     privateKeyOpenFailed: privateKeyOpenError !== null,
@@ -6293,6 +6303,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     historyUnavailableEntries,
     incompletePrivateStreamCount,
     catchUpRemaining,
+    indexLimitReachedWithoutCursor,
     reason,
     mode: quickSync ? 'auto' : 'recovery',
     scanLog,
@@ -6306,6 +6317,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
     catchUpRemaining,
+    indexLimitReachedWithoutCursor,
     rateLimited: rateLimitError !== null,
     ok: rateLimitError === null,
   });

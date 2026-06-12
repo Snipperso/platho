@@ -243,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v421<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v421'/);
+    expect(html).toMatch(/id="appVersionLabel">v422<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v422'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3623,6 +3623,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/options\.readLimit/);
     expect(syncSource).toMatch(/const quickSync = options\.mode === 'auto' \|\| options\.fast === true/);
     expect(app).toMatch(/PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT/);
+    expect(syncSource).toMatch(/const baseLimit = privateIndexSyncReadLimit\(options\)/);
+    expect(syncSource).toMatch(/const limit = !canPersistPrivateIndexCursor && quickSync[\s\S]*PRIVATE_CHAIN_INDEX_READ_LIMIT[\s\S]*: baseLimit/);
     expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS = 3 \* 60 \* 1000/);
     expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT = 2/);
     expect(app).toMatch(/const PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT = 16/);
@@ -3636,6 +3638,9 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/historyUnavailableEntries\.push/);
     expect(syncSource).not.toMatch(/isBodyHistoryUnavailableError\(error\)[\s\S]{0,200}break/);
     expect(syncSource).toMatch(/catchUpRemaining/);
+    expect(syncSource).toMatch(/let indexLimitReachedWithoutCursor = false/);
+    expect(syncSource).toMatch(/if \(canPersistPrivateIndexCursor\) \{[\s\S]*catchUpRemaining \+= 1[\s\S]*\} else \{[\s\S]*indexLimitReachedWithoutCursor = true/);
+    expect(syncSource).toMatch(/indexLimitReachedWithoutCursor/);
     expect(syncSource).not.toMatch(/windowStart/);
     expect(app).toMatch(/privateEntryPublisherWallet/);
     expect(app).toMatch(/resolveKnownPrivateSenderWallet/);
@@ -3731,11 +3736,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v485/);
+    expect(sw).toMatch(/platho-pwa-prototype-v486/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=421/);
+    expect(sw).toMatch(/\.\/app\.js\?v=422/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
