@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v423';
+const PLATHO_APP_RUNTIME_VERSION = 'v424';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2117,12 +2117,13 @@ function privateDebugLines(thread = activeThread()) {
   const recipientCursor = sync.recipientCursor ?? {};
   const senderCursor = sync.senderCursor ?? {};
   const indexError = sync.indexReadError ? ` idxErr=${debugTiny(sync.indexReadError, '-')}` : '';
+  const indexFallback = sync.indexReadFallback ? ` idxFallback=${debugTiny(sync.indexReadFallback, '-')}` : '';
   return [
     `${PLATHO_APP_RUNTIME_VERSION} key=${shortKeyId(localRecipientKeyPair?.keyId)} phase=${phase}${error}`,
     `idx=${sync.indexKeyId ?? '-'} rh=${sync.recipientHead ?? '-'} sh=${sync.senderHead ?? '-'} mode=${sync.mode ?? '-'}`,
     `rc=${recipientCursor.processedHeadLink ?? '-'}:${recipientCursor.resumeLink ?? '-'} sc=${senderCursor.processedHeadLink ?? '-'}:${senderCursor.resumeLink ?? '-'}`,
     `imp=${sync.imported ?? 0} skip=${sync.skipped ?? 0} inc=${sync.incompletePrivateStreamCount ?? 0} catch=${sync.catchUpRemaining ?? 0}`,
-    `reason=${reason}${indexError} block=${sync.blockedEntryId ?? '-'} body=${sync.historyUnavailableCount ?? 0} scanned=${sync.indexEntriesScanned ?? 0} repair=${sync.headRepairScanned ?? 0} retry=${sync.historyRetryScanned ?? 0}`,
+    `reason=${reason}${indexError}${indexFallback} block=${sync.blockedEntryId ?? '-'} body=${sync.historyUnavailableCount ?? 0} scanned=${sync.indexEntriesScanned ?? 0} repair=${sync.headRepairScanned ?? 0} retry=${sync.historyRetryScanned ?? 0}`,
     `entries ${scanLog}`,
     `publish ${privateDebugPublishLine(thread)}`,
     ...privateDebugPublishDetailLines(thread),
@@ -5773,6 +5774,7 @@ function privateSyncResult(fields = {}) {
     blockedEntryId: fields.blockedEntryId ?? null,
     catchUpRemaining: fields.catchUpRemaining ?? 0,
     indexLimitReachedWithoutCursor: fields.indexLimitReachedWithoutCursor === true,
+    indexReadFallback: fields.indexReadFallback ?? null,
     historyUnavailableCount: Number(fields.historyUnavailableCount ?? 0),
     historyUnavailableEntries: Array.isArray(fields.historyUnavailableEntries) ? fields.historyUnavailableEntries : [],
     rateLimited: fields.rateLimited === true,
@@ -5829,12 +5831,8 @@ function privateIndexSyncReadLimit(options = {}) {
     : PRIVATE_CHAIN_INDEX_READ_LIMIT;
 }
 
-function privateIndexCursorPersistenceMode(readOptions = {}, options = {}) {
+function privateIndexCursorPersistenceMode(readOptions = {}) {
   if (readOptions.verify === true && readOptions.allowUnverifiedCriticalRead !== true) return 'verified';
-  if (tonRpcVerificationStructurallyDegraded()) return 'degraded_unverified';
-  if (options.allowUnverifiedPrivateIndexRead === true && readOptions.allowUnverifiedCriticalRead === true) {
-    return 'message_index_unverified';
-  }
   return 'disabled_unverified';
 }
 
@@ -5865,6 +5863,9 @@ function privateSyncStatusText(result) {
   if (result.reason === 'partial_stream_pending') {
     return 'message parts pending';
   }
+  if (result.reason === 'index_limit_without_cursor') {
+    return result.imported > 0 ? 'new messages, index scan limited' : 'index scan limited';
+  }
   if (result.reason === 'catch_up_pending') {
     return result.imported > 0 ? 'new messages, catch-up pending' : `catch-up ${result.catchUpRemaining ?? 0} left`;
   }
@@ -5893,27 +5894,21 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     return result;
   }
   const quickSync = options.mode === 'auto' || options.fast === true;
-  const allowUnverifiedPrivateIndexRead = options.allowUnverifiedPrivateIndexRead === true
-    || (quickSync && options.allowUnverifiedPrivateIndexRead !== false);
-  const readOptions = allowUnverifiedPrivateIndexRead
+  let allowUnverifiedPrivateIndexRead = options.allowUnverifiedPrivateIndexRead === true;
+  const allowUnverifiedPrivateIndexFallback = quickSync && options.allowUnverifiedPrivateIndexRead !== false;
+  let readOptions = allowUnverifiedPrivateIndexRead
     ? capsuleHubMessageSyncReadOptions(address)
     : criticalCapsuleHubReadOptions(address);
-  // Cursor persistence is a local performance cache. Verified reads remain
-  // preferred, structurally degraded transports keep their explicit degraded
-  // label, and background message sync can persist an unverified cursor
-  // because private entry content is still self-authenticated before import.
-  const cursorPersistence = privateIndexCursorPersistenceMode(readOptions, { allowUnverifiedPrivateIndexRead });
-  const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified';
   const forceIndexRescan = options.forceIndexRescan === true;
   const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
   let recipientIndex = null;
   let senderIndex = null;
-  try {
-    [recipientIndex, senderIndex] = await Promise.all([
-      provider.getPrivateRecipientIndex(keyIdIndex, readOptions),
-      provider.getPrivateSenderIndex(keyIdIndex, readOptions),
-    ]);
-  } catch (error) {
+  let indexReadFallback = null;
+  const readPrivateIndexes = async () => Promise.all([
+    provider.getPrivateRecipientIndex(keyIdIndex, readOptions),
+    provider.getPrivateSenderIndex(keyIdIndex, readOptions),
+  ]);
+  const privateIndexReadFailure = (error) => {
     const rateLimited = noteTonRpcRateLimit(error);
     const rpcDelayed = !rateLimited && isTonRpcTransientError(error);
     const result = privateSyncResult({
@@ -5935,6 +5930,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       reason: result.reason,
       mode: quickSync ? 'auto' : 'recovery',
       indexReadError,
+      indexReadFallback,
       rateLimited,
       rpcDelayed,
       scanLog: ['index-read-error'],
@@ -5942,7 +5938,29 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     refreshPrivateDebugLog();
     if (rpcDelayed) return result;
     throw error;
+  };
+  try {
+    [recipientIndex, senderIndex] = await readPrivateIndexes();
+  } catch (error) {
+    if (!allowUnverifiedPrivateIndexRead && allowUnverifiedPrivateIndexFallback && isTonRpcVerificationSoftReadError(error)) {
+      indexReadFallback = shortUiErrorText(error, 'verified private index unavailable');
+      allowUnverifiedPrivateIndexRead = true;
+      readOptions = capsuleHubMessageSyncReadOptions(address);
+      try {
+        [recipientIndex, senderIndex] = await readPrivateIndexes();
+      } catch (fallbackError) {
+        return privateIndexReadFailure(fallbackError);
+      }
+    } else {
+      return privateIndexReadFailure(error);
+    }
   }
+  // Cursor persistence is a local performance cache, but advancing it can hide
+  // older index entries. It only moves after a verified indexed walk; unverified
+  // fallback may import self-authenticated entries but leaves the active cursor
+  // untouched.
+  const cursorPersistence = privateIndexCursorPersistenceMode(readOptions);
+  const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified';
   const recipientHead = privateIndexLatestLink(recipientIndex);
   const senderHead = privateIndexLatestLink(senderIndex);
   const retryEntryIds = privateBodyHistoryRetryEntryIds(address, {
@@ -6279,7 +6297,13 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       ? 'private_key_open_failed'
       : hasFreshPartial
         ? 'partial_stream_pending'
-        : (catchUpRemaining > 0 ? 'catch_up_pending' : null);
+        : indexLimitReachedWithoutCursor
+          ? 'index_limit_without_cursor'
+          : (catchUpRemaining > 0 ? 'catch_up_pending' : null);
+  const fullScanComplete = scanComplete
+    && catchUpRemaining === 0
+    && !hasFreshPartial
+    && !indexLimitReachedWithoutCursor;
   const recipientCursor = readPrivateChainIndexCursor(address, 'recipient');
   const senderCursor = readPrivateChainIndexCursor(address, 'sender');
   globalThis.plathoLastPrivateSync = {
@@ -6293,7 +6317,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     cursorPersistence,
     imported,
     skipped,
-    scanComplete: scanComplete && catchUpRemaining === 0 && !hasFreshPartial,
+    scanComplete: fullScanComplete,
     pageComplete: scanComplete,
     indexEntriesScanned,
     headRepairScanned,
@@ -6301,6 +6325,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     publishConfirmations,
     readLimit: limit,
     forceIndexRescan,
+    indexReadFallback,
     rateLimited: rateLimitError !== null,
     bodyHistoryUnavailable: bodyHistoryError !== null,
     privateKeyOpenFailed: privateKeyOpenError !== null,
@@ -6317,13 +6342,14 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const result = privateSyncResult({
     imported,
     skipped,
-    scanComplete: scanComplete && catchUpRemaining === 0 && !hasFreshPartial,
+    scanComplete: fullScanComplete,
     reason,
     blockedEntryId: blockedEntryId?.toString?.() ?? null,
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
     catchUpRemaining,
     indexLimitReachedWithoutCursor,
+    indexReadFallback,
     rateLimited: rateLimitError !== null,
     ok: rateLimitError === null,
   });
@@ -6464,7 +6490,7 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
     try {
       const result = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' });
       completeMessageSyncUi(result);
-      if (result?.scanComplete === false || result?.reason === 'catch_up_pending') {
+      if ((result?.scanComplete === false && result?.reason !== 'index_limit_without_cursor') || result?.reason === 'catch_up_pending') {
         // Fast follow-up only while the catch-up actually makes progress;
         // a stalled walk (same state every pass) backs off exponentially so
         // it cannot melt the RPC budget with a 2-second resync loop.
