@@ -243,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v418<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v418'/);
+    expect(html).toMatch(/id="appVersionLabel">v419<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v419'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3721,11 +3721,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v481/);
+    expect(sw).toMatch(/platho-pwa-prototype-v483/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=418/);
+    expect(sw).toMatch(/\.\/app\.js\?v=419/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
@@ -3734,7 +3734,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=25/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=36/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=37/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=25/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=23/);
@@ -3757,6 +3757,19 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/platho-icon-192\.png\?v=3/);
     expect(sw).toMatch(/\.\/assets\/icons\/eye\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/eye-off\.svg/);
+  });
+
+  it('PWA-CONFIG-08B: service worker install is resilient and navigation is time-bounded', () => {
+    const sw = readFileSync('web/sw.js', 'utf8');
+    // A single missing/transient asset must not abort install (atomic addAll
+    // would strand the device on the previous worker and its stale shell).
+    expect(sw).toMatch(/Promise\.allSettled\(\s*ASSETS\.map\(\(asset\) => cache\.add\(asset\)\)/);
+    expect(sw).not.toMatch(/cache\.addAll\(ASSETS\)/);
+    // Navigation is network-first but bounded so a slow/filtered network falls
+    // back to the cached shell instead of hanging on a blank screen.
+    expect(sw).toMatch(/function fetchWithTimeout\(request, timeoutMs\)/);
+    expect(sw).toMatch(/fetchWithTimeout\(event\.request, NAVIGATION_NETWORK_TIMEOUT_MS\)/);
+    expect(sw).toMatch(/return await cachedAppShell\(\) \|\| Response\.error\(\)/);
   });
 
   it('PWA-CONFIG-09: production hosting configs require strict security headers', () => {

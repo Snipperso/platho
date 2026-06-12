@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v481';
+const CACHE_NAME = 'platho-pwa-prototype-v483';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=140',
-  './app.js?v=418',
+  './app.js?v=419',
   './boot-guard.js?v=2',
   './platho-config.mjs?v=72',
   './capsule-part-policy.mjs?v=3',
@@ -15,7 +15,7 @@ const ASSETS = [
   './platho-wallet.mjs?v=13',
   './ton-mnemonic-wordlist.mjs?v=1',
   './pwa-contract-transactions.mjs?v=25',
-  './vault-ton-rpc-provider.mjs?v=36',
+  './vault-ton-rpc-provider.mjs?v=37',
   './ton-dns-provider.mjs?v=21',
   './capsulehub-ton-rpc-provider.mjs?v=36',
   './ath-ton-rpc-provider.mjs?v=23',
@@ -94,7 +94,17 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  // Resilient precache: addAll is atomic, so a single missing or transiently
+  // failing asset would abort the whole install and the device would stay on
+  // the previous service worker (and its stale app shell — exactly how an old
+  // cache without boot-guard can pin a device to a dark screen). Cache each
+  // asset independently and never let one failure block activation; the
+  // runtime fetch handler backfills anything that slipped through.
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => Promise.allSettled(
+      ASSETS.map((asset) => cache.add(asset)),
+    )),
+  );
   self.skipWaiting();
 });
 
@@ -126,9 +136,22 @@ function appShellCacheRequest() {
   return new Request(new URL('./index.html', self.location.href).href);
 }
 
+const NAVIGATION_NETWORK_TIMEOUT_MS = 6000;
+
+function fetchWithTimeout(request, timeoutMs) {
+  if (typeof AbortController === 'undefined') return fetch(request);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(request, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function navigationResponse(event) {
+  // Network-first so a fresh release (new app shell + boot-guard) always wins
+  // over a stale cached shell, but time-bounded so a slow or partially
+  // filtered network cannot hang the page on a blank screen: fall back to the
+  // cached shell instead of spinning forever.
   try {
-    const response = await fetch(event.request);
+    const response = await fetchWithTimeout(event.request, NAVIGATION_NETWORK_TIMEOUT_MS);
     return await cacheSameOrigin(appShellCacheRequest(), response);
   } catch (error) {
     return await cachedAppShell() || Response.error();

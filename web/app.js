@@ -37,7 +37,7 @@ import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=6';
 import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=72';
-import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=36';
+import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=37';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v418';
+const PLATHO_APP_RUNTIME_VERSION = 'v419';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4530,7 +4530,13 @@ function chainBackedPublicFeedOnly(feed) {
 async function syncPublicChannels() {
   let chainSyncError = null;
   try {
-    const syncedFromChain = await syncPublicChannelFromChain();
+    // First cycle on a fresh load pays the verifier failure that parks a dead
+    // verifier (e.g. region-blocked toncenter); retry unverified in the same
+    // call so the public feed loads immediately instead of next tick.
+    const syncedFromChain = await callWithDegradedTransportReadFallback(
+      () => syncPublicChannelFromChain(),
+      () => syncPublicChannelFromChain(),
+    );
     if (syncedFromChain) {
       writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
       rebuildThreadsFromPublicSubscriptions();
