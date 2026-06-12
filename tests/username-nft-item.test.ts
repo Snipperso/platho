@@ -40,9 +40,54 @@ function metadataKey(field: string): bigint {
 }
 
 function readSnakeText(cell: any): string {
-  const slice = cell.beginParse();
-  expect(slice.loadUint(8)).toBe(0);
-  return slice.loadBuffer(Math.floor(slice.remainingBits / 8)).toString('utf8');
+  let current = cell;
+  let first = true;
+  const chunks: Buffer[] = [];
+  while (current) {
+    const slice = current.beginParse();
+    if (first) {
+      expect(slice.loadUint(8)).toBe(0);
+      first = false;
+    }
+    chunks.push(slice.loadBuffer(Math.floor(slice.remainingBits / 8)));
+    current = slice.remainingRefs > 0 ? slice.loadRef() : null;
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+function decodeSvgDataUri(uri: string): string {
+  const base64Prefix = 'data:image/svg+xml;base64,';
+  if (uri.startsWith(base64Prefix)) {
+    return Buffer.from(uri.slice(base64Prefix.length), 'base64').toString('utf8');
+  }
+
+  const utf8Prefix = 'data:image/svg+xml;utf8,';
+  if (uri.startsWith(utf8Prefix)) {
+    const rawSvg = uri.slice(utf8Prefix.length);
+    try {
+      return decodeURIComponent(rawSvg);
+    } catch {
+      return rawSvg;
+    }
+  }
+
+  const encodedPrefix = 'data:image/svg+xml,';
+  expect(uri.startsWith(encodedPrefix)).toBe(true);
+  return decodeURIComponent(uri.slice(encodedPrefix.length));
+}
+
+function expectSafeSvgDataUri(uri: string) {
+  expect(uri).toMatch(/^data:image\/svg\+xml,/);
+  expect(uri).toContain('%3Csvg');
+  expect(uri).toContain('%23');
+  expect(uri).not.toContain('<svg');
+  expect(uri).not.toContain('#');
+}
+
+function expectRawSvgData(svg: string) {
+  expect(svg).toMatch(/^<svg /);
+  expect(svg).toContain('#');
+  expect(svg).not.toMatch(/^https?:|^ipfs:|^data:/);
 }
 
 function emptySlice() {
@@ -55,7 +100,7 @@ function inboundValue(tx: any): bigint {
   return info.value.coins;
 }
 
-async function deployItem() {
+async function deployItem(name = 'platho') {
   const blockchain = await Blockchain.create();
   const caller = await blockchain.treasury('username-nft-item-caller');
   const ownerWallet = fixtureAddress('USERNAME_OWNER_WALLET');
@@ -72,7 +117,7 @@ async function deployItem() {
   }));
   const registry = blockchain.openContract(new MockUsernameRegistryAckSink(registryAddress, registryInit));
 
-  const usernameHash = nameHash('platho');
+  const usernameHash = nameHash(name);
   const itemInit = await UsernameNFTItem.init(registryAddress, usernameHash);
   const itemAddress = contractAddress(registryAddress.workChain, itemInit);
   await blockchain.setShardAccount(itemAddress, createShardAccount({
@@ -86,8 +131,8 @@ async function deployItem() {
   await item.send(blockchain.sender(registryAddress), { value: ITEM_ACK_RESEND_RESERVE }, {
     $$type: 'InitializeUsernameItem',
     owner_wallet: ownerWallet,
-    username_len: 6n,
-    username: usernameSlice('platho'),
+    username_len: BigInt(Buffer.from(name, 'ascii').length),
+    username: usernameSlice(name),
   } as InitializeUsernameItem);
 
   return { blockchain, caller, ownerWallet, registry, registryAddress, item, itemAddress, usernameHash };
@@ -329,6 +374,61 @@ describe('UsernameNFTItem v1 milestone', () => {
     const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
     expect(readSnakeText(metadata.get(metadataKey('name')))).toBe('platho.ath');
     expect(readSnakeText(metadata.get(metadataKey('description')))).toBe('Platho username');
+    expectSafeSvgDataUri(readSnakeText(metadata.get(metadataKey('image'))));
+    expectRawSvgData(readSnakeText(metadata.get(metadataKey('image_data'))));
+  });
+
+  it('USERNAME-NFT-08A: get_nft_data embeds distinct on-chain SVG image data by username tier', async () => {
+    const cases = [
+      { name: 'abcd', label: 'EPIC', tier: 1n },
+      { name: 'abcde', label: 'RARE', tier: 2n },
+      { name: 'platho', label: 'COMMON', tier: 3n },
+    ];
+
+    for (const itemCase of cases) {
+      const { item } = await deployItem(itemCase.name);
+      const state = await item.getGetState();
+      expect(state.tier).toBe(itemCase.tier);
+
+      const nftData = await item.getGetNftData();
+      const content = nftData.individual_content.beginParse();
+      expect(content.loadUint(8)).toBe(0);
+      const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+      const image = readSnakeText(metadata.get(metadataKey('image')));
+      const imageData = readSnakeText(metadata.get(metadataKey('image_data')));
+      const svg = decodeSvgDataUri(image);
+
+      expect(image).not.toMatch(/^https?:|^ipfs:/);
+      expectSafeSvgDataUri(image);
+      expect(svg).toContain(itemCase.label);
+      expect(svg).toContain('PLATHO USERNAME');
+      expect(svg).toContain(`${itemCase.name}.ath`);
+      expectRawSvgData(imageData);
+      expect(imageData).toContain(itemCase.label);
+      expect(imageData).toContain('PLATHO USERNAME');
+      expect(imageData).toContain(`${itemCase.name}.ath`);
+      for (const ch of itemCase.name) {
+        expect(imageData).toContain(`>${ch}</text>`);
+      }
+    }
+  });
+
+  it('USERNAME-NFT-08B: common SVG renders sixteen-character usernames as two rows of eight tiles', async () => {
+    const { item } = await deployItem('wwwwwwwwwwwwwwww');
+    const nftData = await item.getGetNftData();
+    const content = nftData.individual_content.beginParse();
+    expect(content.loadUint(8)).toBe(0);
+
+    const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+    const imageData = readSnakeText(metadata.get(metadataKey('image_data')));
+
+    expect(imageData).toContain('COMMON');
+    expect(imageData).toContain('wwwwwwwwwwwwwwww.ath');
+    expect((imageData.match(/>w<\/text>/g) ?? []).length).toBe(16);
+    expect(imageData).toContain('x="164" y="372" width="80" height="80"');
+    expect(imageData).toContain('x="780" y="372" width="80" height="80"');
+    expect(imageData).toContain('x="164" y="464" width="80" height="80"');
+    expect(imageData).toContain('x="780" y="464" width="80" height="80"');
   });
 
   it('USERNAME-NFT-07: non-owner cannot transfer username NFT', async () => {

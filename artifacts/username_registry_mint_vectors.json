@@ -13,17 +13,17 @@
     "USERNAME_BURN_SHARE_BPS": 5000
   },
   "code_hashes": {
-    "username_registry": "6b7739a9aadaef0c2ae69a0007e93961746d861cebabcdd5c68777f6cad2b27f",
-    "username_nft_item": "3ad1c971f6b04e67e8dafcb0624aa794e996761420500cdf10d4edc77a2037ce",
+    "username_registry": "05654898a8882f053587f3c123909d53a88d77ae80567528a78980170ba2a19a",
+    "username_nft_item": "287582eabd4b15bc29e9b2cc66db80bbff9ecb982f046291c29e49beffa2c327",
     "ath_wallet": "6d9d3dff2368d22a4148a48e71d6c91561b6db6ea64d7c14c506445202e13270"
   },
   "registry": {
-    "initial_address": "EQAB1RjHz-cMx-28_oRA6J_b0whgZoEp9UuSEXn7lDRESxnD",
+    "initial_address": "EQDB6oKWpKkgfNhYVVREjAuN9QPxsvD-xUHH82DZSTOCBiXN",
     "initial_data_cell_hash": "b870b7ca2a55c8c670bf505586ff4fa844b8cbb42136b14821730413dd5a06bb",
-    "initial_state_init_hash": "01d518c7cfe70cc7edbcfe8440e89fdbd30860668129f54b921179fb9434444b",
+    "initial_state_init_hash": "c1ea8296a4a9207cd8585554448c0b8df503f1b2f0fec541c7f360d949338206",
     "ath_master_fixture_address": "EQCIIoSHaPnCu7Gb02vLNTPncP_ML5j61JYYDTvLKLcVUHg3",
-    "official_ath_wallet_address": "EQB9m4uALtDxvzRcXTiHR8iL0Af9-b8PFRz5VV4yMVfBnSCv",
-    "official_ath_wallet_state_init_hash": "7d9b8b802ed0f1bf345c5d388747c88bd007fdf9bf0f151cf9555e323157c19d"
+    "official_ath_wallet_address": "EQBw6X7XBNxPzhyc9a4W1cLl-C1uDZWknR4dGD40vYs7_WcY",
+    "official_ath_wallet_state_init_hash": "70e97ed704dc4fce1c9cf5ae16d5c2e5f82d6e0d95a49d1e1d183e34bd8b3bfd"
   },
   "valid_mint_vectors": [
     {
@@ -33,11 +33,11 @@
       "item_workchain": 0,
       "price_ath_atomic": "10000000000000",
       "name_hash": "0xfbd3eb0d62ff50430c222ef8ae27df37666c86cab59d27bfee30220ea7520230",
-      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAmwAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAJGE5yoACAADqjGPn84Zj9t5/QiB0T+3phDAzQJT6pckIvP3KGiIlwAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEATYAHNmHrFkxco8TbSGIk3drH3XXIZkNzFmLjHK2J+HKJf8CMLExskBJW6Yw=",
+      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAmwAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAJGE5yoACAGD1QUtSVJA+bCwqqiJGBcb6gfjZeH9ioOP5sGykmcEDQAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEATYAHNmHrFkxco8TbSGIk3drH3XXIZkNzFmLjHK2J+HKJf8CMLExskPVQK+8=",
       "official_wallet_vault_mint_notification_boc_base64": "te6cckEBAQEAegAA74kSnWAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkYTnKgAIAHbwFLPOcbNTsClRfU6LhwPDbGHAbbBYXj8W33WMFFK9AA5sw9YsmLlHibaQxEm7tY+665DMhuYsxcY5WxPw5RL/gRhYmNkn2up4w=",
-      "username_item_data_cell_hash": "212f978e9c913b8f6c3bfd874d8ea7ec425d0e92fc875f5e61b1b6f60801f72b",
-      "username_item_state_init_hash": "ce845e378e022ff1cfc8a131d0ac4fac8a0c9dc41b279d05b980d22a87395911",
-      "derived_item_address": "EQDOhF43jgIv8c_IoTHQrE-sigydxBsnnQW5gNIqhzlZEXCY"
+      "username_item_data_cell_hash": "37362f9300205abbd74819b70de32b8eff2af6321d58535625f09d80bb5ad8ef",
+      "username_item_state_init_hash": "efa94a9b445d43ab67c74b313d40f8cf2791e89601ec8084ec77e905b55db6eb",
+      "derived_item_address": "EQDvqUqbRF1Dq2fHSzE9QPjPJ5HolgHsgITsd-kFtV2264DJ"
     },
     {
       "username": "abcde",
@@ -46,11 +46,11 @@
       "item_workchain": 0,
       "price_ath_atomic": "1000000000000",
       "name_hash": "0xd8eb09e40240d08524f4781b844522eb7147d6e1bc5299a9b2c1b82ad72e7f8a",
-      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAnAAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAA6NSlEACAADqjGPn84Zj9t5/QiB0T+3phDAzQJT6pckIvP3KGiIlwAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAT4ANlrWhTVRM9Mfa+esOuOzIbn+cWvvsNjr1F+OaG7k69WCsLExsjLDpncLy",
+      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAnAAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAA6NSlEACAGD1QUtSVJA+bCwqqiJGBcb6gfjZeH9ioOP5sGykmcEDQAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAT4ANlrWhTVRM9Mfa+esOuOzIbn+cWvvsNjr1F+OaG7k69WCsLExsjLAek1vF",
       "official_wallet_vault_mint_notification_boc_base64": "te6cckEBAQEAewAA8YkSnWAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADo1KUQAIAHbwFLPOcbNTsClRfU6LhwPDbGHAbbBYXj8W33WMFFK9ABsta0KaqJnpj7Xz1h1x2ZDc/zi199hsdeovxzQ3cnXqwVhYmNkZYs2Ckw",
-      "username_item_data_cell_hash": "1094686e7d9e1de8ce01c34a9ab816200954881b5e3d1895908a10dbabdb15f5",
-      "username_item_state_init_hash": "1dbb27c85a12e47cf6b5441d9f12420bd32be72a1235a6e76aec3f9057057f5a",
-      "derived_item_address": "EQAduyfIWhLkfPa1RB2fEkIL0yvnKhI1pudq7D-QVwV_Wmbq"
+      "username_item_data_cell_hash": "96ae7a6d00e76fcd7bb4cf80b9c9afdb9412a573af28059cedee44c3be1b654d",
+      "username_item_state_init_hash": "c67b276e628e58f4a9cec85912ae5ec480e05146833a9033f43b8c09853ed48f",
+      "derived_item_address": "EQDGeyduYo5Y9KnOyFkSrl7EgOBRRoM6kDP0O4wJhT7Uj9ep"
     },
     {
       "username": "platho",
@@ -59,11 +59,11 @@
       "item_workchain": 0,
       "price_ath_atomic": "100000000000",
       "name_hash": "0x3fdf7a869dfd5cea86cb3a58aaca0cae9918c12f6755c94f4b7abcd2dc83501f",
-      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAnQAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAADqjGPn84Zj9t5/QiB0T+3phDAzQJT6pckIvP3KGiIlwAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAUYAH3Ty1/7qCF0377gsPowHovsFnbX45crskpeYjpidxa8DODYwujQ3wBzrpyQ==",
+      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAnQAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAGD1QUtSVJA+bCwqqiJGBcb6gfjZeH9ioOP5sGykmcEDQAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAUYAH3Ty1/7qCF0377gsPowHovsFnbX45crskpeYjpidxa8DODYwujQ3wl6h67g==",
       "official_wallet_vault_mint_notification_boc_base64": "te6cckEBAQEAfAAA84kSnWAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXSHboAIAHbwFLPOcbNTsClRfU6LhwPDbGHAbbBYXj8W33WMFFK9AA+6eWv/dQQum/fcFh9GA9F9gs7a/HLldklLzEdMTuLXgZwbGF0aG+G8Q7zg==",
-      "username_item_data_cell_hash": "c5adf78b1dae482398abc673bedd0b1abf902c4c2ff2e22f9a20c94628929f71",
-      "username_item_state_init_hash": "3839fe6a48a2aa859263a354639e26ca8e2fde9bf79c9bfb940896cf6092db30",
-      "derived_item_address": "EQA4Of5qSKKqhZJjo1RjnibKji_em_ecm_uUCJbPYJLbMMUn"
+      "username_item_data_cell_hash": "59bfaa587a7009b5f54606d1b77af3e791cae601db9f545ea0569fe3a0802986",
+      "username_item_state_init_hash": "0a7b8dc5076f1bab905392aa998bcae2974816b85d1357b28bb38a0fded70ab4",
+      "derived_item_address": "EQAKe43FB28bq5BTkqqZi8ril0gWuF0TV7KLs4oP3tcKtH0Y"
     },
     {
       "username": "user123",
@@ -72,11 +72,11 @@
       "item_workchain": 0,
       "price_ath_atomic": "100000000000",
       "name_hash": "0x3832b0a3d3f23a2d5620d0c26ea58b38b5f906cfe369922f3158592f32e6c922",
-      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAngAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAADqjGPn84Zj9t5/QiB0T+3phDAzQJT6pckIvP3KGiIlwAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAU4AMy9k/9XaMGs+GRz0+KJ/l+kHAsPYlv5duKq7LqeN9OuDurmyuRiZGcLjn1Bg=",
+      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAngAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAGD1QUtSVJA+bCwqqiJGBcb6gfjZeH9ioOP5sGykmcEDQAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAU4AMy9k/9XaMGs+GRz0+KJ/l+kHAsPYlv5duKq7LqeN9OuDurmyuRiZGcD2IW4o=",
       "official_wallet_vault_mint_notification_boc_base64": "te6cckEBAQEAfQAA9YkSnWAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXSHboAIAHbwFLPOcbNTsClRfU6LhwPDbGHAbbBYXj8W33WMFFK9ABmXsn/q7Rg1nwyOenxRP8v0g4Fh7Et/LtxVXZdTxvp1wd1c2VyMTIzjMOD+Q=",
-      "username_item_data_cell_hash": "fe96c95ea6125c0438cf438826f00a66867e85c7ed920f8bd9b812b45afc5541",
-      "username_item_state_init_hash": "bed5678552cfdf33b0a15e73438421640096c7cfda829f45f5650be2ef25646c",
-      "derived_item_address": "EQC-1WeFUs_fM7ChXnNDhCFkAJbHz9qCn0X1ZQvi7yVkbBMI"
+      "username_item_data_cell_hash": "db57fdbdebef337a1f061e3f29398140d9e9910c6b281af181219c4a8f4bc61a",
+      "username_item_state_init_hash": "a46b7fe4122f43bc5d67b9afc1e4044879e75225ca7e6f707a4d46def6452d15",
+      "derived_item_address": "EQCka3_kEi9DvF1nua_B5ARIeedSJcp-b3B6TUbe9kUtFc9S"
     },
     {
       "username": "user_name",
@@ -85,11 +85,11 @@
       "item_workchain": 0,
       "price_ath_atomic": "100000000000",
       "name_hash": "0x266acdc506f2a24f7b3bc99457800f27447b59e20d8b56d175d31c1b90b66769",
-      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAoAAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAADqjGPn84Zj9t5/QiB0T+3phDAzQJT6pckIvP3KGiIlwAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAV4AAmq6iQpJC9+6PiwRYVWIUqEgtLwtIi+/Z7VixWftaH0EurmyuS+3MLaywyyG9Hw==",
+      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAoAAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAGD1QUtSVJA+bCwqqiJGBcb6gfjZeH9ioOP5sGykmcEDQAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAV4AAmq6iQpJC9+6PiwRYVWIUqEgtLwtIi+/Z7VixWftaH0EurmyuS+3MLaywUB+Dhg==",
       "official_wallet_vault_mint_notification_boc_base64": "te6cckEBAQEAfwAA+YkSnWAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXSHboAIAHbwFLPOcbNTsClRfU6LhwPDbGHAbbBYXj8W33WMFFK9AAE1XUSFJIXv3R8WCLCqxClQkFpeFpEX37PasWKz9rQ+gl1c2VyX25hbWWWniCRw==",
-      "username_item_data_cell_hash": "4818c23597c8a05447f3364fb0dd1bfa5921fe1693229c8b0fe081001d4a0677",
-      "username_item_state_init_hash": "4359e8e1183be9707f6580cd453c59c6c4390b72ff39d0d579fa46f926a091b9",
-      "derived_item_address": "EQBDWejhGDvpcH9lgM1FPFnGxDkLcv850NV5-kb5JqCRuWct"
+      "username_item_data_cell_hash": "d5622a8b66aceb720833175df1e3d9b04769549e957a537e8c43fc683f840357",
+      "username_item_state_init_hash": "00818bee3d85922513d062b8da1addbeaf33385034ac255aaeea6049baebdaf2",
+      "derived_item_address": "EQAAgYvuPYWSJRPQYrjaGt2-rzM4UDSsJVqu6mBJuuva8jYu"
     },
     {
       "username": "user-name",
@@ -98,11 +98,11 @@
       "item_workchain": 0,
       "price_ath_atomic": "100000000000",
       "name_hash": "0x5c1104e98e9dcf3ac640f2361539aa1fbee3361f5ca39359ab8414eb8fed1e65",
-      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAoAAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAADqjGPn84Zj9t5/QiB0T+3phDAzQJT6pckIvP3KGiIlwAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAV4AQ9AfRrJZocSy3vXOoU5Jn6BKsbQ8Zb2aHs/aR/EpeTqEurmyuRa3MLaywELRFXA==",
+      "vault_ath_transfer_request_mint_username_boc_base64": "te6cckEBAgEAoAAB3UFUSBwAAAAAAAAAAQAAAAAAAAAAAAAAF0h26ACAGD1QUtSVJA+bCwqqiJGBcb6gfjZeH9ioOP5sGykmcEDQAO3gKWec42anYFKi+p0XDgeG2MOA22CwvH4tvusYKKV4AAAAAAAAAAAAAAAAB6EgAgEAV4AQ9AfRrJZocSy3vXOoU5Jn6BKsbQ8Zb2aHs/aR/EpeTqEurmyuRa3MLaywi4p7xQ==",
       "official_wallet_vault_mint_notification_boc_base64": "te6cckEBAQEAfwAA+YkSnWAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXSHboAIAHbwFLPOcbNTsClRfU6LhwPDbGHAbbBYXj8W33WMFFK9ACHoD6NZLNDiWW9651CnJM/QJVjaHjLezQ9n7SP4lLydQl1c2VyLW5hbWW8op52g==",
-      "username_item_data_cell_hash": "d5037206cacc29daec27a2babf4c0ea29b9d1716b0177f4114465e013c580a52",
-      "username_item_state_init_hash": "77575c37d6f3b2a70b443a64e5505607cce2bc9b97674340a03876ff647b80c2",
-      "derived_item_address": "EQB3V1w31vOypwtEOmTlUFYHzOK8m5dnQ0CgOHb_ZHuAwhob"
+      "username_item_data_cell_hash": "91cf1843a5abae01d3955f3b83da45d24f64076a384263665ba46e9b8541105c",
+      "username_item_state_init_hash": "a258a33176b93e38d0e719e85527425cf66805069c61269dde570d78a2b23d3f",
+      "derived_item_address": "EQCiWKMxdrk-ONDnGehVJ0Jc9mgFBpxhJp3eVw14orI9P6B6"
     }
   ],
   "invalid_examples": [
