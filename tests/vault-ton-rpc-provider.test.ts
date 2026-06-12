@@ -1106,7 +1106,10 @@ describe('Vault TON RPC provider', () => {
       ],
       requestSpacingMs: 0,
       rateLimitKey: `verifier-403-${Math.random()}`,
-      transportDeadRetryMs: 60_000,
+      // A 401/403 verifier parks for minutes regardless of the configured
+      // dead-retry window, so a region-blocked verifier is not re-probed every
+      // sync cycle (which would re-throw on the first critical read each time).
+      transportDeadRetryMs: 1,
       verifyCriticalReads: true,
       criticalMethods: ['get_user'],
       fetch: async (url: string) => {
@@ -1142,6 +1145,12 @@ describe('Vault TON RPC provider', () => {
     // Primary stays healthy: this is verification degradation, not the
     // censorship-survival primary-parked mode.
     expect(transport?.isDegraded()).toBe(false);
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // Despite transportDeadRetryMs:1, the denial park lasts minutes: a short
+    // sleep does not re-probe the verifier, so it stays parked and verified
+    // reads stay degraded instead of re-throwing each cycle.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(transport?.isVerificationDegraded()).toBe(true);
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
     expect(toncenterCalls).toHaveLength(1);

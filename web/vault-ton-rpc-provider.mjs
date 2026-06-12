@@ -86,6 +86,13 @@ const toncenterMessagesCache = new Map();
 // verifier-only providers are promoted to full emergency duty meanwhile.
 const TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD = 2;
 const TON_RPC_TRANSPORT_DEAD_RETRY_MS = 30_000;
+// A verifier-only transport that answers 401/403 is denied by policy for this
+// network (e.g. keyless toncenter blocked in a region). Park it for minutes,
+// not seconds: a short window makes every sync cycle re-probe it, eat the
+// verification failure on its first critical read, and fail the whole cycle -
+// the "perpetually syncing, never loads" symptom. A long park keeps reads in
+// the clean degraded path and re-probes only occasionally.
+const TON_RPC_VERIFIER_DENIAL_PARK_MS = 300_000;
 const tonRpcTransportHealth = new Map();
 
 function tonRpcTransportHealthState(transport) {
@@ -126,7 +133,12 @@ function noteTonRpcTransportFailure(transport, error, deadRetryMs = TON_RPC_TRAN
   // an app-level 4xx cannot park the main gateway by accident.
   const status = Number(error?.status ?? 0);
   const deterministicDenial = transport?.verifierOnly === true && (status === 401 || status === 403);
-  if (deterministicDenial || state.consecutiveHardFailures >= TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD) {
+  if (deterministicDenial) {
+    state.deadUntil = Date.now() + Math.max(
+      finiteNonNegativeMs(deadRetryMs, TON_RPC_TRANSPORT_DEAD_RETRY_MS),
+      TON_RPC_VERIFIER_DENIAL_PARK_MS,
+    );
+  } else if (state.consecutiveHardFailures >= TON_RPC_TRANSPORT_HARD_FAILURE_THRESHOLD) {
     state.deadUntil = Date.now() + finiteNonNegativeMs(deadRetryMs, TON_RPC_TRANSPORT_DEAD_RETRY_MS);
   }
 }
