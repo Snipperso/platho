@@ -243,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v417<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v417'/);
+    expect(html).toMatch(/id="appVersionLabel">v418<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v418'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3721,11 +3721,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v480/);
+    expect(sw).toMatch(/platho-pwa-prototype-v481/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=417/);
+    expect(sw).toMatch(/\.\/app\.js\?v=418/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
@@ -3814,6 +3814,11 @@ describe('PWA runtime config guard', () => {
     // cannot; it only fires when the app module never started.
     expect(bootGuard).not.toMatch(/=>|\bconst\b|\blet\b|`/);
     expect(bootGuard).toMatch(/data-platho-app-js/);
+    // 'ready' is the terminal healthy marker; anything else after the boot
+    // window (missing, 'started', 'error') shows the diagnostic overlay.
+    expect(bootGuard).toMatch(/=== 'ready'\) return/);
+    expect(bootGuard).toMatch(/boot did not finish/);
+    expect(readFileSync('web/app.js', 'utf8')).toMatch(/dataset\.plathoAppJs !== 'ready'/);
     expect(bootGuard).toMatch(/addEventListener\('error'/);
     expect(bootGuard).toMatch(/unhandledrejection/);
   });
