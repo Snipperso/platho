@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v419';
+const PLATHO_APP_RUNTIME_VERSION = 'v420';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -463,6 +463,8 @@ let messageAutoSyncPhase = 'idle';
 let messageAutoSyncLastResult = null;
 let messageAutoSyncLastErrorLabel = null;
 let messageAutoSyncLoadingFrame = 0;
+let messageAutoSyncStallStreak = 0;
+const privateScanUnknownErrorCounts = new Map();
 let privateOutboundWorkDepth = 0;
 let vaultPublishSendLock = Promise.resolve();
 let vaultPublishSendWaiters = 0;
@@ -549,6 +551,11 @@ const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
 const PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS = 3 * 60 * 1000;
 const PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT = 2;
 const PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT = 16;
+// A single entry that persistently fails with an unclassified error must not
+// freeze the index cursor into a forever-resyncing loop: after this many
+// failed passes the entry is skipped for the session and kept visible in the
+// debug surface instead.
+const PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER = 3;
 const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho.private.chain.head.repair.v1';
 const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8;
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
@@ -5969,6 +5976,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       entry = await resolvePrivateEntryBody(provider, entry, address, readOptions);
       privateEntryCache.set(entryIdKey, entry);
       scannedPrivateEntryIds.add(entryIdKey);
+      privateScanUnknownErrorCounts.delete(`${address}:${entryIdKey}`);
       clearPrivateBodyHistoryUnavailable(address, entryId);
       const opened = await openPrivateCapsuleChainEntry(entry, localRecipientKeyPair, {
         now: Date.now(),
@@ -6037,6 +6045,24 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         };
         return { ok: true, entry };
       } else {
+        const failureKey = `${address}:${entryIdKey}`;
+        const failures = (privateScanUnknownErrorCounts.get(failureKey) ?? 0) + 1;
+        privateScanUnknownErrorCounts.set(failureKey, failures);
+        if (failures >= PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER) {
+          // This entry has failed identically across multiple passes; it must
+          // not pin the cursor into a permanent resync loop. Skip it for the
+          // session and keep the diagnostic reachable from the debug surface.
+          scannedPrivateEntryIds.add(entryIdKey);
+          rememberPrivateScanLog(entryId, 'error-skip');
+          globalThis.plathoLastPrivateSyncBlockedEntry = {
+            entryId: entryIdKey,
+            message,
+            failures,
+            at: new Date().toISOString(),
+          };
+          skipped += 1;
+          return { ok: true, entry };
+        }
         rememberPrivateScanLog(entryId, 'error');
         console.error(error);
         scanComplete = false;
@@ -6410,7 +6436,14 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
       const result = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' });
       completeMessageSyncUi(result);
       if (result?.scanComplete === false || result?.reason === 'catch_up_pending') {
-        nextSyncDelayMs = 2_000;
+        // Fast follow-up only while the catch-up actually makes progress;
+        // a stalled walk (same state every pass) backs off exponentially so
+        // it cannot melt the RPC budget with a 2-second resync loop.
+        const progressed = privateSyncImported(result) || Number(result?.skipped ?? 0) > 0;
+        messageAutoSyncStallStreak = progressed ? 0 : messageAutoSyncStallStreak + 1;
+        nextSyncDelayMs = Math.min(2_000 * 2 ** Math.min(messageAutoSyncStallStreak, 5), MESSAGE_AUTO_SYNC_MS);
+      } else {
+        messageAutoSyncStallStreak = 0;
       }
       if (privateSyncImported(result)) {
         setText(messageSyncStatus, 'new messages');
