@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v422';
+const PLATHO_APP_RUNTIME_VERSION = 'v423';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5829,6 +5829,15 @@ function privateIndexSyncReadLimit(options = {}) {
     : PRIVATE_CHAIN_INDEX_READ_LIMIT;
 }
 
+function privateIndexCursorPersistenceMode(readOptions = {}, options = {}) {
+  if (readOptions.verify === true && readOptions.allowUnverifiedCriticalRead !== true) return 'verified';
+  if (tonRpcVerificationStructurallyDegraded()) return 'degraded_unverified';
+  if (options.allowUnverifiedPrivateIndexRead === true && readOptions.allowUnverifiedCriticalRead === true) {
+    return 'message_index_unverified';
+  }
+  return 'disabled_unverified';
+}
+
 function privateSyncImported(result) {
   if (typeof result === 'boolean') return result;
   return Number(result?.imported ?? 0) > 0;
@@ -5889,17 +5898,13 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const readOptions = allowUnverifiedPrivateIndexRead
     ? capsuleHubMessageSyncReadOptions(address)
     : criticalCapsuleHubReadOptions(address);
-  // Cursor persistence normally requires dual-provider verified index reads
-  // so a lying RPC cannot poison the saved position. When verification is
-  // structurally impossible (no reachable verifier on this network), the
-  // alternative is never persisting at all: every sync re-walks and re-merges
-  // the whole index in a permanent 2s catch-up loop. Availability wins by
-  // explicit product policy; entry content stays self-authenticated and the
-  // head-repair scan keeps covering entries near the head.
-  const canPersistPrivateIndexCursor = (
-    readOptions.verify === true
-    && readOptions.allowUnverifiedCriticalRead !== true
-  ) || tonRpcVerificationStructurallyDegraded();
+  // Cursor persistence is a local performance cache. Verified reads remain
+  // preferred, structurally degraded transports keep their explicit degraded
+  // label, and background message sync can persist an unverified cursor
+  // because private entry content is still self-authenticated before import.
+  const cursorPersistence = privateIndexCursorPersistenceMode(readOptions, { allowUnverifiedPrivateIndexRead });
+  const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified';
+  const forceIndexRescan = options.forceIndexRescan === true;
   const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
   let recipientIndex = null;
   let senderIndex = null;
@@ -6090,7 +6095,9 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   let catchUpRemaining = 0;
   let indexLimitReachedWithoutCursor = false;
   const walkIndexedRole = async (role, latestHeadLink) => {
-    const cursor = readPrivateChainIndexCursor(address, role);
+    const cursor = forceIndexRescan
+      ? normalizePrivateChainIndexCursor(null)
+      : readPrivateChainIndexCursor(address, role);
     const hasResume = cursor.resumeLink > 0n;
     const targetHeadLink = hasResume ? cursor.targetHeadLink : latestHeadLink;
     const stopLink = cursor.processedHeadLink;
@@ -6283,9 +6290,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     senderHead: senderHead.toString(),
     recipientCursor: privateIndexCursorDebug(recipientCursor),
     senderCursor: privateIndexCursorDebug(senderCursor),
-    cursorPersistence: canPersistPrivateIndexCursor
-      ? (readOptions.verify === true ? 'verified' : 'degraded_unverified')
-      : 'disabled_unverified',
+    cursorPersistence,
     imported,
     skipped,
     scanComplete: scanComplete && catchUpRemaining === 0 && !hasFreshPartial,
@@ -6295,6 +6300,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     historyRetryScanned,
     publishConfirmations,
     readLimit: limit,
+    forceIndexRescan,
     rateLimited: rateLimitError !== null,
     bodyHistoryUnavailable: bodyHistoryError !== null,
     privateKeyOpenFailed: privateKeyOpenError !== null,
@@ -9730,6 +9736,7 @@ syncMessagesButton?.addEventListener('click', async () => {
       mode: 'manual',
       readLimit: PRIVATE_CHAIN_INDEX_READ_LIMIT,
       forceHistoryRetry: true,
+      forceIndexRescan: true,
     });
     completeMessageSyncUi(result);
     setText(messageSyncStatus, privateSyncStatusText(result));
