@@ -243,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v423<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v423'/);
+    expect(html).toMatch(/id="appVersionLabel">v424<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v424'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1867,8 +1867,9 @@ describe('PWA runtime config guard', () => {
     }
     expect(publicSyncSource).toMatch(/const readOptions = criticalCapsuleHubReadOptions\(address\)[\s\S]*provider\.getPublicEntry\(entryIdValue, readOptions\)[\s\S]*chainVerified:\s*true/);
     expect(publicSyncSource).not.toMatch(/chainVerified:\s*true[\s\S]*provider\.getPublicEntry\(entryIdValue, readOptions\)/);
-    expect(privateSyncSource).toMatch(/const allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true[\s\S]*quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
-    expect(privateSyncSource).toMatch(/const readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
+    expect(privateSyncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
+    expect(privateSyncSource).toMatch(/const allowUnverifiedPrivateIndexFallback = quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
+    expect(privateSyncSource).toMatch(/let readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
     expect(privateSyncSource).not.toMatch(/provider\.getState\(readOptions\)/);
     expect(privateSyncSource).toMatch(/provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
     expect(privateSyncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
@@ -2171,10 +2172,11 @@ describe('PWA runtime config guard', () => {
     expect(capsuleSource).toMatch(/assertPrivateComposerPartLimit\(totalParts\)/);
     expect(syncSource).toMatch(/provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
     expect(syncSource).toMatch(/provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
-    expect(syncSource).toMatch(/const allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true[\s\S]*quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
-    expect(syncSource).toMatch(/const readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
-    expect(app).toMatch(/function privateIndexCursorPersistenceMode\(readOptions = \{\}, options = \{\}\)/);
-    expect(syncSource).toMatch(/const cursorPersistence = privateIndexCursorPersistenceMode\(readOptions, \{ allowUnverifiedPrivateIndexRead \}\)/);
+    expect(syncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
+    expect(syncSource).toMatch(/const allowUnverifiedPrivateIndexFallback = quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
+    expect(syncSource).toMatch(/let readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
+    expect(app).toMatch(/function privateIndexCursorPersistenceMode\(readOptions = \{\}\)/);
+    expect(syncSource).toMatch(/const cursorPersistence = privateIndexCursorPersistenceMode\(readOptions\)/);
     expect(syncSource).toMatch(/const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified'/);
     expect(app).toMatch(/function privateIndexSyncReadLimit/);
     expect(syncSource).toMatch(/walkIndexedRole\('recipient', recipientHead\)/);
@@ -3581,12 +3583,15 @@ describe('PWA runtime config guard', () => {
     expect(capsuleHubProvider).toMatch(/allowUnverifiedCriticalRead/);
     expect(capsuleHubProvider).toMatch(/get_private_recipient_index/);
     expect(capsuleHubProvider).toMatch(/get_private_sender_index/);
-    expect(syncSource).toMatch(/const allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true[\s\S]*quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
-    expect(syncSource).toMatch(/const readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
-    expect(app).toMatch(/function privateIndexCursorPersistenceMode\(readOptions = \{\}, options = \{\}\)/);
-    expect(app).toMatch(/message_index_unverified/);
-    expect(syncSource).toMatch(/const cursorPersistence = privateIndexCursorPersistenceMode\(readOptions, \{ allowUnverifiedPrivateIndexRead \}\)/);
+    expect(syncSource).toMatch(/let allowUnverifiedPrivateIndexRead = options\.allowUnverifiedPrivateIndexRead === true/);
+    expect(syncSource).toMatch(/const allowUnverifiedPrivateIndexFallback = quickSync && options\.allowUnverifiedPrivateIndexRead !== false/);
+    expect(syncSource).toMatch(/let readOptions = allowUnverifiedPrivateIndexRead[\s\S]*capsuleHubMessageSyncReadOptions\(address\)[\s\S]*criticalCapsuleHubReadOptions\(address\)/);
+    expect(app).toMatch(/function privateIndexCursorPersistenceMode\(readOptions = \{\}\)/);
+    expect(app).not.toMatch(/message_index_unverified/);
+    expect(syncSource).toMatch(/const cursorPersistence = privateIndexCursorPersistenceMode\(readOptions\)/);
     expect(syncSource).toMatch(/const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified'/);
+    expect(syncSource).toMatch(/if \(!allowUnverifiedPrivateIndexRead && allowUnverifiedPrivateIndexFallback && isTonRpcVerificationSoftReadError\(error\)\)/);
+    expect(syncSource).toMatch(/indexReadFallback = shortUiErrorText\(error, 'verified private index unavailable'\)/);
     expect(syncSource).not.toMatch(/provider\.getState\(readOptions\)/);
     expect(syncSource).not.toMatch(/private_latest_id/);
     expect(syncSource).not.toMatch(/readPrivateChainScanCursor|writePrivateChainScanCursor/);
@@ -3623,6 +3628,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/history gaps/);
     expect(app).toMatch(/catch_up_pending/);
     expect(app).toMatch(/partial_stream_pending/);
+    expect(app).toMatch(/index_limit_without_cursor/);
+    expect(app).toMatch(/index scan limited/);
     expect(app).toMatch(/catch-up/);
     expect(app).toMatch(/function privateIndexSyncReadLimit\(options = \{\}\)/);
     expect(app).toMatch(/options\.readLimit/);
@@ -3646,6 +3653,7 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/let indexLimitReachedWithoutCursor = false/);
     expect(syncSource).toMatch(/if \(canPersistPrivateIndexCursor\) \{[\s\S]*catchUpRemaining \+= 1[\s\S]*\} else \{[\s\S]*indexLimitReachedWithoutCursor = true/);
     expect(syncSource).toMatch(/indexLimitReachedWithoutCursor/);
+    expect(syncSource).toMatch(/const fullScanComplete = scanComplete[\s\S]*&& !indexLimitReachedWithoutCursor/);
     expect(syncSource).not.toMatch(/windowStart/);
     expect(app).toMatch(/privateEntryPublisherWallet/);
     expect(app).toMatch(/resolveKnownPrivateSenderWallet/);
@@ -3653,14 +3661,15 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/globalThis\.plathoLastPrivateSync/);
     expect(syncSource).toMatch(/recipientHead: recipientHead\.toString\(\)/);
     expect(syncSource).toMatch(/senderHead: senderHead\.toString\(\)/);
-    // Cursor persistence prefers verified index reads, opens in structurally
-    // degraded mode, and allows background message sync to persist a clearly
-    // labeled unverified cursor because imported entries stay self-authenticated.
+    // Cursor persistence only advances after verified index reads. Unverified
+    // fallback can import self-authenticated entries, but it cannot poison the
+    // active cursor or hide older index history.
     expect(app).toMatch(/if \(readOptions\.verify === true && readOptions\.allowUnverifiedCriticalRead !== true\) return 'verified'/);
-    expect(app).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) return 'degraded_unverified'/);
-    expect(app).toMatch(/return 'message_index_unverified'/);
     expect(app).toMatch(/return 'disabled_unverified'/);
+    expect(app).not.toMatch(/degraded_unverified/);
+    expect(app).not.toMatch(/return 'message_index_unverified'/);
     expect(syncSource).toMatch(/cursorPersistence,/);
+    expect(syncSource).toMatch(/indexReadFallback/);
     expect(syncSource).toMatch(/forceIndexRescan/);
     expect(syncSource).toMatch(/indexEntriesScanned/);
     expect(syncSource).toMatch(/incompletePrivateStreamCount/);
@@ -3674,6 +3683,7 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/beginMessageSyncUi\(\)/);
     expect(syncSource).toMatch(/syncPrivateCapsulesFromChainOnce\(\{ mode: 'auto' \}\)/);
     expect(syncSource).toMatch(/completeMessageSyncUi\(result\)/);
+    expect(syncSource).toMatch(/result\?\.scanComplete === false && result\?\.reason !== 'index_limit_without_cursor'/);
     expect(syncSource).toMatch(/failMessageSyncUi\(label\)/);
     expect(syncSource).toMatch(/resumePendingPrivateSendRetries\(\)/);
     expect(syncSource).toMatch(/resumePendingPrivatePublishConfirmations\(\)/);
@@ -3744,11 +3754,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v487/);
+    expect(sw).toMatch(/platho-pwa-prototype-v488/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=423/);
+    expect(sw).toMatch(/\.\/app\.js\?v=424/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
