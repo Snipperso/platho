@@ -138,7 +138,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v420';
+const PLATHO_APP_RUNTIME_VERSION = 'v421';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5888,8 +5888,17 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const readOptions = allowUnverifiedPrivateIndexRead
     ? capsuleHubMessageSyncReadOptions(address)
     : criticalCapsuleHubReadOptions(address);
-  const canPersistPrivateIndexCursor = readOptions.verify === true
-    && readOptions.allowUnverifiedCriticalRead !== true;
+  // Cursor persistence normally requires dual-provider verified index reads
+  // so a lying RPC cannot poison the saved position. When verification is
+  // structurally impossible (no reachable verifier on this network), the
+  // alternative is never persisting at all: every sync re-walks and re-merges
+  // the whole index in a permanent 2s catch-up loop. Availability wins by
+  // explicit product policy; entry content stays self-authenticated and the
+  // head-repair scan keeps covering entries near the head.
+  const canPersistPrivateIndexCursor = (
+    readOptions.verify === true
+    && readOptions.allowUnverifiedCriticalRead !== true
+  ) || tonRpcVerificationStructurallyDegraded();
   const keyIdIndex = privateKeyIdIndexValue(localRecipientKeyPair.keyId);
   let recipientIndex = null;
   let senderIndex = null;
@@ -6265,7 +6274,9 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     senderHead: senderHead.toString(),
     recipientCursor: privateIndexCursorDebug(recipientCursor),
     senderCursor: privateIndexCursorDebug(senderCursor),
-    cursorPersistence: canPersistPrivateIndexCursor ? 'verified' : 'disabled_unverified',
+    cursorPersistence: canPersistPrivateIndexCursor
+      ? (readOptions.verify === true ? 'verified' : 'degraded_unverified')
+      : 'disabled_unverified',
     imported,
     skipped,
     scanComplete: scanComplete && catchUpRemaining === 0 && !hasFreshPartial,
