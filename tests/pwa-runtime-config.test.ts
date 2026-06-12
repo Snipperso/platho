@@ -243,8 +243,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v419<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v419'/);
+    expect(html).toMatch(/id="appVersionLabel">v420<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v420'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3648,6 +3648,10 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/incompletePrivateStreamCount/);
     expect(syncSource).toMatch(/mode: quickSync \? 'auto' : 'recovery'/);
     expect(syncSource).toMatch(/rateLimited: rateLimitError !== null/);
+    // A persistently failing entry is skipped after three passes instead of
+    // freezing the cursor into a forever-resyncing loop.
+    expect(syncSource).toMatch(/PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER/);
+    expect(syncSource).toMatch(/rememberPrivateScanLog\(entryId, 'error-skip'\)/);
     expect(syncSource).toMatch(/function scheduleMessageAutoSync/);
     expect(syncSource).toMatch(/beginMessageSyncUi\(\)/);
     expect(syncSource).toMatch(/syncPrivateCapsulesFromChainOnce\(\{ mode: 'auto' \}\)/);
@@ -3721,11 +3725,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v483/);
+    expect(sw).toMatch(/platho-pwa-prototype-v484/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=419/);
+    expect(sw).toMatch(/\.\/app\.js\?v=420/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
