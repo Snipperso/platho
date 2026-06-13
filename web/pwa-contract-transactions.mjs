@@ -38,6 +38,15 @@ export const VAULT_PUBLISH_KIND = Object.freeze({
 });
 
 export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
+export const VAULT_BATCH_PUBLISH_SIGNING_DOMAIN = 0x56504232n; // "VPB2" batch-publish signed-root domain
+export const VAULT_BATCH_PUBLISH_ID_DOMAIN = 0x42504931n;      // "BPI1" batch publish_id derivation
+export const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN = 0x45504931n;    // "EPI1" per-entry publish_id derivation
+export const OP_PUBLISH_BATCH = 0x7e1f5041n;                   // Vault external op for PublishBatchFromVaultBalance
+export const MAX_BATCH_PARTS = 8;                              // mirrors contracts/Vault.tact MAX_BATCH_PARTS
+export const VPB2_VERSION = 1n;                                // mirrors contracts/Vault.tact VPB2_VERSION
+// Pinned affine charge floor (mirrors contracts/Vault.tact BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * n).
+export const BATCH_FLOOR_BASE_PIN = 200_700_000n;
+export const BATCH_FLOOR_PER_PART_PIN = 6_200_000n;
 export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
 export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
 export const RECEIVE_INTENT_ID_DOMAIN = 0x52434944n; // "RCID"
@@ -1098,6 +1107,187 @@ export async function buildVaultBalancePublishExternalBoc(type, params = {}, opt
   return {
     ...built,
     boc: bytesToBase64(serializeBoc(root)),
+    vaultAddress,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// VPB2 batch publish (signed BATCH external). Mirrors contracts/Vault.tact
+// external(PublishBatchFromVaultBalance) + tests/helpers/vpb2.ts byte-for-byte.
+// All inputs are pre-built capsule cells + scalar fields; nothing here reads app state.
+// ---------------------------------------------------------------------------
+
+// Worst-case affine floor max_charge must clear (mirrors Vault.batchChargeFloor / BATCH_FLOOR_*_PIN).
+export function batchChargeFloor(partCount) {
+  const n = assertUint(partCount, 8, 'part_count');
+  return BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * n;
+}
+
+function batchPartKind(part) {
+  const raw = part?.kind ?? part?.publish_kind ?? part?.publishKind;
+  if (raw !== undefined && raw !== null) {
+    const kind = toBigInt(raw, 'part.kind');
+    if (kind === VAULT_PUBLISH_KIND.PRIVATE) return VAULT_PUBLISH_KIND.PRIVATE;
+    if (kind === VAULT_PUBLISH_KIND.PUBLIC) return VAULT_PUBLISH_KIND.PUBLIC;
+    throw new RangeError('part.kind must be PRIVATE(1) or PUBLIC(2)');
+  }
+  // Discriminator fallback: a private part carries two headers, a public part one.
+  const hasH1 = (part?.header_1_cell ?? part?.header1Cell) !== undefined
+    || (part?.header_1_hash ?? part?.header1Hash) !== undefined;
+  return hasH1 ? VAULT_PUBLISH_KIND.PRIVATE : VAULT_PUBLISH_KIND.PUBLIC;
+}
+
+// One linked-list part cell. PRIVATE: size(8) suite(8) h0(256) h1(256) bh(256) + ref h0,h1,body[,next].
+// PUBLIC: size(8) reserved(8=0) h(256) bh(256) + ref header,body[,next]. `part.next` (a built cell) appends
+// the 4th/3rd ref to the successor part — the head is part 0, the tail (last) carries no next ref.
+export function buildBatchPublishPartCell(part) {
+  assertObject(part, 'part');
+  const next = part.next ?? part.nextCell ?? null;
+  if (batchPartKind(part) === VAULT_PUBLISH_KIND.PRIVATE) {
+    const header0 = publishCellFromPayload(part.header_0_cell ?? part.header0Cell, 'part.header_0_cell');
+    const header1 = publishCellFromPayload(part.header_1_cell ?? part.header1Cell, 'part.header_1_cell');
+    const body = publishCellFromPayload(part.body_cell ?? part.bodyCell, 'part.body_cell');
+    const builder = beginCell()
+      .uint(part.size_class ?? part.sizeClass, 8, 'size_class')
+      .uint(part.crypto_suite ?? part.cryptoSuite ?? VAULT_CRYPTO_SUITE.HYBRID, 8, 'crypto_suite')
+      .uint(publishHashValue(part.header_0_hash ?? part.header0Hash, 'part.header_0_hash'), 256, 'header_0_hash')
+      .uint(publishHashValue(part.header_1_hash ?? part.header1Hash, 'part.header_1_hash'), 256, 'header_1_hash')
+      .uint(publishHashValue(part.body_hash ?? part.bodyHash, 'part.body_hash'), 256, 'body_hash')
+      .ref(header0, 'header_0')
+      .ref(header1, 'header_1')
+      .ref(body, 'body');
+    if (next) builder.ref(next, 'next_part');
+    return builder.endCell();
+  }
+  const header = publishCellFromPayload(part.header_cell ?? part.headerCell ?? part.header_0_cell, 'part.header_cell');
+  const body = publishCellFromPayload(part.body_cell ?? part.bodyCell, 'part.body_cell');
+  const builder = beginCell()
+    .uint(normalizePublicSizeClass(part.size_class ?? part.sizeClass, 'part.size_class'), 8, 'size_class')
+    .uint(0n, 8, 'reserved')
+    .uint(publishHashValue(part.header_hash ?? part.headerHash ?? part.header_0_hash, 'part.header_hash'), 256, 'header_hash')
+    .uint(publishHashValue(part.body_hash ?? part.bodyHash, 'part.body_hash'), 256, 'body_hash')
+    .ref(header, 'header')
+    .ref(body, 'body');
+  if (next) builder.ref(next, 'next_part');
+  return builder.endCell();
+}
+
+// Link 1..MAX_BATCH_PARTS parts into the singly-linked list and return its head (part 0). Built tail-first so
+// each non-last part carries a ref to its successor.
+export function buildBatchPublishPartsRoot(parts) {
+  if (!Array.isArray(parts) || parts.length < 1) {
+    throw new RangeError('parts must be a non-empty array');
+  }
+  if (parts.length > MAX_BATCH_PARTS) {
+    throw new RangeError(`parts must be at most ${MAX_BATCH_PARTS}`);
+  }
+  let next = null;
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    next = buildBatchPublishPartCell({ ...parts[i], next });
+  }
+  return next;
+}
+
+// Signed ROOT cell: domain(32) manifest(256) vault_hash(256) kind(8) owner_hash(256) nonce(64) max_charge(128)
+// part_count(8) version(8) + ref(partsRoot). Field order is the Vault's authoritative re-validation order.
+export function buildBatchPublishSignedRootCell(params = {}) {
+  assertObject(params, 'params');
+  return beginCell()
+    .uint(VAULT_BATCH_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
+    .uint(params.kind ?? params.publish_kind ?? VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
+    .uint(basechainAddressHashValue(vaultBalancePublishOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
+    .uint(params.part_count ?? params.partCount, 8, 'part_count')
+    .uint(params.version ?? VPB2_VERSION, 8, 'version')
+    .ref(params.partsRoot ?? params.parts_root, 'parts_root')
+    .endCell();
+}
+
+// BPI1 batch publish_id = sha256(domain(32) manifest(256) owner(address) nonce(64) parts_root_hash(256) kind(8)
+// part_count(8)). The owner is a FULL address here (not a hash), matching Vault.computeBatchPublishId.
+export async function computeBatchPublishId(params = {}) {
+  assertObject(params, 'params');
+  const partsRoot = params.partsRoot ?? params.parts_root;
+  const { hash: partsRootHash } = await computeCellHashAndDepth(partsRoot);
+  const idCell = beginCell()
+    .uint(VAULT_BATCH_PUBLISH_ID_DOMAIN, 32, 'batch_publish_id_domain')
+    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
+    .address(vaultBalancePublishOwner(params), 'owner_wallet')
+    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
+    .uint(bytesToBigInt(partsRootHash), 256, 'parts_root_hash')
+    .uint(params.kind ?? params.publish_kind ?? VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
+    .uint(params.part_count ?? params.partCount, 8, 'part_count')
+    .endCell();
+  const { hash } = await computeCellHashAndDepth(idCell);
+  return bytesToBigInt(hash);
+}
+
+// EPI1 entry publish_id = sha256(domain(32) batch_publish_id(256) part_index(16)).
+export async function computeEntryPublishId(batchPublishId, partIndex) {
+  const idCell = beginCell()
+    .uint(CAPSULE_ENTRY_PUBLISH_ID_DOMAIN, 32, 'capsule_entry_publish_id_domain')
+    .uint(batchPublishId, 256, 'batch_publish_id')
+    .uint(partIndex, 16, 'part_index')
+    .endCell();
+  const { hash } = await computeCellHashAndDepth(idCell);
+  return bytesToBigInt(hash);
+}
+
+// Signed envelope (external body): op(32) owner_wallet(address) signature(512) + ref(signedRoot). The signature
+// is ed25519 over signedRoot.hash() with the user's AUTH secret key (32-byte seed), NOT the messaging sign key.
+export async function buildBatchPublishExternalBody(params = {}) {
+  assertObject(params, 'params');
+  const partsRoot = params.partsRoot ?? params.parts_root;
+  if (!partsRoot) throw new TypeError('partsRoot is required');
+  const signedRoot = buildBatchPublishSignedRootCell({ ...params, partsRoot });
+  const authSecretKey = assertBytes(params.authSecretKey ?? params.auth_secret_key, 32, 'authSecretKey');
+  const { hash } = await computeCellHashAndDepth(signedRoot);
+  const signature = ed25519.sign(hash, authSecretKey);
+  const bodyCell = beginVaultBody(Number(OP_PUBLISH_BATCH))
+    .address(vaultBalancePublishOwner(params), 'owner_wallet')
+    .bytesValue(signature, 64, 'signature')
+    .ref(signedRoot, 'signed_root')
+    .endCell();
+  return {
+    bodyCell,
+    signedRoot,
+    signedRootHash: bytesToHex(hash),
+    signature: bytesToHex(signature),
+  };
+}
+
+// Full signed BATCH external: serialized external-in BOC + the derived ids the client can confirm against later.
+export async function buildBatchPublishExternalBoc(params = {}, options = {}) {
+  assertObject(params, 'params');
+  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
+  const deploymentManifestHash = options.deployment_manifest_hash
+    ?? options.deploymentManifestHash
+    ?? params.deployment_manifest_hash
+    ?? params.deploymentManifestHash;
+  const partsRoot = params.partsRoot ?? params.parts_root;
+  if (!partsRoot) throw new TypeError('partsRoot is required');
+  const kind = params.kind ?? params.publish_kind ?? VAULT_PUBLISH_KIND.PRIVATE;
+  const partCount = params.part_count ?? params.partCount;
+  const merged = { ...params, vaultAddress, deploymentManifestHash, partsRoot, kind, part_count: partCount };
+  const built = await buildBatchPublishExternalBody(merged);
+  const batchPublishId = await computeBatchPublishId(merged);
+  const count = Number(assertUint(partCount, 8, 'part_count'));
+  const entryPublishIds = [];
+  for (let i = 0; i < count; i += 1) {
+    entryPublishIds.push(await computeEntryPublishId(batchPublishId, i));
+  }
+  const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  return {
+    boc: bytesToBase64(serializeBoc(root)),
+    bodyCell: built.bodyCell,
+    signedRoot: built.signedRoot,
+    signedRootHash: built.signedRootHash,
+    signature: built.signature,
+    batchPublishId,
+    entryPublishIds,
     vaultAddress,
   };
 }
