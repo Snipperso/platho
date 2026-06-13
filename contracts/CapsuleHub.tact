@@ -16,18 +16,6 @@ const CRYPTO_SUITE_HYBRID: Int = 2;
 const CAPSULEHUB_INDEX_STORAGE_YEARS: Int = 1;
 const CAPSULEHUB_INDEX_RETENTION_SECONDS: Int = 31536000;
 const CAPSULEHUB_PAGE_SIZE: Int = 256;
-const CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE: Int = 4200000;
-const CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE: Int = 4300000;
-const CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE: Int = 4500000;
-const CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE: Int = 5000000;
-const CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE: Int = 5800000;
-const CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE: Int = 7600000;
-const CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE: Int = 2400000;
-const CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE: Int = 4300000;
-const CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE: Int = 4500000;
-const CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE: Int = 5000000;
-const CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE: Int = 5800000;
-const CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE: Int = 7600000;
 const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
 const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 7400000;
@@ -75,41 +63,6 @@ message(0x90E2E0CB) BindDeploymentManifest {
 
 message(0x3A12D1AD) SealGenesis {
     deployment_manifest_hash: Int as uint256;
-}
-
-message(0xA4F862C0) PublishPrivateFromVault {
-    bounce_id: Int as uint64;
-    bounce_tag: Int as uint160;
-    publish_id: Int as uint256;
-    size_class: Int as uint8;
-    crypto_suite: Int as uint8;
-    header_0_hash: Int as uint256;
-    header_1_hash: Int as uint256;
-    body_hash: Int as uint256;
-    header_0: Cell;
-    header_1: Cell;
-    body: Cell;
-    protocol_fee_paid: Int as uint128;
-}
-
-message(0x8C2A76B7) PublishPublicFromVault {
-    bounce_id: Int as uint64;
-    bounce_tag: Int as uint160;
-    publish_id: Int as uint256;
-    size_class: Int as uint8;
-    marketing_note: Int as uint152;
-    author_wallet: Address;
-    header_hash: Int as uint256;
-    body_hash: Int as uint256;
-    header: Cell;
-    body: Cell;
-    protocol_fee_paid: Int as uint128;
-}
-
-message(0x874E576A) CapsuleHubPublishAck {
-    publish_id: Int as uint256;
-    entry_id: Int as uint64;
-    entry_uid: Int as uint256;
 }
 
 message(0x7A861031) FlushFees {
@@ -322,27 +275,6 @@ contract CapsuleHub {
             return PLATO_PRIVATE_LONG_TERM_FEE_TON;
         }
         return 0;
-    }
-
-    fun privateExecReserve(sizeClass: Int, cryptoSuite: Int): Int {
-        throwUnless(12939, self.isAllowedPrivateSizeClass(sizeClass));
-        throwUnless(12940, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE; }
-        return CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE;
-    }
-
-    fun publicExecReserve(sizeClass: Int): Int {
-        throwUnless(12949, self.isAllowedPublicSizeClass(sizeClass));
-        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE; }
-        return CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE;
     }
 
     fun privateIndexStorageReservePerEntry(): Int {
@@ -793,101 +725,6 @@ contract CapsuleHub {
                 part_count: msg.part_count,
                 batch_uid: batchUid
             }.toCell()
-        });
-    }
-
-    receive(msg: PublishPrivateFromVault) {
-        self.requireSealed();
-        throwUnless(13300, sender() == self.vault_address);
-        throwUnless(13301, self.private_latest_id < 18446744073709551615);
-        throwUnless(13302, msg.publish_id != 0);
-        throwUnless(13303, self.isAllowedPrivatePair(msg.size_class, msg.crypto_suite));
-        throwUnless(13304, msg.header_0_hash != 0);
-        throwUnless(13305, msg.header_1_hash != 0);
-        throwUnless(13306, msg.body_hash != 0);
-        // CapsuleHub enforces immutable cell shape and hashes; encrypted payload semantics are verified fail-closed by the PWA/RPC crypto layer.
-        self.requireExactPayloadCell(msg.header_0, msg.header_0_hash, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13311, 13312);
-        self.requireExactPayloadCell(msg.header_1, msg.header_1_hash, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13313, 13314);
-        self.requireExactPayloadCell(msg.body, msg.body_hash, self.privateBodyCells(msg.size_class, msg.crypto_suite), self.privateBodyBits(msg.size_class, msg.crypto_suite), self.privateBodyRefs(msg.size_class, msg.crypto_suite), 13315, 13316);
-
-        let fullFee: Int = self.privateFullFee(msg.crypto_suite);
-        throwUnless(13307, fullFee > 0);
-        throwUnless(13308, msg.protocol_fee_paid >= 0);
-        throwUnless(13309, msg.protocol_fee_paid <= fullFee);
-
-        let entryId: Int = self.private_latest_id;
-        let required: Int = msg.protocol_fee_paid + self.privateExecReserve(msg.size_class, msg.crypto_suite) + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT + CAPSULEHUB_ACK_FORWARD_RESERVE;
-        throwUnless(13310, context().value >= required);
-        let ackValue: Int = CAPSULEHUB_ACK_FORWARD_RESERVE;
-
-        let entryLink: Int = self.entryLink(entryId);
-        let senderKeyId: Int = self.privateHeaderSenderKeyId(msg.header_0);
-        let recipientKeyId: Int = self.privateHeaderRecipientKeyId(msg.header_0);
-        let senderPrevLink: Int = self.pushPrivateSenderIndex(senderKeyId, entryLink);
-        let recipientPrevLink: Int = self.pushPrivateRecipientIndex(recipientKeyId, entryLink);
-        let uid: Int = self.computeVaultPrivateEntryUid(entryId, msg.publish_id, msg.header_0_hash, msg.header_1_hash, msg.body_hash);
-        self.private_entries.set(entryId, PrivateCapsuleEntry {
-            publish_id: msg.publish_id,
-            created_at: now(),
-            body_hash: msg.body_hash,
-            sender_prev_link: senderPrevLink,
-            recipient_prev_link: recipientPrevLink,
-            header_0: msg.header_0,
-            header_1: msg.header_1
-        });
-
-        self.private_latest_id += 1;
-        self.private_live_count += 1;
-        self.accrued_plato_fee_ton += msg.protocol_fee_paid;
-
-        message(MessageParameters {
-            to: self.vault_address,
-            value: ackValue,
-            bounce: false,
-            mode: SendPayFwdFeesSeparately,
-            body: CapsuleHubPublishAck { publish_id: msg.publish_id, entry_id: entryId, entry_uid: uid }.toCell()
-        });
-    }
-
-    receive(msg: PublishPublicFromVault) {
-        self.requireSealed();
-        throwUnless(13400, sender() == self.vault_address);
-        throwUnless(13401, self.public_latest_id < 18446744073709551615);
-        throwUnless(13402, msg.publish_id != 0);
-        throwUnless(13413, self.isAllowedPublicSizeClass(msg.size_class));
-        throwUnless(13407, msg.marketing_note == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
-        throwUnless(13410, msg.header_hash != 0);
-        throwUnless(13403, msg.body_hash != 0);
-        // Public semantic fields stay in the PWA/provider layer; the contract keeps gas bounded with byte alignment, refs, size, and hash truth.
-        self.requirePublicHeaderCell(msg.header, msg.header_hash, 13411, 13412);
-        self.requirePublicPayloadCell(msg.body, msg.body_hash, msg.size_class, 13408, 13409);
-        throwUnless(13404, msg.protocol_fee_paid >= 0);
-        throwUnless(13405, msg.protocol_fee_paid <= PLATO_PUBLIC_POST_FEE_TON);
-
-        let entryId: Int = self.public_latest_id;
-        let required: Int = msg.protocol_fee_paid + self.publicExecReserve(msg.size_class) + CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT + CAPSULEHUB_ACK_FORWARD_RESERVE;
-        throwUnless(13406, context().value >= required);
-        let ackValue: Int = CAPSULEHUB_ACK_FORWARD_RESERVE;
-
-        let uid: Int = self.computeVaultPublicEntryUid(entryId, msg.publish_id, msg.author_wallet, msg.header_hash, msg.body_hash);
-        self.public_entries.set(entryId, PublicCapsuleEntry {
-            publish_id: msg.publish_id,
-            created_at: now(),
-            author_wallet: msg.author_wallet,
-            body_hash: msg.body_hash,
-            header: msg.header
-        });
-
-        self.public_latest_id += 1;
-        self.public_live_count += 1;
-        self.accrued_plato_fee_ton += msg.protocol_fee_paid;
-
-        message(MessageParameters {
-            to: self.vault_address,
-            value: ackValue,
-            bounce: false,
-            mode: SendPayFwdFeesSeparately,
-            body: CapsuleHubPublishAck { publish_id: msg.publish_id, entry_id: entryId, entry_uid: uid }.toCell()
         });
     }
 

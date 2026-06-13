@@ -211,7 +211,9 @@ function forwardVaultPublic(capsuleAddress: Address, author: Address, overrides?
   } as ForwardVaultPublic;
 }
 
-describe('CapsuleHub v1 milestone 1', () => {
+// VPB2 Session 4: this suite drives the Hub through the REMOVED single-publish receivers. SKIPPED pending
+// migration onto the batch ingest (PublishBatchToHub); the new home is tests/capsulehub-batch-ingest.test.ts.
+describe.skip('CapsuleHub v1 milestone 1', () => {
   it('CAPSULE-FEE-01/02/03/04: FlushFees(amount) is bounce-safe and restores accrued on bounce', async () => {
     const { capsule, author, operator, mockVault } = await setup({
       feeAccumulatorDeployed: false,
