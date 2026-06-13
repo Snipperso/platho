@@ -1,187 +1,49 @@
 import { describe, expect, it } from 'vitest';
-import { Cell, beginCell, contractAddress, external, toNano } from '@ton/core';
-import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
-import { keyPairFromSeed, sign } from '@ton/crypto';
-import { Vault, RegisterMessagingKeys, CapsuleHubBatchAck } from '../build/Vault/Vault_Vault';
+import { Cell, beginCell, external, toNano } from '@ton/core';
+import { internal } from '@ton/sandbox';
+import { CapsuleHubBatchAck } from '../build/Vault/Vault_Vault';
 import {
-  finalPrivateBodyCell,
-  finalPrivateHeader0Cell,
-  finalPrivateHeader1Cell,
-} from './helpers/capsule-cells';
+  OP_PUBLISH_BATCH_TO_HUB,
+  OP_CAPSULE_HUB_BATCH_ACK,
+  OP_PRUNE_BATCH_PUBLISH,
+  KIND_PRIVATE,
+  ACT_PUBLISH_BATCH,
+  RES_PROCESSING,
+  RES_CONFIRMED,
+  RES_BOUNCED_REFUNDED,
+  RES_TOMBSTONED,
+  RJ_PART_SHAPE,
+  AIRDROP_REWARD_PER_CAPSULE,
+  VAULT_PENDING_PUBLISH_STALE_TTL,
+  partsList,
+  batchExternalBody,
+  computeBatchPublishId,
+  bounceIdOf,
+  bounceTagOf,
+  setupVault,
+  registerHybrid,
+  depositTon,
+  vaultTxClean,
+  vaultTxExit,
+} from './helpers/vpb2';
 
 // VPB2 batch publish — the single publish ABI (part_count = 1 is the only single-capsule path).
 // Focus here: the pre-accept gates (floor / nonce / envelope) and the atomic reject-WITH-refund
 // invariant. The success leg asserts the Vault->Hub hand-off assembles; the Hub ingest + ACK
-// round-trip is covered in the Session 4 integration suite.
+// round-trip is covered in the Session 4 integration suite. Wire format + scaffolding: ./helpers/vpb2.
 
-const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
-const AUTH_KEY_PAIR = keyPairFromSeed(Buffer.alloc(32, 0x66));
-
-const OP_PUBLISH_BATCH = 0x7e1f5041n;
-const OP_PUBLISH_BATCH_TO_HUB = 0xa4f862d1n;
-const OP_CAPSULE_HUB_BATCH_ACK = 0x874e5771n;
-const OP_PRUNE_BATCH_PUBLISH = 0x720bdd6en;
-const VAULT_BATCH_PUBLISH_SIGNING_DOMAIN = 0x56504232n;
-const KIND_PRIVATE = 1n;
-const VPB2_VERSION = 1n;
-const SUITE_HYBRID = 2n;
-const SIZE_1K = 1n;
-
-const ACT_PUBLISH_BATCH = 7n;
-const RES_PROCESSING = 0n;
-const RES_CONFIRMED = 0x01n;
-const RES_BOUNCED_REFUNDED = 0x02n;
-const RES_TOMBSTONED = 0x03n;
-const RJ_PART_SHAPE = 0x11n;
-const AUX_BATCH_LEVEL = 0xffffffffffffffffn;
-
-const VAULT_BATCH_PUBLISH_ID_DOMAIN = 0x42504931n; // "BPI1"
-const AIRDROP_REWARD_PER_CAPSULE = 10_000_000_000n; // 10 ATH
-const VAULT_PENDING_PUBLISH_STALE_TTL = 86400n;
-const UINT64_MOD = 1n << 64n;
-const UINT160_MOD = 1n << 160n;
-
-const ENC_0 = 0x1000000000000000000000000000000000000000000000000000000000000001n;
-const SIG_0 = 0x2000000000000000000000000000000000000000000000000000000000000002n;
-const AUTH_0 = BigInt('0x' + AUTH_KEY_PAIR.publicKey.toString('hex'));
-const PQ_HASH = 0x5000000000000000000000000000000000000000000000000000000000000005n;
-
-function snakeCell(byteLength: number, fill = 0x5a): Cell {
-  let tail: Cell | null = null;
-  for (let offset = byteLength; offset > 0;) {
-    const start = Math.max(0, offset - 127);
-    const builder = beginCell().storeBuffer(Buffer.alloc(offset - start, fill));
-    if (tail) builder.storeRef(tail);
-    tail = builder.endCell();
-    offset = start;
-  }
-  return tail ?? beginCell().endCell();
-}
-const PQ_CELL = snakeCell(1184);
-
-function addressHash(address: any): bigint {
-  return BigInt('0x' + address.hash.toString('hex'));
-}
-function cellHash(cell: Cell): bigint {
-  return BigInt('0x' + cell.hash().toString('hex'));
-}
-
-async function setup() {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const user = await blockchain.treasury('vault-batch-user');
-  const athWallet = await blockchain.treasury('vault-batch-ath');
-  const capsuleHub = await blockchain.treasury('vault-batch-hub');
-  const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
-  const address = contractAddress(0, init);
-  await blockchain.setShardAccount(address, createShardAccount({
-    address, code: init.code, data: init.data, balance: toNano('3'), workchain: address.workChain,
-  }));
-  const vault = blockchain.openContract(new Vault(address, init));
-  return { blockchain, vault, user, capsuleHub };
-}
-
-async function registerHybrid(vault: any, user: any) {
-  await vault.send(user.getSender(), { value: toNano('0.1') }, {
-    $$type: 'RegisterMessagingKeys',
-    enc_pubkey: ENC_0, sign_pubkey: SIG_0, auth_pubkey: AUTH_0,
-    pq_kem_pubkey_hash: PQ_HASH, pq_kem_pubkey_len: 1184n, pq_kem_pubkey: PQ_CELL,
-    crypto_suite_mask: 2n,
-  } as RegisterMessagingKeys);
-}
-async function depositTon(vault: any, user: any, amount: bigint) {
-  await vault.send(user.getSender(), { value: amount + 2_000_000n }, { $$type: 'DepositTon', amount } as any);
-}
-
-// A valid 1K/hybrid private part (last in the list — 3 refs, no successor).
-function validPrivatePart(): { cell: Cell } {
-  const header0 = finalPrivateHeader0Cell();
-  const header1 = finalPrivateHeader1Cell();
-  const body = finalPrivateBodyCell(SIZE_1K);
-  const cell = beginCell()
-    .storeUint(SIZE_1K, 8)
-    .storeUint(SUITE_HYBRID, 8)
-    .storeUint(cellHash(header0), 256)
-    .storeUint(cellHash(header1), 256)
-    .storeUint(cellHash(body), 256)
-    .storeRef(header0)
-    .storeRef(header1)
-    .storeRef(body)
-    .endCell();
-  return { cell };
-}
-
-interface BatchOpts {
-  kind?: bigint;
-  maxCharge: bigint;
-  partCount: bigint;
-  partsRoot: Cell;
-  nonce: bigint;
-  domain?: bigint;
-  version?: bigint;
-  trailerRef?: Cell;       // extra envelope ref (drain vector)
-}
-
-function batchExternalBody(vault: any, owner: any, opts: BatchOpts): Cell {
-  const root = beginCell()
-    .storeUint(opts.domain ?? VAULT_BATCH_PUBLISH_SIGNING_DOMAIN, 32)
-    .storeUint(GENESIS_HASH, 256)
-    .storeUint(addressHash(vault.address), 256)
-    .storeUint(opts.kind ?? KIND_PRIVATE, 8)
-    .storeUint(addressHash(owner.address), 256)
-    .storeUint(opts.nonce, 64)
-    .storeUint(opts.maxCharge, 128)
-    .storeUint(opts.partCount, 8)
-    .storeUint(opts.version ?? VPB2_VERSION, 8)
-    .storeRef(opts.partsRoot)
-    .endCell();
-  const sig = sign(root.hash(), AUTH_KEY_PAIR.secretKey);
-  const env = beginCell()
-    .storeUint(OP_PUBLISH_BATCH, 32)
-    .storeAddress(owner.address)
-    .storeBuffer(sig)
-    .storeRef(root);
-  if (opts.trailerRef) env.storeRef(opts.trailerRef);
-  return env.endCell();
-}
-
-// Replicates the contract's BPI1 publish_id derivation (computeBatchPublishId) so the test can construct the
-// matching Hub ACK / bounce for a pending entry.
-function computeBatchPublishId(owner: any, nonce: bigint, partsRoot: Cell, kind: bigint, partCount: bigint): bigint {
-  return cellHash(beginCell()
-    .storeUint(VAULT_BATCH_PUBLISH_ID_DOMAIN, 32)
-    .storeUint(GENESIS_HASH, 256)
-    .storeAddress(owner.address)
-    .storeUint(nonce, 64)
-    .storeUint(cellHash(partsRoot), 256)
-    .storeUint(kind, 8)
-    .storeUint(partCount, 8)
-    .endCell());
-}
-const bounceIdOf = (publishId: bigint): bigint => publishId % UINT64_MOD;
-const bounceTagOf = (publishId: bigint): bigint =>
-  cellHash(beginCell().storeUint(publishId, 256).endCell()) % UINT160_MOD;
+const setup = () => setupVault();
+const validPrivatePart = () => partsList(KIND_PRIVATE, 1);
 
 // Sends a valid 1-part private batch and returns its identifiers (publish_id + the pending bounce key/tag).
 async function sendOkBatch(blockchain: any, vault: any, user: any, maxCharge = toNano('1')) {
   const nonce = (await vault.getGetUser(user.address)).publish_nonce;
-  const partsRoot = validPrivatePart().cell;
-  await blockchain.sendMessage(external({ to: vault.address, body: batchExternalBody(vault, user, {
-    maxCharge, partCount: 1n, partsRoot, nonce,
+  const partsRoot = validPrivatePart();
+  await blockchain.sendMessage(external({ to: vault.address, body: batchExternalBody({
+    vaultAddr: vault.address, owner: user.address, maxCharge, partCount: 1n, partsRoot, nonce,
   }) }));
-  const publishId = computeBatchPublishId(user, nonce, partsRoot, KIND_PRIVATE, 1n);
+  const publishId = computeBatchPublishId({ owner: user.address, nonce, partsRoot, kind: KIND_PRIVATE, partCount: 1n });
   return { nonce, publishId, bounceId: bounceIdOf(publishId), bounceTag: bounceTagOf(publishId) };
-}
-
-function vaultTxClean(res: any, vault: any): boolean {
-  const vtx = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === vault.address.toString());
-  const cp: any = vtx?.description?.computePhase;
-  return vtx !== undefined && (cp?.type !== 'vm' || cp.exitCode === 0);
-}
-function vaultTxExit(res: any, vault: any): number {
-  const vtx = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === vault.address.toString());
-  const cp: any = vtx?.description?.computePhase;
-  return cp?.type === 'vm' ? cp.exitCode : 0;
 }
 
 describe('Vault VPB2: batch publish path', () => {
@@ -191,7 +53,8 @@ describe('Vault VPB2: batch publish path', () => {
     await depositTon(vault, user, toNano('2'));
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
 
-    const body = batchExternalBody(vault, user, {
+    const body = batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
       maxCharge: 1000n, partCount: 1n, partsRoot: beginCell().endCell(), nonce,
     });
     await expect(blockchain.sendMessage(external({ to: vault.address, body }))).rejects.toThrow(/16485/);
@@ -206,7 +69,8 @@ describe('Vault VPB2: batch publish path', () => {
     await depositTon(vault, user, toNano('0.05')); // tiny balance, below any real charge
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
 
-    const body = batchExternalBody(vault, user, {
+    const body = batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
       maxCharge: toNano('1'), partCount: 1n, partsRoot: beginCell().endCell(), nonce,
     });
     await expect(blockchain.sendMessage(external({ to: vault.address, body }))).rejects.toThrow(/16463/);
@@ -219,7 +83,8 @@ describe('Vault VPB2: batch publish path', () => {
     await depositTon(vault, user, toNano('2'));
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
 
-    const body = batchExternalBody(vault, user, {
+    const body = batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
       maxCharge: toNano('1'), partCount: 1n, partsRoot: beginCell().endCell(), nonce: nonce + 5n,
     });
     await expect(blockchain.sendMessage(external({ to: vault.address, body }))).rejects.toThrow(/16453/);
@@ -232,8 +97,9 @@ describe('Vault VPB2: batch publish path', () => {
     await depositTon(vault, user, toNano('2'));
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
 
-    const body = batchExternalBody(vault, user, {
-      maxCharge: toNano('1'), partCount: 1n, partsRoot: validPrivatePart().cell, nonce,
+    const body = batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
+      maxCharge: toNano('1'), partCount: 1n, partsRoot: validPrivatePart(), nonce,
       trailerRef: beginCell().storeUint(0xdead, 16).endCell(),
     });
     await expect(blockchain.sendMessage(external({ to: vault.address, body }))).rejects.toThrow(/16901/);
@@ -250,7 +116,8 @@ describe('Vault VPB2: batch publish path', () => {
 
     // A part cell with the wrong bit width (not 784) — fails the very first shape gate.
     const badPart = beginCell().storeUint(0, 100).endCell();
-    const body = batchExternalBody(vault, user, {
+    const body = batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
       maxCharge, partCount: 1n, partsRoot: badPart, nonce,
     });
     await blockchain.sendMessage(external({ to: vault.address, body })); // accepted, then atomically rejected
@@ -279,8 +146,9 @@ describe('Vault VPB2: batch publish path', () => {
     await depositTon(vault, user, toNano('2'));
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
 
-    const body = batchExternalBody(vault, user, {
-      maxCharge: toNano('1'), partCount: 1n, partsRoot: validPrivatePart().cell, nonce,
+    const body = batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
+      maxCharge: toNano('1'), partCount: 1n, partsRoot: validPrivatePart(), nonce,
     });
     const res = await blockchain.sendMessage(external({ to: vault.address, body }));
 
@@ -312,7 +180,8 @@ describe('Vault VPB2: batch publish path', () => {
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
 
     const badPart = beginCell().storeUint(0, 100).endCell(); // wrong shape → atomic reject
-    await blockchain.sendMessage(external({ to: vault.address, body: batchExternalBody(vault, user, {
+    await blockchain.sendMessage(external({ to: vault.address, body: batchExternalBody({
+      vaultAddr: vault.address, owner: user.address,
       maxCharge: toNano('0.5'), partCount: 1n, partsRoot: badPart, nonce,
     }) }));
 
