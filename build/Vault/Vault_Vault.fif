@@ -2735,16 +2735,16 @@ PROGRAM{
   $Vault$_fun_batchHubPartGas PROCREF:<{
     2 EQINT
     IFJMP:<{
-      13000 PUSHINT
+      75000 PUSHINT
     }>
-    16000 PUSHINT
+    75000 PUSHINT
   }>
   $Vault$_fun_batchVaultPartGas PROCREF:<{
     2 EQINT
     IFJMP:<{
-      11000 PUSHINT
+      90000 PUSHINT
     }>
-    14000 PUSHINT
+    90000 PUSHINT
   }>
   $Vault$_fun_computeBatchPublishId PROCREF:<{
         NEWC
@@ -2766,7 +2766,7 @@ PROGRAM{
   }>
   $Vault$_fun_batchChargeFloor PROCINLINE:<{
     200700000 PUSHINT
-    1500000 PUSHINT
+    6200000 PUSHINT
     ROT
     MUL
     ADD
@@ -9889,7 +9889,7 @@ PROGRAM{
       DROP
       16485 PUSHINT
       200700000 PUSHINT
-      1500000 PUSHINT
+      6200000 PUSHINT
       s3 PUSH
       MUL
       ADD
@@ -10056,7 +10056,7 @@ PROGRAM{
           TRUE
         }>ELSE<{
           37 s() PUSH
-          20 GTINT
+          8 GTINT
         }>
         IF:<{
           DROP
@@ -10996,7 +10996,7 @@ PROGRAM{
       s2 24 s() XCHG
       s1 23 s() XCHG
       s0 44 s() XCHG
-      40000 PUSHINT
+      50000 PUSHINT
       s0 44 s() XCHG
       33 s() PUSH
       $Vault$_fun_batchVaultPartGas INLINECALLDICT
@@ -11027,7 +11027,7 @@ PROGRAM{
       DIV
       s1 27 s() XCHG
       ADD
-      25000 PUSHINT
+      14000 PUSHINT
       FALSE
           GETGASFEE
       ADD

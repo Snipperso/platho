@@ -110,14 +110,19 @@ ref[2]    -> next part cell               absent on the last part
 Hash fields are TON `Cell.hash()` of the exact referenced cells. The parts list cell graph is forwarded
 Vault→Hub **as-is** (zero re-serialization), so all stored hashes and uids keep V1 semantics.
 
-### 2.3 Capacity (normative client matrix; external hard ceiling 65,535 bytes, client target 48 KiB)
+### 2.3 Capacity (normative client matrix; external hard ceiling 65,535 bytes)
 
-Uniform-class maxima per external: `20×1K / 14×2K / 8×4K / 4×8K / 2×16K / 1×32K`.
-`MAX_BATCH_PARTS = 20`. Mixed-class batches of one kind are allowed; the client must keep the assembled
-external ≤ 48 KiB target and within the published gas/capacity artifact (section 10), which is measured
-over **adversarial mixed-class compositions up to the hard ceiling**, not only uniform profiles. Two
-32 KiB parts never fit one external; a maximum-quality photo (product cap 64 KB = exactly 2×32K parts —
-owner-corrected, never 3) remains 2 sequential externals with nonce pipelining (8.3).
+**`MAX_BATCH_PARTS = 8` (calibrated 2026-06-13, was 20 — see below).** The binding limit is GAS, not bytes:
+sandbox measurement showed the Vault batch external costs ~47k base + ~50-81k per part (per-capsule gas grows
+only ×1.6 from 1K to 32K — `computeDataSize` is cheap, refuting an earlier alarmist extrapolation), and a
+20-part batch ≈ 1.04M gas **OOGs the 1M tx limit**. The worst *sendable* 8-part batch is `8×4K` (43,760 B,
+fits the 65,535-byte external cap) ≈ 471k Vault gas, under the 50% G8 budget (release gate
+`tests/vpb2-gas-harness.test.ts::GAS-GATE-G8`).
+
+Per-class maxima per external are then the MIN of the part cap, the gas budget, and TON's 65,535-byte external
+cap (the cap, enforced by the network before the contract runs, is what bounds LARGE parts — no contract
+byte-limit is needed): `8×1K / 8×2K / 8×4K / 6×8K / 3×16K / 1×32K`. Two 32 KiB parts never fit one external;
+a maximum-quality photo (2×32K) remains 2 sequential externals with nonce pipelining (8.3).
 
 **Batching policy (normative, supersedes v0.1):** a batch MAY combine already-queued parts of *multiple*
 logical sends of the same kind (this is the design intent — the documented 10-message burst becomes ONE
@@ -633,7 +638,7 @@ verified cursor (d3472cd-compatible). `tail_truncated` signals middle-prune; fal
 
 Sequential-id windows, prune-independent.
 
-**Normative floor (review):** `HUB_GETTER_MAX_ENTRIES >= MAX_BATCH_PARTS (= 20)` for both getter
+**Normative floor (review):** `HUB_GETTER_MAX_ENTRIES >= MAX_BATCH_PARTS (= 8)` for both getter
 families; m17-extended validates the get-method gas at limit 20 (a 20-item response ≈ 6 KB — feasible,
 verified); if measurement ever fails, `MAX_BATCH_PARTS` shrinks to match. Client default window stays 8;
 sync and confirmation flows may request up to the floor. Sync acceptance: cold 200-entry account =

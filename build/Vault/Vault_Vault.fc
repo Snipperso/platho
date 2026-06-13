@@ -2346,20 +2346,20 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, slice, slice, int, 
 ((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell), int) $Vault$_fun_batchHubPartGas((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell) $self, int $kind) impure inline_ref {
     var (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)) = $self;
     if (($kind == 2)) {
-        var $fresh$ret_220 = 13000;
+        var $fresh$ret_220 = 75000;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_220);
     }
-    var $fresh$ret_221 = 16000;
+    var $fresh$ret_221 = 75000;
     return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_221);
 }
 
 ((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell), int) $Vault$_fun_batchVaultPartGas((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell) $self, int $kind) impure inline_ref {
     var (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)) = $self;
     if (($kind == 2)) {
-        var $fresh$ret_222 = 11000;
+        var $fresh$ret_222 = 90000;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_222);
     }
-    var $fresh$ret_223 = 14000;
+    var $fresh$ret_223 = 90000;
     return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_223);
 }
 
@@ -2371,7 +2371,7 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, slice, slice, int, 
 
 ((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell), int) $Vault$_fun_batchChargeFloor((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell) $self, int $partCount) impure inline {
     var (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)) = $self;
-    var $fresh$ret_225 = (200700000 + (1500000 * $partCount));
+    var $fresh$ret_225 = (200700000 + (6200000 * $partCount));
     return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_225);
 }
 
@@ -3819,7 +3819,7 @@ _ %get_global() method_id(126899) {
         throw_unless(16453, ($clientNonce == $user'publish_nonce));
         int $maxCharge = $root~load_uint(128);
         int $partCount = $root~load_uint(8);
-        throw_unless(16485, ($maxCharge >= (200700000 + (1500000 * $partCount))));
+        throw_unless(16485, ($maxCharge >= (200700000 + (6200000 * $partCount))));
         throw_unless(16463, ($user'ton_balance >= $maxCharge));
         $global_acceptMessage();
         $user'ton_balance = $user'ton_balance - $maxCharge;
@@ -3843,7 +3843,7 @@ _ %get_global() method_id(126899) {
         int $failIdx = 18446744073709551615;
         ifnot ($structuralOk) {
             $rejectCode = 23;
-        } elseif (( (($partCount < 1)) ? (true) : (($partCount > 20)) )) {
+        } elseif (( (($partCount < 1)) ? (true) : (($partCount > 8)) )) {
             $rejectCode = 17;
         }
         int $totalFee = 0;
@@ -3966,8 +3966,8 @@ _ %get_global() method_id(126899) {
             $hubMsgBits = $hubMsgBits + 152;
         }
         int $hubFwd = $global_getForwardFee($hubMsgCells, $hubMsgBits, false);
-        int $vaultCompute = $global_getComputeFee((40000 + (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)~$Vault$_fun_batchVaultPartGas($kind) * $partCount)), false);
-        int $canonicalTotal = ((((((($global_getForwardFee(8192, 2097152, false) + $vaultCompute) + $hubFwd) + $totalFee) + $global_getComputeFee($totalHubGas, false)) + (($totalStorage * 125) / 100)) + $global_getComputeFee(25000, false)) + 30000000);
+        int $vaultCompute = $global_getComputeFee((50000 + (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)~$Vault$_fun_batchVaultPartGas($kind) * $partCount)), false);
+        int $canonicalTotal = ((((((($global_getForwardFee(8192, 2097152, false) + $vaultCompute) + $hubFwd) + $totalFee) + $global_getComputeFee($totalHubGas, false)) + (($totalStorage * 125) / 100)) + $global_getComputeFee(14000, false)) + 30000000);
         if (( (($rejectCode == 0)) ? (($maxCharge < $canonicalTotal)) : (false) )) {
             $rejectCode = 22;
         }
