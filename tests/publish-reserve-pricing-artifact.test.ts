@@ -22,15 +22,15 @@ function currentCodeHashes(): Record<string, string> {
     }));
 }
 
-// TODO(Session 6 — client pricing rework): the VPB2 redeploy removed the per-message getter
-// get_canonical_publish_charge that this artifact's generator (scripts/publish_reserve_pricing.ts) relied on,
-// and replaced the single-message charge model with the batch floor-pin + post-accept canonicalTotal. The
-// per-size-class user_net_debit values pinned here and the web/message-pricing-policy.mjs tables they
-// cross-check both belong to the OLD model and must be re-derived for the batch path as part of the Session 6
-// client rework (publish/confirm pricing). Skipped (not deleted) so the artifact + generator get migrated, not
-// silently dropped. Pre-existing breakage: the generator stopped compiling when the single-publish path was
-// removed (commit d602d74); the code-hash rebaseline only surfaced the stale-report cross-check.
-describe.skip('Publish reserve pricing artifacts', () => {
+// NOTE(Session 6 — client pricing rework): the VPB2 redeploy removed the per-message getter
+// get_canonical_publish_charge and replaced the single-message charge model with the batch floor-pin +
+// post-accept canonicalTotal. The generator (scripts/publish_reserve_pricing.ts) was migrated onto the VPB2
+// batch path: it now drives a signed batch external through the bound+sealed Vault + CapsuleHub for evidence
+// and sources the per-size hold / net price / protocol fee from web/message-pricing-policy.mjs. The hold/net
+// tables pinned here still belong to the OLD per-message client model and are scheduled for re-derivation
+// against the batch floor-pin in the Session 6 client pricing rework; the report records the runtime canonical
+// total in observed_settled_charge_nanotons so that re-derivation has current-build evidence.
+describe('Publish reserve pricing artifacts', () => {
   it('PUBLISH-PRICE-ARTIFACT-01: pricing report is tied to current build code hashes', () => {
     const report = readJson('artifacts/publish_reserve_pricing_report.json');
     const current = currentCodeHashes();
