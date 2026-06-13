@@ -676,6 +676,7 @@ describe('PWA contract transaction builders', () => {
       owner_wallet: Address.parseRaw(OWNER),
       signature: Buffer.from(built.signature, 'hex'),
       signed_payload: signedPayloadCell,
+      envelope_padding: beginCell().endCell().asSlice(),
     })));
 
     const external = await buildVaultProfileAvatarExternalBoc({
@@ -738,6 +739,7 @@ describe('PWA contract transaction builders', () => {
       owner_wallet: Address.parseRaw(OWNER),
       signature: Buffer.from(built.signature, 'hex'),
       signed_payload: signedPayloadCell,
+      envelope_padding: beginCell().endCell().asSlice(),
     })));
 
     const external = await buildVaultUsernameMintExternalBoc({

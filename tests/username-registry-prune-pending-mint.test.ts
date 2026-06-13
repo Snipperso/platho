@@ -173,8 +173,8 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     record = await ctx.registry.getGetNameRecord(hash);
     global = await ctx.registry.getGetGlobal();
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
-    expect(record.owner_wallet.equals(wrongOwner)).toBe(false);
+    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.minter_wallet.equals(wrongOwner)).toBe(false);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
     expect(global.name_record_count).toBe(1n);
     expect(global.treasury_due_ath).toBe(PRICE_6_PLUS / 2n);
@@ -232,7 +232,7 @@ describe('UsernameRegistry stale pending mint prune milestone', () => {
     const global = await ctx.registry.getGetGlobal();
     const record = await ctx.registry.getGetNameRecord(hash);
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
     expect(global.name_record_count).toBe(1n);

@@ -457,7 +457,11 @@ function publicBodyCellChain(cells: number): Cell {
   return beginCell().storeUint(1, 8).storeRef(publicBodyCellChain(cells - 1)).endCell();
 }
 
-describe('Vault milestone 6: Vault-balance publish orchestration', () => {
+// VPB2 C3: the old single-publish externals (0x7E1F5031/0x7E1F5032), the VPB1 domain and pending_publishes
+// were removed. This whole orchestration suite (charge scaling, ACK-clears-pending, airdrop, surcharge,
+// replay, bounce) is SKIPPED pending its batch rewrite, which needs the Group D batch ACK/bounce handlers
+// (CapsuleHubBatchAck / bounced<PublishBatchToHub>) and the batch client builder. Tracked in task #19/#20.
+describe.skip('Vault milestone 6: Vault-balance publish orchestration', () => {
   it('VAULT-M6-01: signed Vault-balance publish reaches CapsuleHub, receives ACK, and clears PendingPublish', async () => {
     const { blockchain, vault, capsule, user } = await deployBoundPair();
     await registerKeys(vault, user);

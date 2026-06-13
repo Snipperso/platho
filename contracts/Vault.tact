@@ -1,6 +1,6 @@
 // Platho v1 Vault milestone 1 implementation.
-// Scope: UserState, TON deposit/withdraw, Vault-funded publish, KeyRecord/key_generation lifecycle.
-// Includes signed publish to CapsuleHub with PendingPublish ACK/bounce recovery.
+// Scope: UserState, TON deposit/withdraw, Vault-funded batch publish, KeyRecord/key_generation lifecycle.
+// Includes the signed VPB2 batch publish to CapsuleHub with PendingBatchPublish ACK/bounce recovery.
 // Includes pre-seal official ATH wallet binding to avoid self-address StateInit circularity.
 // No admin/owner override/pause/upgrade/governance/rescue/fallback behavior is implemented.
 
@@ -10,16 +10,15 @@ const VAULT_USER_STATE_STORAGE_ENDOWMENT: Int = 10000000;
 const VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT: Int = 5000000;
 const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT: Int = 30000000;
 const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT: Int = 5000000;
-const VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT: Int = 3000000;
-const VAULT_PENDING_PUBLISH_STALE_TTL: Int = 86400; // 24 hours
-const VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL: Int = 86400; // 24 hours after prune
+const VAULT_PENDING_PUBLISH_STALE_TTL: Int = 86400;          // 24h: a stuck pending batch becomes prunable
+const VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL: Int = 86400;       // 24h tombstone window after prune, then deletable
+const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000; // min inbound value to drive a prune
 const VAULT_DEPOSIT_TON_EXEC_RESERVE: Int = 2000000;
 const VAULT_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 40000000;
 const VAULT_WITHDRAW_TON_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE: Int = 2000000;
-const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000;
 const ASSET_TON: Int = 1;
 const ASSET_ATH: Int = 2;
 const RECEIVE_INTENT_ID_DOMAIN: Int = 0x52434944; // "RCID"
@@ -56,7 +55,9 @@ const ATH_WITHDRAWAL_ID_DOMAIN: Int = 0x41574944; // "AWID"
 const KEY_ID_DOMAIN: Int = 0x4b455949; // "KEYI"
 const PUBLISH_KIND_PRIVATE: Int = 1;
 const PUBLISH_KIND_PUBLIC: Int = 2;
-const VAULT_PUBLISH_SIGNING_DOMAIN: Int = 0x56504231; // "VPB1"
+const VAULT_BATCH_PUBLISH_SIGNING_DOMAIN: Int = 0x56504232; // "VPB2" (retires VPB1 for publishing)
+const VAULT_BATCH_PUBLISH_ID_DOMAIN: Int = 0x42504931;      // "BPI1" batch publish_id derivation
+const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931;    // "EPI1" per-entry publish_id derivation
 const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN: Int = 0x56504131; // "VPA1"
 const VAULT_PROFILE_AVATAR_PAYMENT_ID_DOMAIN: Int = 0x56504149; // "VPAI"
 const VAULT_USERNAME_MINT_SIGNING_DOMAIN: Int = 0x56554E31; // "VUN1"
@@ -68,44 +69,12 @@ const SIZE_CLASS_8K: Int = 8;
 const SIZE_CLASS_16K: Int = 16;
 const SIZE_CLASS_32K: Int = 32;
 const CRYPTO_SUITE_PUBLIC_NONE: Int = 0;
-const PLATO_PRIVATE_LONG_TERM_FEE_TON: Int = 10000000;
-const PLATO_PUBLIC_POST_FEE_TON: Int = 10000000;
 const PLATO_MIN_PROTOCOL_FEE_TON: Int = 0;
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
 const ATH_FULL_DISCOUNT_AMOUNT: Int = 10000000000000;
 const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH: Int = 15000000000000000;
 const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH: Int = 0;
 const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH: Int = 10000000000;
-const VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE: Int = 8700000;
-const VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE: Int = 13800000;
-const VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE: Int = 17300000;
-const VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE: Int = 24400000;
-const VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE: Int = 38900000;
-const VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE: Int = 67600000;
-const VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE: Int = 12000000;
-const VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE: Int = 13800000;
-const VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE: Int = 17300000;
-const VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE: Int = 24400000;
-const VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE: Int = 38900000;
-const VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE: Int = 67600000;
-const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE: Int = 4200000;
-const CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE: Int = 4200000;
-const CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE: Int = 4300000;
-const CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE: Int = 4500000;
-const CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE: Int = 5000000;
-const CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE: Int = 5800000;
-const CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE: Int = 7600000;
-const CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE: Int = 2400000;
-const CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE: Int = 4300000;
-const CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE: Int = 4500000;
-const CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE: Int = 5000000;
-const CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE: Int = 5800000;
-const CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE: Int = 7600000;
-const CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
-const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
-const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
-const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 7400000;
-const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
 const CAPSULEHUB_PRIVATE_HEADER0_BITS: Int = 1120;
 const CAPSULEHUB_PRIVATE_HEADER1_BITS: Int = 240;
 const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 2;
@@ -118,7 +87,7 @@ const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
 const PROFILE_AVATAR_PRICE_ATH: Int = 100000000000;
 const PROFILE_AVATAR_NOTIFY_VALUE: Int = 30000000;
-const PROFILE_AVATAR_MAX_PARTS: Int = 16;
+const PROFILE_AVATAR_MAX_PARTS: Int = 2;
 const PROFILE_AVATAR_MEDIA_FORMAT_WEBP: Int = 1;
 const VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE: Int = 6000000;
 const VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE: Int = 55000000;
@@ -183,6 +152,7 @@ message(0x89D648BB) ReplaceMessagingKeys {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5035) CreateReceiveIntent {
@@ -207,75 +177,63 @@ message(0x7E1F5038) WithdrawTonFromVaultBalance {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5039) WithdrawAthFromVaultBalance {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
-}
-
-message(0x7E1F5031) PublishPrivateFromVaultBalance {
-    owner_wallet: Address;
-    signature: Slice as bytes64;
-    signed_payload: Cell;
-}
-
-message(0x7E1F5032) PublishPublicFromVaultBalance {
-    owner_wallet: Address;
-    signature: Slice as bytes64;
-    signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5033) SetProfileAvatarFromVaultBalance {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5034) MintUsernameFromVaultBalance {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
-message(0xA4F862C0) PublishPrivateFromVault {
+message(0x7E1F5041) PublishBatchFromVaultBalance {
+    owner_wallet: Address;
+    signature: Slice as bytes64;
+    signed_payload: Cell;
+    envelope_padding: Slice as remaining;
+}
+
+message(0xA4F862D1) PublishBatchToHub {
     bounce_id: Int as uint64;
     bounce_tag: Int as uint160;
     publish_id: Int as uint256;
-    size_class: Int as uint8;
-    crypto_suite: Int as uint8;
-    header_0_hash: Int as uint256;
-    header_1_hash: Int as uint256;
-    body_hash: Int as uint256;
-    header_0: Cell;
-    header_1: Cell;
-    body: Cell;
-    protocol_fee_paid: Int as uint128;
-}
-
-message(0x8C2A76B7) PublishPublicFromVault {
-    bounce_id: Int as uint64;
-    bounce_tag: Int as uint160;
-    publish_id: Int as uint256;
-    size_class: Int as uint8;
-    marketing_note: Int as uint152;
+    publish_kind: Int as uint8;
+    part_count: Int as uint8;
+    protocol_fee_total: Int as uint128;
     author_wallet: Address;
-    header_hash: Int as uint256;
-    body_hash: Int as uint256;
-    header: Cell;
-    body: Cell;
-    protocol_fee_paid: Int as uint128;
+    parts: Cell;        // ref[0]: the exact signed part list, forwarded as-is
+    marketing: Cell?;   // ref[1]: public batches only ({marketing_note}); null for private
 }
 
-message(0x874E576A) CapsuleHubPublishAck {
+message(0x874E5771) CapsuleHubBatchAck {
     publish_id: Int as uint256;
-    entry_id: Int as uint64;
-    entry_uid: Int as uint256;
+    first_entry_id: Int as uint64;
+    part_count: Int as uint8;
+    batch_uid: Int as uint256;
 }
 
-message(0x720BDD6D) PrunePendingPublish {
+message(0x720BDD6E) PruneBatchPublish {
     publish_id: Int as uint256;
+}
+
+message(0x5355434D) AnnounceSuccessorManifest {
+    successor_manifest_hash: Int as uint256;
+    successor_vault: Address;
 }
 
 message(0x3215B5FD) TopUpStorageReserve {}
@@ -296,13 +254,14 @@ struct PendingAthWithdrawal {
     created_at: Int as uint32;
 }
 
-struct PendingPublish {
+struct PendingBatchPublish {
     owner_wallet: Address;
     tombstone: Bool;
     refund_to_vault: Bool;
     nonce: Int as uint64;
     publish_kind: Int as uint8;
-    body_hash: Int as uint256;
+    part_count: Int as uint8;
+    publish_id: Int as uint256;     // FULL id: ACK/bounce verify by equality
     refundable_amount: Int as uint128;
     created_at: Int as uint32;
 }
@@ -346,12 +305,90 @@ struct KeyRecord {
     revoked_lt: Int as uint64;
 }
 
+const RECEIPT_RING_K: Int = 20;
+// Receipt action codes (which of the 9 nonce-consuming actions a slot reports).
+const ACT_WITHDRAW_TON: Int = 1;
+const ACT_WITHDRAW_ATH: Int = 2;
+const ACT_REPLACE_KEYS: Int = 3;
+const ACT_CREATE_INTENT: Int = 4;
+const ACT_CLAIM_INTENT: Int = 5;
+const ACT_CANCEL_INTENT: Int = 6;
+const ACT_PUBLISH_BATCH: Int = 7;
+const ACT_SET_AVATAR: Int = 8;
+const ACT_MINT_USERNAME: Int = 9;
+// Receipt result codes (lifecycle). RJ_* reject codes are added with the batch external (group C).
+const RES_PROCESSING: Int = 0x00;     // non-terminal; thin-client timeout fallback applies
+const RES_CONFIRMED: Int = 0x01;
+const RES_BOUNCED_REFUNDED: Int = 0x02;
+const RES_TOMBSTONED: Int = 0x03;
+const AUX_BATCH_LEVEL: Int = 0xFFFFFFFFFFFFFFFF; // 2^64-1: batch-level aux (no specific part index)
+// --- VPB2 batch publish ---
+const MAX_BATCH_PARTS: Int = 20;
+const VPB2_VERSION: Int = 1;
+// Worst-case import bound for the pre-accept floor + the signed hold: the config-43 message caps,
+// which provably upper-bound the import fee of ANY legal inbound external (drain-proof). The Session-5
+// generator MAY tighten EXT_HARD to the sandbox-measured fee-maximizer. Gates a REFUNDABLE hold.
+const EXT_HARD_CELLS: Int = 8192;      // 2^13 max_msg_cells
+const EXT_HARD_BITS: Int = 2097152;    // 2^21 max_msg_bits
+// Root-cell bit width of the PublishBatchToHub body (0xA4F862D1), used to fee the Vault->Hub forward over
+// the FULL message (root + parts subtree + optional marketing), not the bare parts subtree. Derivation:
+// op(32)+bounce_id(64)+bounce_tag(160)+publish_id(256)+kind(8)+part_count(8)+protocol_fee(128)
+// +author_wallet(267)+marketing-maybe(1) = 924. Generator re-pins from the compiled ABI; gate G2 asserts.
+const HUB_BATCH_MSG_ROOT_BITS: Int = 924;
+const ACK_MIN_FORWARD: Int = 30000000; // 0.03 TON floor for the ACK leg (returned via mode-128 ACK)
+// Pinned pre-accept charge floor = worst-case import HOLD + bounded reject-path compute, as an AFFINE constant
+// in part_count. The fee primitives getForwardFee/getComputeFee are too expensive for the 10k pre-accept gas
+// credit (measured: the floor's getForwardFee alone pushes this receiver over), so the floor is PRECOMPUTED.
+// reject_fee uses the SAME formula, so reject refund = max_charge - floor >= 0 ALWAYS (the pre-accept gate is
+// max_charge >= floor) and the Vault recovers its real import as long as each pin >= its runtime value.
+// canonical_total and success retention stay RUNTIME-priced (post-accept, gas-ample, config-tracking).
+// Snapshot (config-43 caps): getForwardFee(EXT_HARD)=194,490,145; getComputeFee(REJECT_BASE_GAS=9000)=600,001;
+// getComputeFee(WALK_GAS_PER_PART_MAX=20000)=1,333,334 — each rounded UP for config headroom. Generator
+// re-pins at freeze; release gate G2 asserts each pin >= its runtime value (drain-proof reject).
+const BATCH_FLOOR_BASE_PIN: Int = 200700000;   // import hold (~195M, rounded to 200M) + reject base compute (~0.7M)
+const BATCH_FLOOR_PER_PART_PIN: Int = 1500000; // per-part walk compute (~1.333M, rounded up)
+const PROTOCOL_FEE_TON_BATCH: Int = 10000000; // 0.01 TON per part
+const STORAGE_RESERVE_PRIVATE: Int = 4300000; // 1M keepalive + 3.3M endowment
+const STORAGE_RESERVE_PUBLIC: Int = 8400000;  // 1M keepalive + 7.4M endowment
+// Structural GAS constants (runtime-priced via getComputeFee; INITIAL estimates, calibrated in Session 5).
+const VAULT_BATCH_BASE_GAS: Int = 40000;
+const VAULT_PART_GAS_PRIVATE: Int = 14000;
+const VAULT_PART_GAS_PUBLIC: Int = 11000;
+const HUB_BATCH_BASE_GAS: Int = 25000;
+const HUB_PART_GAS_PRIVATE: Int = 16000;
+const HUB_PART_GAS_PUBLIC: Int = 13000;
+const WALK_GAS_PER_PART_MAX: Int = 20000;
+const REJECT_BASE_GAS: Int = 9000;
+const ACK_GAS: Int = 9000;
+// VPB2 reject result codes (receipt RJ_*).
+const RJ_PART_SHAPE: Int = 0x11;
+const RJ_CLASS_OR_SUITE: Int = 0x12;
+const RJ_HASH_MISMATCH: Int = 0x13;
+const RJ_PAYLOAD_SHAPE: Int = 0x14;
+const RJ_DUPLICATE_ADJACENT: Int = 0x15;
+const RJ_UNDERPRICED: Int = 0x16;
+const RJ_BINDING: Int = 0x17;          // vault/owner address-hash mismatch (verified POST-accept; see receiver)
+const RJ_ID_ZERO: Int = 0x18;
+const RJ_PENDING_COLLISION: Int = 0x19;
+
+struct ReceiptSlot {
+    nonce: Int as uint64;       // the nonce this slot reports (slot-nonce guard for eviction-safe updates)
+    action: Int as uint8;       // ACT_* (which of the 9 nonce-consuming actions)
+    result: Int as uint8;       // RES_* / RJ_* lifecycle code
+    aux: Int as uint64;         // action-specific: first_entry_id, failing part_index, or AUX_BATCH_LEVEL
+    part_count: Int as uint8;
+    at: Int as uint32;
+}
+
 struct UserState {
     ton_balance: Int as uint128;
     ath_balance: Int as uint128;
     current_key_id: Int as uint256;
     auth_pubkey: Int as uint256;
     publish_nonce: Int as uint64;
+    // Ring of the last RECEIPT_RING_K receipts, keyed by nonce mod RECEIPT_RING_K. Discovery
+    // accelerator only (NOT a trust anchor): "delivered" still needs self-authenticated entry match.
+    receipts: map<Int as uint8, ReceiptSlot>;
 }
 
 
@@ -393,6 +430,14 @@ struct VaultUserView {
     publish_nonce: Int;
 }
 
+struct VaultUserReceiptsView {
+    exists: Bool;
+    publish_nonce: Int;
+    // The receipt ring, keyed by nonce mod RECEIPT_RING_K. One verified getter call replaces both
+    // nonce polling and confirmation discovery (a single dict cell — Orbs-v2-portable).
+    receipts: map<Int as uint8, ReceiptSlot>;
+}
+
 struct VaultPendingAthWithdrawalView {
     exists: Bool;
     owner_wallet: Address;
@@ -400,6 +445,23 @@ struct VaultPendingAthWithdrawalView {
     recipient_ath_wallet: Address;
     amount: Int;
     created_at: Int;
+}
+
+struct VaultSuccessorView {
+    announced: Bool;
+    successor_manifest_hash: Int;
+    successor_vault: Address;
+    announced_at: Int;
+}
+
+struct VaultPendingBatchPublishView {
+    exists: Bool;
+    owner_wallet: Address;
+    nonce: Int;
+    publish_kind: Int;
+    part_count: Int;
+    created_at: Int;
+    tombstone: Bool;
 }
 
 struct VaultGlobalView {
@@ -445,7 +507,7 @@ contract Vault {
     receive_intents: map<Int as uint128, ReceiveIntent>;
     processed_ath_deposits: map<Int, Int>;
     pending_ath_withdrawals: map<Int, PendingAthWithdrawal>;
-    pending_publishes: map<Int, PendingPublish>;
+    pending_batch_publishes: map<Int, PendingBatchPublish>;
     pending_profile_avatar_payments: map<Int, PendingProfileAvatarPayment>;
     pending_username_mint_payments: map<Int, PendingUsernameMintPayment>;
     user_count: Int as uint64;
@@ -454,7 +516,15 @@ contract Vault {
     processed_ath_deposit_count: Int as uint64;
     pending_ath_withdrawal_count: Int as uint64;
     // Packed pending counters: low 32 bits = publish, next 16 = profile avatar, next 16 = username mint.
+    // The publish lane counts live pending_batch_publishes entries (incremented on batch hand-off, decremented
+    // on ACK/bounce/prune settlement) — one global counter, mirrored 1:1 by the pending_batch_publishes map.
     pending_publish_count: Int as uint64;
+    // Ref-stored genesis extension (loaded lazily — only a ref pointer at contract_load, NOT inline bits, so it
+    // does not erode the 10k pre-accept gas credit the edge externals depend on). Layout:
+    //   controller_hash:u256 | announced:Bool | (if announced) successor_manifest_hash:u256, successor_vault:Address, announced_at:u32
+    // controller_hash preserves the genesis controller across seal (genesis_config_hash is repurposed to the
+    // airdrop pool); the successor slot is the one-shot, irreversible successor-deployment record (spec 6).
+    genesis_ext: Cell;
 
     init(vault_ath_wallet_address: Address, ath_master_address: Address, capsule_hub_address: Address, genesis_config_hash: Int, capsule_hub_bound: Bool, sealed: Bool, deployment_manifest_hash: Int) {
         self.vault_ath_wallet_address = vault_ath_wallet_address;
@@ -469,6 +539,9 @@ contract Vault {
         self.sealed = sealed;
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
+        // Capture the controller hash (= pre-seal genesis_config_hash) into the ref ext BEFORE the seal repurposes
+        // genesis_config_hash; successor slot starts unannounced.
+        self.genesis_ext = beginCell().storeUint(genesis_config_hash, 256).storeBool(false).endCell();
         if (sealed) {
             if (self.deployment_manifest_hash == 0) {
                 self.deployment_manifest_hash = genesis_config_hash;
@@ -480,7 +553,7 @@ contract Vault {
         self.receive_intents = emptyMap();
         self.processed_ath_deposits = emptyMap();
         self.pending_ath_withdrawals = emptyMap();
-        self.pending_publishes = emptyMap();
+        self.pending_batch_publishes = emptyMap();
         self.pending_profile_avatar_payments = emptyMap();
         self.pending_username_mint_payments = emptyMap();
         self.user_count = 0;
@@ -491,8 +564,19 @@ contract Vault {
         self.pending_publish_count = 0;
     }
 
-    fun requireSealed() {
+    inline fun requireSealed() {
         throwUnless(15000, self.sealed);
+    }
+
+    inline fun requireEmptyEnvelopePadding(padding: Slice) {
+        // The signed external envelope is exactly (op | owner_wallet | signature | signed_payload).
+        // `padding` is the message's trailing `Slice as remaining`: any extra refs/bits an attacker
+        // appended OUTSIDE the signature. Extra refs are charged to the Vault pool as the import fee but
+        // are never covered by the signature; rejecting here (pre-accept) means the import fee is never
+        // paid. Also enforces a canonical, non-malleable external form. Parsed by Tact itself (correct
+        // layout for externals; avoids inMsg()'s codegen side effects and context().raw's external quirk).
+        throwUnless(16900, padding.bits() == 0);
+        throwUnless(16901, padding.refs() == 0);
     }
 
     fun requireUnsealed() {
@@ -526,7 +610,8 @@ contract Vault {
             ath_balance: 0,
             current_key_id: 0,
             auth_pubkey: 0,
-            publish_nonce: 0
+            publish_nonce: 0,
+            receipts: emptyMap()
         };
     }
 
@@ -536,6 +621,36 @@ contract Vault {
             return self.emptyUser();
         }
         return value!!;
+    }
+
+    // Write a receipt into the ring at the SAME commit that consumes the nonce. Returns the updated
+    // user; the caller persists it with self.users.set. `nonce` is the pre-increment client nonce.
+    fun writeReceipt(user: UserState, nonce: Int, action: Int, result: Int, aux: Int, part_count: Int): UserState {
+        user.receipts.set(nonce % RECEIPT_RING_K, ReceiptSlot {
+            nonce: nonce,
+            action: action,
+            result: result,
+            aux: aux,
+            part_count: part_count,
+            at: now()
+        });
+        return user;
+    }
+
+    // Update an existing receipt by nonce (ACK / bounce / tombstone). Eviction-safe: the slot is only
+    // overwritten if it still holds this exact nonce, so a late ACK can never stamp a foreign receipt.
+    fun updateReceipt(user: UserState, nonce: Int, result: Int, aux: Int): UserState {
+        let idx: Int = nonce % RECEIPT_RING_K;
+        let slotOpt: ReceiptSlot? = user.receipts.get(idx);
+        if (slotOpt != null) {
+            let slot: ReceiptSlot = slotOpt!!;
+            if (slot.nonce == nonce) {
+                slot.result = result;
+                slot.aux = aux;
+                user.receipts.set(idx, slot);
+            }
+        }
+        return user;
     }
 
     fun deriveAthWalletAddress(owner: Address): Address {
@@ -551,6 +666,9 @@ contract Vault {
     }
 
     fun pendingPublishCount(): Int {
+        // Count of outstanding batch publishes (one per live pending_batch_publishes entry): incremented when
+        // a batch is handed to the Hub, decremented on its ACK/bounce/prune settlement. Surfaced in get_global
+        // and asserted == 0 at genesis.
         return self.pending_publish_count % VAULT_PENDING_PROFILE_COUNT_UNIT;
     }
 
@@ -563,6 +681,11 @@ contract Vault {
     }
 
     fun incrementPendingPublishCount() {
+        // No < MAX guard here (unlike the 16-bit profile/username lanes): the publish lane is the low 32 bits,
+        // so its implicit cap is 2^32-1 — unreachable (each pending needs a funded user + unique nonce + an
+        // unsettled Hub round-trip). A throwing guard would also be unsafe: this runs POST-acceptMessage, so a
+        // throw would strand the user's debit. The 32-bit width IS the bound; the carry into the profile lane
+        // it would otherwise risk is not physically attainable.
         self.pending_publish_count += VAULT_PENDING_PUBLISH_COUNT_UNIT;
     }
 
@@ -834,93 +957,6 @@ contract Vault {
         return self.isPublicCapsuleCell(body, self.publicBodyCells(sizeClass), self.publicBodyBits(sizeClass), self.publicBodyRefs(sizeClass), true);
     }
 
-    fun privatePublishLocalExecReserve(sizeClass: Int, cryptoSuite: Int): Int {
-        throwUnless(16323, self.isAllowedPrivateSizeClass(sizeClass));
-        throwUnless(16324, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        if (sizeClass == SIZE_CLASS_1K) { return VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_2K) { return VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_4K) { return VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_8K) { return VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_16K) { return VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE; }
-        return VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE;
-    }
-
-    fun privateCapsulehubExecReserve(sizeClass: Int, cryptoSuite: Int): Int {
-        throwUnless(16329, self.isAllowedPrivateSizeClass(sizeClass));
-        throwUnless(16325, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE; }
-        return CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE;
-    }
-
-    fun publicPublishLocalExecReserve(sizeClass: Int): Int {
-        throwUnless(16331, self.isAllowedPublicSizeClass(sizeClass));
-        if (sizeClass == SIZE_CLASS_1K) { return VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_2K) { return VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_4K) { return VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_8K) { return VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_16K) { return VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE; }
-        return VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE;
-    }
-
-    fun publicCapsulehubExecReserve(sizeClass: Int): Int {
-        throwUnless(16332, self.isAllowedPublicSizeClass(sizeClass));
-        if (sizeClass == SIZE_CLASS_1K) { return CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_2K) { return CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_4K) { return CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_8K) { return CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE; }
-        if (sizeClass == SIZE_CLASS_16K) { return CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE; }
-        return CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE;
-    }
-
-    fun publishLocalExecReserve(publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
-        if (publishKind == PUBLISH_KIND_PUBLIC) {
-            throwUnless(16320, self.isAllowedPublicSizeClass(sizeClass));
-            throwUnless(16321, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
-            return self.publicPublishLocalExecReserve(sizeClass);
-        }
-        throwUnless(16322, publishKind == PUBLISH_KIND_PRIVATE);
-        return self.privatePublishLocalExecReserve(sizeClass, cryptoSuite);
-    }
-
-    fun canonicalPublishMaxCharge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
-        let localExecReserve: Int = self.publishLocalExecReserve(publishKind, sizeClass, cryptoSuite);
-        if (publishKind == PUBLISH_KIND_PUBLIC) {
-            return localExecReserve
-                + self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON)
-                + self.publicCapsulehubExecReserve(sizeClass)
-                + CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE
-                + CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT
-                + CAPSULEHUB_ACK_FORWARD_RESERVE;
-        }
-        throwUnless(16328, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        return localExecReserve
-            + self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON)
-            + self.privateCapsulehubExecReserve(sizeClass, cryptoSuite)
-            + CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE
-            + CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT
-            + CAPSULEHUB_ACK_FORWARD_RESERVE;
-    }
-
-    fun computePublishId(owner: Address, nonce: Int, bodyHash: Int, publishKind: Int): Int {
-        return beginCell()
-            .storeUint(self.deployment_manifest_hash, 256)
-            .storeAddress(owner)
-            .storeUint(nonce, 64)
-            .storeUint(bodyHash, 256)
-            .storeUint(publishKind, 8)
-            .endCell()
-            .hash();
-    }
-
-    fun capsulehubCallValue(maxCharge: Int, localExecReserve: Int): Int {
-        throwUnless(16340, maxCharge >= localExecReserve);
-        return maxCharge - localExecReserve;
-    }
-
     fun computePublishBounceId(publishId: Int): Int {
         return publishId % UINT64_MOD;
     }
@@ -932,56 +968,43 @@ contract Vault {
             .hash() % UINT160_MOD;
     }
 
-    fun protocolFeePaid(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
-        if (publishKind == PUBLISH_KIND_PUBLIC) {
-            throwUnless(16350, self.isAllowedPublicSizeClass(sizeClass));
-            throwUnless(16351, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
-            return self.discountedFee(owner, PLATO_PUBLIC_POST_FEE_TON);
-        }
-        throwUnless(16352, publishKind == PUBLISH_KIND_PRIVATE);
-        throwUnless(16353, self.isAllowedPrivateSizeClass(sizeClass));
-        throwUnless(16355, cryptoSuite == CRYPTO_SUITE_HYBRID);
-        return self.discountedFee(owner, PLATO_PRIVATE_LONG_TERM_FEE_TON);
+    // --- VPB2 batch helpers (bounce_id/tag reuse computePublishBounceId/computePublishBounceTag) ---
+    fun batchStorageReserve(kind: Int): Int {
+        if (kind == PUBLISH_KIND_PUBLIC) { return STORAGE_RESERVE_PUBLIC; }
+        return STORAGE_RESERVE_PRIVATE;
     }
 
-    fun refundPublishValue(owner: Address, refundableAmount: Int, amount: Int) {
-        let refundAmount: Int = 0;
-        if (amount > VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE) {
-            refundAmount = amount - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE;
-        }
-        if (refundAmount > refundableAmount) {
-            refundAmount = refundableAmount;
-        }
-        if (refundAmount <= 0) {
-            return;
-        }
-        message(MessageParameters {
-            to: owner,
-            value: refundAmount,
-            bounce: false,
-            mode: SendPayFwdFeesSeparately,
-            body: null
-        });
+    fun batchHubPartGas(kind: Int): Int {
+        if (kind == PUBLISH_KIND_PUBLIC) { return HUB_PART_GAS_PUBLIC; }
+        return HUB_PART_GAS_PRIVATE;
     }
 
-    fun refundPendingPublish(pending: PendingPublish, amount: Int) {
-        if (!pending.refund_to_vault) {
-            self.refundPublishValue(pending.owner_wallet, pending.refundable_amount, amount);
-            return;
-        }
-        let refundAmount: Int = 0;
-        if (amount > VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE) {
-            refundAmount = amount - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE;
-        }
-        if (refundAmount > pending.refundable_amount) {
-            refundAmount = pending.refundable_amount;
-        }
-        if (refundAmount <= 0) {
-            return;
-        }
-        let user: UserState = self.getUserOrEmpty(pending.owner_wallet);
-        user.ton_balance += refundAmount;
-        self.users.set(pending.owner_wallet, user);
+    fun batchVaultPartGas(kind: Int): Int {
+        if (kind == PUBLISH_KIND_PUBLIC) { return VAULT_PART_GAS_PUBLIC; }
+        return VAULT_PART_GAS_PRIVATE;
+    }
+
+    // publish_id = hash(BPI1 ‖ manifest ‖ owner ‖ nonce ‖ parts_root_hash ‖ kind ‖ part_count).
+    fun computeBatchPublishId(owner: Address, nonce: Int, partsRootHash: Int, kind: Int, partCount: Int): Int {
+        return beginCell()
+            .storeUint(VAULT_BATCH_PUBLISH_ID_DOMAIN, 32)
+            .storeUint(self.deployment_manifest_hash, 256)
+            .storeAddress(owner)
+            .storeUint(nonce, 64)
+            .storeUint(partsRootHash, 256)
+            .storeUint(kind, 8)
+            .storeUint(partCount, 8)
+            .endCell()
+            .hash();
+    }
+
+    // Pre-accept worst-case floor: EXT_HARD import (drain-proof, part_count-independent) + bounded walk
+    // + reject base. reject_fee <= this <= max_charge, so a rejected batch is fully paid by the user.
+    inline fun batchChargeFloor(partCount: Int): Int {
+        // Pinned affine floor (worst-case import hold + bounded reject compute). Pure arithmetic — no fee
+        // primitive — so it fits the 10k pre-accept gas credit. Also serves as reject_fee (refund >= 0 by
+        // construction). See BATCH_FLOOR_BASE_PIN for the calibration + drain-safety argument.
+        return BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * partCount;
     }
 
     fun refundPendingAthWithdrawalTon(pending: PendingAthWithdrawal, amount: Int) {
@@ -1016,12 +1039,14 @@ contract Vault {
         self.decrementPendingUsernameMintPaymentCount();
     }
 
-    fun creditActivityAirdrop(owner: Address) {
+    // Credits the community-activity airdrop for `count` confirmed capsules (owner decision Q2: 10 ATH per
+    // capsule, no per-account cap), capped at the remaining pool. count == part_count for a confirmed batch.
+    fun creditActivityAirdrop(owner: Address, count: Int) {
         if (self.genesis_config_hash <= 0) {
             return;
         }
         throwUnless(16540, self.users.exists(owner));
-        let reward: Int = VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH;
+        let reward: Int = VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH * count;
         if (reward > self.genesis_config_hash) {
             reward = self.genesis_config_hash;
         }
@@ -1245,6 +1270,27 @@ contract Vault {
         self.sealed = true;
     }
 
+    // Spec 6: one-shot, genesis-controller-only, post-seal announcement of a future successor deployment. It is a
+    // DATA RECORD only — no auto-switch semantics (clients verify out-of-band and never migrate automatically), so
+    // immutability is preserved. The unset guard makes it irreversible: a set record can never be changed, so this
+    // is the migration trust-root hint, never an upgrade path. (The announcement key is the controller's sole
+    // standing post-seal power; custody/retirement is an operational mandate — see spec 6.)
+    receive(msg: AnnounceSuccessorManifest) {
+        self.requireSealed();
+        let ext: Slice = self.genesis_ext.beginParse();
+        let controllerHash: Int = ext.loadUint(256);
+        throwUnless(15050, controllerHash != 0);
+        throwUnless(15051, beginCell().storeAddress(sender()).endCell().hash() == controllerHash);
+        throwUnless(15052, !ext.loadBool()); // one-shot: a record already present is irreversible
+        self.genesis_ext = beginCell()
+            .storeUint(controllerHash, 256)
+            .storeBool(true)
+            .storeUint(msg.successor_manifest_hash, 256)
+            .storeAddress(msg.successor_vault)
+            .storeUint(now(), 32)
+            .endCell();
+    }
+
     receive(msg: DepositTon) {
         self.requireSealed();
         throwUnless(16010, msg.amount > 0);
@@ -1311,6 +1357,7 @@ contract Vault {
     }
 
     external(msg: WithdrawTonFromVaultBalance) {
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
         self.requireSealed();
         throwUnless(16800, self.isBasechainAddress(msg.owner_wallet));
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
@@ -1335,6 +1382,7 @@ contract Vault {
         acceptMessage();
         user.ton_balance -= VAULT_WITHDRAW_TON_EXEC_RESERVE;
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_WITHDRAW_TON, RES_PROCESSING, 0, 0);
         self.users.set(msg.owner_wallet, user);
         commit();
 
@@ -1378,6 +1426,7 @@ contract Vault {
     }
 
     external(msg: WithdrawAthFromVaultBalance) {
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
         self.requireSealed();
         throwUnless(16075, self.isBasechainAddress(msg.owner_wallet));
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
@@ -1401,6 +1450,7 @@ contract Vault {
 
         acceptMessage();
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_WITHDRAW_ATH, RES_PROCESSING, 0, 0);
         user.ton_balance -= VAULT_ATH_WITHDRAW_MIN_VALUE;
         self.users.set(msg.owner_wallet, user);
         commit();
@@ -1654,6 +1704,7 @@ contract Vault {
     }
 
     external(msg: ReplaceMessagingKeys) {
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
         self.requireSealed();
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16120, userOpt != null);
@@ -1684,6 +1735,7 @@ contract Vault {
         acceptMessage();
         user.ton_balance -= localReserve;
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_REPLACE_KEYS, RES_PROCESSING, 0, 0);
         self.users.set(msg.owner_wallet, user);
         commit();
 
@@ -1801,6 +1853,7 @@ contract Vault {
         throwUnless(16265, user.ton_balance >= createLocalReserve);
         acceptMessage();
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CREATE_INTENT, RES_PROCESSING, 0, 0);
         user.ton_balance -= createLocalReserve;
         self.users.set(msg.owner_wallet, user);
         commit();
@@ -1929,6 +1982,7 @@ contract Vault {
 
         acceptMessage();
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CLAIM_INTENT, RES_PROCESSING, 0, 0);
 
         if (intent.asset == ASSET_TON) {
             user.ton_balance += intent.amount;
@@ -1977,6 +2031,7 @@ contract Vault {
 
         acceptMessage();
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CANCEL_INTENT, RES_PROCESSING, 0, 0);
 
         if (intent.asset == ASSET_TON) {
             user.ton_balance += intent.amount;
@@ -1989,7 +2044,9 @@ contract Vault {
         self.receive_intent_count -= 1;
     }
 
-    external(msg: PublishPrivateFromVaultBalance) {
+    external(msg: PublishBatchFromVaultBalance) {
+        // Pre-accept (O(1), inside the 10k credit): envelope strictness + binding + worst-case floor.
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
         self.requireSealed();
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16451, userOpt != null);
@@ -1997,146 +2054,222 @@ contract Vault {
         throwUnless(16454, user.auth_pubkey != 0);
         throwUnless(16457, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
 
-        let signedPayload: Slice = msg.signed_payload.beginParse();
-        let signedDomain: Int = signedPayload.loadUint(32);
-        throwUnless(16464, signedDomain == VAULT_PUBLISH_SIGNING_DOMAIN);
-        let signedManifestHash: Int = signedPayload.loadUint(256);
-        throwUnless(16465, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
-        throwUnless(16466, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedPublishKind: Int = signedPayload.loadUint(8);
-        throwUnless(16467, signedPublishKind == PUBLISH_KIND_PRIVATE);
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let clientNonce: Int = signedPayload.loadUint(64);
-        let maxCharge: Int = signedPayload.loadUint(128);
-        let signedSizeClass: Int = signedPayload.loadUint(8);
-        let signedCryptoSuite: Int = signedPayload.loadUint(8);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16450, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16470, signedOwnerHash == ownerPrefix.loadUint(256));
+        // The 10k pre-accept gas credit is tight for this receiver, so pre-accept does ONLY the drain/replay
+        // gates: it skips straight to the nonce/charge/part_count fields and validates the floor + balance.
+        // Domain, manifest, vault/owner binding, kind, version and exact root shape are re-parsed and enforced
+        // AUTHORITATIVELY post-accept (all sig-authenticated, so a mismatch is the owner's own misrouted request
+        // -> a refundable RJ_BINDING reject, never an attacker drain).
+        let root: Slice = msg.signed_payload.beginParse();
+        root.skipBits(808); // domain(32)+manifest(256)+vault(256)+kind(8)+owner(256) — re-checked post-accept
+        let clientNonce: Int = root.loadUint(64);
         throwUnless(16453, clientNonce == user.publish_nonce);
-        throwUnless(16472, signedCryptoSuite == CRYPTO_SUITE_HYBRID);
-        let localExecReserve: Int = 0;
-        if (signedSizeClass == SIZE_CLASS_1K) {
-            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE;
-        } else if (signedSizeClass == SIZE_CLASS_2K) {
-            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE;
-        } else if (signedSizeClass == SIZE_CLASS_4K) {
-            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE;
-        } else if (signedSizeClass == SIZE_CLASS_8K) {
-            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE;
-        } else if (signedSizeClass == SIZE_CLASS_16K) {
-            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE;
-        } else if (signedSizeClass == SIZE_CLASS_32K) {
-            localExecReserve = VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE;
-        }
-        throwUnless(16471, localExecReserve > 0);
-        // Large publish externals can exceed the 10k pre-accept gas credit if the
-        // full maxCharge balance check stays here. Keep only the local reserve
-        // backing gate pre-accept; the remaining publish budget is checked after
-        // nonce consumption and before the CapsuleHub call.
-        throwUnless(16463, user.ton_balance >= localExecReserve);
+        let maxCharge: Int = root.loadUint(128);
+        let partCount: Int = root.loadUint(8); // u8; range 1..MAX_BATCH_PARTS enforced post-accept (before the walk)
+        // Pinned floor inlined here (NOT via batchChargeFloor) — a function call does not fit the gas credit.
+        throwUnless(16485, maxCharge >= BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * partCount);
+        throwUnless(16463, user.ton_balance >= maxCharge);
         acceptMessage();
 
-        user.ton_balance -= localExecReserve;
+        // 3.2 accept: single full debit + nonce + PROCESSING receipt. From here every outcome is observable.
+        user.ton_balance -= maxCharge;
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, clientNonce, ACT_PUBLISH_BATCH, RES_PROCESSING, 0, partCount);
         self.users.set(msg.owner_wallet, user);
         commit();
 
-        if (!(signedPayload.bits() == 0)) {
-            return;
-        }
-        if (!(signedPayload.refs() == 1)) {
-            return;
-        }
-        let payloadCell: Cell = signedPayload.loadRef();
+        // Post-accept: authoritative full re-validation of the signed root (skipped pre-accept to fit the 10k
+        // credit). Every field is sig-authenticated, so a mismatch is the owner's own malformed/misrouted
+        // request -> a batch-level RJ_BINDING reject WITH refund, never a silent drop.
+        let vroot: Slice = msg.signed_payload.beginParse();
+        let vAddr: Slice = myAddress().asSlice();
+        vAddr.loadUint(11); // skip std-address prefix (basechain enforced at genesis)
+        let oAddr: Slice = msg.owner_wallet.asSlice();
+        let structuralOk: Bool =
+               (vroot.loadUint(32) == VAULT_BATCH_PUBLISH_SIGNING_DOMAIN)
+            && (vroot.loadUint(256) == self.deployment_manifest_hash)
+            && (vroot.loadUint(256) == vAddr.loadUint(256));
+        let kind: Int = vroot.loadUint(8);
+        structuralOk = structuralOk
+            && ((kind == PUBLISH_KIND_PRIVATE) || (kind == PUBLISH_KIND_PUBLIC))
+            && (oAddr.loadUint(11) == 1024)
+            && (vroot.loadUint(256) == oAddr.loadUint(256));
+        vroot.skipBits(64 + 128 + 8); // nonce + max_charge + part_count (all validated pre-accept)
+        structuralOk = structuralOk
+            && (vroot.loadUint(8) == VPB2_VERSION)
+            && (vroot.bits() == 0)
+            && (vroot.refs() == 1);
 
-        let payloadPreview: Slice = payloadCell.beginParse();
-        if (!(payloadPreview.bits() == 784)) {
-            return;
-        }
-        if (!(payloadPreview.refs() == 3)) {
-            return;
+        // 3.3 single walk over the linked part list (flag-based; Tact has no break). Reuses the V1 per-part
+        // shape/hash validators. Any failure -> atomic reject WITH refund (no silent returns in V2).
+        let partsRoot: Cell = vroot.loadRef();
+        let cursor: Cell = partsRoot;
+        let i: Int = 0;
+        let rejectCode: Int = 0;
+        let failIdx: Int = AUX_BATCH_LEVEL;
+        // Both checks skip the walk and fall through to the reject-with-refund path. The part_count bound is
+        // enforced HERE (not pre-accept, to fit the gas credit) and before the walk, so the walk gas stays
+        // bounded by MAX_BATCH_PARTS (the G8 freeze gate's worst case).
+        if (!structuralOk) { rejectCode = RJ_BINDING; }
+        else if ((partCount < 1) || (partCount > MAX_BATCH_PARTS)) { rejectCode = RJ_PART_SHAPE; }
+        let totalFee: Int = 0;
+        let totalHubGas: Int = 0;
+        let totalStorage: Int = 0;
+        let prevH0: Int = 0;
+        let prevH1: Int = 0;
+        let prevBody: Int = 0;
+        let hasPrev: Bool = false;
+        while ((i < partCount) && (rejectCode == 0)) {
+            let isLast: Bool = (i == (partCount - 1));
+            let part: Slice = cursor.beginParse();
+            let h0: Int = 0;
+            let h1: Int = 0;
+            let bh: Int = 0;
+            let nextCell: Cell = partsRoot; // overwritten when not last; unused on the last iteration
+            if (kind == PUBLISH_KIND_PRIVATE) {
+                let wantRefs: Int = 3;
+                if (!isLast) { wantRefs = 4; }
+                if (!((part.bits() == 784) && (part.refs() == wantRefs))) {
+                    rejectCode = RJ_PART_SHAPE; failIdx = i;
+                } else {
+                    let sizeClass: Int = part.loadUint(8);
+                    let cryptoSuite: Int = part.loadUint(8);
+                    h0 = part.loadUint(256);
+                    h1 = part.loadUint(256);
+                    bh = part.loadUint(256);
+                    let header0: Cell = part.loadRef();
+                    let header1: Cell = part.loadRef();
+                    let body: Cell = part.loadRef();
+                    if (!isLast) { nextCell = part.loadRef(); }
+                    if (!self.isPublishProfileValid(PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite, h0, h1)) {
+                        rejectCode = RJ_CLASS_OR_SUITE; failIdx = i;
+                    } else if (!self.isPrivateCapsuleShapeValid(sizeClass, cryptoSuite, header0, header1, body)) {
+                        rejectCode = RJ_PAYLOAD_SHAPE; failIdx = i;
+                    } else if (!((header0.hash() == h0) && (header1.hash() == h1) && (body.hash() == bh))) {
+                        rejectCode = RJ_HASH_MISMATCH; failIdx = i;
+                    }
+                }
+            } else {
+                let wantRefs: Int = 2;
+                if (!isLast) { wantRefs = 3; }
+                if (!((part.bits() == 528) && (part.refs() == wantRefs))) {
+                    rejectCode = RJ_PART_SHAPE; failIdx = i;
+                } else {
+                    let sizeClass: Int = part.loadUint(8);
+                    let reserved: Int = part.loadUint(8);
+                    h0 = part.loadUint(256);
+                    bh = part.loadUint(256);
+                    let header: Cell = part.loadRef();
+                    let body: Cell = part.loadRef();
+                    if (!isLast) { nextCell = part.loadRef(); }
+                    if (!(reserved == 0)) {
+                        rejectCode = RJ_PART_SHAPE; failIdx = i;
+                    } else if (!self.isPublishProfileValid(PUBLISH_KIND_PUBLIC, sizeClass, CRYPTO_SUITE_PUBLIC_NONE, h0, 0)) {
+                        rejectCode = RJ_CLASS_OR_SUITE; failIdx = i;
+                    } else if (!self.isPublicCapsuleShapeValid(sizeClass, header, body)) {
+                        rejectCode = RJ_PAYLOAD_SHAPE; failIdx = i;
+                    } else if (!((header.hash() == h0) && (body.hash() == bh))) {
+                        rejectCode = RJ_HASH_MISMATCH; failIdx = i;
+                    }
+                }
+            }
+            if (rejectCode == 0) {
+                if (hasPrev && (h0 == prevH0) && (h1 == prevH1) && (bh == prevBody)) {
+                    rejectCode = RJ_DUPLICATE_ADJACENT; failIdx = i; // anti-bloat tripwire only
+                } else {
+                    totalFee += self.discountedFee(msg.owner_wallet, PROTOCOL_FEE_TON_BATCH);
+                    totalHubGas += self.batchHubPartGas(kind);
+                    totalStorage += self.batchStorageReserve(kind);
+                    prevH0 = h0;
+                    prevH1 = h1;
+                    prevBody = bh;
+                    hasPrev = true;
+                    cursor = nextCell;
+                }
+            }
+            i += 1;
         }
 
-        let payload: Slice = payloadCell.beginParse();
-        let parsedSizeClass: Int = payload.loadUint(8);
-        let parsedCryptoSuite: Int = payload.loadUint(8);
-        if (!(parsedSizeClass == signedSizeClass)) {
-            return;
-        }
-        if (!(parsedCryptoSuite == signedCryptoSuite)) {
-            return;
-        }
-        let sizeClass: Int = parsedSizeClass;
-        let cryptoSuite: Int = parsedCryptoSuite;
-        let header0Hash: Int = payload.loadUint(256);
-        let header1Hash: Int = payload.loadUint(256);
-        let bodyHash: Int = payload.loadUint(256);
-        let header0: Cell = payload.loadRef();
-        let header1: Cell = payload.loadRef();
-        let body: Cell = payload.loadRef();
-        if (!(payload.bits() == 0)) {
-            return;
-        }
-        if (!(payload.refs() == 0)) {
-            return;
-        }
-
-        if (!self.isPublishProfileValid(PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite, header0Hash, header1Hash)) {
-            return;
-        }
-        if (!(header0.hash() == header0Hash)) {
-            return;
-        }
-        if (!(header1.hash() == header1Hash)) {
-            return;
-        }
-        if (!(body.hash() == bodyHash)) {
-            return;
-        }
-        if (!self.isPrivateCapsuleShapeValid(sizeClass, cryptoSuite, header0, header1, body)) {
-            return;
-        }
-
-        let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
-        if (!(maxCharge >= expectedMax)) {
-            return;
-        }
-        let remainingCharge: Int = maxCharge - localExecReserve;
-        if (!(user.ton_balance >= remainingCharge)) {
-            return;
-        }
-
-        let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PRIVATE, sizeClass, cryptoSuite);
-        let callValue: Int = self.capsulehubCallValue(maxCharge, localExecReserve);
-        let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PRIVATE);
-        if (!(publishId != 0)) {
-            return;
-        }
+        let publishId: Int = self.computeBatchPublishId(msg.owner_wallet, clientNonce, partsRoot.hash(), kind, partCount);
         let bounceId: Int = self.computePublishBounceId(publishId);
-        let bounceTag: Int = self.computePublishBounceTag(publishId);
-        if (self.pending_publishes.exists(bounceId)) {
+        if (rejectCode == 0) {
+            if (publishId == 0) {
+                rejectCode = RJ_ID_ZERO;
+            } else if (self.pending_batch_publishes.exists(bounceId)) {
+                rejectCode = RJ_PENDING_COLLISION;
+            }
+        }
+
+        // Measure the actual external once, BEFORE the gate (the canonical gate needs hubFwd). Bounded by the
+        // validated walk, so computeDataSize cannot overflow EXT_HARD_CELLS (the EXT_HARD fallback is
+        // unreachable). measured_import = the import the Vault truly paid; hubFwd = the Vault->Hub forward over
+        // the FULL PublishBatchToHub message (fixed root cell + parts subtree + optional marketing cell), which
+        // under SendPayGasSeparately the Vault pays from its own retention.
+        let measuredCells: Int = EXT_HARD_CELLS;
+        let measuredBits: Int = EXT_HARD_BITS;
+        try {
+            let pd: DataSize = msg.signed_payload.computeDataSize(EXT_HARD_CELLS);
+            measuredCells = pd.cells;
+            measuredBits = pd.bits;
+        } catch (e) {}
+        let measuredImport: Int = getForwardFee(measuredCells, measuredBits, false);
+        let hubMsgCells: Int = measuredCells;                                    // parts subtree (measuredCells-1) + 1 root cell
+        let hubMsgBits: Int = (measuredBits - 1016) + HUB_BATCH_MSG_ROOT_BITS;   // parts subtree bits + root bits
+        if (kind == PUBLISH_KIND_PUBLIC) {
+            hubMsgCells += 1;                                                     // marketing cell
+            hubMsgBits += 152;
+        }
+        let hubFwd: Int = getForwardFee(hubMsgCells, hubMsgBits, false);
+        let vaultCompute: Int = getComputeFee(VAULT_BATCH_BASE_GAS + self.batchVaultPartGas(kind) * partCount, false);
+
+        // canonical_total (the signed hold): the import term is the EXT_HARD worst case (== floor import, so an
+        // honest send clears the floor gate too — G10); every other term is the runtime-priced REAL cost,
+        // including the Vault->Hub forward (hubFwd) so the Hub leg is funded even when the import over-hold is
+        // small. Success retention below uses the MEASURED import; the import over-hold (~0.07 TON snapshot)
+        // rides to the Hub and returns via the mode-128 ACK (Q4: protocol margin lives only in the per-part fee).
+        let canonicalTotal: Int = getForwardFee(EXT_HARD_CELLS, EXT_HARD_BITS, false)
+            + vaultCompute
+            + hubFwd
+            + totalFee
+            + getComputeFee(totalHubGas, false)
+            + totalStorage * 125 / 100
+            + getComputeFee(HUB_BATCH_BASE_GAS, false)
+            + ACK_MIN_FORWARD;
+        if ((rejectCode == 0) && (maxCharge < canonicalTotal)) {
+            rejectCode = RJ_UNDERPRICED;
+        }
+
+        if (rejectCode != 0) {
+            // Atomic reject WITH refund. reject_fee IS the pinned floor (worst-case import + bounded reject
+            // compute), so reject_fee == floor <= max_charge (pre-accept gate) => refund >= 0 ALWAYS, and the
+            // Vault recovers its real import (pin >= runtime import, gate G2). The user loses the worst-case
+            // import their padded/malformed external could have caused, plus one nonce; the receipt names the part.
+            let rejectFee: Int = self.batchChargeFloor(partCount);
+            user = self.updateReceipt(user, clientNonce, rejectCode, failIdx);
+            user.ton_balance += maxCharge - rejectFee;
+            self.users.set(msg.owner_wallet, user);
             return;
         }
 
-        user.ton_balance -= remainingCharge;
-        self.users.set(msg.owner_wallet, user);
+        // Success: retain only the MEASURED import + Vault compute + the Vault->Hub forward; the rest
+        // (import over-hold + ack float + hub costs) rides to the Hub in the message value.
+        let callValue: Int = maxCharge - (measuredImport + vaultCompute + hubFwd);
 
-        self.pending_publishes.set(bounceId, PendingPublish {
+        let marketing: Cell? = null;
+        if (kind == PUBLISH_KIND_PUBLIC) {
+            marketing = beginCell().storeUint(PLATHO_PUBLIC_MARKETING_NOTE_ASCII, 152).endCell();
+        }
+        self.pending_batch_publishes.set(bounceId, PendingBatchPublish {
             owner_wallet: msg.owner_wallet,
             tombstone: false,
             refund_to_vault: true,
             nonce: clientNonce,
-            publish_kind: PUBLISH_KIND_PRIVATE,
-            body_hash: bodyHash,
+            publish_kind: kind,
+            part_count: partCount,
+            publish_id: publishId,
             refundable_amount: callValue,
             created_at: now()
         });
-        self.incrementPendingPublishCount();
+        self.incrementPendingPublishCount(); // decremented on this batch's ACK/bounce/prune settlement (Group D)
         commit();
 
         message(MessageParameters {
@@ -2144,179 +2277,22 @@ contract Vault {
             value: callValue,
             bounce: true,
             mode: SendPayGasSeparately,
-            body: PublishPrivateFromVault {
+            body: PublishBatchToHub {
                 bounce_id: bounceId,
-                bounce_tag: bounceTag,
+                bounce_tag: self.computePublishBounceTag(publishId),
                 publish_id: publishId,
-                size_class: sizeClass,
-                crypto_suite: cryptoSuite,
-                header_0_hash: header0Hash,
-                header_1_hash: header1Hash,
-                body_hash: bodyHash,
-                header_0: header0,
-                header_1: header1,
-                body: body,
-                protocol_fee_paid: protocolFee
-            }.toCell()
-        });
-    }
-
-    external(msg: PublishPublicFromVaultBalance) {
-        self.requireSealed();
-        let userOpt: UserState? = self.users.get(msg.owner_wallet);
-        throwUnless(16481, userOpt != null);
-        let user: UserState = userOpt!!;
-        // checkSignature is the pre-accept auth gate; a zero auth_pubkey cannot authorize a public publish.
-        throwUnless(16487, checkSignature(msg.signed_payload.hash(), msg.signature, user.auth_pubkey));
-
-        let signedPayload: Slice = msg.signed_payload.beginParse();
-        let signedDomain: Int = signedPayload.loadUint(32);
-        throwUnless(16493, signedDomain == VAULT_PUBLISH_SIGNING_DOMAIN);
-        let signedManifestHash: Int = signedPayload.loadUint(256);
-        throwUnless(16494, signedManifestHash == self.deployment_manifest_hash);
-        let signedVaultHash: Int = signedPayload.loadUint(256);
-        let vaultAddressSlice: Slice = myAddress().asSlice();
-        // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
-        throwUnless(16495, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedPublishKind: Int = signedPayload.loadUint(8);
-        throwUnless(16496, signedPublishKind == PUBLISH_KIND_PUBLIC);
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let clientNonce: Int = signedPayload.loadUint(64);
-        let maxCharge: Int = signedPayload.loadUint(128);
-        let sizeClass: Int = signedPayload.loadUint(8);
-        let cryptoSuite: Int = signedPayload.loadUint(8);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        throwUnless(16497, ownerPrefix.loadUint(11) == 1024);
-        throwUnless(16498, signedOwnerHash == ownerPrefix.loadUint(256));
-        throwUnless(16499, cryptoSuite == CRYPTO_SUITE_PUBLIC_NONE);
-        throwUnless(16483, clientNonce == user.publish_nonce);
-        let localExecReserve: Int = 0;
-        if (sizeClass == SIZE_CLASS_1K) {
-            localExecReserve = VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE;
-        } else if (sizeClass == SIZE_CLASS_2K) {
-            localExecReserve = VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE;
-        } else if (sizeClass == SIZE_CLASS_4K) {
-            localExecReserve = VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE;
-        } else if (sizeClass == SIZE_CLASS_8K) {
-            localExecReserve = VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE;
-        } else if (sizeClass == SIZE_CLASS_16K) {
-            localExecReserve = VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE;
-        } else if (sizeClass == SIZE_CLASS_32K) {
-            localExecReserve = VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE;
-        }
-        throwUnless(16331, localExecReserve > 0);
-        // Keep public avatar/media publishes below the 10k pre-accept gas credit:
-        // check only local reserve backing before accept, then validate the full
-        // publish budget before sending anything to CapsuleHub.
-        throwUnless(16492, user.ton_balance >= localExecReserve);
-        acceptMessage();
-
-        user.ton_balance -= localExecReserve;
-        user.publish_nonce += 1;
-        self.users.set(msg.owner_wallet, user);
-        commit();
-
-        if (!(signedPayload.bits() == 0)) {
-            return;
-        }
-        if (!(signedPayload.refs() == 1)) {
-            return;
-        }
-        let payloadCell: Cell = signedPayload.loadRef();
-
-        let payloadPreview: Slice = payloadCell.beginParse();
-        if (!(payloadPreview.bits() == 512)) {
-            return;
-        }
-        if (!(payloadPreview.refs() == 2)) {
-            return;
-        }
-
-        let payload: Slice = payloadCell.beginParse();
-        let headerHash: Int = payload.loadUint(256);
-        let bodyHash: Int = payload.loadUint(256);
-        let header: Cell = payload.loadRef();
-        let body: Cell = payload.loadRef();
-        if (!(payload.bits() == 0)) {
-            return;
-        }
-        if (!(payload.refs() == 0)) {
-            return;
-        }
-
-        if (!self.isPublishProfileValid(PUBLISH_KIND_PUBLIC, sizeClass, cryptoSuite, headerHash, 0)) {
-            return;
-        }
-        if (!(header.hash() == headerHash)) {
-            return;
-        }
-        if (!(body.hash() == bodyHash)) {
-            return;
-        }
-        if (!self.isPublicCapsuleShapeValid(sizeClass, header, body)) {
-            return;
-        }
-
-        let expectedMax: Int = self.canonicalPublishMaxCharge(msg.owner_wallet, PUBLISH_KIND_PUBLIC, sizeClass, cryptoSuite);
-        if (!(maxCharge >= expectedMax)) {
-            return;
-        }
-        let remainingCharge: Int = maxCharge - localExecReserve;
-        if (!(user.ton_balance >= remainingCharge)) {
-            return;
-        }
-
-        let protocolFee: Int = self.protocolFeePaid(msg.owner_wallet, PUBLISH_KIND_PUBLIC, sizeClass, cryptoSuite);
-        let callValue: Int = self.capsulehubCallValue(maxCharge, localExecReserve);
-        let publishId: Int = self.computePublishId(msg.owner_wallet, clientNonce, bodyHash, PUBLISH_KIND_PUBLIC);
-        if (!(publishId != 0)) {
-            return;
-        }
-        let bounceId: Int = self.computePublishBounceId(publishId);
-        let bounceTag: Int = self.computePublishBounceTag(publishId);
-        if (self.pending_publishes.exists(bounceId)) {
-            return;
-        }
-
-        user.ton_balance -= remainingCharge;
-        self.users.set(msg.owner_wallet, user);
-
-        self.pending_publishes.set(bounceId, PendingPublish {
-            owner_wallet: msg.owner_wallet,
-            tombstone: false,
-            refund_to_vault: true,
-            nonce: clientNonce,
-            publish_kind: PUBLISH_KIND_PUBLIC,
-            body_hash: bodyHash,
-            refundable_amount: callValue,
-            created_at: now()
-        });
-        self.incrementPendingPublishCount();
-        commit();
-
-        message(MessageParameters {
-            to: self.capsule_hub_address,
-            value: callValue,
-            bounce: true,
-            mode: SendPayGasSeparately,
-            body: PublishPublicFromVault {
-                bounce_id: bounceId,
-                bounce_tag: bounceTag,
-                publish_id: publishId,
-                size_class: sizeClass,
-                marketing_note: PLATHO_PUBLIC_MARKETING_NOTE_ASCII,
+                publish_kind: kind,
+                part_count: partCount,
+                protocol_fee_total: totalFee,
                 author_wallet: msg.owner_wallet,
-                header_hash: headerHash,
-                body_hash: bodyHash,
-                header: header,
-                body: body,
-                protocol_fee_paid: protocolFee
+                parts: partsRoot,
+                marketing: marketing
             }.toCell()
         });
     }
 
     external(msg: SetProfileAvatarFromVaultBalance) {
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
         self.requireSealed();
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16601, userOpt != null);
@@ -2340,6 +2316,7 @@ contract Vault {
         throwUnless(16614, user.ton_balance >= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE);
         acceptMessage();
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_SET_AVATAR, RES_PROCESSING, 0, 0);
         user.ton_balance -= VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
@@ -2427,6 +2404,7 @@ contract Vault {
     }
 
     external(msg: MintUsernameFromVaultBalance) {
+        self.requireEmptyEnvelopePadding(msg.envelope_padding);
         self.requireSealed();
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16701, userOpt != null);
@@ -2450,6 +2428,7 @@ contract Vault {
         throwUnless(16714, user.ton_balance >= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE);
         acceptMessage();
         user.publish_nonce += 1;
+        user = self.writeReceipt(user, user.publish_nonce - 1, ACT_MINT_USERNAME, RES_PROCESSING, 0, 0);
         user.ton_balance -= VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE;
         self.users.set(msg.owner_wallet, user);
         commit();
@@ -2532,94 +2511,103 @@ contract Vault {
         });
     }
 
-    receive(msg: CapsuleHubPublishAck) {
+    fun creditBatchSettlementRefund(user: UserState, refundableAmount: Int): UserState {
+        // Credits (context().value − ACK exec reserve) to ton_balance, CAPPED at refundable_amount (the value the
+        // Vault actually sent to the Hub). The cap matches spec 5.4/5.5 — an uncapped credit would be an
+        // unbacked-ledger insolvency primitive (the Hub could mint Vault liabilities by over-returning value).
+        let ackReserve: Int = getComputeFee(ACK_GAS, false);
+        let refundAmount: Int = 0;
+        if (context().value > ackReserve) {
+            refundAmount = context().value - ackReserve;
+        }
+        if (refundAmount > refundableAmount) {
+            refundAmount = refundableAmount;
+        }
+        if (refundAmount > 0) {
+            user.ton_balance += refundAmount;
+        }
+        return user;
+    }
+
+    // VPB2 batch ACK (spec 5.4): the Hub confirms a batch. Verify sender + FULL publish_id, refund the returned
+    // over-hold (capped), credit the per-capsule airdrop (count from the RECORD, never the message), advance the
+    // receipt to RES_CONFIRMED, drop the pending. A late ACK on a tombstoned pending still settles, so a user who
+    // pruned a slow publish keeps their airdrop/refund right (the tombstone was already count-decremented).
+    receive(msg: CapsuleHubBatchAck) {
         self.requireSealed();
-        throwUnless(16500, sender() == self.capsule_hub_address);
+        throwUnless(16550, sender() == self.capsule_hub_address);
         let bounceId: Int = self.computePublishBounceId(msg.publish_id);
-        let pendingOpt: PendingPublish? = self.pending_publishes.get(bounceId);
-        throwUnless(16501, pendingOpt != null);
-        let pending: PendingPublish = pendingOpt!!;
-        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
-        throwUnless(16502, expectedPublishId == msg.publish_id);
-        if (pending.tombstone) {
-            throwUnless(16503, now() <= pending.created_at);
-            self.refundPendingPublish(pending, context().value);
-            self.creditActivityAirdrop(pending.owner_wallet);
-            self.pending_publishes.del(bounceId);
-        } else {
-            self.refundPendingPublish(pending, context().value);
-            self.creditActivityAirdrop(pending.owner_wallet);
-            self.pending_publishes.del(bounceId);
+        let pendingOpt: PendingBatchPublish? = self.pending_batch_publishes.get(bounceId);
+        throwUnless(16551, pendingOpt != null);
+        let pending: PendingBatchPublish = pendingOpt!!;
+        throwUnless(16552, pending.publish_id == msg.publish_id);
+        self.creditActivityAirdrop(pending.owner_wallet, pending.part_count);
+        let user: UserState = self.creditBatchSettlementRefund(self.getUserOrEmpty(pending.owner_wallet), pending.refundable_amount);
+        user = self.updateReceipt(user, pending.nonce, RES_CONFIRMED, msg.first_entry_id);
+        self.users.set(pending.owner_wallet, user);
+        if (!pending.tombstone) {
             self.decrementPendingPublishCount();
         }
+        self.pending_batch_publishes.del(bounceId);
     }
 
-    bounced(msg: bounced<PublishPrivateFromVault>) {
-        self.requireSealed();
-        throwUnless(16510, sender() == self.capsule_hub_address);
-        let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
-        throwUnless(16511, pendingOpt != null);
-        let pending: PendingPublish = pendingOpt!!;
-        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
-        throwUnless(16514, self.computePublishBounceTag(expectedPublishId) == msg.bounce_tag);
-        if (pending.tombstone) {
-            throwUnless(16512, now() <= pending.created_at);
-            throwUnless(16513, pending.publish_kind == PUBLISH_KIND_PRIVATE);
-            self.refundPendingPublish(pending, context().value);
-            self.pending_publishes.del(msg.bounce_id);
-        } else {
-            self.refundPendingPublish(pending, context().value);
-            self.pending_publishes.del(msg.bounce_id);
-            self.decrementPendingPublishCount();
-        }
-    }
-
-    bounced(msg: bounced<PublishPublicFromVault>) {
-        self.requireSealed();
-        throwUnless(16520, sender() == self.capsule_hub_address);
-        let pendingOpt: PendingPublish? = self.pending_publishes.get(msg.bounce_id);
-        throwUnless(16521, pendingOpt != null);
-        let pending: PendingPublish = pendingOpt!!;
-        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
-        throwUnless(16524, self.computePublishBounceTag(expectedPublishId) == msg.bounce_tag);
-        if (pending.tombstone) {
-            throwUnless(16522, now() <= pending.created_at);
-            throwUnless(16523, pending.publish_kind == PUBLISH_KIND_PUBLIC);
-            self.refundPendingPublish(pending, context().value);
-            self.pending_publishes.del(msg.bounce_id);
-        } else {
-            self.refundPendingPublish(pending, context().value);
-            self.pending_publishes.del(msg.bounce_id);
-            self.decrementPendingPublishCount();
-        }
-    }
-
-    receive(msg: PrunePendingPublish) {
-        self.requireSealed();
-        throwUnless(16533, context().value >= VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE);
-        let bounceId: Int = self.computePublishBounceId(msg.publish_id);
-        let pendingOpt: PendingPublish? = self.pending_publishes.get(bounceId);
-        throwUnless(16530, pendingOpt != null);
-        let pending: PendingPublish = pendingOpt!!;
-        let expectedPublishId: Int = self.computePublishId(pending.owner_wallet, pending.nonce, pending.body_hash, pending.publish_kind);
-        throwUnless(16531, expectedPublishId == msg.publish_id);
-        if (pending.tombstone) {
-            throwUnless(16534, now() >= pending.created_at);
-            self.pending_publishes.del(bounceId);
+    // VPB2 bounce recovery (spec 5.5): FAIL-CLOSED — this handler MUST NOT throw on ANY input (a delayed bounce
+    // after a tombstone-delete must not strand in a throwing handler). Unknown sender / no pending / tag mismatch
+    // => silently absorb (value joins the Vault balance). On a verified match: refund the full call value (capped)
+    // and advance the receipt to RES_BOUNCED_REFUNDED. bounced<T> exposes only the first 224 bits (bounce_id +
+    // bounce_tag), which is exactly what we key + authenticate on.
+    bounced(msg: bounced<PublishBatchToHub>) {
+        if (sender() != self.capsule_hub_address) {
             return;
         }
-        throwUnless(16532, now() >= pending.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
+        let pendingOpt: PendingBatchPublish? = self.pending_batch_publishes.get(msg.bounce_id);
+        if (pendingOpt == null) {
+            return;
+        }
+        let pending: PendingBatchPublish = pendingOpt!!;
+        if (self.computePublishBounceTag(pending.publish_id) != msg.bounce_tag) {
+            return;
+        }
+        let user: UserState = self.creditBatchSettlementRefund(self.getUserOrEmpty(pending.owner_wallet), pending.refundable_amount);
+        user = self.updateReceipt(user, pending.nonce, RES_BOUNCED_REFUNDED, AUX_BATCH_LEVEL);
+        self.users.set(pending.owner_wallet, user);
+        if (!pending.tombstone) {
+            self.decrementPendingPublishCount();
+        }
+        self.pending_batch_publishes.del(msg.bounce_id);
+    }
+
+    // VPB2 manual prune (spec 3.5): a stuck pending (no ACK/bounce for VAULT_PENDING_PUBLISH_STALE_TTL) ->
+    // tombstone (a VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL window in which a late ACK/bounce can still settle) ->
+    // delete. Prune NEVER refunds (fail-closed); refunds arrive only via the ACK (over-hold) or bounce (full).
+    receive(msg: PruneBatchPublish) {
+        self.requireSealed();
+        throwUnless(16563, context().value >= VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE);
+        let bounceId: Int = self.computePublishBounceId(msg.publish_id);
+        let pendingOpt: PendingBatchPublish? = self.pending_batch_publishes.get(bounceId);
+        throwUnless(16560, pendingOpt != null);
+        let pending: PendingBatchPublish = pendingOpt!!;
+        throwUnless(16561, pending.publish_id == msg.publish_id);
+        if (pending.tombstone) {
+            throwUnless(16564, now() >= pending.created_at);
+            self.pending_batch_publishes.del(bounceId);
+            return;
+        }
+        throwUnless(16562, now() >= pending.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
         let tombstoneExpiresAt: Int = now() + VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL;
         if (tombstoneExpiresAt > UINT32_MAX) {
             tombstoneExpiresAt = UINT32_MAX;
         }
-        self.pending_publishes.set(bounceId, PendingPublish {
+        let user: UserState = self.updateReceipt(self.getUserOrEmpty(pending.owner_wallet), pending.nonce, RES_TOMBSTONED, AUX_BATCH_LEVEL);
+        self.users.set(pending.owner_wallet, user);
+        self.pending_batch_publishes.set(bounceId, PendingBatchPublish {
             owner_wallet: pending.owner_wallet,
             tombstone: true,
             refund_to_vault: pending.refund_to_vault,
             nonce: pending.nonce,
             publish_kind: pending.publish_kind,
-            body_hash: pending.body_hash,
+            part_count: pending.part_count,
+            publish_id: pending.publish_id,
             refundable_amount: pending.refundable_amount,
             created_at: tombstoneExpiresAt
         });
@@ -2646,6 +2634,19 @@ contract Vault {
             current_key_id: user.current_key_id,
             auth_pubkey: user.auth_pubkey,
             publish_nonce: user.publish_nonce
+        };
+    }
+
+    get fun get_user_receipts(owner: Address): VaultUserReceiptsView {
+        let userOpt: UserState? = self.users.get(owner);
+        if (userOpt == null) {
+            return VaultUserReceiptsView { exists: false, publish_nonce: 0, receipts: emptyMap() };
+        }
+        let user: UserState = userOpt!!;
+        return VaultUserReceiptsView {
+            exists: true,
+            publish_nonce: user.publish_nonce,
+            receipts: user.receipts
         };
     }
 
@@ -2729,6 +2730,33 @@ contract Vault {
         return self.computeReceiveIntentCommitment(intentId, recipientWallet, secret32);
     }
 
+    // Pending batch-publish observability (spec 3.5). Key = bounce_id = publish_id mod 2^64; the client
+    // computes it locally (it knows all publish_id inputs). Enables the diagnosis matrix without a backend.
+    get fun get_pending_batch_publish(bounceId: Int): VaultPendingBatchPublishView {
+        let pendingOpt: PendingBatchPublish? = self.pending_batch_publishes.get(bounceId);
+        if (pendingOpt == null) {
+            return VaultPendingBatchPublishView {
+                exists: false,
+                owner_wallet: myAddress(),
+                nonce: 0,
+                publish_kind: 0,
+                part_count: 0,
+                created_at: 0,
+                tombstone: false
+            };
+        }
+        let pending: PendingBatchPublish = pendingOpt!!;
+        return VaultPendingBatchPublishView {
+            exists: true,
+            owner_wallet: pending.owner_wallet,
+            nonce: pending.nonce,
+            publish_kind: pending.publish_kind,
+            part_count: pending.part_count,
+            created_at: pending.created_at,
+            tombstone: pending.tombstone
+        };
+    }
+
     get fun get_pending_ath_withdrawal(queryId: Int): VaultPendingAthWithdrawalView {
         let pendingOpt: PendingAthWithdrawal? = self.pending_ath_withdrawals.get(queryId);
         if (pendingOpt == null) {
@@ -2761,10 +2789,24 @@ contract Vault {
         return self.get_pending_ath_withdrawal(withdrawalId);
     }
 
-    get fun get_canonical_publish_charge(owner: Address, publishKind: Int, sizeClass: Int, cryptoSuite: Int): Int {
-        return self.canonicalPublishMaxCharge(owner, publishKind, sizeClass, cryptoSuite);
+    get fun get_successor(): VaultSuccessorView {
+        let ext: Slice = self.genesis_ext.beginParse();
+        ext.loadUint(256); // skip controller_hash
+        if (!ext.loadBool()) {
+            return VaultSuccessorView {
+                announced: false,
+                successor_manifest_hash: 0,
+                successor_vault: myAddress(),
+                announced_at: 0
+            };
+        }
+        return VaultSuccessorView {
+            announced: true,
+            successor_manifest_hash: ext.loadUint(256),
+            successor_vault: ext.loadAddress(),
+            announced_at: ext.loadUint(32)
+        };
     }
-
 
     get fun get_global(): VaultGlobalView {
         let airdropRemaining: Int = 0;

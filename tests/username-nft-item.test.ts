@@ -364,71 +364,19 @@ describe('UsernameNFTItem v1 milestone', () => {
     expect(state.owner_wallet.equals(nextOwner)).toBe(true);
   });
 
-  it('USERNAME-NFT-08: get_nft_data exposes TEP-64 on-chain username metadata without server URI', async () => {
+  it('USERNAME-NFT-08: get_nft_data exposes slim TEP-64 content (name + description); per-item art removed', async () => {
     const { item } = await deployItem();
 
     const nftData = await item.getGetNftData();
     const content = nftData.individual_content.beginParse();
-    expect(content.loadUint(8)).toBe(0);
+    expect(content.loadUint(8)).toBe(0); // on-chain marker
 
     const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+    // The item now carries only the partial content; UsernameRegistry.get_nft_content adds the SVG art.
     expect(readSnakeText(metadata.get(metadataKey('name')))).toBe('platho.ath');
     expect(readSnakeText(metadata.get(metadataKey('description')))).toBe('Platho username');
-    expectSafeSvgDataUri(readSnakeText(metadata.get(metadataKey('image'))));
-    expectRawSvgData(readSnakeText(metadata.get(metadataKey('image_data'))));
-  });
-
-  it('USERNAME-NFT-08A: get_nft_data embeds distinct on-chain SVG image data by username tier', async () => {
-    const cases = [
-      { name: 'abcd', label: 'EPIC', tier: 1n },
-      { name: 'abcde', label: 'RARE', tier: 2n },
-      { name: 'platho', label: 'COMMON', tier: 3n },
-    ];
-
-    for (const itemCase of cases) {
-      const { item } = await deployItem(itemCase.name);
-      const state = await item.getGetState();
-      expect(state.tier).toBe(itemCase.tier);
-
-      const nftData = await item.getGetNftData();
-      const content = nftData.individual_content.beginParse();
-      expect(content.loadUint(8)).toBe(0);
-      const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
-      const image = readSnakeText(metadata.get(metadataKey('image')));
-      const imageData = readSnakeText(metadata.get(metadataKey('image_data')));
-      const svg = decodeSvgDataUri(image);
-
-      expect(image).not.toMatch(/^https?:|^ipfs:/);
-      expectSafeSvgDataUri(image);
-      expect(svg).toContain(itemCase.label);
-      expect(svg).toContain('PLATHO USERNAME');
-      expect(svg).toContain(`${itemCase.name}.ath`);
-      expectRawSvgData(imageData);
-      expect(imageData).toContain(itemCase.label);
-      expect(imageData).toContain('PLATHO USERNAME');
-      expect(imageData).toContain(`${itemCase.name}.ath`);
-      for (const ch of itemCase.name) {
-        expect(imageData).toContain(`>${ch}</text>`);
-      }
-    }
-  });
-
-  it('USERNAME-NFT-08B: common SVG renders sixteen-character usernames as two rows of eight tiles', async () => {
-    const { item } = await deployItem('wwwwwwwwwwwwwwww');
-    const nftData = await item.getGetNftData();
-    const content = nftData.individual_content.beginParse();
-    expect(content.loadUint(8)).toBe(0);
-
-    const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
-    const imageData = readSnakeText(metadata.get(metadataKey('image_data')));
-
-    expect(imageData).toContain('COMMON');
-    expect(imageData).toContain('wwwwwwwwwwwwwwww.ath');
-    expect((imageData.match(/>w<\/text>/g) ?? []).length).toBe(16);
-    expect(imageData).toContain('x="164" y="372" width="80" height="80"');
-    expect(imageData).toContain('x="780" y="372" width="80" height="80"');
-    expect(imageData).toContain('x="164" y="464" width="80" height="80"');
-    expect(imageData).toContain('x="780" y="464" width="80" height="80"');
+    expect(metadata.get(metadataKey('image'))).toBeUndefined();
+    expect(metadata.get(metadataKey('image_data'))).toBeUndefined();
   });
 
   it('USERNAME-NFT-07: non-owner cannot transfer username NFT', async () => {

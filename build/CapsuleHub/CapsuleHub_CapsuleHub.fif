@@ -9,6 +9,8 @@ PROGRAM{
   DECLPROC $DepositProtocolFee$_store
   DECLPROC $DepositProtocolFee$_store_cell
   DECLPROC $DepositProtocolFee$_load_bounced
+  DECLPROC $CapsuleHubBatchAck$_store
+  DECLPROC $CapsuleHubBatchAck$_store_cell
   DECLPROC $PrivateCapsuleEntry$_store
   DECLPROC $PrivateCapsuleEntry$_store_cell
   DECLPROC $PrivateCapsuleEntry$_load
@@ -39,6 +41,7 @@ PROGRAM{
   DECLPROC $CapsuleHub$_contract_init
   DECLPROC $CapsuleHub$_contract_load
   DECLPROC $CapsuleHub$_contract_store
+  DECLPROC load_uint$not_mut
   DECLPROC $CapsuleHub$_fun_requireSealed
   DECLPROC $CapsuleHub$_fun_requireUnsealed
   DECLPROC $CapsuleHub$_fun_requireGenesisController
@@ -84,6 +87,9 @@ PROGRAM{
   DECLPROC $CapsuleHub$_fun_prunePrivateRecipientIndex
   DECLPROC $CapsuleHub$_fun_computeVaultPrivateEntryUid
   DECLPROC $CapsuleHub$_fun_computeVaultPublicEntryUid
+  DECLPROC $CapsuleHub$_fun_computeEntryPublishId
+  DECLPROC $CapsuleHub$_fun_accumulateBatchUid
+  DECLPROC $CapsuleHub$_fun_batchStorageReserveWithBuffer
   DECLPROC $PrivateCapsuleEntryView$_constructor_exists_entry_id_sender_prev_link_recipient_prev_link_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_0_hash_header_1_hash_body_hash_header_0_header_1
   DECLPROC $CapsuleHub$_fun_get_private_entry
   DECLPROC $PrivateCapsuleKeyIndexView$_constructor_exists_key_id_latest_entry_id_latest_entry_link_entry_count
@@ -97,9 +103,10 @@ PROGRAM{
   DECLPROC $CapsuleHubStateView$_constructor_sealed_vault_bound_deployment_manifest_hash_private_latest_id_public_latest_id_private_page_count_public_page_count_page_size_index_storage_years_index_retention_seconds_accrued_plato_fee_ton_fee_accumulator_address_vault_address_genesis_controller_address_private_live_count_public_live_count_index_storage_reserve_ton_protected_reserve_ton_reserve_floor_ton_reserve_buffer_numerator_reserve_buffer_denominator
   DECLPROC $CapsuleHub$_fun_get_state
   DECLPROC $PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1
-  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
-  DECLPROC $CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid
   DECLPROC $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_header
+  DECLPROC $MessageParameters$_constructor_to_value_bounce_mode_body
+  DECLPROC $CapsuleHubBatchAck$_constructor_publish_id_first_entry_id_part_count_batch_uid
+  DECLPROC $CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid
   DECLPROC $DepositProtocolFee$_constructor_amount
   101473 DECLMETHOD %get_private_entry
   96196 DECLMETHOD %get_private_sender_index
@@ -171,6 +178,21 @@ PROGRAM{
   $DepositProtocolFee$_load_bounced PROCINLINE:<{
     128 LDU
     SWAP
+  }>
+  $CapsuleHubBatchAck$_store PROCINLINE:<{
+    2270058353 PUSHINT
+    s0 s5 XCHG2
+    32 STU
+    s1 s3 XCHG
+    256 STU
+    64 STU
+    8 STU
+    256 STU
+  }>
+  $CapsuleHubBatchAck$_store_cell PROCINLINE:<{
+    4 -ROLL
+    $CapsuleHubBatchAck$_store INLINECALLDICT
+    ENDC
   }>
   $PrivateCapsuleEntry$_store PROCINLINE:<{
     s6 s7 XCHG2
@@ -416,6 +438,10 @@ PROGRAM{
     $CapsuleHub$_store INLINECALLDICT
     ENDC
     c4 POP
+  }>
+  load_uint$not_mut PROCREF:<{
+    LDUX
+    DROP
   }>
   $CapsuleHub$_fun_requireSealed PROCREF:<{
     12900 PUSHINT
@@ -1394,6 +1420,40 @@ PROGRAM{
         ENDC
         HASHCU
   }>
+  $CapsuleHub$_fun_computeEntryPublishId PROCREF:<{
+        NEWC
+    1162889521 PUSHINT
+    SWAP
+    32 STU
+    s1 s2 XCHG
+    256 STU
+    16 STU
+        ENDC
+        HASHCU
+  }>
+  $CapsuleHub$_fun_accumulateBatchUid PROCREF:<{
+        NEWC
+    s1 s2 XCHG
+    256 STU
+    256 STU
+        ENDC
+        HASHCU
+  }>
+  $CapsuleHub$_fun_batchStorageReserveWithBuffer PROCREF:<{
+    7400000 PUSHINT
+    SWAP
+    1 EQINT
+    IF:<{
+      DROP
+      3300000 PUSHINT
+    }>
+    1000000 PUSHINT
+    SWAP
+    ADD
+    125 MULCONST
+    100 PUSHINT
+    DIV
+  }>
   $PrivateCapsuleEntryView$_constructor_exists_entry_id_sender_prev_link_recipient_prev_link_entry_uid_publish_id_author_wallet_page_id_page_offset_created_at_header_0_hash_header_1_hash_body_hash_header_0_header_1 PROCINLINE:<{
   }>
   $CapsuleHub$_fun_get_private_entry PROCREF:<{
@@ -2036,12 +2096,14 @@ PROGRAM{
   }>
   $PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1 PROCINLINE:<{
   }>
+  $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_header PROCINLINE:<{
+  }>
   $MessageParameters$_constructor_to_value_bounce_mode_body PROCINLINE:<{
     s3 s4 s3 XCHG3
   }>
-  $CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid PROCINLINE:<{
+  $CapsuleHubBatchAck$_constructor_publish_id_first_entry_id_part_count_batch_uid PROCINLINE:<{
   }>
-  $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_header PROCINLINE:<{
+  $CapsuleHubPublishAck$_constructor_publish_id_entry_id_entry_uid PROCINLINE:<{
   }>
   $DepositProtocolFee$_constructor_amount PROCINLINE:<{
   }>
@@ -2302,6 +2364,784 @@ PROGRAM{
       TRUE
       s0 s11 XCHG
       10 ROLL
+      $CapsuleHub$_contract_store INLINECALLDICT
+    }>
+    OVER
+    2767741649 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s14 XCHG
+      64 LDU
+      NIP
+      160 LDU
+      NIP
+      256 LDU
+      8 LDU
+      8 LDU
+      128 LDU
+      LDMSGADDR
+      LDREF
+      LDOPTREF
+      DROP
+      s14 19 s() XCHG
+      s13 18 s() XCHG
+      s12 17 s() XCHG
+      s11 16 s() XCHG
+      s10 s15 XCHG
+      s9 19 s() XCHG
+      s8 18 s() XCHG
+      s7 17 s() XCHG
+      s6 16 s() XCHG
+      s5 s15 XCHG
+      s4 19 s() XCHG
+      s3 18 s() XCHG
+      s2 17 s() XCHG
+      s1 20 s() XCHG
+      s0 21 s() XCHG
+      $CapsuleHub$_fun_requireSealed INLINECALLDICT
+      13500 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s15 PUSH
+      SDEQ
+      THROWANYIFNOT
+      13501 PUSHINT
+      17 s() PUSH
+      0 NEQINT
+      THROWANYIFNOT
+      13502 PUSHINT
+      16 s() PUSH
+      1 EQINT
+      IF:<{
+        TRUE
+      }>ELSE<{
+        16 s() PUSH
+        2 EQINT
+      }>
+      THROWANYIFNOT
+      13503 PUSHINT
+      20 s() PUSH
+      0 GTINT
+      IF:<{
+        20 s() PUSH
+        21 LESSINT
+      }>ELSE<{
+        FALSE
+      }>
+      THROWANYIFNOT
+      s15 PUSH
+      1 EQINT
+      s8 PUSH
+      10000000 PUSHINT
+      s2 PUSH
+      IF:<{
+        2DROP
+        s9 PUSH
+        s14 16 s() XCHG
+        5 12 REVERSE
+        s11 s15 XCHG
+        s10 16 s() XCHG
+        s9 s15 XCHG
+        s8 16 s() XCHG
+        s7 s15 XCHG
+        s6 16 s() XCHG
+        s5 s15 XCHG
+        s4 16 s() XCHG
+        s3 s15 XCHG
+        s0 16 s() XCHG
+        s15 s2 XCHG2
+        2 PUSHINT
+        $CapsuleHub$_fun_privateFullFee INLINECALLDICT
+        s15 17 s() XCHG
+        s14 16 s() XCHG
+        s13 s15 XCHG
+        s12 s14 XCHG
+        s11 s13 XCHG
+        s10 s12 XCHG
+        s9 s11 XCHG
+        s8 s10 XCHG
+        s7 s9 XCHG
+        s6 s8 XCHG
+        s5 s7 XCHG
+        s4 s6 XCHG
+        s3 s5 XCHG
+        s4 s3 s0 XCHG3
+      }>
+      13504 PUSHINT
+      s2 PUSH
+      24 s() PUSH
+      ADD
+      64 PUSHPOW2DEC
+      LEQ
+      THROWANYIFNOT
+      22 s() PUSH
+      13506 PUSHINT
+      s0 s2 XCHG
+      MUL
+      22 s() PUSH
+      SWAP
+      LEQ
+      THROWANYIFNOT
+      OVER
+      IFNOT:<{
+        13507 PUSHINT
+        24 s() PUSH
+        ISNULL
+        NOT
+        THROWANYIFNOT
+        13508 PUSHINT
+        s0 24 s() XCHG
+            CTOS
+        152 PUSHINT
+        load_uint$not_mut INLINECALLDICT
+        2573421624129493433291659589718684717235138672 PUSHINT
+        EQUAL
+        s1 24 s() XCHG
+        THROWANYIFNOT
+      }>ELSE<{
+        23 s() POP
+      }>
+      13509 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      22 s() PUSH
+      1000000 PUSHINT
+      MUL
+      22 s() PUSH
+      SWAP
+      ADD
+      30000000 PUSHINT
+      ADD
+      GEQ
+      THROWANYIFNOT
+      21 s() PUSH
+      0 PUSHINT
+      25000 PUSHINT
+      FALSE
+          GETGASFEE
+      22 s() PUSH
+      SWAP
+      ADD
+      30000000 PUSHINT
+      ADD
+      OVER
+      WHILE:<{
+        s2 PUSH
+        25 s() PUSH
+        LESS
+      }>DO<{
+        24 s() PUSH
+        DEC
+        s3 s(-1) PUXC
+        EQUAL
+        s0 s4 XCHG
+            CTOS
+        27 s() PUSH
+        s4 PUSH
+        ADD
+        s14 21 s() XCHG
+        s13 20 s() XCHG
+        s12 19 s() XCHG
+        s11 18 s() XCHG
+        s10 17 s() XCHG
+        s9 16 s() XCHG
+        s8 s15 XCHG
+        s7 21 s() XCHG
+        s6 20 s() XCHG
+        s5 19 s() XCHG
+        s4 18 s() XCHG
+        s3 17 s() XCHG
+        s2 16 s() XCHG
+        s0 21 s() XCHG
+        s1 s15 XCHG
+        23 s() PUSH
+        19 s() PUSH
+        $CapsuleHub$_fun_computeEntryPublishId INLINECALLDICT
+        28 s() PUSH
+        22 s() PUSH
+        IF:<{
+          3 PUSHINT
+          22 s() PUSH
+          IFNOT:<{
+            DROP
+            4 PUSHINT
+          }>
+          13510 PUSHINT
+          19 s() PUSH
+              SBITS
+          784 PUSHINT
+          EQUAL
+          IF:<{
+            19 s() PUSH
+                SREFS
+            ROT
+            EQUAL
+          }>ELSE<{
+            NIP
+            FALSE
+          }>
+          THROWANYIFNOT
+          s0 17 s() XCHG
+          8 LDU
+          8 LDU
+          256 LDU
+          256 LDU
+          256 LDU
+              LDREF
+              LDREF
+              LDREF
+          s0 29 s() XCHG
+          IFNOT:<{
+            24 s() POP
+            s0 27 s() XCHG
+                LDREF
+            DROP
+            s0 23 s() XCHG
+            s0 27 s() XCHG
+          }>ELSE<{
+            28 s() POP
+          }>
+          s13 22 s() XCHG
+          s12 21 s() XCHG
+          s11 20 s() XCHG
+          s10 19 s() XCHG
+          s9 18 s() XCHG
+          s8 17 s() XCHG
+          s7 16 s() XCHG
+          s6 s15 XCHG
+          s5 s14 XCHG
+          s4 22 s() XCHG
+          s3 21 s() XCHG
+          s2 20 s() XCHG
+          s1 19 s() XCHG
+          s0 18 s() XCHG
+          13511 PUSHINT
+          s0 18 s() XCHG
+          16 s() PUSH
+          16 s() PUSH
+          $CapsuleHub$_fun_isAllowedPrivatePair INLINECALLDICT
+          s1 19 s() XCHG
+          THROWANYIFNOT
+          13512 PUSHINT
+          23 s() PUSH
+          0 NEQINT
+          IF:<{
+            22 s() PUSH
+            0 NEQINT
+          }>ELSE<{
+            FALSE
+          }>
+          IF:<{
+            21 s() PUSH
+            0 NEQINT
+          }>ELSE<{
+            FALSE
+          }>
+          THROWANYIFNOT
+          14 ROLL
+          s0 17 s() XCHG
+          2 PUSHINT
+          1120 PUSHINT
+          1 PUSHINT
+          13513 PUSHINT
+          23 s() PUSH
+          s0 s4 XCHG
+          27 s() PUSH
+          s4 s3 s4 XCHG3
+          13514 PUSHINT
+          $CapsuleHub$_fun_requireExactPayloadCell INLINECALLDICT
+          1 PUSHINT
+          240 PUSHINT
+          0 PUSHINT
+          13515 PUSHINT
+          22 s() PUSH
+          s0 s4 XCHG
+          26 s() PUSH
+          s4 s3 s4 XCHG3
+          13516 PUSHINT
+          $CapsuleHub$_fun_requireExactPayloadCell INLINECALLDICT
+          s14 s13 s12 PUSH3
+          s14 s13 s12 PUSH3
+          s14 s13 s12 PUSH3
+          s14 s13 s12 PUSH3
+          s14 s13 s12 PUSH3
+          s14 29 s() XCHG
+          s13 28 s() XCHG
+          s12 27 s() XCHG
+          s11 26 s() XCHG
+          s10 25 s() XCHG
+          s9 24 s() XCHG
+          s8 23 s() XCHG
+          s7 22 s() XCHG
+          s6 21 s() XCHG
+          s5 20 s() XCHG
+          s4 19 s() XCHG
+          s3 18 s() XCHG
+          s2 17 s() XCHG
+          s1 16 s() XCHG
+          s0 s15 XCHG
+          30 s() PUSH
+          33 s() PUSH
+          $CapsuleHub$_fun_privateBodyCells INLINECALLDICT
+          15 -ROLL
+          31 s() PUSH
+          34 s() PUSH
+          $CapsuleHub$_fun_privateBodyBits INLINECALLDICT
+          s15 16 s() XCHG
+          s14 s15 XCHG
+          s13 s14 XCHG
+          s12 s13 XCHG
+          s11 s12 XCHG
+          s10 s11 XCHG
+          s9 s10 XCHG
+          s8 s9 XCHG
+          s7 s8 XCHG
+          s6 s7 XCHG
+          s5 s6 XCHG
+          s4 s5 XCHG
+          s3 s4 XCHG
+          s1 s3 s0 XCHG3
+          s1 32 s() XCHG
+          s0 34 s() XCHG
+          $CapsuleHub$_fun_privateBodyRefs INLINECALLDICT
+          15 1 BLKDROP2
+          s15 18 s() XCHG
+          s14 17 s() XCHG
+          s13 16 s() XCHG
+          s12 s15 XCHG
+          s11 s14 XCHG
+          s10 s13 XCHG
+          s9 s12 XCHG
+          s8 s11 XCHG
+          s7 s10 XCHG
+          s6 s9 XCHG
+          s5 s8 XCHG
+          s4 s7 XCHG
+          s3 s6 XCHG
+          s5 s4 s0 XCHG3
+          s3 28 s() XCHG
+          21 s() PUSH
+          s0 s3 XCHG
+          s0 29 s() XCHG
+          SWAP
+          13517 PUSHINT
+          13518 PUSHINT
+          $CapsuleHub$_fun_requireExactPayloadCell INLINECALLDICT
+          26 s() PUSH
+          $CapsuleHub$_fun_entryLink INLINECALLDICT
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s14 30 s() XCHG
+          s13 29 s() XCHG
+          s12 28 s() XCHG
+          s11 27 s() XCHG
+          s10 26 s() XCHG
+          s9 25 s() XCHG
+          s8 24 s() XCHG
+          s7 23 s() XCHG
+          s6 22 s() XCHG
+          s5 21 s() XCHG
+          s4 20 s() XCHG
+          s3 19 s() XCHG
+          s2 18 s() XCHG
+          s1 17 s() XCHG
+          s0 16 s() XCHG
+          32 s() PUSH
+          $CapsuleHub$_fun_privateHeaderSenderKeyId INLINECALLDICT
+          15 1 BLKDROP2
+          s15 16 s() XCHG
+          s14 16 s() XCHG
+          s13 16 s() XCHG
+          s12 16 s() XCHG
+          s11 16 s() XCHG
+          s10 16 s() XCHG
+          s9 16 s() XCHG
+          s8 16 s() XCHG
+          s7 16 s() XCHG
+          s6 16 s() XCHG
+          s5 16 s() XCHG
+          s4 16 s() XCHG
+          s3 16 s() XCHG
+          s2 16 s() XCHG
+          s1 16 s() XCHG
+          16 s() PUSH
+          $CapsuleHub$_fun_pushPrivateSenderIndex INLINECALLDICT
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s15 s14 s13 PUSH3
+          s14 30 s() XCHG
+          s13 29 s() XCHG
+          s12 28 s() XCHG
+          s11 27 s() XCHG
+          s10 26 s() XCHG
+          s9 25 s() XCHG
+          s8 24 s() XCHG
+          s7 23 s() XCHG
+          s6 22 s() XCHG
+          s5 21 s() XCHG
+          s4 20 s() XCHG
+          s3 19 s() XCHG
+          s2 18 s() XCHG
+          s1 17 s() XCHG
+          s0 16 s() XCHG
+          33 s() PUSH
+          $CapsuleHub$_fun_privateHeaderRecipientKeyId INLINECALLDICT
+          15 1 BLKDROP2
+          SWAP
+          s0 17 s() XCHG
+          $CapsuleHub$_fun_pushPrivateRecipientIndex INLINECALLDICT
+          s15 16 s() XCHG
+          s14 s15 XCHG
+          s13 s14 XCHG
+          s12 s13 XCHG
+          s11 s12 XCHG
+          s10 s11 XCHG
+          s9 s10 XCHG
+          s8 s9 XCHG
+          s7 s8 XCHG
+          s6 s7 XCHG
+          s5 s6 XCHG
+          s4 s5 XCHG
+          s3 s4 XCHG
+          s1 s3 s0 XCHG3
+          28 s() PUSH
+          s0 s2 XCHG
+          27 s() PUSH
+          s0 s2 XCHG
+          s1 23 s() XCHG
+          s0 22 s() XCHG
+          21 s() PUSH
+          $CapsuleHub$_fun_computeVaultPrivateEntryUid INLINECALLDICT
+          64 PUSHINT
+              NOW
+          s6 27 s() XCHG
+          s0 s5 XCHG
+          s4 20 s() XCHG
+          s3 22 s() XCHG
+          s2 21 s() XCHG
+          s1 19 s() XCHG
+          s0 18 s() XCHG
+          $PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1 INLINECALLDICT
+          NEWC
+          $PrivateCapsuleEntry$_store_cell INLINECALLDICT
+          s3 21 s() XCHG
+          s2 s13 XCHG
+          s1 23 s() XCHG
+          __tact_dict_set_uint_cell INLINECALLDICT
+          s0 18 s() XCHG
+          INC
+          16000 PUSHINT
+          FALSE
+              GETGASFEE
+          s9 s14 XCHG
+          s8 s13 XCHG
+          s7 s12 XCHG
+          s6 s11 XCHG
+          s5 s10 XCHG
+          s4 s9 XCHG
+          s3 s8 XCHG
+          s7 s6 s0 XCHG3
+          s1 s5 XCHG
+          s4 21 s() XCHG
+          s3 19 s() XCHG
+          s0 21 s() XCHG
+          s1 s2 XCHG
+          1 PUSHINT
+          $CapsuleHub$_fun_batchStorageReserveWithBuffer INLINECALLDICT
+          s1 22 s() XCHG
+          ADD
+          s1 17 s() XCHG
+          ADD
+          s13 16 s() XCHG
+          s12 s15 XCHG
+          s11 s14 XCHG
+          s10 s13 XCHG
+          s9 s12 XCHG
+          s8 s11 XCHG
+          s7 s10 XCHG
+          s6 s9 XCHG
+          s5 s8 XCHG
+          s4 s7 XCHG
+          s3 s6 XCHG
+          s5 s4 s0 XCHG3
+          s1 s3 XCHG
+          s2 20 s() XCHG
+          s0 18 s() XCHG
+          $CapsuleHub$_fun_accumulateBatchUid INLINECALLDICT
+        }>ELSE<{
+          2 PUSHINT
+          22 s() PUSH
+          IFNOT:<{
+            DROP
+            3 PUSHINT
+          }>
+          13520 PUSHINT
+          19 s() PUSH
+              SBITS
+          528 PUSHINT
+          EQUAL
+          IF:<{
+            19 s() PUSH
+                SREFS
+            ROT
+            EQUAL
+          }>ELSE<{
+            NIP
+            FALSE
+          }>
+          THROWANYIFNOT
+          s0 17 s() XCHG
+          8 LDU
+          8 LDU
+          256 LDU
+          256 LDU
+              LDREF
+              LDREF
+          s0 27 s() XCHG
+          IFNOT:<{
+            22 s() POP
+            s0 25 s() XCHG
+                LDREF
+            DROP
+            s0 21 s() XCHG
+            s0 25 s() XCHG
+          }>ELSE<{
+            26 s() POP
+          }>
+          13521 PUSHINT
+          s0 s4 XCHG
+          0 EQINT
+          s1 s4 XCHG
+          THROWANYIFNOT
+          s13 19 s() XCHG
+          s12 18 s() XCHG
+          s11 17 s() XCHG
+          s10 16 s() XCHG
+          s9 s15 XCHG
+          s8 s14 XCHG
+          s7 19 s() XCHG
+          s6 18 s() XCHG
+          s5 17 s() XCHG
+          s4 16 s() XCHG
+          s3 s15 XCHG
+          s2 s14 XCHG
+          s1 19 s() XCHG
+          s0 18 s() XCHG
+          13522 PUSHINT
+          s0 18 s() XCHG
+          16 s() PUSH
+          $CapsuleHub$_fun_isAllowedPublicSizeClass INLINECALLDICT
+          s1 19 s() XCHG
+          THROWANYIFNOT
+          13523 PUSHINT
+          20 s() PUSH
+          0 NEQINT
+          IF:<{
+            19 s() PUSH
+            0 NEQINT
+          }>ELSE<{
+            FALSE
+          }>
+          THROWANYIFNOT
+          14 ROLL
+          s0 17 s() XCHG
+          13524 PUSHINT
+          13525 PUSHINT
+          19 s() PUSH
+          s0 s2 XCHG
+          22 s() PUSH
+          s0 s2 XCHG
+          $CapsuleHub$_fun_requirePublicHeaderCell INLINECALLDICT
+          s14 16 s() XCHG
+          2 14 BLKSWAP
+          s1 24 s() XCHG
+          18 s() PUSH
+          SWAP
+          s0 25 s() XCHG
+          13526 PUSHINT
+          13527 PUSHINT
+          $CapsuleHub$_fun_requirePublicPayloadCell INLINECALLDICT
+          15 ROLL
+          24 s() PUSH
+          SWAP
+          23 s() PUSH
+          SWAP
+          29 s() PUSH
+          SWAP
+          s0 20 s() XCHG
+          19 s() PUSH
+          $CapsuleHub$_fun_computeVaultPublicEntryUid INLINECALLDICT
+          64 PUSHINT
+              NOW
+          s3 24 s() XCHG
+          s0 s2 XCHG
+          29 s() PUSH
+          s0 s2 XCHG
+          s1 19 s() XCHG
+          s0 20 s() XCHG
+          $PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_header INLINECALLDICT
+          NEWC
+          $PublicCapsuleEntry$_store_cell INLINECALLDICT
+          s2 s3 XCHG
+          s2 16 s() XCHG
+          s1 23 s() XCHG
+          __tact_dict_set_uint_cell INLINECALLDICT
+          s0 s2 XCHG
+          INC
+          13000 PUSHINT
+          FALSE
+              GETGASFEE
+          s12 s14 XCHG
+          s11 s13 XCHG
+          s10 s12 XCHG
+          s9 s11 XCHG
+          s8 s10 XCHG
+          s7 s9 XCHG
+          s6 s8 XCHG
+          s5 s7 XCHG
+          s4 s6 XCHG
+          5 1 REVERSE
+          s2 s3 XCHG
+          s1 21 s() XCHG
+          s0 19 s() XCHG
+          2 PUSHINT
+          $CapsuleHub$_fun_batchStorageReserveWithBuffer INLINECALLDICT
+          s1 20 s() XCHG
+          ADD
+          s1 17 s() XCHG
+          ADD
+          s13 16 s() XCHG
+          s12 s15 XCHG
+          s11 s14 XCHG
+          s10 s13 XCHG
+          s9 s12 XCHG
+          s8 s11 XCHG
+          s7 s10 XCHG
+          s6 s9 XCHG
+          s5 s8 XCHG
+          s4 s7 XCHG
+          s3 s6 XCHG
+          s5 s4 s0 XCHG3
+          s1 s3 XCHG
+          s2 18 s() XCHG
+          s0 20 s() XCHG
+          $CapsuleHub$_fun_accumulateBatchUid INLINECALLDICT
+          17 s() 19 s() XCHG
+        }>
+        s0 16 s() XCHG
+        INC
+        s15 19 s() XCHG
+        s14 18 s() XCHG
+        s13 17 s() XCHG
+        s12 16 s() XCHG
+        s11 s15 XCHG
+        s10 s14 XCHG
+        s9 s13 XCHG
+        s8 s12 XCHG
+        s7 s11 XCHG
+        s6 s10 XCHG
+        s5 s9 XCHG
+        s4 s8 XCHG
+        s3 s7 XCHG
+        s0 s1 s6 XCHG3
+        s5 s4 XCHG2
+      }>
+      22 s() POP
+      24 s() POP
+      2DROP
+      13530 PUSHINT
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      SWAP
+      s0 23 s() XCHG
+      GEQ
+      s1 22 s() XCHG
+      THROWANYIFNOT
+      s0 20 s() XCHG
+      IF:<{
+        s0 s7 XCHG
+        18 s() PUSH
+        ADD
+      }>ELSE<{
+        s0 s6 XCHG
+        18 s() PUSH
+        ADD
+        s0 s6 XCHG
+        s0 s7 XCHG
+      }>
+      s0 s3 XCHG
+      17 s() PUSH
+      ADD
+      s13 s15 XCHG
+      s12 s14 XCHG
+      s11 s13 XCHG
+      s10 s12 XCHG
+      s9 s11 XCHG
+      s8 s10 XCHG
+      s3 s9 XCHG
+      s6 s8 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s5 s1 s5 XCHG3
+      s3 s4 XCHG2
+      s1 19 s() XCHG
+      $CapsuleHub$_fun_batchStorageReserveWithBuffer INLINECALLDICT
+      18 s() PUSH
+      SWAP
+      MUL
+      s1 17 s() XCHG
+      ADD
+      6 PUSHINT
+          RAWRESERVE
+      s0 17 s() XCHG
+      0 PUSHINT
+      s0 19 s() XCHG
+      FALSE
+      s0 18 s() XCHG
+      7 PUSHPOW2
+      s0 17 s() XCHG
+      $CapsuleHubBatchAck$_constructor_publish_id_first_entry_id_part_count_batch_uid INLINECALLDICT
+      NEWC
+      $CapsuleHubBatchAck$_store_cell INLINECALLDICT
+      s12 PUSH
+      s0 s4 XCHG
+      s3 19 s() XCHG
+      s2 17 s() XCHG
+      s15 s15 XCHG2
+      $MessageParameters$_constructor_to_value_bounce_mode_body INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+          STZEROES
+          // → Stack state
+          // s0: Builder
+          // s1: `body`
+          // s2: `mode`
+          STDICT
+          ENDC
+          SWAP
+          SENDRAWMSG
+      s9 s14 XCHG
+      s8 s13 XCHG
+      s7 s12 XCHG
+      s6 s11 XCHG
+      s5 s10 XCHG
+      s4 s9 XCHG
+      s3 s8 XCHG
+      s7 s1 s5 XCHG3
+      s0 s4 XCHG
+      s3 s3 XCHG2
+      s0 s6 XCHG
       $CapsuleHub$_contract_store INLINECALLDICT
     }>
     OVER
