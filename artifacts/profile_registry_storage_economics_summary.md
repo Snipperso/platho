@@ -4,7 +4,7 @@ Status: **PASS**
 
 Sandbox evidence that accepted ProfileRegistry avatar updates retain enough TON after ACK/refund actions to cover the permanent avatar record and owner-version map endowments. This is not a mainnet rent oracle; it is a release gate against underfunded permanent avatar pointer growth.
 
-ProfileRegistry code hash: `6437b6631d0b310781fef9efa214640c69a3ae684dae2c4be5b463a673ed7e29`
+ProfileRegistry code hash: `11a80e2eaf22cf64b6d78e147d44c51174a929c06e8d8bea2e09d2fafa489569`
 
 | Case | Updates | Retained delta | Permanent endowment | Margin |
 |---|---:|---:|---:|---:|

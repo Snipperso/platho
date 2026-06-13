@@ -69,7 +69,7 @@ describe('mainnet transaction dry-run packet', () => {
   it('H-DEP-DRYRUN-03: Tonkeeper console live preflight allows safe deploy resume only for expected targets', () => {
     const script = readFileSync('scripts/mainnet_tonkeeper_console.mjs', 'utf8');
 
-    expect(script).toContain('const ok = clean || expectedActive;');
+    expect(script).toContain('const ok = clean || inactiveFunded || expectedActive;');
     expect(script).toContain('active with expected deploy code/state; resume allowed');
     expect(script).toContain('active target has unexpected deploy code/state');
     expect(script).toContain('All deploy targets are fresh.');
