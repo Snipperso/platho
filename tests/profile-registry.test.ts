@@ -250,7 +250,7 @@ function avatarNotification(owner: Address, overrides: Partial<AthTransferNotifi
     avatar_hash: overrides.avatar_hash ?? 0xabc123n,
     avatar_entry_id: overrides.avatar_entry_id ?? 0n,
     avatar_stream_id: overrides.avatar_stream_id ?? 0x11223344556677889900aabbccddeeffn,
-    avatar_part_count: overrides.avatar_part_count ?? 8n,
+    avatar_part_count: overrides.avatar_part_count ?? 2n,
     media_format: overrides.media_format ?? 1n,
   };
 }
@@ -270,7 +270,7 @@ function vaultAvatarNotification(
     avatar_hash: overrides.avatar_hash ?? 0xabc123n,
     avatar_entry_id: overrides.avatar_entry_id ?? 0n,
     avatar_stream_id: overrides.avatar_stream_id ?? 0x11223344556677889900aabbccddeeffn,
-    avatar_part_count: overrides.avatar_part_count ?? 8n,
+    avatar_part_count: overrides.avatar_part_count ?? 2n,
     media_format: overrides.media_format ?? 1n,
   };
 }
@@ -420,7 +420,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     expect(avatar.owner_wallet.equals(owner)).toBe(true);
     expect(avatar.version).toBe(1n);
     expect(avatar.avatar_hash).toBe(0xabc123n);
-    expect(avatar.avatar_part_count).toBe(8n);
+    expect(avatar.avatar_part_count).toBe(2n);
     expect(global.profile_count).toBe(1n);
     expect(global.avatar_record_count).toBe(1n);
     expect(global.treasury_due_ath).toBe(50_000_000_000n);
@@ -456,7 +456,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       { avatar_hash: 0n },
       { avatar_stream_id: 0n },
       { avatar_part_count: 0n },
-      { avatar_part_count: 17n },
+      { avatar_part_count: 3n },
       { media_format: 2n },
       { owner_wallet: fixtureAddress('INVALID_POINTER_MASTERCHAIN_OWNER', -1) },
     ] satisfies Array<Partial<AthTransferNotificationVaultProfileAvatar>>) {

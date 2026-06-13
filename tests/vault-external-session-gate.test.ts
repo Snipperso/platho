@@ -372,7 +372,11 @@ function removedDirectPublishBody(maxCharge: bigint) {
     .endCell();
 }
 
-describe('Vault balance-funded publish gate', () => {
+// VPB2 C3: the old single-publish externals + VPB1 domain were removed. The pre-accept gate coverage now
+// lives in tests/vault-batch-publish.test.ts (BATCH-FLOOR/BALANCE/NONCE/ENVELOPE/REJECT/SUCCESS). This
+// legacy gate suite is SKIPPED pending a full batch rewrite (auth/binding/size-class gates re-expressed
+// against the PublishBatchFromVaultBalance envelope). Tracked in task #19/#20.
+describe.skip('Vault balance-funded publish gate', () => {
   it('VAULT-BALANCE-PUBLISH-01: signed publish requires activated messaging keys', async () => {
     const { blockchain, vault, user } = await setup();
     const keyPair = keyPairFromSeed(Buffer.alloc(32, 8));

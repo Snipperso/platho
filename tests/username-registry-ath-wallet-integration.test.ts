@@ -160,7 +160,7 @@ describe('UsernameRegistry integration with Vault-owned ATHWallet', () => {
     const official = await officialAthWallet.getGetWalletData();
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(user.address)).toBe(true);
+    expect(record.minter_wallet.equals(user.address)).toBe(true);
     expect(source.balance).toBe(PRICE_6_PLUS);
     expect(official.balance).toBe(PRICE_6_PLUS);
     expect(findTransaction(result.transactions, {

@@ -202,8 +202,8 @@ describe('UsernameRegistry negative authorization matrix', () => {
     record = await ctx.registry.getGetNameRecord(hash);
     expect(record.exists).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
-    expect(record.owner_wallet.equals(mintOwner)).toBe(true);
-    expect(record.owner_wallet.equals(wrongOwner)).toBe(false);
+    expect(record.minter_wallet.equals(mintOwner)).toBe(true);
+    expect(record.minter_wallet.equals(wrongOwner)).toBe(false);
     expect((await ctx.registry.getGetPendingMint(hash)).exists).toBe(false);
   });
 

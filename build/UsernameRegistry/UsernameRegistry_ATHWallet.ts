@@ -3877,7 +3877,7 @@ export function dictValueParserPendingUsernameMint(): DictionaryValue<PendingUse
 
 export type NameRecord = {
     $$type: 'NameRecord';
-    owner_wallet: Address;
+    minter_wallet: Address;
     item_address: Address;
     registered_at: bigint;
 }
@@ -3885,7 +3885,7 @@ export type NameRecord = {
 export function storeNameRecord(src: NameRecord) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeAddress(src.owner_wallet);
+        b_0.storeAddress(src.minter_wallet);
         b_0.storeAddress(src.item_address);
         b_0.storeUint(src.registered_at, 32);
     };
@@ -3893,29 +3893,29 @@ export function storeNameRecord(src: NameRecord) {
 
 export function loadNameRecord(slice: Slice) {
     const sc_0 = slice;
-    const _owner_wallet = sc_0.loadAddress();
+    const _minter_wallet = sc_0.loadAddress();
     const _item_address = sc_0.loadAddress();
     const _registered_at = sc_0.loadUintBig(32);
-    return { $$type: 'NameRecord' as const, owner_wallet: _owner_wallet, item_address: _item_address, registered_at: _registered_at };
+    return { $$type: 'NameRecord' as const, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
 export function loadTupleNameRecord(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
+    const _minter_wallet = source.readAddress();
     const _item_address = source.readAddress();
     const _registered_at = source.readBigNumber();
-    return { $$type: 'NameRecord' as const, owner_wallet: _owner_wallet, item_address: _item_address, registered_at: _registered_at };
+    return { $$type: 'NameRecord' as const, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
 export function loadGetterTupleNameRecord(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
+    const _minter_wallet = source.readAddress();
     const _item_address = source.readAddress();
     const _registered_at = source.readBigNumber();
-    return { $$type: 'NameRecord' as const, owner_wallet: _owner_wallet, item_address: _item_address, registered_at: _registered_at };
+    return { $$type: 'NameRecord' as const, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
 export function storeTupleNameRecord(source: NameRecord) {
     const builder = new TupleBuilder();
-    builder.writeAddress(source.owner_wallet);
+    builder.writeAddress(source.minter_wallet);
     builder.writeAddress(source.item_address);
     builder.writeNumber(source.registered_at);
     return builder.build();
@@ -4124,7 +4124,7 @@ export function dictValueParserUsernamePriceView(): DictionaryValue<UsernamePric
 export type UsernameNameRecordView = {
     $$type: 'UsernameNameRecordView';
     exists: boolean;
-    owner_wallet: Address;
+    minter_wallet: Address;
     item_address: Address;
     registered_at: bigint;
 }
@@ -4133,7 +4133,7 @@ export function storeUsernameNameRecordView(src: UsernameNameRecordView) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeBit(src.exists);
-        b_0.storeAddress(src.owner_wallet);
+        b_0.storeAddress(src.minter_wallet);
         b_0.storeAddress(src.item_address);
         b_0.storeInt(src.registered_at, 257);
     };
@@ -4142,32 +4142,32 @@ export function storeUsernameNameRecordView(src: UsernameNameRecordView) {
 export function loadUsernameNameRecordView(slice: Slice) {
     const sc_0 = slice;
     const _exists = sc_0.loadBit();
-    const _owner_wallet = sc_0.loadAddress();
+    const _minter_wallet = sc_0.loadAddress();
     const _item_address = sc_0.loadAddress();
     const _registered_at = sc_0.loadIntBig(257);
-    return { $$type: 'UsernameNameRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, item_address: _item_address, registered_at: _registered_at };
+    return { $$type: 'UsernameNameRecordView' as const, exists: _exists, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
 export function loadTupleUsernameNameRecordView(source: TupleReader) {
     const _exists = source.readBoolean();
-    const _owner_wallet = source.readAddress();
+    const _minter_wallet = source.readAddress();
     const _item_address = source.readAddress();
     const _registered_at = source.readBigNumber();
-    return { $$type: 'UsernameNameRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, item_address: _item_address, registered_at: _registered_at };
+    return { $$type: 'UsernameNameRecordView' as const, exists: _exists, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
 export function loadGetterTupleUsernameNameRecordView(source: TupleReader) {
     const _exists = source.readBoolean();
-    const _owner_wallet = source.readAddress();
+    const _minter_wallet = source.readAddress();
     const _item_address = source.readAddress();
     const _registered_at = source.readBigNumber();
-    return { $$type: 'UsernameNameRecordView' as const, exists: _exists, owner_wallet: _owner_wallet, item_address: _item_address, registered_at: _registered_at };
+    return { $$type: 'UsernameNameRecordView' as const, exists: _exists, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
 export function storeTupleUsernameNameRecordView(source: UsernameNameRecordView) {
     const builder = new TupleBuilder();
     builder.writeBoolean(source.exists);
-    builder.writeAddress(source.owner_wallet);
+    builder.writeAddress(source.minter_wallet);
     builder.writeAddress(source.item_address);
     builder.writeNumber(source.registered_at);
     return builder.build();
@@ -4958,10 +4958,10 @@ const ATHWallet_types: ABIType[] = [
     {"name":"PrunePendingUsernameMint","header":932634413,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"UsernameRegistryTopUpStorageReserve","header":179986205,"fields":[]},
     {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"NameRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"NameRecord","header":null,"fields":[{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernamePriceView","header":null,"fields":[{"name":"valid_length","type":{"kind":"simple","type":"bool","optional":false}},{"name":"price_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"UsernameNameRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"UsernameNameRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthTreasuryFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingAthBurnFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
@@ -5055,8 +5055,6 @@ export const USERNAME_ITEM_MAX_LENGTH = 16n;
 export const USERNAME_ITEM_NAME_HASH_DOMAIN = 3318512854n;
 export const USERNAME_ITEM_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
 export const USERNAME_ITEM_METADATA_KEY_DESCRIPTION = 90922719342317012409671596374183159143637506542604000676488204638996496437508n;
-export const USERNAME_ITEM_METADATA_KEY_IMAGE = 43884663033947008978309661017057008345326326811558777475113826163084742639165n;
-export const USERNAME_ITEM_METADATA_KEY_IMAGE_DATA = 98449690268711667050166283313913751402364107788915545466587557261600130787812n;
 export const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1000000n;
 export const ATH_VAULT_RESPONSE_ACK_VALUE = 3000000n;
 export const ATH_INTERNAL_TRANSFER_ACK_VALUE = 3000000n;
@@ -5099,6 +5097,8 @@ export const USERNAME_SPLIT_BASE_BPS = 10000n;
 export const USERNAME_TREASURY_SHARE_BPS = 5000n;
 export const USERNAME_NAME_HASH_DOMAIN = 3318512854n;
 export const USERNAME_COLLECTION_METADATA_KEY_NAME = 59089242681608890680090686026688704441792375738894456860693970539822503415433n;
+export const USERNAME_COLLECTION_METADATA_KEY_IMAGE = 43884663033947008978309661017057008345326326811558777475113826163084742639165n;
+export const USERNAME_COLLECTION_METADATA_KEY_IMAGE_DATA = 98449690268711667050166283313913751402364107788915545466587557261600130787812n;
 export const USERNAME_COLLECTION_UNORDERED_NEXT_INDEX = -1n;
 export const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET = 1715335229n;
 export const OP_USERNAME_BIND_VAULT = 1621496068n;

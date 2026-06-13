@@ -123,6 +123,68 @@ async function contractBalance(blockchain: Blockchain, vault: any): Promise<bigi
 }
 
 describe('Vault milestone 2: KeyRecord + key_generation lifecycle', () => {
+  it('VAULT-ENVELOPE-01: rejects externals padded with extra refs or trailing bits (import-fee drain fix)', async () => {
+    const { blockchain, vault, user } = await setup();
+    await registerHybrid(vault, user);
+    await depositTon(vault, user); // give the user a TON balance so a CANONICAL replace would succeed
+    const nonce = (await vault.getGetUser(user.address)).publish_nonce;
+
+    // Rebuild the canonical signed body, then append framing the signature does not cover.
+    const payload = beginCell()
+      .storeUint(ENC_1, 256).storeUint(SIG_1, 256).storeUint(PQ_HASH, 256)
+      .storeUint(1184n, 16).storeRef(PQ_CELL).storeUint(2n, 16).endCell();
+    const signedPayload = beginCell()
+      .storeUint(VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN, 32)
+      .storeUint(GENESIS_HASH, 256)
+      .storeUint(addressHash(vault.address), 256)
+      .storeUint(addressHash(user.address), 256)
+      .storeUint(nonce, 64).storeRef(payload).endCell();
+    const sig = sign(signedPayload.hash(), AUTH_KEY_PAIR.secretKey);
+    const canonicalHead = () => beginCell()
+      .storeUint(OP_REPLACE_MESSAGING_KEYS, 32)
+      .storeAddress(user.address)
+      .storeBuffer(sig)
+      .storeRef(signedPayload);
+
+    // (a) extra junk ref on the envelope — the drain vector (charged to the Vault, uncovered by the
+    //     signature) — must be rejected PRE-accept so no import fee is paid (exit 16901).
+    const extraRefBody = canonicalHead().storeRef(beginCell().endCell()).endCell();
+    await expect(blockchain.sendMessage(external({ to: vault.address, body: extraRefBody })))
+      .rejects.toThrow(/16901/);
+
+    // (b) trailing bits on the envelope — non-canonical/malleable form — rejected pre-accept (exit 16900).
+    const trailingBitsBody = canonicalHead().storeUint(0, 3).endCell();
+    await expect(blockchain.sendMessage(external({ to: vault.address, body: trailingBitsBody })))
+      .rejects.toThrow(/16900/);
+
+    // Neither padded attempt consumed the nonce; the canonical body still succeeds.
+    expect((await vault.getGetUser(user.address)).publish_nonce).toBe(nonce);
+    await blockchain.sendMessage(external({ to: vault.address, body: canonicalHead().endCell() }));
+    expect((await vault.getGetUser(user.address)).publish_nonce).toBe(nonce + 1n);
+  });
+
+  it('VAULT-RECEIPT-01: a nonce-consuming action writes a receipt readable via get_user_receipts', async () => {
+    const { blockchain, vault, user } = await setup();
+    await registerHybrid(vault, user);
+    await depositTon(vault, user); // fund the user so the replace passes its balance gate
+    // No receipts before any nonce-consuming external.
+    const before = await vault.getGetUserReceipts(user.address);
+    expect(before.exists).toBe(true);
+    expect(before.publish_nonce).toBe(0n);
+    expect(before.receipts.size).toBe(0);
+
+    await replaceHybrid(blockchain, vault, user); // consumes nonce 0 (ReplaceMessagingKeys, synchronous)
+
+    const after = await vault.getGetUserReceipts(user.address);
+    expect(after.publish_nonce).toBe(1n);
+    const slot = after.receipts.get(0); // nonce 0 mod 20 = slot 0
+    expect(slot).toBeDefined();
+    expect(slot!.nonce).toBe(0n);
+    expect(slot!.action).toBe(3n);   // ACT_REPLACE_KEYS
+    expect(slot!.result).toBe(0n);   // RES_PROCESSING (action accepted at this nonce)
+    expect(slot!.part_count).toBe(0n);
+  });
+
   it('VAULT-HAPPY-06: first key registration creates UserState and key_generation 0 record', async () => {
     const { vault, user } = await setup();
 

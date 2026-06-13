@@ -163,7 +163,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const global = await registry.getGetGlobal();
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
     expect(pending.exists).toBe(false);
     expect(global.name_record_count).toBe(1n);
@@ -203,7 +203,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const itemState = await item.getGetState();
     expect(record.exists).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
-    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
     expect(itemState.initialized).toBe(true);
     expect(itemState.owner_wallet.equals(ownerWallet)).toBe(true);
     expect(itemState.owner_wallet.equals(attacker.address)).toBe(false);
@@ -221,7 +221,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const global = await registry.getGetGlobal();
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
     expect(global.name_record_count).toBe(1n);
   });
 
@@ -236,7 +236,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const global = await registry.getGetGlobal();
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerWallet)).toBe(true);
+    expect(record.minter_wallet.equals(ownerWallet)).toBe(true);
     expect(global.name_record_count).toBe(1n);
   });
 
@@ -262,7 +262,7 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect(beforeRecord.exists).toBe(true);
     expect(afterRecord.exists).toBe(true);
-    expect(afterRecord.owner_wallet.equals(beforeRecord.owner_wallet)).toBe(true);
+    expect(afterRecord.minter_wallet.equals(beforeRecord.minter_wallet)).toBe(true);
     expect(afterRecord.item_address.equals(beforeRecord.item_address)).toBe(true);
     expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
     expect(afterGlobal.pending_mint_count).toBe(0n);
@@ -292,7 +292,7 @@ describe('UsernameRegistry paid mint milestone', () => {
 
     expect(beforeRecord.exists).toBe(true);
     expect(afterRecord.exists).toBe(true);
-    expect(afterRecord.owner_wallet.equals(beforeRecord.owner_wallet)).toBe(true);
+    expect(afterRecord.minter_wallet.equals(beforeRecord.minter_wallet)).toBe(true);
     expect(afterRecord.item_address.equals(beforeRecord.item_address)).toBe(true);
     expect(afterGlobal.name_record_count).toBe(beforeGlobal.name_record_count);
     expect(afterGlobal.pending_mint_count).toBe(0n);
@@ -377,7 +377,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const itemState = await item.getGetState();
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerA)).toBe(true);
+    expect(record.minter_wallet.equals(ownerA)).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
     expect(itemState.owner_wallet.equals(ownerB)).toBe(true);
     expect((await registry.getGetPendingMint(hash)).exists).toBe(false);
@@ -597,7 +597,7 @@ describe('UsernameRegistry paid mint milestone', () => {
     const global = await registry.getGetGlobal();
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ownerA)).toBe(true);
+    expect(record.minter_wallet.equals(ownerA)).toBe(true);
     expect(global.name_record_count).toBe(1n);
   });
 

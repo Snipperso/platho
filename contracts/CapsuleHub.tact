@@ -57,6 +57,15 @@ const ENTRY_UID_DOMAIN_VAULT_PRIVATE: Int = 0xD1190201;
 const ENTRY_UID_DOMAIN_VAULT_PUBLIC: Int = 0xD1190202;
 const CAPSULEHUB_ENTRY_KIND_PRIVATE: Int = 1;
 const CAPSULEHUB_ENTRY_KIND_PUBLIC: Int = 2;
+
+// --- VPB2 batch ingest (mirror the Vault's batch constants so the value model is consistent end-to-end;
+// the Session-5 generator pins both sides from one source) ---
+const MAX_BATCH_PARTS: Int = 20;
+const HUB_BATCH_BASE_GAS: Int = 25000;
+const HUB_PART_GAS_PRIVATE: Int = 16000;
+const HUB_PART_GAS_PUBLIC: Int = 13000;
+const HUB_MIN_PER_PART_VALUE: Int = 1000000; // loose O(1) Phase-A lower bound (gross-underfunding early bounce)
+const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931; // "EPI1" per-entry publish_id derivation
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
 
 message(0x90E2E0CB) BindDeploymentManifest {
@@ -121,6 +130,28 @@ message(0x4350524E) PruneCapsuleEntry {
     kind: Int as uint8;
     entry_id: Int as uint64;
     publish_id: Int as uint256;
+}
+
+// VPB2: the Vault forwards one signed batch (1..MAX_BATCH_PARTS parts) under this op. Wire format mirrors the
+// Vault's PublishBatchToHub exactly; op + the 224 recovery bits (bounce_id, bounce_tag) come FIRST so they
+// survive bounce truncation.
+message(0xA4F862D1) PublishBatchToHub {
+    bounce_id: Int as uint64;
+    bounce_tag: Int as uint160;
+    publish_id: Int as uint256;
+    publish_kind: Int as uint8;
+    part_count: Int as uint8;
+    protocol_fee_total: Int as uint128;
+    author_wallet: Address;
+    parts: Cell;        // ref[0]: the exact signed part list (singly linked)
+    marketing: Cell?;   // ref[1]: public batches only ({marketing_note}); null for private
+}
+
+message(0x874E5771) CapsuleHubBatchAck {
+    publish_id: Int as uint256;
+    first_entry_id: Int as uint64;
+    part_count: Int as uint8;
+    batch_uid: Int as uint256;
 }
 
 struct CapsuleHubStateView {
@@ -605,6 +636,164 @@ contract CapsuleHub {
         throwUnless(12921, self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(12922, self.vault_bound);
         self.sealed = true;
+    }
+
+    // entry.publish_id = hash(EPI1 ‖ batch_publish_id ‖ part_index:u16) — a distinct, verifiable id per stored entry.
+    fun computeEntryPublishId(batchPublishId: Int, partIndex: Int): Int {
+        return beginCell()
+            .storeUint(CAPSULE_ENTRY_PUBLISH_ID_DOMAIN, 32)
+            .storeUint(batchPublishId, 256)
+            .storeUint(partIndex, 16)
+            .endCell()
+            .hash();
+    }
+
+    // Running hash over the part-ordered per-entry uids (client cross-check; no on-chain consumer).
+    fun accumulateBatchUid(acc: Int, uid: Int): Int {
+        return beginCell().storeUint(acc, 256).storeUint(uid, 256).endCell().hash();
+    }
+
+    // Per-entry storage reserve carried IN the batch value, with the 1.25 protectedReserve buffer (S1 finding).
+    fun batchStorageReserveWithBuffer(kind: Int): Int {
+        let endowment: Int = CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT;
+        if (kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) { endowment = CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT; }
+        return (CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE + endowment)
+            * CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR / CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR;
+    }
+
+    // VPB2 batch ingest (spec 5.2): validate-all-then-commit-all. Tact reverts ALL state on any throw, so a
+    // single atomic pass that validates (shape+hash via requireExact*) and stores each part IS "no partial
+    // commit": any per-part throw aborts the whole batch (nothing stored, no fee, message bounces). The full
+    // value gate is checked after the loop (still atomic). Phase A holds a cheap O(1) lower bound so gross
+    // underfunding bounces before the expensive walk.
+    receive(msg: PublishBatchToHub) {
+        // Phase A — scalars
+        self.requireSealed();
+        throwUnless(13500, sender() == self.vault_address);
+        throwUnless(13501, msg.publish_id != 0);
+        throwUnless(13502, (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) || (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PUBLIC));
+        throwUnless(13503, (msg.part_count >= 1) && (msg.part_count <= MAX_BATCH_PARTS));
+        let isPrivate: Bool = (msg.publish_kind == CAPSULEHUB_ENTRY_KIND_PRIVATE);
+
+        let firstEntryId: Int = self.public_latest_id;
+        let fullFeePerPart: Int = PLATO_PUBLIC_POST_FEE_TON;
+        if (isPrivate) {
+            firstEntryId = self.private_latest_id;
+            fullFeePerPart = self.privateFullFee(CRYPTO_SUITE_HYBRID);
+        }
+        throwUnless(13504, firstEntryId + msg.part_count <= 18446744073709551615);
+        throwUnless(13505, msg.protocol_fee_total >= 0);
+        throwUnless(13506, msg.protocol_fee_total <= msg.part_count * fullFeePerPart);
+        if (!isPrivate) {
+            let mk: Cell? = msg.marketing;
+            throwUnless(13507, mk != null);
+            throwUnless(13508, mk!!.beginParse().loadUint(152) == PLATHO_PUBLIC_MARKETING_NOTE_ASCII);
+        }
+        // Phase A cheap lower bound (O(1)): bounce gross underfunding before the walk (drift-beyond-cushion case).
+        throwUnless(13509, context().value >= msg.protocol_fee_total + msg.part_count * HUB_MIN_PER_PART_VALUE + CAPSULEHUB_ACK_FORWARD_RESERVE);
+
+        // Phases B/C/D — one atomic pass.
+        let cursor: Cell = msg.parts;
+        let i: Int = 0;
+        let requiredValue: Int = msg.protocol_fee_total + getComputeFee(HUB_BATCH_BASE_GAS, false) + CAPSULEHUB_ACK_FORWARD_RESERVE;
+        let batchUid: Int = 0;
+        while (i < msg.part_count) {
+            let isLast: Bool = (i == (msg.part_count - 1));
+            let part: Slice = cursor.beginParse();
+            let entryId: Int = firstEntryId + i;
+            let entryPublishId: Int = self.computeEntryPublishId(msg.publish_id, i);
+            let nextCell: Cell = msg.parts; // overwritten when not last; unused on the last iteration
+            if (isPrivate) {
+                let wantRefs: Int = 3;
+                if (!isLast) { wantRefs = 4; }
+                throwUnless(13510, (part.bits() == 784) && (part.refs() == wantRefs));
+                let sizeClass: Int = part.loadUint(8);
+                let cryptoSuite: Int = part.loadUint(8);
+                let h0: Int = part.loadUint(256);
+                let h1: Int = part.loadUint(256);
+                let bh: Int = part.loadUint(256);
+                let header0: Cell = part.loadRef();
+                let header1: Cell = part.loadRef();
+                let body: Cell = part.loadRef();
+                if (!isLast) { nextCell = part.loadRef(); }
+                throwUnless(13511, self.isAllowedPrivatePair(sizeClass, cryptoSuite));
+                throwUnless(13512, (h0 != 0) && (h1 != 0) && (bh != 0));
+                self.requireExactPayloadCell(header0, h0, CAPSULEHUB_PRIVATE_HEADER0_CELLS, CAPSULEHUB_PRIVATE_HEADER0_BITS, CAPSULEHUB_PRIVATE_HEADER0_REFS, 13513, 13514);
+                self.requireExactPayloadCell(header1, h1, CAPSULEHUB_PRIVATE_HEADER1_CELLS, CAPSULEHUB_PRIVATE_HEADER1_BITS, CAPSULEHUB_PRIVATE_HEADER1_REFS, 13515, 13516);
+                self.requireExactPayloadCell(body, bh, self.privateBodyCells(sizeClass, cryptoSuite), self.privateBodyBits(sizeClass, cryptoSuite), self.privateBodyRefs(sizeClass, cryptoSuite), 13517, 13518);
+                let entryLink: Int = self.entryLink(entryId);
+                let senderPrevLink: Int = self.pushPrivateSenderIndex(self.privateHeaderSenderKeyId(header0), entryLink);
+                let recipientPrevLink: Int = self.pushPrivateRecipientIndex(self.privateHeaderRecipientKeyId(header0), entryLink);
+                let uid: Int = self.computeVaultPrivateEntryUid(entryId, entryPublishId, h0, h1, bh);
+                self.private_entries.set(entryId, PrivateCapsuleEntry {
+                    publish_id: entryPublishId,
+                    created_at: now(),
+                    body_hash: bh,
+                    sender_prev_link: senderPrevLink,
+                    recipient_prev_link: recipientPrevLink,
+                    header_0: header0,
+                    header_1: header1
+                });
+                self.private_live_count += 1;
+                requiredValue += getComputeFee(HUB_PART_GAS_PRIVATE, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_PRIVATE);
+                batchUid = self.accumulateBatchUid(batchUid, uid);
+            } else {
+                let wantRefs: Int = 2;
+                if (!isLast) { wantRefs = 3; }
+                throwUnless(13520, (part.bits() == 528) && (part.refs() == wantRefs));
+                let sizeClass: Int = part.loadUint(8);
+                let reserved: Int = part.loadUint(8);
+                let h0: Int = part.loadUint(256);
+                let bh: Int = part.loadUint(256);
+                let header: Cell = part.loadRef();
+                let body: Cell = part.loadRef();
+                if (!isLast) { nextCell = part.loadRef(); }
+                throwUnless(13521, reserved == 0);
+                throwUnless(13522, self.isAllowedPublicSizeClass(sizeClass));
+                throwUnless(13523, (h0 != 0) && (bh != 0));
+                self.requirePublicHeaderCell(header, h0, 13524, 13525);
+                self.requirePublicPayloadCell(body, bh, sizeClass, 13526, 13527);
+                let uid: Int = self.computeVaultPublicEntryUid(entryId, entryPublishId, msg.author_wallet, h0, bh);
+                self.public_entries.set(entryId, PublicCapsuleEntry {
+                    publish_id: entryPublishId,
+                    created_at: now(),
+                    author_wallet: msg.author_wallet,
+                    body_hash: bh,
+                    header: header
+                });
+                self.public_live_count += 1;
+                requiredValue += getComputeFee(HUB_PART_GAS_PUBLIC, false) + self.batchStorageReserveWithBuffer(CAPSULEHUB_ENTRY_KIND_PUBLIC);
+                batchUid = self.accumulateBatchUid(batchUid, uid);
+            }
+            cursor = nextCell;
+            i += 1;
+        }
+        // Full value gate (atomic: reverts every store above if the forwarded value is short).
+        throwUnless(13530, context().value >= requiredValue);
+        // Commit batch-level counters + fee exactly once.
+        if (isPrivate) {
+            self.private_latest_id += msg.part_count;
+        } else {
+            self.public_latest_id += msg.part_count;
+        }
+        self.accrued_plato_fee_ton += msg.protocol_fee_total;
+
+        // ACK (spec 5.3): keep fee + entry storage (+1.25 buffer), protect pre-existing balance, return the rest
+        // (import over-hold + ack float) to the Vault via mode 128. The Vault credits it back to the user ledger.
+        let kept: Int = msg.protocol_fee_total + msg.part_count * self.batchStorageReserveWithBuffer(msg.publish_kind);
+        nativeReserve(kept, ReserveAtMost | ReserveAddOriginalBalance);
+        message(MessageParameters {
+            to: self.vault_address,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingBalance,
+            body: CapsuleHubBatchAck {
+                publish_id: msg.publish_id,
+                first_entry_id: firstEntryId,
+                part_count: msg.part_count,
+                batch_uid: batchUid
+            }.toCell()
+        });
     }
 
     receive(msg: PublishPrivateFromVault) {
