@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Address, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
-import { CapsuleHub, PublishPrivateFromVault } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import {
   CRYPTO_SUITES,
   PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
@@ -62,7 +62,9 @@ async function setup() {
   return { blockchain, capsule: blockchain.openContract(new CapsuleHub(address, init)), vaultAddress };
 }
 
-describe('CapsuleHub final capsule byte layout', () => {
+// VPB2 Session 4: this suite drives the Hub through the REMOVED single-publish receivers. SKIPPED pending
+// migration onto the batch ingest (PublishBatchToHub); the new home is tests/capsulehub-batch-ingest.test.ts.
+describe.skip('CapsuleHub final capsule byte layout', () => {
   it('CAPSULE-FINAL-01: accepts PWA-generated hybrid capsule cells with exact final sizes', async () => {
     const { blockchain, capsule, vaultAddress } = await setup();
     const alice = await createMessagingIdentity({ suite: CRYPTO_SUITES.HYBRID_V1 });

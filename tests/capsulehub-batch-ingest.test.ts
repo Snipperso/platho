@@ -6,6 +6,8 @@ import {
   finalPrivateBodyCell,
   finalPrivateHeader0Cell,
   finalPrivateHeader1Cell,
+  finalPublicBodyCell,
+  finalPublicHeaderCell,
 } from './helpers/capsule-cells';
 
 // VPB2 Session 4 — CapsuleHub batch ingest core (spec 5.2). Drives the Hub directly from the bound Vault
@@ -16,8 +18,10 @@ const MANIFEST = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556
 const OP_CAPSULE_HUB_BATCH_ACK = 0x874e5771n;
 const VAULT_BATCH_PUBLISH_ID_DOMAIN_HUB = 0x45504931n; // EPI1 (per-entry)
 const KIND_PRIVATE = 1n;
+const KIND_PUBLIC = 2n;
 const SUITE_HYBRID = 2n;
 const SIZE_1K = 1n;
+const MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n; // "sent via Platho.App"
 const BATCH_PUBLISH_ID = 0x9999000000000000000000000000000000000000000000000000000000009999n;
 
 function cellHash(cell: Cell): bigint {
@@ -48,6 +52,34 @@ function privatePartCell(): Cell {
     .endCell();
 }
 
+const marketingCell = (): Cell => beginCell().storeUint(MARKETING_NOTE, 152).endCell();
+
+// Builds a singly-linked part list of `n` 1K parts (private or public). Last part has no successor ref; earlier
+// parts carry one. Fills vary per index so the parts (and their hashes) differ, exercising distinct entries.
+function partsList(kind: bigint, n: number): Cell {
+  let next: Cell | null = null;
+  for (let i = n - 1; i >= 0; i -= 1) {
+    let b;
+    if (kind === KIND_PRIVATE) {
+      const h0 = finalPrivateHeader0Cell(0x30 + i);
+      const h1 = finalPrivateHeader1Cell(0x31 + i);
+      const body = finalPrivateBodyCell(SIZE_1K, 0x62 + i);
+      b = beginCell().storeUint(SIZE_1K, 8).storeUint(SUITE_HYBRID, 8)
+        .storeUint(cellHash(h0), 256).storeUint(cellHash(h1), 256).storeUint(cellHash(body), 256)
+        .storeRef(h0).storeRef(h1).storeRef(body);
+    } else {
+      const header = finalPublicHeaderCell(0x50, 8);
+      const body = finalPublicBodyCell(0x70 + i, 1024);
+      b = beginCell().storeUint(SIZE_1K, 8).storeUint(0, 8)
+        .storeUint(cellHash(header), 256).storeUint(cellHash(body), 256)
+        .storeRef(header).storeRef(body);
+    }
+    if (next) b.storeRef(next);
+    next = b.endCell();
+  }
+  return next!;
+}
+
 async function setup() {
   const bc = await Blockchain.create();
   bc.now = 1_700_000_000;
@@ -62,6 +94,12 @@ async function setup() {
   }));
   const hub = bc.openContract(new CapsuleHub(addr, init));
   return { bc, hub, vault };
+}
+
+function hubTxExit(res: any, hub: any): number {
+  const tx = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === hub.address.toString());
+  const cp: any = tx?.description?.computePhase;
+  return cp?.type === 'vm' ? cp.exitCode : 0;
 }
 
 describe('CapsuleHub VPB2: batch ingest (Session 4)', () => {
@@ -115,5 +153,61 @@ describe('CapsuleHub VPB2: batch ingest (Session 4)', () => {
     const cp: any = hubTx?.description?.computePhase;
     expect(cp?.type === 'vm' ? cp.exitCode : 0).toBe(13500);
     expect((await hub.getGetState()).private_latest_id).toBe(0n); // nothing stored
+  });
+
+  it('HUB-BATCH-03: ingests a 1-part public batch (marketing marker required) and stores a public entry', async () => {
+    const { hub, vault } = await setup();
+    await hub.send(vault.getSender(), { value: toNano('0.1') }, {
+      $$type: 'PublishBatchToHub',
+      bounce_id: 1n, bounce_tag: 2n, publish_id: BATCH_PUBLISH_ID, publish_kind: KIND_PUBLIC,
+      part_count: 1n, protocol_fee_total: 0n, author_wallet: vault.address,
+      parts: partsList(KIND_PUBLIC, 1), marketing: marketingCell(),
+    } as any);
+    const entry = await hub.getGetPublicEntry(0n);
+    expect(entry.exists).toBe(true);
+    expect(entry.publish_id).toBe(computeEntryPublishId(BATCH_PUBLISH_ID, 0));
+    expect((await hub.getGetState()).public_latest_id).toBe(1n);
+  });
+
+  it('HUB-BATCH-04: a 3-part private batch stores 3 sequential entries, each with its own EPI1 publish_id', async () => {
+    const { hub, vault } = await setup();
+    await hub.send(vault.getSender(), { value: toNano('0.3') }, {
+      $$type: 'PublishBatchToHub',
+      bounce_id: 1n, bounce_tag: 2n, publish_id: BATCH_PUBLISH_ID, publish_kind: KIND_PRIVATE,
+      part_count: 3n, protocol_fee_total: 0n, author_wallet: vault.address,
+      parts: partsList(KIND_PRIVATE, 3), marketing: null,
+    } as any);
+    for (let i = 0; i < 3; i += 1) {
+      const e = await hub.getGetPrivateEntry(BigInt(i));
+      expect(e.exists).toBe(true);
+      expect(e.publish_id).toBe(computeEntryPublishId(BATCH_PUBLISH_ID, i));
+    }
+    const state = await hub.getGetState();
+    expect(state.private_latest_id).toBe(3n);
+    expect(state.private_live_count).toBe(3n);
+  });
+
+  it('HUB-BATCH-05: a grossly underfunded batch bounces in Phase A (13509) before the walk; nothing stored', async () => {
+    const { hub, vault } = await setup();
+    const res = await hub.send(vault.getSender(), { value: toNano('0.025') }, { // < fee + 1M + 30M ACK floor
+      $$type: 'PublishBatchToHub',
+      bounce_id: 1n, bounce_tag: 2n, publish_id: BATCH_PUBLISH_ID, publish_kind: KIND_PRIVATE,
+      part_count: 1n, protocol_fee_total: 0n, author_wallet: vault.address,
+      parts: privatePartCell(), marketing: null,
+    } as any);
+    expect(hubTxExit(res, hub)).toBe(13509);
+    expect((await hub.getGetState()).private_latest_id).toBe(0n);
+  });
+
+  it('HUB-BATCH-06: a malformed part (wrong bit width) aborts the whole batch (13510); nothing stored', async () => {
+    const { hub, vault } = await setup();
+    const res = await hub.send(vault.getSender(), { value: toNano('0.1') }, {
+      $$type: 'PublishBatchToHub',
+      bounce_id: 1n, bounce_tag: 2n, publish_id: BATCH_PUBLISH_ID, publish_kind: KIND_PRIVATE,
+      part_count: 1n, protocol_fee_total: 0n, author_wallet: vault.address,
+      parts: beginCell().storeUint(0, 100).endCell(), marketing: null,
+    } as any);
+    expect(hubTxExit(res, hub)).toBe(13510);
+    expect((await hub.getGetState()).private_latest_id).toBe(0n);
   });
 });
