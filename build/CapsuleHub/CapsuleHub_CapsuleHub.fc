@@ -1467,7 +1467,7 @@ _ %get_state() method_id(86957) {
         throw_unless(13500, ( equal_slices_bits(__tact_context_get_sender(), $self'vault_address) ));
         throw_unless(13501, ($msg'publish_id != 0));
         throw_unless(13502, ( (($msg'publish_kind == 1)) ? (true) : (($msg'publish_kind == 2)) ));
-        throw_unless(13503, ( (($msg'part_count >= 1)) ? (($msg'part_count <= 20)) : (false) ));
+        throw_unless(13503, ( (($msg'part_count >= 1)) ? (($msg'part_count <= 8)) : (false) ));
         int $isPrivate = ($msg'publish_kind == 1);
         int $firstEntryId = $self'public_latest_id;
         int $fullFeePerPart = 10000000;
@@ -1486,7 +1486,7 @@ _ %get_state() method_id(86957) {
         throw_unless(13509, ($Context$_get_value(__tact_context_get()) >= (($msg'protocol_fee_total + ($msg'part_count * 1000000)) + 30000000)));
         cell $cursor = $msg'parts;
         int $i = 0;
-        int $requiredValue = (($msg'protocol_fee_total + $global_getComputeFee(25000, false)) + 30000000);
+        int $requiredValue = (($msg'protocol_fee_total + $global_getComputeFee(14000, false)) + 30000000);
         int $batchUid = 0;
         while (($i < $msg'part_count)) {
             int $isLast = ($i == ($msg'part_count - 1));
@@ -1522,7 +1522,7 @@ _ %get_state() method_id(86957) {
                 int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_computeVaultPrivateEntryUid($entryId, $entryPublishId, $h0, $h1, $bh);
                 $self'private_entries~__tact_dict_set_uint_cell(64, $entryId, $PrivateCapsuleEntry$_store_cell($PrivateCapsuleEntry$_constructor_publish_id_created_at_body_hash_sender_prev_link_recipient_prev_link_header_0_header_1($entryPublishId, $global_now(), $bh, $senderPrevLink, $recipientPrevLink, $header0, $header1), begin_cell()));
                 $self'private_live_count = $self'private_live_count + 1;
-                $requiredValue = $requiredValue + ($global_getComputeFee(16000, false) + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_batchStorageReserveWithBuffer(1));
+                $requiredValue = $requiredValue + ($global_getComputeFee(75000, false) + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_batchStorageReserveWithBuffer(1));
                 $batchUid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_accumulateBatchUid($batchUid, $uid);
             } else {
                 int $wantRefs = 2;
@@ -1547,7 +1547,7 @@ _ %get_state() method_id(86957) {
                 int $uid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_computeVaultPublicEntryUid($entryId, $entryPublishId, $msg'author_wallet, $h0, $bh);
                 $self'public_entries~__tact_dict_set_uint_cell(64, $entryId, $PublicCapsuleEntry$_store_cell($PublicCapsuleEntry$_constructor_publish_id_created_at_author_wallet_body_hash_header($entryPublishId, $global_now(), $msg'author_wallet, $bh, $header), begin_cell()));
                 $self'public_live_count = $self'public_live_count + 1;
-                $requiredValue = $requiredValue + ($global_getComputeFee(13000, false) + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_batchStorageReserveWithBuffer(2));
+                $requiredValue = $requiredValue + ($global_getComputeFee(75000, false) + ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_batchStorageReserveWithBuffer(2));
                 $batchUid = ($self'fee_accumulator_address, $self'vault_address, $self'vault_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_controller_address, $self'private_latest_id, $self'public_latest_id, $self'private_live_count, $self'public_live_count, $self'accrued_plato_fee_ton, $self'private_entries, $self'public_entries, $self'private_sender_index, $self'private_recipient_index)~$CapsuleHub$_fun_accumulateBatchUid($batchUid, $uid);
             }
             $cursor = $nextCell;

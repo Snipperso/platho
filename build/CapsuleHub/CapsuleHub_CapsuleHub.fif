@@ -2289,7 +2289,7 @@ PROGRAM{
       0 GTINT
       IF:<{
         20 s() PUSH
-        21 LESSINT
+        9 LESSINT
       }>ELSE<{
         FALSE
       }>
@@ -2381,7 +2381,7 @@ PROGRAM{
       THROWANYIFNOT
       21 s() PUSH
       0 PUSHINT
-      25000 PUSHINT
+      14000 PUSHINT
       FALSE
           GETGASFEE
       22 s() PUSH
@@ -2700,7 +2700,7 @@ PROGRAM{
           __tact_dict_set_uint_cell INLINECALLDICT
           s0 18 s() XCHG
           INC
-          16000 PUSHINT
+          75000 PUSHINT
           FALSE
               GETGASFEE
           s9 s14 XCHG
@@ -2858,7 +2858,7 @@ PROGRAM{
           __tact_dict_set_uint_cell INLINECALLDICT
           s0 s2 XCHG
           INC
-          13000 PUSHINT
+          75000 PUSHINT
           FALSE
               GETGASFEE
           s12 s14 XCHG

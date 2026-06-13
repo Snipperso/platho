@@ -323,7 +323,7 @@ const RES_BOUNCED_REFUNDED: Int = 0x02;
 const RES_TOMBSTONED: Int = 0x03;
 const AUX_BATCH_LEVEL: Int = 0xFFFFFFFFFFFFFFFF; // 2^64-1: batch-level aux (no specific part index)
 // --- VPB2 batch publish ---
-const MAX_BATCH_PARTS: Int = 20;
+const MAX_BATCH_PARTS: Int = 8;
 const VPB2_VERSION: Int = 1;
 // Worst-case import bound for the pre-accept floor + the signed hold: the config-43 message caps,
 // which provably upper-bound the import fee of ANY legal inbound external (drain-proof). The Session-5
@@ -342,23 +342,25 @@ const ACK_MIN_FORWARD: Int = 30000000; // 0.03 TON floor for the ACK leg (return
 // reject_fee uses the SAME formula, so reject refund = max_charge - floor >= 0 ALWAYS (the pre-accept gate is
 // max_charge >= floor) and the Vault recovers its real import as long as each pin >= its runtime value.
 // canonical_total and success retention stay RUNTIME-priced (post-accept, gas-ample, config-tracking).
-// Snapshot (config-43 caps): getForwardFee(EXT_HARD)=194,490,145; getComputeFee(REJECT_BASE_GAS=9000)=600,001;
-// getComputeFee(WALK_GAS_PER_PART_MAX=20000)=1,333,334 — each rounded UP for config headroom. Generator
+// Snapshot (config-43 caps): getForwardFee(EXT_HARD)=194,490,145; getComputeFee(REJECT_BASE_GAS=10000)≈666,667;
+// getComputeFee(WALK_GAS_PER_PART_MAX=90000)≈6,000,003 — each rounded UP for config headroom. Generator
 // re-pins at freeze; release gate G2 asserts each pin >= its runtime value (drain-proof reject).
 const BATCH_FLOOR_BASE_PIN: Int = 200700000;   // import hold (~195M, rounded to 200M) + reject base compute (~0.7M)
-const BATCH_FLOOR_PER_PART_PIN: Int = 1500000; // per-part walk compute (~1.333M, rounded up)
+const BATCH_FLOOR_PER_PART_PIN: Int = 6200000; // per-part walk compute (getComputeFee(90000)≈6.0M, rounded up)
 const PROTOCOL_FEE_TON_BATCH: Int = 10000000; // 0.01 TON per part
 const STORAGE_RESERVE_PRIVATE: Int = 4300000; // 1M keepalive + 3.3M endowment
 const STORAGE_RESERVE_PUBLIC: Int = 8400000;  // 1M keepalive + 7.4M endowment
-// Structural GAS constants (runtime-priced via getComputeFee; INITIAL estimates, calibrated in Session 5).
-const VAULT_BATCH_BASE_GAS: Int = 40000;
-const VAULT_PART_GAS_PRIVATE: Int = 14000;
-const VAULT_PART_GAS_PUBLIC: Int = 11000;
-const HUB_BATCH_BASE_GAS: Int = 25000;
-const HUB_PART_GAS_PRIVATE: Int = 16000;
-const HUB_PART_GAS_PUBLIC: Int = 13000;
-const WALK_GAS_PER_PART_MAX: Int = 20000;
-const REJECT_BASE_GAS: Int = 9000;
+// Structural GAS constants (runtime-priced via getComputeFee). CALIBRATED 2026-06-13 from sandbox worst-case:
+// per-part is the 32K measurement (Vault ~81,452 / Hub ~69,289) + margin; bases from the count-sweep intercept.
+// MAX_BATCH_PARTS=8 keeps the worst sendable batch (8x4K ~471k) under 50% of the 1M tx limit (gate GAS-GATE-G8).
+const VAULT_BATCH_BASE_GAS: Int = 50000;
+const VAULT_PART_GAS_PRIVATE: Int = 90000;
+const VAULT_PART_GAS_PUBLIC: Int = 90000;
+const HUB_BATCH_BASE_GAS: Int = 14000;
+const HUB_PART_GAS_PRIVATE: Int = 75000;
+const HUB_PART_GAS_PUBLIC: Int = 75000;
+const WALK_GAS_PER_PART_MAX: Int = 90000;
+const REJECT_BASE_GAS: Int = 10000;
 const ACK_GAS: Int = 9000;
 // VPB2 reject result codes (receipt RJ_*).
 const RJ_PART_SHAPE: Int = 0x11;

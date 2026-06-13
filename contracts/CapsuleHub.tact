@@ -48,10 +48,10 @@ const CAPSULEHUB_ENTRY_KIND_PUBLIC: Int = 2;
 
 // --- VPB2 batch ingest (mirror the Vault's batch constants so the value model is consistent end-to-end;
 // the Session-5 generator pins both sides from one source) ---
-const MAX_BATCH_PARTS: Int = 20;
-const HUB_BATCH_BASE_GAS: Int = 25000;
-const HUB_PART_GAS_PRIVATE: Int = 16000;
-const HUB_PART_GAS_PUBLIC: Int = 13000;
+const MAX_BATCH_PARTS: Int = 8;
+const HUB_BATCH_BASE_GAS: Int = 14000;
+const HUB_PART_GAS_PRIVATE: Int = 75000;
+const HUB_PART_GAS_PUBLIC: Int = 75000;
 const HUB_MIN_PER_PART_VALUE: Int = 1000000; // loose O(1) Phase-A lower bound (gross-underfunding early bounce)
 const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931; // "EPI1" per-entry publish_id derivation
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
