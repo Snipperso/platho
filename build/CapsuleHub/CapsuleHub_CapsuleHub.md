@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: CapsuleHub
-BoC Size: 8105 bytes
+BoC Size: 8107 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 28
