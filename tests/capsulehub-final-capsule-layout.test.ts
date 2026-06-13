@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Address, Cell, contractAddress, toNano } from '@ton/core';
-import { Blockchain, createShardAccount } from '@ton/sandbox';
-import { createHash } from 'crypto';
-import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { Cell, toNano } from '@ton/core';
 import {
   CRYPTO_SUITES,
   PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
@@ -10,63 +7,35 @@ import {
   createMessagingIdentity,
   exportSignedPublicKeyBundle,
 } from '../web/crypto/platho-crypto.mjs';
+import {
+  DEFAULT_BATCH_PUBLISH_ID,
+  KIND_PRIVATE,
+  computeEntryPublishId,
+  hubTxExit,
+  privatePartCustom,
+  publishBatchToHub,
+  setupHub,
+} from './helpers/vpb2';
 
-const PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS = new Map<bigint, bigint>([
-  [1n, 4_200_000n],
-  [2n, 4_300_000n],
-  [4n, 4_500_000n],
-  [8n, 5_000_000n],
-  [16n, 5_800_000n],
-  [32n, 7_600_000n],
-]);
-const MANIFEST_HASH = 0x43415053554c454855425f46494e414c5f4c41594f55545fn;
+// VPB2 Session 4 migration: this suite used to drive the (removed) single-publish receiver
+// PublishPrivateFromVault to prove the PWA's REAL crypto-lib hybrid capsule cells land on-chain with the
+// exact final byte layout. Repointed onto the batch ingest path (PublishBatchToHub): the same crypto-lib
+// header0/header1/body Cells are wrapped via privatePartCustom into a 1-part private batch and sent
+// Hub-direct from the bound Vault to a setupHub() Hub. We still assert the exact source byte sizes (the
+// layout claim being protected) AND that the entry is stored at id 0 with the EPI1 per-entry publish_id and
+// the stored header hashes equal to the crypto-lib hashes.
 
-function fixtureAddress(label: string, workchain = 0): Address {
-  return new Address(workchain, createHash('sha256').update(`PLATHO.V1.CAPSULE.FINAL.${label}`).digest());
+function cellFromPayload(payload: { boc: string }): Cell {
+  return Cell.fromBoc(Buffer.from(payload.boc, 'base64'))[0];
 }
 
 function hashHexToBigInt(hash: string): bigint {
   return BigInt(hash.startsWith('0x') ? hash : `0x${hash}`);
 }
 
-function cellFromPayload(payload: { boc: string }): Cell {
-  return Cell.fromBoc(Buffer.from(payload.boc, 'base64'))[0];
-}
-
-function privateRequired(sizeClass: bigint): bigint {
-  const execReserve = PRIVATE_HYBRID_EXEC_BY_SIZE_CLASS.get(sizeClass);
-  if (execReserve === undefined) throw new Error(`missing private exec reserve for ${sizeClass}K`);
-  return 10_000_000n + execReserve + 1_000_000n + 3_300_000n + 30_000_000n;
-}
-
-async function setup() {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const vaultAddress = fixtureAddress('VAULT');
-  const init = await CapsuleHub.init(
-    fixtureAddress('FEE_ACCUMULATOR'),
-    vaultAddress,
-    true,
-    true,
-    MANIFEST_HASH,
-    fixtureAddress('GENESIS_CONTROLLER'),
-  );
-  const address = contractAddress(0, init);
-  await blockchain.setShardAccount(address, createShardAccount({
-    address,
-    code: init.code,
-    data: init.data,
-    balance: toNano('1'),
-    workchain: address.workChain,
-  }));
-  return { blockchain, capsule: blockchain.openContract(new CapsuleHub(address, init)), vaultAddress };
-}
-
-// VPB2 Session 4: this suite drives the Hub through the REMOVED single-publish receivers. SKIPPED pending
-// migration onto the batch ingest (PublishBatchToHub); the new home is tests/capsulehub-batch-ingest.test.ts.
-describe.skip('CapsuleHub final capsule byte layout', () => {
-  it('CAPSULE-FINAL-01: accepts PWA-generated hybrid capsule cells with exact final sizes', async () => {
-    const { blockchain, capsule, vaultAddress } = await setup();
+describe('CapsuleHub final capsule byte layout (VPB2 batch ingest)', () => {
+  it('CAPSULE-FINAL-01: ingests a PWA-generated 1K hybrid capsule (exact final sizes) via the batch path', async () => {
+    const { hub, vault } = await setupHub();
     const alice = await createMessagingIdentity({ suite: CRYPTO_SUITES.HYBRID_V1 });
     const bob = await createMessagingIdentity({ suite: CRYPTO_SUITES.HYBRID_V1 });
     const bobBundle = await exportSignedPublicKeyBundle(bob, {
@@ -81,38 +50,40 @@ describe.skip('CapsuleHub final capsule byte layout', () => {
       clientNonce: 'AAAAAAAAAAAAAAAAAAAAAA',
     });
 
+    // The layout claim this suite protects: the crypto-lib emits exactly these final byte sizes.
+    expect(BigInt(encrypted.publish.size_class)).toBe(1n);
     expect(encrypted.publish.header_0_cell.bytes).toBe(140);
     expect(encrypted.publish.header_1_cell.bytes).toBe(30);
     expect(encrypted.publish.body_cell.bytes).toBe(2228);
 
-    await capsule.send(blockchain.sender(vaultAddress), { value: privateRequired(1n) }, {
-      $$type: 'PublishPrivateFromVault',
-      bounce_id: 9001n,
-      bounce_tag: 9001n,
-      publish_id: hashHexToBigInt(encrypted.publish.body_hash),
-      size_class: 1n,
-      crypto_suite: 2n,
-      header_0_hash: hashHexToBigInt(encrypted.publish.header_0_hash),
-      header_1_hash: hashHexToBigInt(encrypted.publish.header_1_hash),
-      body_hash: hashHexToBigInt(encrypted.publish.body_hash),
-      header_0: cellFromPayload(encrypted.publish.header_0_cell),
-      header_1: cellFromPayload(encrypted.publish.header_1_cell),
-      body: cellFromPayload(encrypted.publish.body_cell),
-      protocol_fee_paid: 10_000_000n,
-    } as PublishPrivateFromVault);
+    const h0Cell = cellFromPayload(encrypted.publish.header_0_cell);
+    const h1Cell = cellFromPayload(encrypted.publish.header_1_cell);
+    const bodyCell = cellFromPayload(encrypted.publish.body_cell);
 
-    const stored = await capsule.getGetPrivateEntry(0n);
+    const parts = privatePartCustom({ sizeClass: 1n, h0Cell, h1Cell, bodyCell });
+    const res = await hub.send(vault.getSender(), { value: toNano('0.1') }, publishBatchToHub({
+      parts,
+      authorWallet: vault.address,
+      kind: KIND_PRIVATE,
+      partCount: 1n,
+    }));
+    expect(hubTxExit(res, hub)).toBe(0);
+
+    const stored = await hub.getGetPrivateEntry(0n);
     expect(stored.exists).toBe(true);
+    expect(stored.publish_id).toBe(computeEntryPublishId(DEFAULT_BATCH_PUBLISH_ID, 0));
+    // Stored header cells / hashes match the crypto-lib output exactly.
     expect(stored.header_0.hash().toString('hex')).toBe(encrypted.publish.header_0_hash.slice(2));
     expect(stored.header_1.hash().toString('hex')).toBe(encrypted.publish.header_1_hash.slice(2));
+    expect(stored.header_0_hash).toBe(hashHexToBigInt(encrypted.publish.header_0_hash));
+    expect(stored.header_1_hash).toBe(hashHexToBigInt(encrypted.publish.header_1_hash));
     expect(stored.body_hash).toBe(hashHexToBigInt(encrypted.publish.body_hash));
-    expect(stored.page_id).toBe(0n);
-    expect(stored.page_offset).toBe(0n);
     expect((stored as any).body).toBeUndefined();
+    expect((await hub.getGetState()).private_latest_id).toBe(1n);
   });
 
-  it('CAPSULE-FINAL-02: accepts PWA-generated 32 KiB hybrid capsule cells with exact final sizes', async () => {
-    const { blockchain, capsule, vaultAddress } = await setup();
+  it('CAPSULE-FINAL-02: ingests a PWA-generated 32 KiB hybrid capsule (exact final sizes) via the batch path', async () => {
+    const { hub, vault } = await setupHub();
     const alice = await createMessagingIdentity({ suite: CRYPTO_SUITES.HYBRID_V1 });
     const bob = await createMessagingIdentity({ suite: CRYPTO_SUITES.HYBRID_V1 });
     const bobBundle = await exportSignedPublicKeyBundle(bob, {
@@ -125,11 +96,11 @@ describe.skip('CapsuleHub final capsule byte layout', () => {
       bobBundle,
       alice,
       {
-      now: 1_700_000_000_000,
-      createdAt: 1_700_000_000_000,
-      expiresAt: 1_700_060_000_000,
-      clientNonce: 'BBBBBBBBBBBBBBBBBBBBBB',
-      sizeClass: 32,
+        now: 1_700_000_000_000,
+        createdAt: 1_700_000_000_000,
+        expiresAt: 1_700_060_000_000,
+        clientNonce: 'BBBBBBBBBBBBBBBBBBBBBB',
+        sizeClass: 32,
       },
     );
 
@@ -138,27 +109,26 @@ describe.skip('CapsuleHub final capsule byte layout', () => {
     expect(encrypted.publish.header_1_cell.bytes).toBe(30);
     expect(encrypted.publish.body_cell.bytes).toBe(33972);
 
-    await capsule.send(blockchain.sender(vaultAddress), { value: privateRequired(32n) }, {
-      $$type: 'PublishPrivateFromVault',
-      bounce_id: 9002n,
-      bounce_tag: 9002n,
-      publish_id: hashHexToBigInt(encrypted.publish.body_hash),
-      size_class: 32n,
-      crypto_suite: 2n,
-      header_0_hash: hashHexToBigInt(encrypted.publish.header_0_hash),
-      header_1_hash: hashHexToBigInt(encrypted.publish.header_1_hash),
-      body_hash: hashHexToBigInt(encrypted.publish.body_hash),
-      header_0: cellFromPayload(encrypted.publish.header_0_cell),
-      header_1: cellFromPayload(encrypted.publish.header_1_cell),
-      body: cellFromPayload(encrypted.publish.body_cell),
-      protocol_fee_paid: 10_000_000n,
-    } as PublishPrivateFromVault);
+    const h0Cell = cellFromPayload(encrypted.publish.header_0_cell);
+    const h1Cell = cellFromPayload(encrypted.publish.header_1_cell);
+    const bodyCell = cellFromPayload(encrypted.publish.body_cell);
 
-    const stored = await capsule.getGetPrivateEntry(0n);
+    const parts = privatePartCustom({ sizeClass: 32n, h0Cell, h1Cell, bodyCell });
+    const res = await hub.send(vault.getSender(), { value: toNano('0.1') }, publishBatchToHub({
+      parts,
+      authorWallet: vault.address,
+      kind: KIND_PRIVATE,
+      partCount: 1n,
+    }));
+    expect(hubTxExit(res, hub)).toBe(0);
+
+    const stored = await hub.getGetPrivateEntry(0n);
     expect(stored.exists).toBe(true);
+    expect(stored.publish_id).toBe(computeEntryPublishId(DEFAULT_BATCH_PUBLISH_ID, 0));
+    expect(stored.header_0.hash().toString('hex')).toBe(encrypted.publish.header_0_hash.slice(2));
+    expect(stored.header_1.hash().toString('hex')).toBe(encrypted.publish.header_1_hash.slice(2));
     expect(stored.body_hash).toBe(hashHexToBigInt(encrypted.publish.body_hash));
-    expect(stored.page_id).toBe(0n);
-    expect(stored.page_offset).toBe(0n);
     expect((stored as any).body).toBeUndefined();
+    expect((await hub.getGetState()).private_latest_id).toBe(1n);
   }, 30000);
 });
