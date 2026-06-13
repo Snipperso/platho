@@ -165,7 +165,7 @@ describe('UsernameRegistry state-machine invariants', () => {
           if (model.status === 'registered') {
             registeredCount += 1n;
             expect(record.exists, `${debugContext}: ${name} record exists`).toBe(true);
-            expect(record.owner_wallet.toString()).toBe(model.owner.toString());
+            expect(record.minter_wallet.toString()).toBe(model.owner.toString());
             expect(pending.exists, `${debugContext}: ${name} no pending`).toBe(false);
           } else {
             pendingCount += 1n;

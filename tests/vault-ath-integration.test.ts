@@ -757,6 +757,7 @@ function signedVaultProfileAvatarBody(params: {
     owner_wallet: params.outerOwner ?? params.owner,
     signature: sign(signedPayload.hash(), params.secretKey),
     signed_payload: signedPayload,
+    envelope_padding: beginCell().endCell().asSlice(),
   })).endCell();
 }
 
@@ -794,6 +795,7 @@ function signedVaultUsernameMintBody(params: {
     owner_wallet: params.outerOwner ?? params.owner,
     signature: sign(signedPayload.hash(), params.secretKey),
     signed_payload: signedPayload,
+    envelope_padding: beginCell().endCell().asSlice(),
   })).endCell();
 }
 
@@ -1085,7 +1087,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
       avatarHash: secondAvatarHash,
       avatarEntryId: 72n,
       avatarStreamId: 0x21223344556677889900aabbccddeeffn,
-      avatarPartCount: 3n,
+      avatarPartCount: 2n,
     });
     const secondResult = await ctx.blockchain.sendMessage(external({
       to: ctx.vault.address,
@@ -1567,7 +1569,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const rawAfterFirst = await contractBalance(ctx.blockchain, ctx.vault.address);
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ctx.user.address)).toBe(true);
+    expect(record.minter_wallet.equals(ctx.user.address)).toBe(true);
     expect(afterUser.ath_balance).toBe(USERNAME_PRICE_6_PLUS);
     expect(afterUser.publish_nonce).toBe(beforeUser.publish_nonce + 1n);
     expect(afterGlobal.pending_username_mint_payment_count).toBe(0n);
@@ -2115,7 +2117,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const record = await ctx.usernameRegistry.getGetNameRecord(hash);
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ctx.user.address)).toBe(true);
+    expect(record.minter_wallet.equals(ctx.user.address)).toBe(true);
     expect(record.item_address.equals(itemAddress)).toBe(true);
     expect((await ctx.usernameRegistry.getGetPendingMint(hash)).exists).toBe(false);
     expect(afterUser.ath_balance).toBe(USERNAME_PRICE_6_PLUS);
@@ -2186,7 +2188,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const usernameOfficialWallet = ctx.blockchain.openContract(new ATHWallet(ctx.officialUsernameAthWallet));
 
     expect(record.exists).toBe(true);
-    expect(record.owner_wallet.equals(ctx.user.address)).toBe(true);
+    expect(record.minter_wallet.equals(ctx.user.address)).toBe(true);
     expect(afterSecond.ath_balance).toBe(afterFirst.ath_balance);
     expect(afterSecond.publish_nonce).toBe(afterFirst.publish_nonce + 1n);
     expect(afterGlobal.pending_username_mint_payment_count).toBe(0n);

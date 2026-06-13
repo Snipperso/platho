@@ -3191,6 +3191,7 @@ export type ReplaceMessagingKeys = {
     owner_wallet: Address;
     signature: Buffer;
     signed_payload: Cell;
+    envelope_padding: Slice;
 }
 
 export function storeReplaceMessagingKeys(src: ReplaceMessagingKeys) {
@@ -3200,6 +3201,7 @@ export function storeReplaceMessagingKeys(src: ReplaceMessagingKeys) {
         b_0.storeAddress(src.owner_wallet);
         b_0.storeBuffer(src.signature);
         b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
     };
 }
 
@@ -3209,21 +3211,24 @@ export function loadReplaceMessagingKeys(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _signature = sc_0.loadBuffer(64);
     const _signed_payload = sc_0.loadRef();
-    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = sc_0;
+    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadTupleReplaceMessagingKeys(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadGetterTupleReplaceMessagingKeys(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'ReplaceMessagingKeys' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function storeTupleReplaceMessagingKeys(source: ReplaceMessagingKeys) {
@@ -3231,6 +3236,7 @@ export function storeTupleReplaceMessagingKeys(source: ReplaceMessagingKeys) {
     builder.writeAddress(source.owner_wallet);
     builder.writeBuffer(source.signature);
     builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
     return builder.build();
 }
 
@@ -3427,6 +3433,7 @@ export type WithdrawTonFromVaultBalance = {
     owner_wallet: Address;
     signature: Buffer;
     signed_payload: Cell;
+    envelope_padding: Slice;
 }
 
 export function storeWithdrawTonFromVaultBalance(src: WithdrawTonFromVaultBalance) {
@@ -3436,6 +3443,7 @@ export function storeWithdrawTonFromVaultBalance(src: WithdrawTonFromVaultBalanc
         b_0.storeAddress(src.owner_wallet);
         b_0.storeBuffer(src.signature);
         b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
     };
 }
 
@@ -3445,21 +3453,24 @@ export function loadWithdrawTonFromVaultBalance(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _signature = sc_0.loadBuffer(64);
     const _signed_payload = sc_0.loadRef();
-    return { $$type: 'WithdrawTonFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = sc_0;
+    return { $$type: 'WithdrawTonFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadTupleWithdrawTonFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'WithdrawTonFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'WithdrawTonFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadGetterTupleWithdrawTonFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'WithdrawTonFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'WithdrawTonFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function storeTupleWithdrawTonFromVaultBalance(source: WithdrawTonFromVaultBalance) {
@@ -3467,6 +3478,7 @@ export function storeTupleWithdrawTonFromVaultBalance(source: WithdrawTonFromVau
     builder.writeAddress(source.owner_wallet);
     builder.writeBuffer(source.signature);
     builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
     return builder.build();
 }
 
@@ -3486,6 +3498,7 @@ export type WithdrawAthFromVaultBalance = {
     owner_wallet: Address;
     signature: Buffer;
     signed_payload: Cell;
+    envelope_padding: Slice;
 }
 
 export function storeWithdrawAthFromVaultBalance(src: WithdrawAthFromVaultBalance) {
@@ -3495,6 +3508,7 @@ export function storeWithdrawAthFromVaultBalance(src: WithdrawAthFromVaultBalanc
         b_0.storeAddress(src.owner_wallet);
         b_0.storeBuffer(src.signature);
         b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
     };
 }
 
@@ -3504,21 +3518,24 @@ export function loadWithdrawAthFromVaultBalance(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _signature = sc_0.loadBuffer(64);
     const _signed_payload = sc_0.loadRef();
-    return { $$type: 'WithdrawAthFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = sc_0;
+    return { $$type: 'WithdrawAthFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadTupleWithdrawAthFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'WithdrawAthFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'WithdrawAthFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadGetterTupleWithdrawAthFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'WithdrawAthFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'WithdrawAthFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function storeTupleWithdrawAthFromVaultBalance(source: WithdrawAthFromVaultBalance) {
@@ -3526,6 +3543,7 @@ export function storeTupleWithdrawAthFromVaultBalance(source: WithdrawAthFromVau
     builder.writeAddress(source.owner_wallet);
     builder.writeBuffer(source.signature);
     builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
     return builder.build();
 }
 
@@ -3540,129 +3558,12 @@ export function dictValueParserWithdrawAthFromVaultBalance(): DictionaryValue<Wi
     }
 }
 
-export type PublishPrivateFromVaultBalance = {
-    $$type: 'PublishPrivateFromVaultBalance';
-    owner_wallet: Address;
-    signature: Buffer;
-    signed_payload: Cell;
-}
-
-export function storePublishPrivateFromVaultBalance(src: PublishPrivateFromVaultBalance) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(2115981361, 32);
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeBuffer(src.signature);
-        b_0.storeRef(src.signed_payload);
-    };
-}
-
-export function loadPublishPrivateFromVaultBalance(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2115981361) { throw Error('Invalid prefix'); }
-    const _owner_wallet = sc_0.loadAddress();
-    const _signature = sc_0.loadBuffer(64);
-    const _signed_payload = sc_0.loadRef();
-    return { $$type: 'PublishPrivateFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
-}
-
-export function loadTuplePublishPrivateFromVaultBalance(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _signature = source.readBuffer();
-    const _signed_payload = source.readCell();
-    return { $$type: 'PublishPrivateFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
-}
-
-export function loadGetterTuplePublishPrivateFromVaultBalance(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _signature = source.readBuffer();
-    const _signed_payload = source.readCell();
-    return { $$type: 'PublishPrivateFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
-}
-
-export function storeTuplePublishPrivateFromVaultBalance(source: PublishPrivateFromVaultBalance) {
-    const builder = new TupleBuilder();
-    builder.writeAddress(source.owner_wallet);
-    builder.writeBuffer(source.signature);
-    builder.writeCell(source.signed_payload);
-    return builder.build();
-}
-
-export function dictValueParserPublishPrivateFromVaultBalance(): DictionaryValue<PublishPrivateFromVaultBalance> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePublishPrivateFromVaultBalance(src)).endCell());
-        },
-        parse: (src) => {
-            return loadPublishPrivateFromVaultBalance(src.loadRef().beginParse());
-        }
-    }
-}
-
-export type PublishPublicFromVaultBalance = {
-    $$type: 'PublishPublicFromVaultBalance';
-    owner_wallet: Address;
-    signature: Buffer;
-    signed_payload: Cell;
-}
-
-export function storePublishPublicFromVaultBalance(src: PublishPublicFromVaultBalance) {
-    return (builder: Builder) => {
-        const b_0 = builder;
-        b_0.storeUint(2115981362, 32);
-        b_0.storeAddress(src.owner_wallet);
-        b_0.storeBuffer(src.signature);
-        b_0.storeRef(src.signed_payload);
-    };
-}
-
-export function loadPublishPublicFromVaultBalance(slice: Slice) {
-    const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2115981362) { throw Error('Invalid prefix'); }
-    const _owner_wallet = sc_0.loadAddress();
-    const _signature = sc_0.loadBuffer(64);
-    const _signed_payload = sc_0.loadRef();
-    return { $$type: 'PublishPublicFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
-}
-
-export function loadTuplePublishPublicFromVaultBalance(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _signature = source.readBuffer();
-    const _signed_payload = source.readCell();
-    return { $$type: 'PublishPublicFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
-}
-
-export function loadGetterTuplePublishPublicFromVaultBalance(source: TupleReader) {
-    const _owner_wallet = source.readAddress();
-    const _signature = source.readBuffer();
-    const _signed_payload = source.readCell();
-    return { $$type: 'PublishPublicFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
-}
-
-export function storeTuplePublishPublicFromVaultBalance(source: PublishPublicFromVaultBalance) {
-    const builder = new TupleBuilder();
-    builder.writeAddress(source.owner_wallet);
-    builder.writeBuffer(source.signature);
-    builder.writeCell(source.signed_payload);
-    return builder.build();
-}
-
-export function dictValueParserPublishPublicFromVaultBalance(): DictionaryValue<PublishPublicFromVaultBalance> {
-    return {
-        serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePublishPublicFromVaultBalance(src)).endCell());
-        },
-        parse: (src) => {
-            return loadPublishPublicFromVaultBalance(src.loadRef().beginParse());
-        }
-    }
-}
-
 export type SetProfileAvatarFromVaultBalance = {
     $$type: 'SetProfileAvatarFromVaultBalance';
     owner_wallet: Address;
     signature: Buffer;
     signed_payload: Cell;
+    envelope_padding: Slice;
 }
 
 export function storeSetProfileAvatarFromVaultBalance(src: SetProfileAvatarFromVaultBalance) {
@@ -3672,6 +3573,7 @@ export function storeSetProfileAvatarFromVaultBalance(src: SetProfileAvatarFromV
         b_0.storeAddress(src.owner_wallet);
         b_0.storeBuffer(src.signature);
         b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
     };
 }
 
@@ -3681,21 +3583,24 @@ export function loadSetProfileAvatarFromVaultBalance(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _signature = sc_0.loadBuffer(64);
     const _signed_payload = sc_0.loadRef();
-    return { $$type: 'SetProfileAvatarFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = sc_0;
+    return { $$type: 'SetProfileAvatarFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadTupleSetProfileAvatarFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'SetProfileAvatarFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'SetProfileAvatarFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadGetterTupleSetProfileAvatarFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'SetProfileAvatarFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'SetProfileAvatarFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function storeTupleSetProfileAvatarFromVaultBalance(source: SetProfileAvatarFromVaultBalance) {
@@ -3703,6 +3608,7 @@ export function storeTupleSetProfileAvatarFromVaultBalance(source: SetProfileAva
     builder.writeAddress(source.owner_wallet);
     builder.writeBuffer(source.signature);
     builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
     return builder.build();
 }
 
@@ -3722,6 +3628,7 @@ export type MintUsernameFromVaultBalance = {
     owner_wallet: Address;
     signature: Buffer;
     signed_payload: Cell;
+    envelope_padding: Slice;
 }
 
 export function storeMintUsernameFromVaultBalance(src: MintUsernameFromVaultBalance) {
@@ -3731,6 +3638,7 @@ export function storeMintUsernameFromVaultBalance(src: MintUsernameFromVaultBala
         b_0.storeAddress(src.owner_wallet);
         b_0.storeBuffer(src.signature);
         b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
     };
 }
 
@@ -3740,21 +3648,24 @@ export function loadMintUsernameFromVaultBalance(slice: Slice) {
     const _owner_wallet = sc_0.loadAddress();
     const _signature = sc_0.loadBuffer(64);
     const _signed_payload = sc_0.loadRef();
-    return { $$type: 'MintUsernameFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = sc_0;
+    return { $$type: 'MintUsernameFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadTupleMintUsernameFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'MintUsernameFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'MintUsernameFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function loadGetterTupleMintUsernameFromVaultBalance(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _signature = source.readBuffer();
     const _signed_payload = source.readCell();
-    return { $$type: 'MintUsernameFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload };
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'MintUsernameFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
 export function storeTupleMintUsernameFromVaultBalance(source: MintUsernameFromVaultBalance) {
@@ -3762,6 +3673,7 @@ export function storeTupleMintUsernameFromVaultBalance(source: MintUsernameFromV
     builder.writeAddress(source.owner_wallet);
     builder.writeBuffer(source.signature);
     builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
     return builder.build();
 }
 
@@ -3776,334 +3688,327 @@ export function dictValueParserMintUsernameFromVaultBalance(): DictionaryValue<M
     }
 }
 
-export type PublishPrivateFromVault = {
-    $$type: 'PublishPrivateFromVault';
-    bounce_id: bigint;
-    bounce_tag: bigint;
-    publish_id: bigint;
-    size_class: bigint;
-    crypto_suite: bigint;
-    header_0_hash: bigint;
-    header_1_hash: bigint;
-    body_hash: bigint;
-    header_0: Cell;
-    header_1: Cell;
-    body: Cell;
-    protocol_fee_paid: bigint;
+export type PublishBatchFromVaultBalance = {
+    $$type: 'PublishBatchFromVaultBalance';
+    owner_wallet: Address;
+    signature: Buffer;
+    signed_payload: Cell;
+    envelope_padding: Slice;
 }
 
-export function storePublishPrivateFromVault(src: PublishPrivateFromVault) {
+export function storePublishBatchFromVaultBalance(src: PublishBatchFromVaultBalance) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(2767741632, 32);
-        b_0.storeUint(src.bounce_id, 64);
-        b_0.storeUint(src.bounce_tag, 160);
-        b_0.storeUint(src.publish_id, 256);
-        b_0.storeUint(src.size_class, 8);
-        b_0.storeUint(src.crypto_suite, 8);
-        b_0.storeUint(src.header_0_hash, 256);
-        const b_1 = new Builder();
-        b_1.storeUint(src.header_1_hash, 256);
-        b_1.storeUint(src.body_hash, 256);
-        b_1.storeRef(src.header_0);
-        b_1.storeRef(src.header_1);
-        b_1.storeRef(src.body);
-        b_1.storeUint(src.protocol_fee_paid, 128);
-        b_0.storeRef(b_1.endCell());
+        b_0.storeUint(2115981377, 32);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeBuffer(src.signature);
+        b_0.storeRef(src.signed_payload);
+        b_0.storeBuilder(src.envelope_padding.asBuilder());
     };
 }
 
-export function loadPublishPrivateFromVault(slice: Slice) {
+export function loadPublishBatchFromVaultBalance(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2767741632) { throw Error('Invalid prefix'); }
-    const _bounce_id = sc_0.loadUintBig(64);
-    const _bounce_tag = sc_0.loadUintBig(160);
-    const _publish_id = sc_0.loadUintBig(256);
-    const _size_class = sc_0.loadUintBig(8);
-    const _crypto_suite = sc_0.loadUintBig(8);
-    const _header_0_hash = sc_0.loadUintBig(256);
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _header_1_hash = sc_1.loadUintBig(256);
-    const _body_hash = sc_1.loadUintBig(256);
-    const _header_0 = sc_1.loadRef();
-    const _header_1 = sc_1.loadRef();
-    const _body = sc_1.loadRef();
-    const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    if (sc_0.loadUint(32) !== 2115981377) { throw Error('Invalid prefix'); }
+    const _owner_wallet = sc_0.loadAddress();
+    const _signature = sc_0.loadBuffer(64);
+    const _signed_payload = sc_0.loadRef();
+    const _envelope_padding = sc_0;
+    return { $$type: 'PublishBatchFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
-export function loadTuplePublishPrivateFromVault(source: TupleReader) {
-    const _bounce_id = source.readBigNumber();
-    const _bounce_tag = source.readBigNumber();
-    const _publish_id = source.readBigNumber();
-    const _size_class = source.readBigNumber();
-    const _crypto_suite = source.readBigNumber();
-    const _header_0_hash = source.readBigNumber();
-    const _header_1_hash = source.readBigNumber();
-    const _body_hash = source.readBigNumber();
-    const _header_0 = source.readCell();
-    const _header_1 = source.readCell();
-    const _body = source.readCell();
-    const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+export function loadTuplePublishBatchFromVaultBalance(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'PublishBatchFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
-export function loadGetterTuplePublishPrivateFromVault(source: TupleReader) {
-    const _bounce_id = source.readBigNumber();
-    const _bounce_tag = source.readBigNumber();
-    const _publish_id = source.readBigNumber();
-    const _size_class = source.readBigNumber();
-    const _crypto_suite = source.readBigNumber();
-    const _header_0_hash = source.readBigNumber();
-    const _header_1_hash = source.readBigNumber();
-    const _body_hash = source.readBigNumber();
-    const _header_0 = source.readCell();
-    const _header_1 = source.readCell();
-    const _body = source.readCell();
-    const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPrivateFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, crypto_suite: _crypto_suite, header_0_hash: _header_0_hash, header_1_hash: _header_1_hash, body_hash: _body_hash, header_0: _header_0, header_1: _header_1, body: _body, protocol_fee_paid: _protocol_fee_paid };
+export function loadGetterTuplePublishBatchFromVaultBalance(source: TupleReader) {
+    const _owner_wallet = source.readAddress();
+    const _signature = source.readBuffer();
+    const _signed_payload = source.readCell();
+    const _envelope_padding = source.readCell().asSlice();
+    return { $$type: 'PublishBatchFromVaultBalance' as const, owner_wallet: _owner_wallet, signature: _signature, signed_payload: _signed_payload, envelope_padding: _envelope_padding };
 }
 
-export function storeTuplePublishPrivateFromVault(source: PublishPrivateFromVault) {
+export function storeTuplePublishBatchFromVaultBalance(source: PublishBatchFromVaultBalance) {
     const builder = new TupleBuilder();
-    builder.writeNumber(source.bounce_id);
-    builder.writeNumber(source.bounce_tag);
-    builder.writeNumber(source.publish_id);
-    builder.writeNumber(source.size_class);
-    builder.writeNumber(source.crypto_suite);
-    builder.writeNumber(source.header_0_hash);
-    builder.writeNumber(source.header_1_hash);
-    builder.writeNumber(source.body_hash);
-    builder.writeCell(source.header_0);
-    builder.writeCell(source.header_1);
-    builder.writeCell(source.body);
-    builder.writeNumber(source.protocol_fee_paid);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeBuffer(source.signature);
+    builder.writeCell(source.signed_payload);
+    builder.writeSlice(source.envelope_padding.asCell());
     return builder.build();
 }
 
-export function dictValueParserPublishPrivateFromVault(): DictionaryValue<PublishPrivateFromVault> {
+export function dictValueParserPublishBatchFromVaultBalance(): DictionaryValue<PublishBatchFromVaultBalance> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePublishPrivateFromVault(src)).endCell());
+            builder.storeRef(beginCell().store(storePublishBatchFromVaultBalance(src)).endCell());
         },
         parse: (src) => {
-            return loadPublishPrivateFromVault(src.loadRef().beginParse());
+            return loadPublishBatchFromVaultBalance(src.loadRef().beginParse());
         }
     }
 }
 
-export type PublishPublicFromVault = {
-    $$type: 'PublishPublicFromVault';
+export type PublishBatchToHub = {
+    $$type: 'PublishBatchToHub';
     bounce_id: bigint;
     bounce_tag: bigint;
     publish_id: bigint;
-    size_class: bigint;
-    marketing_note: bigint;
+    publish_kind: bigint;
+    part_count: bigint;
+    protocol_fee_total: bigint;
     author_wallet: Address;
-    header_hash: bigint;
-    body_hash: bigint;
-    header: Cell;
-    body: Cell;
-    protocol_fee_paid: bigint;
+    parts: Cell;
+    marketing: Cell | null;
 }
 
-export function storePublishPublicFromVault(src: PublishPublicFromVault) {
+export function storePublishBatchToHub(src: PublishBatchToHub) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(2351593143, 32);
+        b_0.storeUint(2767741649, 32);
         b_0.storeUint(src.bounce_id, 64);
         b_0.storeUint(src.bounce_tag, 160);
         b_0.storeUint(src.publish_id, 256);
-        b_0.storeUint(src.size_class, 8);
-        b_0.storeUint(src.marketing_note, 152);
+        b_0.storeUint(src.publish_kind, 8);
+        b_0.storeUint(src.part_count, 8);
+        b_0.storeUint(src.protocol_fee_total, 128);
         b_0.storeAddress(src.author_wallet);
-        const b_1 = new Builder();
-        b_1.storeUint(src.header_hash, 256);
-        b_1.storeUint(src.body_hash, 256);
-        b_1.storeRef(src.header);
-        b_1.storeRef(src.body);
-        b_1.storeUint(src.protocol_fee_paid, 128);
-        b_0.storeRef(b_1.endCell());
+        b_0.storeRef(src.parts);
+        if (src.marketing !== null && src.marketing !== undefined) { b_0.storeBit(true).storeRef(src.marketing); } else { b_0.storeBit(false); }
     };
 }
 
-export function loadPublishPublicFromVault(slice: Slice) {
+export function loadPublishBatchToHub(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2351593143) { throw Error('Invalid prefix'); }
+    if (sc_0.loadUint(32) !== 2767741649) { throw Error('Invalid prefix'); }
     const _bounce_id = sc_0.loadUintBig(64);
     const _bounce_tag = sc_0.loadUintBig(160);
     const _publish_id = sc_0.loadUintBig(256);
-    const _size_class = sc_0.loadUintBig(8);
-    const _marketing_note = sc_0.loadUintBig(152);
+    const _publish_kind = sc_0.loadUintBig(8);
+    const _part_count = sc_0.loadUintBig(8);
+    const _protocol_fee_total = sc_0.loadUintBig(128);
     const _author_wallet = sc_0.loadAddress();
-    const sc_1 = sc_0.loadRef().beginParse();
-    const _header_hash = sc_1.loadUintBig(256);
-    const _body_hash = sc_1.loadUintBig(256);
-    const _header = sc_1.loadRef();
-    const _body = sc_1.loadRef();
-    const _protocol_fee_paid = sc_1.loadUintBig(128);
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    const _parts = sc_0.loadRef();
+    const _marketing = sc_0.loadBit() ? sc_0.loadRef() : null;
+    return { $$type: 'PublishBatchToHub' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, publish_kind: _publish_kind, part_count: _part_count, protocol_fee_total: _protocol_fee_total, author_wallet: _author_wallet, parts: _parts, marketing: _marketing };
 }
 
-export function loadTuplePublishPublicFromVault(source: TupleReader) {
+export function loadTuplePublishBatchToHub(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
-    const _size_class = source.readBigNumber();
-    const _marketing_note = source.readBigNumber();
+    const _publish_kind = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _protocol_fee_total = source.readBigNumber();
     const _author_wallet = source.readAddress();
-    const _header_hash = source.readBigNumber();
-    const _body_hash = source.readBigNumber();
-    const _header = source.readCell();
-    const _body = source.readCell();
-    const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    const _parts = source.readCell();
+    const _marketing = source.readCellOpt();
+    return { $$type: 'PublishBatchToHub' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, publish_kind: _publish_kind, part_count: _part_count, protocol_fee_total: _protocol_fee_total, author_wallet: _author_wallet, parts: _parts, marketing: _marketing };
 }
 
-export function loadGetterTuplePublishPublicFromVault(source: TupleReader) {
+export function loadGetterTuplePublishBatchToHub(source: TupleReader) {
     const _bounce_id = source.readBigNumber();
     const _bounce_tag = source.readBigNumber();
     const _publish_id = source.readBigNumber();
-    const _size_class = source.readBigNumber();
-    const _marketing_note = source.readBigNumber();
+    const _publish_kind = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _protocol_fee_total = source.readBigNumber();
     const _author_wallet = source.readAddress();
-    const _header_hash = source.readBigNumber();
-    const _body_hash = source.readBigNumber();
-    const _header = source.readCell();
-    const _body = source.readCell();
-    const _protocol_fee_paid = source.readBigNumber();
-    return { $$type: 'PublishPublicFromVault' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, size_class: _size_class, marketing_note: _marketing_note, author_wallet: _author_wallet, header_hash: _header_hash, body_hash: _body_hash, header: _header, body: _body, protocol_fee_paid: _protocol_fee_paid };
+    const _parts = source.readCell();
+    const _marketing = source.readCellOpt();
+    return { $$type: 'PublishBatchToHub' as const, bounce_id: _bounce_id, bounce_tag: _bounce_tag, publish_id: _publish_id, publish_kind: _publish_kind, part_count: _part_count, protocol_fee_total: _protocol_fee_total, author_wallet: _author_wallet, parts: _parts, marketing: _marketing };
 }
 
-export function storeTuplePublishPublicFromVault(source: PublishPublicFromVault) {
+export function storeTuplePublishBatchToHub(source: PublishBatchToHub) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.bounce_id);
     builder.writeNumber(source.bounce_tag);
     builder.writeNumber(source.publish_id);
-    builder.writeNumber(source.size_class);
-    builder.writeNumber(source.marketing_note);
+    builder.writeNumber(source.publish_kind);
+    builder.writeNumber(source.part_count);
+    builder.writeNumber(source.protocol_fee_total);
     builder.writeAddress(source.author_wallet);
-    builder.writeNumber(source.header_hash);
-    builder.writeNumber(source.body_hash);
-    builder.writeCell(source.header);
-    builder.writeCell(source.body);
-    builder.writeNumber(source.protocol_fee_paid);
+    builder.writeCell(source.parts);
+    builder.writeCell(source.marketing);
     return builder.build();
 }
 
-export function dictValueParserPublishPublicFromVault(): DictionaryValue<PublishPublicFromVault> {
+export function dictValueParserPublishBatchToHub(): DictionaryValue<PublishBatchToHub> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePublishPublicFromVault(src)).endCell());
+            builder.storeRef(beginCell().store(storePublishBatchToHub(src)).endCell());
         },
         parse: (src) => {
-            return loadPublishPublicFromVault(src.loadRef().beginParse());
+            return loadPublishBatchToHub(src.loadRef().beginParse());
         }
     }
 }
 
-export type CapsuleHubPublishAck = {
-    $$type: 'CapsuleHubPublishAck';
+export type CapsuleHubBatchAck = {
+    $$type: 'CapsuleHubBatchAck';
     publish_id: bigint;
-    entry_id: bigint;
-    entry_uid: bigint;
+    first_entry_id: bigint;
+    part_count: bigint;
+    batch_uid: bigint;
 }
 
-export function storeCapsuleHubPublishAck(src: CapsuleHubPublishAck) {
+export function storeCapsuleHubBatchAck(src: CapsuleHubBatchAck) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(2270058346, 32);
+        b_0.storeUint(2270058353, 32);
         b_0.storeUint(src.publish_id, 256);
-        b_0.storeUint(src.entry_id, 64);
-        b_0.storeUint(src.entry_uid, 256);
+        b_0.storeUint(src.first_entry_id, 64);
+        b_0.storeUint(src.part_count, 8);
+        b_0.storeUint(src.batch_uid, 256);
     };
 }
 
-export function loadCapsuleHubPublishAck(slice: Slice) {
+export function loadCapsuleHubBatchAck(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 2270058346) { throw Error('Invalid prefix'); }
+    if (sc_0.loadUint(32) !== 2270058353) { throw Error('Invalid prefix'); }
     const _publish_id = sc_0.loadUintBig(256);
-    const _entry_id = sc_0.loadUintBig(64);
-    const _entry_uid = sc_0.loadUintBig(256);
-    return { $$type: 'CapsuleHubPublishAck' as const, publish_id: _publish_id, entry_id: _entry_id, entry_uid: _entry_uid };
+    const _first_entry_id = sc_0.loadUintBig(64);
+    const _part_count = sc_0.loadUintBig(8);
+    const _batch_uid = sc_0.loadUintBig(256);
+    return { $$type: 'CapsuleHubBatchAck' as const, publish_id: _publish_id, first_entry_id: _first_entry_id, part_count: _part_count, batch_uid: _batch_uid };
 }
 
-export function loadTupleCapsuleHubPublishAck(source: TupleReader) {
+export function loadTupleCapsuleHubBatchAck(source: TupleReader) {
     const _publish_id = source.readBigNumber();
-    const _entry_id = source.readBigNumber();
-    const _entry_uid = source.readBigNumber();
-    return { $$type: 'CapsuleHubPublishAck' as const, publish_id: _publish_id, entry_id: _entry_id, entry_uid: _entry_uid };
+    const _first_entry_id = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _batch_uid = source.readBigNumber();
+    return { $$type: 'CapsuleHubBatchAck' as const, publish_id: _publish_id, first_entry_id: _first_entry_id, part_count: _part_count, batch_uid: _batch_uid };
 }
 
-export function loadGetterTupleCapsuleHubPublishAck(source: TupleReader) {
+export function loadGetterTupleCapsuleHubBatchAck(source: TupleReader) {
     const _publish_id = source.readBigNumber();
-    const _entry_id = source.readBigNumber();
-    const _entry_uid = source.readBigNumber();
-    return { $$type: 'CapsuleHubPublishAck' as const, publish_id: _publish_id, entry_id: _entry_id, entry_uid: _entry_uid };
+    const _first_entry_id = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _batch_uid = source.readBigNumber();
+    return { $$type: 'CapsuleHubBatchAck' as const, publish_id: _publish_id, first_entry_id: _first_entry_id, part_count: _part_count, batch_uid: _batch_uid };
 }
 
-export function storeTupleCapsuleHubPublishAck(source: CapsuleHubPublishAck) {
+export function storeTupleCapsuleHubBatchAck(source: CapsuleHubBatchAck) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.publish_id);
-    builder.writeNumber(source.entry_id);
-    builder.writeNumber(source.entry_uid);
+    builder.writeNumber(source.first_entry_id);
+    builder.writeNumber(source.part_count);
+    builder.writeNumber(source.batch_uid);
     return builder.build();
 }
 
-export function dictValueParserCapsuleHubPublishAck(): DictionaryValue<CapsuleHubPublishAck> {
+export function dictValueParserCapsuleHubBatchAck(): DictionaryValue<CapsuleHubBatchAck> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storeCapsuleHubPublishAck(src)).endCell());
+            builder.storeRef(beginCell().store(storeCapsuleHubBatchAck(src)).endCell());
         },
         parse: (src) => {
-            return loadCapsuleHubPublishAck(src.loadRef().beginParse());
+            return loadCapsuleHubBatchAck(src.loadRef().beginParse());
         }
     }
 }
 
-export type PrunePendingPublish = {
-    $$type: 'PrunePendingPublish';
+export type PruneBatchPublish = {
+    $$type: 'PruneBatchPublish';
     publish_id: bigint;
 }
 
-export function storePrunePendingPublish(src: PrunePendingPublish) {
+export function storePruneBatchPublish(src: PruneBatchPublish) {
     return (builder: Builder) => {
         const b_0 = builder;
-        b_0.storeUint(1913380205, 32);
+        b_0.storeUint(1913380206, 32);
         b_0.storeUint(src.publish_id, 256);
     };
 }
 
-export function loadPrunePendingPublish(slice: Slice) {
+export function loadPruneBatchPublish(slice: Slice) {
     const sc_0 = slice;
-    if (sc_0.loadUint(32) !== 1913380205) { throw Error('Invalid prefix'); }
+    if (sc_0.loadUint(32) !== 1913380206) { throw Error('Invalid prefix'); }
     const _publish_id = sc_0.loadUintBig(256);
-    return { $$type: 'PrunePendingPublish' as const, publish_id: _publish_id };
+    return { $$type: 'PruneBatchPublish' as const, publish_id: _publish_id };
 }
 
-export function loadTuplePrunePendingPublish(source: TupleReader) {
+export function loadTuplePruneBatchPublish(source: TupleReader) {
     const _publish_id = source.readBigNumber();
-    return { $$type: 'PrunePendingPublish' as const, publish_id: _publish_id };
+    return { $$type: 'PruneBatchPublish' as const, publish_id: _publish_id };
 }
 
-export function loadGetterTuplePrunePendingPublish(source: TupleReader) {
+export function loadGetterTuplePruneBatchPublish(source: TupleReader) {
     const _publish_id = source.readBigNumber();
-    return { $$type: 'PrunePendingPublish' as const, publish_id: _publish_id };
+    return { $$type: 'PruneBatchPublish' as const, publish_id: _publish_id };
 }
 
-export function storeTuplePrunePendingPublish(source: PrunePendingPublish) {
+export function storeTuplePruneBatchPublish(source: PruneBatchPublish) {
     const builder = new TupleBuilder();
     builder.writeNumber(source.publish_id);
     return builder.build();
 }
 
-export function dictValueParserPrunePendingPublish(): DictionaryValue<PrunePendingPublish> {
+export function dictValueParserPruneBatchPublish(): DictionaryValue<PruneBatchPublish> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePrunePendingPublish(src)).endCell());
+            builder.storeRef(beginCell().store(storePruneBatchPublish(src)).endCell());
         },
         parse: (src) => {
-            return loadPrunePendingPublish(src.loadRef().beginParse());
+            return loadPruneBatchPublish(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type AnnounceSuccessorManifest = {
+    $$type: 'AnnounceSuccessorManifest';
+    successor_manifest_hash: bigint;
+    successor_vault: Address;
+}
+
+export function storeAnnounceSuccessorManifest(src: AnnounceSuccessorManifest) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1398096717, 32);
+        b_0.storeUint(src.successor_manifest_hash, 256);
+        b_0.storeAddress(src.successor_vault);
+    };
+}
+
+export function loadAnnounceSuccessorManifest(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1398096717) { throw Error('Invalid prefix'); }
+    const _successor_manifest_hash = sc_0.loadUintBig(256);
+    const _successor_vault = sc_0.loadAddress();
+    return { $$type: 'AnnounceSuccessorManifest' as const, successor_manifest_hash: _successor_manifest_hash, successor_vault: _successor_vault };
+}
+
+export function loadTupleAnnounceSuccessorManifest(source: TupleReader) {
+    const _successor_manifest_hash = source.readBigNumber();
+    const _successor_vault = source.readAddress();
+    return { $$type: 'AnnounceSuccessorManifest' as const, successor_manifest_hash: _successor_manifest_hash, successor_vault: _successor_vault };
+}
+
+export function loadGetterTupleAnnounceSuccessorManifest(source: TupleReader) {
+    const _successor_manifest_hash = source.readBigNumber();
+    const _successor_vault = source.readAddress();
+    return { $$type: 'AnnounceSuccessorManifest' as const, successor_manifest_hash: _successor_manifest_hash, successor_vault: _successor_vault };
+}
+
+export function storeTupleAnnounceSuccessorManifest(source: AnnounceSuccessorManifest) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.successor_manifest_hash);
+    builder.writeAddress(source.successor_vault);
+    return builder.build();
+}
+
+export function dictValueParserAnnounceSuccessorManifest(): DictionaryValue<AnnounceSuccessorManifest> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAnnounceSuccessorManifest(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAnnounceSuccessorManifest(src.loadRef().beginParse());
         }
     }
 }
@@ -4286,19 +4191,20 @@ export function dictValueParserPendingAthWithdrawal(): DictionaryValue<PendingAt
     }
 }
 
-export type PendingPublish = {
-    $$type: 'PendingPublish';
+export type PendingBatchPublish = {
+    $$type: 'PendingBatchPublish';
     owner_wallet: Address;
     tombstone: boolean;
     refund_to_vault: boolean;
     nonce: bigint;
     publish_kind: bigint;
-    body_hash: bigint;
+    part_count: bigint;
+    publish_id: bigint;
     refundable_amount: bigint;
     created_at: bigint;
 }
 
-export function storePendingPublish(src: PendingPublish) {
+export function storePendingBatchPublish(src: PendingBatchPublish) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeAddress(src.owner_wallet);
@@ -4306,69 +4212,74 @@ export function storePendingPublish(src: PendingPublish) {
         b_0.storeBit(src.refund_to_vault);
         b_0.storeUint(src.nonce, 64);
         b_0.storeUint(src.publish_kind, 8);
-        b_0.storeUint(src.body_hash, 256);
+        b_0.storeUint(src.part_count, 8);
+        b_0.storeUint(src.publish_id, 256);
         b_0.storeUint(src.refundable_amount, 128);
         b_0.storeUint(src.created_at, 32);
     };
 }
 
-export function loadPendingPublish(slice: Slice) {
+export function loadPendingBatchPublish(slice: Slice) {
     const sc_0 = slice;
     const _owner_wallet = sc_0.loadAddress();
     const _tombstone = sc_0.loadBit();
     const _refund_to_vault = sc_0.loadBit();
     const _nonce = sc_0.loadUintBig(64);
     const _publish_kind = sc_0.loadUintBig(8);
-    const _body_hash = sc_0.loadUintBig(256);
+    const _part_count = sc_0.loadUintBig(8);
+    const _publish_id = sc_0.loadUintBig(256);
     const _refundable_amount = sc_0.loadUintBig(128);
     const _created_at = sc_0.loadUintBig(32);
-    return { $$type: 'PendingPublish' as const, owner_wallet: _owner_wallet, tombstone: _tombstone, refund_to_vault: _refund_to_vault, nonce: _nonce, publish_kind: _publish_kind, body_hash: _body_hash, refundable_amount: _refundable_amount, created_at: _created_at };
+    return { $$type: 'PendingBatchPublish' as const, owner_wallet: _owner_wallet, tombstone: _tombstone, refund_to_vault: _refund_to_vault, nonce: _nonce, publish_kind: _publish_kind, part_count: _part_count, publish_id: _publish_id, refundable_amount: _refundable_amount, created_at: _created_at };
 }
 
-export function loadTuplePendingPublish(source: TupleReader) {
+export function loadTuplePendingBatchPublish(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _tombstone = source.readBoolean();
     const _refund_to_vault = source.readBoolean();
     const _nonce = source.readBigNumber();
     const _publish_kind = source.readBigNumber();
-    const _body_hash = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _publish_id = source.readBigNumber();
     const _refundable_amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingPublish' as const, owner_wallet: _owner_wallet, tombstone: _tombstone, refund_to_vault: _refund_to_vault, nonce: _nonce, publish_kind: _publish_kind, body_hash: _body_hash, refundable_amount: _refundable_amount, created_at: _created_at };
+    return { $$type: 'PendingBatchPublish' as const, owner_wallet: _owner_wallet, tombstone: _tombstone, refund_to_vault: _refund_to_vault, nonce: _nonce, publish_kind: _publish_kind, part_count: _part_count, publish_id: _publish_id, refundable_amount: _refundable_amount, created_at: _created_at };
 }
 
-export function loadGetterTuplePendingPublish(source: TupleReader) {
+export function loadGetterTuplePendingBatchPublish(source: TupleReader) {
     const _owner_wallet = source.readAddress();
     const _tombstone = source.readBoolean();
     const _refund_to_vault = source.readBoolean();
     const _nonce = source.readBigNumber();
     const _publish_kind = source.readBigNumber();
-    const _body_hash = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _publish_id = source.readBigNumber();
     const _refundable_amount = source.readBigNumber();
     const _created_at = source.readBigNumber();
-    return { $$type: 'PendingPublish' as const, owner_wallet: _owner_wallet, tombstone: _tombstone, refund_to_vault: _refund_to_vault, nonce: _nonce, publish_kind: _publish_kind, body_hash: _body_hash, refundable_amount: _refundable_amount, created_at: _created_at };
+    return { $$type: 'PendingBatchPublish' as const, owner_wallet: _owner_wallet, tombstone: _tombstone, refund_to_vault: _refund_to_vault, nonce: _nonce, publish_kind: _publish_kind, part_count: _part_count, publish_id: _publish_id, refundable_amount: _refundable_amount, created_at: _created_at };
 }
 
-export function storeTuplePendingPublish(source: PendingPublish) {
+export function storeTuplePendingBatchPublish(source: PendingBatchPublish) {
     const builder = new TupleBuilder();
     builder.writeAddress(source.owner_wallet);
     builder.writeBoolean(source.tombstone);
     builder.writeBoolean(source.refund_to_vault);
     builder.writeNumber(source.nonce);
     builder.writeNumber(source.publish_kind);
-    builder.writeNumber(source.body_hash);
+    builder.writeNumber(source.part_count);
+    builder.writeNumber(source.publish_id);
     builder.writeNumber(source.refundable_amount);
     builder.writeNumber(source.created_at);
     return builder.build();
 }
 
-export function dictValueParserPendingPublish(): DictionaryValue<PendingPublish> {
+export function dictValueParserPendingBatchPublish(): DictionaryValue<PendingBatchPublish> {
     return {
         serialize: (src, builder) => {
-            builder.storeRef(beginCell().store(storePendingPublish(src)).endCell());
+            builder.storeRef(beginCell().store(storePendingBatchPublish(src)).endCell());
         },
         parse: (src) => {
-            return loadPendingPublish(src.loadRef().beginParse());
+            return loadPendingBatchPublish(src.loadRef().beginParse());
         }
     }
 }
@@ -4697,6 +4608,81 @@ export function dictValueParserKeyRecord(): DictionaryValue<KeyRecord> {
     }
 }
 
+export type ReceiptSlot = {
+    $$type: 'ReceiptSlot';
+    nonce: bigint;
+    action: bigint;
+    result: bigint;
+    aux: bigint;
+    part_count: bigint;
+    at: bigint;
+}
+
+export function storeReceiptSlot(src: ReceiptSlot) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(src.nonce, 64);
+        b_0.storeUint(src.action, 8);
+        b_0.storeUint(src.result, 8);
+        b_0.storeUint(src.aux, 64);
+        b_0.storeUint(src.part_count, 8);
+        b_0.storeUint(src.at, 32);
+    };
+}
+
+export function loadReceiptSlot(slice: Slice) {
+    const sc_0 = slice;
+    const _nonce = sc_0.loadUintBig(64);
+    const _action = sc_0.loadUintBig(8);
+    const _result = sc_0.loadUintBig(8);
+    const _aux = sc_0.loadUintBig(64);
+    const _part_count = sc_0.loadUintBig(8);
+    const _at = sc_0.loadUintBig(32);
+    return { $$type: 'ReceiptSlot' as const, nonce: _nonce, action: _action, result: _result, aux: _aux, part_count: _part_count, at: _at };
+}
+
+export function loadTupleReceiptSlot(source: TupleReader) {
+    const _nonce = source.readBigNumber();
+    const _action = source.readBigNumber();
+    const _result = source.readBigNumber();
+    const _aux = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _at = source.readBigNumber();
+    return { $$type: 'ReceiptSlot' as const, nonce: _nonce, action: _action, result: _result, aux: _aux, part_count: _part_count, at: _at };
+}
+
+export function loadGetterTupleReceiptSlot(source: TupleReader) {
+    const _nonce = source.readBigNumber();
+    const _action = source.readBigNumber();
+    const _result = source.readBigNumber();
+    const _aux = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _at = source.readBigNumber();
+    return { $$type: 'ReceiptSlot' as const, nonce: _nonce, action: _action, result: _result, aux: _aux, part_count: _part_count, at: _at };
+}
+
+export function storeTupleReceiptSlot(source: ReceiptSlot) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.nonce);
+    builder.writeNumber(source.action);
+    builder.writeNumber(source.result);
+    builder.writeNumber(source.aux);
+    builder.writeNumber(source.part_count);
+    builder.writeNumber(source.at);
+    return builder.build();
+}
+
+export function dictValueParserReceiptSlot(): DictionaryValue<ReceiptSlot> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeReceiptSlot(src)).endCell());
+        },
+        parse: (src) => {
+            return loadReceiptSlot(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UserState = {
     $$type: 'UserState';
     ton_balance: bigint;
@@ -4704,6 +4690,7 @@ export type UserState = {
     current_key_id: bigint;
     auth_pubkey: bigint;
     publish_nonce: bigint;
+    receipts: Dictionary<number, ReceiptSlot>;
 }
 
 export function storeUserState(src: UserState) {
@@ -4714,6 +4701,7 @@ export function storeUserState(src: UserState) {
         b_0.storeUint(src.current_key_id, 256);
         b_0.storeUint(src.auth_pubkey, 256);
         b_0.storeUint(src.publish_nonce, 64);
+        b_0.storeDict(src.receipts, Dictionary.Keys.Uint(8), dictValueParserReceiptSlot());
     };
 }
 
@@ -4724,7 +4712,8 @@ export function loadUserState(slice: Slice) {
     const _current_key_id = sc_0.loadUintBig(256);
     const _auth_pubkey = sc_0.loadUintBig(256);
     const _publish_nonce = sc_0.loadUintBig(64);
-    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
+    const _receipts = Dictionary.load(Dictionary.Keys.Uint(8), dictValueParserReceiptSlot(), sc_0);
+    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce, receipts: _receipts };
 }
 
 export function loadTupleUserState(source: TupleReader) {
@@ -4733,7 +4722,8 @@ export function loadTupleUserState(source: TupleReader) {
     const _current_key_id = source.readBigNumber();
     const _auth_pubkey = source.readBigNumber();
     const _publish_nonce = source.readBigNumber();
-    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
+    const _receipts = Dictionary.loadDirect(Dictionary.Keys.Uint(8), dictValueParserReceiptSlot(), source.readCellOpt());
+    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce, receipts: _receipts };
 }
 
 export function loadGetterTupleUserState(source: TupleReader) {
@@ -4742,7 +4732,8 @@ export function loadGetterTupleUserState(source: TupleReader) {
     const _current_key_id = source.readBigNumber();
     const _auth_pubkey = source.readBigNumber();
     const _publish_nonce = source.readBigNumber();
-    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce };
+    const _receipts = Dictionary.loadDirect(Dictionary.Keys.Uint(8), dictValueParserReceiptSlot(), source.readCellOpt());
+    return { $$type: 'UserState' as const, ton_balance: _ton_balance, ath_balance: _ath_balance, current_key_id: _current_key_id, auth_pubkey: _auth_pubkey, publish_nonce: _publish_nonce, receipts: _receipts };
 }
 
 export function storeTupleUserState(source: UserState) {
@@ -4752,6 +4743,7 @@ export function storeTupleUserState(source: UserState) {
     builder.writeNumber(source.current_key_id);
     builder.writeNumber(source.auth_pubkey);
     builder.writeNumber(source.publish_nonce);
+    builder.writeCell(source.receipts.size > 0 ? beginCell().storeDictDirect(source.receipts, Dictionary.Keys.Uint(8), dictValueParserReceiptSlot()).endCell() : null);
     return builder.build();
 }
 
@@ -5075,6 +5067,63 @@ export function dictValueParserVaultUserView(): DictionaryValue<VaultUserView> {
     }
 }
 
+export type VaultUserReceiptsView = {
+    $$type: 'VaultUserReceiptsView';
+    exists: boolean;
+    publish_nonce: bigint;
+    receipts: Dictionary<number, ReceiptSlot>;
+}
+
+export function storeVaultUserReceiptsView(src: VaultUserReceiptsView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.exists);
+        b_0.storeInt(src.publish_nonce, 257);
+        b_0.storeDict(src.receipts, Dictionary.Keys.Uint(8), dictValueParserReceiptSlot());
+    };
+}
+
+export function loadVaultUserReceiptsView(slice: Slice) {
+    const sc_0 = slice;
+    const _exists = sc_0.loadBit();
+    const _publish_nonce = sc_0.loadIntBig(257);
+    const _receipts = Dictionary.load(Dictionary.Keys.Uint(8), dictValueParserReceiptSlot(), sc_0);
+    return { $$type: 'VaultUserReceiptsView' as const, exists: _exists, publish_nonce: _publish_nonce, receipts: _receipts };
+}
+
+export function loadTupleVaultUserReceiptsView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _publish_nonce = source.readBigNumber();
+    const _receipts = Dictionary.loadDirect(Dictionary.Keys.Uint(8), dictValueParserReceiptSlot(), source.readCellOpt());
+    return { $$type: 'VaultUserReceiptsView' as const, exists: _exists, publish_nonce: _publish_nonce, receipts: _receipts };
+}
+
+export function loadGetterTupleVaultUserReceiptsView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _publish_nonce = source.readBigNumber();
+    const _receipts = Dictionary.loadDirect(Dictionary.Keys.Uint(8), dictValueParserReceiptSlot(), source.readCellOpt());
+    return { $$type: 'VaultUserReceiptsView' as const, exists: _exists, publish_nonce: _publish_nonce, receipts: _receipts };
+}
+
+export function storeTupleVaultUserReceiptsView(source: VaultUserReceiptsView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeNumber(source.publish_nonce);
+    builder.writeCell(source.receipts.size > 0 ? beginCell().storeDictDirect(source.receipts, Dictionary.Keys.Uint(8), dictValueParserReceiptSlot()).endCell() : null);
+    return builder.build();
+}
+
+export function dictValueParserVaultUserReceiptsView(): DictionaryValue<VaultUserReceiptsView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeVaultUserReceiptsView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadVaultUserReceiptsView(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type VaultPendingAthWithdrawalView = {
     $$type: 'VaultPendingAthWithdrawalView';
     exists: boolean;
@@ -5149,6 +5198,153 @@ export function dictValueParserVaultPendingAthWithdrawalView(): DictionaryValue<
         },
         parse: (src) => {
             return loadVaultPendingAthWithdrawalView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type VaultSuccessorView = {
+    $$type: 'VaultSuccessorView';
+    announced: boolean;
+    successor_manifest_hash: bigint;
+    successor_vault: Address;
+    announced_at: bigint;
+}
+
+export function storeVaultSuccessorView(src: VaultSuccessorView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.announced);
+        b_0.storeInt(src.successor_manifest_hash, 257);
+        b_0.storeAddress(src.successor_vault);
+        b_0.storeInt(src.announced_at, 257);
+    };
+}
+
+export function loadVaultSuccessorView(slice: Slice) {
+    const sc_0 = slice;
+    const _announced = sc_0.loadBit();
+    const _successor_manifest_hash = sc_0.loadIntBig(257);
+    const _successor_vault = sc_0.loadAddress();
+    const _announced_at = sc_0.loadIntBig(257);
+    return { $$type: 'VaultSuccessorView' as const, announced: _announced, successor_manifest_hash: _successor_manifest_hash, successor_vault: _successor_vault, announced_at: _announced_at };
+}
+
+export function loadTupleVaultSuccessorView(source: TupleReader) {
+    const _announced = source.readBoolean();
+    const _successor_manifest_hash = source.readBigNumber();
+    const _successor_vault = source.readAddress();
+    const _announced_at = source.readBigNumber();
+    return { $$type: 'VaultSuccessorView' as const, announced: _announced, successor_manifest_hash: _successor_manifest_hash, successor_vault: _successor_vault, announced_at: _announced_at };
+}
+
+export function loadGetterTupleVaultSuccessorView(source: TupleReader) {
+    const _announced = source.readBoolean();
+    const _successor_manifest_hash = source.readBigNumber();
+    const _successor_vault = source.readAddress();
+    const _announced_at = source.readBigNumber();
+    return { $$type: 'VaultSuccessorView' as const, announced: _announced, successor_manifest_hash: _successor_manifest_hash, successor_vault: _successor_vault, announced_at: _announced_at };
+}
+
+export function storeTupleVaultSuccessorView(source: VaultSuccessorView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.announced);
+    builder.writeNumber(source.successor_manifest_hash);
+    builder.writeAddress(source.successor_vault);
+    builder.writeNumber(source.announced_at);
+    return builder.build();
+}
+
+export function dictValueParserVaultSuccessorView(): DictionaryValue<VaultSuccessorView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeVaultSuccessorView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadVaultSuccessorView(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type VaultPendingBatchPublishView = {
+    $$type: 'VaultPendingBatchPublishView';
+    exists: boolean;
+    owner_wallet: Address;
+    nonce: bigint;
+    publish_kind: bigint;
+    part_count: bigint;
+    created_at: bigint;
+    tombstone: boolean;
+}
+
+export function storeVaultPendingBatchPublishView(src: VaultPendingBatchPublishView) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeBit(src.exists);
+        b_0.storeAddress(src.owner_wallet);
+        b_0.storeInt(src.nonce, 257);
+        b_0.storeInt(src.publish_kind, 257);
+        const b_1 = new Builder();
+        b_1.storeInt(src.part_count, 257);
+        b_1.storeInt(src.created_at, 257);
+        b_1.storeBit(src.tombstone);
+        b_0.storeRef(b_1.endCell());
+    };
+}
+
+export function loadVaultPendingBatchPublishView(slice: Slice) {
+    const sc_0 = slice;
+    const _exists = sc_0.loadBit();
+    const _owner_wallet = sc_0.loadAddress();
+    const _nonce = sc_0.loadIntBig(257);
+    const _publish_kind = sc_0.loadIntBig(257);
+    const sc_1 = sc_0.loadRef().beginParse();
+    const _part_count = sc_1.loadIntBig(257);
+    const _created_at = sc_1.loadIntBig(257);
+    const _tombstone = sc_1.loadBit();
+    return { $$type: 'VaultPendingBatchPublishView' as const, exists: _exists, owner_wallet: _owner_wallet, nonce: _nonce, publish_kind: _publish_kind, part_count: _part_count, created_at: _created_at, tombstone: _tombstone };
+}
+
+export function loadTupleVaultPendingBatchPublishView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _owner_wallet = source.readAddress();
+    const _nonce = source.readBigNumber();
+    const _publish_kind = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _tombstone = source.readBoolean();
+    return { $$type: 'VaultPendingBatchPublishView' as const, exists: _exists, owner_wallet: _owner_wallet, nonce: _nonce, publish_kind: _publish_kind, part_count: _part_count, created_at: _created_at, tombstone: _tombstone };
+}
+
+export function loadGetterTupleVaultPendingBatchPublishView(source: TupleReader) {
+    const _exists = source.readBoolean();
+    const _owner_wallet = source.readAddress();
+    const _nonce = source.readBigNumber();
+    const _publish_kind = source.readBigNumber();
+    const _part_count = source.readBigNumber();
+    const _created_at = source.readBigNumber();
+    const _tombstone = source.readBoolean();
+    return { $$type: 'VaultPendingBatchPublishView' as const, exists: _exists, owner_wallet: _owner_wallet, nonce: _nonce, publish_kind: _publish_kind, part_count: _part_count, created_at: _created_at, tombstone: _tombstone };
+}
+
+export function storeTupleVaultPendingBatchPublishView(source: VaultPendingBatchPublishView) {
+    const builder = new TupleBuilder();
+    builder.writeBoolean(source.exists);
+    builder.writeAddress(source.owner_wallet);
+    builder.writeNumber(source.nonce);
+    builder.writeNumber(source.publish_kind);
+    builder.writeNumber(source.part_count);
+    builder.writeNumber(source.created_at);
+    builder.writeBoolean(source.tombstone);
+    return builder.build();
+}
+
+export function dictValueParserVaultPendingBatchPublishView(): DictionaryValue<VaultPendingBatchPublishView> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeVaultPendingBatchPublishView(src)).endCell());
+        },
+        parse: (src) => {
+            return loadVaultPendingBatchPublishView(src.loadRef().beginParse());
         }
     }
 }
@@ -5365,7 +5561,7 @@ export type Vault$Data = {
     receive_intents: Dictionary<bigint, ReceiveIntent>;
     processed_ath_deposits: Dictionary<bigint, bigint>;
     pending_ath_withdrawals: Dictionary<bigint, PendingAthWithdrawal>;
-    pending_publishes: Dictionary<bigint, PendingPublish>;
+    pending_batch_publishes: Dictionary<bigint, PendingBatchPublish>;
     pending_profile_avatar_payments: Dictionary<bigint, PendingProfileAvatarPayment>;
     pending_username_mint_payments: Dictionary<bigint, PendingUsernameMintPayment>;
     user_count: bigint;
@@ -5374,6 +5570,7 @@ export type Vault$Data = {
     processed_ath_deposit_count: bigint;
     pending_ath_withdrawal_count: bigint;
     pending_publish_count: bigint;
+    genesis_ext: Cell;
 }
 
 export function storeVault$Data(src: Vault$Data) {
@@ -5396,7 +5593,7 @@ export function storeVault$Data(src: Vault$Data) {
         const b_3 = new Builder();
         b_3.storeDict(src.processed_ath_deposits, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257));
         b_3.storeDict(src.pending_ath_withdrawals, Dictionary.Keys.BigInt(257), dictValueParserPendingAthWithdrawal());
-        b_3.storeDict(src.pending_publishes, Dictionary.Keys.BigInt(257), dictValueParserPendingPublish());
+        b_3.storeDict(src.pending_batch_publishes, Dictionary.Keys.BigInt(257), dictValueParserPendingBatchPublish());
         const b_4 = new Builder();
         b_4.storeDict(src.pending_profile_avatar_payments, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarPayment());
         b_4.storeDict(src.pending_username_mint_payments, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMintPayment());
@@ -5406,6 +5603,7 @@ export function storeVault$Data(src: Vault$Data) {
         b_4.storeUint(src.processed_ath_deposit_count, 64);
         b_4.storeUint(src.pending_ath_withdrawal_count, 64);
         b_4.storeUint(src.pending_publish_count, 64);
+        b_4.storeRef(src.genesis_ext);
         b_3.storeRef(b_4.endCell());
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
@@ -5432,7 +5630,7 @@ export function loadVault$Data(slice: Slice) {
     const sc_3 = sc_2.loadRef().beginParse();
     const _processed_ath_deposits = Dictionary.load(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), sc_3);
     const _pending_ath_withdrawals = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthWithdrawal(), sc_3);
-    const _pending_publishes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingPublish(), sc_3);
+    const _pending_batch_publishes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingBatchPublish(), sc_3);
     const sc_4 = sc_3.loadRef().beginParse();
     const _pending_profile_avatar_payments = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarPayment(), sc_4);
     const _pending_username_mint_payments = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMintPayment(), sc_4);
@@ -5442,7 +5640,8 @@ export function loadVault$Data(slice: Slice) {
     const _processed_ath_deposit_count = sc_4.loadUintBig(64);
     const _pending_ath_withdrawal_count = sc_4.loadUintBig(64);
     const _pending_publish_count = sc_4.loadUintBig(64);
-    return { $$type: 'Vault$Data' as const, vault_ath_wallet_address: _vault_ath_wallet_address, ath_master_address: _ath_master_address, capsule_hub_address: _capsule_hub_address, profile_registry_address: _profile_registry_address, username_registry_address: _username_registry_address, binding_flags: _binding_flags, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, users: _users, key_records: _key_records, receive_intents: _receive_intents, processed_ath_deposits: _processed_ath_deposits, pending_ath_withdrawals: _pending_ath_withdrawals, pending_publishes: _pending_publishes, pending_profile_avatar_payments: _pending_profile_avatar_payments, pending_username_mint_payments: _pending_username_mint_payments, user_count: _user_count, key_record_count: _key_record_count, receive_intent_count: _receive_intent_count, processed_ath_deposit_count: _processed_ath_deposit_count, pending_ath_withdrawal_count: _pending_ath_withdrawal_count, pending_publish_count: _pending_publish_count };
+    const _genesis_ext = sc_4.loadRef();
+    return { $$type: 'Vault$Data' as const, vault_ath_wallet_address: _vault_ath_wallet_address, ath_master_address: _ath_master_address, capsule_hub_address: _capsule_hub_address, profile_registry_address: _profile_registry_address, username_registry_address: _username_registry_address, binding_flags: _binding_flags, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, users: _users, key_records: _key_records, receive_intents: _receive_intents, processed_ath_deposits: _processed_ath_deposits, pending_ath_withdrawals: _pending_ath_withdrawals, pending_batch_publishes: _pending_batch_publishes, pending_profile_avatar_payments: _pending_profile_avatar_payments, pending_username_mint_payments: _pending_username_mint_payments, user_count: _user_count, key_record_count: _key_record_count, receive_intent_count: _receive_intent_count, processed_ath_deposit_count: _processed_ath_deposit_count, pending_ath_withdrawal_count: _pending_ath_withdrawal_count, pending_publish_count: _pending_publish_count, genesis_ext: _genesis_ext };
 }
 
 export function loadTupleVault$Data(source: TupleReader) {
@@ -5461,7 +5660,7 @@ export function loadTupleVault$Data(source: TupleReader) {
     const _processed_ath_deposits = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_ath_withdrawals = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthWithdrawal(), source.readCellOpt());
     source = source.readTuple();
-    const _pending_publishes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingPublish(), source.readCellOpt());
+    const _pending_batch_publishes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingBatchPublish(), source.readCellOpt());
     const _pending_profile_avatar_payments = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarPayment(), source.readCellOpt());
     const _pending_username_mint_payments = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMintPayment(), source.readCellOpt());
     const _user_count = source.readBigNumber();
@@ -5470,7 +5669,8 @@ export function loadTupleVault$Data(source: TupleReader) {
     const _processed_ath_deposit_count = source.readBigNumber();
     const _pending_ath_withdrawal_count = source.readBigNumber();
     const _pending_publish_count = source.readBigNumber();
-    return { $$type: 'Vault$Data' as const, vault_ath_wallet_address: _vault_ath_wallet_address, ath_master_address: _ath_master_address, capsule_hub_address: _capsule_hub_address, profile_registry_address: _profile_registry_address, username_registry_address: _username_registry_address, binding_flags: _binding_flags, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, users: _users, key_records: _key_records, receive_intents: _receive_intents, processed_ath_deposits: _processed_ath_deposits, pending_ath_withdrawals: _pending_ath_withdrawals, pending_publishes: _pending_publishes, pending_profile_avatar_payments: _pending_profile_avatar_payments, pending_username_mint_payments: _pending_username_mint_payments, user_count: _user_count, key_record_count: _key_record_count, receive_intent_count: _receive_intent_count, processed_ath_deposit_count: _processed_ath_deposit_count, pending_ath_withdrawal_count: _pending_ath_withdrawal_count, pending_publish_count: _pending_publish_count };
+    const _genesis_ext = source.readCell();
+    return { $$type: 'Vault$Data' as const, vault_ath_wallet_address: _vault_ath_wallet_address, ath_master_address: _ath_master_address, capsule_hub_address: _capsule_hub_address, profile_registry_address: _profile_registry_address, username_registry_address: _username_registry_address, binding_flags: _binding_flags, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, users: _users, key_records: _key_records, receive_intents: _receive_intents, processed_ath_deposits: _processed_ath_deposits, pending_ath_withdrawals: _pending_ath_withdrawals, pending_batch_publishes: _pending_batch_publishes, pending_profile_avatar_payments: _pending_profile_avatar_payments, pending_username_mint_payments: _pending_username_mint_payments, user_count: _user_count, key_record_count: _key_record_count, receive_intent_count: _receive_intent_count, processed_ath_deposit_count: _processed_ath_deposit_count, pending_ath_withdrawal_count: _pending_ath_withdrawal_count, pending_publish_count: _pending_publish_count, genesis_ext: _genesis_ext };
 }
 
 export function loadGetterTupleVault$Data(source: TupleReader) {
@@ -5488,7 +5688,7 @@ export function loadGetterTupleVault$Data(source: TupleReader) {
     const _receive_intents = Dictionary.loadDirect(Dictionary.Keys.BigUint(128), dictValueParserReceiveIntent(), source.readCellOpt());
     const _processed_ath_deposits = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257), source.readCellOpt());
     const _pending_ath_withdrawals = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthWithdrawal(), source.readCellOpt());
-    const _pending_publishes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingPublish(), source.readCellOpt());
+    const _pending_batch_publishes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingBatchPublish(), source.readCellOpt());
     const _pending_profile_avatar_payments = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarPayment(), source.readCellOpt());
     const _pending_username_mint_payments = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMintPayment(), source.readCellOpt());
     const _user_count = source.readBigNumber();
@@ -5497,7 +5697,8 @@ export function loadGetterTupleVault$Data(source: TupleReader) {
     const _processed_ath_deposit_count = source.readBigNumber();
     const _pending_ath_withdrawal_count = source.readBigNumber();
     const _pending_publish_count = source.readBigNumber();
-    return { $$type: 'Vault$Data' as const, vault_ath_wallet_address: _vault_ath_wallet_address, ath_master_address: _ath_master_address, capsule_hub_address: _capsule_hub_address, profile_registry_address: _profile_registry_address, username_registry_address: _username_registry_address, binding_flags: _binding_flags, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, users: _users, key_records: _key_records, receive_intents: _receive_intents, processed_ath_deposits: _processed_ath_deposits, pending_ath_withdrawals: _pending_ath_withdrawals, pending_publishes: _pending_publishes, pending_profile_avatar_payments: _pending_profile_avatar_payments, pending_username_mint_payments: _pending_username_mint_payments, user_count: _user_count, key_record_count: _key_record_count, receive_intent_count: _receive_intent_count, processed_ath_deposit_count: _processed_ath_deposit_count, pending_ath_withdrawal_count: _pending_ath_withdrawal_count, pending_publish_count: _pending_publish_count };
+    const _genesis_ext = source.readCell();
+    return { $$type: 'Vault$Data' as const, vault_ath_wallet_address: _vault_ath_wallet_address, ath_master_address: _ath_master_address, capsule_hub_address: _capsule_hub_address, profile_registry_address: _profile_registry_address, username_registry_address: _username_registry_address, binding_flags: _binding_flags, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, users: _users, key_records: _key_records, receive_intents: _receive_intents, processed_ath_deposits: _processed_ath_deposits, pending_ath_withdrawals: _pending_ath_withdrawals, pending_batch_publishes: _pending_batch_publishes, pending_profile_avatar_payments: _pending_profile_avatar_payments, pending_username_mint_payments: _pending_username_mint_payments, user_count: _user_count, key_record_count: _key_record_count, receive_intent_count: _receive_intent_count, processed_ath_deposit_count: _processed_ath_deposit_count, pending_ath_withdrawal_count: _pending_ath_withdrawal_count, pending_publish_count: _pending_publish_count, genesis_ext: _genesis_ext };
 }
 
 export function storeTupleVault$Data(source: Vault$Data) {
@@ -5516,7 +5717,7 @@ export function storeTupleVault$Data(source: Vault$Data) {
     builder.writeCell(source.receive_intents.size > 0 ? beginCell().storeDictDirect(source.receive_intents, Dictionary.Keys.BigUint(128), dictValueParserReceiveIntent()).endCell() : null);
     builder.writeCell(source.processed_ath_deposits.size > 0 ? beginCell().storeDictDirect(source.processed_ath_deposits, Dictionary.Keys.BigInt(257), Dictionary.Values.BigInt(257)).endCell() : null);
     builder.writeCell(source.pending_ath_withdrawals.size > 0 ? beginCell().storeDictDirect(source.pending_ath_withdrawals, Dictionary.Keys.BigInt(257), dictValueParserPendingAthWithdrawal()).endCell() : null);
-    builder.writeCell(source.pending_publishes.size > 0 ? beginCell().storeDictDirect(source.pending_publishes, Dictionary.Keys.BigInt(257), dictValueParserPendingPublish()).endCell() : null);
+    builder.writeCell(source.pending_batch_publishes.size > 0 ? beginCell().storeDictDirect(source.pending_batch_publishes, Dictionary.Keys.BigInt(257), dictValueParserPendingBatchPublish()).endCell() : null);
     builder.writeCell(source.pending_profile_avatar_payments.size > 0 ? beginCell().storeDictDirect(source.pending_profile_avatar_payments, Dictionary.Keys.BigInt(257), dictValueParserPendingProfileAvatarPayment()).endCell() : null);
     builder.writeCell(source.pending_username_mint_payments.size > 0 ? beginCell().storeDictDirect(source.pending_username_mint_payments, Dictionary.Keys.BigInt(257), dictValueParserPendingUsernameMintPayment()).endCell() : null);
     builder.writeNumber(source.user_count);
@@ -5525,6 +5726,7 @@ export function storeTupleVault$Data(source: Vault$Data) {
     builder.writeNumber(source.processed_ath_deposit_count);
     builder.writeNumber(source.pending_ath_withdrawal_count);
     builder.writeNumber(source.pending_publish_count);
+    builder.writeCell(source.genesis_ext);
     return builder.build();
 }
 
@@ -5691,35 +5893,38 @@ const ATHWallet_types: ABIType[] = [
     {"name":"SealGenesis","header":974311853,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"DepositTon","header":716160408,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"RegisterMessagingKeys","header":1383096026,"fields":[{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}}]},
-    {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"ReplaceMessagingKeys","header":2312521915,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"CreateReceiveIntent","header":2115981365,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"ClaimReceiveIntent","header":2115981366,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
     {"name":"CancelReceiveIntent","header":2115981367,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"WithdrawTonFromVaultBalance","header":2115981368,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"WithdrawAthFromVaultBalance","header":2115981369,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"PublishPrivateFromVaultBalance","header":2115981361,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"PublishPublicFromVaultBalance","header":2115981362,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"SetProfileAvatarFromVaultBalance","header":2115981363,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"MintUsernameFromVaultBalance","header":2115981364,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"PublishPrivateFromVault","header":2767741632,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"crypto_suite","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"header_0_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_1_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header_0","type":{"kind":"simple","type":"cell","optional":false}},{"name":"header_1","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"PublishPublicFromVault","header":2351593143,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"size_class","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"marketing_note","type":{"kind":"simple","type":"uint","optional":false,"format":152}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"header_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"header","type":{"kind":"simple","type":"cell","optional":false}},{"name":"body","type":{"kind":"simple","type":"cell","optional":false}},{"name":"protocol_fee_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
-    {"name":"CapsuleHubPublishAck","header":2270058346,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"entry_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
-    {"name":"PrunePendingPublish","header":1913380205,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"WithdrawTonFromVaultBalance","header":2115981368,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"WithdrawAthFromVaultBalance","header":2115981369,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"SetProfileAvatarFromVaultBalance","header":2115981363,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"MintUsernameFromVaultBalance","header":2115981364,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"PublishBatchFromVaultBalance","header":2115981377,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"signature","type":{"kind":"simple","type":"fixed-bytes","optional":false,"format":64}},{"name":"signed_payload","type":{"kind":"simple","type":"cell","optional":false}},{"name":"envelope_padding","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
+    {"name":"PublishBatchToHub","header":2767741649,"fields":[{"name":"bounce_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"bounce_tag","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"part_count","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"protocol_fee_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"author_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"parts","type":{"kind":"simple","type":"cell","optional":false}},{"name":"marketing","type":{"kind":"simple","type":"cell","optional":true}}]},
+    {"name":"CapsuleHubBatchAck","header":2270058353,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"first_entry_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"part_count","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"batch_uid","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"PruneBatchPublish","header":1913380206,"fields":[{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
+    {"name":"AnnounceSuccessorManifest","header":1398096717,"fields":[{"name":"successor_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"successor_vault","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"TopUpStorageReserve","header":840283645,"fields":[]},
     {"name":"ProfileAvatarTonExcessRefund","header":1353060641,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}}]},
     {"name":"PendingAthWithdrawal","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"refundable_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"PendingPublish","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"tombstone","type":{"kind":"simple","type":"bool","optional":false}},{"name":"refund_to_vault","type":{"kind":"simple","type":"bool","optional":false}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"body_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"refundable_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingBatchPublish","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"tombstone","type":{"kind":"simple","type":"bool","optional":false}},{"name":"refund_to_vault","type":{"kind":"simple","type":"bool","optional":false}},{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"publish_kind","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"part_count","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"publish_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"refundable_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingProfileAvatarPayment","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"PendingUsernameMintPayment","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
     {"name":"ReceiveIntent","header":null,"fields":[{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"commitment","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"client_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"settlement_reserve_ton","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"KeyRecord","header":null,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"enc_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"sign_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"created_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"revoked_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"revoked_lt","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
-    {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"publish_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"ReceiptSlot","header":null,"fields":[{"name":"nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"action","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"result","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"aux","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"part_count","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"UserState","header":null,"fields":[{"name":"ton_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"ath_balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"current_key_id","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"auth_pubkey","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"publish_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"receipts","type":{"kind":"dict","key":"uint","keyFormat":8,"value":"ReceiptSlot","valueFormat":"ref"}}]},
     {"name":"VaultReceiveIntentView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"asset","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"commitment","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"client_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"settlement_reserve_ton","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claimed","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultKeyRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"key_generation","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"enc_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sign_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey_len","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pq_kem_pubkey","type":{"kind":"simple","type":"cell","optional":false}},{"name":"crypto_suite_mask","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"revoked_lt","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"VaultUserView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"ton_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"current_key_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"auth_pubkey","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publish_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"VaultUserReceiptsView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"publish_nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"receipts","type":{"kind":"dict","key":"uint","keyFormat":8,"value":"ReceiptSlot","valueFormat":"ref"}}]},
     {"name":"VaultPendingAthWithdrawalView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"VaultSuccessorView","header":null,"fields":[{"name":"announced","type":{"kind":"simple","type":"bool","optional":false}},{"name":"successor_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"successor_vault","type":{"kind":"simple","type":"address","optional":false}},{"name":"announced_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"VaultPendingBatchPublishView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"nonce","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"publish_kind","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"part_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"tombstone","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"VaultGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"capsule_hub_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"profile_registry_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"username_registry_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"user_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"key_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"receive_intent_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_ath_withdrawal_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_publish_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_profile_avatar_payment_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_username_mint_payment_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"processed_ath_deposit_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_publish_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_remaining_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_distributed_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_reward_per_message_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"airdrop_total_allocation_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"Vault$Data","header":null,"fields":[{"name":"vault_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"binding_flags","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"users","type":{"kind":"dict","key":"address","value":"UserState","valueFormat":"ref"}},{"name":"key_records","type":{"kind":"dict","key":"int","value":"KeyRecord","valueFormat":"ref"}},{"name":"receive_intents","type":{"kind":"dict","key":"uint","keyFormat":128,"value":"ReceiveIntent","valueFormat":"ref"}},{"name":"processed_ath_deposits","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_ath_withdrawals","type":{"kind":"dict","key":"int","value":"PendingAthWithdrawal","valueFormat":"ref"}},{"name":"pending_publishes","type":{"kind":"dict","key":"int","value":"PendingPublish","valueFormat":"ref"}},{"name":"pending_profile_avatar_payments","type":{"kind":"dict","key":"int","value":"PendingProfileAvatarPayment","valueFormat":"ref"}},{"name":"pending_username_mint_payments","type":{"kind":"dict","key":"int","value":"PendingUsernameMintPayment","valueFormat":"ref"}},{"name":"user_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"key_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"receive_intent_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"processed_ath_deposit_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_ath_withdrawal_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_publish_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"Vault$Data","header":null,"fields":[{"name":"vault_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"capsule_hub_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"profile_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_registry_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"binding_flags","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"users","type":{"kind":"dict","key":"address","value":"UserState","valueFormat":"ref"}},{"name":"key_records","type":{"kind":"dict","key":"int","value":"KeyRecord","valueFormat":"ref"}},{"name":"receive_intents","type":{"kind":"dict","key":"uint","keyFormat":128,"value":"ReceiveIntent","valueFormat":"ref"}},{"name":"processed_ath_deposits","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_ath_withdrawals","type":{"kind":"dict","key":"int","value":"PendingAthWithdrawal","valueFormat":"ref"}},{"name":"pending_batch_publishes","type":{"kind":"dict","key":"int","value":"PendingBatchPublish","valueFormat":"ref"}},{"name":"pending_profile_avatar_payments","type":{"kind":"dict","key":"int","value":"PendingProfileAvatarPayment","valueFormat":"ref"}},{"name":"pending_username_mint_payments","type":{"kind":"dict","key":"int","value":"PendingUsernameMintPayment","valueFormat":"ref"}},{"name":"user_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"key_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"receive_intent_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"processed_ath_deposit_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_ath_withdrawal_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_publish_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_ext","type":{"kind":"simple","type":"cell","optional":false}}]},
 ]
 
 const ATHWallet_opcodes = {
@@ -5762,14 +5967,13 @@ const ATHWallet_opcodes = {
     "CancelReceiveIntent": 2115981367,
     "WithdrawTonFromVaultBalance": 2115981368,
     "WithdrawAthFromVaultBalance": 2115981369,
-    "PublishPrivateFromVaultBalance": 2115981361,
-    "PublishPublicFromVaultBalance": 2115981362,
     "SetProfileAvatarFromVaultBalance": 2115981363,
     "MintUsernameFromVaultBalance": 2115981364,
-    "PublishPrivateFromVault": 2767741632,
-    "PublishPublicFromVault": 2351593143,
-    "CapsuleHubPublishAck": 2270058346,
-    "PrunePendingPublish": 1913380205,
+    "PublishBatchFromVaultBalance": 2115981377,
+    "PublishBatchToHub": 2767741649,
+    "CapsuleHubBatchAck": 2270058353,
+    "PruneBatchPublish": 1913380206,
+    "AnnounceSuccessorManifest": 1398096717,
     "TopUpStorageReserve": 840283645,
     "ProfileAvatarTonExcessRefund": 1353060641,
 }
@@ -5832,16 +6036,15 @@ export const VAULT_USER_STATE_STORAGE_ENDOWMENT = 10000000n;
 export const VAULT_KEY_RECORD_STANDARD_STORAGE_ENDOWMENT = 5000000n;
 export const VAULT_KEY_RECORD_LONG_TERM_STORAGE_ENDOWMENT = 30000000n;
 export const VAULT_RECEIVE_INTENT_STORAGE_ENDOWMENT = 5000000n;
-export const VAULT_PENDING_PUBLISH_STORAGE_ENDOWMENT = 3000000n;
 export const VAULT_PENDING_PUBLISH_STALE_TTL = 86400n;
 export const VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL = 86400n;
+export const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2000000n;
 export const VAULT_DEPOSIT_TON_EXEC_RESERVE = 2000000n;
 export const VAULT_STATE_GROWTH_EXEC_RESERVE = 2000000n;
 export const VAULT_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
 export const VAULT_ATH_WITHDRAW_MIN_VALUE = 40000000n;
 export const VAULT_WITHDRAW_TON_EXEC_RESERVE = 2000000n;
 export const VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE = 2000000n;
-export const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE = 2000000n;
 export const ASSET_TON = 1n;
 export const ASSET_ATH = 2n;
 export const RECEIVE_INTENT_ID_DOMAIN = 1380141380n;
@@ -5877,7 +6080,9 @@ export const ATH_WITHDRAWAL_ID_DOMAIN = 1096239428n;
 export const KEY_ID_DOMAIN = 1262836041n;
 export const PUBLISH_KIND_PRIVATE = 1n;
 export const PUBLISH_KIND_PUBLIC = 2n;
-export const VAULT_PUBLISH_SIGNING_DOMAIN = 1448100401n;
+export const VAULT_BATCH_PUBLISH_SIGNING_DOMAIN = 1448100402n;
+export const VAULT_BATCH_PUBLISH_ID_DOMAIN = 1112557873n;
+export const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN = 1162889521n;
 export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 1448100145n;
 export const VAULT_PROFILE_AVATAR_PAYMENT_ID_DOMAIN = 1448100169n;
 export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 1448431153n;
@@ -5889,44 +6094,12 @@ export const SIZE_CLASS_8K = 8n;
 export const SIZE_CLASS_16K = 16n;
 export const SIZE_CLASS_32K = 32n;
 export const CRYPTO_SUITE_PUBLIC_NONE = 0n;
-export const PLATO_PRIVATE_LONG_TERM_FEE_TON = 10000000n;
-export const PLATO_PUBLIC_POST_FEE_TON = 10000000n;
 export const PLATO_MIN_PROTOCOL_FEE_TON = 0n;
 export const PLATHO_PUBLIC_MARKETING_NOTE_ASCII = 2573421624129493433291659589718684717235138672n;
 export const ATH_FULL_DISCOUNT_AMOUNT = 10000000000000n;
 export const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH = 15000000000000000n;
 export const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH = 0n;
 export const VAULT_ACTIVITY_AIRDROP_REWARD_PER_MESSAGE_ATH = 10000000000n;
-export const VAULT_PUBLISH_PUBLIC_1K_LOCAL_EXEC_RESERVE = 8700000n;
-export const VAULT_PUBLISH_PUBLIC_2K_LOCAL_EXEC_RESERVE = 13800000n;
-export const VAULT_PUBLISH_PUBLIC_4K_LOCAL_EXEC_RESERVE = 17300000n;
-export const VAULT_PUBLISH_PUBLIC_8K_LOCAL_EXEC_RESERVE = 24400000n;
-export const VAULT_PUBLISH_PUBLIC_16K_LOCAL_EXEC_RESERVE = 38900000n;
-export const VAULT_PUBLISH_PUBLIC_32K_LOCAL_EXEC_RESERVE = 67600000n;
-export const VAULT_PUBLISH_PRIVATE_HYBRID_1K_LOCAL_EXEC_RESERVE = 12000000n;
-export const VAULT_PUBLISH_PRIVATE_HYBRID_2K_LOCAL_EXEC_RESERVE = 13800000n;
-export const VAULT_PUBLISH_PRIVATE_HYBRID_4K_LOCAL_EXEC_RESERVE = 17300000n;
-export const VAULT_PUBLISH_PRIVATE_HYBRID_8K_LOCAL_EXEC_RESERVE = 24400000n;
-export const VAULT_PUBLISH_PRIVATE_HYBRID_16K_LOCAL_EXEC_RESERVE = 38900000n;
-export const VAULT_PUBLISH_PRIVATE_HYBRID_32K_LOCAL_EXEC_RESERVE = 67600000n;
-export const VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE = 4200000n;
-export const CAPSULEHUB_PRIVATE_HYBRID_1K_EXEC_RESERVE = 4200000n;
-export const CAPSULEHUB_PRIVATE_HYBRID_2K_EXEC_RESERVE = 4300000n;
-export const CAPSULEHUB_PRIVATE_HYBRID_4K_EXEC_RESERVE = 4500000n;
-export const CAPSULEHUB_PRIVATE_HYBRID_8K_EXEC_RESERVE = 5000000n;
-export const CAPSULEHUB_PRIVATE_HYBRID_16K_EXEC_RESERVE = 5800000n;
-export const CAPSULEHUB_PRIVATE_HYBRID_32K_EXEC_RESERVE = 7600000n;
-export const CAPSULEHUB_PUBLIC_1K_EXEC_RESERVE = 2400000n;
-export const CAPSULEHUB_PUBLIC_2K_EXEC_RESERVE = 4300000n;
-export const CAPSULEHUB_PUBLIC_4K_EXEC_RESERVE = 4500000n;
-export const CAPSULEHUB_PUBLIC_8K_EXEC_RESERVE = 5000000n;
-export const CAPSULEHUB_PUBLIC_16K_EXEC_RESERVE = 5800000n;
-export const CAPSULEHUB_PUBLIC_32K_EXEC_RESERVE = 7600000n;
-export const CAPSULEHUB_PRIVATE_STORAGE_KEEPALIVE_RESERVE = 1000000n;
-export const CAPSULEHUB_PUBLIC_STORAGE_KEEPALIVE_RESERVE = 1000000n;
-export const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT = 3300000n;
-export const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT = 7400000n;
-export const CAPSULEHUB_ACK_FORWARD_RESERVE = 30000000n;
 export const CAPSULEHUB_PRIVATE_HEADER0_BITS = 1120n;
 export const CAPSULEHUB_PRIVATE_HEADER1_BITS = 240n;
 export const CAPSULEHUB_PRIVATE_HEADER0_CELLS = 2n;
@@ -5939,7 +6112,7 @@ export const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS = 1n;
 export const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS = 0n;
 export const PROFILE_AVATAR_PRICE_ATH = 100000000000n;
 export const PROFILE_AVATAR_NOTIFY_VALUE = 30000000n;
-export const PROFILE_AVATAR_MAX_PARTS = 16n;
+export const PROFILE_AVATAR_MAX_PARTS = 2n;
 export const PROFILE_AVATAR_MEDIA_FORMAT_WEBP = 1n;
 export const VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE = 6000000n;
 export const VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE = 55000000n;
@@ -5960,6 +6133,50 @@ export const OP_BIND_OFFICIAL_ATH_WALLET = 417017035n;
 export const OP_BIND_PROFILE_REGISTRY = 1353060611n;
 export const OP_BIND_USERNAME_REGISTRY = 1353060612n;
 export const OP_SEAL_GENESIS = 974311853n;
+export const RECEIPT_RING_K = 20n;
+export const ACT_WITHDRAW_TON = 1n;
+export const ACT_WITHDRAW_ATH = 2n;
+export const ACT_REPLACE_KEYS = 3n;
+export const ACT_CREATE_INTENT = 4n;
+export const ACT_CLAIM_INTENT = 5n;
+export const ACT_CANCEL_INTENT = 6n;
+export const ACT_PUBLISH_BATCH = 7n;
+export const ACT_SET_AVATAR = 8n;
+export const ACT_MINT_USERNAME = 9n;
+export const RES_PROCESSING = 0n;
+export const RES_CONFIRMED = 1n;
+export const RES_BOUNCED_REFUNDED = 2n;
+export const RES_TOMBSTONED = 3n;
+export const AUX_BATCH_LEVEL = 18446744073709551615n;
+export const MAX_BATCH_PARTS = 20n;
+export const VPB2_VERSION = 1n;
+export const EXT_HARD_CELLS = 8192n;
+export const EXT_HARD_BITS = 2097152n;
+export const HUB_BATCH_MSG_ROOT_BITS = 924n;
+export const ACK_MIN_FORWARD = 30000000n;
+export const BATCH_FLOOR_BASE_PIN = 200700000n;
+export const BATCH_FLOOR_PER_PART_PIN = 1500000n;
+export const PROTOCOL_FEE_TON_BATCH = 10000000n;
+export const STORAGE_RESERVE_PRIVATE = 4300000n;
+export const STORAGE_RESERVE_PUBLIC = 8400000n;
+export const VAULT_BATCH_BASE_GAS = 40000n;
+export const VAULT_PART_GAS_PRIVATE = 14000n;
+export const VAULT_PART_GAS_PUBLIC = 11000n;
+export const HUB_BATCH_BASE_GAS = 25000n;
+export const HUB_PART_GAS_PRIVATE = 16000n;
+export const HUB_PART_GAS_PUBLIC = 13000n;
+export const WALK_GAS_PER_PART_MAX = 20000n;
+export const REJECT_BASE_GAS = 9000n;
+export const ACK_GAS = 9000n;
+export const RJ_PART_SHAPE = 17n;
+export const RJ_CLASS_OR_SUITE = 18n;
+export const RJ_HASH_MISMATCH = 19n;
+export const RJ_PAYLOAD_SHAPE = 20n;
+export const RJ_DUPLICATE_ADJACENT = 21n;
+export const RJ_UNDERPRICED = 22n;
+export const RJ_BINDING = 23n;
+export const RJ_ID_ZERO = 24n;
+export const RJ_PENDING_COLLISION = 25n;
 
 export class ATHWallet implements Contract {
     

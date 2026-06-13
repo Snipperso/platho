@@ -3,7 +3,6 @@ import { beginCell, contractAddress, toNano, type Address } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import {
   Vault,
-  CapsuleHubPublishAck,
   DepositTon,
 } from '../build/Vault/Vault_Vault';
 import {
@@ -88,15 +87,9 @@ describe('Vault negative authorization matrix', () => {
     } as ATHTransferFailed);
     expect((await vault.getGetGlobal()).pending_ath_withdrawal_count).toBe(0n);
     expect((await vault.getGetUser(user.address)).exists).toBe(false);
-
-    await vault.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'CapsuleHubPublishAck',
-      publish_id: 4n,
-      entry_id: 1n,
-      entry_uid: 2n,
-    } as CapsuleHubPublishAck);
-    expect((await vault.getGetGlobal()).pending_publish_count).toBe(0n);
-    expect((await vault.getGetGlobal()).airdrop_distributed_ath).toBe(0n);
+    // NOTE (VPB2 C3): the forged-CapsuleHubPublishAck sub-case was removed with the old single-publish path.
+    // Its batch equivalent (a forged CapsuleHubBatchAck cannot settle pending_batch_publishes or mint airdrop)
+    // lands with the Group D batch ACK handler.
   });
 
   it('VAULT-AUTH-NEG-02: forged ATH withdrawal callbacks cannot clear or restore a live pending withdrawal', async () => {
