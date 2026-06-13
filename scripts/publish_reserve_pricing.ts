@@ -1,83 +1,87 @@
-import { Address, beginCell, Cell, contractAddress, external, toNano } from '@ton/core';
-import { Blockchain, createShardAccount, defaultConfig, loadConfig } from '@ton/sandbox';
-import { keyPairFromSeed, sign } from '@ton/crypto';
-import { createHash } from 'crypto';
+import { Cell, external, toNano } from '@ton/core';
+import { defaultConfig, loadConfig } from '@ton/sandbox';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { TopUpStorageReserve as CapsuleTopUpStorageReserve } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import {
-  CapsuleHub,
-  BindDeploymentManifest as CapsuleBind,
-  SealGenesis as CapsuleSeal,
-  PublishPrivateFromVault,
-  PublishPublicFromVault,
-  TopUpStorageReserve as CapsuleTopUpStorageReserve,
-} from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
-import {
-  Vault,
-  BindDeploymentManifest as VaultBind,
-  BindOfficialAthWallet as VaultBindAth,
-  BindProfileRegistry as VaultBindProfile,
-  BindUsernameRegistry as VaultBindUsername,
-  SealGenesis as VaultSeal,
-  RegisterMessagingKeys,
-  TopUpStorageReserve as VaultTopUpStorageReserve,
-} from '../build/Vault/Vault_Vault';
+  ACT_PUBLISH_BATCH,
+  KIND_PRIVATE,
+  KIND_PUBLIC,
+  MANIFEST_HASH,
+  RES_CONFIRMED,
+  batchExternalBody,
+  deployBoundSealedPair,
+  depositTon,
+  partsList,
+  registerHybrid,
+} from '../tests/helpers/vpb2';
 
-const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
-const VAULT_PUBLISH_SIGNING_DOMAIN = 0x56504231n;
-const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
+// VPB2 migration: the single-publish surface (PublishPrivateFromVault / PublishPublicFromVault) and the
+// per-message Vault.get_canonical_publish_charge getter were removed with the batch redeploy (commit d602d74).
+// This harness now drives the real VPB2 batch path — a signed batch external through the bound+sealed
+// Vault -> PublishBatchToHub -> CapsuleHub ingest -> CapsuleHubBatchAck -> Vault settle — to capture
+// current-build fee evidence, and sources the per-size hold / net price / protocol fee from the client
+// message-pricing-policy tables (mirrored below). See tests/helpers/vpb2.ts for the wire format.
 
-const KIND_PRIVATE = 1n;
-const KIND_PUBLIC = 2n;
+// EVIDENCE_MAX_CHARGE clears the VPB2 pre-accept floor (BATCH_FLOOR_BASE_PIN 200_700_000 + per-part pin) so the
+// batch settles CONFIRMED and refunds the excess down to the runtime-priced canonical total. It is the signed
+// hold *envelope* for the sandbox evidence run, NOT the per-size client hold reported in canonical_max_charge.
+const EVIDENCE_MAX_CHARGE = toNano('1');
+const EVIDENCE_DEPOSIT = toNano('2');
+const RECEIPT_RING_SIZE = 20n;
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
+const BASE_NOW = 1_700_000_000;
+
 const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
-const SUITE_PUBLIC_NONE = 0n;
-const SUITE_HYBRID = 2n;
+
+// Mirror of web/message-pricing-policy.mjs (PUBLIC/PRIVATE_CAPSULE_HOLD + _NET_PRICE tables and the
+// SUCCESSFUL_PUBLISH_ACK_REFUND constant). Kept in sync — not derived — so the artifact stays a flat pin;
+// tests/publish-reserve-pricing-artifact and scripts/preprod_guard.mjs both cross-check these against the
+// policy module and fail the build on any drift. These hold/net tables are the OLD per-message client model
+// and are slated for re-derivation against the batch floor-pin in the Session 6 client pricing rework.
+const PROTOCOL_FEE = 10_000_000n;
+const SUCCESSFUL_PUBLISH_ACK_REFUND = 25_800_000n;
+const PUBLIC_HOLD_BY_SIZE: Record<number, bigint> = {
+  1: 59_500_000n,
+  2: 66_500_000n,
+  4: 70_200_000n,
+  8: 77_800_000n,
+  16: 93_100_000n,
+  32: 123_600_000n,
+};
+const PRIVATE_HOLD_BY_SIZE: Record<number, bigint> = {
+  1: 60_500_000n,
+  2: 62_400_000n,
+  4: 66_100_000n,
+  8: 73_700_000n,
+  16: 89_000_000n,
+  32: 119_500_000n,
+};
+// Net price = hold - successful-publish ACK refund (PUBLIC_CAPSULE_NET_PRICE / PRIVATE_CAPSULE_NET_PRICE).
+function netPrice(hold: bigint): bigint {
+  return hold - SUCCESSFUL_PUBLISH_ACK_REFUND;
+}
 
 const CURRENT = {
-  vaultPublic1kLocalExec: 8_700_000n,
-  vaultPublic2kLocalExec: 13_800_000n,
-  vaultPublic4kLocalExec: 17_300_000n,
-  vaultPublic8kLocalExec: 24_400_000n,
-  vaultPublic16kLocalExec: 38_900_000n,
-  vaultPublic32kLocalExec: 67_600_000n,
-  vaultPrivateHybrid1kLocalExec: 12_000_000n,
-  vaultPrivateHybrid2kLocalExec: 13_800_000n,
-  vaultPrivateHybrid4kLocalExec: 17_300_000n,
-  vaultPrivateHybrid8kLocalExec: 24_400_000n,
-  vaultPrivateHybrid16kLocalExec: 38_900_000n,
-  vaultPrivateHybrid32kLocalExec: 67_600_000n,
-  vaultPendingRefundExec: 4_200_000n,
-  privateHybridFee: 10_000_000n,
-  publicFee: 10_000_000n,
-  privateCapsulehub1kExec: 4_200_000n,
-  privateCapsulehub2kExec: 4_300_000n,
-  privateCapsulehub4kExec: 4_500_000n,
-  privateCapsulehub8kExec: 5_000_000n,
-  privateCapsulehub16kExec: 5_800_000n,
-  privateCapsulehub32kExec: 7_600_000n,
-  public1kExec: 2_400_000n,
-  public2kExec: 4_300_000n,
-  public4kExec: 4_500_000n,
-  public8kExec: 5_000_000n,
-  public16kExec: 5_800_000n,
-  public32kExec: 7_600_000n,
-  storageKeepalive: 1_000_000n,
-  privateEntryStorage: 3_300_000n,
-  publicEntryStorage: 7_400_000n,
-  pageStorage: 0n,
-  ackForward: 30_000_000n,
+  privateHybridFee: PROTOCOL_FEE,
+  publicFee: PROTOCOL_FEE,
+  successfulPublishAckRefund: SUCCESSFUL_PUBLISH_ACK_REFUND,
+  // VPB2 pinned pre-accept floor (contracts/Vault.tact BATCH_FLOOR_BASE_PIN / BATCH_FLOOR_PER_PART_PIN).
+  batchFloorBasePin: 200_700_000n,
+  batchFloorPerPartPin: 6_200_000n,
+  ackMinForward: 30_000_000n,
 };
 
 type PublishCaseId = string;
 
 type PublishCaseSpec = {
   id: PublishCaseId;
+  kind: bigint;
   sizeClass: bigint;
-  cryptoSuite: bigint;
+  hold: bigint;
+  net: bigint;
   protocolFee: bigint;
-  keySeed: number;
 };
 
 type TxMetric = {
@@ -101,6 +105,7 @@ type PublishCaseReport = {
   canonical_max_charge_nanotons: string;
   protocol_fee_nanotons: string;
   user_net_debit_nanotons: string;
+  observed_settled_charge_nanotons: string;
   vault_external_fee_nanotons: string;
   capsulehub_publish_fee_nanotons: string;
   vault_ack_fee_nanotons: string;
@@ -132,6 +137,7 @@ type PricingReport = {
     network_fee_basis: string;
     reference_safety_multiplier: string;
     storage_note: string;
+    client_pricing_source: string;
     current_code_hash_gate: string;
   };
   fee_config_snapshot: Record<string, string>;
@@ -198,243 +204,7 @@ function currentFeeConfigSnapshot(): Record<string, string> {
   return snapshot;
 }
 
-function fixtureAddress(label: string, workchain = 0): Address {
-  return new Address(workchain, createHash('sha256').update(`PLATHO.V1.PUBLISH.RESERVE.${label}`).digest());
-}
-
-function addressHash(address: Address): bigint {
-  return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
-}
-
-function compactAddressHash(address: Address): bigint {
-  if (address.workChain !== 0) {
-    throw new Error(`Expected basechain address, got workchain ${address.workChain}`);
-  }
-  return BigInt('0x' + address.hash.toString('hex'));
-}
-
-function snakeCell(byteLength: number, fill: number): Cell {
-  const bytes = Buffer.alloc(byteLength, fill);
-  return snakeCellFromBytes(bytes);
-}
-
-function snakeCellFromBytes(bytes: Buffer): Cell {
-  const chunks: Buffer[] = [];
-  for (let offset = 0; offset < bytes.length; offset += 127) {
-    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
-  }
-  let tail: Cell | null = null;
-  for (let index = chunks.length - 1; index >= 0; index -= 1) {
-    const builder = beginCell().storeBuffer(chunks[index]);
-    if (tail) {
-      builder.storeRef(tail);
-    }
-    tail = builder.endCell();
-  }
-  return tail ?? beginCell().endCell();
-}
-
-function mlKemPubkeySnakeCell(byteLength: number, fill: number): Cell {
-  const bytes = Buffer.alloc(byteLength, fill);
-  let tail: Cell | null = null;
-  for (let offset = bytes.length; offset > 0;) {
-    const start = Math.max(0, offset - 127);
-    const builder = beginCell().storeBuffer(bytes.subarray(start, offset));
-    if (tail) {
-      builder.storeRef(tail);
-    }
-    tail = builder.endCell();
-    offset = start;
-  }
-  return tail ?? beginCell().endCell();
-}
-
-function cellHash(cell: Cell): bigint {
-  return BigInt('0x' + cell.hash().toString('hex'));
-}
-
-async function deriveAthWallet(owner: Address, athMasterAddress: Address): Promise<Address> {
-  const walletInit = await ATHWallet.init(0n, owner, athMasterAddress);
-  return contractAddress(owner.workChain, walletInit);
-}
-
-async function setupBoundPair(label: string) {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-
-  const deployer = await blockchain.treasury(`reserve-${label}-deployer`);
-  const user = await blockchain.treasury(`reserve-${label}-user`);
-  const feeAccumulator = fixtureAddress(`${label}_FEE_ACCUMULATOR`);
-
-  const vaultInit = await Vault.init(deployer.address, deployer.address, fixtureAddress(`${label}_UNBOUND_CAPSULE`), addressHash(deployer.address), false, false, 0n);
-  const vaultAddress = contractAddress(0, vaultInit);
-  const officialAthWallet = await deriveAthWallet(vaultAddress, deployer.address);
-  await blockchain.setShardAccount(vaultAddress, createShardAccount({
-    address: vaultAddress,
-    code: vaultInit.code,
-    data: vaultInit.data,
-    balance: toNano('3'),
-    workchain: vaultAddress.workChain,
-  }));
-  const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
-
-  const capsuleInit = await CapsuleHub.init(feeAccumulator, fixtureAddress(`${label}_UNBOUND_VAULT`), false, false, 0n, deployer.address);
-  const capsuleAddress = contractAddress(0, capsuleInit);
-  await blockchain.setShardAccount(capsuleAddress, createShardAccount({
-    address: capsuleAddress,
-    code: capsuleInit.code,
-    data: capsuleInit.data,
-    balance: toNano('3'),
-    workchain: capsuleAddress.workChain,
-  }));
-  const capsule = blockchain.openContract(new CapsuleHub(capsuleAddress, capsuleInit));
-
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindDeploymentManifest',
-    deployment_manifest_hash: MANIFEST_HASH,
-    counterpart_address: capsuleAddress,
-  } as VaultBind);
-  await capsule.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindDeploymentManifest',
-    deployment_manifest_hash: MANIFEST_HASH,
-    counterpart_address: vaultAddress,
-  } as CapsuleBind);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindOfficialAthWallet',
-    deployment_manifest_hash: MANIFEST_HASH,
-    official_ath_wallet_address: officialAthWallet,
-  } as VaultBindAth);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindProfileRegistry',
-    deployment_manifest_hash: MANIFEST_HASH,
-    profile_registry_address: fixtureAddress(`${label}_PROFILE_REGISTRY`),
-  } as VaultBindProfile);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'BindUsernameRegistry',
-    deployment_manifest_hash: MANIFEST_HASH,
-    username_registry_address: fixtureAddress(`${label}_USERNAME_REGISTRY`),
-  } as VaultBindUsername);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'SealGenesis',
-    deployment_manifest_hash: MANIFEST_HASH,
-  } as VaultSeal);
-  await capsule.send(deployer.getSender(), { value: toNano('0.05') }, {
-    $$type: 'SealGenesis',
-    deployment_manifest_hash: MANIFEST_HASH,
-  } as CapsuleSeal);
-
-  return { blockchain, deployer, user, vault, capsule };
-}
-
-async function registerKeys(vault: any, user: any, seedByte: number) {
-  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
-  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
-  const pqKemPubkey = mlKemPubkeySnakeCell(1184, 0x5a);
-  await vault.send(user.getSender(), { value: toNano('0.05') }, {
-    $$type: 'RegisterMessagingKeys',
-    enc_pubkey: 1n,
-    sign_pubkey: BigInt('0x' + messagingKeyPair.publicKey.toString('hex')),
-    auth_pubkey: BigInt('0x' + authKeyPair.publicKey.toString('hex')),
-    pq_kem_pubkey_hash: BigInt('0x' + pqKemPubkey.hash().toString('hex')),
-    pq_kem_pubkey_len: 1184n,
-    pq_kem_pubkey: pqKemPubkey,
-    crypto_suite_mask: SUITE_HYBRID,
-  } as RegisterMessagingKeys);
-  return authKeyPair;
-}
-
-async function topUpVaultTon(vault: any, user: any, amount: bigint) {
-  await vault.send(user.getSender(), { value: amount + 12_000_000n }, {
-    $$type: 'DepositTon',
-    amount,
-  });
-}
-
-function privateBodyBytes(sizeClass: bigint, cryptoSuite: bigint): number {
-  if (cryptoSuite !== SUITE_HYBRID) {
-    throw new Error(`unsupported private crypto suite ${cryptoSuite}`);
-  }
-  const overhead = 1204;
-  return overhead + (Number(sizeClass) * 1024);
-}
-
-function privateCells(sizeClass: bigint, cryptoSuite: bigint) {
-  if (cryptoSuite !== SUITE_HYBRID) {
-    throw new Error(`unsupported private crypto suite ${cryptoSuite}`);
-  }
-  const header0 = snakeCell(140, 0x42);
-  const header1 = snakeCell(30, 0x43);
-  const body = snakeCell(privateBodyBytes(sizeClass, cryptoSuite), 0x44);
-  return { header0, header1, body };
-}
-
-function publicCells(sizeClass: bigint) {
-  const header = snakeCell(72, 0x50);
-  const body = snakeCell(Number(sizeClass) * 1024, 0x70);
-  return { header, body };
-}
-
-function signedPrivatePublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address, sizeClass: bigint, cryptoSuite: bigint): Cell {
-  const cells = privateCells(sizeClass, cryptoSuite);
-  const payload = beginCell()
-    .storeUint(sizeClass, 8)
-    .storeUint(cryptoSuite, 8)
-    .storeUint(cellHash(cells.header0), 256)
-    .storeUint(cellHash(cells.header1), 256)
-    .storeUint(cellHash(cells.body), 256)
-    .storeRef(cells.header0)
-    .storeRef(cells.header1)
-    .storeRef(cells.body)
-    .endCell();
-  const signedDataCell = beginCell()
-    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
-    .storeUint(MANIFEST_HASH, 256)
-    .storeUint(compactAddressHash(vaultAddress), 256)
-    .storeUint(KIND_PRIVATE, 8)
-    .storeUint(compactAddressHash(owner), 256)
-    .storeUint(nonce, 64)
-    .storeUint(maxCharge, 128)
-    .storeUint(sizeClass, 8)
-    .storeUint(cryptoSuite, 8)
-    .storeRef(payload)
-    .endCell();
-  return beginCell()
-    .storeUint(0x7E1F5031, 32)
-    .storeAddress(owner)
-    .storeBuffer(sign(signedDataCell.hash(), secretKey))
-    .storeRef(signedDataCell)
-    .endCell();
-}
-
-function signedPublicPublishBody(owner: Address, nonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address, sizeClass: bigint): Cell {
-  const cells = publicCells(sizeClass);
-  const payload = beginCell()
-    .storeUint(cellHash(cells.header), 256)
-    .storeUint(cellHash(cells.body), 256)
-    .storeRef(cells.header)
-    .storeRef(cells.body)
-    .endCell();
-  const signedDataCell = beginCell()
-    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
-    .storeUint(MANIFEST_HASH, 256)
-    .storeUint(compactAddressHash(vaultAddress), 256)
-    .storeUint(KIND_PUBLIC, 8)
-    .storeUint(compactAddressHash(owner), 256)
-    .storeUint(nonce, 64)
-    .storeUint(maxCharge, 128)
-    .storeUint(sizeClass, 8)
-    .storeUint(SUITE_PUBLIC_NONE, 8)
-    .storeRef(payload)
-    .endCell();
-  return beginCell()
-    .storeUint(0x7E1F5032, 32)
-    .storeAddress(owner)
-    .storeBuffer(sign(signedDataCell.hash(), secretKey))
-    .storeRef(signedDataCell)
-    .endCell();
-}
-
-function addressFromTx(tx: any): Address | null {
+function addressFromTx(tx: any): any {
   const info = tx.inMessage?.info;
   if (info?.type === 'external-in') {
     return info.dest ?? null;
@@ -490,7 +260,7 @@ function roundUp(value: bigint, quantum: bigint): bigint {
   return ((value + quantum - 1n) / quantum) * quantum;
 }
 
-function txAtRole(tx: any, ctx: { vaultAddress: Address; capsuleAddress: Address }): string {
+function txAtRole(tx: any, ctx: { vaultAddress: any; hubAddress: any }): string {
   const address = addressFromTx(tx);
   if (!address) {
     return 'unknown';
@@ -498,7 +268,7 @@ function txAtRole(tx: any, ctx: { vaultAddress: Address; capsuleAddress: Address
   if (address.equals(ctx.vaultAddress)) {
     return inboundType(tx) === 'external-in' ? 'vault_external_publish' : 'vault_ack_or_bounce';
   }
-  if (address.equals(ctx.capsuleAddress)) {
+  if (address.equals(ctx.hubAddress)) {
     return 'capsulehub_publish';
   }
   return 'other';
@@ -510,69 +280,61 @@ function sumFees(metrics: TxMetric[], role: string): bigint {
     .reduce((acc, m) => acc + BigInt(m.total_fees_nanotons), 0n);
 }
 
-async function oneYearStorageFee(id: PublishCaseId, sizeClass: bigint, cryptoSuite: bigint): Promise<bigint> {
-  const ctx = await setupBoundPair(`storage-${id}`);
-  const { blockchain, deployer, user, vault, capsule } = ctx;
-  const keyPair = await registerKeys(vault, user, 80 + Number(sizeClass));
-  const isPublic = id.startsWith('public_');
-  const maxCharge = isPublic
-    ? await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, sizeClass, SUITE_PUBLIC_NONE)
-    : await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, sizeClass, cryptoSuite);
-  await topUpVaultTon(vault, user, maxCharge * 2n);
+// Drives one signed 1-part VPB2 batch external through a freshly bound+sealed Vault/CapsuleHub pair and
+// returns the settled transactions. Mirrors tests/vault-hub-batch-integration (E2E-BATCH-01).
+async function publishBatch(kind: bigint, sizeClass: bigint) {
+  const ctx = await deployBoundSealedPair();
+  const { blockchain, vault, hub, user, vaultAddress } = ctx;
+  await registerHybrid(vault, user);
+  await depositTon(vault, user, EVIDENCE_DEPOSIT);
   const before = await vault.getGetUser(user.address);
-  await blockchain.sendMessage(external({
-    to: vault.address,
-    body: isPublic
-      ? signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass)
-      : signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass, cryptoSuite),
+  const partsRoot = partsList(kind, 1, sizeClass);
+  const result = await blockchain.sendMessage(external({
+    to: vaultAddress,
+    body: batchExternalBody({
+      vaultAddr: vaultAddress,
+      owner: user.address,
+      nonce: before.publish_nonce,
+      maxCharge: EVIDENCE_MAX_CHARGE,
+      partCount: 1n,
+      partsRoot,
+      kind,
+      genesisHash: MANIFEST_HASH,
+    }),
   }));
+  return { ctx, before, result };
+}
 
-  blockchain.now = 1_700_000_000 + 365 * 24 * 60 * 60;
-  const touch = await capsule.send(deployer.getSender(), { value: 2_000_000n }, {
+async function oneYearStorageFee(id: PublishCaseId, kind: bigint, sizeClass: bigint): Promise<bigint> {
+  const { ctx } = await publishBatch(kind, sizeClass);
+  ctx.blockchain.now = BASE_NOW + SECONDS_PER_YEAR;
+  const touch = await ctx.hub.send(ctx.deployer.getSender(), { value: 2_000_000n }, {
     $$type: 'TopUpStorageReserve',
   } as CapsuleTopUpStorageReserve);
-  const capsuleTx = touch.transactions.find((tx: any) => {
-    const address = addressFromTx(tx);
-    return address?.equals(capsule.address);
-  });
-  if (!capsuleTx) {
+  const hubTx = touch.transactions.find((tx: any) => addressFromTx(tx)?.equals(ctx.hub.address));
+  if (!hubTx) {
     throw new Error(`Missing one-year CapsuleHub storage touch tx for ${id}`);
   }
 
-  const emptyCtx = await setupBoundPair(`storage-empty-${id}`);
-  emptyCtx.blockchain.now = 1_700_000_000 + 365 * 24 * 60 * 60;
-  const emptyTouch = await emptyCtx.capsule.send(emptyCtx.deployer.getSender(), { value: 2_000_000n }, {
+  const empty = await deployBoundSealedPair();
+  empty.blockchain.now = BASE_NOW + SECONDS_PER_YEAR;
+  const emptyTouch = await empty.hub.send(empty.deployer.getSender(), { value: 2_000_000n }, {
     $$type: 'TopUpStorageReserve',
   } as CapsuleTopUpStorageReserve);
-  const emptyTx = emptyTouch.transactions.find((tx: any) => {
-    const address = addressFromTx(tx);
-    return address?.equals(emptyCtx.capsule.address);
-  });
+  const emptyTx = emptyTouch.transactions.find((tx: any) => addressFromTx(tx)?.equals(empty.hub.address));
   if (!emptyTx) {
     throw new Error(`Missing empty one-year CapsuleHub storage touch tx for ${id}`);
   }
 
-  return txStorageFees(capsuleTx) - txStorageFees(emptyTx);
+  return txStorageFees(hubTx) - txStorageFees(emptyTx);
 }
 
 async function measureCase(spec: PublishCaseSpec): Promise<PublishCaseReport> {
-  const { id, sizeClass, cryptoSuite, protocolFee, keySeed } = spec;
+  const { id, kind, sizeClass, hold, net, protocolFee } = spec;
 
-  const ctx = await setupBoundPair(id);
-  const { blockchain, user, vault, capsule } = ctx;
-  const keyPair = await registerKeys(vault, user, keySeed);
-  const isPublic = id.startsWith('public_');
-  const maxCharge = isPublic
-    ? await vault.getGetCanonicalPublishCharge(user.address, KIND_PUBLIC, sizeClass, SUITE_PUBLIC_NONE)
-    : await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, sizeClass, cryptoSuite);
-  await topUpVaultTon(vault, user, maxCharge * 3n);
-  const before = await vault.getGetUser(user.address);
-  const result = await blockchain.sendMessage(external({
-    to: vault.address,
-    body: isPublic
-      ? signedPublicPublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass)
-      : signedPrivatePublishBody(user.address, before.publish_nonce, maxCharge, keyPair.secretKey, vault.address, sizeClass, cryptoSuite),
-  }));
+  const { ctx, before, result } = await publishBatch(kind, sizeClass);
+  const { vault, hub, user, vaultAddress } = ctx;
+
   const after = await vault.getGetUser(user.address);
   if (after.publish_nonce !== before.publish_nonce + 1n) {
     throw new Error(`${id}: publish nonce did not advance`);
@@ -580,19 +342,25 @@ async function measureCase(spec: PublishCaseSpec): Promise<PublishCaseReport> {
   if ((await vault.getGetGlobal()).pending_publish_count !== 0n) {
     throw new Error(`${id}: pending publish did not clear`);
   }
-  const metrics = result.transactions.map((tx: any) => txMetric(tx, txAtRole(tx, {
-    vaultAddress: vault.address,
-    capsuleAddress: capsule.address,
-  })));
-  const capsulePublish = metrics.find((tx) => tx.role === 'capsulehub_publish');
-  if (!capsulePublish || capsulePublish.aborted || !capsulePublish.success || capsulePublish.exit_code !== 0) {
-    throw new Error(`${id}: CapsuleHub publish did not finalize successfully`);
+  const slot = (await vault.getGetUserReceipts(user.address)).receipts.get(Number(before.publish_nonce % RECEIPT_RING_SIZE));
+  if (!slot || slot.action !== ACT_PUBLISH_BATCH || slot.result !== RES_CONFIRMED) {
+    throw new Error(`${id}: batch did not settle CONFIRMED (action=${slot?.action} result=${slot?.result})`);
   }
 
+  const metrics = result.transactions.map((tx: any) => txMetric(tx, txAtRole(tx, {
+    vaultAddress,
+    hubAddress: hub.address,
+  })));
+  const hubPublish = metrics.find((tx) => tx.role === 'capsulehub_publish');
+  if (!hubPublish || hubPublish.aborted || !hubPublish.success || hubPublish.exit_code !== 0) {
+    throw new Error(`${id}: CapsuleHub batch ingest did not finalize successfully`);
+  }
+
+  const observedSettledCharge = before.ton_balance - after.ton_balance;
   const vaultExternalFee = sumFees(metrics, 'vault_external_publish');
   const capsuleHubFee = sumFees(metrics, 'capsulehub_publish');
   const vaultAckFee = sumFees(metrics, 'vault_ack_or_bounce');
-  const storageOneYear = await oneYearStorageFee(id, sizeClass, cryptoSuite);
+  const storageOneYear = await oneYearStorageFee(id, kind, sizeClass);
 
   const vaultLocalRecommended = roundUp(ceilMul(vaultExternalFee, 2n), 100_000n);
   const capsuleRecommended = roundUp(ceilMul(capsuleHubFee, 2n), 100_000n);
@@ -603,9 +371,10 @@ async function measureCase(spec: PublishCaseSpec): Promise<PublishCaseReport> {
 
   return {
     id,
-    canonical_max_charge_nanotons: String(maxCharge),
+    canonical_max_charge_nanotons: String(hold),
     protocol_fee_nanotons: String(protocolFee),
-    user_net_debit_nanotons: String(before.ton_balance - after.ton_balance),
+    user_net_debit_nanotons: String(net),
+    observed_settled_charge_nanotons: String(observedSettledCharge),
     vault_external_fee_nanotons: String(vaultExternalFee),
     capsulehub_publish_fee_nanotons: String(capsuleHubFee),
     vault_ack_fee_nanotons: String(vaultAckFee),
@@ -637,7 +406,7 @@ function renderMarkdown(report: PricingReport): string {
   lines.push(`- CapsuleHub: \`${report.code_hashes.capsulehub}\``);
   lines.push(`- ATHWallet: \`${report.code_hashes.ath_wallet}\``);
   lines.push('');
-  lines.push('Policy: current contract constants are the release constants. Observed fees are measured with the bundled sandbox config matching the audited TON mainnet basechain fee snapshot. The x2 columns are reference sizing only; PASS does not require reserves to equal a 2x target.');
+  lines.push('Policy: the canonical max charge (hold), net price, and 0.010 TON protocol fee per size class are the client message-pricing-policy tables; the measured fees are sandbox evidence from a signed VPB2 batch external driven through the bound+sealed Vault + CapsuleHub at the current code hashes. Observed fees use the bundled sandbox config matching the audited TON mainnet basechain fee snapshot. The x2 columns are reference sizing only; PASS does not require reserves to equal a 2x target.');
   lines.push('');
   lines.push('Fee snapshot:');
   lines.push('');
@@ -648,36 +417,38 @@ function renderMarkdown(report: PricingReport): string {
   lines.push(`- Config 21 gas price: \`${report.fee_config_snapshot.config_21_gas_price}\``);
   lines.push(`- Config 25 lump/bit/cell prices: \`${report.fee_config_snapshot.config_25_lump_price}\` / \`${report.fee_config_snapshot.config_25_bit_price}\` / \`${report.fee_config_snapshot.config_25_cell_price}\``);
   lines.push('');
-  lines.push('| Case | Current net | Vault fee | Capsule fee | ACK fee | 1y storage | Reference x2 net 1y | Reference x2 net 3y | Reference x2 net 5y |');
-  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|');
+  lines.push('| Case | Hold | Net price | Observed settled | Vault fee | Capsule fee | ACK fee | 1y storage | Reference x2 net 1y | Reference x2 net 3y | Reference x2 net 5y |');
+  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
   for (const c of report.cases) {
-    lines.push(`| ${c.id} | ${c.user_net_debit_nanotons} | ${c.vault_external_fee_nanotons} | ${c.capsulehub_publish_fee_nanotons} | ${c.vault_ack_fee_nanotons} | ${c.one_year_storage_fee_nanotons} | ${c.recommended.net_price_1y_storage_x2_nanotons} | ${c.recommended.net_price_3y_storage_x2_nanotons} | ${c.recommended.net_price_5y_storage_x2_nanotons} |`);
+    lines.push(`| ${c.id} | ${c.canonical_max_charge_nanotons} | ${c.user_net_debit_nanotons} | ${c.observed_settled_charge_nanotons} | ${c.vault_external_fee_nanotons} | ${c.capsulehub_publish_fee_nanotons} | ${c.vault_ack_fee_nanotons} | ${c.one_year_storage_fee_nanotons} | ${c.recommended.net_price_1y_storage_x2_nanotons} | ${c.recommended.net_price_3y_storage_x2_nanotons} | ${c.recommended.net_price_5y_storage_x2_nanotons} |`);
   }
   lines.push('');
   return lines.join('\n');
 }
 
 export async function runPublishReservePricing(writeArtifacts = true): Promise<PricingReport> {
-  const publicCases: PublishCaseSpec[] = [];
-  for (const sizeClass of SIZE_CLASSES) {
-    publicCases.push({
+  const publicCases: PublishCaseSpec[] = SIZE_CLASSES.map((sizeClass) => {
+    const hold = PUBLIC_HOLD_BY_SIZE[Number(sizeClass)];
+    return {
       id: `public_${sizeClass}k`,
+      kind: KIND_PUBLIC,
       sizeClass,
-      cryptoSuite: SUITE_PUBLIC_NONE,
+      hold,
+      net: netPrice(hold),
       protocolFee: CURRENT.publicFee,
-      keySeed: 10 + Number(sizeClass),
-    });
-  }
-  const privateCases: PublishCaseSpec[] = [];
-  for (const sizeClass of SIZE_CLASSES) {
-    privateCases.push({
+    };
+  });
+  const privateCases: PublishCaseSpec[] = SIZE_CLASSES.map((sizeClass) => {
+    const hold = PRIVATE_HOLD_BY_SIZE[Number(sizeClass)];
+    return {
       id: `private_hybrid_${sizeClass}k`,
+      kind: KIND_PRIVATE,
       sizeClass,
-      cryptoSuite: SUITE_HYBRID,
+      hold,
+      net: netPrice(hold),
       protocolFee: CURRENT.privateHybridFee,
-      keySeed: 40 + Number(sizeClass),
-    });
-  }
+    };
+  });
   const cases = [
     ...(await Promise.all(publicCases.map((item) => measureCase(item)))),
     ...(await Promise.all(privateCases.map((item) => measureCase(item)))),
@@ -695,6 +466,7 @@ export async function runPublishReservePricing(writeArtifacts = true): Promise<P
       network_fee_basis: 'Measured on @ton/sandbox defaultConfig matching the audited 2026-06-02 TON mainnet basechain storage/gas/forward fee snapshot.',
       reference_safety_multiplier: '2',
       storage_note: 'Storage is continuous rent, not a one-shot fee. The report gives 1y/3y/5y reference options at 2x observed incremental yearly CapsuleHub index/header rent; pages are virtual entry-id ranges.',
+      client_pricing_source: 'canonical_max_charge_nanotons (hold), user_net_debit_nanotons (net = hold - successful-publish ACK refund), and protocol_fee_nanotons mirror web/message-pricing-policy.mjs. The sandbox evidence run signs the contract-required hold envelope (clears the VPB2 pre-accept floor) and refunds down to the runtime canonical total recorded as observed_settled_charge_nanotons.',
       current_code_hash_gate: 'This report is deploy evidence only when code_hashes match artifacts/CURRENT_CODE_HASHES.txt for the release being verified.',
     },
     fee_config_snapshot: currentFeeConfigSnapshot(),
@@ -716,7 +488,9 @@ if (require.main === module) {
         status: report.status,
         cases: report.cases.map((item) => ({
           id: item.id,
-          current_net: item.user_net_debit_nanotons,
+          hold: item.canonical_max_charge_nanotons,
+          net: item.user_net_debit_nanotons,
+          observed_settled: item.observed_settled_charge_nanotons,
           reference_x2_1y_net: item.recommended.net_price_1y_storage_x2_nanotons,
           reference_x2_3y_net: item.recommended.net_price_3y_storage_x2_nanotons,
           reference_x2_5y_net: item.recommended.net_price_5y_storage_x2_nanotons,

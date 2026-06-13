@@ -4,11 +4,11 @@ Status: **PASS**
 
 Current code hashes:
 
-- Vault: `604cde90f95ad360e8ecaff18f03646b96dda863c924720b81f8024b53a24cf3`
-- CapsuleHub: `2d16b0ba66fc6df66b1f890890b96ea0aaa5a7ece2ef2db8368c4f045ea40e7a`
+- Vault: `4fbb290a49e73b9b33ccd246737cf27b756d347c7ac8a63f587df3a27f5731b0`
+- CapsuleHub: `2edc2f92dcc3942793f6315fa2d3a35fc79f37e10dc645c038400b70584731e3`
 - ATHWallet: `6d9d3dff2368d22a4148a48e71d6c91561b6db6ea64d7c14c506445202e13270`
 
-Policy: current contract constants are the release constants. Observed fees are measured with the bundled sandbox config matching the audited TON mainnet basechain fee snapshot. The x2 columns are reference sizing only; PASS does not require reserves to equal a 2x target.
+Policy: the canonical max charge (hold), net price, and 0.010 TON protocol fee per size class are the client message-pricing-policy tables; the measured fees are sandbox evidence from a signed VPB2 batch external driven through the bound+sealed Vault + CapsuleHub at the current code hashes. Observed fees use the bundled sandbox config matching the audited TON mainnet basechain fee snapshot. The x2 columns are reference sizing only; PASS does not require reserves to equal a 2x target.
 
 Fee snapshot:
 
@@ -19,17 +19,17 @@ Fee snapshot:
 - Config 21 gas price: `4369067`
 - Config 25 lump/bit/cell prices: `66667` / `4369067` / `436906667`
 
-| Case | Current net | Vault fee | Capsule fee | ACK fee | 1y storage | Reference x2 net 1y | Reference x2 net 3y | Reference x2 net 5y |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| public_1k | 33700000 | 6558287 | 1936956 | 2130334 | 1394040 | 34200000 | 39800000 | 45400000 |
-| public_2k | 40700000 | 7446306 | 2006023 | 2130334 | 1394040 | 36100000 | 41700000 | 47300000 |
-| public_4k | 44400000 | 9185611 | 2128423 | 2130334 | 1394040 | 39800000 | 45400000 | 51000000 |
-| public_8k | 52000000 | 12641088 | 2357489 | 2130334 | 1394040 | 47200000 | 52800000 | 58400000 |
-| public_16k | 67300000 | 19505264 | 2805356 | 2130334 | 1394040 | 61900000 | 67500000 | 73100000 |
-| public_32k | 97800000 | 33164394 | 3661356 | 2130334 | 1394040 | 90900000 | 96500000 | 102100000 |
-| private_hybrid_1k | 34700000 | 8358550 | 2887823 | 2130334 | 2856892 | 42700000 | 54100000 | 65500000 |
-| private_hybrid_2k | 36600000 | 9250169 | 2955156 | 2130334 | 2856892 | 44700000 | 56100000 | 67500000 |
-| private_hybrid_4k | 40300000 | 10998674 | 3075823 | 2130334 | 2856892 | 48300000 | 59700000 | 71100000 |
-| private_hybrid_8k | 47900000 | 14439085 | 3303156 | 2130334 | 2856892 | 55700000 | 67100000 | 78500000 |
-| private_hybrid_16k | 63200000 | 21305261 | 3755289 | 2130334 | 2856892 | 70400000 | 81800000 | 93200000 |
-| private_hybrid_32k | 93700000 | 34963724 | 4612623 | 2130334 | 2856892 | 99400000 | 110800000 | 122200000 |
+| Case | Hold | Net price | Observed settled | Vault fee | Capsule fee | ACK fee | 1y storage | Reference x2 net 1y | Reference x2 net 3y | Reference x2 net 5y |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| public_1k | 59500000 | 33700000 | 34671007 | 6812820 | 2550734 | 2265801 | 1147664 | 35800000 | 40400000 | 45000000 |
+| public_2k | 66500000 | 40700000 | 35931940 | 7685706 | 2612734 | 2265801 | 1147664 | 37600000 | 42200000 | 46800000 |
+| public_4k | 70200000 | 44400000 | 38445140 | 9424545 | 2728067 | 2265801 | 1147664 | 41300000 | 45900000 | 50500000 |
+| public_8k | 77800000 | 52000000 | 43462874 | 12895288 | 2950067 | 2265801 | 1147664 | 48700000 | 53300000 | 57900000 |
+| public_16k | 93100000 | 67300000 | 53509674 | 19847065 | 3392067 | 2265801 | 1147664 | 63400000 | 68000000 | 72600000 |
+| public_32k | 123600000 | 97800000 | 73562609 | 33716861 | 4248734 | 2265801 | 1147664 | 92900000 | 97500000 | 102100000 |
+| private_hybrid_1k | 60500000 | 34700000 | 32285406 | 8670861 | 3669067 | 2265801 | 2856891 | 45200000 | 56600000 | 68000000 |
+| private_hybrid_2k | 62400000 | 36600000 | 33544607 | 9543746 | 3729334 | 2265801 | 2856891 | 47000000 | 58400000 | 69800000 |
+| private_hybrid_4k | 66100000 | 40300000 | 36056073 | 11282585 | 3842934 | 2265801 | 2856891 | 50700000 | 62100000 | 73500000 |
+| private_hybrid_8k | 73700000 | 47900000 | 41072074 | 14753329 | 4063201 | 2265801 | 2856891 | 58200000 | 69600000 | 81000000 |
+| private_hybrid_16k | 89000000 | 63200000 | 51117142 | 21705105 | 4503468 | 2265801 | 2856891 | 73000000 | 84400000 | 95800000 |
+| private_hybrid_32k | 119500000 | 93700000 | 71170743 | 35574901 | 5360801 | 2265801 | 2856891 | 102400000 | 113800000 | 125200000 |
