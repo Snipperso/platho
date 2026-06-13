@@ -1,4 +1,4 @@
-import { Address, beginCell, Cell, contractAddress, toNano } from '@ton/core';
+import { Address, Cell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
@@ -6,30 +6,39 @@ import * as path from 'path';
 
 import {
   CapsuleHub,
-  PublishPrivateFromVault,
-  PublishPublicFromVault,
+  PublishBatchToHub,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { MockVaultAckSink } from '../build/MockVaultAckSink/MockVaultAckSink_MockVaultAckSink';
+import {
+  KIND_PRIVATE,
+  KIND_PUBLIC,
+  marketingCell,
+  partsList,
+} from '../tests/helpers/vpb2';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
-const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 const PRIVATE_HYBRID_FEE = 10_000_000n;
 const PUBLIC_FEE = 10_000_000n;
-const EXEC_BY_SIZE_CLASS = new Map<SizeClass, bigint>([
-  [1n, 4_200_000n],
-  [2n, 4_300_000n],
-  [4n, 4_500_000n],
-  [8n, 5_000_000n],
-  [16n, 5_800_000n],
-  [32n, 7_600_000n],
-]);
+// VPB2 batch ingest charges a flat per-batch compute reserve (getComputeFee(HUB_BATCH_BASE_GAS) +
+// getComputeFee(HUB_PART_GAS_*) for the single part). Unlike the old single-publish ABI, the Hub's
+// required value is INDEPENDENT of the body size class (it validates payload cells by declared hash and
+// stores only compact index entries), so this reserve is flat across 1K..32K. Empirical floor for the
+// 1-part batch is ~5.94M nanotons; 7M leaves headroom that the Hub returns to the Vault via mode-128.
+const BATCH_EXEC_RESERVE = 7_000_000n;
 const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 const KEEPALIVE = 1_000_000n;
 const PRIVATE_ENTRY_STORAGE = 3_300_000n;
 const PUBLIC_ENTRY_STORAGE = 7_400_000n;
 const PAGE_STORAGE = 0n;
 const ACK_RESERVE = 30_000_000n;
+// The Hub keeps storage with the 1.25 protectedReserve buffer (batchStorageReserveWithBuffer); the inbound
+// value must therefore carry the BUFFERED storage so the post-loop value gate (13530) passes. The reported
+// required_storage_reserve stays un-buffered so retained_margin measures the real backed surplus.
+const STORAGE_RESERVE_BUFFER_NUMERATOR = 125n;
+const STORAGE_RESERVE_BUFFER_DENOMINATOR = 100n;
+function bufferedStorage(unbuffered: bigint): bigint {
+  return unbuffered * STORAGE_RESERVE_BUFFER_NUMERATOR / STORAGE_RESERVE_BUFFER_DENOMINATOR;
+}
 
 const HEADER0_BYTES = 140;
 const HEADER1_BYTES = 30;
@@ -79,25 +88,6 @@ function codeHash(relPath: string): string {
   return Cell.fromBoc(fs.readFileSync(relPath))[0].hash().toString('hex');
 }
 
-function snakeCell(byteLength: number, fill = 0x61): Cell {
-  const bytes = Buffer.alloc(byteLength, fill);
-  const chunks: Buffer[] = [];
-  for (let offset = 0; offset < bytes.length; offset += 127) {
-    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
-  }
-  let tail: Cell | null = null;
-  for (let index = chunks.length - 1; index >= 0; index -= 1) {
-    const builder = beginCell().storeBuffer(chunks[index]);
-    if (tail) builder.storeRef(tail);
-    tail = builder.endCell();
-  }
-  return tail ?? beginCell().endCell();
-}
-
-function cellHash(cell: Cell): bigint {
-  return BigInt(`0x${cell.hash().toString('hex')}`);
-}
-
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.CAPSULEHUB.ECON.${label}`).digest());
 }
@@ -113,15 +103,11 @@ async function setup() {
   const feeAccumulator = fixtureAddress('FEE_ACCUMULATOR');
   const genesisController = fixtureAddress('GENESIS_CONTROLLER');
 
-  const mockVaultInit = await MockVaultAckSink.init();
-  const mockVaultAddress = contractAddress(0, mockVaultInit);
-  await blockchain.setShardAccount(mockVaultAddress, createShardAccount({
-    address: mockVaultAddress,
-    code: mockVaultInit.code,
-    data: mockVaultInit.data,
-    balance: toNano('1'),
-    workchain: mockVaultAddress.workChain,
-  }));
+  // The bound vault is the only allowed sender and the recipient of the VPB2 CapsuleHubBatchAck. A sandbox
+  // treasury swallows the ACK cleanly (the batch ack mock for the single-publish ABI was removed), which is
+  // all this economics harness needs — it measures the Hub's reserved balance, not the Vault credit-back.
+  const mockVault = await blockchain.treasury('caphub-econ-bound-vault');
+  const mockVaultAddress = mockVault.address;
 
   const init = await CapsuleHub.init(feeAccumulator, mockVaultAddress, true, true, MANIFEST_HASH, genesisController);
   const address = contractAddress(0, init);
@@ -152,53 +138,45 @@ function privateBodyBytes(sizeClass: bigint, cryptoSuite: bigint): number {
   return 1204 + (Number(sizeClass) * 1024);
 }
 
-function execReserve(sizeClass: SizeClass): bigint {
-  const value = EXEC_BY_SIZE_CLASS.get(sizeClass);
-  if (value === undefined) throw new Error(`missing exec reserve for ${sizeClass}K`);
-  return value;
+function execReserve(_sizeClass: SizeClass): bigint {
+  // Flat across size classes under the VPB2 batch ABI (see BATCH_EXEC_RESERVE note).
+  return BATCH_EXEC_RESERVE;
 }
 
 function publicBodyBytes(sizeClass: SizeClass): number {
   return Number(sizeClass) * 1024;
 }
 
-function privateVault(sizeClass: SizeClass, cryptoSuite: 2n, fill: number): PublishPrivateFromVault {
-  const header0 = snakeCell(HEADER0_BYTES, fill);
-  const header1 = snakeCell(HEADER1_BYTES, fill + 1);
-  const body = snakeCell(privateBodyBytes(sizeClass, cryptoSuite), fill + 2);
+// A 1-part private VPB2 batch (the Vault->Hub wire format). The Hub validates the part shape against its
+// declared hashes and stores only the compact index entry, so partsList builds the canonical 1K..32K hybrid
+// part. protocol_fee_total carries the per-part fee that the Hub accrues (drives the economics fee delta).
+function privateVault(sizeClass: SizeClass, _cryptoSuite: 2n, fill: number, author: Address): PublishBatchToHub {
   return {
-    $$type: 'PublishPrivateFromVault',
+    $$type: 'PublishBatchToHub',
     bounce_id: BigInt(10_000 + fill),
     bounce_tag: BigInt(30_000 + fill),
     publish_id: hash256(`vault-private-${fill}`),
-    size_class: sizeClass,
-    crypto_suite: cryptoSuite,
-    header_0_hash: cellHash(header0),
-    header_1_hash: cellHash(header1),
-    body_hash: cellHash(body),
-    header_0: header0,
-    header_1: header1,
-    body,
-    protocol_fee_paid: PRIVATE_HYBRID_FEE,
+    publish_kind: KIND_PRIVATE,
+    part_count: 1n,
+    protocol_fee_total: PRIVATE_HYBRID_FEE,
+    author_wallet: author,
+    parts: partsList(KIND_PRIVATE, 1, sizeClass),
+    marketing: null,
   };
 }
 
-function publicVault(sizeClass: SizeClass, fill: number, author: Address): PublishPublicFromVault {
-  const header = snakeCell(PUBLIC_HEADER_BYTES, 0x50);
-  const body = snakeCell(publicBodyBytes(sizeClass), fill);
+function publicVault(sizeClass: SizeClass, fill: number, author: Address): PublishBatchToHub {
   return {
-    $$type: 'PublishPublicFromVault',
+    $$type: 'PublishBatchToHub',
     bounce_id: BigInt(20_000 + fill),
     bounce_tag: BigInt(40_000 + fill),
     publish_id: hash256(`vault-public-${fill}`),
-    size_class: sizeClass,
-    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
+    publish_kind: KIND_PUBLIC,
+    part_count: 1n,
+    protocol_fee_total: PUBLIC_FEE,
     author_wallet: author,
-    header_hash: cellHash(header),
-    body_hash: cellHash(body),
-    header,
-    body,
-    protocol_fee_paid: PUBLIC_FEE,
+    parts: partsList(KIND_PUBLIC, 1, sizeClass),
+    marketing: marketingCell(),
   };
 }
 
@@ -240,18 +218,18 @@ async function measure(
 
 export async function runCapsuleHubStorageEconomics(writeArtifacts = true): Promise<CapsuleHubStorageEconomicsReport> {
   const privateCases = await Promise.all(SIZE_CLASSES.map((sizeClass, index) => {
-    const inbound = PRIVATE_HYBRID_FEE + execReserve(sizeClass) + KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
+    const inbound = PRIVATE_HYBRID_FEE + execReserve(sizeClass) + bufferedStorage(KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE) + ACK_RESERVE;
     return measure(
       `VAULT_PRIVATE_HYBRID_${sizeClass}K`,
       inbound,
       KEEPALIVE + PRIVATE_ENTRY_STORAGE + PAGE_STORAGE,
       (ctx) => ctx.capsule.send(ctx.blockchain.sender(ctx.mockVaultAddress), {
         value: inbound,
-      }, privateVault(sizeClass, 2n, 0x70 + index)),
+      }, privateVault(sizeClass, 2n, 0x70 + index, ctx.author.address)),
     );
   }));
   const publicCases = await Promise.all(SIZE_CLASSES.map((sizeClass, index) => {
-    const inbound = PUBLIC_FEE + execReserve(sizeClass) + KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE + ACK_RESERVE;
+    const inbound = PUBLIC_FEE + execReserve(sizeClass) + bufferedStorage(KEEPALIVE + PUBLIC_ENTRY_STORAGE + PAGE_STORAGE) + ACK_RESERVE;
     return measure(
       `VAULT_PUBLIC_${sizeClass}K`,
       inbound,

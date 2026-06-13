@@ -8,18 +8,18 @@ Status: DERIVED_MAINNET_BUYBACKBURN_ADDRESSES
 ## Inputs
 
 - genesisControllerAddress: EQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPFkC
-- athMasterAddress: EQB4sZxJa8CAaRBbFb8-33j3mA9scMCz0zqTy42qEnWnVvaM
+- athMasterAddress: EQCF-3kT4hwskPW8qVPkROqEHMdGEONYn_edh3NLxJmBcFOi
 - genesisControllerHashHex: 8f70af6ee5c5a1bcbbc018bdd7d47c26a4e448d1b6530f1b7bd7f095b795454e
 
 ## Derived Addresses
 
-- buybackBurnAddress: EQAn-Ho53r48Z5LU0nB2NkDwyFhxLenClfOPRcyypQsVkmO9
-- buybackBurnOfficialAthWalletAddress: EQA9pVFmFTbbQrPC95tXIRj3EmE-nMEzSMqDNlTEGfq8Lw_e
+- buybackBurnAddress: EQCTP3r55c0bTflRQCkCI0fxbXUIqYYmXPsffPmKFYWCkack
+- buybackBurnOfficialAthWalletAddress: EQCZRj1z7UI_ur4t79r2PtIMfZo38i73aQSGFEZiezvZS9GQ
 
 ## StateInit Hashes
 
-- buybackBurnStateInitHash: 27f87a39debe3c6792d4d270763640f0c858712de9c295f38f45ccb2a50b1592
-- buybackBurnOfficialAthWalletStateInitHash: 3da551661536db42b3c2f79b572118f712613e9cc13348ca833654c419fabc2f
+- buybackBurnStateInitHash: 933f7af9e5cd1b4df9514029022347f16d7508a986265cfb1f7cf98a15858291
+- buybackBurnOfficialAthWalletStateInitHash: 99463d73ed423fbabe2defdaf63ed20c7d9a37f22ef76904861446627b3bd94b
 
 ## Blockers
 
@@ -27,6 +27,6 @@ Status: DERIVED_MAINNET_BUYBACKBURN_ADDRESSES
 
 ## M20F Collector Inputs
 
-- athMasterAddress: EQB4sZxJa8CAaRBbFb8-33j3mA9scMCz0zqTy42qEnWnVvaM
-- buybackBurnAddress: EQAn-Ho53r48Z5LU0nB2NkDwyFhxLenClfOPRcyypQsVkmO9
-- buybackBurnOfficialAthWalletAddress: EQA9pVFmFTbbQrPC95tXIRj3EmE-nMEzSMqDNlTEGfq8Lw_e
+- athMasterAddress: EQCF-3kT4hwskPW8qVPkROqEHMdGEONYn_edh3NLxJmBcFOi
+- buybackBurnAddress: EQCTP3r55c0bTflRQCkCI0fxbXUIqYYmXPsffPmKFYWCkack
+- buybackBurnOfficialAthWalletAddress: EQCZRj1z7UI_ur4t79r2PtIMfZo38i73aQSGFEZiezvZS9GQ

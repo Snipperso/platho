@@ -24,7 +24,6 @@ describe('PWA on-chain self-sufficiency', () => {
       'get_receive_intent',
       'get_receive_intent_id',
       'get_receive_intent_commitment',
-      'get_canonical_publish_charge',
     ]) {
       expect(vault, `Vault must expose ${method}`).toMatch(new RegExp(`get fun ${method}\\b`));
     }
@@ -52,13 +51,12 @@ describe('PWA on-chain self-sufficiency', () => {
     const usernameProvider = read('web/username-ton-rpc-provider.mjs');
     const athProvider = read('web/ath-ton-rpc-provider.mjs');
 
-    expect(app).toMatch(/provider\.getCanonicalPublishCharge\(/);
     expect(app).toMatch(/readUsernameMintPriceForOwnVaultAction\(provider, registry, username\)/);
     expect(app).toMatch(/provider\.getUser\(walletAddress/);
     expect(app).toMatch(/provider\.getKeyRecord\(currentKeyId/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerFromChain/);
 
-    for (const method of ['get_global', 'get_user', 'get_key_record', 'get_canonical_publish_charge']) {
+    for (const method of ['get_global', 'get_user', 'get_key_record']) {
       expect(vaultProvider).toMatch(new RegExp(`method:\\s*'${method}'`));
     }
     for (const method of ['get_state', 'get_private_entry', 'get_public_entry', 'get_private_page', 'get_public_page']) {
@@ -101,6 +99,5 @@ describe('PWA on-chain self-sufficiency', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.messagesEndpoint).toBe('https://toncenter.com/api/v3/messages');
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.apiKey).toBeUndefined();
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'platho-rpc-mainnet')?.sendBocEndpoint).toBe('https://rpc.platho.app/api/v3/message');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_canonical_publish_charge');
   });
 });

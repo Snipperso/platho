@@ -18,12 +18,12 @@ describe('ATH metadata content artifact', () => {
       symbol: 'ATH',
       decimals: '9',
       description: 'Utility token of the Platho communication protocol.',
-      deployment_id: 'platho-mainnet-20260608-clean-04',
+      deployment_id: 'platho-mainnet-20260610-clean-06',
     });
     expect(parsed).toHaveLength(1);
     expect(parsed[0].equals(content)).toBe(true);
     expect(content.hash().toString('hex')).toBe(artifact.contentHashHex);
-    expect(artifact.contentHashHex).toBe('2bd5a2a31ae443cd1c1b812ae7a255ed556fa22b3b391082c3593cca99067816');
+    expect(artifact.contentHashHex).toBe('d8a113e74ef44499e27b367992a2d579a045d1670644b79458edaa504860c6fb');
 
     const slice = content.beginParse();
     expect(slice.loadUint(8)).toBe(0);
