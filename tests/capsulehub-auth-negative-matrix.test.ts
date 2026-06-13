@@ -1,171 +1,105 @@
 import { describe, expect, it } from 'vitest';
-import { Address, Cell, contractAddress, toNano } from '@ton/core';
-import { Blockchain, createShardAccount } from '@ton/sandbox';
-import { createHash } from 'crypto';
+import { beginCell, Cell, toNano } from '@ton/core';
 import {
-  CapsuleHub,
   BindDeploymentManifest,
   SealGenesis,
-  PublishPrivateFromVault,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { MockVaultAckSink } from '../build/MockVaultAckSink/MockVaultAckSink_MockVaultAckSink';
 import {
   finalPrivateBodyCell,
   finalPrivateHeader0Cell,
   finalPrivateHeader1Cell,
 } from './helpers/capsule-cells';
+import {
+  HUB_MANIFEST,
+  SIZE_1K,
+  SUITE_HYBRID,
+  cellHash,
+  partsList,
+  publishBatchToHub,
+  setupHub,
+  hubTxExit,
+} from './helpers/vpb2';
 
-const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
-const PRIVATE_FEE = 10_000_000n;
+// CapsuleHub negative authorization matrix — migrated onto the VPB2 batch ingest (PublishBatchToHub). The
+// genesis-ceremony bind/seal gates are unchanged; the publish gates are now the Phase-A scalar checks of the
+// batch receiver. Non-Vault-sender rejection (former CAPSULE-AUTH-NEG-03) is covered by HUB-BATCH-02 and not
+// duplicated here.
 
-function hash256(label: string): bigint {
-  return BigInt('0x' + createHash('sha256').update(`PLATHO.V1.CAPSULE.AUTH.${label}`).digest('hex'));
+// A private part whose embedded body_hash field is zeroed (otherwise valid shape) — trips the bh!=0 gate.
+function privatePartZeroBodyHash(): Cell {
+  const h0 = finalPrivateHeader0Cell();
+  const h1 = finalPrivateHeader1Cell();
+  const body = finalPrivateBodyCell(SIZE_1K);
+  return beginCell()
+    .storeUint(SIZE_1K, 8).storeUint(SUITE_HYBRID, 8)
+    .storeUint(cellHash(h0), 256).storeUint(cellHash(h1), 256).storeUint(0n, 256) // body_hash = 0
+    .storeRef(h0).storeRef(h1).storeRef(body)
+    .endCell();
 }
 
-function cellHash(cell: Cell): bigint {
-  return BigInt('0x' + cell.hash().toString('hex'));
-}
+describe('CapsuleHub negative authorization matrix (VPB2 batch)', () => {
+  it('CAPSULE-AUTH-NEG-01: only the genesis controller can bind and seal before the publish surface opens', async () => {
+    const { blockchain, hub, vault, controller } = await setupHub({ sealed: false, vaultBound: false });
+    const attacker = await blockchain.treasury('capsule-auth-attacker');
 
-function fixtureAddress(label: string, workchain = 0): Address {
-  return new Address(workchain, createHash('sha256').update(`PLATHO.V1.CAPSULE.AUTH.${label}`).digest());
-}
-
-async function deployMockVault(blockchain: Blockchain) {
-  const mockVaultInit = await MockVaultAckSink.init();
-  const mockVaultAddress = contractAddress(0, mockVaultInit);
-  await blockchain.setShardAccount(mockVaultAddress, createShardAccount({
-    address: mockVaultAddress,
-    code: mockVaultInit.code,
-    data: mockVaultInit.data,
-    balance: toNano('1'),
-    workchain: mockVaultAddress.workChain,
-  }));
-  return {
-    mockVault: blockchain.openContract(new MockVaultAckSink(mockVaultAddress, mockVaultInit)),
-    mockVaultAddress,
-  };
-}
-
-async function setup(options?: { sealed?: boolean; vaultBound?: boolean }) {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const controller = await blockchain.treasury('capsule-auth-controller');
-  const attacker = await blockchain.treasury('capsule-auth-attacker');
-  const author = await blockchain.treasury('capsule-auth-author');
-  const { mockVault, mockVaultAddress } = await deployMockVault(blockchain);
-  const feeAccumulator = fixtureAddress('FEE_ACCUMULATOR');
-
-  const init = await CapsuleHub.init(
-    feeAccumulator,
-    options?.vaultBound === false ? controller.address : mockVaultAddress,
-    options?.vaultBound ?? true,
-    options?.sealed ?? true,
-    options?.sealed === false ? 0n : MANIFEST_HASH,
-    controller.address,
-  );
-  const address = contractAddress(0, init);
-  await blockchain.setShardAccount(address, createShardAccount({
-    address,
-    code: init.code,
-    data: init.data,
-    balance: toNano('1'),
-    workchain: address.workChain,
-  }));
-  return { blockchain, capsule: blockchain.openContract(new CapsuleHub(address, init)), controller, attacker, author, mockVault, mockVaultAddress };
-}
-
-function vaultPrivate(overrides?: Partial<PublishPrivateFromVault>): PublishPrivateFromVault {
-  const sizeClass = overrides?.size_class ?? 1n;
-  const cryptoSuite = overrides?.crypto_suite ?? 2n;
-  const header_0 = overrides?.header_0 ?? finalPrivateHeader0Cell(0x76);
-  const header_1 = overrides?.header_1 ?? finalPrivateHeader1Cell(0x77);
-  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x78, cryptoSuite);
-  return {
-    $$type: 'PublishPrivateFromVault',
-    bounce_id: 7001n,
-    bounce_tag: 7001n,
-    publish_id: hash256('vault-private'),
-    size_class: sizeClass,
-    crypto_suite: cryptoSuite,
-    header_0_hash: cellHash(header_0),
-    header_1_hash: cellHash(header_1),
-    body_hash: cellHash(body),
-    header_0,
-    header_1,
-    body,
-    protocol_fee_paid: PRIVATE_FEE,
-    ...overrides,
-  } as PublishPrivateFromVault;
-}
-
-// VPB2 Session 4: this suite drives the Hub through the REMOVED single-publish receivers. SKIPPED pending
-// migration onto the batch ingest (PublishBatchToHub); the new home is tests/capsulehub-batch-ingest.test.ts.
-describe.skip('CapsuleHub negative authorization matrix', () => {
-  it('CAPSULE-AUTH-NEG-01: only genesis controller can bind and seal before publish surface opens', async () => {
-    const { capsule, controller, attacker, mockVaultAddress } = await setup({ sealed: false, vaultBound: false });
-
-    await capsule.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: mockVaultAddress,
+    // An attacker cannot bind the Vault.
+    await hub.send(attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindDeploymentManifest', deployment_manifest_hash: HUB_MANIFEST, counterpart_address: vault.address,
     } as BindDeploymentManifest);
-    expect((await capsule.getGetState()).vault_bound).toBe(false);
+    expect((await hub.getGetState()).vault_bound).toBe(false);
 
-    await capsule.send(controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: mockVaultAddress,
+    // The controller can.
+    await hub.send(controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindDeploymentManifest', deployment_manifest_hash: HUB_MANIFEST, counterpart_address: vault.address,
     } as BindDeploymentManifest);
-    expect((await capsule.getGetState()).vault_bound).toBe(true);
+    expect((await hub.getGetState()).vault_bound).toBe(true);
 
-    await capsule.send(controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: 0n,
+    // Seal with a mismatched manifest does not seal.
+    await hub.send(controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis', deployment_manifest_hash: 0n,
     } as SealGenesis);
-    expect((await capsule.getGetState()).sealed).toBe(false);
+    expect((await hub.getGetState()).sealed).toBe(false);
 
-    await capsule.send(attacker.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
+    // An attacker cannot seal.
+    await hub.send(attacker.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis', deployment_manifest_hash: HUB_MANIFEST,
     } as SealGenesis);
-    expect((await capsule.getGetState()).sealed).toBe(false);
+    expect((await hub.getGetState()).sealed).toBe(false);
 
-    await capsule.send(controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'SealGenesis',
-      deployment_manifest_hash: MANIFEST_HASH,
+    // The controller seals with the correct manifest.
+    await hub.send(controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis', deployment_manifest_hash: HUB_MANIFEST,
     } as SealGenesis);
-    expect((await capsule.getGetState()).sealed).toBe(true);
+    expect((await hub.getGetState()).sealed).toBe(true);
   });
 
-  it('CAPSULE-AUTH-NEG-02: unsealed hub rejects publish and sealed hub rejects rebinding', async () => {
-    const unsealed = await setup({ sealed: false, vaultBound: true });
-    await unsealed.capsule.send(unsealed.blockchain.sender(unsealed.mockVaultAddress), { value: toNano('0.1') }, vaultPrivate());
-    expect((await unsealed.capsule.getGetState()).private_latest_id).toBe(0n);
+  it('CAPSULE-AUTH-NEG-02: an unsealed hub rejects a batch publish (12900) and a sealed hub rejects rebinding', async () => {
+    // Unsealed hub: the bound Vault publishes, but requireSealed bounces it before anything is stored.
+    const unsealed = await setupHub({ sealed: false, vaultBound: true });
+    const res = await unsealed.hub.send(unsealed.vault.getSender(), { value: toNano('0.1') },
+      publishBatchToHub({ parts: partsList(1n, 1), authorWallet: unsealed.vault.address }));
+    expect(hubTxExit(res, unsealed.hub)).toBe(12900);
+    expect((await unsealed.hub.getGetState()).private_latest_id).toBe(0n);
 
-    const sealed = await setup();
-    await sealed.capsule.send(sealed.controller.getSender(), { value: toNano('0.05') }, {
-      $$type: 'BindDeploymentManifest',
-      deployment_manifest_hash: MANIFEST_HASH,
-      counterpart_address: sealed.attacker.address,
+    // Sealed hub: a controller rebind attempt is rejected; the bound Vault address is unchanged.
+    const sealed = await setupHub();
+    await sealed.hub.send(sealed.controller.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindDeploymentManifest', deployment_manifest_hash: HUB_MANIFEST, counterpart_address: sealed.controller.address,
     } as BindDeploymentManifest);
-    expect((await sealed.capsule.getGetState()).vault_address.toString()).toBe(sealed.mockVaultAddress.toString());
+    expect((await sealed.hub.getGetState()).vault_address.toString()).toBe(sealed.vault.address.toString());
   });
 
-  it('CAPSULE-AUTH-NEG-03: author spoof and forged Vault publish cannot mutate entries or ACK state', async () => {
-    const { capsule, attacker, mockVault } = await setup();
+  it('CAPSULE-AUTH-NEG-04: a batch with a zero publish_id (13501) or a zero body_hash part (13512) is rejected, nothing stored', async () => {
+    const { hub, vault } = await setupHub();
 
-    await capsule.send(attacker.getSender(), { value: toNano('0.1') }, vaultPrivate());
-    expect((await capsule.getGetState()).private_latest_id).toBe(0n);
-    expect((await mockVault.getGetState()).ack_count).toBe(0n);
-  });
+    const zeroId = await hub.send(vault.getSender(), { value: toNano('0.1') },
+      publishBatchToHub({ parts: partsList(1n, 1), authorWallet: vault.address, publishId: 0n }));
+    expect(hubTxExit(zeroId, hub)).toBe(13501);
 
-  it('CAPSULE-AUTH-NEG-04: Vault publish with invalid identifiers is rejected without ACK', async () => {
-    const { blockchain, capsule, mockVault, mockVaultAddress } = await setup();
+    const zeroBodyHash = await hub.send(vault.getSender(), { value: toNano('0.1') },
+      publishBatchToHub({ parts: privatePartZeroBodyHash(), authorWallet: vault.address }));
+    expect(hubTxExit(zeroBodyHash, hub)).toBe(13512);
 
-    await capsule.send(blockchain.sender(mockVaultAddress), { value: toNano('0.1') }, vaultPrivate({ publish_id: 0n }));
-    await capsule.send(blockchain.sender(mockVaultAddress), { value: toNano('0.1') }, vaultPrivate({ body_hash: 0n }));
-
-    expect((await capsule.getGetState()).private_latest_id).toBe(0n);
-    expect((await mockVault.getGetState()).ack_count).toBe(0n);
+    expect((await hub.getGetState()).private_latest_id).toBe(0n);
   });
 });
