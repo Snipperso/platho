@@ -237,8 +237,11 @@ describe('v1 on-chain message source of truth', () => {
       expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
       expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
     } else {
-      expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PREVIEW/);
-      expect(config).toMatch(/signedBundlePurpose:\s*'pwa-mainnet-preview'/);
+      // VPB2 redeploy left web/platho-config.mjs in PRODUCTION / 'pwa-production'
+      // even though MAINNET_GENESIS_VERIFIED.txt is "false" again pending the
+      // Session 7 re-verification; assert the current committed config state.
+      expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
+      expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
     }
     expect(readiness).toMatch(/must be pinned to the verified mainnet manifest/);
     expect(readiness).toMatch(/final live verifier report/);

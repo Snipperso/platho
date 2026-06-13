@@ -50,8 +50,8 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 874,
-      "receive_handlers": 9,
+      "non_comment_lines": 888,
+      "receive_handlers": 8,
       "bounced_handlers": 1,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -95,7 +95,7 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 678,
+      "non_comment_lines": 1146,
       "receive_handlers": 14,
       "bounced_handlers": 3,
       "forbidden_hits": [],
@@ -104,9 +104,9 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 2517,
-      "receive_handlers": 15,
-      "bounced_handlers": 5,
+      "non_comment_lines": 2464,
+      "receive_handlers": 16,
+      "bounced_handlers": 4,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
       "storage_top_up_receive": true
@@ -139,8 +139,8 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "2d16b0ba66fc6df66b1f890890b96ea0aaa5a7ece2ef2db8368c4f045ea40e7a",
-      "pinned": "2d16b0ba66fc6df66b1f890890b96ea0aaa5a7ece2ef2db8368c4f045ea40e7a",
+      "built": "2edc2f92dcc3942793f6315fa2d3a35fc79f37e10dc645c038400b70584731e3",
+      "pinned": "2edc2f92dcc3942793f6315fa2d3a35fc79f37e10dc645c038400b70584731e3",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -149,8 +149,8 @@
       "match": true
     },
     "PROFILE_REGISTRY_CODE_HASH": {
-      "built": "6437b6631d0b310781fef9efa214640c69a3ae684dae2c4be5b463a673ed7e29",
-      "pinned": "6437b6631d0b310781fef9efa214640c69a3ae684dae2c4be5b463a673ed7e29",
+      "built": "11a80e2eaf22cf64b6d78e147d44c51174a929c06e8d8bea2e09d2fafa489569",
+      "pinned": "11a80e2eaf22cf64b6d78e147d44c51174a929c06e8d8bea2e09d2fafa489569",
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
@@ -159,13 +159,13 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "6b7739a9aadaef0c2ae69a0007e93961746d861cebabcdd5c68777f6cad2b27f",
-      "pinned": "6b7739a9aadaef0c2ae69a0007e93961746d861cebabcdd5c68777f6cad2b27f",
+      "built": "0febf3487aefc1363eba3cce080a23d001c8764f3b7031f0859e5cc2d39ab566",
+      "pinned": "0febf3487aefc1363eba3cce080a23d001c8764f3b7031f0859e5cc2d39ab566",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "0e6013dec3a95c521f94cba1e600e139b1683bb635d353b877c4e5242f2bbb22",
-      "pinned": "0e6013dec3a95c521f94cba1e600e139b1683bb635d353b877c4e5242f2bbb22",
+      "built": "4fbb290a49e73b9b33ccd246737cf27b756d347c7ac8a63f587df3a27f5731b0",
+      "pinned": "4fbb290a49e73b9b33ccd246737cf27b756d347c7ac8a63f587df3a27f5731b0",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "8c905cb260768da0a2aa33d593ec4bcc9f9d78ff86382cbcdd6fef6af22fd728",
+    "manifest_hash_hex": "464cb84b470d67e5efa8ad89488d735499fd0f0dcf0f4e404a89a853500e867e",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

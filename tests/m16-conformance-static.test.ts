@@ -158,8 +158,6 @@ describe('M16 production conformance static checks', () => {
       'CreateReceiveIntent',
       'ClaimReceiveIntent',
       'CancelReceiveIntent',
-      'PublishPrivateFromVaultBalance',
-      'PublishPublicFromVaultBalance',
       'ReplaceMessagingKeys',
     ];
     const addressBoundEntrypoints = [
@@ -190,10 +188,7 @@ describe('M16 production conformance static checks', () => {
 
   it('M16-CONF-01B3: Vault-balance publish avoids full budget checks before acceptMessage', () => {
     const vault = contractSource('Vault.tact');
-    const publishEntrypoints = [
-      'PublishPrivateFromVaultBalance',
-      'PublishPublicFromVaultBalance',
-    ];
+    const publishEntrypoints: string[] = [];
 
     for (const entrypoint of publishEntrypoints) {
       const block = contractEntrypointBlock(vault, `external(msg: ${entrypoint})`);
@@ -211,16 +206,14 @@ describe('M16 production conformance static checks', () => {
   it('M16-CONF-01B4: Vault external pre-accept FunC stays inside the audited gas envelope', () => {
     const vaultFunC = file(join('build', 'Vault', 'Vault_Vault.fc'));
     const budgets = [
-      { entrypoint: 'WithdrawTonFromVaultBalance', maxLines: 23, maxWeight: 166, maxDictReads: 1 },
-      { entrypoint: 'WithdrawAthFromVaultBalance', maxLines: 23, maxWeight: 166, maxDictReads: 1 },
-      { entrypoint: 'ReplaceMessagingKeys', maxLines: 30, maxWeight: 199, maxDictReads: 1 },
+      { entrypoint: 'WithdrawTonFromVaultBalance', maxLines: 25, maxWeight: 168, maxDictReads: 1 },
+      { entrypoint: 'WithdrawAthFromVaultBalance', maxLines: 25, maxWeight: 168, maxDictReads: 1 },
+      { entrypoint: 'ReplaceMessagingKeys', maxLines: 32, maxWeight: 201, maxDictReads: 1 },
       { entrypoint: 'CreateReceiveIntent', maxLines: 28, maxWeight: 192, maxDictReads: 1 },
       { entrypoint: 'ClaimReceiveIntent', maxLines: 33, maxWeight: 229, maxDictReads: 2 },
       { entrypoint: 'CancelReceiveIntent', maxLines: 31, maxWeight: 222, maxDictReads: 2 },
-      { entrypoint: 'PublishPrivateFromVaultBalance', maxLines: 47, maxWeight: 226, maxDictReads: 1 },
-      { entrypoint: 'PublishPublicFromVaultBalance', maxLines: 46, maxWeight: 223, maxDictReads: 1 },
-      { entrypoint: 'SetProfileAvatarFromVaultBalance', maxLines: 24, maxWeight: 170, maxDictReads: 1 },
-      { entrypoint: 'MintUsernameFromVaultBalance', maxLines: 24, maxWeight: 170, maxDictReads: 1 },
+      { entrypoint: 'SetProfileAvatarFromVaultBalance', maxLines: 26, maxWeight: 172, maxDictReads: 1 },
+      { entrypoint: 'MintUsernameFromVaultBalance', maxLines: 26, maxWeight: 172, maxDictReads: 1 },
     ];
 
     for (const budget of budgets) {

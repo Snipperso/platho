@@ -1,13 +1,12 @@
-import { Address, beginCell, Cell, contractAddress, external, toNano } from '@ton/core';
+import { Address, beginCell, contractAddress, external, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
-import { keyPairFromSeed, sign } from '@ton/crypto';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import { ATHWallet, ATHTransferRequest, ATHBurn } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
-import { CapsuleHub, BindDeploymentManifest as CapsuleBind, SealGenesis as CapsuleSeal, PublishPrivateFromVault, PublishPublicFromVault } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
+import { CapsuleHub } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import { FeeAccumulator, DepositProtocolFee, EnableBuybackSplit, SplitAccumulated, FlushTreasuryDue, FlushBuybackDue } from '../build/FeeAccumulator/FeeAccumulator_FeeAccumulator';
 import {
   UsernameRegistry,
@@ -19,69 +18,26 @@ import {
   FlushBurnAthDue,
   PrunePendingUsernameMint,
 } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import { Vault } from '../build/Vault/Vault_Vault';
 import {
-  Vault,
-  BindDeploymentManifest as VaultBind,
-  BindOfficialAthWallet as VaultBindAth,
-  BindProfileRegistry as VaultBindProfile,
-  BindUsernameRegistry as VaultBindUsername,
-  SealGenesis as VaultSeal,
-  RegisterMessagingKeys,
-} from '../build/Vault/Vault_Vault';
+  KIND_PRIVATE as VPB2_KIND_PRIVATE,
+  KIND_PUBLIC as VPB2_KIND_PUBLIC,
+  GENESIS_HASH as VPB2_GENESIS_HASH,
+  marketingCell,
+  partsList,
+  batchExternalBody,
+  setupVault,
+  registerHybrid,
+  depositTon,
+} from '../tests/helpers/vpb2';
 
 const MANIFEST_HASH = 0x777788889999aaaabbbbccccddddeeeeffff0000111122223333444455556666n;
 const USERNAME_MANIFEST_HASH = 0x9999888877776666555544443333222211110000ffffeeeeddddccccbbbbaaaan;
-const VAULT_PUBLISH_SIGNING_DOMAIN = 0x56504231n;
 const GENESIS_HASH = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn;
-const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 const ATH_TOTAL_SUPPLY_ATOMIC = 100_000_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const HALF_PRICE = 50_000_000_000n;
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
-
-const KIND_PRIVATE = 1n;
-const SIZE_STANDARD = 1n;
-const SUITE_HYBRID = 2n;
-
-function snakeCell(byteLength: number, fill = 0x61): Cell {
-  const bytes = Buffer.alloc(byteLength, fill);
-  const chunks: Buffer[] = [];
-  for (let offset = 0; offset < bytes.length; offset += 127) {
-    chunks.push(Buffer.from(bytes.subarray(offset, offset + 127)));
-  }
-  let tail: Cell | null = null;
-  for (let index = chunks.length - 1; index >= 0; index -= 1) {
-    const builder = beginCell().storeBuffer(chunks[index]);
-    if (tail) builder.storeRef(tail);
-    tail = builder.endCell();
-  }
-  return tail ?? beginCell().endCell();
-}
-
-function mlKemPubkeySnakeCell(byteLength: number, fill = 0x5a): Cell {
-  const bytes = Buffer.alloc(byteLength, fill);
-  let tail: Cell | null = null;
-  for (let offset = bytes.length; offset > 0;) {
-    const start = Math.max(0, offset - 127);
-    const builder = beginCell().storeBuffer(bytes.subarray(start, offset));
-    if (tail) builder.storeRef(tail);
-    tail = builder.endCell();
-    offset = start;
-  }
-  return tail ?? beginCell().endCell();
-}
-
-const BODY_CELL = snakeCell(2228, 0x62);
-const HEADER0_CELL = snakeCell(140, 0x30);
-const HEADER1_CELL = snakeCell(30, 0x31);
-const CAPSULE_PRIVATE_BODY_CELL = snakeCell(2228, 0x64);
-const CAPSULE_PRIVATE_HEADER0_CELL = snakeCell(140, 0x32);
-const CAPSULE_PRIVATE_HEADER1_CELL = snakeCell(30, 0x33);
-const CAPSULE_PUBLIC_HEADER_CELL = snakeCell(68, 0x50);
-const CAPSULE_PUBLIC_BODY_CELL = snakeCell(1024, 0x70);
-const BODY_HASH = BigInt(`0x${BODY_CELL.hash().toString('hex')}`);
-const HEADER0 = BigInt(`0x${HEADER0_CELL.hash().toString('hex')}`);
-const HEADER1 = BigInt(`0x${HEADER1_CELL.hash().toString('hex')}`);
 
 export type M17TxMetric = {
   total_fees_nanotons: string;
@@ -130,18 +86,6 @@ export type M17Report = {
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
-}
-
-
-function addressHash(address: Address): bigint {
-  return BigInt('0x' + beginCell().storeAddress(address).endCell().hash().toString('hex'));
-}
-
-function compactAddressHash(address: Address): bigint {
-  if (address.workChain !== 0) {
-    throw new Error(`Expected basechain address, got workchain ${address.workChain}`);
-  }
-  return BigInt('0x' + address.hash.toString('hex'));
 }
 
 function usernameSlice(name: string) {
@@ -296,38 +240,33 @@ async function capsuleHubScenario(): Promise<M17ScenarioMetric> {
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({ address, code: init.code, data: init.data, balance: toNano('2'), workchain: address.workChain }));
   const capsule = blockchain.openContract(new CapsuleHub(address, init));
-  const privateValue = 48_500_000n;
-  const publicValue = 50_800_000n;
+  const privateValue = toNano('0.1');
+  const publicValue = toNano('0.1');
   const flushValue = toNano('0.05');
   const privateRes = await capsule.send(blockchain.sender(vaultAddress), { value: privateValue }, {
-    $$type: 'PublishPrivateFromVault',
+    $$type: 'PublishBatchToHub',
     bounce_id: 17_101n,
     bounce_tag: 17_101n,
     publish_id: GENESIS_HASH,
-    size_class: 1n,
-    crypto_suite: SUITE_HYBRID,
-    header_0_hash: BigInt(`0x${CAPSULE_PRIVATE_HEADER0_CELL.hash().toString('hex')}`),
-    header_1_hash: BigInt(`0x${CAPSULE_PRIVATE_HEADER1_CELL.hash().toString('hex')}`),
-    body_hash: BigInt(`0x${CAPSULE_PRIVATE_BODY_CELL.hash().toString('hex')}`),
-    header_0: CAPSULE_PRIVATE_HEADER0_CELL,
-    header_1: CAPSULE_PRIVATE_HEADER1_CELL,
-    body: CAPSULE_PRIVATE_BODY_CELL,
-    protocol_fee_paid: 10_000_000n,
-  } as PublishPrivateFromVault);
+    publish_kind: VPB2_KIND_PRIVATE,
+    part_count: 1n,
+    protocol_fee_total: 10_000_000n,
+    author_wallet: author.address,
+    parts: partsList(VPB2_KIND_PRIVATE, 1),
+    marketing: null,
+  } as any);
   const publicRes = await capsule.send(blockchain.sender(vaultAddress), { value: publicValue }, {
-    $$type: 'PublishPublicFromVault',
+    $$type: 'PublishBatchToHub',
     bounce_id: 17_102n,
     bounce_tag: 17_102n,
     publish_id: GENESIS_HASH + 1n,
-    size_class: 1n,
+    publish_kind: VPB2_KIND_PUBLIC,
+    part_count: 1n,
+    protocol_fee_total: 10_000_000n,
     author_wallet: author.address,
-    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
-    header_hash: BigInt(`0x${CAPSULE_PUBLIC_HEADER_CELL.hash().toString('hex')}`),
-    body_hash: BigInt(`0x${CAPSULE_PUBLIC_BODY_CELL.hash().toString('hex')}`),
-    header: CAPSULE_PUBLIC_HEADER_CELL,
-    body: CAPSULE_PUBLIC_BODY_CELL,
-    protocol_fee_paid: 10_000_000n,
-  } as PublishPublicFromVault);
+    parts: partsList(VPB2_KIND_PUBLIC, 1),
+    marketing: marketingCell(),
+  } as any);
   const state = await capsule.getGetState();
   if (state.private_latest_id !== 1n || state.public_latest_id !== 1n) {
     throw new Error('CapsuleHub Vault publish scenario did not create both entries');
@@ -517,113 +456,51 @@ async function usernameRegistryScenario(): Promise<M17ScenarioMetric> {
   ]);
 }
 
-async function activateVaultWallet(vault: any, user: any, seed: bigint) {
-  const seedByte = Number(seed & 0xffn);
-  const messagingKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte));
-  const authKeyPair = keyPairFromSeed(Buffer.alloc(32, seedByte + 64));
-  const pqKemPubkey = mlKemPubkeySnakeCell(1184, 0x5a);
-  await vault.send(user.getSender(), { value: toNano('0.1') }, {
-    $$type: 'RegisterMessagingKeys',
-    enc_pubkey: seed,
-    sign_pubkey: BigInt(`0x${messagingKeyPair.publicKey.toString('hex')}`),
-    auth_pubkey: BigInt(`0x${authKeyPair.publicKey.toString('hex')}`),
-    pq_kem_pubkey_hash: BigInt(`0x${pqKemPubkey.hash().toString('hex')}`),
-    pq_kem_pubkey_len: 1184n,
-    pq_kem_pubkey: pqKemPubkey,
-    crypto_suite_mask: SUITE_HYBRID,
-  } as RegisterMessagingKeys);
-  return authKeyPair;
+// A standalone bound+sealed Vault whose capsule_hub_address points at a *missing* (uninitialized) contract,
+// so a forwarded PublishBatchToHub bounces back to the Vault. Mirrors the helper setupVault construction
+// (genesis_config_hash = VPB2_GENESIS_HASH so signed batch bodies validate) but swaps the hub for a fixture.
+async function setupVaultMissingHub() {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+  const user = await blockchain.treasury('m17-vault-bounce-user');
+  const athWallet = await blockchain.treasury('m17-vault-bounce-ath');
+  const missingHub = fixtureAddress('M17_MISSING_CAPSULEHUB_FOR_BOUNCE');
+  const init = await Vault.init(athWallet.address, athWallet.address, missingHub, VPB2_GENESIS_HASH, true, true, 0n);
+  const address = contractAddress(0, init);
+  await blockchain.setShardAccount(address, createShardAccount({
+    address, code: init.code, data: init.data, balance: toNano('3'), workchain: address.workChain,
+  }));
+  const vault = blockchain.openContract(new Vault(address, init));
+  return { blockchain, vault, user };
 }
 
-async function depositVaultTon(vault: any, user: any, amount: bigint) {
-  await vault.send(user.getSender(), { value: amount + 12_000_000n }, {
-    $$type: 'DepositTon',
-    amount,
-  });
-}
-
-function signedVaultPublishBody(owner: Address, clientNonce: bigint, maxCharge: bigint, secretKey: Buffer, vaultAddress: Address): Cell {
-  const payload = beginCell()
-    .storeUint(SIZE_STANDARD, 8)
-    .storeUint(SUITE_HYBRID, 8)
-    .storeUint(HEADER0, 256)
-    .storeUint(HEADER1, 256)
-    .storeUint(BODY_HASH, 256)
-    .storeRef(HEADER0_CELL)
-    .storeRef(HEADER1_CELL)
-    .storeRef(BODY_CELL)
-    .endCell();
-  const signedPayload = beginCell()
-    .storeUint(VAULT_PUBLISH_SIGNING_DOMAIN, 32)
-    .storeUint(MANIFEST_HASH, 256)
-    .storeUint(compactAddressHash(vaultAddress), 256)
-    .storeUint(KIND_PRIVATE, 8)
-    .storeUint(compactAddressHash(owner), 256)
-    .storeUint(clientNonce, 64)
-    .storeUint(maxCharge, 128)
-    .storeUint(SIZE_STANDARD, 8)
-    .storeUint(SUITE_HYBRID, 8)
-    .storeRef(payload)
-    .endCell();
-  return beginCell()
-    .storeUint(0x7E1F5031, 32)
-    .storeAddress(owner)
-    .storeBuffer(sign(signedPayload.hash(), secretKey))
-    .storeRef(signedPayload)
-    .endCell();
+// Drives a signed VPB2 batch external (op 0x7e1f5041, domain 0x56504232) through a Vault and returns the
+// resulting transactions. The Vault accepts, charges, and forwards a PublishBatchToHub to its bound hub.
+async function sendVaultBatch(blockchain: any, vault: any, user: any) {
+  const nonce = (await vault.getGetUser(user.address)).publish_nonce;
+  const partsRoot = partsList(VPB2_KIND_PRIVATE, 1);
+  return blockchain.sendMessage(external({
+    to: vault.address,
+    body: batchExternalBody({
+      vaultAddr: vault.address, owner: user.address, nonce, maxCharge: toNano('1'),
+      partCount: 1n, partsRoot, kind: VPB2_KIND_PRIVATE,
+    }),
+  }));
 }
 
 async function vaultScenario(): Promise<M17ScenarioMetric> {
-  const blockchain = await Blockchain.create();
-  blockchain.now = 1_700_000_000;
-  const deployer = await blockchain.treasury('m17-vault-deployer');
-  const user = await blockchain.treasury('m17-vault-user');
-  const feeAccumulator = await blockchain.treasury('m17-vault-fee-accumulator');
-  const athMasterAddress = fixtureAddress('M17_VAULT_ATH_MASTER');
-  const vaultInit = await Vault.init(deployer.address, athMasterAddress, fixtureAddress('M17_UNBOUND_CAPSULE_PLACEHOLDER'), addressHash(deployer.address), false, false, 0n);
-  const vaultAddress = contractAddress(0, vaultInit);
-  const officialAthWallet = contractAddress(vaultAddress.workChain, await ATHWallet.init(0n, vaultAddress, athMasterAddress));
-  await blockchain.setShardAccount(vaultAddress, createShardAccount({ address: vaultAddress, code: vaultInit.code, data: vaultInit.data, balance: toNano('3'), workchain: vaultAddress.workChain }));
-  const vault = blockchain.openContract(new Vault(vaultAddress, vaultInit));
-  const capsuleInit = await CapsuleHub.init(feeAccumulator.address, fixtureAddress('M17_UNBOUND_VAULT_PLACEHOLDER'), false, false, 0n, deployer.address);
-  const capsuleAddress = contractAddress(0, capsuleInit);
-  await blockchain.setShardAccount(capsuleAddress, createShardAccount({ address: capsuleAddress, code: capsuleInit.code, data: capsuleInit.data, balance: toNano('3'), workchain: capsuleAddress.workChain }));
-  const capsule = blockchain.openContract(new CapsuleHub(capsuleAddress, capsuleInit));
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST_HASH, counterpart_address: capsuleAddress } as VaultBind);
-  await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindDeploymentManifest', deployment_manifest_hash: MANIFEST_HASH, counterpart_address: vaultAddress } as CapsuleBind);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindOfficialAthWallet', deployment_manifest_hash: MANIFEST_HASH, official_ath_wallet_address: officialAthWallet } as VaultBindAth);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindProfileRegistry', deployment_manifest_hash: MANIFEST_HASH, profile_registry_address: fixtureAddress('M17_PROFILE_REGISTRY') } as VaultBindProfile);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'BindUsernameRegistry', deployment_manifest_hash: MANIFEST_HASH, username_registry_address: fixtureAddress('M17_USERNAME_REGISTRY') } as VaultBindUsername);
-  await vault.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as VaultSeal);
-  await capsule.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as CapsuleSeal);
+  // Leg 1: a bound+sealed Vault forwarding a 1-part private batch to its (treasury stand-in) CapsuleHub.
+  const ok = await setupVault();
+  await registerHybrid(ok.vault, ok.user);
+  await depositTon(ok.vault, ok.user, toNano('2'));
+  const publishRes = await sendVaultBatch(ok.blockchain, ok.vault, ok.user);
 
-  const keyPair = await activateVaultWallet(vault, user, 91n);
-  const maxCharge = await vault.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
-  await depositVaultTon(vault, user, maxCharge * 2n);
-  const userState = await vault.getGetUser(user.address);
-  const publishRes = await blockchain.sendMessage(external({
-    to: vault.address,
-    body: signedVaultPublishBody(user.address, userState.publish_nonce, maxCharge, keyPair.secretKey, vault.address),
-  }));
+  // Leg 2: the same signed batch external to a Vault whose CapsuleHub is missing — the forward bounces.
+  const bounce = await setupVaultMissingHub();
+  await registerHybrid(bounce.vault, bounce.user);
+  await depositTon(bounce.vault, bounce.user, toNano('2'));
+  const pendingRes = await sendVaultBatch(bounce.blockchain, bounce.vault, bounce.user);
 
-  // Create stale pending by publishing to missing CapsuleHub, then prune.
-  const missingCapsule = fixtureAddress('M17_MISSING_CAPSULEHUB_FOR_PRUNE');
-  const vault2Init = await Vault.init(officialAthWallet, athMasterAddress, missingCapsule, GENESIS_HASH, true, true, MANIFEST_HASH);
-  const vault2Address = contractAddress(0, vault2Init);
-  await blockchain.setShardAccount(vault2Address, createShardAccount({ address: vault2Address, code: vault2Init.code, data: vault2Init.data, balance: toNano('3'), workchain: vault2Address.workChain }));
-  const vault2 = blockchain.openContract(new Vault(vault2Address, vault2Init));
-  const keyPair2 = await activateVaultWallet(vault2, user, 92n);
-  const maxCharge2 = await vault2.getGetCanonicalPublishCharge(user.address, KIND_PRIVATE, SIZE_STANDARD, SUITE_HYBRID);
-  await depositVaultTon(vault2, user, maxCharge2 * 2n);
-  const userState2 = await vault2.getGetUser(user.address);
-  const pendingRes = await blockchain.sendMessage(external({
-    to: vault2.address,
-    body: signedVaultPublishBody(user.address, userState2.publish_nonce, maxCharge2, keyPair2.secretKey, vault2.address),
-  }));
-  const vg = await vault2.getGetGlobal();
-  if (vg.pending_publish_count !== 0n) {
-    // In current M14 bounce path clears pending immediately, so no stale pending exists here. Keep publish metric only.
-  }
   return scenario('VAULT_BALANCE_PUBLISH', [
     opMetric('vault_balance_private_publish_to_capsulehub_ack', 0n, publishRes),
     opMetric('vault_balance_private_publish_to_missing_capsulehub_bounce', 0n, pendingRes),
