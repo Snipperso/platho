@@ -1,8 +1,8 @@
-import { Address, beginCell, Cell, contractAddress, external, toNano } from '@ton/core';
+import { Address, beginCell, Cell, contractAddress, Dictionary, external, toNano } from '@ton/core';
 import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { keyPairFromSeed, sign } from '@ton/crypto';
 import { createHash } from 'crypto';
-import { Vault, RegisterMessagingKeys } from '../../build/Vault/Vault_Vault';
+import { Vault, RegisterMessagingKeys, storeVault$Data } from '../../build/Vault/Vault_Vault';
 import {
   CapsuleHub,
   BindDeploymentManifest as CapsuleBind,
@@ -62,7 +62,30 @@ export const RES_PROCESSING = 0n;
 export const RES_CONFIRMED = 0x01n;
 export const RES_BOUNCED_REFUNDED = 0x02n;
 export const RES_TOMBSTONED = 0x03n;
+// Post-accept batch reject codes — stored in the receipt-ring slot's `result` field (the reject-with-refund
+// path: external completes exit 0, nonce burned, balance refunded, receipt.result == one of these).
 export const RJ_PART_SHAPE = 0x11n;
+export const RJ_CLASS_OR_SUITE = 0x12n;
+export const RJ_HASH_MISMATCH = 0x13n;
+export const RJ_PAYLOAD_SHAPE = 0x14n;
+export const RJ_DUPLICATE_ADJACENT = 0x15n;
+export const RJ_UNDERPRICED = 0x16n;
+export const RJ_BINDING = 0x17n;
+export const RJ_ID_ZERO = 0x18n;
+export const RJ_PENDING_COLLISION = 0x19n;
+
+// Private size classes (hybrid). Public allows 1K/2K only.
+export const SIZE_2K = 2n;
+export const SIZE_4K = 4n;
+export const SIZE_8K = 8n;
+export const SIZE_16K = 16n;
+export const SIZE_32K = 32n;
+
+// Fee / activity-airdrop discount constants (mirror contracts/Vault.tact).
+export const PROTOCOL_FEE_TON_BATCH = 10_000_000n;            // full per-part protocol fee (0.01 TON)
+export const ATH_FULL_DISCOUNT_AMOUNT = 10_000_000_000_000n;  // ATH balance that fully discounts the fee
+export const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH = 15_000_000_000_000_000n; // genesis_config_hash pin at seal
+export const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH = 0n;  // discount unlocks when remaining <= this
 
 export const AIRDROP_REWARD_PER_CAPSULE = 10_000_000_000n; // 10 ATH
 export const VAULT_PENDING_PUBLISH_STALE_TTL = 86400n;
@@ -140,6 +163,59 @@ export function partsList(kind: bigint, n: number, size: bigint = SIZE_1K): Cell
       : publicPart({ size, fillBase: i % 90, next });
   }
   return next!;
+}
+
+// A singly-linked chain of `cells` cells (one ref each) — for public body ref-overflow boundary tests.
+export function refChainCell(cells: number, fill = 0x6a): Cell {
+  let tail: Cell | null = null;
+  for (let i = cells - 1; i >= 0; i -= 1) {
+    const b = beginCell().storeUint(fill, 8);
+    if (tail) b.storeRef(tail);
+    tail = b.endCell();
+  }
+  return tail ?? beginCell().endCell();
+}
+
+// Fully-overridable private part frame (size(8) suite(8) h0(256) h1(256) bh(256) + ref h0,h1,body[,next]). Every
+// hash/cell/field is independently settable so negative tests can mismatch a declared hash, zero a field, or feed
+// wrong-sized cells (or real crypto-lib cells). Defaults reproduce a valid 1K hybrid part.
+export function privatePartCustom(opts: {
+  sizeClass?: bigint; suite?: bigint;
+  h0Hash?: bigint; h1Hash?: bigint; bodyHash?: bigint;
+  h0Cell?: Cell; h1Cell?: Cell; bodyCell?: Cell;
+  next?: Cell | null;
+} = {}): Cell {
+  const size = opts.sizeClass ?? SIZE_1K;
+  const h0 = opts.h0Cell ?? finalPrivateHeader0Cell();
+  const h1 = opts.h1Cell ?? finalPrivateHeader1Cell();
+  const body = opts.bodyCell ?? finalPrivateBodyCell(size);
+  const b = beginCell()
+    .storeUint(size, 8).storeUint(opts.suite ?? SUITE_HYBRID, 8)
+    .storeUint(opts.h0Hash ?? cellHash(h0), 256)
+    .storeUint(opts.h1Hash ?? cellHash(h1), 256)
+    .storeUint(opts.bodyHash ?? cellHash(body), 256)
+    .storeRef(h0).storeRef(h1).storeRef(body);
+  if (opts.next) b.storeRef(opts.next);
+  return b.endCell();
+}
+
+// Fully-overridable public part frame (size(8) reserved(8) h(256) bh(256) + ref header,body[,next]).
+export function publicPartCustom(opts: {
+  sizeClass?: bigint; reserved?: bigint;
+  hHash?: bigint; bodyHash?: bigint;
+  hCell?: Cell; bodyCell?: Cell;
+  next?: Cell | null;
+} = {}): Cell {
+  const size = opts.sizeClass ?? SIZE_1K;
+  const header = opts.hCell ?? finalPublicHeaderCell(0x50, 8);
+  const body = opts.bodyCell ?? finalPublicBodyCell(0x40, Number(size) * 1024);
+  const b = beginCell()
+    .storeUint(size, 8).storeUint(opts.reserved ?? 0n, 8)
+    .storeUint(opts.hHash ?? cellHash(header), 256)
+    .storeUint(opts.bodyHash ?? cellHash(body), 256)
+    .storeRef(header).storeRef(body);
+  if (opts.next) b.storeRef(opts.next);
+  return b.endCell();
 }
 
 export const marketingCell = (): Cell => beginCell().storeUint(MARKETING_NOTE, 152).endCell();
@@ -222,13 +298,14 @@ export interface BatchExternalOpts {
   vaultHashOverride?: bigint;     // wrong-vault-binding negative
   ownerHashOverride?: bigint;     // owner-hash-field mismatch negative
   signKey?: Buffer;               // wrong-signer negative (default AUTH_KEY_PAIR)
-  signRootOverride?: Cell;        // sign a different cell than embedded (cell-hash / pre-domain negatives)
+  signRootOverride?: Cell;        // sign a different cell than embedded (cell-hash negative)
+  rootOverride?: Cell;            // embed AND sign a fully custom root (no-domain / trailing-bit-in-root negatives)
   envOwner?: Address;             // address put in the envelope (owner-spoof / cross-owner replay)
   trailerRef?: Cell;              // extra envelope ref (padding / drain vector)
 }
 
 export function batchExternalBody(opts: BatchExternalOpts): Cell {
-  const root = beginCell()
+  const root = opts.rootOverride ?? beginCell()
     .storeUint(opts.domain ?? VAULT_BATCH_PUBLISH_SIGNING_DOMAIN, 32)
     .storeUint(opts.genesisHash ?? GENESIS_HASH, 256)
     .storeUint(opts.vaultHashOverride ?? addressHash(opts.vaultAddr), 256)
@@ -353,6 +430,7 @@ export async function deployBoundSealedPair() {
   const feeInit = await FeeAccumulator.init(feeTreasury.address, fixtureAddress('BUYBACK'));
   const feeAddress = contractAddress(0, feeInit);
   await blockchain.setShardAccount(feeAddress, createShardAccount({ address: feeAddress, code: feeInit.code, data: feeInit.data, balance: toNano('2'), workchain: 0 }));
+  const feeAccumulator = blockchain.openContract(new FeeAccumulator(feeAddress, feeInit));
 
   const hubInit = await CapsuleHub.init(feeAddress, fixtureAddress('UNBOUND_VAULT'), false, false, 0n, deployer.address);
   const hubAddress = contractAddress(0, hubInit);
@@ -368,7 +446,54 @@ export async function deployBoundSealedPair() {
   await send(vault, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as VaultSeal);
   await send(hub, { $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH } as CapsuleSeal);
 
-  return { blockchain, vault, hub, user, vaultAddress, hubAddress, deployer, genesisHash: addressCellHash(deployer.address) };
+  return { blockchain, vault, hub, user, vaultAddress, hubAddress, deployer, feeAccumulator, feeAddress, genesisHash: addressCellHash(deployer.address) };
+}
+
+// A standalone pre-bound/pre-sealed Vault whose genesis_config_hash is poked to `airdropRemaining` so the
+// activity-airdrop fee discount can be exercised: discountedFee unlocks only when genesis_config_hash <=
+// VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH (0), but init pins it to the airdrop TOTAL at seal — so the
+// only way to reach the unlocked state in a sandbox is to write the storage cell directly (matching the live
+// Vault$Data layout). manifest = GENESIS_HASH (signed batches validate); binding_flags = 7 (all bound).
+export async function setupVaultAirdrop(opts: { airdropRemaining: bigint; balance?: bigint }) {
+  const blockchain = await Blockchain.create();
+  blockchain.now = 1_700_000_000;
+  const user = await blockchain.treasury('vpb2-air-user');
+  const athWallet = await blockchain.treasury('vpb2-air-ath');
+  const capsuleHub = await blockchain.treasury('vpb2-air-hub');
+  const init = await Vault.init(athWallet.address, athWallet.address, capsuleHub.address, GENESIS_HASH, true, true, 0n);
+  const address = contractAddress(0, init);
+  const data = beginCell().storeBit(true).store(storeVault$Data({
+    $$type: 'Vault$Data',
+    vault_ath_wallet_address: athWallet.address,
+    ath_master_address: athWallet.address,
+    capsule_hub_address: capsuleHub.address,
+    profile_registry_address: capsuleHub.address,
+    username_registry_address: capsuleHub.address,
+    binding_flags: 7n,
+    sealed: true,
+    deployment_manifest_hash: GENESIS_HASH,
+    genesis_config_hash: opts.airdropRemaining,
+    users: Dictionary.empty(),
+    key_records: Dictionary.empty(),
+    receive_intents: Dictionary.empty(),
+    processed_ath_deposits: Dictionary.empty(),
+    pending_ath_withdrawals: Dictionary.empty(),
+    pending_batch_publishes: Dictionary.empty(),
+    pending_profile_avatar_payments: Dictionary.empty(),
+    pending_username_mint_payments: Dictionary.empty(),
+    user_count: 0n,
+    key_record_count: 0n,
+    receive_intent_count: 0n,
+    processed_ath_deposit_count: 0n,
+    pending_ath_withdrawal_count: 0n,
+    pending_publish_count: 0n,
+    genesis_ext: beginCell().storeUint(GENESIS_HASH, 256).storeBit(false).endCell(),
+  })).endCell();
+  await blockchain.setShardAccount(address, createShardAccount({
+    address, code: init.code, data, balance: opts.balance ?? toNano('10'), workchain: 0,
+  }));
+  const vault = blockchain.openContract(new Vault(address, init));
+  return { blockchain, vault, user, athWallet, capsuleHub };
 }
 
 export { internal, external };

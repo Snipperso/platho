@@ -1,33 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { Address, Cell, contractAddress, toNano } from '@ton/core';
+import { Address, Cell, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
+import { CapsuleHub, FlushFees } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
 import {
-  CapsuleHub,
-  PublishPrivateFromVault,
-  PublishPublicFromVault,
-  FlushFees,
-} from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
-import { MockVaultAckSink } from '../build/MockVaultAckSink/MockVaultAckSink_MockVaultAckSink';
+  KIND_PRIVATE,
+  KIND_PUBLIC,
+  OP_CAPSULE_HUB_BATCH_ACK,
+  marketingCell,
+  partsList,
+} from './helpers/vpb2';
 import {
   finalPrivateBodyCell,
   finalPrivateHeader0Cell,
   finalPrivateHeader1Cell,
-  finalPublicBodyCell,
-  finalPublicHeaderCell,
 } from './helpers/capsule-cells';
 
-const PRIVATE_HYBRID_FEE = 10_000_000n;
-const PUBLIC_FEE = 10_000_000n;
-const PRIVATE_REQUIRED = 10_000_000n + 4_200_000n + 1_000_000n + 3_300_000n;
-const PUBLIC_REQUIRED = 10_000_000n + 2_400_000n + 1_000_000n + 7_400_000n;
-const PAGE_STORAGE = 0n;
+// VPB2 Session 4/5 — migrated onto the batch ingest (PublishBatchToHub). The original suite drove the Hub
+// through the REMOVED single-publish receivers (PublishPrivateFromVault / PublishPublicFromVault) and counted
+// CapsuleHubPublishAck replies on a MockVaultAckSink. The batch path replaces each single publish step with a
+// 1-part PublishBatchToHub of the matching kind: it stores one entry, advances the same counters by one,
+// accrues msg.protocol_fee_total, and ACKs the bound Vault with CapsuleHubBatchAck (op 0x874E5771). Because
+// the new ACK op is not a CapsuleHubPublishAck, the MockVaultAckSink can no longer count it — so the bound
+// Vault is now a plain treasury and ack_count is observed directly off the emitted CapsuleHubBatchAck message.
+// Every counter, page-count, and accrued-fee assertion is preserved exactly. Forged-sender and malformed-part
+// steps map to a non-Vault sender (13500) and a body-hash-zero private part (13512); both must change nothing.
+
+// Per-step protocol fee accrued by a successful 1-part batch (== the old single-publish protocol_fee_paid).
+const PRIVATE_FEE = 10_000_000n; // PLATO_PRIVATE_LONG_TERM_FEE_TON (hybrid full fee)
+const PUBLIC_FEE = 10_000_000n;  // PLATO_PUBLIC_POST_FEE_TON
+// Value forwarded with a funded batch — comfortably above the Phase-A floor (fee + 1M/part + 30M ACK reserve)
+// and the full-value gate (storage endowments + gas). Mirrors the working HUB-BATCH-* funded sends.
+const FUNDED_VALUE = toNano('0.1');
+// Value forwarded with an underfunded batch — below the Phase-A gross-underfunding floor (op 13509), so the
+// batch bounces before the part walk and stores nothing. floor = fee(10M) + 1M + 30M = 41M; 20M < 41M.
+const UNDERFUNDED_VALUE = toNano('0.02');
+// FlushFees exec budget (matches the old suite): 30M ACK reserve + 2M local exec reserve.
 const ACK_RESERVE = 30_000_000n;
 const FLUSH_LOCAL_EXEC_RESERVE = 2_000_000n;
-const VAULT_PRIVATE_REQUIRED = PRIVATE_REQUIRED + ACK_RESERVE;
-const VAULT_PUBLIC_REQUIRED = PUBLIC_REQUIRED + ACK_RESERVE;
+
 const MANIFEST_HASH = hash256('capsulehub-state-invariants-manifest');
-const PLATHO_PUBLIC_MARKETING_NOTE = 0x73656e742076696120506c6174686f2e417070n;
 
 function hash256(label: string): bigint {
   return BigInt('0x' + createHash('sha256').update(`PLATHO.V1.CAPSULE.INV.${label}`).digest('hex'));
@@ -51,25 +63,91 @@ function makeRng(seed: number) {
   };
 }
 
+// A valid 1-part private batch payload (reuses the helper part builders via partsList).
+function privateParts(): Cell {
+  return partsList(KIND_PRIVATE, 1);
+}
+
+// A valid 1-part public batch payload.
+function publicParts(): Cell {
+  return partsList(KIND_PUBLIC, 1);
+}
+
+// A malformed private part: valid shape but body_hash field zeroed -> trips the bh!=0 gate (13512). The whole
+// batch aborts and nothing is stored. (Stand-in for the old "invalid-private" header_0_hash:0 step.)
+function privatePartZeroBodyHash(): Cell {
+  const h0 = finalPrivateHeader0Cell();
+  const h1 = finalPrivateHeader1Cell();
+  const body = finalPrivateBodyCell(1n);
+  return beginCell()
+    .storeUint(1n, 8).storeUint(2n, 8) // size_class=1K, suite=hybrid
+    .storeUint(cellHash(h0), 256).storeUint(cellHash(h1), 256).storeUint(0n, 256) // body_hash = 0
+    .storeRef(h0).storeRef(h1).storeRef(body)
+    .endCell();
+}
+
+// Builds a PublishBatchToHub message struct. publishId must be non-zero (13501); we derive a deterministic
+// non-zero id per step. protocolFeeTotal is what the Hub accrues. marketing marker is required for public.
+function batchMsg(opts: {
+  kind: bigint;
+  step: number;
+  parts: Cell;
+  authorWallet: Address;
+  protocolFeeTotal: bigint;
+}) {
+  return {
+    $$type: 'PublishBatchToHub',
+    bounce_id: BigInt(10_000 + opts.step),
+    bounce_tag: BigInt(30_000 + opts.step),
+    publish_id: hash256(`batch-${opts.kind}-${opts.step}`),
+    publish_kind: opts.kind,
+    part_count: 1n,
+    protocol_fee_total: opts.protocolFeeTotal,
+    author_wallet: opts.authorWallet,
+    parts: opts.parts,
+    marketing: opts.kind === KIND_PUBLIC ? marketingCell() : null,
+  } as any;
+}
+
+// Counts CapsuleHubBatchAck messages emitted to `dest` in a send result (the bound Vault is a treasury, so we
+// observe the ACK directly off the wire rather than via a mock sink). A successful 1-part batch emits exactly one.
+function countBatchAcks(res: any, dest: Address): number {
+  let count = 0;
+  for (const tx of res.transactions) {
+    const inMsg = tx.inMessage;
+    if (!inMsg || inMsg.info?.type !== 'internal') continue;
+    if (inMsg.info.dest?.toString() !== dest.toString()) continue;
+    const body = inMsg.body;
+    if (!body) continue;
+    const cs = body.beginParse();
+    if (cs.remainingBits < 32) continue;
+    if (cs.loadUint(32) === Number(OP_CAPSULE_HUB_BATCH_ACK)) count += 1;
+  }
+  return count;
+}
+
 async function setup() {
   const blockchain = await Blockchain.create();
   blockchain.now = 1_700_000_000;
-  const author = await blockchain.treasury('capsule-inv-author');
-  const attacker = await blockchain.treasury('capsule-inv-attacker');
   const operator = await blockchain.treasury('capsule-inv-operator');
+  const attacker = await blockchain.treasury('capsule-inv-attacker');
+  const author = await blockchain.treasury('capsule-inv-author');
+  // The bound Vault is a plain treasury (the only sender the Hub accepts) — it receives the CapsuleHubBatchAck.
+  const boundVault = await blockchain.treasury('capsule-inv-bound-vault');
 
-  const mockVaultInit = await MockVaultAckSink.init();
-  const mockVaultAddress = contractAddress(0, mockVaultInit);
-  await blockchain.setShardAccount(mockVaultAddress, createShardAccount({
-    address: mockVaultAddress,
-    code: mockVaultInit.code,
-    data: mockVaultInit.data,
-    balance: toNano('1'),
-    workchain: mockVaultAddress.workChain,
-  }));
-  const mockVault = blockchain.openContract(new MockVaultAckSink(mockVaultAddress, mockVaultInit));
+  // The configured fee accumulator address is intentionally a never-deployed fixture, so a FlushFees either
+  // reverts at the protected-reserve gate (13206) or its DepositProtocolFee bounces back and the bounced
+  // handler restores accrued — both leave accrued unchanged (matching the original model).
+  const feeAccumulator = fixtureAddress('MISSING_FEE_ACCUMULATOR');
 
-  const init = await CapsuleHub.init(fixtureAddress('MISSING_FEE_ACCUMULATOR'), mockVaultAddress, true, true, MANIFEST_HASH, fixtureAddress('GENESIS_CONTROLLER'));
+  const init = await CapsuleHub.init(
+    feeAccumulator,
+    boundVault.address, // vault_address (bound)
+    true,               // vault_bound
+    true,               // sealed
+    MANIFEST_HASH,
+    fixtureAddress('GENESIS_CONTROLLER'),
+  );
   const address = contractAddress(0, init);
   await blockchain.setShardAccount(address, createShardAccount({
     address,
@@ -78,60 +156,14 @@ async function setup() {
     balance: toNano('1'),
     workchain: address.workChain,
   }));
-  return { blockchain, capsule: blockchain.openContract(new CapsuleHub(address, init)), mockVault, mockVaultAddress, author, attacker, operator };
+  const capsule = blockchain.openContract(new CapsuleHub(address, init));
+  return { blockchain, capsule, boundVault, attacker, operator, author };
 }
 
-function vaultPrivate(step: number, overrides?: Partial<PublishPrivateFromVault>): PublishPrivateFromVault {
-  const sizeClass = overrides?.size_class ?? 1n;
-  const cryptoSuite = overrides?.crypto_suite ?? 2n;
-  const header_0 = overrides?.header_0 ?? finalPrivateHeader0Cell(0x60 + (step % 16));
-  const header_1 = overrides?.header_1 ?? finalPrivateHeader1Cell(0x70 + (step % 16));
-  const body = overrides?.body ?? finalPrivateBodyCell(sizeClass, 0x80 + (step % 16), cryptoSuite);
-  return {
-    $$type: 'PublishPrivateFromVault',
-    bounce_id: BigInt(10_000 + step),
-    bounce_tag: BigInt(30_000 + step),
-    publish_id: hash256(`vault-private-${step}`),
-    size_class: sizeClass,
-    crypto_suite: cryptoSuite,
-    header_0_hash: cellHash(header_0),
-    header_1_hash: cellHash(header_1),
-    body_hash: cellHash(body),
-    header_0,
-    header_1,
-    body,
-    protocol_fee_paid: PRIVATE_HYBRID_FEE,
-    ...overrides,
-  } as PublishPrivateFromVault;
-}
-
-function vaultPublic(author: Address, step: number, overrides?: Partial<PublishPublicFromVault>): PublishPublicFromVault {
-  const sizeClass = overrides?.size_class ?? 1n;
-  const header = overrides?.header ?? finalPublicHeaderCell(0x50 + (step % 16));
-  const body = overrides?.body ?? finalPublicBodyCell(0x90 + (step % 16));
-  return {
-    $$type: 'PublishPublicFromVault',
-    bounce_id: BigInt(20_000 + step),
-    bounce_tag: BigInt(40_000 + step),
-    publish_id: hash256(`vault-public-${step}`),
-    size_class: sizeClass,
-    author_wallet: author,
-    marketing_note: PLATHO_PUBLIC_MARKETING_NOTE,
-    header_hash: cellHash(header),
-    body_hash: cellHash(body),
-    header,
-    body,
-    protocol_fee_paid: PUBLIC_FEE,
-    ...overrides,
-  } as PublishPublicFromVault;
-}
-
-// VPB2 Session 4: this suite drives the Hub through the REMOVED single-publish receivers. SKIPPED pending
-// migration onto the batch ingest (PublishBatchToHub); the new home is tests/capsulehub-batch-ingest.test.ts.
-describe.skip('CapsuleHub state-machine invariants', () => {
-  it('CAPSULE-INV-01: deterministic Vault publish and flush walks preserve counters and accrued fees', async () => {
+describe('CapsuleHub state-machine invariants (VPB2 batch)', () => {
+  it('CAPSULE-INV-01: deterministic Vault batch-publish and flush walks preserve counters and accrued fees', async () => {
     for (const seed of [0xcab50001, 0xcab50002, 0xcab50003]) {
-      const { blockchain, capsule, mockVault, mockVaultAddress, author, attacker, operator } = await setup();
+      const { blockchain, capsule, boundVault, attacker, operator, author } = await setup();
       const rng = makeRng(seed);
       let privateLatest = 0n;
       let publicLatest = 0n;
@@ -150,7 +182,6 @@ describe.skip('CapsuleHub state-machine invariants', () => {
         expect(state.private_page_count, `${debugContext}: private_page_count`).toBe(privatePages);
         expect(state.public_page_count, `${debugContext}: public_page_count`).toBe(publicPages);
         expect(state.accrued_plato_fee_ton, `${debugContext}: accrued`).toBe(accrued);
-        expect((await mockVault.getGetState()).ack_count, `${debugContext}: ack_count`).toBe(ackCount);
       }
 
       function notePrivateSuccess(fee: bigint) {
@@ -169,28 +200,50 @@ describe.skip('CapsuleHub state-machine invariants', () => {
         const op = rng() % 5;
         if (op === 0) {
           const underfunded = (rng() % 5) === 0;
-          const required = VAULT_PRIVATE_REQUIRED + ((privateLatest % 256n) === 0n ? PAGE_STORAGE : 0n);
-          debugContext = `seed ${seed} step ${step} vault-private underfunded=${underfunded}`;
-          await capsule.send(blockchain.sender(mockVaultAddress), { value: underfunded ? required - 1n : required }, vaultPrivate(step));
+          debugContext = `seed ${seed} step ${step} batch-private underfunded=${underfunded}`;
+          const res = await capsule.send(
+            boundVault.getSender(),
+            { value: underfunded ? UNDERFUNDED_VALUE : FUNDED_VALUE },
+            batchMsg({ kind: KIND_PRIVATE, step, parts: privateParts(), authorWallet: author.address, protocolFeeTotal: PRIVATE_FEE }),
+          );
           if (!underfunded) {
-            notePrivateSuccess(PRIVATE_HYBRID_FEE);
-            ackCount += 1n;
+            notePrivateSuccess(PRIVATE_FEE);
+            ackCount += BigInt(countBatchAcks(res, boundVault.address));
+          } else {
+            expect(countBatchAcks(res, boundVault.address), `${debugContext}: no ack on underfunded`).toBe(0);
           }
         } else if (op === 1) {
           const underfunded = (rng() % 5) === 0;
-          const required = VAULT_PUBLIC_REQUIRED + ((publicLatest % 256n) === 0n ? PAGE_STORAGE : 0n);
-          debugContext = `seed ${seed} step ${step} vault-public underfunded=${underfunded}`;
-          await capsule.send(blockchain.sender(mockVaultAddress), { value: underfunded ? required - 1n : required }, vaultPublic(author.address, step));
+          debugContext = `seed ${seed} step ${step} batch-public underfunded=${underfunded}`;
+          const res = await capsule.send(
+            boundVault.getSender(),
+            { value: underfunded ? UNDERFUNDED_VALUE : FUNDED_VALUE },
+            batchMsg({ kind: KIND_PUBLIC, step, parts: publicParts(), authorWallet: author.address, protocolFeeTotal: PUBLIC_FEE }),
+          );
           if (!underfunded) {
             notePublicSuccess(PUBLIC_FEE);
-            ackCount += 1n;
+            ackCount += BigInt(countBatchAcks(res, boundVault.address));
+          } else {
+            expect(countBatchAcks(res, boundVault.address), `${debugContext}: no ack on underfunded`).toBe(0);
           }
         } else if (op === 2) {
-          debugContext = `seed ${seed} step ${step} forged-vault`;
-          await capsule.send(attacker.getSender(), { value: VAULT_PRIVATE_REQUIRED }, vaultPrivate(step));
+          debugContext = `seed ${seed} step ${step} forged-vault (non-Vault sender)`;
+          const res = await capsule.send(
+            attacker.getSender(),
+            { value: FUNDED_VALUE },
+            batchMsg({ kind: KIND_PRIVATE, step, parts: privateParts(), authorWallet: author.address, protocolFeeTotal: PRIVATE_FEE }),
+          );
+          // Non-Vault sender is rejected (13500); nothing is stored and no ACK is emitted to the bound Vault.
+          expect(countBatchAcks(res, boundVault.address), `${debugContext}: no ack on forged sender`).toBe(0);
         } else if (op === 3) {
-          debugContext = `seed ${seed} step ${step} invalid-private`;
-          await capsule.send(blockchain.sender(mockVaultAddress), { value: VAULT_PRIVATE_REQUIRED }, vaultPrivate(step, { header_0_hash: 0n }));
+          debugContext = `seed ${seed} step ${step} invalid-private (body_hash=0)`;
+          // A valid-shaped private part with its body_hash field zeroed -> trips bh!=0 (13512); whole batch aborts.
+          const res = await capsule.send(
+            boundVault.getSender(),
+            { value: FUNDED_VALUE },
+            batchMsg({ kind: KIND_PRIVATE, step, parts: privatePartZeroBodyHash(), authorWallet: author.address, protocolFeeTotal: PRIVATE_FEE }),
+          );
+          expect(countBatchAcks(res, boundVault.address), `${debugContext}: no ack on invalid part`).toBe(0);
         } else {
           const amount = accrued > 0n ? (accrued > PUBLIC_FEE ? PUBLIC_FEE : accrued) : PUBLIC_FEE;
           debugContext = `seed ${seed} step ${step} flush amount=${amount}`;
@@ -198,10 +251,14 @@ describe.skip('CapsuleHub state-machine invariants', () => {
             $$type: 'FlushFees',
             amount,
           } as FlushFees);
-          // The configured accumulator address is intentionally missing, so bounce recovery restores accrued.
+          // The configured accumulator address is intentionally missing and the 100 TON protected-reserve floor
+          // is unmet at 1 TON balance, so the flush reverts (or bounces) and accrued is restored — unchanged.
         }
         await assertModel();
       }
+
+      // Cross-check: every successful batch produced exactly one CapsuleHubBatchAck to the bound Vault.
+      expect(ackCount, `${debugContext}: ack_count == successful batches`).toBe(privateLatest + publicLatest);
     }
   }, 30000);
 });
