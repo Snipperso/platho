@@ -1,11 +1,21 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
 import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=37';
-import { tonCell } from './pwa-contract-transactions.mjs?v=25';
+import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=25';
 
 const CAPSULEHUB_OPS = Object.freeze({
+  // VPB2 batch ingest (the live redeploy path): ONE Vault->Hub message carries N part bodies.
+  PublishBatchToHub: 0xA4F862D1n,
+  // Legacy single-publish ops. Removed from the live contract post-redeploy; the parser still routes
+  // to them by peeked op so historical single-publish bodies (and the legacy test vectors) keep resolving.
   PublishPrivateFromVault: 0xA4F862C0n,
   PublishPublicFromVault: 0x8C2A76B7n,
 });
+
+// EPI1 per-entry publish_id domain (sha256(0x45504931 | batch_publish_id(256) | part_index(16))). The Hub stores
+// each batch part under this id; recovery re-derives it per part to reconnect an on-chain entry to its off-chain body.
+const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN = 0x45504931n;
+const KIND_PRIVATE_BYTE = 1n;
+const KIND_PUBLIC_BYTE = 2n;
 
 const CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS = 3600;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT = 1000;
@@ -284,6 +294,137 @@ function parseCapsuleHubPublishMessageBody(bodyBoc) {
   throw new CapsuleHubTonRpcProviderError(`Unsupported CapsuleHub publish opcode 0x${op.toString(16)}`);
 }
 
+// VPB2 batch message (0xA4F862D1 PublishBatchToHub). ONE message carries the whole signed part list; this walks
+// it into one raw per-part record per part. EPI1 publish_id derivation is async, so it is filled by the caller
+// (cachePublishMessages) — this stays a pure structural decode. The `parts` linked list mirrors the contract walk
+// in CapsuleHub.tact receive(PublishBatchToHub): part 0 is ref0 of the message; each non-last part carries an extra
+// trailing ref to the next part (private: 4 refs when not last / 3 when last; public: 3 / 2).
+export function parseCapsuleHubBatchMessageBody(bodyBoc) {
+  const root = tonCell.parseBocBase64(assertString(bodyBoc, 'message body BoC'));
+  const reader = new TinyCellReader(root, 'CapsuleHub batch message');
+  const op = reader.readUint(32, 'op');
+  if (op !== CAPSULEHUB_OPS.PublishBatchToHub) {
+    throw new CapsuleHubTonRpcProviderError(`Unsupported CapsuleHub batch opcode 0x${op.toString(16)}`);
+  }
+  reader.readUint(64, 'bounce_id');
+  reader.readUint(160, 'bounce_tag');
+  const batchPublishId = reader.readUint(256, 'publish_id');
+  const publishKind = reader.readUint(8, 'publish_kind');
+  const partCount = Number(reader.readUint(8, 'part_count'));
+  reader.readUint(128, 'protocol_fee_total');
+  const authorWallet = reader.readAddress('author_wallet');
+  if (publishKind !== KIND_PRIVATE_BYTE && publishKind !== KIND_PUBLIC_BYTE) {
+    throw new CapsuleHubTonRpcProviderError(`Unsupported CapsuleHub batch kind ${publishKind.toString()}`);
+  }
+  if (!Number.isFinite(partCount) || partCount < 1) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub batch part_count is invalid');
+  }
+  const kind = publishKind === KIND_PRIVATE_BYTE ? 'private' : 'public';
+  const records = [];
+  let cursor = reader.readRef('parts'); // ref[0] of the message: the head part (part 0)
+  for (let partIndex = 0; partIndex < partCount; partIndex += 1) {
+    const isLast = partIndex === partCount - 1;
+    const part = new TinyCellReader(cursor, `CapsuleHub batch part ${partIndex}`);
+    if (kind === 'private') {
+      const sizeClass = part.readUint(8, 'size_class');
+      const cryptoSuite = part.readUint(8, 'crypto_suite');
+      const header0Hash = part.readUint(256, 'header_0_hash');
+      const header1Hash = part.readUint(256, 'header_1_hash');
+      const bodyHash = part.readUint(256, 'body_hash');
+      const header0 = part.readRef('header_0');
+      const header1 = part.readRef('header_1');
+      const body = part.readRef('body');
+      const nextPart = isLast ? null : part.readRef('next_part');
+      records.push({
+        kind: 'private',
+        batch_publish_id: batchPublishId,
+        part_index: partIndex,
+        author_wallet: authorWallet,
+        size_class: sizeClass,
+        crypto_suite: cryptoSuite,
+        header_0_hash: header0Hash,
+        header_1_hash: header1Hash,
+        body_hash: bodyHash,
+        header_0_cell: header0,
+        header_1_cell: header1,
+        body_cell: body,
+      });
+      cursor = nextPart;
+    } else {
+      const sizeClass = part.readUint(8, 'size_class');
+      part.readUint(8, 'reserved');
+      const headerHash = part.readUint(256, 'header_hash');
+      const bodyHash = part.readUint(256, 'body_hash');
+      const header = part.readRef('header');
+      const body = part.readRef('body');
+      const nextPart = isLast ? null : part.readRef('next_part');
+      records.push({
+        kind: 'public',
+        batch_publish_id: batchPublishId,
+        part_index: partIndex,
+        author_wallet: authorWallet,
+        size_class: sizeClass,
+        header_hash: headerHash,
+        body_hash: bodyHash,
+        header_cell: header,
+        body_cell: body,
+      });
+      cursor = nextPart;
+    }
+    if (!isLast && !cursor) {
+      throw new CapsuleHubTonRpcProviderError(`CapsuleHub batch part ${partIndex} is missing its successor`);
+    }
+  }
+  return records;
+}
+
+// Peek the 32-bit op without consuming the parser, to route a message body to the batch or legacy decoder.
+function peekMessageOp(bodyBoc) {
+  const root = tonCell.parseBocBase64(assertString(bodyBoc, 'message body BoC'));
+  return new TinyCellReader(root, 'CapsuleHub message').readUint(32, 'op');
+}
+
+// One per-part cache record. Re-derives the EPI1 publish_id (async) and finalizes the body/header BOC + cell-hash
+// verification. Rejects (returns null) any part whose recovered body cell hash != its declared body_hash — a body
+// that fails its own authenticated hash is never served.
+export async function batchPartCacheRecord(raw) {
+  const publishId = await computeEntryPublishId(raw.batch_publish_id, raw.part_index);
+  const bodyHashHex = await cellHashHex(raw.body_cell);
+  if (bodyHashHex !== uint256Hex(raw.body_hash)) return null;
+  if (raw.kind === 'private') {
+    return {
+      kind: 'private',
+      publish_id: publishId,
+      part_index: raw.part_index,
+      author_wallet: raw.author_wallet,
+      size_class: raw.size_class,
+      crypto_suite: raw.crypto_suite,
+      header_0_hash: raw.header_0_hash,
+      header_1_hash: raw.header_1_hash,
+      body_hash: raw.body_hash,
+      header_0_cell: raw.header_0_cell,
+      header_1_cell: raw.header_1_cell,
+      body_cell: raw.body_cell,
+      header_0_boc: cellToBocBase64(raw.header_0_cell),
+      header_1_boc: cellToBocBase64(raw.header_1_cell),
+      body_boc: cellToBocBase64(raw.body_cell),
+    };
+  }
+  return {
+    kind: 'public',
+    publish_id: publishId,
+    part_index: raw.part_index,
+    author_wallet: raw.author_wallet,
+    size_class: raw.size_class,
+    header_hash: raw.header_hash,
+    body_hash: raw.body_hash,
+    header_cell: raw.header_cell,
+    body_cell: raw.body_cell,
+    header_boc: cellToBocBase64(raw.header_cell),
+    body_boc: cellToBocBase64(raw.body_cell),
+  };
+}
+
 function messageRecordsFromResponse(response) {
   const records = response?.messages ?? response?.result?.messages ?? response?.result ?? [];
   return Array.isArray(records) ? records : [];
@@ -376,7 +517,7 @@ function entryBodyCacheKey(kind, entry) {
 }
 
 function messageBucketParams(kind, entry, address, callOptions = {}, providerOptions = {}, options = {}) {
-  const op = kind === 'private' ? CAPSULEHUB_OPS.PublishPrivateFromVault : CAPSULEHUB_OPS.PublishPublicFromVault;
+  const op = options.op ?? (kind === 'private' ? CAPSULEHUB_OPS.PublishPrivateFromVault : CAPSULEHUB_OPS.PublishPublicFromVault);
   const limit = Number(callOptions.messageLookupLimit ?? providerOptions.messageLookupLimit ?? CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT);
   const params = {
     destination: address,
@@ -388,6 +529,13 @@ function messageBucketParams(kind, entry, address, callOptions = {}, providerOpt
   // Toncenter v3 message history can miss valid messages when the source
   // filter uses a different raw-address casing. Keep the query broad enough
   // and validate the expected Vault source after parsing each record.
+  //
+  // The entry's body_hash is the PER-PART body cell hash. For a legacy single-publish message the message body
+  // cell IS the publish envelope (whose toncenter body_hash differs from the part body hash), so the body_hash
+  // filter here is the part-body hash and toncenter's index happens to match the envelope only when it indexes
+  // the publish body — which is why the legacy path keeps it as a narrowing hint with a broad fallback. For a
+  // VPB2 BATCH message ONE message carries N part body_hashes, none of which equals the message body cell hash,
+  // so the body_hash filter must be DROPPED for batch-op attempts (options.includeBodyHash === false).
   if (options.includeBodyHash !== false && entry?.body_hash !== undefined && entry?.body_hash !== null && BigInt(entry.body_hash) !== 0n) {
     params.body_hash = uint256HexPlain(entry.body_hash);
     params.limit = Math.min(params.limit, 10);
@@ -428,14 +576,26 @@ function stableParamKey(params) {
 }
 
 function messageLookupParamAttempts(kind, entry, address, callOptions = {}, providerOptions = {}) {
-  const primary = messageBucketParams(kind, entry, address, callOptions, providerOptions, { includeBodyHash: true });
-  const attempts = [primary];
-  if (primary.body_hash) attempts.push(withoutBodyHash(primary));
-  if (primary.start_utime !== undefined || primary.end_utime !== undefined) {
-    const unbucketed = unbucketedMessagesParams(primary);
-    attempts.push(unbucketed);
-    if (unbucketed.body_hash) attempts.push(withoutBodyHash(unbucketed));
-  }
+  const attempts = [];
+  const pushBucketed = (primary) => {
+    attempts.push(primary);
+    if (primary.body_hash) attempts.push(withoutBodyHash(primary));
+    if (primary.start_utime !== undefined || primary.end_utime !== undefined) {
+      const unbucketed = unbucketedMessagesParams(primary);
+      attempts.push(unbucketed);
+      if (unbucketed.body_hash) attempts.push(withoutBodyHash(unbucketed));
+    }
+  };
+  // Legacy single-publish attempts FIRST: they keep the historical/test behaviour (exact body_hash hint, then
+  // broad, bucketed then unbucketed) and resolve any pre-redeploy single-publish body on the first hit.
+  pushBucketed(messageBucketParams(kind, entry, address, callOptions, providerOptions, { includeBodyHash: true }));
+  // VPB2 batch attempts AFTER: the live redeploy forwards bodies under PublishBatchToHub (0xA4F862D1) only, where
+  // ONE message carries N part bodies, so we query the batch op WITHOUT the per-part body_hash filter (it can't
+  // match the batch message's body cell hash) and let the parser fan the message out into per-part cache records.
+  pushBucketed(messageBucketParams(kind, entry, address, callOptions, providerOptions, {
+    op: CAPSULEHUB_OPS.PublishBatchToHub,
+    includeBodyHash: false,
+  }));
   const seen = new Set();
   return attempts.filter((params) => {
     const key = stableParamKey(params);
@@ -602,15 +762,36 @@ export function decodeCapsuleHubStateStack(result) {
 export function createCapsuleHubTonRpcProvider(options = {}) {
   const publishBodyCache = new Map();
 
+  // Fan each history record into the publish-body cache, keyed by ${kind}|${publish_id}|${body_hash}. The publish_id
+  // is the PER-ENTRY id (legacy: the message publish_id; VPB2 batch: the per-part EPI1 id), so a Hub entry — whose
+  // publish_id is already that per-entry id — looks up directly. A batch message expands to one record per part, so a
+  // single dropped batch message only loses its own parts; every other part that arrives still resolves independently.
   async function cachePublishMessages(kind, records, expectedSourceRaw = null) {
     for (const record of records) {
       const actualSourceRaw = messageSourceRawFromRecord(record);
       if (expectedSourceRaw && actualSourceRaw && actualSourceRaw !== expectedSourceRaw) continue;
       const bodyBoc = messageBodyBocFromRecord(record);
       if (!bodyBoc) continue;
+      const createdAt = messageCreatedAtSecFromRecord(record);
       try {
+        let op;
+        try {
+          op = peekMessageOp(bodyBoc);
+        } catch {
+          continue; // not a parseable cell — neighbouring/garbage record from a broad filter.
+        }
+        if (op === CAPSULEHUB_OPS.PublishBatchToHub) {
+          const rawParts = parseCapsuleHubBatchMessageBody(bodyBoc);
+          for (const raw of rawParts) {
+            if (raw.kind !== kind) continue;
+            const parsed = await batchPartCacheRecord(raw);
+            if (!parsed) continue; // body cell failed its declared per-part hash — never cache/serve it.
+            if (createdAt !== null && (!parsed.created_at || parsed.created_at === 0n)) parsed.created_at = createdAt;
+            publishBodyCache.set(`${parsed.kind}|${parsed.publish_id.toString()}|${parsed.body_hash.toString()}`, parsed);
+          }
+          continue;
+        }
         const parsed = parseCapsuleHubPublishMessageBody(bodyBoc);
-        const createdAt = messageCreatedAtSecFromRecord(record);
         if (createdAt !== null && (!parsed.created_at || parsed.created_at === 0n)) parsed.created_at = createdAt;
         const key = `${parsed.kind}|${parsed.publish_id.toString()}|${parsed.body_hash.toString()}`;
         publishBodyCache.set(key, parsed);
