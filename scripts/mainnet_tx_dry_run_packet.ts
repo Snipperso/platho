@@ -70,8 +70,11 @@ const ATH_METADATA_PATH = join(process.cwd(), 'artifacts', 'ath_metadata_content
 const DEPLOY_VALUE_RECOMMENDED_NANOTONS = '500000000';
 const CONTROL_VALUE_RECOMMENDED_NANOTONS = '50000000';
 const DEPLOY_TREASURY_SUPPLY_VALUE_RECOMMENDED_NANOTONS = '10000000';
-const ATH_TRANSFER_REQUEST_VALUE_MIN_NANOTONS = '30000000';
-const ATH_TRANSFER_REQUEST_VALUE_RECOMMENDED_NANOTONS = '40000000';
+// Floor = ATHWallet plain ATHTransferRequest required_value (contracts/ATHWallet.tact:549):
+// EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+NOTIFY_STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M)=48M.
+// Raised 30M->48M / 40M->58M to track the NOTIFY_STORAGE_ENDOWMENT 2M->20M endowment raise; recommended carries a 10M buffer for forward fees.
+const ATH_TRANSFER_REQUEST_VALUE_MIN_NANOTONS = '48000000';
+const ATH_TRANSFER_REQUEST_VALUE_RECOMMENDED_NANOTONS = '58000000';
 
 function sha256Hex(data: Buffer | string): string {
   return createHash('sha256').update(data).digest('hex');

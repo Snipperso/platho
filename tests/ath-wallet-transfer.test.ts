@@ -358,7 +358,10 @@ describe('ATH wallet transfer profile', () => {
 
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
     expect((await recipientWallet.getGetWalletData()).balance).toBe(100n);
-    expect(await contractBalance(blockchain, recipientAddress)).toBeLessThan(toNano('0.01'));
+    // The recipient legitimately retains the per-notification storage endowment
+    // (ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT, raised 2M->20M). Threshold raised by the
+    // 18M endowment delta so it still detects stranded owner overpayment with the same margin.
+    expect(await contractBalance(blockchain, recipientAddress)).toBeLessThan(toNano('0.028'));
   });
 
   it('ATH-XFER-05: stale notify pending can be pruned when destination never ACKs', async () => {
@@ -517,7 +520,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceAddressA,
       to: recipientAddress,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferWithNotify({
         $$type: 'ATHInternalTransferWithNotify',
         query_id: queryId,
@@ -545,7 +548,7 @@ describe('ATH wallet transfer profile', () => {
     const independentReuse = await blockchain.sendMessage(internal({
       from: sourceAddressB,
       to: recipientAddress,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferWithNotify({
         $$type: 'ATHInternalTransferWithNotify',
         query_id: queryId,
@@ -602,7 +605,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceAddressA,
       to: recipientAddress,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferWithNotify({
         $$type: 'ATHInternalTransferWithNotify',
         query_id: queryId,
@@ -665,7 +668,7 @@ describe('ATH wallet transfer profile', () => {
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
     const recipientWallet = blockchain.openContract(new ATHWallet(recipientAddress, recipientInit));
 
-    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.051') }, {
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.069') }, {
       $$type: 'ATHTransferRequestWithNotify',
       query_id: queryId,
       amount: 100n,
@@ -686,7 +689,7 @@ describe('ATH wallet transfer profile', () => {
     const usernameReuse = await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientAddress,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultMintUsername({
         $$type: 'ATHInternalTransferVaultMintUsername',
         query_id: queryId,
@@ -709,7 +712,7 @@ describe('ATH wallet transfer profile', () => {
     const profileReuse = await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientAddress,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
         $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
@@ -753,7 +756,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultMintUsername({
         $$type: 'ATHInternalTransferVaultMintUsername',
         query_id: queryId,
@@ -802,7 +805,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
         $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
@@ -880,7 +883,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
         $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
@@ -975,7 +978,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWalletAddress,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
         $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: queryId,
@@ -1055,7 +1058,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferWithNotify({
         $$type: 'ATHInternalTransferWithNotify',
         query_id: 551n,
@@ -1069,7 +1072,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultMintUsername({
         $$type: 'ATHInternalTransferVaultMintUsername',
         query_id: 552n,
@@ -1085,7 +1088,7 @@ describe('ATH wallet transfer profile', () => {
     await blockchain.sendMessage(internal({
       from: sourceWallet.address,
       to: recipientWallet.address,
-      value: toNano('0.05'),
+      value: toNano('0.07'),
       body: beginCell().store(storeATHInternalTransferVaultProfileAvatar({
         $$type: 'ATHInternalTransferVaultProfileAvatar',
         query_id: 553n,
@@ -1146,7 +1149,7 @@ describe('ATH wallet transfer profile', () => {
     const recipientInit = await ATHWallet.init(0n, recipientOwner.address, master);
     const recipientAddress = contractAddress(recipientOwner.address.workChain, recipientInit);
 
-    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.051') }, {
+    await sourceWallet.send(sourceOwner.getSender(), { value: toNano('0.069') }, {
       $$type: 'ATHTransferRequestWithNotify',
       query_id: queryId,
       amount: 100n,

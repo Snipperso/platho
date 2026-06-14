@@ -572,13 +572,13 @@ cell $CapsuleHubBatchAck$_store_cell((int, int, int, int) v, builder b) inline {
 
 ;;
 ;; Type: PrivateCapsuleEntry
-;; TLB: _ publish_id:uint256 created_at:uint32 body_hash:uint256 sender_prev_link:uint64 recipient_prev_link:uint64 header_0:^cell header_1:^cell = PrivateCapsuleEntry
+;; TLB: _ publish_id:uint256 created_at:uint64 body_hash:uint256 sender_prev_link:uint64 recipient_prev_link:uint64 header_0:^cell header_1:^cell = PrivateCapsuleEntry
 ;;
 
 builder $PrivateCapsuleEntry$_store(builder build_0, (int, int, int, int, int, cell, cell) v) inline {
     var (v'publish_id, v'created_at, v'body_hash, v'sender_prev_link, v'recipient_prev_link, v'header_0, v'header_1) = v;
     build_0 = build_0.store_uint(v'publish_id, 256);
-    build_0 = build_0.store_uint(v'created_at, 32);
+    build_0 = build_0.store_uint(v'created_at, 64);
     build_0 = build_0.store_uint(v'body_hash, 256);
     build_0 = build_0.store_uint(v'sender_prev_link, 64);
     build_0 = build_0.store_uint(v'recipient_prev_link, 64);
@@ -593,7 +593,7 @@ cell $PrivateCapsuleEntry$_store_cell((int, int, int, int, int, cell, cell) v, b
 
 (slice, ((int, int, int, int, int, cell, cell))) $PrivateCapsuleEntry$_load(slice sc_0) inline {
     var v'publish_id = sc_0~load_uint(256);
-    var v'created_at = sc_0~load_uint(32);
+    var v'created_at = sc_0~load_uint(64);
     var v'body_hash = sc_0~load_uint(256);
     var v'sender_prev_link = sc_0~load_uint(64);
     var v'recipient_prev_link = sc_0~load_uint(64);
@@ -626,13 +626,13 @@ tuple $PrivateCapsuleEntry$_load_opt(cell cl) inline {
 
 ;;
 ;; Type: PublicCapsuleEntry
-;; TLB: _ publish_id:uint256 created_at:uint32 author_wallet:address body_hash:uint256 header:^cell = PublicCapsuleEntry
+;; TLB: _ publish_id:uint256 created_at:uint64 author_wallet:address body_hash:uint256 header:^cell = PublicCapsuleEntry
 ;;
 
 builder $PublicCapsuleEntry$_store(builder build_0, (int, int, slice, int, cell) v) inline {
     var (v'publish_id, v'created_at, v'author_wallet, v'body_hash, v'header) = v;
     build_0 = build_0.store_uint(v'publish_id, 256);
-    build_0 = build_0.store_uint(v'created_at, 32);
+    build_0 = build_0.store_uint(v'created_at, 64);
     build_0 = build_0.store_slice(v'author_wallet);
     build_0 = build_0.store_uint(v'body_hash, 256);
     build_0 = build_0.store_ref(v'header);
@@ -645,7 +645,7 @@ cell $PublicCapsuleEntry$_store_cell((int, int, slice, int, cell) v, builder b) 
 
 (slice, ((int, int, slice, int, cell))) $PublicCapsuleEntry$_load(slice sc_0) inline {
     var v'publish_id = sc_0~load_uint(256);
-    var v'created_at = sc_0~load_uint(32);
+    var v'created_at = sc_0~load_uint(64);
     var v'author_wallet = sc_0~load_msg_addr();
     var v'body_hash = sc_0~load_uint(256);
     var v'header = sc_0~load_ref();
@@ -762,7 +762,7 @@ tuple $PrivateCapsuleKeyIndex$_load_opt(cell cl) inline {
 
 ;;
 ;; Type: CapsuleHub
-;; TLB: _ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 private_live_count:uint64 public_live_count:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint32,body_hash:uint256,sender_prev_link:uint64,recipient_prev_link:uint64,header_0:^cell,header_1:^cell}> public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint32,author_wallet:address,body_hash:uint256,header:^cell}> private_sender_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> private_recipient_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> = CapsuleHub
+;; TLB: _ fee_accumulator_address:address vault_address:address vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_controller_address:address private_latest_id:uint64 public_latest_id:uint64 private_live_count:uint64 public_live_count:uint64 accrued_plato_fee_ton:uint128 private_entries:dict<uint64, ^PrivateCapsuleEntry{publish_id:uint256,created_at:uint64,body_hash:uint256,sender_prev_link:uint64,recipient_prev_link:uint64,header_0:^cell,header_1:^cell}> public_entries:dict<uint64, ^PublicCapsuleEntry{publish_id:uint256,created_at:uint64,author_wallet:address,body_hash:uint256,header:^cell}> private_sender_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> private_recipient_index:dict<uint256, ^PrivateCapsuleKeyIndex{latest_entry_link:uint64,entry_count:uint64}> = CapsuleHub
 ;;
 
 builder $CapsuleHub$_store(builder build_0, (slice, slice, int, int, int, slice, int, int, int, int, int, cell, cell, cell, cell) v) inline {

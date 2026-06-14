@@ -202,16 +202,16 @@ TL-B: `_ exists:bool sender_owner:address response_destination:address amount:in
 Signature: `PendingAthTransferNotificationView{exists:bool,sender_owner:address,response_destination:address,amount:int257,created_at:int257}`
 
 ### PendingAthTransferNotification
-TL-B: `_ sender_owner:address response_destination:address response_ack_value:uint64 amount:uint128 created_at:uint32 = PendingAthTransferNotification`
-Signature: `PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}`
+TL-B: `_ sender_owner:address response_destination:address response_ack_value:uint64 amount:uint128 created_at:uint64 = PendingAthTransferNotification`
+Signature: `PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint64}`
 
 ### PendingAthOutgoingTransfer
-TL-B: `_ recipient_wallet:address response_destination:address amount:uint128 created_at:uint32 = PendingAthOutgoingTransfer`
-Signature: `PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}`
+TL-B: `_ recipient_wallet:address response_destination:address amount:uint128 created_at:uint64 = PendingAthOutgoingTransfer`
+Signature: `PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint64}`
 
 ### ATHWallet$Data
-TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}> processed_notifications:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}> = ATHWallet`
-Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint32}>,processed_notifications:dict<int, int>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint32}>}`
+TL-B: `_ balance:uint128 owner_address:address ath_master_address:address pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint64}> processed_notifications:dict<int, int> pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint64}> = ATHWallet`
+Signature: `ATHWallet{balance:uint128,owner_address:address,ath_master_address:address,pending_notifications:dict<int, ^PendingAthTransferNotification{sender_owner:address,response_destination:address,response_ack_value:uint64,amount:uint128,created_at:uint64}>,processed_notifications:dict<int, int>,pending_outgoing_transfers:dict<int, ^PendingAthOutgoingTransfer{recipient_wallet:address,response_destination:address,amount:uint128,created_at:uint64}>}`
 
 ### BindOfficialAthWallet
 TL-B: `bind_official_ath_wallet#663df03d deployment_manifest_hash:uint256 official_ath_wallet_address:address = BindOfficialAthWallet`
@@ -242,12 +242,12 @@ TL-B: `username_registry_top_up_storage_reserve#0aba5f1d  = UsernameRegistryTopU
 Signature: `UsernameRegistryTopUpStorageReserve{}`
 
 ### PendingUsernameMint
-TL-B: `_ query_id:uint64 sender_key:uint160 owner_wallet:address name_hash:uint256 price_paid:uint128 item_address:address item_deploy_value:uint128 created_at:uint32 = PendingUsernameMint`
-Signature: `PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint32}`
+TL-B: `_ query_id:uint64 sender_key:uint160 owner_wallet:address name_hash:uint256 price_paid:uint128 item_address:address item_deploy_value:uint128 created_at:uint64 = PendingUsernameMint`
+Signature: `PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64}`
 
 ### NameRecord
-TL-B: `_ minter_wallet:address item_address:address registered_at:uint32 = NameRecord`
-Signature: `NameRecord{minter_wallet:address,item_address:address,registered_at:uint32}`
+TL-B: `_ minter_wallet:address item_address:address registered_at:uint64 = NameRecord`
+Signature: `NameRecord{minter_wallet:address,item_address:address,registered_at:uint64}`
 
 ### UsernameRegistryGlobalView
 TL-B: `_ sealed:bool official_ath_wallet_bound:bool vault_bound:bool deployment_manifest_hash:int257 genesis_config_hash:int257 official_ath_wallet_address:address vault_address:address genesis_controller_address:address name_record_count:int257 pending_mint_count:int257 treasury_due_ath:int257 burn_due_ath:int257 pending_treasury_flush_count:int257 pending_burn_flush_count:int257 pending_mint_stale_ttl:int257 = UsernameRegistryGlobalView`
@@ -266,12 +266,12 @@ TL-B: `_ exists:bool query_id:int257 sender_key:int257 owner_wallet:address name
 Signature: `PendingUsernameMintView{exists:bool,query_id:int257,sender_key:int257,owner_wallet:address,name_hash:int257,price_paid:int257,item_address:address,item_deploy_value:int257,created_at:int257}`
 
 ### PendingAthTreasuryFlush
-TL-B: `_ amount:uint128 recipient_ath_wallet:address created_at:uint32 = PendingAthTreasuryFlush`
-Signature: `PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint32}`
+TL-B: `_ amount:uint128 recipient_ath_wallet:address created_at:uint64 = PendingAthTreasuryFlush`
+Signature: `PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}`
 
 ### PendingAthBurnFlush
-TL-B: `_ amount:uint128 created_at:uint32 = PendingAthBurnFlush`
-Signature: `PendingAthBurnFlush{amount:uint128,created_at:uint32}`
+TL-B: `_ amount:uint128 created_at:uint64 = PendingAthBurnFlush`
+Signature: `PendingAthBurnFlush{amount:uint128,created_at:uint64}`
 
 ### PendingAthTreasuryFlushView
 TL-B: `_ exists:bool amount:int257 recipient_ath_wallet:address created_at:int257 = PendingAthTreasuryFlushView`
@@ -290,8 +290,8 @@ TL-B: `_ marker:uint8 metadata:dict<uint256, ^cell> = UsernameCollectionOnchainC
 Signature: `UsernameCollectionOnchainContent{marker:uint8,metadata:dict<uint256, ^cell>}`
 
 ### UsernameRegistry$Data
-TL-B: `_ official_ath_wallet_address:address vault_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 name_record_count:uint64 pending_mint_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 name_records:dict<int, ^NameRecord{minter_wallet:address,item_address:address,registered_at:uint32}> pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint32}> pending_item_to_name_hash:dict<address, int> pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint32}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint32}> pending_burn_flush_count:uint64 genesis_controller_address:address = UsernameRegistry`
-Signature: `UsernameRegistry{official_ath_wallet_address:address,vault_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,name_record_count:uint64,pending_mint_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,name_records:dict<int, ^NameRecord{minter_wallet:address,item_address:address,registered_at:uint32}>,pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint32}>,pending_item_to_name_hash:dict<address, int>,pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint32}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint32}>,pending_burn_flush_count:uint64,genesis_controller_address:address}`
+TL-B: `_ official_ath_wallet_address:address vault_address:address ath_master_address:address treasury_ath_receiver_address:address official_ath_wallet_bound:bool vault_bound:bool sealed:bool deployment_manifest_hash:uint256 genesis_config_hash:uint256 name_record_count:uint64 pending_mint_count:uint64 treasury_due_ath:uint128 burn_due_ath:uint128 name_records:dict<int, ^NameRecord{minter_wallet:address,item_address:address,registered_at:uint64}> pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64}> pending_item_to_name_hash:dict<address, int> pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}> pending_treasury_flush_count:uint64 pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint64}> pending_burn_flush_count:uint64 genesis_controller_address:address = UsernameRegistry`
+Signature: `UsernameRegistry{official_ath_wallet_address:address,vault_address:address,ath_master_address:address,treasury_ath_receiver_address:address,official_ath_wallet_bound:bool,vault_bound:bool,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,name_record_count:uint64,pending_mint_count:uint64,treasury_due_ath:uint128,burn_due_ath:uint128,name_records:dict<int, ^NameRecord{minter_wallet:address,item_address:address,registered_at:uint64}>,pending_mints:dict<int, ^PendingUsernameMint{query_id:uint64,sender_key:uint160,owner_wallet:address,name_hash:uint256,price_paid:uint128,item_address:address,item_deploy_value:uint128,created_at:uint64}>,pending_item_to_name_hash:dict<address, int>,pending_treasury_flushes:dict<int, ^PendingAthTreasuryFlush{amount:uint128,recipient_ath_wallet:address,created_at:uint64}>,pending_treasury_flush_count:uint64,pending_burn_flushes:dict<int, ^PendingAthBurnFlush{amount:uint128,created_at:uint64}>,pending_burn_flush_count:uint64,genesis_controller_address:address}`
 
 ## Get methods
 Total get methods: 11
