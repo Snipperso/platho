@@ -37,7 +37,13 @@ import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=6';
 import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=72';
-import { createTonRpcTransport, isTonRpcTransportDead } from './vault-ton-rpc-provider.mjs?v=37';
+import {
+  createTonRpcTransport,
+  isTonRpcTransportDead,
+  readBatchPublishReceipt,
+  interpretBatchPublishReceipt,
+  BATCH_PUBLISH_RECEIPT_STATUS,
+} from './vault-ton-rpc-provider.mjs?v=37';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -91,7 +97,6 @@ import {
   createPublicPostPayload,
   createUsernameRegistryMessage,
   createWalletTransaction,
-  buildVaultBalancePublishExternalBoc,
   buildVaultProfileAvatarExternalBoc,
   buildVaultReceiveIntentExternalBoc,
   buildVaultReplaceMessagingKeysExternalBoc,
@@ -118,6 +123,10 @@ import {
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
 } from './pwa-contract-transactions.mjs?v=25';
+import {
+  groupPublishItemsIntoBatches,
+  buildBatchExternalFromPublishItems,
+} from './publish-batch-orchestration.mjs?v=1';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=23';
 import {
   createCapsuleHubTonRpcProvider,
@@ -138,7 +147,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v424';
+const PLATHO_APP_RUNTIME_VERSION = 'v425';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14959,9 +14968,6 @@ const PUBLISH_PART_STATUS_UNKNOWN = 'unknown';
 const VAULT_PUBLISH_PARTIAL_ERROR_CODE = 'PLATHO_VAULT_PUBLISH_PARTIAL';
 const CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT = 32;
 const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8;
-const CAPSULEHUB_PUBLISH_ACK_OP = 0x874E576An;
-const VAULT_PUBLISH_ACK_HISTORY_LOOKUP_LIMIT = 100;
-const VAULT_PUBLISH_ACK_HISTORY_LOOKUP_MAX_PAGES = 4;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS = 35_000;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT = 6;
 const PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS = 12 * 1000;
@@ -14982,24 +14988,6 @@ function publishHashPlain(value) {
   } catch {
     return null;
   }
-}
-
-function publishHashBigInt(value, label = 'publish hash') {
-  const plain = publishHashPlain(value);
-  if (!plain) throw new Error(`${label} is missing`);
-  return BigInt(`0x${plain}`);
-}
-
-async function computeVaultPublishId(owner, clientNonce, bodyHash, publishKind) {
-  const cell = tonCell.beginCell()
-    .uint(uint256ConfigValue(requireVaultDeploymentManifestHash(), 'Vault deployment manifest hash'), 256, 'deployment_manifest_hash')
-    .address(owner, 'owner')
-    .uint(clientNonce, 64, 'client_nonce')
-    .uint(publishHashBigInt(bodyHash, 'publish body hash'), 256, 'body_hash')
-    .uint(publishKind, 8, 'publish_kind')
-    .endCell();
-  const { hash } = await tonCell.computeCellHashAndDepth(cell);
-  return tonCell.bytesToBigInt(hash).toString(16).padStart(64, '0');
 }
 
 function publishPartFromCapsule(capsule, index, total) {
@@ -15053,18 +15041,6 @@ function publishPartHasPayloadHashes(part) {
 
 function publishIdForPart(part) {
   return publishHashPlain(part?.publishId ?? part?.publish_id);
-}
-
-async function ensurePublishPartVaultPublishId(part, owner = null) {
-  if (!part || publishIdForPart(part)) return publishIdForPart(part);
-  const bodyHash = publishPartBodyHash(part);
-  if (part.clientNonce === undefined || part.clientNonce === null || !bodyHash) return null;
-  const resolvedOwner = owner ?? plathoWallet?.address ?? null;
-  if (!resolvedOwner) return null;
-  const publishKind = publishPartKind(part) === 'public' ? VAULT_PUBLISH_KIND.PUBLIC : VAULT_PUBLISH_KIND.PRIVATE;
-  const publishId = await computeVaultPublishId(resolvedOwner, BigInt(part.clientNonce), bodyHash, publishKind);
-  part.publishId = publishId;
-  return publishId;
 }
 
 function createCapsulePublishState(capsules) {
@@ -15278,101 +15254,6 @@ async function confirmPendingPrivatePublishMessagesFromEntries(entries, confirme
   return changedMessages;
 }
 
-class PublishAckCellReader {
-  constructor(cell) {
-    if (!cell || !(cell.data instanceof Uint8Array) || !Array.isArray(cell.refs)) {
-      throw new Error('CapsuleHub ACK body is not a TON cell');
-    }
-    this.cell = cell;
-    this.bitOffset = 0;
-  }
-
-  readBit(label) {
-    if (this.bitOffset >= this.cell.bitLength) {
-      throw new Error(`CapsuleHub ACK ${label} is truncated`);
-    }
-    const byte = this.cell.data[this.bitOffset >> 3] ?? 0;
-    const bit = (byte & (1 << (7 - (this.bitOffset & 7)))) !== 0;
-    this.bitOffset += 1;
-    return bit;
-  }
-
-  readUint(bitLength, label) {
-    let out = 0n;
-    for (let index = 0; index < bitLength; index += 1) {
-      out = (out << 1n) | (this.readBit(label) ? 1n : 0n);
-    }
-    return out;
-  }
-}
-
-function parseCapsuleHubPublishAckBody(bodyBoc) {
-  if (typeof bodyBoc !== 'string' || bodyBoc.length === 0) return null;
-  try {
-    const reader = new PublishAckCellReader(tonCell.parseBocBase64(bodyBoc));
-    const op = reader.readUint(32, 'op');
-    if (op !== CAPSULEHUB_PUBLISH_ACK_OP) return null;
-    return {
-      publish_id: reader.readUint(256, 'publish_id'),
-      entry_id: reader.readUint(64, 'entry_id'),
-      entry_uid: reader.readUint(256, 'entry_uid'),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function messageRecordsFromResponse(response) {
-  const records = response?.messages ?? response?.result?.messages ?? response?.result ?? [];
-  return Array.isArray(records) ? records : [];
-}
-
-function messageBodyBocFromRecord(record) {
-  return record?.message_content?.body
-    ?? record?.messageContent?.body
-    ?? record?.body
-    ?? record?.in_msg?.message_content?.body
-    ?? record?.inMsg?.messageContent?.body
-    ?? null;
-}
-
-function publishConfirmationHistoryTransports() {
-  const transport = globalThis.plathoCapsuleHubRpcTransport ?? globalThis.plathoTonRpcTransport;
-  const transports = Array.isArray(transport?.transports) && transport.transports.length > 0
-    ? transport.transports
-    : [transport];
-  const primary = [];
-  const emergency = [];
-  for (const item of transports) {
-    const resolved = item?.transport ?? item;
-    if (!resolved?.getMessages || resolved.supportsMessageHistory === false) continue;
-    // Verifier-only transports (keyless toncenter) carry a ~1 rps budget and
-    // serve message history only when no live primary history transport
-    // exists — the censorship-survival path.
-    const bucket = resolved.verifierOnly === true ? emergency : primary;
-    if (!bucket.includes(resolved)) bucket.push(resolved);
-  }
-  const alivePrimary = primary.filter((item) => !isTonRpcTransportDead(item));
-  if (alivePrimary.length > 0) return alivePrimary;
-  const aliveEmergency = emergency.filter((item) => !isTonRpcTransportDead(item));
-  if (aliveEmergency.length > 0) return aliveEmergency;
-  return primary.length > 0 ? primary : emergency;
-}
-
-function vaultPublishAckHistoryParams(capsuleHubAddress, pageIndex = 0) {
-  const limit = VAULT_PUBLISH_ACK_HISTORY_LOOKUP_LIMIT;
-  const params = {
-    destination: parseTonAddress(requireVaultAddress()).raw,
-    source: parseTonAddress(capsuleHubAddress).raw,
-    opcode: '0x874E576A',
-    exclude_externals: true,
-    limit,
-    sort: 'desc',
-  };
-  if (pageIndex > 0) params.offset = pageIndex * limit;
-  return params;
-}
-
 function publishConfirmSearchState(publishState, kind, latest) {
   if (!publishState.confirmSearch || typeof publishState.confirmSearch !== 'object') {
     publishState.confirmSearch = {};
@@ -15484,111 +15365,6 @@ function capsuleHubConfirmationProviderCandidates(baseProvider, address, options
   return providers;
 }
 
-async function readVaultPublishAckHistory(capsuleHubAddress, publishIds = null, options = {}) {
-  const transports = publishConfirmationHistoryTransports();
-  if (transports.length === 0) return [];
-  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
-  const timeoutMs = Number(options.requestTimeoutMs ?? options.timeoutMs ?? 0);
-  const queueTimeoutMs = Number(options.queueTimeoutMs ?? 0);
-  const targetPublishIds = publishIds instanceof Set
-    ? publishIds
-    : new Set((publishIds ?? []).map((value) => publishHashPlain(value)).filter(Boolean));
-  const found = [];
-  const seen = new Set();
-  for (const transport of transports) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) return found;
-    for (let pageIndex = 0; pageIndex < VAULT_PUBLISH_ACK_HISTORY_LOOKUP_MAX_PAGES; pageIndex += 1) {
-      if (publishConfirmDeadlineExpired(deadlineAt)) return found;
-      const params = vaultPublishAckHistoryParams(capsuleHubAddress, pageIndex);
-      let response;
-      try {
-        const requestOptions = {
-          priority: 'messages',
-          cacheTtlMs: 0,
-          allowUnverifiedCriticalRead: true,
-        };
-        if (Number.isFinite(timeoutMs) && timeoutMs > 0) requestOptions.requestTimeoutMs = Math.floor(timeoutMs);
-        if (Number.isFinite(queueTimeoutMs) && queueTimeoutMs > 0) requestOptions.queueTimeoutMs = Math.floor(queueTimeoutMs);
-        response = await transport.getMessages(params, requestOptions);
-      } catch (error) {
-        if (noteTonRpcRateLimit(error)) throw error;
-        break;
-      }
-      const records = messageRecordsFromResponse(response);
-      for (const record of records) {
-        if (publishConfirmDeadlineExpired(deadlineAt)) return found;
-        const ack = parseCapsuleHubPublishAckBody(messageBodyBocFromRecord(record));
-        if (!ack) continue;
-        const publishId = publishHashPlain(ack.publish_id);
-        if (targetPublishIds.size > 0 && !targetPublishIds.has(publishId)) continue;
-        const key = `${publishId}:${ack.entry_id.toString()}`;
-        if (!publishId || seen.has(key)) continue;
-        seen.add(key);
-        found.push({
-          publishId,
-          entryId: ack.entry_id,
-          entryUid: ack.entry_uid,
-        });
-        if (targetPublishIds.size > 0 && found.length >= targetPublishIds.size) return found;
-      }
-      if (records.length < VAULT_PUBLISH_ACK_HISTORY_LOOKUP_LIMIT) break;
-    }
-    if (targetPublishIds.size > 0 && found.length >= targetPublishIds.size) return found;
-  }
-  return found;
-}
-
-async function confirmCapsuleHubPublishEntriesFromVaultAckHistory(publishState, pendingParts, providerCandidates, capsuleHubAddress, readOptions, options = {}) {
-  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
-  for (const part of pendingParts) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) return;
-    try {
-      await ensurePublishPartVaultPublishId(part);
-    } catch {
-      // Older pending records may not have enough local data to reconstruct Vault publish_id.
-    }
-  }
-  const publishIds = new Set(
-    pendingParts
-      .map((part) => publishIdForPart(part))
-      .filter((value) => typeof value === 'string' && value.length > 0),
-  );
-  if (publishIds.size === 0) return;
-  let acks = [];
-  try {
-    acks = await readVaultPublishAckHistory(capsuleHubAddress, publishIds, options);
-  } catch (error) {
-    if (noteTonRpcRateLimit(error)) throw error;
-    return;
-  }
-  if (acks.length === 0) return;
-  const byPublishId = new Map();
-  for (const ack of acks) byPublishId.set(ack.publishId, ack);
-  for (const part of pendingParts) {
-    if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
-    const ack = byPublishId.get(publishIdForPart(part));
-    if (!ack) continue;
-    for (const candidateProvider of providerCandidates) {
-      if (publishConfirmDeadlineExpired(deadlineAt)) return;
-      try {
-        const entry = publishPartKind(part) === 'public'
-          ? await candidateProvider.getPublicEntry(ack.entryId, readOptions)
-          : await candidateProvider.getPrivateEntry(ack.entryId, readOptions);
-        if (!publishEntryMatchesPart(entry, part)) continue;
-        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
-          entryId: String(entry.entry_id ?? ack.entryId),
-          entryUid: ack.entryUid?.toString?.() ?? null,
-          confirmedBy: 'vault_ack_history',
-        });
-        break;
-      } catch (error) {
-        if (isTonRpcVerificationSoftReadError(error) || noteTonRpcRateLimit(error)) continue;
-        continue;
-      }
-    }
-  }
-}
-
 async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, options = {}) {
   const privateParts = pendingParts.filter((part) => publishPartKind(part) === 'private');
   if (privateParts.length === 0 || !localRecipientKeyPair?.keyId) return;
@@ -15637,6 +15413,125 @@ async function confirmPrivatePublishEntriesFromSenderIndex(publishState, pending
   }
 }
 
+// Group the still-pending parts of a publishState back into their VPB2 batches. Every part of a batch was
+// stamped at send time with the SHARED batch nonce (part.clientNonce) and batch id (part.batchPublishId), plus
+// its position within the batch (part.batchPartIndex). The receipt ring is keyed by nonce, so a batch is the
+// set of pending parts that share a (clientNonce) — confirming a batch is a SINGLE receipt read.
+function pendingPublishBatchesFromState(publishState) {
+  const groups = new Map();
+  for (const part of publishState?.parts ?? []) {
+    if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+    if (part.clientNonce === undefined || part.clientNonce === null) continue;
+    let nonce = null;
+    try {
+      nonce = BigInt(part.clientNonce);
+    } catch {
+      continue;
+    }
+    const key = nonce.toString();
+    let group = groups.get(key);
+    if (!group) {
+      group = { nonce, parts: [] };
+      groups.set(key, group);
+    }
+    group.parts.push(part);
+  }
+  return [...groups.values()];
+}
+
+// PRIMARY confirm: read the Vault receipt ring once per in-flight batch and map the outcome onto the per-part
+// publishState statuses. The receipt is the authoritative, single-read answer for a batch's fate:
+//   confirmed  -> the Hub stored entries first_entry_id .. +partCount-1; derive each part's entry id from its
+//                 batchPartIndex (= EPI1 order) and mark it CAPSULEHUB_CONFIRMED.
+//   rejected   -> post-accept atomic reject WITH refund; surface the reject code, mark the batch FAILED.
+//   bounced    -> the Hub bounced, the call value was refunded; mark FAILED so the UI re-sends.
+//   processing -> accepted, awaiting the Hub ACK; leave pending (entry-scan / a later receipt read settle it).
+//   tombstoned -> a stale pending was pruned, but a late ACK can still confirm it; leave pending.
+//   evicted    -> the slot no longer reports our nonce (a newer action overwrote it); leave to the entry scan.
+async function confirmVaultBatchReceiptsFromPublishState(publishState, options = {}) {
+  const batches = pendingPublishBatchesFromState(publishState);
+  if (batches.length === 0) return 0;
+  let provider = null;
+  try {
+    provider = await resolveVaultChainProvider(options.provider);
+  } catch {
+    return 0;
+  }
+  if (typeof provider?.getUserReceipts !== 'function') return 0;
+  const owner = options.owner ?? plathoWallet?.address ?? null;
+  if (!owner) return 0;
+  const vaultAddress = requireVaultAddress();
+  const deadlineAt = Number(options.deadlineAt ?? 0) || 0;
+  // The receipt ring confirmation is authoritative, so it reads VERIFIED (dual-provider) fail-closed — a
+  // CAPSULEHUB_CONFIRMED transition must never rest on a single unverified replica. Transient verification
+  // failures simply leave the batch pending for the entry-scan recovery / a later receipt read.
+  const readOptions = {
+    verify: true,
+    priority: 'critical',
+    cacheTtlMs: 0,
+  };
+  if (options.requestTimeoutMs) readOptions.requestTimeoutMs = options.requestTimeoutMs;
+  if (options.queueTimeoutMs) readOptions.queueTimeoutMs = options.queueTimeoutMs;
+  let changed = 0;
+  for (const batch of batches) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) break;
+    let interp = null;
+    try {
+      interp = await readBatchPublishReceipt(provider, vaultAddress, owner, batch.nonce, readOptions);
+    } catch (error) {
+      // Rate limits propagate so the caller can fall back to SUBMITTED; a soft verification miss (RPC
+      // disagreement / verifier unavailable) just leaves this batch pending for the entry-scan recovery.
+      if (noteTonRpcRateLimit(error)) throw error;
+      if (isTonRpcVerificationSoftReadError(error) || isTonRpcRecoverableReadError(error)) continue;
+      continue;
+    }
+    if (!interp) continue;
+    if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.CONFIRMED) {
+      const firstEntryId = interp.firstEntryId === undefined || interp.firstEntryId === null
+        ? null
+        : BigInt(interp.firstEntryId);
+      for (const part of batch.parts) {
+        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+        const batchPartIndex = Number(part.batchPartIndex ?? 0) || 0;
+        const entryId = firstEntryId === null ? null : firstEntryId + BigInt(batchPartIndex);
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+          entryId: entryId === null ? (part.entryId ?? null) : String(entryId),
+          confirmedBy: 'vault_batch_receipt',
+          error: null,
+        });
+        changed += 1;
+      }
+    } else if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.REJECTED) {
+      const rejectCode = interp.rejectCode === undefined || interp.rejectCode === null
+        ? null
+        : `0x${Number(interp.rejectCode).toString(16)}`;
+      const failPartIndex = interp.failPartIndex === undefined || interp.failPartIndex === null
+        ? null
+        : interp.failPartIndex.toString();
+      const reason = `Vault rejected the batch publish${rejectCode ? ` (reject ${rejectCode}${failPartIndex !== null ? `, part ${failPartIndex}` : ''})` : ''}`;
+      for (const part of batch.parts) {
+        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_FAILED, {
+          error: reason,
+          batchRejectCode: rejectCode,
+          batchFailPartIndex: failPartIndex,
+        });
+        changed += 1;
+      }
+    } else if (interp.status === BATCH_PUBLISH_RECEIPT_STATUS.BOUNCED) {
+      for (const part of batch.parts) {
+        if (part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED) continue;
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_FAILED, {
+          error: 'CapsuleHub bounced the batch publish; the charge was refunded',
+        });
+        changed += 1;
+      }
+    }
+    // processing / tombstoned / evicted: leave the parts pending for the entry-scan fallback below.
+  }
+  return changed;
+}
+
 async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options = {}) {
   const pendingParts = (publishState?.parts ?? []).filter((part) => (
     part.status === PUBLISH_PART_STATUS_VAULT_SUBMITTED
@@ -15645,6 +15540,26 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
     || publishPartHadPriorChainAttempt(part)
   ));
   if (pendingParts.length === 0) return publishState;
+  const deadlineAt = publishConfirmDeadlineAt(options);
+  // VPB2 PRIMARY confirm: the Vault receipt ring is the authoritative, single-read answer for each in-flight
+  // batch (confirmed/rejected/bounced/processing/tombstoned). It supersedes the obsolete VPB1 per-message
+  // PublishAck history scan; the CapsuleHub entry-scan strategies below remain the recovery fallback when the
+  // receipt is still processing or has been evicted from the ring.
+  if (options.skipBatchReceipt !== true) {
+    try {
+      await confirmVaultBatchReceiptsFromPublishState(publishState, {
+        owner: options.owner,
+        provider: options.vaultProvider,
+        deadlineAt,
+        requestTimeoutMs: options.requestTimeoutMs ?? options.timeoutMs,
+        queueTimeoutMs: options.queueTimeoutMs,
+      });
+    } catch (error) {
+      if (!isTonRpcRecoverableReadError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+    }
+  }
+  if (pendingParts.every((part) => part.status === PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED)) return publishState;
+  if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return publishState;
   const { provider, address } = resolved;
@@ -15653,14 +15568,6 @@ async function confirmCapsuleHubPublishEntriesWithReadMode(publishState, options
     scanAvailableTransports: options.scanAvailableTransports,
   });
   const scanLimit = options.scanLimit ?? CAPSULEHUB_PUBLISH_CONFIRM_SCAN_LIMIT;
-  const deadlineAt = publishConfirmDeadlineAt(options);
-  if (options.skipAckHistory !== true) {
-    await confirmCapsuleHubPublishEntriesFromVaultAckHistory(publishState, pendingParts, providerCandidates, address, readOptions, {
-      deadlineAt,
-      requestTimeoutMs: readOptions.requestTimeoutMs,
-      queueTimeoutMs: readOptions.queueTimeoutMs,
-    });
-  }
   if (publishConfirmDeadlineExpired(deadlineAt)) return publishState;
   await confirmPrivatePublishEntriesFromSenderIndex(publishState, pendingParts, providerCandidates, readOptions, {
     scanLimit,
@@ -15971,17 +15878,32 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
   } = prepared;
   await options.onReadyToSend?.(publishState);
   let lastResult = null;
+  // VPB2: the flat per-capsule charge plan is packed into batches of
+  // 1..MAX_BATCH_PARTS contiguous same-kind items; each batch is ONE signed
+  // external consuming ONE strictly-sequential nonce. Every item in a batch
+  // shares the fate of that single external (sent/unknown/failed together).
+  const batches = groupPublishItemsIntoBatches(results);
   const sendTurn = await enterVaultPublishSendLock();
   try {
     await awaitVaultPublishNonceBarrier();
-    for (let index = 0; index < results.length; index += 1) {
-      const item = results[index];
-      const existingPart = publishState.parts?.[item.partIndex];
-      if (publishPartAlreadyAttempted(existingPart)) {
-        notifyPublishState(options, publishState, existingPart);
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
+      const batch = batches[batchIndex];
+      const pendingItems = batch.items.filter((item) => !publishPartAlreadyAttempted(publishState.parts?.[item.partIndex]));
+      // A batch is atomic (one nonce, one external, one BPI1): it is sent only when EVERY item is still
+      // pending. Once any item has been attempted the whole batch is in-flight, so we keep its state and never
+      // re-send — re-sending here would re-publish (and re-charge) the already-attempted parts under a fresh
+      // nonce. Deterministic grouping makes the mixed case unreachable; this guard keeps that invariant explicit.
+      if (pendingItems.length !== batch.items.length) {
+        for (const item of batch.items) {
+          const existingPart = publishState.parts?.[item.partIndex];
+          if (existingPart) notifyPublishState(options, publishState, existingPart);
+        }
         continue;
       }
-      notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
+      for (const item of batch.items) {
+        notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENDING));
+      }
+      let batchExternal = null;
       try {
         let clientNonce = options.allowOwnVaultActionReadFallback === true
           ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
@@ -16009,80 +15931,98 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
           }
           if (clientNonce < nonceFloor) clientNonce = nonceFloor;
         }
-        item.clientNonce = clientNonce;
-        const publishId = await computeVaultPublishId(owner, clientNonce, item.publish.body_hash, item.publish.publish_kind);
-        item.publishId = publishId;
-        const partWithPublishId = publishState.parts?.[item.partIndex];
-        if (partWithPublishId) {
-          partWithPublishId.publishId = publishId;
-          partWithPublishId.clientNonce = clientNonce.toString();
-          if (publishPartKind(partWithPublishId) === 'public') partWithPublishId.authorWallet = owner;
-          notifyPublishState(options, publishState, partWithPublishId);
-        }
-        item.external = await buildVaultBalancePublishExternalBoc(item.messageType, {
-          owner_wallet: owner,
-          client_nonce: clientNonce,
-          max_charge: item.maxCharge,
-          publish: item.publish,
-          signingSecretKey: requireVaultAuthSecretKey(),
-          deploymentManifestHash: requireVaultDeploymentManifestHash(),
-        }, {
+        batch.clientNonce = clientNonce;
+        // ONE signed batch external for the whole group.
+        batchExternal = await buildBatchExternalFromPublishItems(batch, {
+          owner,
+          clientNonce,
           vaultAddress: requireVaultAddress(),
+          manifestHash: requireVaultDeploymentManifestHash(),
+          authSecretKey: requireVaultAuthSecretKey(),
         });
-        if (partWithPublishId) {
-          partWithPublishId.externalBoc = item.external.boc;
-          partWithPublishId.maxCharge = item.maxCharge.toString();
-          partWithPublishId.lastBroadcastAt = new Date().toISOString();
+        batch.external = batchExternal;
+        batch.batchPublishId = publishHashPlain(batchExternal.batchPublishId);
+        const broadcastAt = new Date().toISOString();
+        // Stamp each item with its per-entry EPI1 publish_id and the SHARED
+        // batch external/nonce: the confirm + broadcast-retry + dropped-recovery
+        // paths key on these per part, but all parts of a batch carry the SAME
+        // external boc and nonce (the one in-flight message they all ride).
+        for (let entryIndex = 0; entryIndex < batch.items.length; entryIndex += 1) {
+          const item = batch.items[entryIndex];
+          item.clientNonce = clientNonce;
+          const epi1 = publishHashPlain(batchExternal.entryPublishIds[entryIndex]);
+          item.publishId = epi1;
+          item.external = batchExternal;
+          const partWithPublishId = publishState.parts?.[item.partIndex];
+          if (partWithPublishId) {
+            partWithPublishId.publishId = epi1;
+            partWithPublishId.clientNonce = clientNonce.toString();
+            partWithPublishId.batchPublishId = batch.batchPublishId;
+            partWithPublishId.batchPartIndex = entryIndex;
+            if (publishPartKind(partWithPublishId) === 'public') partWithPublishId.authorWallet = owner;
+            partWithPublishId.externalBoc = batchExternal.boc;
+            partWithPublishId.maxCharge = (batchExternal.maxCharge ?? batch.items.reduce((sum, it) => sum + BigInt(it.maxCharge ?? 0n), 0n)).toString();
+            partWithPublishId.lastBroadcastAt = broadcastAt;
+            notifyPublishState(options, publishState, partWithPublishId);
+          }
         }
-        lastResult = await sendVaultExternalBoc(item.external);
-        item.result = lastResult;
+        lastResult = await sendVaultExternalBoc(batchExternal);
+        batch.result = lastResult;
+        for (const item of batch.items) item.result = lastResult;
         // The signed external is now out: this nonce is consumed from the
         // client's point of view even before the chain reflects it.
         raiseVaultPublishNonceFloor(owner, clientNonce + 1n);
-        notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
-        if (shouldConfirmVaultPublishNonceAfterSend(index, results.length, options)) {
+        for (const item of batch.items) {
+          notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_SENT));
+        }
+        if (shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)) {
           const nonceWaitOptions = {
             timeoutMs: options.timeoutMs ?? VAULT_PUBLISH_NONCE_CONFIRM_TIMEOUT_MS,
             requestTimeoutMs: options.requestTimeoutMs,
             queueTimeoutMs: options.queueTimeoutMs,
           };
-          if (index < results.length - 1) {
-            // Middle parts: the contract consumes one strictly sequential
-            // nonce per accepted external, so the next part cannot be signed
+          if (batchIndex < batches.length - 1) {
+            // Middle batches: the contract consumes one strictly sequential
+            // nonce per accepted batch, so the next batch cannot be signed
             // until this one is reflected on-chain.
             await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, nonceWaitOptions);
-            notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+            for (const item of batch.items) {
+              notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+            }
           } else {
-            // Final part: do not block CapsuleHub confirmation on the nonce
+            // Final batch: do not block CapsuleHub confirmation on the nonce
             // poll. Track it in the background; the barrier serializes any
             // following signed vault action instead of this await.
-            const partIndex = item.partIndex;
+            const finalPartIndexes = batch.items.map((item) => item.partIndex);
             const expectedNonce = clientNonce + 1n;
             installVaultPublishNonceBarrier((async () => {
               try {
                 await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions);
-                const part = publishState.parts?.[partIndex];
-                if (part && part.status === PUBLISH_PART_STATUS_SENT) {
-                  notifyPublishState(options, publishState, setPublishPartStatus(publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+                for (const partIndex of finalPartIndexes) {
+                  const part = publishState.parts?.[partIndex];
+                  if (part && part.status === PUBLISH_PART_STATUS_SENT) {
+                    notifyPublishState(options, publishState, setPublishPartStatus(publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
+                  }
                 }
               } catch {
-                // Confirmation retries re-broadcast and re-check this part;
+                // Confirmation retries re-broadcast and re-check this batch;
                 // a failed background nonce poll must not surface here.
               }
             })());
           }
         }
       } catch (error) {
-        const sentBeforeFailure = Boolean(item.result);
+        const sentBeforeFailure = Boolean(batch.result);
         const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
-        const part = setPublishPartStatus(
-          publishState,
-          item.partIndex,
-          sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED,
-          { error: String(error?.message ?? error) },
-        );
+        const nextStatus = sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED;
+        // The whole batch shares the fate of its single external.
+        for (const item of batch.items) {
+          const part = setPublishPartStatus(publishState, item.partIndex, nextStatus, {
+            error: String(error?.message ?? error),
+          });
+          notifyPublishState(options, publishState, part);
+        }
         if (publishState.submittedCount > 0 || sentBeforeFailure || ambiguousBroadcast) publishState.status = VAULT_PUBLISH_STATUS_PARTIAL;
-        notifyPublishState(options, publishState, part);
         const partialResult = {
           status: publishState.status === VAULT_PUBLISH_STATUS_PARTIAL ? VAULT_PUBLISH_STATUS_PARTIAL : 'vault-publish-failed',
           results,
@@ -16283,47 +16223,73 @@ async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}
     if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) return 0;
     throw error;
   }
+  // VPB2: every part of a batch shares ONE externalBoc + nonce. Group the retryable parts by that shared nonce
+  // so each distinct in-flight external is re-broadcast at most ONCE per pass; all parts of the batch then move
+  // together (the contract accepts or rejects the single external atomically).
+  const retryBatches = new Map();
   for (const part of retryableParts) {
-    if (publishConfirmDeadlineExpired(deadlineAt)) break;
     let clientNonce = null;
     try {
       clientNonce = BigInt(part.clientNonce);
     } catch {
       continue;
     }
+    const key = clientNonce.toString();
+    let group = retryBatches.get(key);
+    if (!group) {
+      group = { clientNonce, parts: [] };
+      retryBatches.set(key, group);
+    }
+    group.parts.push(part);
+  }
+  for (const group of retryBatches.values()) {
+    if (publishConfirmDeadlineExpired(deadlineAt)) break;
+    const { clientNonce, parts } = group;
     if (currentNonce !== null && currentNonce > clientNonce) {
-      setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
-        confirmedBy: 'vault_nonce',
-        error: null,
-      });
-      changed += 1;
+      // The chain consumed this batch's nonce: the external landed. Every part of the batch is on-chain.
+      for (const part of parts) {
+        setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_VAULT_SUBMITTED, {
+          confirmedBy: 'vault_nonce',
+          error: null,
+        });
+        changed += 1;
+      }
       continue;
     }
     if (currentNonce !== null && currentNonce < clientNonce) continue;
-    const retryCount = publishPartBroadcastRetryCount(part);
+    // Per-part retry budget/cooldown is identical across a batch (shared lastBroadcastAt/count); read it off the head.
+    const head = parts[0];
+    const retryCount = publishPartBroadcastRetryCount(head);
     if (retryCount >= PRIVATE_PUBLISH_BROADCAST_RETRY_LIMIT) continue;
-    if (publishPartLastBroadcastAgeMs(part) < PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS) continue;
+    if (publishPartLastBroadcastAgeMs(head) < PRIVATE_PUBLISH_BROADCAST_RETRY_AFTER_MS) continue;
     let result = null;
     try {
-      result = await sendVaultExternalBoc({ boc: part.externalBoc }, {
+      result = await sendVaultExternalBoc({ boc: head.externalBoc }, {
         requestTimeoutMs: sendTimeoutMs,
         queueTimeoutMs,
         skipIfRateLimited: true,
         priority: 'background',
       });
     } catch (error) {
-      part.lastBroadcastRetryError = shortUiErrorText(error, 'broadcast retry failed');
-      part.lastBroadcastRetryErrorAt = new Date().toISOString();
+      const retryError = shortUiErrorText(error, 'broadcast retry failed');
+      const retryErrorAt = new Date().toISOString();
+      for (const part of parts) {
+        part.lastBroadcastRetryError = retryError;
+        part.lastBroadcastRetryErrorAt = retryErrorAt;
+      }
       if (isTonRpcTransientError(error) || noteTonRpcRateLimit(error)) continue;
       throw error;
     }
-    part.lastBroadcastResult = result?.result ?? null;
-    setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
-      broadcastRetryCount: retryCount + 1,
-      lastBroadcastAt: new Date().toISOString(),
-      error: null,
-    });
-    changed += 1;
+    const broadcastAt = new Date().toISOString();
+    for (const part of parts) {
+      part.lastBroadcastResult = result?.result ?? null;
+      setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_SENT, {
+        broadcastRetryCount: retryCount + 1,
+        lastBroadcastAt: broadcastAt,
+        error: null,
+      });
+      changed += 1;
+    }
   }
   return changed;
 }
