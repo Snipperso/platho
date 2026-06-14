@@ -1,5 +1,7 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=25';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell } from './pwa-contract-transactions.mjs?v=25';
+
+const { parseBocBase64 } = tonCell;
 
 export class VaultTonRpcProviderError extends Error {
   constructor(message, options = {}) {
@@ -27,6 +29,7 @@ const TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
   'get_state',
   'get_user',
+  'get_user_receipts',
   'get_key_record',
   'get_canonical_publish_charge',
   'get_name_record',
@@ -37,6 +40,9 @@ const TONCENTER_RUN_GET_METHOD_CACHE_TTLS_MS = Object.freeze({
   get_global: 10_000,
   get_state: 10_000,
   get_user: 10_000,
+  // Receipt-ring confirmation polling is on the hot publish path; a stale read
+  // can re-confirm a slot the user just learned about, so keep the TTL short.
+  get_user_receipts: 5_000,
   get_wallet_data: 10_000,
   get_key_record: 300_000,
   get_receive_intent: 120_000,
@@ -63,6 +69,7 @@ const TONCENTER_RUN_GET_METHOD_PRIORITIES = Object.freeze({
   get_global: 'messages',
   get_state: 'messages',
   get_user: 'wallet',
+  get_user_receipts: 'wallet',
   get_wallet_data: 'wallet',
   get_pending_ath_withdrawal_for: 'wallet',
   get_key_record: 'profile',
@@ -934,6 +941,142 @@ export function decodeVaultUserViewStack(result) {
   };
 }
 
+// --- VPB2 batch-publish receipt ring -----------------------------------------------------------
+// Mirrors contracts/Vault.tact: RECEIPT_RING_K=20, the ReceiptSlot lifecycle codes, and the
+// AUX_BATCH_LEVEL sentinel. Exported so the confirmation reader/interpreter and callers share one
+// source of truth for the wire constants (no magic numbers leaking into app code).
+export const RECEIPT_RING_K = 20;
+export const ACT_PUBLISH_BATCH = 7;
+export const RES_PROCESSING = 0x00;
+export const RES_CONFIRMED = 0x01;
+export const RES_BOUNCED_REFUNDED = 0x02;
+export const RES_TOMBSTONED = 0x03;
+export const RJ_PART_SHAPE = 0x11;
+export const RJ_CLASS_OR_SUITE = 0x12;
+export const RJ_HASH_MISMATCH = 0x13;
+export const RJ_PAYLOAD_SHAPE = 0x14;
+export const RJ_DUPLICATE_ADJACENT = 0x15;
+export const RJ_UNDERPRICED = 0x16;
+export const RJ_BINDING = 0x17;
+export const RJ_ID_ZERO = 0x18;
+export const RJ_PENDING_COLLISION = 0x19;
+// 2^64-1: a batch-level aux (no specific failing part index).
+export const AUX_BATCH_LEVEL = (1n << 64n) - 1n;
+
+function tonCellBitReader(cell) {
+  let bitOffset = 0;
+  return {
+    remaining() {
+      return cell.bitLength - bitOffset;
+    },
+    loadBit() {
+      if (bitOffset >= cell.bitLength) throw new Error('TON cell bit underflow');
+      const bit = (cell.data[bitOffset >> 3] >> (7 - (bitOffset & 7))) & 1;
+      bitOffset += 1;
+      return bit;
+    },
+    loadUint(bitLength) {
+      let out = 0n;
+      for (let index = 0; index < bitLength; index += 1) out = (out << 1n) | BigInt(this.loadBit());
+      return out;
+    },
+  };
+}
+
+// Parse a TON hashmap (Dictionary) directly off its root edge — the layout a Tact getter tuple
+// returns for `map<...>` (Dictionary.loadDirect): the root cell IS the top edge, no leading
+// present bit. Keys are fixed-width `keyBits`; each value is carried as a single ref cell. Walks
+// the labelled patricia tree iteratively. Returns a Map<keyBigInt, valueCell>.
+function loadTonHashmapDirect(rootCell, keyBits) {
+  const out = new Map();
+  if (!rootCell) return out;
+  const stack = [{ cell: rootCell, keyPrefix: 0n, keyBitsLeft: keyBits }];
+  const seen = new Set();
+  while (stack.length > 0) {
+    const { cell, keyPrefix, keyBitsLeft } = stack.pop();
+    if (seen.has(cell)) throw new Error('TON hashmap has a cycle');
+    seen.add(cell);
+    const reader = tonCellBitReader(cell);
+    // hml_* label: read the prefix that this edge contributes to the key.
+    let label = 0n;
+    let labelLen = 0;
+    if (reader.loadBit() === 0) {
+      // hml_short$0: unary length, then `len` label bits.
+      let len = 0;
+      while (reader.loadBit() === 1) len += 1;
+      labelLen = len;
+      if (len > 0) label = reader.loadUint(len);
+    } else if (reader.loadBit() === 0) {
+      // hml_long$10: len as ceil(log2(keyBitsLeft+1)) bits, then `len` label bits.
+      const lenBits = Math.ceil(Math.log2(keyBitsLeft + 1));
+      const len = Number(reader.loadUint(lenBits));
+      labelLen = len;
+      if (len > 0) label = reader.loadUint(len);
+    } else {
+      // hml_same$11: a single repeated bit, then len as ceil(log2(keyBitsLeft+1)) bits.
+      const fill = BigInt(reader.loadBit());
+      const lenBits = Math.ceil(Math.log2(keyBitsLeft + 1));
+      const len = Number(reader.loadUint(lenBits));
+      labelLen = len;
+      label = fill === 1n ? (1n << BigInt(len)) - 1n : 0n;
+    }
+    const nextPrefix = (keyPrefix << BigInt(labelLen)) | label;
+    const remainingBits = keyBitsLeft - labelLen;
+    if (remainingBits === 0) {
+      // Leaf: the value is this cell's first ref (dictValueParser stores a ref-cell).
+      const valueCell = cell.refs[0];
+      if (!valueCell) throw new Error('TON hashmap leaf is missing its value ref');
+      out.set(nextPrefix, valueCell);
+    } else {
+      // Fork: two children (bit 0 / bit 1) consume one more key bit each.
+      const left = cell.refs[0];
+      const right = cell.refs[1];
+      if (!left || !right) throw new Error('TON hashmap fork is missing a child ref');
+      stack.push({ cell: left, keyPrefix: nextPrefix << 1n, keyBitsLeft: remainingBits - 1 });
+      stack.push({ cell: right, keyPrefix: (nextPrefix << 1n) | 1n, keyBitsLeft: remainingBits - 1 });
+    }
+  }
+  return out;
+}
+
+// ReceiptSlot wire layout (contracts/Vault.tact storeReceiptSlot): nonce(64) action(8) result(8)
+// aux(64) part_count(8) at(32). The leaf value cell carries the slot inline, byte-aligned.
+function decodeReceiptSlotCell(valueCell) {
+  const reader = tonCellBitReader(valueCell);
+  return {
+    nonce: reader.loadUint(64),
+    action: reader.loadUint(8),
+    result: reader.loadUint(8),
+    aux: reader.loadUint(64),
+    partCount: reader.loadUint(8),
+    at: reader.loadUint(32),
+  };
+}
+
+// Decode the get_user_receipts getter stack -> { exists, publishNonce, receipts }.
+// Stack layout (loadGetterTupleVaultUserReceiptsView): [exists(int/bool), publish_nonce(int),
+// receipts(cell|null)]. receipts is the dictionary root cell (`map<uint8, ReceiptSlot>`) or null.
+// receipts is keyed by slotKey = nonce % RECEIPT_RING_K (Number), values carry bigints.
+export function decodeVaultUserReceiptsViewStack(result) {
+  const stack = extractStack(result);
+  const exists = readStackBool(stack, 0, 'Vault user receipts exists');
+  const publishNonce = readStackInt(stack, 1, 'Vault user receipts publish_nonce');
+  const receipts = new Map();
+  const dictItem = stack[2];
+  const dictValue = dictItem === undefined ? null : stackItemValue(dictItem);
+  if (dictValue !== null && dictValue !== undefined) {
+    const dictType = stackItemType(dictItem);
+    if (typeof dictValue !== 'string' || !(dictType.includes('cell') || dictType.includes('slice'))) {
+      throw new Error('Vault user receipts dictionary must be a TON cell stack item');
+    }
+    const rootCell = parseBocBase64(dictValue);
+    for (const [key, valueCell] of loadTonHashmapDirect(rootCell, 8)) {
+      receipts.set(Number(key), decodeReceiptSlotCell(valueCell));
+    }
+  }
+  return { exists, publishNonce, receipts };
+}
+
 export function decodeVaultKeyRecordViewStack(result) {
   const stack = extractStack(result);
   const pqKemPubkeyBoc = readStackCellBoc(stack, 7, 'Vault key record pq_kem_pubkey');
@@ -1019,6 +1162,99 @@ export function decodeVaultGlobalViewStack(result) {
     airdrop_reward_per_message_ath: readStackInt(stack, 21, 'Vault global airdrop_reward_per_message_ath'),
     airdrop_total_allocation_ath: readStackInt(stack, 22, 'Vault global airdrop_total_allocation_ath'),
   };
+}
+
+// Batch-publish confirmation statuses the interpreter maps the receipt-ring slot onto.
+export const BATCH_PUBLISH_RECEIPT_STATUS = Object.freeze({
+  PROCESSING: 'processing',
+  CONFIRMED: 'confirmed',
+  BOUNCED: 'bounced',
+  TOMBSTONED: 'tombstoned',
+  REJECTED: 'rejected',
+  EVICTED: 'evicted',
+});
+
+const BATCH_PUBLISH_REJECT_CODES = Object.freeze(new Set([
+  RJ_PART_SHAPE,
+  RJ_CLASS_OR_SUITE,
+  RJ_HASH_MISMATCH,
+  RJ_PAYLOAD_SHAPE,
+  RJ_DUPLICATE_ADJACENT,
+  RJ_UNDERPRICED,
+  RJ_BINDING,
+  RJ_ID_ZERO,
+  RJ_PENDING_COLLISION,
+]));
+
+function toReceiptBigInt(value) {
+  return typeof value === 'bigint' ? value : BigInt(value);
+}
+
+// PURE: classify a single receipt-ring slot for an expected publish nonce. No transport, no state.
+// The ring is overwritten every RECEIPT_RING_K nonces, so a slot is only meaningful when it still
+// reports the nonce we sent for the batch action — otherwise it was evicted by a newer action.
+//   processing -> accepted + forwarded to the Hub, awaiting ACK
+//   confirmed  -> Hub stored the batch (firstEntryId = aux = entry id of part 0)
+//   bounced    -> Hub bounced, the call value was refunded
+//   tombstoned -> a stale pending was pruned (a late ACK can still confirm it)
+//   rejected   -> post-accept reject WITH refund (rejectCode = result; failPartIndex = aux, or
+//                 null at AUX_BATCH_LEVEL for batch-level failures)
+//   evicted    -> slot missing, nonce mismatch, or a non-batch action overwrote the slot
+export function interpretBatchPublishReceipt(slot, expectedNonce) {
+  const wantNonce = toReceiptBigInt(expectedNonce);
+  if (
+    !slot
+    || toReceiptBigInt(slot.nonce) !== wantNonce
+    || toReceiptBigInt(slot.action) !== BigInt(ACT_PUBLISH_BATCH)
+  ) {
+    return { status: BATCH_PUBLISH_RECEIPT_STATUS.EVICTED };
+  }
+  const result = Number(toReceiptBigInt(slot.result));
+  const aux = toReceiptBigInt(slot.aux);
+  const partCount = slot.partCount === undefined || slot.partCount === null
+    ? undefined
+    : Number(toReceiptBigInt(slot.partCount));
+  const base = partCount === undefined ? {} : { partCount };
+  if (result === RES_PROCESSING) {
+    return { status: BATCH_PUBLISH_RECEIPT_STATUS.PROCESSING, ...base };
+  }
+  if (result === RES_CONFIRMED) {
+    return { status: BATCH_PUBLISH_RECEIPT_STATUS.CONFIRMED, firstEntryId: aux, ...base };
+  }
+  if (result === RES_BOUNCED_REFUNDED) {
+    return { status: BATCH_PUBLISH_RECEIPT_STATUS.BOUNCED, ...base };
+  }
+  if (result === RES_TOMBSTONED) {
+    return { status: BATCH_PUBLISH_RECEIPT_STATUS.TOMBSTONED, ...base };
+  }
+  if (BATCH_PUBLISH_REJECT_CODES.has(result)) {
+    return {
+      status: BATCH_PUBLISH_RECEIPT_STATUS.REJECTED,
+      rejectCode: result,
+      failPartIndex: aux === AUX_BATCH_LEVEL ? null : aux,
+      ...base,
+    };
+  }
+  // An unknown/unmapped result code on a matching batch slot: treat as evicted (cannot be trusted).
+  return { status: BATCH_PUBLISH_RECEIPT_STATUS.EVICTED };
+}
+
+// Transport-thin reader: fetch the receipt ring for `owner`, pick the slot at expectedNonce % K,
+// and interpret it. `provider` is anything exposing getUserReceipts (the Vault TON RPC provider).
+export async function readBatchPublishReceipt(provider, vaultAddress, owner, expectedNonce, callOptions = {}) {
+  if (typeof provider?.getUserReceipts !== 'function') {
+    throw new VaultTonRpcProviderError('Vault provider does not expose getUserReceipts');
+  }
+  const wantNonce = toReceiptBigInt(expectedNonce);
+  const view = await provider.getUserReceipts(owner, {
+    ...callOptions,
+    ...(vaultAddress ? { vaultAddress } : {}),
+  });
+  const slotKey = Number(wantNonce % BigInt(RECEIPT_RING_K));
+  const slot = view?.receipts instanceof Map
+    ? view.receipts.get(slotKey)
+    : view?.receipts?.[slotKey];
+  return interpretBatchPublishReceipt(slot ?? null, wantNonce);
 }
 
 export function createTonCenterV3VaultTransport(options = {}) {
@@ -1731,6 +1967,17 @@ export function createVaultTonRpcProvider(options = {}) {
       return decodeVaultUserViewStack(await transport.runGetMethod({
         address: vaultAddress,
         method: 'get_user',
+        stack: [stackAddress(ownerWallet)],
+        ...runGetCallOptions(callOptions),
+      }));
+    },
+    async getUserReceipts(ownerWallet, callOptions = {}) {
+      const transport = resolveTransport(options);
+      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
+      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
+      return decodeVaultUserReceiptsViewStack(await transport.runGetMethod({
+        address: vaultAddress,
+        method: 'get_user_receipts',
         stack: [stackAddress(ownerWallet)],
         ...runGetCallOptions(callOptions),
       }));
