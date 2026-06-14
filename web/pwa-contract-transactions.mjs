@@ -101,7 +101,11 @@ export const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 export const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
 export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 30_000_000n;
 export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 61_000_000n;
-export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 63_000_000n;
+// UsernameRegistry now retains 511M nanotons per mint (6M endowment + 500M NFT-item deploy reserve [0.5 TON
+// prepaid storage, ~250+ years] + 1M ack + 4M state-growth), up from the old 32M. The Vault-funded mint hold is
+// the registry retained value plus the Vault local exec reserve (6M) and ATH-wallet forwarding overhead margin.
+// ~0.5 TON more than the old 63M hold.
+export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 563_000_000n;
 const UINT128_MOD = 1n << 128n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({

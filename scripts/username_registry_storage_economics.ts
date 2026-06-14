@@ -23,11 +23,19 @@ const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const PRICE_4 = 10_000_000_000_000n;
 const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
-const USERNAME_NOTIFY_VALUE = 32_000_000n;
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6_000_000n;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
-const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 21_000_000n;
+const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 500_000_000n;
 const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
+// The registry retains 6M endowment + 500M item deploy reserve + 1M ack value + 4M state-growth reserve = 511M,
+// then forwards the 500M deploy reserve to the item. The notify message must carry the full retained value plus a
+// gas/fwd-fee margin for the registry's own accept + deploy send.
+const USERNAME_RETAINED_VALUE =
+  USERNAME_PENDING_MINT_STORAGE_ENDOWMENT +
+  USERNAME_NFT_ITEM_DEPLOY_RESERVE +
+  USERNAME_ATH_NOTIFICATION_ACK_VALUE +
+  USERNAME_STATE_GROWTH_EXEC_RESERVE;
+const USERNAME_NOTIFY_VALUE = USERNAME_RETAINED_VALUE + 89_000_000n; // 600M total: full retained value + thick exec/fwd margin
 const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3_000_000n;
 const USERNAME_ITEM_ACK_EXEC_RESERVE = 1_000_000n;
 const USERNAME_ITEM_ACK_FWD_FEE_ALLOWANCE = 100_000n;

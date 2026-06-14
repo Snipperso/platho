@@ -151,10 +151,11 @@ contract UsernameNFTItem {
     }
 
     fun snakeDescriptionCell(): Cell {
-        return beginCell()
-            .storeUint(0, 8)
-            .storeUint(0x506c6174686f20757365726e616d65, 120) // "Platho username"
-            .endCell();
+        // TEP-64 description shown in wallets/marketplaces. Generic value-prop — the `name` key carries the
+        // actual username. beginTailString writes the 0x00 snake marker (same as the image keys).
+        let b: StringBuilder = beginTailString();
+        b.append("Private correspondence is a right, not a privilege. This is a username NFT for Platho — the anonymous, post-quantum-encrypted, uncensorable messenger. A permanent, transferable, fully on-chain handle: the name others reach you by, held by no one but you. platho.app");
+        return b.toCell();
     }
 
     fun individualContent(): Cell {

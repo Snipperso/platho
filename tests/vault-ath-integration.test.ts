@@ -56,7 +56,7 @@ const PROFILE_AVATAR_TON_CHARGE = 61_000_000n;
 const PROFILE_AVATAR_LOCAL_EXEC_RESERVE = 6_000_000n;
 const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n;
 const USERNAME_PRICE_6_PLUS = 100_000_000_000n;
-const USERNAME_MINT_TON_CHARGE = 63_000_000n;
+const USERNAME_MINT_TON_CHARGE = 563_000_000n;
 const USERNAME_MINT_LOCAL_EXEC_RESERVE = 6_000_000n;
 const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n;
 const USERNAME_NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -1528,9 +1528,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const ctx = await setupUsernameMintRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
 
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.2'),
+      amount: toNano('1'),
     });
     await depositAth({
       vault: ctx.vault,
@@ -1612,9 +1612,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     expect(ctx.recipientUsernameAthWallet.equals(ctx.officialUsernameAthWallet)).toBe(false);
 
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.2'),
+      amount: toNano('1'),
     });
     await depositAth({
       vault: ctx.vault,
@@ -1903,9 +1903,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const ctx = await setupUsernameMintNoAckRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
 
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.2'),
+      amount: toNano('1'),
     });
     await depositAth({
       vault: ctx.vault,
@@ -1977,9 +1977,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const ctx = await setupUsernameMintNoAckRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
 
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.2'),
+      amount: toNano('1'),
     });
     await depositAth({
       vault: ctx.vault,
@@ -2054,9 +2054,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const itemAddress = await ctx.usernameRegistry.getGetUsernameItemAddress(hash);
 
     await installRejectingContractAt(ctx.blockchain, itemAddress, toNano('0.05'));
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('1.05') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.2'),
+      amount: toNano('1'),
     });
     await depositAth({
       vault: ctx.vault,
@@ -2138,9 +2138,9 @@ describe('Vault ATH integration with production ATHWallet', () => {
     const ctx = await setupUsernameMintRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
 
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.42') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('2.05') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.4'),
+      amount: toNano('2'),
     });
     await depositAth({
       vault: ctx.vault,

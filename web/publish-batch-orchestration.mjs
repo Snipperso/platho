@@ -13,7 +13,7 @@ import {
   batchChargeFloor,
   buildBatchPublishExternalBoc,
   buildBatchPublishPartsRoot,
-} from './pwa-contract-transactions.mjs?v=26';
+} from './pwa-contract-transactions.mjs?v=27';
 import { batchHoldNanotons } from './message-pricing-policy.mjs?v=12';
 
 export { MAX_BATCH_PARTS };

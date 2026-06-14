@@ -22,7 +22,7 @@ const PRICE_6_PLUS = 100_000_000_000n;
 const HALF_PRICE = 50_000_000_000n;
 
 const PENDING_MINT_STORAGE = 6_000_000n;
-const NFT_ITEM_DEPLOY_RESERVE = 21_000_000n;
+const NFT_ITEM_DEPLOY_RESERVE = 500_000_000n;
 const ATH_NOTIFICATION_ACK_VALUE = 1_000_000n;
 const STATE_GROWTH_EXEC_RESERVE = 4_000_000n;
 const ATH_TRANSFER_EXEC_RESERVE = 30_000_000n;
@@ -204,7 +204,7 @@ async function sendMint(registry: any, officialSender: any, ownerWallet: Address
   } as AthTransferNotificationVaultMintUsername);
 }
 
-async function sendMintFromAddress(blockchain: Blockchain, registry: any, officialAddress: Address, ownerWallet: Address, name: string, amount: bigint, payerWallet: Address, value = toNano('0.15')) {
+async function sendMintFromAddress(blockchain: Blockchain, registry: any, officialAddress: Address, ownerWallet: Address, name: string, amount: bigint, payerWallet: Address, value = toNano('0.6')) {
   await registry.send(blockchain.sender(officialAddress), { value }, {
     $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: 88n,

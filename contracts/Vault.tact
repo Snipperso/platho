@@ -95,11 +95,11 @@ const VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRICE_4_CHARS: Int = 10000000000000;
 const USERNAME_PRICE_5_CHARS: Int = 1000000000000;
 const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;
-const USERNAME_NOTIFY_VALUE: Int = 32000000;
+const USERNAME_NOTIFY_VALUE: Int = 532000000; // >= UsernameRegistry mint retainedValue (6M endowment + 500M NFT deploy reserve + 1M ack + 4M state-growth = 511M); the Vault forwards this to the registry via the ATH wallet to fund a username mint + its ~250yr NFT storage.
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
 const VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE: Int = 6000000;
-const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 57000000;
+const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 557000000; // USERNAME_NOTIFY_VALUE (532M) + ~25M ATH-wallet exec/fwd overhead. usernameMintTonCharge = 6M local exec + this = 563M (the client mint TON charge).
 const VAULT_BINDING_CAPSULE_HUB: Int = 1;
 const VAULT_BINDING_PROFILE_REGISTRY: Int = 2;
 const VAULT_BINDING_USERNAME_REGISTRY: Int = 4;
