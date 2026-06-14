@@ -9,7 +9,7 @@ const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE: Int = 1000000;
 const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 21000000;
 const ATH_VAULT_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 30000000;
-const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 2000000;
+const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 20000000; // ~100+ yr of mainnet config-18 rent for one processed_notifications dict entry (~67k nanoton/cell/yr; ~2-3 cells) + cushion. Funded per-transfer by the sender; the replay tombstone is self-funding for the contract's lifetime.
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE: Int = 7000000;
@@ -266,14 +266,14 @@ struct PendingAthTransferNotification {
     response_destination: Address;
     response_ack_value: Int as uint64;
     amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingAthOutgoingTransfer {
     recipient_wallet: Address;
     response_destination: Address;
     amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 contract ATHWallet {

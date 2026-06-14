@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell, VAULT_PUBLISH_KIND } from './pwa-contract-transactions.mjs?v=27';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell, VAULT_PUBLISH_KIND } from './pwa-contract-transactions.mjs?v=28';
 import { BATCH_SHARED_BASE_HOLD_NANOTONS, capsulePerPartHoldNanotons } from './message-pricing-policy.mjs?v=12';
 
 const { parseBocBase64 } = tonCell;
@@ -1041,7 +1041,7 @@ function loadTonHashmapDirect(rootCell, keyBits) {
 }
 
 // ReceiptSlot wire layout (contracts/Vault.tact storeReceiptSlot): nonce(64) action(8) result(8)
-// aux(64) part_count(8) at(32). The leaf value cell carries the slot inline, byte-aligned.
+// aux(64) part_count(8) at(64). The leaf value cell carries the slot inline, byte-aligned.
 function decodeReceiptSlotCell(valueCell) {
   const reader = tonCellBitReader(valueCell);
   return {
@@ -1050,7 +1050,7 @@ function decodeReceiptSlotCell(valueCell) {
     result: reader.loadUint(8),
     aux: reader.loadUint(64),
     partCount: reader.loadUint(8),
-    at: reader.loadUint(32),
+    at: reader.loadUint(64),
   };
 }
 

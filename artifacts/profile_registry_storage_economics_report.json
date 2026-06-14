@@ -3,26 +3,26 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "profile_registry": "11a80e2eaf22cf64b6d78e147d44c51174a929c06e8d8bea2e09d2fafa489569"
+    "profile_registry": "6a1de90ff8834d25bc34a74221a161290ab3f3e2cfdbfb2d73dd407adc7eecef"
   },
   "note": "Sandbox evidence that accepted ProfileRegistry avatar updates retain enough TON after ACK/refund actions to cover the permanent avatar record and owner-version map endowments. This is not a mainnet rent oracle; it is a release gate against underfunded permanent avatar pointer growth.",
   "constants": {
-    "profile_avatar_record_storage_endowment_nanotons": "6000000",
-    "profile_owner_version_storage_endowment_nanotons": "3000000",
+    "profile_avatar_record_storage_endowment_nanotons": "36000000",
+    "profile_owner_version_storage_endowment_nanotons": "9000000",
     "profile_state_growth_exec_reserve_nanotons": "3000000",
     "profile_ath_notification_ack_value_nanotons": "1000000",
     "profile_excess_refund_forward_reserve_nanotons": "200000",
-    "profile_first_retained_model_nanotons": "13000000",
-    "profile_repeat_retained_model_nanotons": "10000000",
+    "profile_first_retained_model_nanotons": "49000000",
+    "profile_repeat_retained_model_nanotons": "40000000",
     "minimum_storage_margin_nanotons": "1000000"
   },
   "cases": [
     {
       "label": "VAULT_FIRST_AVATAR",
       "updates": 1,
-      "raw_balance_delta_nanotons": "10302399",
-      "expected_permanent_endowment_nanotons": "9000000",
-      "expected_retained_model_nanotons": "13000000",
+      "raw_balance_delta_nanotons": "46302399",
+      "expected_permanent_endowment_nanotons": "45000000",
+      "expected_retained_model_nanotons": "49000000",
       "retained_margin_vs_permanent_endowment_nanotons": "1302399",
       "profile_count": "1",
       "avatar_record_count": "1"
@@ -30,9 +30,9 @@
     {
       "label": "VAULT_REPEAT_AVATAR",
       "updates": 1,
-      "raw_balance_delta_nanotons": "7213999",
-      "expected_permanent_endowment_nanotons": "6000000",
-      "expected_retained_model_nanotons": "10000000",
+      "raw_balance_delta_nanotons": "37213999",
+      "expected_permanent_endowment_nanotons": "36000000",
+      "expected_retained_model_nanotons": "40000000",
       "retained_margin_vs_permanent_endowment_nanotons": "1213999",
       "profile_count": "1",
       "avatar_record_count": "2"
@@ -40,9 +40,9 @@
     {
       "label": "VAULT_MANY_OWNERS_12",
       "updates": 12,
-      "raw_balance_delta_nanotons": "120562122",
-      "expected_permanent_endowment_nanotons": "108000000",
-      "expected_retained_model_nanotons": "156000000",
+      "raw_balance_delta_nanotons": "552562122",
+      "expected_permanent_endowment_nanotons": "540000000",
+      "expected_retained_model_nanotons": "588000000",
       "retained_margin_vs_permanent_endowment_nanotons": "12562122",
       "profile_count": "12",
       "avatar_record_count": "12"
@@ -50,9 +50,9 @@
     {
       "label": "VAULT_MANY_UPDATES_ONE_OWNER_10",
       "updates": 10,
-      "raw_balance_delta_nanotons": "74561723",
-      "expected_permanent_endowment_nanotons": "63000000",
-      "expected_retained_model_nanotons": "103000000",
+      "raw_balance_delta_nanotons": "380561723",
+      "expected_permanent_endowment_nanotons": "369000000",
+      "expected_retained_model_nanotons": "409000000",
       "retained_margin_vs_permanent_endowment_nanotons": "11561723",
       "profile_count": "1",
       "avatar_record_count": "10"

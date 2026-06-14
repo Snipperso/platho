@@ -127,7 +127,7 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=27';
+} from './pwa-contract-transactions.mjs?v=28';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,

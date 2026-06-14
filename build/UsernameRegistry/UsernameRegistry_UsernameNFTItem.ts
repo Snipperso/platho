@@ -3259,7 +3259,7 @@ export function storePendingAthTransferNotification(src: PendingAthTransferNotif
         b_0.storeAddress(src.response_destination);
         b_0.storeUint(src.response_ack_value, 64);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.created_at, 32);
+        b_0.storeUint(src.created_at, 64);
     };
 }
 
@@ -3269,7 +3269,7 @@ export function loadPendingAthTransferNotification(slice: Slice) {
     const _response_destination = sc_0.loadAddress();
     const _response_ack_value = sc_0.loadUintBig(64);
     const _amount = sc_0.loadUintBig(128);
-    const _created_at = sc_0.loadUintBig(32);
+    const _created_at = sc_0.loadUintBig(64);
     return { $$type: 'PendingAthTransferNotification' as const, sender_owner: _sender_owner, response_destination: _response_destination, response_ack_value: _response_ack_value, amount: _amount, created_at: _created_at };
 }
 
@@ -3326,7 +3326,7 @@ export function storePendingAthOutgoingTransfer(src: PendingAthOutgoingTransfer)
         b_0.storeAddress(src.recipient_wallet);
         b_0.storeAddress(src.response_destination);
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.created_at, 32);
+        b_0.storeUint(src.created_at, 64);
     };
 }
 
@@ -3335,7 +3335,7 @@ export function loadPendingAthOutgoingTransfer(slice: Slice) {
     const _recipient_wallet = sc_0.loadAddress();
     const _response_destination = sc_0.loadAddress();
     const _amount = sc_0.loadUintBig(128);
-    const _created_at = sc_0.loadUintBig(32);
+    const _created_at = sc_0.loadUintBig(64);
     return { $$type: 'PendingAthOutgoingTransfer' as const, recipient_wallet: _recipient_wallet, response_destination: _response_destination, amount: _amount, created_at: _created_at };
 }
 
@@ -3808,7 +3808,7 @@ export function storePendingUsernameMint(src: PendingUsernameMint) {
         const b_1 = new Builder();
         b_1.storeAddress(src.item_address);
         b_1.storeUint(src.item_deploy_value, 128);
-        b_1.storeUint(src.created_at, 32);
+        b_1.storeUint(src.created_at, 64);
         b_0.storeRef(b_1.endCell());
     };
 }
@@ -3823,7 +3823,7 @@ export function loadPendingUsernameMint(slice: Slice) {
     const sc_1 = sc_0.loadRef().beginParse();
     const _item_address = sc_1.loadAddress();
     const _item_deploy_value = sc_1.loadUintBig(128);
-    const _created_at = sc_1.loadUintBig(32);
+    const _created_at = sc_1.loadUintBig(64);
     return { $$type: 'PendingUsernameMint' as const, query_id: _query_id, sender_key: _sender_key, owner_wallet: _owner_wallet, name_hash: _name_hash, price_paid: _price_paid, item_address: _item_address, item_deploy_value: _item_deploy_value, created_at: _created_at };
 }
 
@@ -3887,7 +3887,7 @@ export function storeNameRecord(src: NameRecord) {
         const b_0 = builder;
         b_0.storeAddress(src.minter_wallet);
         b_0.storeAddress(src.item_address);
-        b_0.storeUint(src.registered_at, 32);
+        b_0.storeUint(src.registered_at, 64);
     };
 }
 
@@ -3895,7 +3895,7 @@ export function loadNameRecord(slice: Slice) {
     const sc_0 = slice;
     const _minter_wallet = sc_0.loadAddress();
     const _item_address = sc_0.loadAddress();
-    const _registered_at = sc_0.loadUintBig(32);
+    const _registered_at = sc_0.loadUintBig(64);
     return { $$type: 'NameRecord' as const, minter_wallet: _minter_wallet, item_address: _item_address, registered_at: _registered_at };
 }
 
@@ -4295,7 +4295,7 @@ export function storePendingAthTreasuryFlush(src: PendingAthTreasuryFlush) {
         const b_0 = builder;
         b_0.storeUint(src.amount, 128);
         b_0.storeAddress(src.recipient_ath_wallet);
-        b_0.storeUint(src.created_at, 32);
+        b_0.storeUint(src.created_at, 64);
     };
 }
 
@@ -4303,7 +4303,7 @@ export function loadPendingAthTreasuryFlush(slice: Slice) {
     const sc_0 = slice;
     const _amount = sc_0.loadUintBig(128);
     const _recipient_ath_wallet = sc_0.loadAddress();
-    const _created_at = sc_0.loadUintBig(32);
+    const _created_at = sc_0.loadUintBig(64);
     return { $$type: 'PendingAthTreasuryFlush' as const, amount: _amount, recipient_ath_wallet: _recipient_ath_wallet, created_at: _created_at };
 }
 
@@ -4350,14 +4350,14 @@ export function storePendingAthBurnFlush(src: PendingAthBurnFlush) {
     return (builder: Builder) => {
         const b_0 = builder;
         b_0.storeUint(src.amount, 128);
-        b_0.storeUint(src.created_at, 32);
+        b_0.storeUint(src.created_at, 64);
     };
 }
 
 export function loadPendingAthBurnFlush(slice: Slice) {
     const sc_0 = slice;
     const _amount = sc_0.loadUintBig(128);
-    const _created_at = sc_0.loadUintBig(32);
+    const _created_at = sc_0.loadUintBig(64);
     return { $$type: 'PendingAthBurnFlush' as const, amount: _amount, created_at: _created_at };
 }
 
@@ -4945,8 +4945,8 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"PendingAthTransferNotificationView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingAthTransferNotification","header":null,"fields":[{"name":"sender_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_ack_value","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"PendingAthOutgoingTransfer","header":null,"fields":[{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWallet$Data","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pending_notifications","type":{"kind":"dict","key":"int","value":"PendingAthTransferNotification","valueFormat":"ref"}},{"name":"processed_notifications","type":{"kind":"dict","key":"int","value":"int"}},{"name":"pending_outgoing_transfers","type":{"kind":"dict","key":"int","value":"PendingAthOutgoingTransfer","valueFormat":"ref"}}]},
     {"name":"BindOfficialAthWallet","header":1715335229,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"BindUsernameVault","header":1621496068,"fields":[{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}}]},
@@ -4955,14 +4955,14 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"FlushBurnAthDue","header":3919758027,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PrunePendingUsernameMint","header":932634413,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}}]},
     {"name":"UsernameRegistryTopUpStorageReserve","header":179986205,"fields":[]},
-    {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"NameRecord","header":null,"fields":[{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingUsernameMint","header":null,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"price_paid","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"NameRecord","header":null,"fields":[{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"UsernameRegistryGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_record_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"burn_due_ath","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"pending_mint_stale_ttl","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernamePriceView","header":null,"fields":[{"name":"valid_length","type":{"kind":"simple","type":"bool","optional":false}},{"name":"price_ath_atomic","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameNameRecordView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"minter_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"registered_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingUsernameMintView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"query_id","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sender_key","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"name_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price_paid","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"item_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"item_deploy_value","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
-    {"name":"PendingAthTreasuryFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
-    {"name":"PendingAthBurnFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
+    {"name":"PendingAthTreasuryFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"PendingAthBurnFlush","header":null,"fields":[{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"created_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"PendingAthTreasuryFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"recipient_ath_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"PendingAthBurnFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameCollectionDataView","header":null,"fields":[{"name":"next_item_index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
@@ -5048,7 +5048,7 @@ export const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1000000n;
 export const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE = 21000000n;
 export const ATH_VAULT_PROFILE_AVATAR_FWD_FEE_ALLOWANCE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_MIN_VALUE = 30000000n;
-export const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2000000n;
+export const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 20000000n;
 export const ATH_INTERNAL_TRANSFER_EXEC_RESERVE = 2000000n;
 export const ATH_BURN_NOTIFICATION_EXEC_RESERVE = 2000000n;
 export const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7000000n;
@@ -5071,7 +5071,7 @@ export const USERNAME_PRICE_6_PLUS_CHARS = 100000000000n;
 export const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT = 6000000n;
 export const USERNAME_STATE_GROWTH_EXEC_RESERVE = 4000000n;
 export const USERNAME_NFT_ITEM_DEPLOY_RESERVE = 500000000n;
-export const USERNAME_ATH_TRANSFER_EXEC_RESERVE = 30000000n;
+export const USERNAME_ATH_TRANSFER_EXEC_RESERVE = 48000000n;
 export const USERNAME_ATH_BURN_EXEC_RESERVE = 5000000n;
 export const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE = 2000000n;
 export const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE = 2000000n;

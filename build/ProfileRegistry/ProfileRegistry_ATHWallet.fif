@@ -490,7 +490,7 @@ PROGRAM{
     STSLICE
     64 STU
     128 STU
-    32 STU
+    64 STU
   }>
   $PendingAthTransferNotification$_store_cell PROCINLINE:<{
     5 -ROLL
@@ -502,7 +502,7 @@ PROGRAM{
     LDMSGADDR
     64 LDU
     128 LDU
-    32 LDU
+    64 LDU
     5 -ROLL
   }>
   $PendingAthTransferNotification$_as_optional PROCINLINE:<{
@@ -526,7 +526,7 @@ PROGRAM{
     STSLICE
     STSLICE
     128 STU
-    32 STU
+    64 STU
   }>
   $PendingAthOutgoingTransfer$_store_cell PROCINLINE:<{
     4 -ROLL
@@ -537,7 +537,7 @@ PROGRAM{
     LDMSGADDR
     LDMSGADDR
     128 LDU
-    32 LDU
+    64 LDU
     4 -ROLL
   }>
   $PendingAthOutgoingTransfer$_as_optional PROCINLINE:<{
@@ -777,7 +777,7 @@ PROGRAM{
     ADD
     7000000 PUSHINT
     ADD
-    2000000 PUSHINT
+    20000000 PUSHINT
     ADD
   }>
   $ATHWallet$_fun_vault_notify_transfer_value PROCREF:<{
@@ -787,7 +787,7 @@ PROGRAM{
     ADD
     7000000 PUSHINT
     ADD
-    2000000 PUSHINT
+    20000000 PUSHINT
     ADD
     2000000 PUSHINT
     ADD
@@ -1676,7 +1676,7 @@ PROGRAM{
       s6 s7 PUSH2
       GEQ
       THROWANYIFNOT
-      30000000 PUSHINT
+      48000000 PUSHINT
       14204 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -2350,7 +2350,7 @@ PROGRAM{
         GEQ
       }>
       THROWANYIFNOT
-      12000000 PUSHINT
+      30000000 PUSHINT
       s11 PUSH
       ADD
       21000000 PUSHINT
@@ -2495,7 +2495,7 @@ PROGRAM{
       14212 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      8000000 PUSHINT
+      26000000 PUSHINT
       GEQ
       THROWANYIFNOT
       s3 s4 XCPU
@@ -2612,7 +2612,7 @@ PROGRAM{
         ADD
         7000000 PUSHINT
         ADD
-        2000000 PUSHINT
+        20000000 PUSHINT
         ADD
         GEQ
         THROWANYIFNOT
@@ -2684,7 +2684,7 @@ PROGRAM{
         14717 PUSHINT
         __tact_context_get INLINECALLDICT
         $Context$_get_value INLINECALLDICT
-        5000000 PUSHINT
+        23000000 PUSHINT
         GEQ
         THROWANYIFNOT
         s3 s7 XCPU
@@ -2798,7 +2798,7 @@ PROGRAM{
       ADD
       7000000 PUSHINT
       ADD
-      2000000 PUSHINT
+      20000000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT
@@ -2977,7 +2977,7 @@ PROGRAM{
       ADD
       7000000 PUSHINT
       ADD
-      2000000 PUSHINT
+      20000000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT
@@ -3148,7 +3148,7 @@ PROGRAM{
       ADD
       7000000 PUSHINT
       ADD
-      2000000 PUSHINT
+      20000000 PUSHINT
       ADD
       GEQ
       THROWANYIFNOT

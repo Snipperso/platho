@@ -804,6 +804,43 @@ describe('Production BuybackBurn candidate', () => {
     expect(state.reserve_due_ton).toBe(0n);
   });
 
+  // 2106/uint64 regression: pending_deadline (= now() + DEADLINE_MAX_AHEAD_SECONDS) is a now()-sourced field
+  // widened from `Int as uint32` to `Int as uint64`. Running the swap at the 2106 boundary (now = 0xFFFFFFFE)
+  // makes the stored deadline = 0xFFFFFFFE + 900 = 4294968194, which EXCEEDS 2^32. A uint32 column could not
+  // hold this value (store would trap with a range error / exit 5), so this test MUST fail if pending_deadline
+  // were still uint32. It proves the chunk executes successfully and the >2^32 deadline round-trips exactly.
+  it('BUYBACK-UINT64-2106: a route deadline past the 2106 uint32 ceiling is stored and read without overflow', async () => {
+    const env = await setup();
+    await freezeAndSeal(env);
+    await acceptReserve(env);
+
+    // 0xFFFFFFFE is the largest block time the sandbox/TVM gen_utime can represent; + 900s overflows uint32.
+    const boundaryNow = 0xFFFFFFFEn;
+    env.blockchain.now = Number(boundaryNow);
+    const expectedDeadline = boundaryNow + DEADLINE_MAX_AHEAD_SECONDS;
+    expect(expectedDeadline).toBeGreaterThan(0xFFFFFFFFn); // genuinely past the uint32 ceiling
+
+    const result = await env.buyback.send(env.operator.getSender(), { value: toNano('0.1') }, {
+      $$type: 'ExecuteBuybackChunk',
+      query_id: 1n,
+      quote_out_atomic_ath: 100_000n,
+      dex_min_out_atomic_ath: 95_000n,
+    } as ExecuteBuybackChunk);
+
+    // The chunk must execute (no exit 5 range trap when storing the post-2106 deadline).
+    expect(findTransaction(result.transactions, {
+      from: env.buyback.address,
+      to: env.stonfiPtonWallet.address,
+      op: OP_PTON_TON_TRANSFER,
+    })).toBeDefined();
+
+    const state = await env.buyback.getGetBuybackBurnState();
+    expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
+    // The uint64 column holds the full > 2^32 value; under the old uint32 this round-trip would be impossible.
+    expect(state.pending_deadline).toBe(expectedDeadline);
+    expect(state.pending_deadline).toBeGreaterThan(0xFFFFFFFFn);
+  });
+
   it('BUYBACK-04J: no ATH notification and no route refund remains pending after grace', async () => {
     const env = await setup();
     await freezeAndSeal(env);

@@ -528,9 +528,9 @@ describe('PWA contract transaction builders', () => {
   });
 
   it('PWA-TX-07: quotes exact ATHWallet generic values used by the PWA', () => {
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(30_000_000n);
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(48_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(51_000_000n);
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(69_000_000n);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductMintUsername', { notify_value: 32_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductProfileAvatar', { notify_value: 30_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(ATH_WALLET_RESERVES_NANOTONS.transferNotifyMinValue).toBe(30_000_000n);
@@ -544,7 +544,7 @@ describe('PWA contract transaction builders', () => {
     const depositNotifyValue = 32_000_000n;
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', {
       notify_value: depositNotifyValue,
-    })).toBe(53_000_000n);
+    })).toBe(71_000_000n);
 
     const athMessage = createAthWalletMessage('ATHTransferRequestWithNotify', {
       query_id: 16n,
@@ -557,7 +557,7 @@ describe('PWA contract transaction builders', () => {
       athWalletAddress: ATH_WALLET,
     });
 
-    expect(athMessage.amount).toBe('53000000');
+    expect(athMessage.amount).toBe('71000000');
     expect(athMessage.payload).toBe(generatedBody(storeATHTransferRequestWithNotify({
       $$type: 'ATHTransferRequestWithNotify',
       query_id: 16n,
@@ -579,7 +579,7 @@ describe('PWA contract transaction builders', () => {
       athWalletAddress: ATH_WALLET,
     });
     expect(athMessage.address).toBe(ATH_WALLET);
-    expect(athMessage.amount).toBe('30000000');
+    expect(athMessage.amount).toBe('48000000');
     expect(athMessage.payload).toBe(generatedBody(storeATHTransferRequest({
       $$type: 'ATHTransferRequest',
       query_id: 11n,
@@ -664,7 +664,7 @@ describe('PWA contract transaction builders', () => {
     ))[0];
 
     expect(PROFILE_AVATAR_PRICE_ATH).toBe(100_000_000_000n);
-    expect(PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS).toBe(61_000_000n);
+    expect(PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS).toBe(115_000_000n);
     expect(ed25519.verify(
       Buffer.from(built.signature, 'hex'),
       Buffer.from(built.signedDataHash, 'hex'),
@@ -727,7 +727,7 @@ describe('PWA contract transaction builders', () => {
       'base64',
     ))[0];
 
-    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(563_000_000n);
+    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(581_000_000n);
     expect(ed25519.verify(
       Buffer.from(built.signature, 'hex'),
       Buffer.from(built.signedDataHash, 'hex'),

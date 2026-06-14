@@ -170,6 +170,29 @@ function expectSuccessfulExternalVaultCompute(result: any) {
   }
 }
 
+function expectOnlyComputeGasSpent(before: bigint, after: bigint) {
+  // Post-accept reject pays the (small, bounded) compute gas because the external WAS accepted, but moves no
+  // protocol value: a miss is not a drain. Old pre-accept rejects charged the Vault nothing; this asserts the
+  // only delta is the gas fee.
+  expect(after).toBeLessThanOrEqual(before);
+  expect(before - after).toBeLessThan(toNano('0.01'));
+}
+
+function expectAbortedExternalVaultCompute(result: any, exitCode: number) {
+  // Post-accept reject (publish-external pattern): the external IS accepted, then the compute phase aborts and
+  // state reverts. sendMessage RESOLVES with an aborted tx (it does not throw), so assert on the result.
+  const tx = result.transactions[0];
+  expect(tx.description.type).toBe('generic');
+  if (tx.description.type === 'generic') {
+    expect(tx.description.aborted).toBe(true);
+    expect(tx.description.computePhase.type).toBe('vm');
+    if (tx.description.computePhase.type === 'vm') {
+      expect(tx.description.computePhase.exitCode).toBe(exitCode);
+      expect(tx.description.computePhase.success).toBe(false);
+    }
+  }
+}
+
 async function computeIntent(vault: any, sender: any, recipient: any, amount: bigint, clientNonce: bigint, secret = 0x1234n) {
   const intentId = await vault.getGetReceiveIntentId(sender.address, recipient.address, ASSET_TON, amount, clientNonce);
   const commitment = await vault.getGetReceiveIntentCommitment(intentId, recipient.address, secret);
@@ -366,53 +389,53 @@ describe('Vault milestone 3: ReceiveIntent', () => {
 
     const rawBeforeWrongRecipient = await contractBalance(blockchain, vault.address);
     const attackerBeforeWrongRecipient = await vault.getGetUser(attacker.address);
-    await expect(sendReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', attacker, attackerKey, {
+    expectAbortedExternalVaultCompute(await sendReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', attacker, attackerKey, {
       intent_id: intentId,
       secret32: 0x9999n,
-    })).rejects.toThrow(/16278/);
+    }), 16278); // recipient check moved post-accept (publish-external pattern): accept-then-revert
     const attackerAfterWrongRecipient = await vault.getGetUser(attacker.address);
-    expect(await contractBalance(blockchain, vault.address)).toBe(rawBeforeWrongRecipient);
+    expectOnlyComputeGasSpent(rawBeforeWrongRecipient, await contractBalance(blockchain, vault.address));
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
     expect(attackerAfterWrongRecipient.publish_nonce).toBe(attackerBeforeWrongRecipient.publish_nonce);
     expect(attackerAfterWrongRecipient.ton_balance).toBe(attackerBeforeWrongRecipient.ton_balance);
 
     const rawBeforeWrongSecret = await contractBalance(blockchain, vault.address);
     const recipientBeforeWrongSecret = await vault.getGetUser(recipient.address);
-    await expect(sendReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', recipient, recipientKey, {
+    expectAbortedExternalVaultCompute(await sendReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', recipient, recipientKey, {
       intent_id: intentId,
       secret32: 0x8888n,
-    })).rejects.toThrow(/16280/);
+    }), 16280); // secret check moved post-accept: accept-then-revert, state still unmutated
     const recipientAfterWrongSecret = await vault.getGetUser(recipient.address);
-    expect(await contractBalance(blockchain, vault.address)).toBe(rawBeforeWrongSecret);
+    expectOnlyComputeGasSpent(rawBeforeWrongSecret, await contractBalance(blockchain, vault.address));
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
     expect(recipientAfterWrongSecret.publish_nonce).toBe(recipientBeforeWrongSecret.publish_nonce);
     expect(recipientAfterWrongSecret.ton_balance).toBe(recipientBeforeWrongSecret.ton_balance);
   });
 
-  it('VAULT-REJECT: missing receive intent claim/cancel reject before accept without nonce or balance mutation', async () => {
+  it('VAULT-REJECT: missing receive intent claim/cancel reject (post-accept revert) without nonce or balance mutation', async () => {
     const { vault, sender, recipient, blockchain } = await setup();
     const senderKey = await registerKeys(vault, sender, 18);
     const recipientKey = await registerKeys(vault, recipient, 19);
 
     const rawBeforeClaim = await contractBalance(blockchain, vault.address);
     const recipientBefore = await vault.getGetUser(recipient.address);
-    await expect(sendReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', recipient, recipientKey, {
+    expectAbortedExternalVaultCompute(await sendReceiveIntentExternal(blockchain, vault, 'ClaimReceiveIntent', recipient, recipientKey, {
       intent_id: 0xdeadn,
       secret32: 0xbeefn,
-    })).rejects.toThrow(/16276/);
+    }), 16276); // intent lookup moved post-accept: accept-then-revert, no state mutation
     const recipientAfter = await vault.getGetUser(recipient.address);
-    expect(await contractBalance(blockchain, vault.address)).toBe(rawBeforeClaim);
+    expectOnlyComputeGasSpent(rawBeforeClaim, await contractBalance(blockchain, vault.address));
     expect(recipientAfter.publish_nonce).toBe(recipientBefore.publish_nonce);
     expect(recipientAfter.ton_balance).toBe(recipientBefore.ton_balance);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
 
     const rawBeforeCancel = await contractBalance(blockchain, vault.address);
     const senderBefore = await vault.getGetUser(sender.address);
-    await expect(sendReceiveIntentExternal(blockchain, vault, 'CancelReceiveIntent', sender, senderKey, {
+    expectAbortedExternalVaultCompute(await sendReceiveIntentExternal(blockchain, vault, 'CancelReceiveIntent', sender, senderKey, {
       intent_id: 0xfeedn,
-    })).rejects.toThrow(/16285/);
+    }), 16285); // intent lookup moved post-accept: accept-then-revert, no state mutation
     const senderAfter = await vault.getGetUser(sender.address);
-    expect(await contractBalance(blockchain, vault.address)).toBe(rawBeforeCancel);
+    expectOnlyComputeGasSpent(rawBeforeCancel, await contractBalance(blockchain, vault.address));
     expect(senderAfter.publish_nonce).toBe(senderBefore.publish_nonce);
     expect(senderAfter.ton_balance).toBe(senderBefore.ton_balance);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
@@ -525,11 +548,11 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     const { intentId } = await createTonIntent(blockchain, vault, sender, recipient, senderKey, amount, 0x11n);
     const rawBeforeAttackerCancel = await contractBalance(blockchain, vault.address);
     const attackerBeforeCancel = await vault.getGetUser(attacker.address);
-    await expect(sendReceiveIntentExternal(blockchain, vault, 'CancelReceiveIntent', attacker, attackerKey, {
+    expectAbortedExternalVaultCompute(await sendReceiveIntentExternal(blockchain, vault, 'CancelReceiveIntent', attacker, attackerKey, {
       intent_id: intentId,
-    })).rejects.toThrow(/16286/);
+    }), 16286); // sender check moved post-accept: accept-then-revert, no state mutation
     const attackerAfterCancel = await vault.getGetUser(attacker.address);
-    expect(await contractBalance(blockchain, vault.address)).toBe(rawBeforeAttackerCancel);
+    expectOnlyComputeGasSpent(rawBeforeAttackerCancel, await contractBalance(blockchain, vault.address));
     expect((await vault.getGetReceiveIntent(intentId)).exists).toBe(true);
     expect(attackerAfterCancel.publish_nonce).toBe(attackerBeforeCancel.publish_nonce);
     expect(attackerAfterCancel.ton_balance).toBe(attackerBeforeCancel.ton_balance);
@@ -557,11 +580,106 @@ describe('Vault milestone 3: ReceiveIntent', () => {
     }, attacker.address);
 
     const rawBefore = await contractBalance(blockchain, vault.address);
-    await expect(blockchain.sendMessage(external({ to: vault.address, body }))).rejects.toThrow(/16288/);
+    expectAbortedExternalVaultCompute(await blockchain.sendMessage(external({ to: vault.address, body })), 16288); // owner-domain check moved post-accept: accept-then-revert, no state mutation
     const attackerAfter = await vault.getGetUser(attacker.address);
     expect(attackerAfter.publish_nonce).toBe(attackerBefore.publish_nonce);
     expect(attackerAfter.ton_balance).toBe(attackerBefore.ton_balance);
     expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
-    expect(await contractBalance(blockchain, vault.address)).toBe(rawBefore);
+    expectOnlyComputeGasSpent(rawBefore, await contractBalance(blockchain, vault.address));
+  });
+
+  // 2106/uint64 boundary witness: every now()-sourced timestamp field was widened from `Int as uint32` to
+  // `Int as uint64` to survive the year 2106. The TON sandbox (like real TON's gen_utime) caps a block's now()
+  // at the uint32 ceiling, so we exercise the receive-intent created_at write right at that 2106 cliff
+  // (now = 0xFFFFFFFE) and prove it succeeds and round-trips exactly. The companion BUYBACK-UINT64-2106 test in
+  // buybackburn-production.test.ts drives a now()+offset field PAST 2^32 (which a uint32 column could not hold).
+  it('VAULT-UINT64-2106: receive-intent create records a now() timestamp at the 2106 uint32 boundary', async () => {
+    const { vault, sender, recipient, blockchain } = await setup();
+    // 0xFFFFFFFE = 4294967294, the last representable second before the uint32/2106 rollover.
+    const BOUNDARY_NOW = 0xFFFFFFFE;
+    blockchain.now = BOUNDARY_NOW;
+
+    const senderKey = await registerKeys(vault, sender, 41);
+    await registerKeys(vault, recipient, 42);
+    await deposit(vault, sender, toNano('1'));
+
+    const amount = toNano('0.2');
+    const nonce = (await vault.getGetUser(sender.address)).publish_nonce;
+    const { intentId, commitment } = await computeIntent(vault, sender, recipient, amount, nonce, 0x4242n);
+    const createBody = signedReceiveIntentBody('CreateReceiveIntent', sender.address, nonce, senderKey.secretKey, vault.address, {
+      asset: ASSET_TON,
+      amount,
+      recipient_wallet: recipient.address,
+      commitment,
+    });
+
+    // Must NOT throw a range error (exit 5) — the widened field accepts the 2106-era now().
+    const result = await blockchain.sendMessage(external({ to: vault.address, body: createBody }));
+    expectSuccessfulExternalVaultCompute(result);
+
+    const intent = await vault.getGetReceiveIntent(intentId);
+    expect(intent.exists).toBe(true);
+    expect(intent.created_at).toBe(BigInt(BOUNDARY_NOW));
+    expect((await vault.getGetGlobal()).receive_intent_count).toBe(1n);
+  });
+
+  // Padding-rejection regression: appending an EXTRA trailing ref to the OUTER message body (outside the
+  // signed_payload ref) must be rejected pre-accept by requireNoEnvelopePaddingRefs (exit 16901) on every
+  // receive-intent external (Create/Claim/Cancel). The extra ref is the economically-meaningful import-fee
+  // drain vector; this proves it cannot pad the receive-intent envelopes. (The WithdrawTon/publish/key-record
+  // full bits+refs guards 16900/16901 are covered separately in vault-batch-publish + vault-key-records.)
+  it('VAULT-PADDING-16901: a trailing ref appended outside the signed receive-intent envelope is rejected pre-accept', async () => {
+    const { vault, sender, recipient, blockchain } = await setup();
+    const senderKey = await registerKeys(vault, sender, 51);
+    const recipientKey = await registerKeys(vault, recipient, 52);
+    await deposit(vault, sender, toNano('1'));
+
+    const amount = toNano('0.2');
+
+    // Helper: take a canonical signed receive-intent body and append one extra ref to the OUTER cell,
+    // landing in `envelope_padding: Slice as remaining` and tripping requireNoEnvelopePaddingRefs (16901).
+    const withTrailingRef = (canonical: any) => beginCell()
+      .storeSlice(canonical.beginParse())
+      .storeRef(beginCell().endCell())
+      .endCell();
+
+    // CREATE
+    const createNonce = (await vault.getGetUser(sender.address)).publish_nonce;
+    const created = await computeIntent(vault, sender, recipient, amount, createNonce, 0x5151n);
+    const createBody = signedReceiveIntentBody('CreateReceiveIntent', sender.address, createNonce, senderKey.secretKey, vault.address, {
+      asset: ASSET_TON,
+      amount,
+      recipient_wallet: recipient.address,
+      commitment: created.commitment,
+    });
+    await expect(blockchain.sendMessage(external({ to: vault.address, body: withTrailingRef(createBody) })))
+      .rejects.toThrow(/16901/);
+    // No mutation: the padded create never reached accept, so no intent was recorded.
+    expect((await vault.getGetGlobal()).receive_intent_count).toBe(0n);
+
+    // Land a clean intent so CLAIM/CANCEL have a live target.
+    await blockchain.sendMessage(external({ to: vault.address, body: createBody }));
+    expect((await vault.getGetReceiveIntent(created.intentId)).exists).toBe(true);
+
+    // CLAIM with trailing ref -> 16901.
+    const recipientNonce = (await vault.getGetUser(recipient.address)).publish_nonce;
+    const claimBody = signedReceiveIntentBody('ClaimReceiveIntent', recipient.address, recipientNonce, recipientKey.secretKey, vault.address, {
+      intent_id: created.intentId,
+      secret32: created.secret,
+    });
+    await expect(blockchain.sendMessage(external({ to: vault.address, body: withTrailingRef(claimBody) })))
+      .rejects.toThrow(/16901/);
+
+    // CANCEL with trailing ref -> 16901.
+    const cancelNonce = (await vault.getGetUser(sender.address)).publish_nonce;
+    const cancelBody = signedReceiveIntentBody('CancelReceiveIntent', sender.address, cancelNonce, senderKey.secretKey, vault.address, {
+      intent_id: created.intentId,
+    });
+    await expect(blockchain.sendMessage(external({ to: vault.address, body: withTrailingRef(cancelBody) })))
+      .rejects.toThrow(/16901/);
+
+    // The live intent is untouched by any of the rejected padded externals.
+    expect((await vault.getGetReceiveIntent(created.intentId)).exists).toBe(true);
+    expect((await vault.getGetReceiveIntent(created.intentId)).claimed).toBe(false);
   });
 });

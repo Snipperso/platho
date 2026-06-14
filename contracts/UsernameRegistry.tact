@@ -13,7 +13,7 @@ const USERNAME_PRICE_6_PLUS_CHARS: Int = 100000000000;   // 100 ATH atomic units
 const USERNAME_PENDING_MINT_STORAGE_ENDOWMENT: Int = 6000000;
 const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 500000000; // 0.5 TON prepaid storage: ~250+ years at mainnet config-18 (~2M nanoton/yr for the ~30-cell item), with a thick cushion against storage-price growth. The minter funds it once; the NFT lives for centuries.
-const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 30000000;
+const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
@@ -69,7 +69,7 @@ struct PendingUsernameMint {
     price_paid: Int as uint128;
     item_address: Address;
     item_deploy_value: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct NameRecord {
@@ -77,7 +77,7 @@ struct NameRecord {
     // item's owner_wallet but not this record. Resolve live ownership from the item state.
     minter_wallet: Address;
     item_address: Address;
-    registered_at: Int as uint32;
+    registered_at: Int as uint64;
 }
 
 struct UsernameRegistryGlobalView {
@@ -127,12 +127,12 @@ struct PendingUsernameMintView {
 struct PendingAthTreasuryFlush {
     amount: Int as uint128;
     recipient_ath_wallet: Address;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingAthBurnFlush {
     amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingAthTreasuryFlushView {
