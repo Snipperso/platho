@@ -176,13 +176,13 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQCmdc0PhHDBRQqzcQ2oOuP8GmdtrbFknXAUMo90zRDfCeiZ');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQC5gVebWAtoY-8KQiz0FpjUPzh_z3vH8C5n6ZbK0rkQMBKd');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
-      '0f54ea7d319aaad69cfba922e7779e25fca683de15c8caf7fe444e2dc99dc610',
+      '5980b2a2bc2518d36fce705eceec86a45b4102f6857a1fe29aacbf2c31381603',
     );
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBCcYl8tsg1vtzK2qWNgLqzbcl5yEgrVYYLnUh_2PNVnayN');
-    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQAUIc1Ql31ou5uV2qimUND9nX0mvNAPGEw2zLdYBBn5SbIw');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQCF-3kT4hwskPW8qVPkROqEHMdGEONYn_edh3NLxJmBcA5n');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQCx4n-REXJXI1gH0mlhoP7eThEaFNBMoQL8UOdXq_0XEjTt');
+    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQBU0bZsv9j5wf6xooDeEzPmn-51O0Qh6dRidXkodDwhI2jX');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQA_iaT8mdvUOV-ffbA0FU_vN1KLzW_gdUNJiPuprdJ1pma3');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
@@ -473,9 +473,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQCmdc0PhHDBRQqzcQ2oOuP8GmdtrbFknXAUMo90zRDfCeiZ');
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQBCcYl8tsg1vtzK2qWNgLqzbcl5yEgrVYYLnUh_2PNVnayN');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQCF-3kT4hwskPW8qVPkROqEHMdGEONYn_edh3NLxJmBcA5n');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQC5gVebWAtoY-8KQiz0FpjUPzh_z3vH8C5n6ZbK0rkQMBKd');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQCx4n-REXJXI1gH0mlhoP7eThEaFNBMoQL8UOdXq_0XEjTt');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQA_iaT8mdvUOV-ffbA0FU_vN1KLzW_gdUNJiPuprdJ1pma3');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).toMatch(/fetchTonWalletBalance\(address\)/);
@@ -3782,13 +3782,13 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v492/);
+    expect(sw).toMatch(/platho-pwa-prototype-v493/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
     expect(sw).toMatch(/\.\/app\.js\?v=426/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=73/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);

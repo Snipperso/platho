@@ -1,6 +1,6 @@
 import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/core';
 import { createHash } from 'crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHVesting } from '../build/ATHVesting/ATHVesting_ATHVesting';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
@@ -12,6 +12,7 @@ import { ProfileRegistry } from '../build/ProfileRegistry/ProfileRegistry_Profil
 import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_UsernameNFTItem';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { Vault } from '../build/Vault/Vault_Vault';
+import { computeFinalGenesisManifestHashHex } from './mainnet_genesis_verify';
 
 export const MANIFEST_DOMAIN = 'PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15';
 export const MANIFEST_VERSION = 15;
@@ -381,11 +382,56 @@ export function assertFinalGenesisReady(manifest: ImplementedSubsetManifest) {
   }
 }
 
+const MAINNET_GENESIS_VERIFIED_PATH = 'artifacts/MAINNET_GENESIS_VERIFIED.txt';
+const MAINNET_GENESIS_VERIFY_INPUT_PATH = 'artifacts/mainnet_genesis_verify_input.json';
+
+function mainnetGenesisVerified(): boolean {
+  return existsSync(MAINNET_GENESIS_VERIFIED_PATH)
+    && readFileSync(MAINNET_GENESIS_VERIFIED_PATH, 'utf8').trim().toLowerCase() === 'true';
+}
+
+// Once the live mainnet genesis is verified, the deployment manifest artifact
+// stops being the local implemented-subset fixture and becomes the verified
+// final-genesis manifest captured in the verifier input snapshot. This keeps a
+// single source of deploy truth: the on-chain-verified manifest, not a
+// re-derived fixture. M18 promotes the same manifest internally, so generator
+// and verifier stay in lockstep.
+function resolveDeploymentManifest(): { manifest: ImplementedSubsetManifest; source: string } {
+  if (mainnetGenesisVerified() && existsSync(MAINNET_GENESIS_VERIFY_INPUT_PATH)) {
+    const input = JSON.parse(readFileSync(MAINNET_GENESIS_VERIFY_INPUT_PATH, 'utf8'));
+    const verifiedManifest = input?.manifest as ImplementedSubsetManifest | undefined;
+    if (!verifiedManifest || verifiedManifest.status !== 'FINAL_GENESIS') {
+      throw new Error('MAINNET_GENESIS_VERIFIED=true but verifier input does not carry a FINAL_GENESIS manifest.');
+    }
+    if ((verifiedManifest.blockers_before_final_genesis ?? []).length > 0) {
+      throw new Error(`Verified final-genesis manifest still lists blockers: ${verifiedManifest.blockers_before_final_genesis.join('; ')}`);
+    }
+    const recomputed = computeFinalGenesisManifestHashHex(verifiedManifest);
+    if (recomputed !== verifiedManifest.manifest_hash_hex) {
+      throw new Error(`Verified final-genesis manifest hash mismatch: declared ${verifiedManifest.manifest_hash_hex}, recomputed ${recomputed}.`);
+    }
+    return { manifest: verifiedManifest, source: MAINNET_GENESIS_VERIFY_INPUT_PATH };
+  }
+  // No verified genesis yet: keep emitting the local implemented-subset fixture
+  // manifest with its open blockers.
+  // (Resolved synchronously by the caller via buildImplementedSubsetManifest.)
+  throw new Error('IMPLEMENTED_SUBSET');
+}
+
 async function main() {
-  const { manifest } = await buildImplementedSubsetManifest();
+  let manifest: ImplementedSubsetManifest;
+  let source: string;
+  try {
+    ({ manifest, source } = resolveDeploymentManifest());
+  } catch (err) {
+    if (!(err instanceof Error) || err.message !== 'IMPLEMENTED_SUBSET') throw err;
+    ({ manifest } = await buildImplementedSubsetManifest());
+    source = 'implemented-subset-fixture';
+  }
   mkdirSync('artifacts', { recursive: true });
   writeFileSync('artifacts/deployment_manifest_implemented_subset_m15.json', JSON.stringify(manifest, null, 2) + '\n');
   writeFileSync('artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt', manifest.manifest_hash_hex + '\n');
+  console.error(`deployment manifest source: ${source}, status: ${manifest.status}, hash: ${manifest.manifest_hash_hex}`);
   console.log(JSON.stringify(manifest, null, 2));
 }
 

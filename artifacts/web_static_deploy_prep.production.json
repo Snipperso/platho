@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-14T17:12:28.569Z",
+  "generatedAt": "2026-06-14T19:59:07.425Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "BLOCKED_BY_PREPROD",
-  "productionReady": false,
+  "status": "PRODUCTION_STATIC_PACKAGE_READY",
+  "productionReady": true,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 129,
     "totalBytes": 3189348,
-    "bundleSha256": "3557ad146ea122555c43bf5be588bdbb9efcbd5c3e3aa1c54c507e4d4f98439c",
+    "bundleSha256": "37c787064b86263715708eff2f295d2c51104474aaf51b9cf3a03f3208a0861e",
     "files": [
       {
         "path": "app.js",
         "bytes": 723955,
-        "sha256": "40b425e7af9c897fadb4595a39d99ab8955ffa750fae9f75c4665b2e55a86fc9"
+        "sha256": "536bc2ae7191b464a2f3980a5d00756657937d55cca91eb219fa7d8e52ef5b80"
       },
       {
         "path": "assets/icons/back.svg",
@@ -225,7 +225,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 15275,
-        "sha256": "f811d4a6667b4d132ace59113b3ed5757dc5b4e190e7856a1e8409b59a2df299"
+        "sha256": "e0eeb9e5fe2e251f7551c23312e5cca57987b1f12172efcc1de27374833d80f4"
       },
       {
         "path": "platho-wallet.mjs",
@@ -270,7 +270,7 @@
       {
         "path": "sw.js",
         "bytes": 6517,
-        "sha256": "8df72e4bcf7d0ac08dbeddd8e171c1df351c93c2dba6b85b9c5ba806d1aea3fa"
+        "sha256": "fc6b07d6e01ef77f9732d722a483b4fe010fef16badb56a7877fead5d21dce86"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -913,17 +913,9 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
-  "blockers": [
-    "MAINNET_GENESIS_NOT_VERIFIED"
-  ],
+  "blockers": [],
   "warnings": [],
-  "productionFindings": [
-    {
-      "id": "MAINNET_GENESIS_NOT_VERIFIED",
-      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
-      "message": "Current release candidate has no verified final mainnet genesis evidence."
-    }
-  ]
+  "productionFindings": []
 }
