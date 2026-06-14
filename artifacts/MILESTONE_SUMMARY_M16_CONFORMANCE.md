@@ -17,7 +17,7 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: 464cb84b470d67e5efa8ad89488d735499fd0f0dcf0f4e404a89a853500e867e
+- Hash: 539860aa79e71ff674229c51130e890ad078ea45a7af24ccbba759a739480df3
 
 ## Remaining final-genesis blockers
 
@@ -40,4 +40,4 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 | ProfileRegistry.tact | 542 | 12 | 2 | true | true |
 | UsernameNFTItem.tact | 239 | 5 | 0 | true | true |
 | UsernameRegistry.tact | 1146 | 14 | 3 | true | true |
-| Vault.tact | 2464 | 16 | 4 | true | true |
+| Vault.tact | 2473 | 16 | 4 | true | true |

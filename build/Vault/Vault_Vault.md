@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: Vault
-BoC Size: 43124 bytes
+BoC Size: 43365 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 80
@@ -326,13 +326,23 @@ TL-B: `_ vault_ath_wallet_address:address ath_master_address:address capsule_hub
 Signature: `Vault{vault_ath_wallet_address:address,ath_master_address:address,capsule_hub_address:address,profile_registry_address:address,username_registry_address:address,binding_flags:uint8,sealed:bool,deployment_manifest_hash:uint256,genesis_config_hash:uint256,users:dict<address, ^UserState{ton_balance:uint128,ath_balance:uint128,current_key_id:uint256,auth_pubkey:uint256,publish_nonce:uint64,receipts:dict<uint8, ^ReceiptSlot{nonce:uint64,action:uint8,result:uint8,aux:uint64,part_count:uint8,at:uint32}>}>,key_records:dict<int, ^KeyRecord{owner_wallet:address,key_generation:uint32,enc_pubkey:uint256,sign_pubkey:uint256,pq_kem_pubkey_hash:uint256,pq_kem_pubkey_len:uint16,pq_kem_pubkey:^cell,crypto_suite_mask:uint16,created_at:uint32,created_lt:uint64,revoked_at:uint32,revoked_lt:uint64}>,receive_intents:dict<uint128, ^ReceiveIntent{sender_wallet:address,recipient_wallet:address,asset:uint8,amount:uint128,commitment:uint256,client_nonce:uint64,settlement_reserve_ton:uint128,created_at:uint32,claimed:bool}>,processed_ath_deposits:dict<int, int>,pending_ath_withdrawals:dict<int, ^PendingAthWithdrawal{owner_wallet:address,recipient:address,recipient_ath_wallet:address,amount:uint128,refundable_ton_amount:uint128,created_at:uint32}>,pending_batch_publishes:dict<int, ^PendingBatchPublish{owner_wallet:address,tombstone:bool,refund_to_vault:bool,nonce:uint64,publish_kind:uint8,part_count:uint8,publish_id:uint256,refundable_amount:uint128,created_at:uint32}>,pending_profile_avatar_payments:dict<int, ^PendingProfileAvatarPayment{owner_wallet:address,amount:uint128,created_at:uint32}>,pending_username_mint_payments:dict<int, ^PendingUsernameMintPayment{owner_wallet:address,amount:uint128,created_at:uint32}>,user_count:uint64,key_record_count:uint64,receive_intent_count:uint64,processed_ath_deposit_count:uint64,pending_ath_withdrawal_count:uint64,pending_publish_count:uint64,genesis_ext:^cell}`
 
 ## Get methods
-Total get methods: 12
+Total get methods: 15
 
 ## get_user
 Argument: owner
 
 ## get_user_receipts
 Argument: owner
+
+## diag_forward_fee
+Argument: cells
+Argument: bits
+
+## diag_compute_fee
+Argument: gas
+
+## diag_ext_hard_import
+No arguments
 
 ## get_key_record
 Argument: keyId
