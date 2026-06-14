@@ -33,6 +33,10 @@ function srcIntConst(name: string): bigint {
 const BATCH_FLOOR_BASE_PIN = srcIntConst('BATCH_FLOOR_BASE_PIN');
 const BATCH_FLOOR_PER_PART_PIN = srcIntConst('BATCH_FLOOR_PER_PART_PIN');
 const MAX_BATCH_PARTS = Number(srcIntConst('MAX_BATCH_PARTS'));
+const EXT_HARD_CELLS = srcIntConst('EXT_HARD_CELLS');
+const EXT_HARD_BITS = srcIntConst('EXT_HARD_BITS');
+const REJECT_BASE_GAS = srcIntConst('REJECT_BASE_GAS');
+const WALK_GAS_PER_PART_MAX = srcIntConst('WALK_GAS_PER_PART_MAX');
 const PRE_ACCEPT_CREDIT = 10_000; // TON basechain external pre-accept gas credit
 
 const pinnedFloor = (parts: number): bigint => BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * BigInt(parts);
@@ -136,5 +140,24 @@ describe('VPB2 release gate G2: pinned reject floor is solvent', () => {
     // eslint-disable-next-line no-console
     console.log(`G2 per-part walk gasFees ~ ${perPartActual} vs pin ${BATCH_FLOOR_PER_PART_PIN}`);
     expect(perPartActual).toBeLessThanOrEqual(BATCH_FLOOR_PER_PART_PIN);
+  });
+
+  it('G2-FLOOR-04: the pinned floor dominates the LIVE-config worst-case import + walk fees (drain-proof at the network config)', async () => {
+    // The sandbox sets the external import fee to 0, so G2-FLOOR-02/03 can only check the COMPUTE part. The
+    // import hold — the dominant term of BASE_PIN — is verified here against the contract's own getForwardFee at
+    // the EXT_HARD ceiling (= the largest external the network will deliver). This is the recalibration's safety
+    // net: BASE_PIN must cover the real worst-case import even after EXT_HARD was tightened to 65535*8 bits.
+    const { vault } = await setupVault();
+    const extHardImport = await vault.getDiagExtHardImport();                 // getForwardFee(EXT_HARD)
+    const forwardAtCeiling = await vault.getDiagForwardFee(EXT_HARD_CELLS, EXT_HARD_BITS);
+    const rejectBaseCompute = await vault.getDiagComputeFee(REJECT_BASE_GAS); // reject-path base compute
+    const perPartCompute = await vault.getDiagComputeFee(WALK_GAS_PER_PART_MAX);
+    // eslint-disable-next-line no-console
+    console.log(`G2 live-config: import=${extHardImport} rejectBase=${rejectBaseCompute} perPart=${perPartCompute} | BASE_PIN=${BATCH_FLOOR_BASE_PIN} PER_PART_PIN=${BATCH_FLOOR_PER_PART_PIN}`);
+    expect(forwardAtCeiling).toBe(extHardImport);                              // the getter agrees with EXT_HARD
+    // BASE_PIN >= the worst-case import the Vault pays on a reject + the bounded reject-path base compute.
+    expect(BATCH_FLOOR_BASE_PIN).toBeGreaterThanOrEqual(extHardImport + rejectBaseCompute);
+    // PER_PART_PIN >= the per-part walk compute the reject can incur.
+    expect(BATCH_FLOOR_PER_PART_PIN).toBeGreaterThanOrEqual(perPartCompute);
   });
 });

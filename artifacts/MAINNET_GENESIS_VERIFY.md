@@ -15,4 +15,5 @@ Status: BLOCKED_GENESIS_MISMATCH
 
 ## Issues
 
-- MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT: Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=0abbf86a6982ac9d73ac7ee0873dba8234e7a661e3d98b3acc66643fd857f7d0 local_draft=28c5e08eb28095b9dcc30108028c370376f60ae07b2c8de11fe0824aa0a741f3 production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification.
+- CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST: Final genesis evidence does not belong to the current local build: vault: current=60a5bb63d11f510606038d633f30cf62d4fab87cc98c91c0f1b424b7acf9e0d2, manifest=4fbb290a49e73b9b33ccd246737cf27b756d347c7ac8a63f587df3a27f5731b0.
+- MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT: Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=0abbf86a6982ac9d73ac7ee0873dba8234e7a661e3d98b3acc66643fd857f7d0 local_draft=d5dbe8a9a8e6281d154ae13c1a7e9be6d03f58ae95293181a82a15911989a36a production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification.

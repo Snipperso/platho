@@ -3,18 +3,19 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-14T00:00:00.0000000+03:00",
+  "generated_after_local_run": "2026-06-14T13:15:00.0000000+03:00",
   "discovered_test_files": 108,
   "executed_test_files": 108,
   "passed_test_files": 108,
   "failed_test_files": 0,
-  "total_tests": 954,
-  "passed_tests": 954,
+  "total_tests": 955,
+  "passed_tests": 955,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
   ],
   "notes": [
+    "It also includes the 2026-06-14 Vault floor recalibration rebaseline: EXT_HARD_BITS was tightened from the absolute TVM cap (2097152) to the config-43 max_ext_msg_size data ceiling (65535*8=524280), BATCH_FLOOR_BASE_PIN was lowered from 200700000 to 92700000 (so the 1-part reject floor dropped from ~206.9M to 98.9M), and three diag getters (diag_forward_fee/diag_compute_fee/diag_ext_hard_import) were added to drive the new live-config G2-FLOOR-04 release gate. The Vault code hash moved to 60a5bb63d11f510606038d633f30cf62d4fab87cc98c91c0f1b424b7acf9e0d2; CURRENT_CODE_HASHES, the m16 conformance report, m18 artifact-integrity lock, the m15 implemented-subset manifest, the publish reserve pricing report, and the local mainnet final-manifest draft / deploy packet / tx dry-run packet were all regenerated against it, and the three floor-calibrated session-gate tests now read BATCH_FLOOR_BASE_PIN/BATCH_FLOOR_PER_PART_PIN from contracts/Vault.tact so they auto-track future recalibrations. The 1-part private canonical_total observed in-sandbox sits at ~151.5M-152M nanotons. The total test count grew by one (the new G2-FLOOR-04 gate) to 955. The mainnet genesis verifier input remains the pre-rebaseline chain snapshot and is correctly flagged stale (CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST + MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT); MAINNET_GENESIS_VERIFIED stays false until a fresh live genesis ceremony.",
     "Regenerated after the VPB2 batch-publish redeploy: all contract code hashes, economics reports and manifests rebaselined to the new build; the seven legacy single-publish test suites migrated to the batch path; the G1/G2 pre-accept-credit and reject-floor release gates added; and the client batch-publish builders landed. Genesis is not verified, so the production PWA deploy stays blocked pending the genesis ceremony.",
     "This is local workspace evidence generated after the Section 7 release-packet fixes for complete official ATHWallet dry-run StateInit evidence, safe local mainnet packet archive inclusion, current ATHMaster derivation hash freshness, and M20F address derivation alignment with the current manifest draft.",
     "This is local workspace evidence generated after the Section 6 UsernameRegistry storage economics fix, storage proof, non-destructive prune docs cleanup, and unsealed UsernameRegistry deploy-packet gate.",
