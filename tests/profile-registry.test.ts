@@ -280,7 +280,7 @@ async function sendAcceptedAvatar(
   owner: Address,
   queryId = 1n,
 ) {
-  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
+  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
     query_id: queryId,
   }));
 }
@@ -412,7 +412,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('OWNER_ONE');
 
-    const result = await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner));
+    const result = await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner));
 
     const avatar = await registry.getGetAvatar(owner);
     const global = await registry.getGetGlobal();
@@ -436,7 +436,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('WRONG_AMOUNT_OWNER');
 
-    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, {
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
       amount: PROFILE_AVATAR_PRICE_ATH - 1n,
     }));
 
@@ -460,7 +460,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       { media_format: 2n },
       { owner_wallet: fixtureAddress('INVALID_POINTER_MASTERCHAIN_OWNER', -1) },
     ] satisfies Array<Partial<AthTransferNotificationVaultProfileAvatar>>) {
-      await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, overrides));
+      await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, overrides));
     }
 
     const avatar = await registry.getGetAvatar(owner);
@@ -476,11 +476,11 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const { blockchain, registry, officialAthWalletAddress } = await deploySealedProfileRegistry();
     const owner = fixtureAddress('VERSION_OWNER');
 
-    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, {
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
       query_id: 11n,
       avatar_hash: 0x11n,
     }));
-    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner, {
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner, {
       query_id: 12n,
       avatar_hash: 0x22n,
       avatar_stream_id: 0x22223333444455556666777788889999n,
@@ -512,7 +512,7 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       workchain: officialAthWalletAddress.workChain,
     }));
 
-    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.05') }, avatarNotification(owner));
+    await registry.send(blockchain.sender(officialAthWalletAddress), { value: toNano('0.08') }, avatarNotification(owner));
     await registry.send(flusher.getSender(), { value: toNano('0.05') }, {
       $$type: 'FlushProfileBurnAthDue',
       query_id: queryId,
@@ -751,12 +751,12 @@ describe('ProfileRegistry wallet avatar pointers', () => {
     const forgedOwner = fixtureAddress('VAULT_FUNDED_FORGED_OWNER');
     const attackerVault = fixtureAddress('VAULT_FUNDED_ATTACKER_VAULT');
 
-    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
+    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(ctx.vaultAddress, owner, {
       query_id: 1_201n,
       avatar_hash: 0x1201n,
     }));
 
-    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.05') }, vaultAvatarNotification(attackerVault, forgedOwner, {
+    await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWalletAddress), { value: toNano('0.08') }, vaultAvatarNotification(attackerVault, forgedOwner, {
       query_id: 1_202n,
       avatar_hash: 0x1202n,
     }));
@@ -796,7 +796,9 @@ describe('ProfileRegistry wallet avatar pointers', () => {
       amount: PROFILE_AVATAR_PRICE_ATH,
       recipient: ctx.registry.address,
       response_destination: wrongPayer.address,
-      notify_value: toNano('0.03'),
+      // Use the production avatar notify value (raised 30M->66M with the ProfileRegistry endowment raises)
+      // so the wrong-payer notification still reaches the registry's payer check before any value floor.
+      notify_value: toNano('0.066'),
       owner_wallet: owner,
       avatar_hash: 0x1203n,
       avatar_entry_id: 0n,

@@ -6,7 +6,7 @@ Date: 2026-06-01
 
 Frozen source: `contracts/BuybackBurn.tact`
 
-Current code hash: `adf826d02915f535d900d769fe3e47ba24181e6bfe669a8de52fc75a00afd8bd`
+Current code hash: `0c39dc79e436ad71b7b8f467a9c72fb84a7fdae7454cd25ecfbb4f8c130c832c`
 
 Production unlock status: final genesis may seal BuybackBurn with `route_frozen=false`, but route freeze and execution remain blocked until post-pool M20F mainnet STON.fi route evidence passes. This local freeze does not set `production_buyback_burn_unlocked` or `BUYBACKBURN_IMPLEMENTATION_READY` to true.
 

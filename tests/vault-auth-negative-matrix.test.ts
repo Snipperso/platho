@@ -104,9 +104,9 @@ describe('Vault negative authorization matrix', () => {
       sender_key: 0n,
       sender_wallet: user.address,
     } as AthTransferNotification);
-    await vault.send(user.getSender(), { value: toNano('0.08') }, {
+    await vault.send(user.getSender(), { value: toNano('0.1') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.04'),
+      amount: toNano('0.06'),
     } as DepositTon);
     await sendVaultWithdrawAthExternal(blockchain, vault, user, signingKey, GENESIS_HASH, 400n, recipient.address);
 

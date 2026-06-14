@@ -16,7 +16,7 @@ const VAULT_PRUNE_PENDING_PUBLISH_EXEC_RESERVE: Int = 2000000; // min inbound va
 const VAULT_DEPOSIT_TON_EXEC_RESERVE: Int = 2000000;
 const VAULT_STATE_GROWTH_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
-const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 40000000;
+const VAULT_ATH_WITHDRAW_MIN_VALUE: Int = 58000000; // raised 40M->58M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the Vault ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M, +10M margin.
 const VAULT_WITHDRAW_TON_EXEC_RESERVE: Int = 2000000;
 const VAULT_ATH_WITHDRAW_REFUND_EXEC_RESERVE: Int = 2000000;
 const ASSET_TON: Int = 1;
@@ -86,11 +86,11 @@ const CAPSULEHUB_PUBLIC_HEADER_MAX_BITS: Int = 576;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_CELLS: Int = 1;
 const CAPSULEHUB_PUBLIC_HEADER_MAX_REFS: Int = 0;
 const PROFILE_AVATAR_PRICE_ATH: Int = 100000000000;
-const PROFILE_AVATAR_NOTIFY_VALUE: Int = 30000000;
+const PROFILE_AVATAR_NOTIFY_VALUE: Int = 66000000; // raised 30M->66M to cover the ProfileRegistry avatar-record floor after the endowment raises: retainedValue(first-time) = PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT(36M)+PROFILE_ATH_NOTIFICATION_ACK_VALUE(1M)+PROFILE_STATE_GROWTH_EXEC_RESERVE(3M)+PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT(9M) = 49M, +17M margin (preserving the old 30M-13M margin).
 const PROFILE_AVATAR_MAX_PARTS: Int = 2;
 const PROFILE_AVATAR_MEDIA_FORMAT_WEBP: Int = 1;
 const VAULT_PROFILE_AVATAR_LOCAL_EXEC_RESERVE: Int = 6000000;
-const VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE: Int = 55000000;
+const VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE: Int = 109000000; // raised 55M->109M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M) AND the PROFILE_AVATAR_NOTIFY_VALUE raise (30M->66M). Vault ATH wallet required_value = downstream + NOTIFY_OWNER_REQUEST_EXEC(10M), downstream = notify_value(66M)+VAULT_RESPONSE_ACK(3M)+SOURCE_ACK(1M)+NOTIFY_EXEC(7M)+STORAGE_ENDOWMENT(20M)+AVATAR_FWD_FEE(2M) = 99M; required = 109M.
 const VAULT_PROFILE_AVATAR_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRICE_4_CHARS: Int = 10000000000000;
 const USERNAME_PRICE_5_CHARS: Int = 1000000000000;
@@ -99,7 +99,7 @@ const USERNAME_NOTIFY_VALUE: Int = 532000000; // >= UsernameRegistry mint retain
 const USERNAME_MAX_LENGTH: Int = 16;
 const USERNAME_NAME_HASH_DOMAIN: Int = 0xC5CC7CD6;
 const VAULT_USERNAME_MINT_LOCAL_EXEC_RESERVE: Int = 6000000;
-const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 557000000; // USERNAME_NOTIFY_VALUE (532M) + ~25M ATH-wallet exec/fwd overhead. usernameMintTonCharge = 6M local exec + this = 563M (the client mint TON charge).
+const VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE: Int = 575000000; // raised 557M->575M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M). USERNAME_NOTIFY_VALUE (532M) + ATH-wallet downstream/exec overhead (VAULT_RESPONSE_ACK 3M + SOURCE_ACK 1M + NOTIFY_EXEC 7M + STORAGE_ENDOWMENT 20M + AVATAR_FWD_FEE 2M + NOTIFY_OWNER_REQUEST_EXEC 10M = 43M) = 575M. usernameMintTonCharge = 6M local exec + this = 581M (the client mint TON charge).
 const VAULT_BINDING_CAPSULE_HUB: Int = 1;
 const VAULT_BINDING_PROFILE_REGISTRY: Int = 2;
 const VAULT_BINDING_USERNAME_REGISTRY: Int = 4;
@@ -159,18 +159,21 @@ message(0x7E1F5035) CreateReceiveIntent {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5036) ClaimReceiveIntent {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5037) CancelReceiveIntent {
     owner_wallet: Address;
     signature: Slice as bytes64;
     signed_payload: Cell;
+    envelope_padding: Slice as remaining;
 }
 
 message(0x7E1F5038) WithdrawTonFromVaultBalance {
@@ -251,7 +254,7 @@ struct PendingAthWithdrawal {
     recipient_ath_wallet: Address;
     amount: Int as uint128;
     refundable_ton_amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingBatchPublish {
@@ -263,19 +266,19 @@ struct PendingBatchPublish {
     part_count: Int as uint8;
     publish_id: Int as uint256;     // FULL id: ACK/bounce verify by equality
     refundable_amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingProfileAvatarPayment {
     owner_wallet: Address;
     amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingUsernameMintPayment {
     owner_wallet: Address;
     amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct ReceiveIntent {
@@ -286,7 +289,7 @@ struct ReceiveIntent {
     commitment: Int as uint256;
     client_nonce: Int as uint64;
     settlement_reserve_ton: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
     claimed: Bool;
 }
 
@@ -299,9 +302,9 @@ struct KeyRecord {
     pq_kem_pubkey_len: Int as uint16;
     pq_kem_pubkey: Cell;
     crypto_suite_mask: Int as uint16;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
     created_lt: Int as uint64;
-    revoked_at: Int as uint32;
+    revoked_at: Int as uint64;
     revoked_lt: Int as uint64;
 }
 
@@ -383,7 +386,7 @@ struct ReceiptSlot {
     result: Int as uint8;       // RES_* / RJ_* lifecycle code
     aux: Int as uint64;         // action-specific: first_entry_id, failing part_index, or AUX_BATCH_LEVEL
     part_count: Int as uint8;
-    at: Int as uint32;
+    at: Int as uint64;
 }
 
 struct UserState {
@@ -582,6 +585,16 @@ contract Vault {
         // paid. Also enforces a canonical, non-malleable external form. Parsed by Tact itself (correct
         // layout for externals; avoids inMsg()'s codegen side effects and context().raw's external quirk).
         throwUnless(16900, padding.bits() == 0);
+        throwUnless(16901, padding.refs() == 0);
+    }
+
+    inline fun requireNoEnvelopePaddingRefs(padding: Slice) {
+        // Cheaper refs-only variant for the receive-intent externals, which sit right on the 10k
+        // pre-accept gas credit (a full bits+refs check OOGs them by a few gas). The import-fee drain
+        // is driven ENTIRELY by extra refs: each padded cell adds ~40k nanoton of import fee, whereas
+        // root-bit padding is bounded to <=1023 bits (~0.00008 TON at basechain bit_price) and replay
+        // here is nonce-bound (publish_nonce), not message-hash-bound. Rejecting extra refs pre-accept
+        // closes the economically-meaningful drain within the gas budget.
         throwUnless(16901, padding.refs() == 0);
     }
 
@@ -1293,7 +1306,7 @@ contract Vault {
             .storeBool(true)
             .storeUint(msg.successor_manifest_hash, 256)
             .storeAddress(msg.successor_vault)
-            .storeUint(now(), 32)
+            .storeUint(now(), 64)
             .endCell();
     }
 
@@ -1830,6 +1843,7 @@ contract Vault {
 
 
     external(msg: CreateReceiveIntent) {
+        self.requireNoEnvelopePaddingRefs(msg.envelope_padding);
         self.requireSealed();
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16214, userOpt != null);
@@ -1845,19 +1859,24 @@ contract Vault {
         let signedVaultHash: Int = signedPayload.loadUint(256);
         let vaultAddressSlice: Slice = myAddress().asSlice();
         // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        vaultAddressSlice.skipBits(11);
         throwUnless(16225, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        // Keep receive-intent externals inside the 10k pre-accept gas credit: the signed owner hash still binds the typed outer owner address.
-        ownerPrefix.loadUint(11);
-        throwUnless(16288, signedOwnerHash == ownerPrefix.loadUint(256));
+        signedPayload.skipBits(256); // owner hash: re-validated post-accept (publish-external pattern) to fit the 10k pre-accept credit without a stack carry
         throwUnless(16226, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CREATE);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16233, clientNonce == user.publish_nonce);
         let createLocalReserve: Int = VAULT_STATE_GROWTH_EXEC_RESERVE;
         throwUnless(16265, user.ton_balance >= createLocalReserve);
         acceptMessage();
+        // Owner-domain binding re-validated post-accept by re-parsing the signed payload (publish-external
+        // pattern): skipped pre-accept to fit the 10k credit, re-parsed here to avoid a pre-accept stack carry.
+        // Sig-authenticated, so a mismatch is the owner's own misrouted request; no state has mutated yet so it
+        // reverts cleanly. Keeps same-auth two-wallet domain separation.
+        let createOwnerReparse: Slice = msg.signed_payload.beginParse();
+        createOwnerReparse.skipBits(32 + 256 + 256); // domain + manifest + vault -> owner hash
+        let createOwnerSlice: Slice = msg.owner_wallet.asSlice();
+        createOwnerSlice.skipBits(11);
+        throwUnless(16288, createOwnerReparse.loadUint(256) == createOwnerSlice.loadUint(256));
         user.publish_nonce += 1;
         user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CREATE_INTENT, RES_PROCESSING, 0, 0);
         user.ton_balance -= createLocalReserve;
@@ -1951,6 +1970,7 @@ contract Vault {
     }
 
     external(msg: ClaimReceiveIntent) {
+        self.requireNoEnvelopePaddingRefs(msg.envelope_padding);
         // Valid users/intents are created only by sealed flows; auth, manifest, vault binding, and intent checks stay pre-accept here.
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16239, userOpt != null);
@@ -1966,27 +1986,27 @@ contract Vault {
         let signedVaultHash: Int = signedPayload.loadUint(256);
         let vaultAddressSlice: Slice = myAddress().asSlice();
         // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        vaultAddressSlice.skipBits(11);
         throwUnless(16244, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        // Keep receive-intent externals inside the 10k pre-accept gas credit: the signed owner hash still binds the typed outer owner address.
-        ownerPrefix.loadUint(11);
-        throwUnless(16292, signedOwnerHash == ownerPrefix.loadUint(256));
+        signedPayload.skipBits(256); // owner hash: owner-domain separation enforced by intent.recipient_wallet below
         throwUnless(16245, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CLAIM);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16249, clientNonce == user.publish_nonce);
-        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        acceptMessage();
+        // Intent lookup + recipient + 256-bit secret moved post-accept (publish-external pattern) to fit the
+        // 10k pre-accept credit; re-parsed from a fresh slice to avoid a pre-accept stack carry. The secret is
+        // unguessable so post-accept gating is safe, the recipient check enforces owner-domain separation
+        // (incl. same-auth two-wallet), and a miss is the owner's own bad claim that reverts (nothing committed).
+        let claimRoot: Slice = msg.signed_payload.beginParse();
+        claimRoot.skipBits(32 + 256 + 256 + 256 + 8 + 64); // domain+manifest+vault+owner+action+nonce
+        let actionPayload: Slice = claimRoot.loadRef().beginParse();
         let intentId: Int = actionPayload.loadUint(256);
         let secret32: Int = actionPayload.loadUint(256);
-
         let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
         throwUnless(16276, intentOpt != null);
         let intent: ReceiveIntent = intentOpt!!;
         throwUnless(16278, msg.owner_wallet == intent.recipient_wallet);
         throwUnless(16280, secret32 == intent.commitment);
-
-        acceptMessage();
         user.publish_nonce += 1;
         user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CLAIM_INTENT, RES_PROCESSING, 0, 0);
 
@@ -2002,6 +2022,7 @@ contract Vault {
     }
 
     external(msg: CancelReceiveIntent) {
+        self.requireNoEnvelopePaddingRefs(msg.envelope_padding);
         // Valid users/intents are created only by sealed flows; auth, manifest, vault binding, and intent checks stay pre-accept here.
         let userOpt: UserState? = self.users.get(msg.owner_wallet);
         throwUnless(16252, userOpt != null);
@@ -2017,25 +2038,25 @@ contract Vault {
         let signedVaultHash: Int = signedPayload.loadUint(256);
         let vaultAddressSlice: Slice = myAddress().asSlice();
         // Advances past the std-address prefix. A separate prefix throw was tested and pushes large publish externals over the 10k pre-accept gas credit; basechain deployment is enforced by genesis/config.
-        let vaultAddressPrefix: Int = vaultAddressSlice.loadUint(11);
+        vaultAddressSlice.skipBits(11);
         throwUnless(16257, signedVaultHash == vaultAddressSlice.loadUint(256));
-        let signedOwnerHash: Int = signedPayload.loadUint(256);
-        let ownerPrefix: Slice = msg.owner_wallet.asSlice();
-        // Keep receive-intent externals inside the 10k pre-accept gas credit: the signed owner hash still binds the typed outer owner address.
-        ownerPrefix.loadUint(11);
-        throwUnless(16296, signedOwnerHash == ownerPrefix.loadUint(256));
+        signedPayload.skipBits(256); // owner hash: owner-domain separation enforced by intent.sender_wallet below
         throwUnless(16258, signedPayload.loadUint(8) == VAULT_RECEIVE_INTENT_ACTION_CANCEL);
         let clientNonce: Int = signedPayload.loadUint(64);
         throwUnless(16262, clientNonce == user.publish_nonce);
-        let actionPayload: Slice = signedPayload.loadRef().beginParse();
+        acceptMessage();
+        // Intent lookup + sender check moved post-accept (publish-external pattern) to fit the 10k pre-accept
+        // credit; re-parsed from a fresh slice to avoid a pre-accept stack carry. The sender check enforces
+        // owner-domain separation (incl. same-auth two-wallet); a miss is the owner's own bad cancel that
+        // reverts (nothing committed).
+        let cancelRoot: Slice = msg.signed_payload.beginParse();
+        cancelRoot.skipBits(32 + 256 + 256 + 256 + 8 + 64); // domain+manifest+vault+owner+action+nonce
+        let actionPayload: Slice = cancelRoot.loadRef().beginParse();
         let intentId: Int = actionPayload.loadUint(256);
-
         let intentOpt: ReceiveIntent? = self.receive_intents.get(intentId);
         throwUnless(16285, intentOpt != null);
         let intent: ReceiveIntent = intentOpt!!;
         throwUnless(16286, msg.owner_wallet == intent.sender_wallet);
-
-        acceptMessage();
         user.publish_nonce += 1;
         user = self.writeReceipt(user, user.publish_nonce - 1, ACT_CANCEL_INTENT, RES_PROCESSING, 0, 0);
 
@@ -2823,7 +2844,7 @@ contract Vault {
             announced: true,
             successor_manifest_hash: ext.loadUint(256),
             successor_vault: ext.loadAddress(),
-            announced_at: ext.loadUint(32)
+            announced_at: ext.loadUint(64)
         };
     }
 

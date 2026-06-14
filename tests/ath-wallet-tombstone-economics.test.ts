@@ -23,7 +23,7 @@ describe('ATHWallet tombstone economics', () => {
 
     expect(report.status).toBe('PASS');
     expect(report.code_hashes.ath_wallet).toBe(currentCodeHashes().ATH_WALLET_CODE_HASH);
-    expect(BigInt(report.required_tombstone_endowment_nanotons)).toBe(2_000_000n);
+    expect(BigInt(report.required_tombstone_endowment_nanotons)).toBe(20_000_000n);
     expect(report.cases.map((item) => item.label)).toEqual([
       'NORMAL_NOTIFY_ACK',
       'VAULT_USERNAME_NOTIFY_ACK',

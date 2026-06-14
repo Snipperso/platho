@@ -144,7 +144,7 @@ struct CapsuleHubPageView {
 
 struct PrivateCapsuleEntry {
     publish_id: Int as uint256;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
     body_hash: Int as uint256;
     sender_prev_link: Int as uint64;
     recipient_prev_link: Int as uint64;
@@ -154,7 +154,7 @@ struct PrivateCapsuleEntry {
 
 struct PublicCapsuleEntry {
     publish_id: Int as uint256;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
     author_wallet: Address;
     body_hash: Int as uint256;
     header: Cell;

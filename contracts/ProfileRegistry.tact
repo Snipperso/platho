@@ -6,14 +6,17 @@
 import "./ATHWallet.tact";
 
 const PROFILE_AVATAR_PRICE_ATH: Int = 100000000000; // 100 ATH atomic units
-const PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT: Int = 6000000;
-const PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT: Int = 3000000;
+// NOTE: the avatar-notify funding chain (Vault -> ATH wallet -> ProfileRegistry) is sized off the
+// PROFILE_AVATAR_NOTIFY_VALUE constant declared in Vault.tact, which was raised 30M->66M to cover the
+// PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT (6M->36M) + PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT (3M->9M) raises.
+const PROFILE_AVATAR_RECORD_STORAGE_ENDOWMENT: Int = 36000000; // ~100+ yr of mainnet config-18 rent for one never-pruned avatar record (~67k nanoton/cell/yr; ~3-4 cells incl. version-map entry) + cushion. The record lives forever, so it self-funds its own rent.
+const PROFILE_OWNER_VERSION_STORAGE_ENDOWMENT: Int = 9000000; // one-time per owner; ~100+ yr rent for the current_avatar_versions entry + cushion.
 const PROFILE_STATE_GROWTH_EXEC_RESERVE: Int = 3000000;
 const PROFILE_ATH_NOTIFICATION_ACK_VALUE: Int = 1000000;
 const PROFILE_AVATAR_EXCESS_REFUND_MIN_VALUE: Int = 100000;
 const PROFILE_VAULT_EXCESS_REFUND_EXEC_RESERVE: Int = 2000000;
 const PROFILE_EXCESS_REFUND_FORWARD_RESERVE: Int = 200000;
-const PROFILE_ATH_TRANSFER_EXEC_RESERVE: Int = 30000000;
+const PROFILE_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
 const PROFILE_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const PROFILE_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const PROFILE_SPLIT_BASE_BPS: Int = 10000;
@@ -60,7 +63,7 @@ struct ProfileAvatarRecord {
     avatar_stream_id: Int as uint128;
     avatar_part_count: Int as uint16;
     media_format: Int as uint8;
-    updated_at: Int as uint32;
+    updated_at: Int as uint64;
 }
 
 struct ProfileAvatarView {
@@ -78,12 +81,12 @@ struct ProfileAvatarView {
 struct PendingProfileTreasuryFlush {
     amount: Int as uint128;
     recipient_ath_wallet: Address;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingProfileBurnFlush {
     amount: Int as uint128;
-    created_at: Int as uint32;
+    created_at: Int as uint64;
 }
 
 struct PendingProfileTreasuryFlushView {

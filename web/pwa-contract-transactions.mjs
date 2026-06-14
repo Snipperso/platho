@@ -99,13 +99,17 @@ export const PUBLIC_POST_TEXT_MAX_BYTES = PUBLIC_POST_BODY_MAX_BYTES;
 export const PUBLIC_COMMENT_TEXT_MAX_BYTES = PUBLIC_POST_BODY_MAX_BYTES;
 export const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 export const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
-export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 30_000_000n;
-export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 61_000_000n;
+export const PROFILE_AVATAR_NOTIFY_VALUE_NANOTONS = 66_000_000n; // mirrors Vault.PROFILE_AVATAR_NOTIFY_VALUE (raised 30M->66M with the ProfileRegistry endowment raise). Informational; the live attached charge is PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS.
+// Raised 61M->115M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M) and the
+// ProfileRegistry avatar-record/owner-version endowment raises (which lifted PROFILE_AVATAR_NOTIFY_VALUE 30M->66M):
+// the Vault forwards VAULT_PROFILE_AVATAR_ATH_WALLET_REQUEST_VALUE (55M->109M) + 6M local exec = 115M.
+export const PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS = 115_000_000n;
 // UsernameRegistry now retains 511M nanotons per mint (6M endowment + 500M NFT-item deploy reserve [0.5 TON
 // prepaid storage, ~250+ years] + 1M ack + 4M state-growth), up from the old 32M. The Vault-funded mint hold is
 // the registry retained value plus the Vault local exec reserve (6M) and ATH-wallet forwarding overhead margin.
-// ~0.5 TON more than the old 63M hold.
-export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 563_000_000n;
+// Raised 563M->581M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M):
+// the Vault forwards VAULT_USERNAME_MINT_ATH_WALLET_REQUEST_VALUE (557M->575M) + 6M local exec = 581M.
+export const USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS = 581_000_000n;
 const UINT128_MOD = 1n << 128n;
 
 export const VAULT_RESERVES_NANOTONS = Object.freeze({
@@ -117,7 +121,7 @@ export const VAULT_RESERVES_NANOTONS = Object.freeze({
   stateGrowthExec: 2_000_000n,
   depositTonExec: 2_000_000n,
   withdrawTonExec: 2_000_000n,
-  withdrawAthMinValue: 40_000_000n,
+  withdrawAthMinValue: 58_000_000n,
 });
 
 export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
@@ -126,7 +130,7 @@ export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   internalTransferSourceAckValue: 1_000_000n,
   internalTransferFwdFeeAllowance: 21_000_000n,
   transferNotifyMinValue: 30_000_000n,
-  transferNotifyStorageEndowment: 2_000_000n,
+  transferNotifyStorageEndowment: 20_000_000n,
   internalTransferExec: 2_000_000n,
   burnNotificationExec: 2_000_000n,
   transferNotifyExec: 7_000_000n,

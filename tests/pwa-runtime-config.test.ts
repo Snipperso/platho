@@ -3782,7 +3782,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v491/);
+    expect(sw).toMatch(/platho-pwa-prototype-v492/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
@@ -3795,7 +3795,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=27/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=25/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);

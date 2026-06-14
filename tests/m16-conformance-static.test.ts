@@ -154,6 +154,13 @@ describe('M16 production conformance static checks', () => {
 
   it('M16-CONF-01B2: Vault-auth service external payloads bind manifest, Vault, and owner domains', () => {
     const vault = contractSource('Vault.tact');
+    // All hash-bound externals still bind manifest + Vault-address hash pre-accept. Owner-domain binding
+    // differs by entrypoint after the receive-intent pre-accept-gas restructure (publish-external pattern):
+    //  - ReplaceMessagingKeys: signed owner hash bound pre-accept (room in the 10k credit).
+    //  - CreateReceiveIntent: signed owner hash re-validated POST-accept (re-parse), since binding it pre-accept
+    //    pushes the external over the 10k pre-accept credit; sig-authenticated so a mismatch reverts cleanly.
+    //  - Claim/Cancel ReceiveIntent: owner-domain separation enforced by the intent's recipient_wallet /
+    //    sender_wallet equality check (the signed owner hash is skipped pre-accept to fit the credit).
     const hashBoundEntrypoints = [
       'CreateReceiveIntent',
       'ClaimReceiveIntent',
@@ -172,8 +179,28 @@ describe('M16 production conformance static checks', () => {
       expect(block, `${entrypoint} must verify deployment manifest`).toMatch(/signedManifestHash[\s\S]*self\.deployment_manifest_hash/);
       expect(block, `${entrypoint} signed payload must include Vault address hash`).toMatch(/signedVaultHash:\s*Int\s*=\s*signedPayload\.loadUint\(256\)/);
       expect(block, `${entrypoint} signed Vault hash must match current Vault`).toMatch(/signedVaultHash\s*==\s*vaultAddressSlice\.loadUint\(256\)/);
-      expect(block, `${entrypoint} signed payload must include owner wallet hash`).toMatch(/signedOwnerHash:\s*Int\s*=\s*signedPayload\.loadUint\(256\)/);
-      expect(block, `${entrypoint} signed owner hash must match outer owner`).toMatch(/signedOwnerHash\s*==\s*ownerPrefix\.loadUint\(256\)/);
+    }
+
+    // ReplaceMessagingKeys keeps the pre-accept signed-owner-hash binding.
+    {
+      const block = contractEntrypointBlock(vault, 'external(msg: ReplaceMessagingKeys)');
+      expect(block, 'ReplaceMessagingKeys signed payload must include owner wallet hash').toMatch(/signedOwnerHash:\s*Int\s*=\s*signedPayload\.loadUint\(256\)/);
+      expect(block, 'ReplaceMessagingKeys signed owner hash must match outer owner').toMatch(/signedOwnerHash\s*==\s*ownerPrefix\.loadUint\(256\)/);
+    }
+
+    // CreateReceiveIntent re-validates the signed owner hash post-accept against the outer owner wallet.
+    {
+      const block = contractEntrypointBlock(vault, 'external(msg: CreateReceiveIntent)');
+      expect(block, 'CreateReceiveIntent must re-parse the signed owner hash post-accept').toMatch(/createOwnerReparse:\s*Slice\s*=\s*msg\.signed_payload\.beginParse\(\)/);
+      expect(block, 'CreateReceiveIntent post-accept owner binding must compare signed owner hash to outer owner').toMatch(/createOwnerReparse\.loadUint\(256\)\s*==\s*createOwnerSlice\.loadUint\(256\)/);
+    }
+
+    // Claim/Cancel ReceiveIntent enforce owner domain via the stored intent's recipient/sender wallet.
+    {
+      const claim = contractEntrypointBlock(vault, 'external(msg: ClaimReceiveIntent)');
+      expect(claim, 'ClaimReceiveIntent must enforce owner domain via intent.recipient_wallet').toMatch(/intent\.recipient_wallet/);
+      const cancel = contractEntrypointBlock(vault, 'external(msg: CancelReceiveIntent)');
+      expect(cancel, 'CancelReceiveIntent must enforce owner domain via intent.sender_wallet').toMatch(/intent\.sender_wallet/);
     }
 
     for (const entrypoint of addressBoundEntrypoints) {
@@ -246,8 +273,14 @@ describe('M16 production conformance static checks', () => {
       const block = compiledVaultPreAcceptBlock(vaultFunC, entrypoint);
       expect(block, `${entrypoint} must not re-add a pre-accept owner basechain throw`).not.toMatch(/ownerPrefix~load_uint\(11\)\s*==\s*1024/);
       expect(block, `${entrypoint} must not re-add a pre-accept Vault basechain throw`).not.toMatch(/vaultAddressPrefix\s*==\s*1024/);
+      // Vault address is still hash-bound pre-accept (target-Vault binding cannot be deferred).
       expect(block, `${entrypoint} must still hash-bind signed Vault address before accept`).toMatch(/signedVaultHash[\s\S]*vaultAddressSlice~load_uint\(256\)/);
-      expect(block, `${entrypoint} must still hash-bind signed owner before accept`).toMatch(/signedOwnerHash[\s\S]*ownerPrefix~load_uint\(256\)/);
+      // The signed owner hash is NOT equality-bound pre-accept anymore: it is skipped to fit the 10k pre-accept
+      // gas credit, and owner-domain is enforced after accept (re-parse for Create; intent.recipient/sender
+      // wallet for Claim/Cancel). Guard that no owner-hash equality comparison creeps back into the pre-accept
+      // block, while a single skip of the 256-bit owner hash remains.
+      expect(block, `${entrypoint} must skip the owner hash slot before accept`).toMatch(/skip_bits\(256\)|256\)/);
+      expect(block, `${entrypoint} must not equality-bind the signed owner hash before accept`).not.toMatch(/signedOwnerHash[\s\S]*ownerPrefix~load_uint\(256\)/);
     }
   });
 

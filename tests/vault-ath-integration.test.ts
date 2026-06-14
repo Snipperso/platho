@@ -49,14 +49,14 @@ const ATH_PENDING_NOTIFICATION_TTL = 86_400;
 const ATH_TRANSFER_NOTIFY_ACK_VALUE = 1_000_000n;
 const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE = 1_000_000n;
 const ATH_TRANSFER_NOTIFY_EXEC_RESERVE = 7_000_000n;
-const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 2_000_000n;
+const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT = 20_000_000n;
 const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE = 10_000_000n;
 const PROFILE_AVATAR_PRICE_ATH = 100_000_000_000n;
-const PROFILE_AVATAR_TON_CHARGE = 61_000_000n;
+const PROFILE_AVATAR_TON_CHARGE = 115_000_000n;
 const PROFILE_AVATAR_LOCAL_EXEC_RESERVE = 6_000_000n;
 const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n;
 const USERNAME_PRICE_6_PLUS = 100_000_000_000n;
-const USERNAME_MINT_TON_CHARGE = 563_000_000n;
+const USERNAME_MINT_TON_CHARGE = 581_000_000n;
 const USERNAME_MINT_LOCAL_EXEC_RESERVE = 6_000_000n;
 const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n;
 const USERNAME_NAME_HASH_DOMAIN = 0xC5CC7CD6n;
@@ -832,7 +832,8 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(source.balance).toBe(4_000n);
     expect((await vault.getGetGlobal()).user_count).toBe(1n);
     expect((await vault.getGetGlobal()).processed_ath_deposit_count).toBe(1n);
-    expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.01'));
+    // Official Vault ATH wallet legitimately retains the +18M endowment (ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT 2M->20M); threshold raised by the 18M delta.
+    expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.028'));
   });
 
   it('VAULT-ATH-02: insufficient notification value is rejected before debiting the source wallet', async () => {
@@ -861,7 +862,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
     await depositAth({ vault, user, userAthWallet, amount: 2_000n, queryId: 3n });
     expect((await vault.getGetUser(user.address)).ath_balance).toBe(2_000n);
     const signingKey = await registerAvatarRouteKeys(vault, user);
-    await depositTonFromAddress(blockchain, vault, user.address, toNano('0.04'));
+    await depositTonFromAddress(blockchain, vault, user.address, toNano('0.06'));
     const beforeUser = await vault.getGetUser(user.address);
 
     await sendVaultWithdrawAthExternal(blockchain, vault, user, signingKey, MANIFEST_HASH, 750n, recipient.address);
@@ -901,7 +902,7 @@ describe('Vault ATH integration with production ATHWallet', () => {
 
     await depositAth({ vault, user, userAthWallet, amount: 2_000n, queryId: 33n });
     const signingKey = await registerAvatarRouteKeys(vault, user);
-    await depositTonFromAddress(blockchain, vault, user.address, toNano('0.04'));
+    await depositTonFromAddress(blockchain, vault, user.address, toNano('0.06'));
     await sendVaultWithdrawAthExternal(blockchain, vault, user, signingKey, MANIFEST_HASH, 750n, masterchainRecipient);
 
     const officialWallet = blockchain.openContract(new ATHWallet(officialVaultAthWallet));
@@ -982,16 +983,17 @@ describe('Vault ATH integration with production ATHWallet', () => {
     expect(userState.exists).toBe(true);
     expect(userState.ath_balance).toBe(1_000n);
     expect(source.balance).toBe(4_000n);
-    expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.01'));
+    // Official Vault ATH wallet legitimately retains the +18M endowment (ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT 2M->20M); threshold raised by the 18M delta.
+    expect(await contractBalance(blockchain, officialVaultAthWallet)).toBeLessThan(toNano('0.028'));
   });
 
   it('VAULT-ATH-06: Vault-funded profile avatar registration spends internal Vault ATH, not the user ATH wallet', async () => {
     const ctx = await setupProfileAvatarRoute();
     const keyPair = await registerAvatarRouteKeys(ctx.vault, ctx.user);
 
-    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.22') }, {
+    await ctx.vault.send(ctx.user.getSender(), { value: toNano('0.42') }, {
       $$type: 'DepositTon',
-      amount: toNano('0.2'),
+      amount: toNano('0.4'),
     });
     await depositAth({
       vault: ctx.vault,
