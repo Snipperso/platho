@@ -14,6 +14,18 @@
 ;; __tact_context_get_sender
 slice __tact_context_get_sender() inline;
 
+;; __tact_string_builder_start
+tuple __tact_string_builder_start(builder b) inline;
+
+;; __tact_string_builder_start_tail_string
+tuple __tact_string_builder_start_tail_string() inline;
+
+;; __tact_string_builder_end
+cell __tact_string_builder_end(tuple builders) inline;
+
+;; __tact_string_builder_append
+((tuple), ()) __tact_string_builder_append(tuple builders, slice sc) inline_ref;
+
 ;; __tact_dict_set_uint_cell
 (cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline;
 
@@ -143,6 +155,63 @@ slice __tact_context_get_sender() inline {
     return __tact_context_sender;
 }
 
+tuple __tact_string_builder_start(builder b) inline {
+    return tpush(tpush(empty_tuple(), b), null());
+}
+
+tuple __tact_string_builder_start_tail_string() inline {
+    return __tact_string_builder_start(begin_cell().store_uint(0, 8));
+}
+
+cell __tact_string_builder_end(tuple builders) inline {
+    (builder b, tuple tail) = uncons(builders);
+    cell c = b.end_cell();
+    while(~ null?(tail)) {
+        (b, tail) = uncons(tail);
+        c = b.store_ref(c).end_cell();
+    }
+    return c;
+}
+
+((tuple), ()) __tact_string_builder_append(tuple builders, slice sc) inline_ref {
+    int sliceRefs = slice_refs(sc);
+    int sliceBits = slice_bits(sc);
+
+    while((sliceBits > 0) | (sliceRefs > 0)) {
+
+        ;; Load the current builder
+        (builder b, tuple tail) = uncons(builders);
+        int remBytes = 127 - (builder_bits(b) / 8);
+        int exBytes = sliceBits / 8;
+
+        ;; Append bits
+        int amount = min(remBytes, exBytes);
+        if (amount > 0) {
+            slice read = sc~load_bits(amount * 8);
+            b = b.store_slice(read);
+        }
+
+        ;; Update builders
+        builders = cons(b, tail);
+
+        ;; Check if we need to add a new cell and continue
+        if (exBytes - amount > 0) {
+            var bb = begin_cell();
+            builders = cons(bb, builders);
+            sliceBits = (exBytes - amount) * 8;
+        } elseif (sliceRefs > 0) {
+            sc = sc~load_ref().begin_parse();
+            sliceRefs = slice_refs(sc);
+            sliceBits = slice_bits(sc);
+        } else {
+            sliceBits = 0;
+            sliceRefs = 0;
+        }
+    }
+
+    return ((builders), ());
+}
+
 (cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline {
     if (null?(v)) {
         var (r, ok) = udict_delete?(d, kl, k);
@@ -213,6 +282,12 @@ int $Cell$_fun_hash(cell $self) impure asm """
 """;
 
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; UsernameNFTItem_UsernameNFTItem.constants.fc
+;; String "Private correspondence is a right, not a privilege. This is a username NFT for Platho — the anonymous, post-quantum-encrypted, uncensorable messenger. A permanent, transferable, fully on-chain handle: the name others reach you by, held by no one but you. platho.app"
+slice __gen_slice_string_772226ccf1356301686fba4dcc4c81332c0c7470c4e5732318ac44d730bce72a() asm """
+    B{b5ee9c72410203010001130001fe5072697661746520636f72726573706f6e64656e636520697320612072696768742c206e6f7420612070726976696c6567652e2054686973206973206120757365726e616d65204e465420666f7220506c6174686f20e280942074686520616e6f6e796d6f75732c20706f73742d7175616e74756d2d656e637279707465640101fe2c20756e63656e736f7261626c65206d657373656e6765722e2041207065726d616e656e742c207472616e7366657261626c652c2066756c6c79206f6e2d636861696e2068616e646c653a20746865206e616d65206f746865727320726561636820796f752062792c2068656c64206279206e6f206f6e652062757420796f02001a752e20706c6174686f2e617070b15a61b1} B>boc <s PUSHSLICE
+""";
 
 ;; UsernameNFTItem_UsernameNFTItem.storage.fc
 ;;
@@ -492,7 +567,9 @@ builder $UsernameNFTItem$_store(builder build_0, (int, slice, slice, int, int, c
 
 ((int, slice, slice, int, int, cell), cell) $UsernameNFTItem$_fun_snakeDescriptionCell((int, slice, slice, int, int, cell) $self) impure inline_ref {
     var (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username)) = $self;
-    var $fresh$ret_12 = $Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 0, 8), 417581970078258680283550545719946597, 120));
+    tuple $b = __tact_string_builder_start_tail_string();
+    $b~__tact_string_builder_append(__gen_slice_string_772226ccf1356301686fba4dcc4c81332c0c7470c4e5732318ac44d730bce72a());
+    var $fresh$ret_12 = __tact_string_builder_end($b);
     return (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username), $fresh$ret_12);
 }
 

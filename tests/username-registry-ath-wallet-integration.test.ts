@@ -20,8 +20,12 @@ const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_USERNAME_MINT_NOTIFICATION = 0x89129D60;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
-const USERNAME_MINT_NOTIFY_VALUE = 32_000_000n;
-const USERNAME_MINT_VAULT_REQUEST_VALUE = 60_000_000n;
+// Registry retains 6M + 500M item deploy reserve + 1M + 4M = 511M, so the notification value the registry
+// receives must clear that floor. The ATHWallet vault-notify path adds ~15M ack/exec/storage overhead on top of
+// notify_value, plus gas; the request value carried into the wallet must comfortably exceed notify_value by that
+// overhead (with margin) so the official wallet stays active after forwarding the notification.
+const USERNAME_MINT_NOTIFY_VALUE = 600_000_000n;
+const USERNAME_MINT_VAULT_REQUEST_VALUE = 660_000_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());

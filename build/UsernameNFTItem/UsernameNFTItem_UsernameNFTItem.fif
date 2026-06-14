@@ -2,6 +2,10 @@
 PROGRAM{
   DECLPROC __tact_context_get
   DECLPROC __tact_context_get_sender
+  DECLPROC __tact_string_builder_start
+  DECLPROC __tact_string_builder_start_tail_string
+  DECLPROC __tact_string_builder_end
+  DECLPROC __tact_string_builder_append
   DECLPROC __tact_dict_set_uint_cell
   DECLPROC $UsernameItemDeployedAck$_store
   DECLPROC $UsernameItemDeployedAck$_store_cell
@@ -53,6 +57,103 @@ PROGRAM{
   }>
   __tact_context_get_sender PROCINLINE:<{
     __tact_context_sender GETGLOB
+  }>
+  __tact_string_builder_start PROCINLINE:<{
+    NIL
+    SWAP
+    TPUSH
+    PUSHNULL
+    TPUSH
+  }>
+  __tact_string_builder_start_tail_string PROCINLINE:<{
+    NEWC
+    0 PUSHINT
+    SWAP
+    8 STU
+    __tact_string_builder_start INLINECALLDICT
+  }>
+  __tact_string_builder_end PROCINLINE:<{
+    UNCONS
+    SWAP
+    ENDC
+    WHILE:<{
+      OVER
+      ISNULL
+      NOT
+    }>DO<{
+      SWAP
+      UNCONS
+      -ROT
+      STREF
+      ENDC
+    }>
+    NIP
+  }>
+  __tact_string_builder_append PROCREF:<{
+    DUP
+    SREFS
+    OVER
+    SBITS
+    WHILE:<{
+      DUP
+      0 GTINT
+      s2 PUSH
+      0 GTINT
+      OR
+    }>DO<{
+      s0 s3 XCHG
+      UNCONS
+      127 PUSHINT
+      s2 PUSH
+      BBITS
+      3 RSHIFT#
+      SUB
+      s0 s5 XCHG
+      3 RSHIFT#
+      s5 s5 XCPU
+      MIN
+      DUP
+      0 GTINT
+      IF:<{
+        DUP
+        3 LSHIFT#
+        s1 s5 XCHG
+        LDSLICEX
+        s0 s3 XCHG
+        STSLICE
+        s0 s1 s4 XCHG3
+      }>
+      -ROT
+      CONS
+      s4 s1 PUSH2
+      SUB
+      0 GTINT
+      IF:<{
+        NEWC
+        SWAP
+        CONS
+        s4 s4 XCHG2
+        SUB
+        3 LSHIFT#
+      }>ELSE<{
+        NIP
+        s3 POP
+        0 GTINT
+        IF:<{
+          LDREF
+          DROP
+          CTOS
+          DUP
+          SREFS
+          OVER
+          SBITS
+        }>ELSE<{
+          0 PUSHINT
+          DUP
+        }>
+      }>
+    }>
+    3 BLKDROP
   }>
   __tact_dict_set_uint_cell PROCINLINE:<{
     DUP
@@ -326,14 +427,10 @@ PROGRAM{
         ENDC
   }>
   $UsernameNFTItem$_fun_snakeDescriptionCell PROCREF:<{
-        NEWC
-    0 PUSHINT
-    SWAP
-    8 STU
-    417581970078258680283550545719946597 PUSHINT
-    SWAP
-    120 STU
-        ENDC
+    __tact_string_builder_start_tail_string INLINECALLDICT
+        B{b5ee9c72410203010001130001fe5072697661746520636f72726573706f6e64656e636520697320612072696768742c206e6f7420612070726976696c6567652e2054686973206973206120757365726e616d65204e465420666f7220506c6174686f20e280942074686520616e6f6e796d6f75732c20706f73742d7175616e74756d2d656e637279707465640101fe2c20756e63656e736f7261626c65206d657373656e6765722e2041207065726d616e656e742c207472616e7366657261626c652c2066756c6c79206f6e2d636861696e2068616e646c653a20746865206e616d65206f746865727320726561636820796f752062792c2068656c64206279206e6f206f6e652062757420796f02001a752e20706c6174686f2e617070b15a61b1} B>boc <s PUSHSLICE
+    __tact_string_builder_append INLINECALLDICT
+    __tact_string_builder_end INLINECALLDICT
   }>
   $UsernameNftOnchainContent$_constructor_marker_metadata PROCINLINE:<{
   }>

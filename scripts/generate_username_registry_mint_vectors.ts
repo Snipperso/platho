@@ -8,7 +8,9 @@ import { ATHWallet, storeATHTransferRequestVaultMintUsername } from '../build/AT
 const NAME_HASH_DOMAIN = 0xC5CC7CD6n;
 const OP_ATH_TRANSFER_NOTIFICATION_VAULT_MINT_USERNAME = 0x89129D60n;
 const OP_ATH_TRANSFER_REQUEST_VAULT_MINT_USERNAME = 0x4154481Cn;
-const USERNAME_MINT_NOTIFY_VALUE_NANOTONS = 32000000n;
+// The registry retains 6M + 500M item deploy reserve + 1M ack + 4M state-growth = 511M, so the mint notification
+// it receives must clear that floor. Canonical mint value the Vault/client carries is 600M (511M + exec/fwd margin).
+const USERNAME_MINT_NOTIFY_VALUE_NANOTONS = 600000000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -91,7 +93,7 @@ async function main() {
       USERNAME_MINT_NOTIFY_VALUE_NANOTONS: USERNAME_MINT_NOTIFY_VALUE_NANOTONS.toString(),
       USERNAME_NAME_HASH_DOMAIN: '0xC5CC7CD6',
       USERNAME_MAX_LENGTH: 16,
-      USERNAME_NFT_ITEM_DEPLOY_RESERVE_NANOTONS: '21000000',
+      USERNAME_NFT_ITEM_DEPLOY_RESERVE_NANOTONS: '500000000',
       USERNAME_ITEM_ACK_FORWARD_RESERVE_NANOTONS: '3000000',
       USERNAME_ATH_NOTIFICATION_ACK_VALUE_NANOTONS: '1000000',
       USERNAME_TREASURY_SHARE_BPS: 5000,
