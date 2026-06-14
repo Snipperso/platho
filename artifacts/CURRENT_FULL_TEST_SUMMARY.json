@@ -3,13 +3,13 @@
   "status": "PASS",
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
-  "generated_after_local_run": "2026-06-13T00:00:00.0000000+03:00",
-  "discovered_test_files": 107,
-  "executed_test_files": 107,
-  "passed_test_files": 107,
+  "generated_after_local_run": "2026-06-14T00:00:00.0000000+03:00",
+  "discovered_test_files": 108,
+  "executed_test_files": 108,
+  "passed_test_files": 108,
   "failed_test_files": 0,
-  "total_tests": 948,
-  "passed_tests": 948,
+  "total_tests": 954,
+  "passed_tests": 954,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"
@@ -82,6 +82,7 @@
     "It also includes the Larisa Section 14 locked-wallet replacement cleanup: the PWA now tracks activeRuntimeWalletAddress separately from the unlocked plathoWallet object, so create/import/import-key replacement after wallet lock still clears old private runtime threads, payment-check UI state, encrypted history handles, replay store, and retry/confirmation timers before switching to the new wallet. npm.cmd test passed locally on 2026-06-04 with 98/98 test files and 787/787 tests.",
     "It also includes the 2026-06-07 predeploy checkpoint after the Vault get_key_record ABI restoration: npm.cmd test passed locally with 98/98 test files and 880/880 tests; current mainnet final manifest draft, deploy packet, tx dry-run packet, pricing evidence, genesis verifier report, and static deploy prep artifacts were regenerated for Vault code hash 1b1dc3ee8c29358c7abfea579848769483113a465c82d8aba6583082f002c492. Production remains blocked until fresh live genesis verification passes and the PWA is intentionally flipped from preview to production.",
     "It also includes the 2026-06-07 full-redeploy seed refresh: ATH metadata deployment_id is platho-mainnet-20260607-clean-03, mainnet manifest hash is d7024ba567a81204fdad8d612885c7438078d2fe5dbfb22c1d540d474b784c87, Tonkeeper live preflight passed for 9/9 fresh deploy targets, M20F address derivation was realigned to the new ATHMaster address, and npm.cmd test passed locally with 98/98 test files and 881/881 tests.",
-    "The 2026-06-07 final genesis and production PWA checkpoint is superseded by the 2026-06-08 Vault publish pre-accept gas fix: Vault code hash is now cb0adbd4ac2c934af6e92ffed4673b87fc2c996de45c05bfe7bf2f1741948019, MAINNET_GENESIS_VERIFIED is false until fresh live genesis verification is collected for the new final manifest, web/platho-config.mjs is back in preview mode with signedBundlePurpose=pwa-mainnet-preview, static deploy prep artifacts were refreshed in blocked/preview state, and npm.cmd test passed locally with 98/98 test files and 892/892 tests."
+    "The 2026-06-07 final genesis and production PWA checkpoint is superseded by the 2026-06-08 Vault publish pre-accept gas fix: Vault code hash is now cb0adbd4ac2c934af6e92ffed4673b87fc2c996de45c05bfe7bf2f1741948019, MAINNET_GENESIS_VERIFIED is false until fresh live genesis verification is collected for the new final manifest, web/platho-config.mjs is back in preview mode with signedBundlePurpose=pwa-mainnet-preview, static deploy prep artifacts were refreshed in blocked/preview state, and npm.cmd test passed locally with 98/98 test files and 892/892 tests.",
+    "It also includes the Session 6 step 4 PWA client batch-publish wiring: web/app.js publish/confirm/sync orchestration was moved onto the VPB2 batch path. A new web/publish-batch-orchestration.mjs module groups the flat per-capsule charge plan into contiguous same-kind batches of <=8 parts and builds ONE signed batch external per batch; the send loop reads one nonce per batch (same floor/clamp/stale-read/barrier logic), sends once, raises the nonce floor once, and stamps each item with its per-entry EPI1 publish_id plus the shared batch external/nonce. Confirmation now reads the Vault receipt ring once per in-flight batch (verified, fail-closed) mapping confirmed/processing/bounced/tombstoned/rejected onto the existing per-part statuses, with the CapsuleHub entry scan kept as recovery and the obsolete VPB1 PublishAck-history scan removed. app.js was bumped to v425 and the service-worker cache to v489; the new module ships at v1. Username-mint UI and the message-pricing-policy table re-derivation remain out of scope. npm.cmd test passed locally with 108/108 test files and 954/954 tests."
   ]
 }

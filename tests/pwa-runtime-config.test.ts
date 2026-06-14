@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v424<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v424'/);
+    expect(html).toMatch(/id="appVersionLabel">v425<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v425'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -990,7 +990,9 @@ describe('PWA runtime config guard', () => {
     const balanceIndex = prepareSource.indexOf('if (balance < totalMaxCharge)');
     const priceConfirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
     const surchargeConfirmIndex = prepareSource.indexOf('confirmHighNetworkFeeSurcharge');
-    const sendBuildIndex = sendSource.indexOf('item.external = await buildVaultBalancePublishExternalBoc');
+    // VPB2: send-time signing builds ONE batch external per grouped batch, not one VPB1 external per capsule.
+    const sendBuildIndex = sendSource.indexOf('await buildBatchExternalFromPublishItems(batch');
+    const sendGroupIndex = sendSource.indexOf('groupPublishItemsIntoBatches(results)');
 
     expect(capSource).toMatch(/networkFeeSurchargeExceedsMax\(estimate, pricingOptions\)/);
     expect(capSource).toMatch(/throw new Error\(`Network surcharge/);
@@ -1000,9 +1002,10 @@ describe('PWA runtime config guard', () => {
     expect(balanceIndex).toBeGreaterThan(surchargeIndex);
     expect(priceConfirmIndex).toBeGreaterThan(balanceIndex);
     expect(surchargeConfirmIndex).toBeGreaterThan(priceConfirmIndex);
-    expect(prepareSource).not.toMatch(/buildVaultBalancePublishExternalBoc/);
+    expect(prepareSource).not.toMatch(/buildBatchExternalFromPublishItems/);
     expect(prepareSource).not.toMatch(/sendVaultExternalBoc/);
-    expect(sendBuildIndex).toBeGreaterThanOrEqual(0);
+    expect(sendGroupIndex).toBeGreaterThanOrEqual(0);
+    expect(sendBuildIndex).toBeGreaterThan(sendGroupIndex);
   });
 
   it('PWA-SEND-01B: private preflight shows actionable blocked reasons instead of generic send blocked', () => {
@@ -1079,10 +1082,10 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function publishCapsulesThroughVault'),
     );
     const nonceReadIndex = sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true');
-    const buildIndex = sendSource.indexOf('item.external = await buildVaultBalancePublishExternalBoc');
-    const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(item.external)');
+    const buildIndex = sendSource.indexOf('batchExternal = await buildBatchExternalFromPublishItems(batch');
+    const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(batchExternal)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
-    const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(index, results.length, options)');
+    const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)');
     const middleNonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, nonceWaitOptions)');
     const submittedStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_VAULT_SUBMITTED');
     const finalBarrierIndex = sendSource.indexOf('installVaultPublishNonceBarrier');
@@ -1129,8 +1132,11 @@ describe('PWA runtime config guard', () => {
     expect(sendSource).toMatch(/if \(part && part\.status === PUBLISH_PART_STATUS_SENT\)/);
     expect(sendSource).toMatch(/readVaultPublishNonceForOwnVaultAction\(provider, owner\)/);
     expect(clientNonceSource).not.toMatch(/allowUnverifiedNonceRead|allowUnverifiedCriticalRead|verify:/);
-    expect(sendSource).toMatch(/partWithPublishId\.externalBoc = item\.external\.boc/);
-    expect(sendSource).toMatch(/partWithPublishId\.lastBroadcastAt = new Date\(\)\.toISOString\(\)/);
+    // VPB2: each part of a batch is stamped with the SHARED batch external boc + a single broadcast timestamp.
+    expect(sendSource).toMatch(/partWithPublishId\.externalBoc = batchExternal\.boc/);
+    expect(sendSource).toMatch(/partWithPublishId\.lastBroadcastAt = broadcastAt/);
+    expect(sendSource).toMatch(/const epi1 = publishHashPlain\(batchExternal\.entryPublishIds\[entryIndex\]\)/);
+    expect(sendSource).toMatch(/batchExternal = await buildBatchExternalFromPublishItems\(batch/);
     // Post-broadcast nonce polling is unverified, cache-bypassing, and
     // tolerant of transient RPC trouble until the deadline decides.
     expect(nonceWaitSource).toMatch(/ignoreNonceBarrier: true/);
@@ -1162,7 +1168,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT = 8/);
     expect(app).toMatch(/async function enterVaultPublishSendLock\(\)/);
     expect(app).toMatch(/function shouldConfirmVaultPublishNonceAfterSend\(index, total, options = \{\}\)[\s\S]*index < total - 1 \|\| options\.confirmFinalNonce === true/);
-    expect(sendSource).toMatch(/if \(shouldConfirmVaultPublishNonceAfterSend\(index, results\.length, options\)\) \{/);
+    expect(sendSource).toMatch(/if \(shouldConfirmVaultPublishNonceAfterSend\(batchIndex, batches\.length, options\)\) \{/);
     expect(app).toMatch(/const publishCallbacks = \{[\s\S]*allowOwnVaultActionReadFallback: true,\s*confirmFinalNonce: true,/);
     expect(app).toMatch(/sendPreparedCapsulesThroughVault\(preparedPublish, \{[\s\S]*publishState,\s*confirmFinalNonce: true,/);
     expect(app).toMatch(/async function publishPublicPayloadParts\(payloads, idPrefix, options = \{\}\)[\s\S]*confirmFinalNonce: options\.confirmFinalNonce \?\? true/);
@@ -1181,7 +1187,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/queueTimeoutMs: options\.queueTimeoutMs \?\? PRIVATE_PUBLISH_CONFIRM_HOT_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/readVaultPublishNonceForBroadcastRetry\(provider, owner, \{/);
-    expect(app).toMatch(/sendVaultExternalBoc\(\{ boc: part\.externalBoc \}, \{/);
+    // VPB2: broadcast-retry re-sends each batch's SHARED external once (keyed off the head part of the batch group).
+    expect(app).toMatch(/sendVaultExternalBoc\(\{ boc: head\.externalBoc \}, \{/);
     expect(app).toMatch(/queueTimeoutMs: PRIVATE_PUBLISH_BROADCAST_RETRY_QUEUE_TIMEOUT_MS/);
     expect(app).toMatch(/skipIfRateLimited:\s*true/);
     expect(app).toMatch(/priority:\s*'background'/);
@@ -1280,8 +1287,12 @@ describe('PWA runtime config guard', () => {
     );
     expect(staleRetrySource).not.toMatch(/parts\.length <= 1/);
     expect(staleRetrySource).not.toMatch(/confirmedCount <= 0/);
-    expect(sendSource).toMatch(/const existingPart = publishState\.parts\?\.\[item\.partIndex\]/);
-    expect(sendSource).toMatch(/if \(publishPartAlreadyAttempted\(existingPart\)\) \{[\s\S]*continue;/);
+    // VPB2: the already-attempted skip is evaluated per BATCH — a batch whose items were all already attempted
+    // (e.g. on a partial-retry pass) keeps its state and is skipped without re-sending the shared external.
+    expect(sendSource).toMatch(/const pendingItems = batch\.items\.filter\(\(item\) => !publishPartAlreadyAttempted\(publishState\.parts\?\.\[item\.partIndex\]\)\)/);
+    // VPB2 atomic batch: send only when EVERY item is still pending; any already-attempted item means the
+    // whole batch is in-flight and must not be re-sent (which would re-publish + re-charge the attempted parts).
+    expect(sendSource).toMatch(/if \(pendingItems\.length !== batch\.items\.length\) \{[\s\S]*continue;/);
     expect(attemptSource).toMatch(/let capsules = Array\.isArray\(message\.capsules\) && message\.capsules\.length > 0[\s\S]*\? message\.capsules[\s\S]*: \(message\.capsule \? \[message\.capsule\] : null\)/);
     expect(attemptSource).toMatch(/if \(!capsules\) \{[\s\S]*createPrivateComposerCapsules/);
     expect(attemptSource).toMatch(/const existingPublishState = message\.publishState/);
@@ -1887,7 +1898,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)[\s\S]*const out = criticalCapsuleHubReadOptions\(address\)/);
     expect(confirmationSource).not.toMatch(/capsuleHubMessageSyncReadOptions\(address\)/);
     expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntries\(publishState, options = \{\}\)[\s\S]*return confirmCapsuleHubPublishEntriesWithReadMode\(publishState, options\.hot === true/);
-    expect(confirmationSource).toMatch(/if \(options\.skipAckHistory !== true\)[\s\S]*confirmCapsuleHubPublishEntriesFromVaultAckHistory/);
+    // VPB2: the receipt ring is the PRIMARY confirm; the CapsuleHub entry scan is the recovery fallback.
+    expect(confirmationSource).toMatch(/if \(options\.skipBatchReceipt !== true\)[\s\S]*confirmVaultBatchReceiptsFromPublishState/);
     expect(confirmationSource).toMatch(/CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT/);
     expect(confirmationSource).toMatch(/PRIVATE_PUBLISH_CONFIRM_HOT_DEADLINE_MS/);
     expect(confirmationSource).toMatch(/PRIVATE_PUBLISH_CONFIRM_HOT_REQUEST_TIMEOUT_MS/);
@@ -1895,28 +1907,34 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)/);
     expect(confirmationSource).not.toMatch(/stillPending[\s\S]*scanAvailableTransports/);
     expect(confirmationSource).toMatch(/catch \(error\) \{[\s\S]*if \(isTonRpcRecoverableReadError\(error\)\) throw error;[\s\S]*if \(noteTonRpcRateLimit\(error\)\) throw error;/);
+    // The CapsuleHub entry-scan strategies never trust unverified critical reads to confirm.
     expect(confirmationSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true/);
     expect(confirmationSource).not.toMatch(/scanAvailableTransports:\s*true/);
     expect(sendPreparedSource).toMatch(/const softVerification = isTonRpcRecoverableReadError\(error\)/);
     expect(sendPreparedSource).toMatch(/if \(softVerification \|\| rateLimited\) \{[\s\S]*publishState\.status = VAULT_PUBLISH_STATUS_SUBMITTED;/);
-    expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part\)/);
-    expect(app).toMatch(/const CAPSULEHUB_PUBLISH_ACK_OP = 0x874E576An/);
-    expect(app).toMatch(/function parseCapsuleHubPublishAckBody\(bodyBoc\)/);
-    expect(app).toMatch(/async function confirmCapsuleHubPublishEntriesFromVaultAckHistory/);
-    expect(app).toMatch(/readVaultPublishAckHistory\(capsuleHubAddress, publishIds, options\)/);
-    expect(app).toMatch(/opcode:\s*'0x874E576A'/);
-    expect(app).toMatch(/source:\s*parseTonAddress\(capsuleHubAddress\)\.raw/);
-    expect(app).toMatch(/confirmedBy:\s*'vault_ack_history'/);
+    // The entry-scan recovery matches by payload hashes + publish_id (EPI1) via the 3-arg matcher.
+    expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part, \{ allowPublishIdMismatch, requirePublishIdMatch \}\)/);
+    // The VPB1 per-message PublishAck history scan is gone; the receipt-ring read replaces it.
+    expect(app).not.toMatch(/const CAPSULEHUB_PUBLISH_ACK_OP/);
+    expect(app).not.toMatch(/function parseCapsuleHubPublishAckBody/);
+    expect(app).not.toMatch(/confirmCapsuleHubPublishEntriesFromVaultAckHistory/);
+    expect(app).not.toMatch(/readVaultPublishAckHistory/);
+    expect(app).not.toMatch(/confirmedBy:\s*'vault_ack_history'/);
+    expect(app).toMatch(/async function confirmVaultBatchReceiptsFromPublishState\(publishState, options = \{\}\)/);
+    expect(app).toMatch(/readBatchPublishReceipt\(provider, vaultAddress, owner, batch\.nonce, readOptions\)/);
+    expect(app).toMatch(/confirmedBy:\s*'vault_batch_receipt'/);
     expect(app).toMatch(/async function confirmPrivatePublishEntriesFromSenderIndex/);
     expect(app).toMatch(/confirmedBy:\s*'private_sender_index'/);
     expect(confirmationSource).toMatch(/await confirmPrivatePublishEntriesFromSenderIndex\(publishState, pendingParts, providerCandidates, readOptions, \{/);
-    expect(confirmationSource).toMatch(/candidateProvider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
+    expect(app).toMatch(/candidateProvider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
     expect(app).toMatch(/function publishConfirmScanBounds/);
     expect(app).toMatch(/function publishConfirmCommitScan/);
     expect(app).toMatch(/publishState\.confirmSearch/);
     expect(app).toMatch(/if \(latest > latestSeen\) \{[\s\S]*existing\.nextEntryId = latest > 0n \? String\(latest - 1n\) : null;[\s\S]*existing\.exhausted = false;/);
-    expect(app).toMatch(/async function computeVaultPublishId/);
-    expect(app).toMatch(/partWithPublishId\.publishId = publishId/);
+    // VPB2: each part's publish_id is the per-entry EPI1 derived by the batch builder (not a VPB1 single-publish id).
+    expect(app).not.toMatch(/async function computeVaultPublishId/);
+    expect(app).toMatch(/const epi1 = publishHashPlain\(batchExternal\.entryPublishIds\[entryIndex\]\)/);
+    expect(app).toMatch(/partWithPublishId\.publishId = epi1/);
     expect(app).toMatch(/function publishEntryMatchesPartPayload\(entry, part\)/);
     expect(app).toMatch(/options\.requirePublishIdMatch === true \|\| expectedPublishId/);
     expect(app).toMatch(/return options\.allowPublishIdMismatch === true/);
@@ -1933,15 +1951,16 @@ describe('PWA runtime config guard', () => {
     expect(confirmationSource).toMatch(/candidateProvider\.getPublicEntry\(entryId, readOptions\)/);
   });
 
-  it('RT-PWA-CAPS-001: publish confirmation cannot mark CapsuleHub confirmed from unverified reads or ACK history alone', () => {
+  it('RT-PWA-CAPS-001: publish confirmation cannot mark CapsuleHub confirmed from unverified reads, and the receipt-ring read is verified fail-closed', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const confirmationSource = app.slice(
-      app.indexOf('async function confirmCapsuleHubPublishEntriesFromVaultAckHistory'),
+      app.indexOf('async function confirmVaultBatchReceiptsFromPublishState'),
       app.indexOf('async function publishCapsuleThroughVault'),
     );
-    const ackSource = app.slice(
-      app.indexOf('async function confirmCapsuleHubPublishEntriesFromVaultAckHistory'),
-      app.indexOf('async function confirmPrivatePublishEntriesFromSenderIndex'),
+    // The receipt-ring confirm: the authoritative single-read answer for a batch's fate.
+    const receiptSource = app.slice(
+      app.indexOf('async function confirmVaultBatchReceiptsFromPublishState'),
+      app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'),
     );
     const strictStart = app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode');
     const directConfirmStart = app.indexOf('async function confirmCapsuleHubPublishEntries(publishState, options = {})');
@@ -1964,19 +1983,24 @@ describe('PWA runtime config guard', () => {
 
     expect(strictSource).toMatch(/const readOptions = publishConfirmReadOptions\(address, options\)/);
     expect(app).toMatch(/function publishConfirmReadOptions\(address, options = \{\}\)[\s\S]*const out = criticalCapsuleHubReadOptions\(address\)/);
-    expect(strictSource).not.toMatch(/capsuleHubMessageSyncReadOptions|verify:\s*false|allowUnverifiedCriticalRead/);
-    expect(ackSource).toMatch(/readVaultPublishAckHistory\(capsuleHubAddress, publishIds, options\)/);
-    expect(ackSource).toMatch(/candidateProvider\.getPublicEntry\(ack\.entryId, readOptions\)/);
-    expect(ackSource).toMatch(/candidateProvider\.getPrivateEntry\(ack\.entryId, readOptions\)/);
-    expect(ackSource).toMatch(/if \(!publishEntryMatchesPart\(entry, part\)\) continue/);
-    expect(ackSource).not.toMatch(/allowPublishIdMismatch/);
-    expect(confirmationSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true|verify:\s*false/);
+    // The CapsuleHub entry-scan recovery never trusts unverified critical reads to confirm.
+    expect(strictSource).not.toMatch(/capsuleHubMessageSyncReadOptions|allowUnverifiedCriticalRead/);
+    // The receipt-ring read is VERIFIED (dual-provider) fail-closed: a CAPSULEHUB_CONFIRMED transition must
+    // never rest on a single unverified replica.
+    expect(receiptSource).toMatch(/const readOptions = \{\s*verify: true,/);
+    expect(receiptSource).not.toMatch(/allowUnverifiedCriticalRead:\s*true/);
+    expect(receiptSource).toMatch(/readBatchPublishReceipt\(provider, vaultAddress, owner, batch\.nonce, readOptions\)/);
+    expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.CONFIRMED/);
+    expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.REJECTED/);
+    expect(receiptSource).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.BOUNCED/);
+    expect(receiptSource).toMatch(/firstEntryId \+ BigInt\(batchPartIndex\)/);
+    expect(receiptSource).toMatch(/confirmedBy:\s*'vault_batch_receipt'/);
     expect(confirmationSource).toMatch(/const requirePublishIdMatch = group\.kind === 'public'/);
     expect(confirmationSource).toMatch(/publishEntryMatchesPart\(entry, part, \{ allowPublishIdMismatch, requirePublishIdMatch \}\)/);
     expect(confirmationSource).not.toMatch(/group\.kind === 'public' && Boolean\(part\.authorWallet \?\? part\.author_wallet\)/);
     expect(directConfirmStart).toBeGreaterThan(strictStart);
     expect(confirmationSource).toMatch(/async function confirmCapsuleHubPublishEntries\(publishState, options = \{\}\)[\s\S]*return confirmCapsuleHubPublishEntriesWithReadMode\(publishState, options\.hot === true/);
-    expect(confirmationSource).toMatch(/if \(options\.skipAckHistory !== true\)[\s\S]*confirmCapsuleHubPublishEntriesFromVaultAckHistory/);
+    expect(strictSource).toMatch(/if \(options\.skipBatchReceipt !== true\)[\s\S]*confirmVaultBatchReceiptsFromPublishState/);
     expect(confirmationSource).toMatch(/scanLimit: options\.scanLimit \?\? CAPSULEHUB_PUBLISH_CONFIRM_HOT_SCAN_LIMIT/);
     expect(retrySource).toMatch(/await recoverDroppedSignedPublishParts\(message\)/);
     expect(retrySource).toMatch(/if \(message\.publishState\?\.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED\)[\s\S]*schedulePrivatePublishConfirmationRetry\(context\)/);
@@ -1991,7 +2015,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const repairSource = app.slice(
       app.indexOf('async function confirmPendingPrivatePublishMessagesFromEntries'),
-      app.indexOf('class PublishAckCellReader'),
+      app.indexOf('function publishConfirmSearchState'),
     );
     const strictSource = app.slice(
       app.indexOf('async function confirmCapsuleHubPublishEntriesWithReadMode'),
@@ -3758,11 +3782,12 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v488/);
+    expect(sw).toMatch(/platho-pwa-prototype-v489/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=424/);
+    expect(sw).toMatch(/\.\/app\.js\?v=425/);
+    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=1/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
