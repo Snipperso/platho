@@ -727,7 +727,7 @@ describe('PWA contract transaction builders', () => {
       'base64',
     ))[0];
 
-    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(63_000_000n);
+    expect(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS).toBe(563_000_000n);
     expect(ed25519.verify(
       Buffer.from(built.signature, 'hex'),
       Buffer.from(built.signedDataHash, 'hex'),

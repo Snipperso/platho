@@ -86,7 +86,7 @@
     },
     {
       "contract": "UsernameNFTItem.tact",
-      "non_comment_lines": 239,
+      "non_comment_lines": 238,
       "receive_handlers": 5,
       "bounced_handlers": 0,
       "forbidden_hits": [],
@@ -154,18 +154,18 @@
       "match": true
     },
     "USERNAME_NFT_ITEM_CODE_HASH": {
-      "built": "3ad1c971f6b04e67e8dafcb0624aa794e996761420500cdf10d4edc77a2037ce",
-      "pinned": "3ad1c971f6b04e67e8dafcb0624aa794e996761420500cdf10d4edc77a2037ce",
+      "built": "73d19a15d46c24d0eda7047d073490b7166d01322399751108be40ae2fda2eab",
+      "pinned": "73d19a15d46c24d0eda7047d073490b7166d01322399751108be40ae2fda2eab",
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "0febf3487aefc1363eba3cce080a23d001c8764f3b7031f0859e5cc2d39ab566",
-      "pinned": "0febf3487aefc1363eba3cce080a23d001c8764f3b7031f0859e5cc2d39ab566",
+      "built": "9f35c0499220a69dfbaa9ced5db36c62beb6bb1f4394d8e0a33e2e9b35723c47",
+      "pinned": "9f35c0499220a69dfbaa9ced5db36c62beb6bb1f4394d8e0a33e2e9b35723c47",
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "60a5bb63d11f510606038d633f30cf62d4fab87cc98c91c0f1b424b7acf9e0d2",
-      "pinned": "60a5bb63d11f510606038d633f30cf62d4fab87cc98c91c0f1b424b7acf9e0d2",
+      "built": "e824c40d09448ef30ea804cba46039423f264e8a7be347b6d8b3aed47cda60a6",
+      "pinned": "e824c40d09448ef30ea804cba46039423f264e8a7be347b6d8b3aed47cda60a6",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "539860aa79e71ff674229c51130e890ad078ea45a7af24ccbba759a739480df3",
+    "manifest_hash_hex": "22967c8c1603b93db2068133a84839b12605a6d5567883001125280aaeb342a8",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

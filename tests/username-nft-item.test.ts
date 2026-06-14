@@ -374,7 +374,7 @@ describe('UsernameNFTItem v1 milestone', () => {
     const metadata = content.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
     // The item now carries only the partial content; UsernameRegistry.get_nft_content adds the SVG art.
     expect(readSnakeText(metadata.get(metadataKey('name')))).toBe('platho.ath');
-    expect(readSnakeText(metadata.get(metadataKey('description')))).toBe('Platho username');
+    expect(readSnakeText(metadata.get(metadataKey('description')))).toBe('Private correspondence is a right, not a privilege. This is a username NFT for Platho — the anonymous, post-quantum-encrypted, uncensorable messenger. A permanent, transferable, fully on-chain handle: the name others reach you by, held by no one but you. platho.app');
     expect(metadata.get(metadataKey('image'))).toBeUndefined();
     expect(metadata.get(metadataKey('image_data'))).toBeUndefined();
   });

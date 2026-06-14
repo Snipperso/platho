@@ -125,7 +125,8 @@ async function sendMint(params: {
   payerWallet: Address;
   value?: bigint;
 }) {
-  await params.registry.send(params.officialAthWallet.getSender(), { value: params.value ?? toNano('0.15') }, {
+  // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so the mint notification must carry >= that.
+  await params.registry.send(params.officialAthWallet.getSender(), { value: params.value ?? toNano('0.6') }, {
     $$type: 'AthTransferNotificationVaultMintUsername',
     query_id: params.queryId,
     amount: params.amount,

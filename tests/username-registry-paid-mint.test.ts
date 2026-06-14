@@ -25,7 +25,7 @@ const PRICE_5 = 1_000_000_000_000n;
 const PRICE_6_PLUS = 100_000_000_000n;
 const OP_ATH_TRANSFER_NOTIFICATION_ACK = 0x472D9D7E;
 const OP_ATH_TRANSFER_NOTIFICATION_REFUND = 0x4154481E;
-const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 21_000_000n + 1_000_000n + 4_000_000n;
+const SUCCESSFUL_MINT_REQUIRED_VALUE = 6_000_000n + 500_000_000n + 1_000_000n + 4_000_000n;
 const USERNAME_ITEM_STORAGE_FLOOR = 15_900_000n;
 
 function fixtureAddress(label: string, workchain = 0): Address {
@@ -102,7 +102,8 @@ async function sendMint(
   ownerWallet: Address,
   name: string,
   amount: bigint,
-  value = toNano('0.1'),
+  // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M), so a successful mint notification must carry >= that.
+  value = toNano('0.6'),
   payerWallet = fixtureAddress('USERNAME_REGISTRY_VAULT'),
 ) {
   return registry.send(officialAthWallet.getSender(), { value }, {
@@ -346,7 +347,8 @@ describe('UsernameRegistry paid mint milestone', () => {
     const mintIterator = await blockchain.sendMessageIter(internalMessage(
       officialAthWallet.address,
       registry.address,
-      toNano('0.1'),
+      // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M); the mint notification must carry >= that.
+      toNano('0.6'),
       vaultMintNotificationBody(ownerA, 'ackrace', PRICE_6_PLUS, vaultAddress),
     ), { allowParallel: true });
 
@@ -398,7 +400,8 @@ describe('UsernameRegistry paid mint milestone', () => {
     const mintIterator = await blockchain.sendMessageIter(internalMessage(
       officialAthWallet.address,
       registry.address,
-      toNano('0.1'),
+      // Registry now retains 511M (6M + 500M item deploy reserve + 1M + 4M); the mint notification must carry >= that.
+      toNano('0.6'),
       vaultMintNotificationBody(ownerA, 'resrace', PRICE_6_PLUS, vaultAddress),
     ), { allowParallel: true });
 

@@ -17,7 +17,7 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 
 - Profile: PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15
 - Status: IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS
-- Hash: 539860aa79e71ff674229c51130e890ad078ea45a7af24ccbba759a739480df3
+- Hash: 22967c8c1603b93db2068133a84839b12605a6d5567883001125280aaeb342a8
 
 ## Remaining final-genesis blockers
 
@@ -38,6 +38,6 @@ Scope: static and manifest-level conformance checks over the implemented subset.
 | FeeAccumulator.tact | 125 | 7 | 1 | true | true |
 | MarketStabilitySeller.tact | 468 | 12 | 1 | true | true |
 | ProfileRegistry.tact | 542 | 12 | 2 | true | true |
-| UsernameNFTItem.tact | 239 | 5 | 0 | true | true |
+| UsernameNFTItem.tact | 238 | 5 | 0 | true | true |
 | UsernameRegistry.tact | 1146 | 14 | 3 | true | true |
 | Vault.tact | 2473 | 16 | 4 | true | true |
