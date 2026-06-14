@@ -1764,7 +1764,6 @@ describe('Vault TON RPC provider', () => {
             ],
           };
         }
-        if (call.method === 'get_canonical_publish_charge') return { stack: [num(58_000_000n)] };
         if (call.method === 'get_global') {
           return {
             stack: [
@@ -1815,7 +1814,11 @@ describe('Vault TON RPC provider', () => {
       owner_wallet: OWNER,
       amount: 500n,
     });
-    await expect(provider.getCanonicalPublishCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(58_000_000n);
+    // VPB2: getCanonicalPublishCharge is now a pure client computation (SHARED_BASE + per-part marginal == a
+    // 1-part batch canonical_total) — the per-message contract getter get_canonical_publish_charge was removed
+    // with the batch redeploy, so this makes NO RPC call and is absent from the calls list below.
+    await expect(provider.getCanonicalPublishCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(156_500_000n);
+    await expect(provider.getCanonicalPublishCharge(OWNER, 2n, 1n, 0n)).resolves.toBe(161_000_000n);
     await expect(provider.getGlobal()).resolves.toMatchObject({
       sealed: true,
       capsule_hub_bound: true,
@@ -1829,10 +1832,11 @@ describe('Vault TON RPC provider', () => {
       'get_receive_intent_commitment',
       'get_ath_withdrawal_id',
       'get_pending_ath_withdrawal_for',
-      'get_canonical_publish_charge',
       'get_global',
     ]);
-    expect(decodeTonAddressSliceBoc(calls[5].stack[0].value)).toBe(OWNER);
+    // get_pending_ath_withdrawal_for (now index 4 after get_canonical_publish_charge stopped hitting the RPC)
+    // passes the owner address as its first stack arg.
+    expect(decodeTonAddressSliceBoc(calls[4].stack[0].value)).toBe(OWNER);
   });
 
   it('VAULT-RPC-06: decodes the Vault registry binding fields from new get_global stacks', () => {

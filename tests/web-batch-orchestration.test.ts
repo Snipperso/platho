@@ -118,14 +118,23 @@ describe('VPB2 publish-batch orchestration: grouping + batch-external build', ()
     expect(batches.flatMap((b) => b.partIndexes)).toEqual(items.map((_v, i) => i));
   });
 
-  it('WBO-GROUP-04: kind label + max-charge floor clamp behave as the Vault expects', () => {
+  it('WBO-GROUP-04: kind label + batch hold model (SHARED_BASE + per-part marginal, floor clamp)', () => {
     expect(publishItemKindLabel(publicItem(0, 0))).toBe('public');
     expect(publishItemKindLabel(privateItem(0, 0))).toBe('private');
-    // tiny per-part holds clamp UP to the affine floor; large holds sum through.
-    const tiny = [privateItem(0, 0, 1n), privateItem(1, 1, 1n)];
-    expect(batchMaxChargeForItems(tiny)).toBe(batchChargeFloor(2));
-    const big = [privateItem(0, 0, toNano('1')), privateItem(1, 1, toNano('1'))];
-    expect(batchMaxChargeForItems(big)).toBe(toNano('2'));
+    // VPB2: max_charge is the AMORTIZED batch hold (SHARED_BASE charged once + Σ per-part marginal), derived
+    // from each item's kind+size — NOT the sum of the per-item maxCharge fields (the stale model). Item
+    // maxCharge is ignored by the orchestrator now, so the result is identical regardless of those values.
+    const SHARED_BASE = 127_800_000n;
+    const PRIV_1K = 28_700_000n; // private size-1 per-part marginal (message-pricing-policy.mjs)
+    const twoPriv1k = [privateItem(0, 0, 1n), privateItem(1, 1, toNano('1'))];
+    const expectedHold = SHARED_BASE + 2n * PRIV_1K; // 185.2M
+    expect(batchMaxChargeForItems(twoPriv1k)).toBe(expectedHold);
+    // The amortized hold comfortably exceeds the affine pre-accept floor for this small shape.
+    expect(batchMaxChargeForItems(twoPriv1k)).toBeGreaterThan(batchChargeFloor(2));
+    // A 1-part batch pays SHARED_BASE once: its per-capsule hold is far higher than an 8-part batch's.
+    const one = batchMaxChargeForItems([privateItem(0, 0)]);
+    const eight = batchMaxChargeForItems(Array.from({ length: 8 }, (_v, i) => privateItem(i % 90, i)));
+    expect(eight / 8n).toBeLessThan(one); // amortization: per-capsule hold drops with batch size
   });
 
   async function runOrchestratedBatch(kindItems: any[], kind: bigint) {

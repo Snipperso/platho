@@ -1,5 +1,5 @@
 import { parseTonAddress, verifyVaultKeyRecordBinding } from './crypto/platho-crypto.mjs?v=12';
-import { computeVaultMessagingKeyId } from './pwa-contract-transactions.mjs?v=25';
+import { computeVaultMessagingKeyId } from './pwa-contract-transactions.mjs?v=26';
 
 export class VaultChainProviderUnavailableError extends Error {
   constructor(message = 'Vault chain provider is not configured') {

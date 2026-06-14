@@ -13,7 +13,8 @@ import {
   batchChargeFloor,
   buildBatchPublishExternalBoc,
   buildBatchPublishPartsRoot,
-} from './pwa-contract-transactions.mjs?v=25';
+} from './pwa-contract-transactions.mjs?v=26';
+import { batchHoldNanotons } from './message-pricing-policy.mjs?v=12';
 
 export { MAX_BATCH_PARTS };
 
@@ -92,13 +93,29 @@ export function publishItemToBatchPart(item, kindLabel = publishItemKindLabel(it
   };
 }
 
-// max_charge the signed root must clear: the sum of the per-item canonical holds, clamped UP to the affine
-// batch floor for this part count (the Vault rejects a batch whose max_charge < batchChargeFloor(partCount)).
+// Pull a part's size_class off its charge-plan item (publish payload first, then top-level fallbacks).
+function publishItemSizeClass(item) {
+  const publish = item?.publish ?? {};
+  return publish.size_class ?? publish.sizeClass ?? item?.sizeClass ?? item?.size_class ?? 1;
+}
+
+// max_charge the signed batch root must clear. The contract post-accept-rejects RJ_UNDERPRICED (0x16) any
+// batch whose max_charge < canonical_total, where canonical_total == SHARED_BASE + Σ perPartHold(kind,size).
+// So the hold is the AMORTIZED batch model (SHARED_BASE charged ONCE, not per item) — NOT a sum of per-item
+// single-capsule holds, and NOT the stale per-message table. It is then clamped UP to the pre-accept affine
+// floor batchChargeFloor(partCount) (the Vault drops a batch whose max_charge < floor before acceptance).
+// Since canonical_total >= floor for every honest shape, the clamp is a no-op in practice but keeps the two
+// gates consistent. Over-reserving above canonical_total is refunded on the mode-128 ACK, so a conservative
+// hold only costs a transient reserve, never a real debit — but it must NEVER be below canonical_total.
 export function batchMaxChargeForItems(items) {
-  const partCount = items.length;
-  const summed = items.reduce((total, item) => total + BigInt(item.maxCharge ?? 0n), 0n);
+  const list = (items ?? []).filter(Boolean);
+  const partCount = list.length;
+  const hold = batchHoldNanotons(list.map((item) => ({
+    kindLabel: publishItemKindLabel(item),
+    sizeClass: publishItemSizeClass(item),
+  })));
   const floor = batchChargeFloor(partCount);
-  return summed > floor ? summed : floor;
+  return hold > floor ? hold : floor;
 }
 
 // Build ONE signed batch external from a grouped batch. ctx carries the owner, the chosen client_nonce, the

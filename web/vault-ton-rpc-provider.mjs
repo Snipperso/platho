@@ -1,5 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell } from './pwa-contract-transactions.mjs?v=25';
+import { MLKEM768_PUBLIC_KEY_BYTES, readSnakeCellBytes, tonCell, VAULT_PUBLISH_KIND } from './pwa-contract-transactions.mjs?v=26';
+import { BATCH_SHARED_BASE_HOLD_NANOTONS, capsulePerPartHoldNanotons } from './message-pricing-policy.mjs?v=12';
 
 const { parseBocBase64 } = tonCell;
 
@@ -2061,22 +2062,15 @@ export function createVaultTonRpcProvider(options = {}) {
         ...runGetCallOptions(callOptions),
       }));
     },
-    async getCanonicalPublishCharge(ownerWallet, publishKind, sizeClass, cryptoSuite, callOptions = {}) {
-      const transport = resolveTransport(options);
-      if (!transport?.runGetMethod) throw new VaultTonRpcProviderError('TON RPC transport is not configured');
-      const vaultAddress = resolveVaultAddress(options.vaultAddress, callOptions);
-      const result = await transport.runGetMethod({
-        address: vaultAddress,
-        method: 'get_canonical_publish_charge',
-        stack: [
-          stackAddress(ownerWallet),
-          stackNumber(publishKind),
-          stackNumber(sizeClass),
-          stackNumber(cryptoSuite),
-        ],
-        ...runGetCallOptions(callOptions),
-      });
-      return readStackInt(extractStack(result), 0, 'Vault canonical publish charge');
+    // VPB2: the per-message contract getter get_canonical_publish_charge was removed with the batch redeploy.
+    // The single-capsule canonical hold is now a pure client computation from the recalibrated pricing model:
+    // SHARED_BASE + perPartHold(kind, size) == the canonical_total (== signed max_charge) of a 1-part batch.
+    // No RPC round-trip; callOptions are accepted for signature compatibility but ignored.
+    async getCanonicalPublishCharge(ownerWallet, publishKind, sizeClass, _cryptoSuite, _callOptions = {}) {
+      const kindLabel = BigInt(publishKind ?? VAULT_PUBLISH_KIND.PRIVATE) === VAULT_PUBLISH_KIND.PUBLIC
+        ? 'public'
+        : 'private';
+      return BATCH_SHARED_BASE_HOLD_NANOTONS + capsulePerPartHoldNanotons(kindLabel, Number(sizeClass ?? 1));
     },
     async getGlobal(callOptions = {}) {
       const transport = resolveTransport(options);

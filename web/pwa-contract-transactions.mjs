@@ -45,7 +45,8 @@ export const OP_PUBLISH_BATCH = 0x7e1f5041n;                   // Vault external
 export const MAX_BATCH_PARTS = 8;                              // mirrors contracts/Vault.tact MAX_BATCH_PARTS
 export const VPB2_VERSION = 1n;                                // mirrors contracts/Vault.tact VPB2_VERSION
 // Pinned affine charge floor (mirrors contracts/Vault.tact BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * n).
-export const BATCH_FLOOR_BASE_PIN = 200_700_000n;
+// Recalibrated 2026-06-14: base = worst-case EXT_HARD import hold (89.63M -> 92M) + reject base compute (0.7M).
+export const BATCH_FLOOR_BASE_PIN = 92_700_000n;
 export const BATCH_FLOOR_PER_PART_PIN = 6_200_000n;
 export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
 export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
