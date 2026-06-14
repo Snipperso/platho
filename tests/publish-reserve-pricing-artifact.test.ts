@@ -22,14 +22,14 @@ function currentCodeHashes(): Record<string, string> {
     }));
 }
 
-// NOTE(Session 6 — client pricing rework): the VPB2 redeploy removed the per-message getter
+// NOTE(Session 6 — client pricing rework, DONE): the VPB2 redeploy removed the per-message getter
 // get_canonical_publish_charge and replaced the single-message charge model with the batch floor-pin +
-// post-accept canonicalTotal. The generator (scripts/publish_reserve_pricing.ts) was migrated onto the VPB2
-// batch path: it now drives a signed batch external through the bound+sealed Vault + CapsuleHub for evidence
-// and sources the per-size hold / net price / protocol fee from web/message-pricing-policy.mjs. The hold/net
-// tables pinned here still belong to the OLD per-message client model and are scheduled for re-derivation
-// against the batch floor-pin in the Session 6 client pricing rework; the report records the runtime canonical
-// total in observed_settled_charge_nanotons so that re-derivation has current-build evidence.
+// post-accept canonicalTotal. The generator (scripts/publish_reserve_pricing.ts) drives a signed batch
+// external through the bound+sealed Vault + CapsuleHub for evidence and sources the per-size hold / net price
+// / protocol fee from web/message-pricing-policy.mjs. The hold table is now the RE-DERIVED batch model: each
+// case's canonical_max_charge_nanotons is a 1-part batch's canonical_total (SHARED_BASE + per-part marginal),
+// and user_net_debit_nanotons is the observed SETTLED net charge after the over-hold ACK refund. The
+// no-underprice proof lives in tests/web-publish-pricing.test.ts.
 describe('Publish reserve pricing artifacts', () => {
   it('PUBLISH-PRICE-ARTIFACT-01: pricing report is tied to current build code hashes', () => {
     const report = readJson('artifacts/publish_reserve_pricing_report.json');
@@ -54,8 +54,8 @@ describe('Publish reserve pricing artifacts', () => {
     expect(report.fee_config_snapshot.config_25_cell_price).toBe('436906667');
     expect(report.current_constants_nanotons.privateHybridFee).toBe('10000000');
     expect(report.current_constants_nanotons.publicFee).toBe('10000000');
-    expect(report.cases.find((item: any) => item.id === 'public_1k')?.user_net_debit_nanotons).toBe('33700000');
-    expect(report.cases.find((item: any) => item.id === 'private_hybrid_1k')?.user_net_debit_nanotons).toBe('34700000');
+    expect(report.cases.find((item: any) => item.id === 'public_1k')?.user_net_debit_nanotons).toBe('34700000');
+    expect(report.cases.find((item: any) => item.id === 'private_hybrid_1k')?.user_net_debit_nanotons).toBe('32300000');
     expect(report.cases.map((item: any) => item.id)).toEqual([
       'public_1k',
       'public_2k',
