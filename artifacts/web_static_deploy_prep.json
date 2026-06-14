@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-13T17:06:36.794Z",
+  "generatedAt": "2026-06-14T08:45:51.133Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 129,
-    "totalBytes": 3159570,
-    "bundleSha256": "b053f9391a7bc9556d4cbe78cd3c135d893f65022ba71ccc9eb074fa15807c7a",
+    "totalBytes": 3179572,
+    "bundleSha256": "cd511668c6f1f6aeb385c01d61ff221fb631c94f7ec5e8d48ee9d2c6042d9417",
     "files": [
       {
         "path": "app.js",
@@ -174,8 +174,8 @@
       },
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
-        "bytes": 32511,
-        "sha256": "b8a68fdd00205968da86add3dbc6f04fcc50b56fbc765e903b6cd49bc8f80639"
+        "bytes": 41822,
+        "sha256": "717a1db54f17da31359ba76f5b52b164a78a7fc551505902ac8e6802534250d8"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -294,8 +294,8 @@
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 74154,
-        "sha256": "0cbba0c1a09573b091cbd2d37c63eecb181b3a0672c741aa953377164efa8a77"
+        "bytes": 84845,
+        "sha256": "b71ecfc37af2af89d048a5d0d24214db333da959f46a80cb290ca7f13e81ad1e"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
