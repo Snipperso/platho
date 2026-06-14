@@ -24,7 +24,7 @@ import {
 // current-build fee evidence, and sources the per-size hold / net price / protocol fee from the client
 // message-pricing-policy tables (mirrored below). See tests/helpers/vpb2.ts for the wire format.
 
-// EVIDENCE_MAX_CHARGE clears the VPB2 pre-accept floor (BATCH_FLOOR_BASE_PIN 200_700_000 + per-part pin) so the
+// EVIDENCE_MAX_CHARGE clears the VPB2 pre-accept floor (BATCH_FLOOR_BASE_PIN 92_700_000 + per-part pin) so the
 // batch settles CONFIRMED and refunds the excess down to the runtime-priced canonical total. It is the signed
 // hold *envelope* for the sandbox evidence run, NOT the per-size client hold reported in canonical_max_charge.
 const EVIDENCE_MAX_CHARGE = toNano('1');
@@ -35,40 +35,55 @@ const BASE_NOW = 1_700_000_000;
 
 const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 
-// Mirror of web/message-pricing-policy.mjs (PUBLIC/PRIVATE_CAPSULE_HOLD + _NET_PRICE tables and the
-// SUCCESSFUL_PUBLISH_ACK_REFUND constant). Kept in sync — not derived — so the artifact stays a flat pin;
-// tests/publish-reserve-pricing-artifact and scripts/preprod_guard.mjs both cross-check these against the
-// policy module and fail the build on any drift. These hold/net tables are the OLD per-message client model
-// and are slated for re-derivation against the batch floor-pin in the Session 6 client pricing rework.
+// Mirror of web/message-pricing-policy.mjs (the RE-DERIVED VPB2 batch hold model, Session 6 client pricing
+// rework). Kept in sync — not imported — because this generator runs under ts-node CommonJS, which cannot
+// require the .mjs ESM policy module. tests/publish-reserve-pricing-artifact and scripts/preprod_guard.mjs
+// BOTH cross-check the generated report against the real policy module exports and FAIL the build on any
+// drift, so the mirror cannot silently diverge. canonical_max_charge_nanotons == the SINGLE-capsule total
+// hold (a 1-part batch's canonical_total == SHARED_BASE + perPartHold(kind,size)); user_net_debit_nanotons ==
+// the OBSERVED SETTLED net price (sandbox-measured after the over-hold ACK refund).
 const PROTOCOL_FEE = 10_000_000n;
-const SUCCESSFUL_PUBLISH_ACK_REFUND = 25_800_000n;
+const BATCH_SHARED_BASE_HOLD = 127_800_000n;
 const PUBLIC_HOLD_BY_SIZE: Record<number, bigint> = {
-  1: 59_500_000n,
-  2: 66_500_000n,
-  4: 70_200_000n,
-  8: 77_800_000n,
-  16: 93_100_000n,
-  32: 123_600_000n,
+  1: 161_000_000n,
+  2: 161_600_000n,
+  4: 162_800_000n,
+  8: 165_300_000n,
+  16: 170_200_000n,
+  32: 180_100_000n,
 };
 const PRIVATE_HOLD_BY_SIZE: Record<number, bigint> = {
-  1: 60_500_000n,
-  2: 62_400_000n,
-  4: 66_100_000n,
-  8: 73_700_000n,
-  16: 89_000_000n,
-  32: 119_500_000n,
+  1: 156_500_000n,
+  2: 157_200_000n,
+  4: 158_400_000n,
+  8: 160_900_000n,
+  16: 165_800_000n,
+  32: 175_700_000n,
 };
-// Net price = hold - successful-publish ACK refund (PUBLIC_CAPSULE_NET_PRICE / PRIVATE_CAPSULE_NET_PRICE).
-function netPrice(hold: bigint): bigint {
-  return hold - SUCCESSFUL_PUBLISH_ACK_REFUND;
-}
+const PUBLIC_NET_BY_SIZE: Record<number, bigint> = {
+  1: 34_700_000n,
+  2: 36_000_000n,
+  4: 38_500_000n,
+  8: 43_500_000n,
+  16: 53_600_000n,
+  32: 73_600_000n,
+};
+const PRIVATE_NET_BY_SIZE: Record<number, bigint> = {
+  1: 32_300_000n,
+  2: 33_600_000n,
+  4: 36_100_000n,
+  8: 41_100_000n,
+  16: 51_200_000n,
+  32: 71_200_000n,
+};
 
 const CURRENT = {
   privateHybridFee: PROTOCOL_FEE,
   publicFee: PROTOCOL_FEE,
-  successfulPublishAckRefund: SUCCESSFUL_PUBLISH_ACK_REFUND,
+  // Amortizable fixed base of a batch's canonical_total (charged once per signed root).
+  batchSharedBaseHold: BATCH_SHARED_BASE_HOLD,
   // VPB2 pinned pre-accept floor (contracts/Vault.tact BATCH_FLOOR_BASE_PIN / BATCH_FLOOR_PER_PART_PIN).
-  batchFloorBasePin: 200_700_000n,
+  batchFloorBasePin: 92_700_000n,
   batchFloorPerPartPin: 6_200_000n,
   ackMinForward: 30_000_000n,
 };
@@ -427,28 +442,22 @@ function renderMarkdown(report: PricingReport): string {
 }
 
 export async function runPublishReservePricing(writeArtifacts = true): Promise<PricingReport> {
-  const publicCases: PublishCaseSpec[] = SIZE_CLASSES.map((sizeClass) => {
-    const hold = PUBLIC_HOLD_BY_SIZE[Number(sizeClass)];
-    return {
-      id: `public_${sizeClass}k`,
-      kind: KIND_PUBLIC,
-      sizeClass,
-      hold,
-      net: netPrice(hold),
-      protocolFee: CURRENT.publicFee,
-    };
-  });
-  const privateCases: PublishCaseSpec[] = SIZE_CLASSES.map((sizeClass) => {
-    const hold = PRIVATE_HOLD_BY_SIZE[Number(sizeClass)];
-    return {
-      id: `private_hybrid_${sizeClass}k`,
-      kind: KIND_PRIVATE,
-      sizeClass,
-      hold,
-      net: netPrice(hold),
-      protocolFee: CURRENT.privateHybridFee,
-    };
-  });
+  const publicCases: PublishCaseSpec[] = SIZE_CLASSES.map((sizeClass) => ({
+    id: `public_${sizeClass}k`,
+    kind: KIND_PUBLIC,
+    sizeClass,
+    hold: PUBLIC_HOLD_BY_SIZE[Number(sizeClass)],
+    net: PUBLIC_NET_BY_SIZE[Number(sizeClass)],
+    protocolFee: CURRENT.publicFee,
+  }));
+  const privateCases: PublishCaseSpec[] = SIZE_CLASSES.map((sizeClass) => ({
+    id: `private_hybrid_${sizeClass}k`,
+    kind: KIND_PRIVATE,
+    sizeClass,
+    hold: PRIVATE_HOLD_BY_SIZE[Number(sizeClass)],
+    net: PRIVATE_NET_BY_SIZE[Number(sizeClass)],
+    protocolFee: CURRENT.privateHybridFee,
+  }));
   const cases = [
     ...(await Promise.all(publicCases.map((item) => measureCase(item)))),
     ...(await Promise.all(privateCases.map((item) => measureCase(item)))),

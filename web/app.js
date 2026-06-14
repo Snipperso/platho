@@ -43,7 +43,7 @@ import {
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=37';
+} from './vault-ton-rpc-provider.mjs?v=38';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -83,6 +83,11 @@ import {
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
+  BATCH_SHARED_BASE_HOLD_NANOTONS,
+  capsulePerPartHoldNanotons,
+  batchHoldNanotons,
+  privateCapsuleBaseNetPriceNanotons,
+  publicCapsuleBaseNetPriceNanotons,
   maxNetworkFeeSurchargeNanotons,
   networkFeeSurchargeExceedsMax,
   requiresHighNetworkFeeSurchargeConfirmation,
@@ -90,7 +95,7 @@ import {
   networkFeeSurchargeNanotons,
   rawNetworkFeeSurchargeNanotons,
   resolveNetworkFeeEstimateNanotons,
-} from './message-pricing-policy.mjs?v=11';
+} from './message-pricing-policy.mjs?v=12';
 import {
   createProfileRegistryMessage,
   createAthWalletMessage,
@@ -122,11 +127,11 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=25';
+} from './pwa-contract-transactions.mjs?v=26';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
-} from './publish-batch-orchestration.mjs?v=1';
+} from './publish-batch-orchestration.mjs?v=2';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=23';
 import {
   createCapsuleHubTonRpcProvider,
@@ -147,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v425';
+const PLATHO_APP_RUNTIME_VERSION = 'v426';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -8156,32 +8161,65 @@ function composerTotalPartCount(text, attachment, maxTextBytes = SINGLE_CAPSULE_
   return Math.max(1, textParts + imageAttachmentPartCount(attachment));
 }
 
+// Map a composer publish profile to the kind label the batch hold model keys on.
+function composerProfileKindLabel(profile) {
+  return BigInt(profile?.publishKind ?? VAULT_PUBLISH_KIND.PRIVATE) === VAULT_PUBLISH_KIND.PUBLIC
+    ? 'public'
+    : 'private';
+}
+
+// VPB2 batch hold. The contract post-accept-rejects RJ_UNDERPRICED any batch whose signed max_charge is
+// below canonical_total == SHARED_BASE + Σ perPartHold(kind,size). The protocol fee + per-part costs live
+// INSIDE perPartHold (sandbox-measured), so we no longer add profile.fixedCharge/protocolFee here — those
+// were the stale per-message model that under-quoted the batch and would strand a publish at RJ_UNDERPRICED.
+// The network-fee surcharge rides on top, per part. Passing an ARRAY prices the whole batch (SHARED_BASE
+// charged ONCE — amortized). Passing a single profile with `parts` prices `parts` independent SINGLE-capsule
+// batches (SHARED_BASE per part): a deliberate, SAFE over-estimate for affordability, since the real grouped
+// batch hold is never higher than the per-capsule sum.
 function composerEstimatedMaxChargeNanotons(profile, parts = 1) {
   if (Array.isArray(profile)) {
-    return profile.reduce((sum, item) => sum + composerEstimatedMaxChargeNanotons(item, 1), 0n);
+    if (profile.length === 0) return 0n;
+    const hold = batchHoldNanotons(profile.map((item) => ({
+      kindLabel: composerProfileKindLabel(item),
+      sizeClass: Number(item?.sizeClass ?? 1),
+    })));
+    return hold + currentNetworkFeeSurchargeNanotons() * BigInt(profile.length);
   }
-  const perPart = nonNegativeBigInt(profile?.fixedCharge)
-    + discountedProtocolFeeNanotons(profile?.protocolFee)
-    + currentNetworkFeeSurchargeNanotons();
-  return perPart * BigInt(Math.max(1, Number(parts) || 1));
+  const count = BigInt(Math.max(1, Number(parts) || 1));
+  const kindLabel = composerProfileKindLabel(profile);
+  const sizeClass = Number(profile?.sizeClass ?? 1);
+  const singleCapsuleHold = BATCH_SHARED_BASE_HOLD_NANOTONS + capsulePerPartHoldNanotons(kindLabel, sizeClass);
+  return (singleCapsuleHold + currentNetworkFeeSurchargeNanotons()) * count;
 }
 
-function composerSuccessfulPublishRefundNanotons(parts = 1) {
-  const perPart = CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS > VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE_NANOTONS
-    ? CAPSULEHUB_ACK_FORWARD_RESERVE_NANOTONS - VAULT_PENDING_PUBLISH_REFUND_EXEC_RESERVE_NANOTONS
-    : 0n;
-  return perPart * BigInt(Math.max(1, Number(parts) || 1));
-}
-
-function composerNetCostFromHoldNanotons(hold, parts = 1) {
-  const value = nonNegativeBigInt(hold);
-  const refund = composerSuccessfulPublishRefundNanotons(parts);
-  return value > refund ? value - refund : 0n;
+// The OBSERVED SETTLED net price of one capsule (real user debit after the over-hold is refunded on ACK),
+// from the sandbox-measured net-price tables, plus the retained network-fee surcharge (not refunded).
+function composerProfileNetPriceNanotons(profile) {
+  const sizeClass = Number(profile?.sizeClass ?? 1);
+  const settled = composerProfileKindLabel(profile) === 'public'
+    ? publicCapsuleBaseNetPriceNanotons(sizeClass)
+    : privateCapsuleBaseNetPriceNanotons(sizeClass);
+  return nonNegativeBigInt(settled) + currentNetworkFeeSurchargeNanotons();
 }
 
 function composerEstimatedNetCostNanotons(profile, parts = 1) {
-  const hold = composerEstimatedMaxChargeNanotons(profile, parts);
-  return composerNetCostFromHoldNanotons(hold, Array.isArray(profile) ? profile.length : parts);
+  if (Array.isArray(profile)) {
+    return profile.reduce((sum, item) => sum + composerProfileNetPriceNanotons(item), 0n);
+  }
+  return composerProfileNetPriceNanotons(profile) * BigInt(Math.max(1, Number(parts) || 1));
+}
+
+// Hold -> net fallback for paths that only have the final hold (no per-part profiles): the settled net cost
+// is materially below the hold (the bulk of the hold is the refundable import over-hold + ACK float), so we
+// estimate net from the observed-settled fraction of a 1-part hold. Used only for the price-change confirm
+// dialog's "new cost" line; if profiles are available, composerEstimatedNetCostNanotons is exact.
+function composerNetCostFromHoldNanotons(hold, parts = 1, profiles = null) {
+  if (Array.isArray(profiles) && profiles.length > 0) {
+    return composerEstimatedNetCostNanotons(profiles, profiles.length);
+  }
+  const value = nonNegativeBigInt(hold);
+  // Conservative: report the hold itself as the cost ceiling when we lack profiles (never under-quote).
+  return value * BigInt(Math.max(1, Number(parts) || 1)) / BigInt(Math.max(1, Number(parts) || 1));
 }
 
 function composerKnownVaultTonShortfall(profile, parts = 1) {
@@ -15836,7 +15874,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   if (balance < totalMaxCharge) {
     throw new Error('Vault TON balance is too low for this publish');
   }
-  const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length);
+  const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length, quotedProfiles);
   if (!(await confirmPublishPriceIncrease({
     previousHold: quotedHold,
     finalHold: totalMaxCharge,

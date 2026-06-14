@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v425<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v425'/);
+    expect(html).toMatch(/id="appVersionLabel">v426<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v426'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -781,7 +781,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/Cost/);
     expect(app).toMatch(/Hold/);
     expect(app).toMatch(/composerEstimatedNetCostNanotons/);
-    expect(app).toMatch(/composerSuccessfulPublishRefundNanotons/);
+    expect(app).toMatch(/composerProfileNetPriceNanotons/);
     expect(app).toMatch(/function confirmPublishPriceIncrease/);
     expect(app).toMatch(/The chain returned a higher fresh price before signing/);
     expect(app).toMatch(/Send with new price/);
@@ -957,7 +957,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function rememberLocalPublicPost'),
     );
     const quoteIndex = prepareSource.indexOf('const quotedProfiles = composerPublishProfilesForCapsules(normalizedCapsules)');
-    const freshIndex = prepareSource.indexOf('const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length)');
+    const freshIndex = prepareSource.indexOf('const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length, quotedProfiles)');
     const confirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
 
     expect(quoteIndex).toBeGreaterThanOrEqual(0);
@@ -3782,21 +3782,21 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v489/);
+    expect(sw).toMatch(/platho-pwa-prototype-v490/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=425/);
-    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=1/);
+    expect(sw).toMatch(/\.\/app\.js\?v=426/);
+    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=72/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=28/);
-    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=11/);
+    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=25/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=26/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=25/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=23/);
