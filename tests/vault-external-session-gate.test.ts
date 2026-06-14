@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Address, beginCell, Cell, external, toNano } from '@ton/core';
 import { keyPairFromSeed, sign } from '@ton/crypto';
@@ -48,11 +49,19 @@ import {
 //     the nonce is burned (+1), the user is refunded max_charge - batchChargeFloor (so balance drops by ~the
 //     floor, not max_charge), NO pending entry is created, and the receipt slot records the RJ_* code.
 //
-// batchChargeFloor(partCount) = BATCH_FLOOR_BASE_PIN(200_700_000) + BATCH_FLOOR_PER_PART_PIN(6_200_000)*partCount
-// (contracts/Vault.tact). A maxCharge that clears the floor but sits below canonical_total -> RJ_UNDERPRICED.
+// batchChargeFloor(partCount) = BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN*partCount (contracts/Vault.tact).
+// A maxCharge that clears the floor but sits below canonical_total -> RJ_UNDERPRICED. The pins are READ FROM THE
+// CONTRACT SOURCE (same srcIntConst regex as tests/vpb2-release-gates.test.ts) so this gate auto-tracks any future
+// floor recalibration instead of hardcoding a snapshot value.
 
-const BATCH_FLOOR_BASE_PIN = 200_700_000n;
-const BATCH_FLOOR_PER_PART_PIN = 6_200_000n;
+const VAULT_SRC = readFileSync('contracts/Vault.tact', 'utf8');
+function srcIntConst(name: string): bigint {
+  const m = VAULT_SRC.match(new RegExp(`const\\s+${name}\\s*:\\s*Int\\s*=\\s*(\\d+)`));
+  if (!m) throw new Error(`could not read const ${name} from contracts/Vault.tact`);
+  return BigInt(m[1]);
+}
+const BATCH_FLOOR_BASE_PIN = srcIntConst('BATCH_FLOOR_BASE_PIN');
+const BATCH_FLOOR_PER_PART_PIN = srcIntConst('BATCH_FLOOR_PER_PART_PIN');
 const batchChargeFloor = (partCount: bigint): bigint => BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * partCount;
 
 // A comfortably-canonical max_charge for a 1-part batch (the working batch suite uses 0.5–1 TON).
@@ -330,8 +339,12 @@ describe('Vault VPB2: batch external session gate', () => {
   it('VAULT-BALANCE-PUBLISH-03: a valid signature with max_charge above the floor but below canonical_total rejects RJ_UNDERPRICED', async () => {
     const { blockchain, vault, user } = await setupRegistered();
     const nonce = (await vault.getGetUser(user.address)).publish_nonce;
-    // Just above the pre-accept floor (passes 16485) but far below the runtime canonical_total -> refundable.
-    const maxCharge = batchChargeFloor(1n) + 1n;
+    // Just above the pre-accept floor (clears 16485) but well below the runtime canonical_total -> RJ_UNDERPRICED
+    // with a refund. floor(1) is the pinned pre-accept floor; canonical_total is the runtime-priced real cost
+    // (observed ~151.5M-152M for a 1-part private batch in-sandbox, where the external import fee is 0). A small
+    // delta above the floor stays comfortably under canonical_total, so the charge is refunded and the receipt
+    // records RJ_UNDERPRICED.
+    const maxCharge = batchChargeFloor(1n) + 5_000_000n;
     const body = batchExternalBody({
       vaultAddr: vault.address, owner: user.address, nonce, maxCharge,
       partCount: 1n, partsRoot: partsList(KIND_PRIVATE, 1),

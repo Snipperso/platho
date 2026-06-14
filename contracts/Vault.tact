@@ -325,11 +325,14 @@ const AUX_BATCH_LEVEL: Int = 0xFFFFFFFFFFFFFFFF; // 2^64-1: batch-level aux (no 
 // --- VPB2 batch publish ---
 const MAX_BATCH_PARTS: Int = 8;
 const VPB2_VERSION: Int = 1;
-// Worst-case import bound for the pre-accept floor + the signed hold: the config-43 message caps,
-// which provably upper-bound the import fee of ANY legal inbound external (drain-proof). The Session-5
-// generator MAY tighten EXT_HARD to the sandbox-measured fee-maximizer. Gates a REFUNDABLE hold.
-const EXT_HARD_CELLS: Int = 8192;      // 2^13 max_msg_cells
-const EXT_HARD_BITS: Int = 2097152;    // 2^21 max_msg_bits
+// Worst-case import bound for the pre-accept floor + the signed hold: provably upper-bounds the import fee of
+// ANY legal inbound EXTERNAL (drain-proof) — gates a REFUNDABLE hold. Tightened (2026-06-14) from the absolute
+// TVM message caps (8192 cells / 2^21 bits) to the config-43 max_ext_msg_size: an inbound external BoC is <=
+// 65,535 bytes, so its data is <= 65535*8 = 524,280 bits (data cannot exceed the byte size that carries it),
+// and its cells are still <= the 8192 cap. The network drops anything larger before the contract runs, so this
+// is a true ceiling, not the 2^21-bit theoretical max (which an external can never reach). Halves the hold.
+const EXT_HARD_CELLS: Int = 8192;      // config-43 max_msg_cells
+const EXT_HARD_BITS: Int = 524280;     // config-43 max_ext_msg_size (65535 bytes) * 8 — provable data-bit ceiling
 // Root-cell bit width of the PublishBatchToHub body (0xA4F862D1), used to fee the Vault->Hub forward over
 // the FULL message (root + parts subtree + optional marketing), not the bare parts subtree. Derivation:
 // op(32)+bounce_id(64)+bounce_tag(160)+publish_id(256)+kind(8)+part_count(8)+protocol_fee(128)
@@ -342,10 +345,11 @@ const ACK_MIN_FORWARD: Int = 30000000; // 0.03 TON floor for the ACK leg (return
 // reject_fee uses the SAME formula, so reject refund = max_charge - floor >= 0 ALWAYS (the pre-accept gate is
 // max_charge >= floor) and the Vault recovers its real import as long as each pin >= its runtime value.
 // canonical_total and success retention stay RUNTIME-priced (post-accept, gas-ample, config-tracking).
-// Snapshot (config-43 caps): getForwardFee(EXT_HARD)=194,490,145; getComputeFee(REJECT_BASE_GAS=10000)≈666,667;
-// getComputeFee(WALK_GAS_PER_PART_MAX=90000)≈6,000,003 — each rounded UP for config headroom. Generator
-// re-pins at freeze; release gate G2 asserts each pin >= its runtime value (drain-proof reject).
-const BATCH_FLOOR_BASE_PIN: Int = 200700000;   // import hold (~195M, rounded to 200M) + reject base compute (~0.7M)
+// Snapshot (config-43 max_ext_msg_size, on-chain measured 2026-06-14 via diag_ext_hard_import):
+// getForwardFee(8192,524280)=89,632,004; getComputeFee(REJECT_BASE_GAS=10000)=666,668;
+// getComputeFee(WALK_GAS_PER_PART_MAX=90000)=6,000,001 — each rounded UP for config headroom. Release gate G2
+// reads diag_forward_fee/diag_compute_fee and asserts each pin >= its runtime value (drain-proof reject).
+const BATCH_FLOOR_BASE_PIN: Int = 92700000;    // import hold (89.63M, rounded up to 92M) + reject base compute (0.7M)
 const BATCH_FLOOR_PER_PART_PIN: Int = 6200000; // per-part walk compute (getComputeFee(90000)≈6.0M, rounded up)
 const PROTOCOL_FEE_TON_BATCH: Int = 10000000; // 0.01 TON per part
 const STORAGE_RESERVE_PRIVATE: Int = 4300000; // 1M keepalive + 3.3M endowment
@@ -2650,6 +2654,19 @@ contract Vault {
             publish_nonce: user.publish_nonce,
             receipts: user.receipts
         };
+    }
+
+    // Drain-safety diagnostics: the live-config forward/compute fees the floor pins must dominate (release gate
+    // G2 reads these and asserts BATCH_FLOOR_BASE_PIN / BATCH_FLOOR_PER_PART_PIN >= the runtime values, so the
+    // reject_fee always covers the Vault's real worst-case import + walk cost at the current network config).
+    get fun diag_forward_fee(cells: Int, bits: Int): Int {
+        return getForwardFee(cells, bits, false);
+    }
+    get fun diag_compute_fee(gas: Int): Int {
+        return getComputeFee(gas, false);
+    }
+    get fun diag_ext_hard_import(): Int {
+        return getForwardFee(EXT_HARD_CELLS, EXT_HARD_BITS, false);
     }
 
 

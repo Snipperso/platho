@@ -174,6 +174,9 @@ PROGRAM{
   DECLPROC $Vault$_fun_get_user
   DECLPROC $VaultUserReceiptsView$_constructor_exists_publish_nonce_receipts
   DECLPROC $Vault$_fun_get_user_receipts
+  DECLPROC $Vault$_fun_diag_forward_fee
+  DECLPROC $Vault$_fun_diag_compute_fee
+  DECLPROC $Vault$_fun_diag_ext_hard_import
   DECLPROC $VaultKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt
   DECLPROC $Vault$_fun_get_key_record
   DECLPROC $VaultReceiveIntentView$_constructor_exists_sender_wallet_recipient_wallet_asset_amount_commitment_client_nonce_settlement_reserve_ton_created_at_claimed
@@ -203,6 +206,9 @@ PROGRAM{
   DECLPROC $ATHTransferRequestVaultMintUsername$_constructor_query_id_amount_recipient_response_destination_notify_value_owner_wallet_username_len_username
   91785 DECLMETHOD %get_user
   79094 DECLMETHOD %get_user_receipts
+  127218 DECLMETHOD %diag_forward_fee
+  107587 DECLMETHOD %diag_compute_fee
+  107995 DECLMETHOD %diag_ext_hard_import
   104356 DECLMETHOD %get_key_record
   118324 DECLMETHOD %get_receive_intent
   72648 DECLMETHOD %get_receive_intent_id
@@ -2765,7 +2771,7 @@ PROGRAM{
         HASHCU
   }>
   $Vault$_fun_batchChargeFloor PROCINLINE:<{
-    200700000 PUSHINT
+    92700000 PUSHINT
     6200000 PUSHINT
     ROT
     MUL
@@ -3440,6 +3446,20 @@ PROGRAM{
     SWAP
     $VaultUserReceiptsView$_constructor_exists_publish_nonce_receipts INLINECALLDICT
   }>
+  $Vault$_fun_diag_forward_fee PROCREF:<{
+    FALSE
+        GETFORWARDFEE
+  }>
+  $Vault$_fun_diag_compute_fee PROCREF:<{
+    FALSE
+        GETGASFEE
+  }>
+  $Vault$_fun_diag_ext_hard_import PROCREF:<{
+    13 PUSHPOW2
+    524280 PUSHINT
+    FALSE
+        GETFORWARDFEE
+  }>
   $VaultKeyRecordView$_constructor_exists_owner_wallet_key_generation_enc_pubkey_sign_pubkey_pq_kem_pubkey_hash_pq_kem_pubkey_len_pq_kem_pubkey_crypto_suite_mask_created_at_created_lt_revoked_at_revoked_lt PROCINLINE:<{
   }>
   $Vault$_fun_get_key_record PROCREF:<{
@@ -3846,6 +3866,48 @@ PROGRAM{
     15 3 BLKDROP2
     9 3 BLKDROP2
     $VaultUserReceiptsView$_to_external INLINECALLDICT
+  }>
+  %diag_forward_fee PROC:<{
+    $Vault$_contract_load INLINECALLDICT
+    23 s() 25 s() XCHG
+    22 s() 24 s() XCHG
+    21 s() 23 s() XCHG
+    20 s() 22 s() XCHG
+    19 s() 21 s() XCHG
+    18 s() 20 s() XCHG
+    17 s() 19 s() XCHG
+    16 s() 18 s() XCHG
+    s15 17 s() XCHG
+    s14 16 s() XCHG
+    2 14 BLKSWAP
+    $Vault$_fun_diag_forward_fee INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    8 1 BLKDROP2
+  }>
+  %diag_compute_fee PROC:<{
+    $Vault$_contract_load INLINECALLDICT
+    23 s() 24 s() XCHG
+    22 s() 23 s() XCHG
+    21 s() 22 s() XCHG
+    20 s() 21 s() XCHG
+    19 s() 20 s() XCHG
+    18 s() 19 s() XCHG
+    17 s() 18 s() XCHG
+    16 s() 17 s() XCHG
+    s15 16 s() XCHG
+    15 ROLL
+    $Vault$_fun_diag_compute_fee INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    8 1 BLKDROP2
+  }>
+  %diag_ext_hard_import PROC:<{
+    $Vault$_contract_load INLINECALLDICT
+    $Vault$_fun_diag_ext_hard_import INLINECALLDICT
+    16 s() POP
+    15 BLKDROP
+    8 1 BLKDROP2
   }>
   %get_key_record PROC:<{
     $Vault$_contract_load INLINECALLDICT
@@ -9888,7 +9950,7 @@ PROGRAM{
       8 LDU
       DROP
       16485 PUSHINT
-      200700000 PUSHINT
+      92700000 PUSHINT
       6200000 PUSHINT
       s3 PUSH
       MUL
@@ -10798,7 +10860,7 @@ PROGRAM{
         }>
       }>
       13 PUSHPOW2
-      21 PUSHPOW2
+      524280 PUSHINT
       26 s() PUSH
       s0 s2 XCHG
       26 s() PUSH
@@ -11007,7 +11069,7 @@ PROGRAM{
       FALSE
           GETGASFEE
       13 PUSHPOW2
-      21 PUSHPOW2
+      524280 PUSHINT
       FALSE
           GETFORWARDFEE
       OVER
