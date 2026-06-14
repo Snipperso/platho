@@ -1,6 +1,6 @@
 # Platho Static Web Deploy Prep
 
-Status: BLOCKED_BY_PREPROD
+Status: PRODUCTION_STATIC_PACKAGE_READY
 Mode: production
 Domain: platho.app
 Output: C:\platho\artifacts\platho-web-static-production
@@ -10,7 +10,7 @@ Output: C:\platho\artifacts\platho-web-static-production
 ```text
 fileCount=129
 totalBytes=3189348
-bundleSha256=3557ad146ea122555c43bf5be588bdbb9efcbd5c3e3aa1c54c507e4d4f98439c
+bundleSha256=37c787064b86263715708eff2f295d2c51104474aaf51b9cf3a03f3208a0861e
 noBackendRuntime=true
 ```
 
@@ -21,11 +21,11 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: false
+- productionMarkersCleared: true
 
 ## Blockers
 
-- MAINNET_GENESIS_NOT_VERIFIED
+None
 
 ## Warnings
 
@@ -33,4 +33,4 @@ None
 
 ## Production Findings
 
-- MAINNET_GENESIS_NOT_VERIFIED: Current release candidate has no verified final mainnet genesis evidence. (artifacts/MAINNET_GENESIS_VERIFIED.txt)
+None
