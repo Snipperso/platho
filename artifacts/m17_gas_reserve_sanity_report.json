@@ -839,8 +839,8 @@
           "label": "prune_stale_pending_mint",
           "inbound_value_nanotons": "50000000",
           "tx_count": 3,
-          "total_fees_nanotons": "1900461",
-          "max_single_tx_fee_nanotons": "1595466",
+          "total_fees_nanotons": "1986862",
+          "max_single_tx_fee_nanotons": "1681867",
           "max_gas_used": "8237",
           "aborted_count": 1,
           "failed_compute_count": 1,
@@ -857,7 +857,7 @@
               "exit_code": 0
             },
             {
-              "total_fees_nanotons": "1595466",
+              "total_fees_nanotons": "1681867",
               "gas_used": "8237",
               "gas_fees_nanotons": "549134",
               "action_fees_nanotons": "0",
@@ -881,7 +881,7 @@
           ]
         }
       ],
-      "total_fees_nanotons": "20522438",
+      "total_fees_nanotons": "20608839",
       "max_operation_fee_nanotons": "5933583",
       "max_gas_used": "35476"
     },
