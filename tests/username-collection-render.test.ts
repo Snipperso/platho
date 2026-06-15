@@ -26,7 +26,7 @@ function nameHash(name: string): bigint {
 }
 
 // Read a TEP-64 snake string. `hasMarker` (default true) consumes the leading
-// 0x00 snake-string marker byte (name/description/image_data). The base64 IMAGE
+// 0x00 snake-string marker byte (name/description/image_data). The percent IMAGE
 // URI is an off-chain-style ASCII snake with NO leading marker byte.
 function readSnakeText(cell: Cell, hasMarker = true): string {
   let current: Cell | null = cell;
@@ -44,6 +44,13 @@ function readSnakeText(cell: Cell, hasMarker = true): string {
     current = slice.remainingRefs > 0 ? slice.loadRef() : null;
   }
   return Buffer.concat(chunks).toString('utf8');
+}
+
+// Decode a percent-encoded URI body (each %XX -> byte, everything else literal),
+// the way a browser / GetGems would. The contract emits %XX only for the reserved
+// set and never a literal %, so a straight percent decode is exact.
+function percentDecode(s: string): string {
+  return Buffer.from(s.replace(/%([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16))), 'latin1').toString('utf8');
 }
 
 // Faithful replica of the slimmed UsernameNFTItem.individualContent(): { marker:0, { name, description } }.
@@ -133,10 +140,12 @@ describe('UsernameRegistry collection-render', () => {
       expect((svg.match(/<\/svg>/g) ?? []).length).toBe(1);
 
       const imageUri = readSnakeText(dict.get(metadataKey('image'))!, false);
-      expect(imageUri.startsWith('data:image/svg+xml;base64,')).toBe(true);
+      // image is a PERCENT data-URI (GetGems-proven, cheap getter), NOT base64.
+      expect(imageUri.startsWith('data:image/svg+xml,')).toBe(true);
+      expect(imageUri.startsWith('data:image/svg+xml;base64,')).toBe(false);
       expect(imageUri).not.toMatch(/^https?:|^ipfs:/);
-      // The base64 image must decode byte-for-byte to the image_data SVG.
-      const decoded = Buffer.from(imageUri.slice('data:image/svg+xml;base64,'.length), 'base64').toString('utf8');
+      // The percent image must decode byte-for-byte to the image_data SVG.
+      const decoded = percentDecode(imageUri.slice('data:image/svg+xml,'.length));
       expect(decoded).toBe(svg);
     });
   }
