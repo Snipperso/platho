@@ -1,0 +1,347 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/_probe/ProbeCollection/ProbeCollection_ProbeCollection.fc` 
+PROGRAM{
+  DECLPROC __tact_dict_get_uint_cell
+  DECLPROC $ProbeCollection$_store
+  DECLPROC $ProbeCollection$_load
+  DECLPROC $ProbeCollectionDataView$_to_external
+  DECLPROC $ProbeItem$init$_store
+  DECLPROC $ProbeCollection$init$_load
+  DECLPROC $ProbeCollection$_contract_init
+  DECLPROC $ProbeCollection$_contract_load
+  DECLPROC $ProbeCollection$_contract_store
+  DECLPROC $Cell$_fun_asSlice
+  DECLPROC $global_newAddress
+  DECLPROC $global_contractAddressExt
+  DECLPROC $global_contractAddress
+  DECLPROC $ProbeItem$_init_child
+  DECLPROC $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address
+  DECLPROC $ProbeCollection$_fun_get_collection_data
+  DECLPROC $ProbeCollection$_fun_get_nft_address_by_index
+  DECLPROC $ProbeCollection$_fun_get_nft_content
+  DECLPROC $SendParameters$_constructor_to_value_mode_bounce_code_data_body
+  102491 DECLMETHOD %get_collection_data
+  92067 DECLMETHOD %get_nft_address_by_index
+  68445 DECLMETHOD %get_nft_content
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_dict_get_uint_cell PROCINLINE:<{
+    -ROT
+    DICTUGETREF
+    NULLSWAPIFNOT
+    IF:<{
+    }>ELSE<{
+      DROP
+      PUSHNULL
+    }>
+  }>
+  $ProbeCollection$_store PROCINLINE:<{
+    s3 s4 XCHG2
+    STSLICE
+    64 STU
+    STREF
+    STDICT
+  }>
+  $ProbeCollection$_load PROCINLINE:<{
+    LDMSGADDR
+    64 LDU
+    LDREF
+    LDDICT
+    4 -ROLL
+  }>
+  $ProbeCollectionDataView$_to_external PROCINLINE:<{
+  }>
+  $ProbeItem$init$_store PROCINLINE:<{
+    s2 s3 XCHG2
+    STSLICE
+    257 PUSHINT
+    STIX
+    STSLICE
+  }>
+  $ProbeCollection$init$_load PROCINLINE:<{
+    LDMSGADDR
+    257 PUSHINT
+    LDIX
+    LDREF
+    LDDICT
+    4 -ROLL
+  }>
+  $ProbeCollection$_contract_init PROCINLINE:<{
+  }>
+  $ProbeCollection$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $ProbeCollection$_load INLINECALLDICT
+      1 4 BLKDROP2
+    }>ELSE<{
+      $ProbeCollection$init$_load INLINECALLDICT
+      s0 s4 XCHG
+      ENDS
+      3 ROLL
+      $ProbeCollection$_contract_init INLINECALLDICT
+    }>
+  }>
+  $ProbeCollection$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    4 -ROLL
+    $ProbeCollection$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $Cell$_fun_asSlice PROCINLINE:<{
+        CTOS
+  }>
+  $global_newAddress PROCINLINE:<{
+        NEWC
+    4 PUSHINT
+    SWAP
+    3 STU
+    s1 s2 XCHG
+    8 STI
+    256 STU
+        ENDC
+    $Cell$_fun_asSlice INLINECALLDICT
+  }>
+  $global_contractAddressExt PROCINLINE:<{
+        s0 PUSH HASHCU // `data` hash
+        s2 PUSH HASHCU // `code` hash
+        SWAP2
+        CDEPTH         // `data` depth
+        SWAP
+        CDEPTH         // `code` depth
+        131380 INT     // (2 << 16) | (1 << 8) | 0x34
+        // Group 2: Composition of the Builder
+        NEWC
+        24 STU  // store refs_descriptor | bits_descriptor | data
+        16 STU  // store depth_descriptor for `code`
+        16 STU  // store depth_descriptor for `data`
+        256 STU // store `code` hash
+        256 STU // store `data` hash
+        // Group 3: SHA256 hash of the resulting Builder
+        ONE HASHEXT_SHA256
+    $global_newAddress INLINECALLDICT
+  }>
+  $global_contractAddress PROCINLINE:<{
+    0 PUSHINT
+    -ROT
+    $global_contractAddressExt INLINECALLDICT
+  }>
+  $ProbeItem$_init_child PROCREF:<{
+        B{b5ee9c720101050100bf000114ff00f4a413f4bcf2c80b01020162020300dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40d33ffa4055206c139efa40810101d700fa40552003d158e204925f04e07023d74920c21f953103d31f309134e2c00003c12113b08e1102c87f01ca0055205023cecb3fcec9ed54e05f03f2c082014fa11f9fda89a1a4000335f481a67ff480aa40d8273df481020203ae01f480aa4007a2b1c5b678d86b0400207fc87001cb077001cb00c95463505240} B>boc PUSHREF
+    NEWC
+    FALSE
+    SWAP
+    1 STI
+    3 2 BLKSWAP
+    $ProbeItem$init$_store INLINECALLDICT
+    ENDC
+  }>
+  $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address PROCINLINE:<{
+  }>
+  $ProbeCollection$_fun_get_collection_data PROCREF:<{
+    s2 s1 s3 PUSH3
+    $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address INLINECALLDICT
+  }>
+  $ProbeCollection$_fun_get_nft_address_by_index PROCREF:<{
+        MYADDR
+    s1 s5 XCPU
+    $ProbeItem$_init_child INLINECALLDICT
+    $global_contractAddress INLINECALLDICT
+  }>
+  $ProbeCollection$_fun_get_nft_content PROCREF:<{
+    DROP
+    64 PUSHINT
+    s2 PUSH
+    s0 s2 XCHG
+    __tact_dict_get_uint_cell INLINECALLDICT
+    DUP
+    ISNULL
+    NOT
+    IFJMP:<{
+    }>
+    DROP
+        NEWC
+    0 PUSHINT
+    SWAP
+    8 STU
+    0 PUSHINT
+    SWAP
+    1 STU
+        ENDC
+  }>
+  $SendParameters$_constructor_to_value_mode_bounce_code_data_body PROCINLINE:<{
+    s4 s6 XCHG
+    s5 s1 s5 XCHG3
+    s4 s4 XCHG2
+    s0 s3 XCHG
+  }>
+  %get_collection_data PROC:<{
+    $ProbeCollection$_contract_load INLINECALLDICT
+    $ProbeCollection$_fun_get_collection_data INLINECALLDICT
+    4 3 BLKDROP2
+    $ProbeCollectionDataView$_to_external INLINECALLDICT
+  }>
+  %get_nft_address_by_index PROC:<{
+    $ProbeCollection$_contract_load INLINECALLDICT
+    4 ROLL
+    $ProbeCollection$_fun_get_nft_address_by_index INLINECALLDICT
+    4 1 BLKDROP2
+  }>
+  %get_nft_content PROC:<{
+    $ProbeCollection$_contract_load INLINECALLDICT
+    2 4 BLKSWAP
+    $ProbeCollection$_fun_get_nft_content INLINECALLDICT
+    4 1 BLKDROP2
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $ProbeCollection$_contract_load INLINECALLDICT
+    s0 s5 XCHG
+    IFJMP:<{
+      5 BLKDROP
+    }>
+    0 PUSHINT
+    s4 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s4 XCHG
+      32 LDU
+      s0 s5 XCHG
+    }>
+    OVER
+    1347571522 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s3 XCHG
+      LDVARUINT16
+      DROP
+      0 PUSHINT
+      WHILE:<{
+        s0 s2 PUSH2
+        LESS
+      }>DO<{
+            MYADDR
+        s1 s4 PUSH2
+        $ProbeItem$_init_child INLINECALLDICT
+        2DUP
+        $global_contractAddress INLINECALLDICT
+        2 PUSHINT
+        FALSE
+            <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+        s7 PUSH
+        s4 s6 XCHG
+        s0 s5 XCHG
+        s3 s4 XCHG
+        s3 s0 s0 XCHG3
+        $SendParameters$_constructor_to_value_mode_bounce_code_data_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+            STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+            // → Stack state
+            // s0: Builder
+            // s1: `data`
+            // s2: `code`
+            // s3: `body`
+            // s4: `mode`
+            // Group 2: Placing the Builder after code and data, then checking those for nullability
+            s2 XCHG0
+            DUP2
+            ISNULL
+            SWAP
+            ISNULL
+            AND
+            // → Stack state
+            // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+            // s1: `code`
+            // s2: `data`
+            // s3: Builder
+            // s4: `body`
+            // s5: `mode`
+            // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+            <{
+                DROP2 // drop `data` and `code`, since either of those is null
+                b{0} STSLICECONST
+            }> PUSHCONT
+            // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+            <{
+                // _ split_depth:(Maybe (## 5))
+                //   special:(Maybe TickTock)
+                //   code:(Maybe ^Cell)
+                //   data:(Maybe ^Cell)
+                //   library:(Maybe ^Cell)
+                // = StateInit;
+                ROT                // place message Builder on top
+                b{10} STSLICECONST // store Maybe = true, Either = false
+                // Start composing inlined StateInit
+                b{00} STSLICECONST // store split_depth and special first
+                STDICT             // store code
+                STDICT             // store data
+                b{0} STSLICECONST  // store library
+            }> PUSHCONT
+            // Group 3: IFELSE that does the branching shown above
+            IFELSE
+            // → Stack state
+            // s0: Builder
+            // s1: null or StateInit
+            // s2: `body`
+            // s3: `mode`
+            // Group 4: Finalizing the message
+            STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+            ENDC
+            // → Stack state
+            // s0: Cell
+            // s1: `mode`
+            // Group 5: Sending the message, with `mode` on top
+            SWAP
+            SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+        INC
+      }>
+      2DROP
+      s0 s0 s3 XCHG3
+      $ProbeCollection$_contract_store INLINECALLDICT
+    }>
+    s5 POP
+    0 EQINT
+    s0 s4 XCHG
+    33 LESSINT
+    s1 s4 XCHG
+    AND
+    IFJMP:<{
+      s0 s0 s3 XCHG3
+      $ProbeCollection$_contract_store INLINECALLDICT
+    }>
+    4 BLKDROP
+    130 THROW
+  }>
+}END>c

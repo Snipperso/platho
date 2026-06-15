@@ -36,7 +36,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=73';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=74';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
