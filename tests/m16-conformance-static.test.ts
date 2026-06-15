@@ -444,7 +444,12 @@ describe('M16 production conformance static checks', () => {
     }
   });
 
-  it('M16-CONF-04: implemented-subset manifest remains canonical and explicitly non-final while blockers remain', async () => {
+  it('M16-CONF-04: implemented-subset manifest fixture remains canonical and explicitly non-final while blockers remain', async () => {
+    // buildImplementedSubsetManifest() always returns the local implemented-subset
+    // FIXTURE (with its open blockers). The on-chain-verified FINAL_GENESIS manifest
+    // is promoted separately by the m15 CLI / m18 lock from the verifier-input
+    // snapshot, never re-derived by this fixture builder — so the fixture stays
+    // explicitly non-final regardless of MAINNET_GENESIS_VERIFIED.
     const { manifest } = await buildImplementedSubsetManifest();
     const recomputed = computeManifestCell({
       addresses: manifest.addresses,

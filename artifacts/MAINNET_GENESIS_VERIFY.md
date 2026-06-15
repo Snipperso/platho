@@ -1,19 +1,18 @@
 # Mainnet Genesis Verify
 
-Status: BLOCKED_GENESIS_MISMATCH
+Status: MAINNET_GENESIS_VERIFIED
 
-- mainnet_genesis_verified: false
-- checked_manifest_hash: 5980b2a2bc2518d36fce705eceec86a45b4102f6857a1fe29aacbf2c31381603
+- mainnet_genesis_verified: true
+- checked_manifest_hash: 4380cfc0bee0df6f363cd6f98d041bf9024df7c1c4828e8aac8ab78cc0faec4a
 - input_source: artifacts/mainnet_genesis_verify_input.json
-- input_sha256: a532faa4935d65092b4028a86297650d256e8b0431f28c9ceec107963a925431
+- input_sha256: 6849969748b2e24e097ac8933bf062023bd0cbc08d76edf668f52375bb76bc1b
 
 ## Evidence refs
 
-- getterSnapshotSource: live-rpc/platho-toncenter/2026-06-14T19:36:33.982Z
-- codeHashProofSource: artifacts/CURRENT_CODE_HASHES.txt#sha256=5118e6c465044012aec5ed946b0c6d562bba3ebac655a4e302a735b45fa1f743
-- finalManifestSource: artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=5980b2a2bc2518d36fce705eceec86a45b4102f6857a1fe29aacbf2c31381603
+- getterSnapshotSource: live-rpc/platho-toncenter/2026-06-15T16:15:07.356Z
+- codeHashProofSource: artifacts/CURRENT_CODE_HASHES.txt#sha256=f375e2a4162842a89208ae6900bf3abb888425cbd466e7858639d19c7755a373
+- finalManifestSource: artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=4380cfc0bee0df6f363cd6f98d041bf9024df7c1c4828e8aac8ab78cc0faec4a
 
 ## Issues
 
-- CURRENT_CODE_HASHES_DO_NOT_MATCH_FINAL_MANIFEST: Final genesis evidence does not belong to the current local build: username_registry: current=eb8b3ffad3a2da34d4c10e1ab8b2918f87e40c39b175cb46600d0a6ec7f59990, manifest=783ebf58d7a72be5504ef6c9fd8449c3aac31f0fe6367752de13a55fb41a6933.
-- MAINNET_GENESIS_VERIFY_INPUT_STALE_RELATIVE_TO_LOCAL_DRAFT: Stored mainnet genesis verifier input is stale relative to the current local final manifest draft. input=5980b2a2bc2518d36fce705eceec86a45b4102f6857a1fe29aacbf2c31381603 local_draft=4380cfc0bee0df6f363cd6f98d041bf9024df7c1c4828e8aac8ab78cc0faec4a production_deploy_executed=false Regenerate artifacts/mainnet_genesis_verify_input.json from a fresh live getter/code-hash snapshot before final mainnet verification.
+- none

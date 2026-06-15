@@ -1,0 +1,435 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; ProbeCollection_ProbeCollection.headers.fc
+;;
+;; Header files for ProbeCollection
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_dict_get_uint_cell
+cell __tact_dict_get_uint_cell(cell d, int kl, int k) inline;
+
+;; $ProbeCollection$_store
+builder $ProbeCollection$_store(builder build_0, (slice, int, cell, cell) v) inline;
+
+;; $ProbeCollection$_load
+(slice, ((slice, int, cell, cell))) $ProbeCollection$_load(slice sc_0) inline;
+
+;; $ProbeCollectionDataView$_to_external
+(int, cell, slice) $ProbeCollectionDataView$_to_external(((int, cell, slice)) v) inline;
+
+;; $ProbeItem$init$_store
+builder $ProbeItem$init$_store(builder build_0, (slice, int, slice) v) inline;
+
+;; $ProbeCollection$init$_load
+(slice, ((slice, int, cell, cell))) $ProbeCollection$init$_load(slice sc_0) inline;
+
+;; $ProbeCollection$_contract_init
+(slice, int, cell, cell) $ProbeCollection$_contract_init(slice $owner, int $next_index, cell $collection_content, cell $contents) impure inline;
+
+;; $ProbeCollection$_contract_load
+(slice, int, cell, cell) $ProbeCollection$_contract_load() impure inline;
+
+;; $ProbeCollection$_contract_store
+() $ProbeCollection$_contract_store((slice, int, cell, cell) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $global_contractAddress
+slice $global_contractAddress((cell, cell) $s) impure inline;
+
+;; $ProbeItem$_init_child
+(cell, cell) $ProbeItem$_init_child(slice $collection, int $index, slice $owner) inline_ref;
+
+;; $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address
+((int, cell, slice)) $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address(int $next_item_index, cell $collection_content, slice $owner_address) inline;
+
+;; $ProbeCollection$_fun_get_collection_data
+((slice, int, cell, cell), (int, cell, slice)) $ProbeCollection$_fun_get_collection_data((slice, int, cell, cell) $self) impure inline_ref;
+
+;; $ProbeCollection$_fun_get_nft_address_by_index
+((slice, int, cell, cell), slice) $ProbeCollection$_fun_get_nft_address_by_index((slice, int, cell, cell) $self, int $index) impure inline_ref;
+
+;; $ProbeCollection$_fun_get_nft_content
+((slice, int, cell, cell), cell) $ProbeCollection$_fun_get_nft_content((slice, int, cell, cell) $self, int $index, cell $individual_content) impure inline_ref;
+
+;; $SendParameters$_constructor_to_value_mode_bounce_code_data_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_code_data_body(slice $to, int $value, int $mode, int $bounce, cell $code, cell $data, cell $body) inline;
+
+
+;; ProbeCollection_ProbeCollection.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+cell __tact_dict_get_uint_cell(cell d, int kl, int k) inline {
+    var (r, ok) = udict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+cell $global_emptyCell() impure asm """
+    <b b> PUSHREF // Pure Fift: "<b" creates a builder, "b>" turns it into a cell at compile time
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_contractAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    return $global_contractAddressExt(0, $s'code, $s'data);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+;; ProbeCollection_ProbeCollection.storage.fc
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_bounce_code_data_body(slice $to, int $value, int $mode, int $bounce, cell $code, cell $data, cell $body) inline {
+    return ($mode, $body, $code, $data, $value, $to, $bounce);
+}
+
+;;
+;; Type: ProbeCollectionDataView
+;; TLB: _ next_item_index:int257 collection_content:^cell owner_address:address = ProbeCollectionDataView
+;;
+
+(int, cell, slice) $ProbeCollectionDataView$_to_external(((int, cell, slice)) v) inline {
+    var (v'next_item_index, v'collection_content, v'owner_address) = v; 
+    return (v'next_item_index, v'collection_content, v'owner_address);
+}
+
+((int, cell, slice)) $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address(int $next_item_index, cell $collection_content, slice $owner_address) inline {
+    return ($next_item_index, $collection_content, $owner_address);
+}
+
+;;
+;; Type: ProbeItem
+;; TLB: _ collection:address index:uint64 owner:address = ProbeItem
+;;
+
+builder $ProbeItem$init$_store(builder build_0, (slice, int, slice) v) inline {
+    var (v'collection, v'index, v'owner) = v;
+    build_0 = build_0.store_slice(v'collection);
+    build_0 = build_0.store_int(v'index, 257);
+    build_0 = build_0.store_slice(v'owner);
+    return build_0;
+}
+
+cell $ProbeItem$_child_get_code() impure asm """
+    B{b5ee9c720101050100bf000114ff00f4a413f4bcf2c80b01020162020300dcd001d072d721d200d200fa4021103450666f04f86102f862ed44d0d200019afa40d33ffa4055206c139efa40810101d700fa40552003d158e204925f04e07023d74920c21f953103d31f309134e2c00003c12113b08e1102c87f01ca0055205023cecb3fcec9ed54e05f03f2c082014fa11f9fda89a1a4000335f481a67ff480aa40d8273df481020203ae01f480aa4007a2b1c5b678d86b0400207fc87001cb077001cb00c95463505240} B>boc PUSHREF
+""";
+
+(cell, cell) $ProbeItem$_init_child(slice $collection, int $index, slice $owner) inline_ref {
+    ;; Build init code cell
+
+    ;; Contract Code: ProbeItem
+    cell init_code = $ProbeItem$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = b.store_int(false, 1);
+    b = $ProbeItem$init$_store(b, ($collection, $index, $owner));
+    return (init_code, b.end_cell());
+}
+
+;;
+;; Type: ProbeCollection
+;; TLB: _ owner:address next_index:uint64 collection_content:^cell contents:dict<uint64, ^cell> = ProbeCollection
+;;
+
+builder $ProbeCollection$_store(builder build_0, (slice, int, cell, cell) v) inline {
+    var (v'owner, v'next_index, v'collection_content, v'contents) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_uint(v'next_index, 64);
+    build_0 = build_0.store_ref(v'collection_content);
+    build_0 = build_0.store_dict(v'contents);
+    return build_0;
+}
+
+(slice, ((slice, int, cell, cell))) $ProbeCollection$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'next_index = sc_0~load_uint(64);
+    var v'collection_content = sc_0~load_ref();
+    var v'contents = sc_0~load_dict();
+    return (sc_0, (v'owner, v'next_index, v'collection_content, v'contents));
+}
+
+(slice, ((slice, int, cell, cell))) $ProbeCollection$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'next_index = sc_0~load_int(257);
+    var v'collection_content = sc_0~load_ref();
+    var v'contents = sc_0~load_dict();
+    return (sc_0, (v'owner, v'next_index, v'collection_content, v'contents));
+}
+
+(slice, int, cell, cell) $ProbeCollection$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$ProbeCollection$_load();
+    }
+    else {
+        (slice $owner, int $next_index, cell $collection_content, cell $contents) = $sc~$ProbeCollection$init$_load();
+        $sc.end_parse();
+        return $ProbeCollection$_contract_init($owner, $next_index, $collection_content, $contents);
+    }
+}
+
+() $ProbeCollection$_contract_store((slice, int, cell, cell) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $ProbeCollection$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract ProbeCollection functions
+;;
+
+(slice, int, cell, cell) $ProbeCollection$_contract_init(slice $owner, int $next_index, cell $collection_content, cell $contents) impure inline {
+    var (($self'owner, $self'next_index, $self'collection_content, $self'contents)) = (null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'next_index = $next_index;
+    $self'collection_content = $collection_content;
+    $self'contents = $contents;
+    return ($self'owner, $self'next_index, $self'collection_content, $self'contents);
+}
+
+((slice, int, cell, cell), (int, cell, slice)) $ProbeCollection$_fun_get_collection_data((slice, int, cell, cell) $self) impure inline_ref {
+    var (($self'owner, $self'next_index, $self'collection_content, $self'contents)) = $self;
+    var $fresh$ret_6 = $ProbeCollectionDataView$_constructor_next_item_index_collection_content_owner_address($self'next_index, $self'collection_content, $self'owner);
+    return (($self'owner, $self'next_index, $self'collection_content, $self'contents), $fresh$ret_6);
+}
+
+((slice, int, cell, cell), slice) $ProbeCollection$_fun_get_nft_address_by_index((slice, int, cell, cell) $self, int $index) impure inline_ref {
+    var (($self'owner, $self'next_index, $self'collection_content, $self'contents)) = $self;
+    var $fresh$ret_7 = $global_contractAddress($ProbeItem$_init_child($global_myAddress(), $index, $self'owner));
+    return (($self'owner, $self'next_index, $self'collection_content, $self'contents), $fresh$ret_7);
+}
+
+((slice, int, cell, cell), cell) $ProbeCollection$_fun_get_nft_content((slice, int, cell, cell) $self, int $index, cell $individual_content) impure inline_ref {
+    var (($self'owner, $self'next_index, $self'collection_content, $self'contents)) = $self;
+    cell $stored = __tact_dict_get_uint_cell($self'contents, 64, $index);
+    if ((~ null?($stored))) {
+        var $fresh$ret_8 = $stored;
+        return (($self'owner, $self'next_index, $self'collection_content, $self'contents), $fresh$ret_8);
+    }
+    var $fresh$ret_9 = $Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 0, 8), 0, 1));
+    return (($self'owner, $self'next_index, $self'collection_content, $self'contents), $fresh$ret_9);
+}
+
+;;
+;; Get methods of a Contract ProbeCollection
+;;
+
+_ %get_collection_data() method_id(102491) {
+    var self = $ProbeCollection$_contract_load();
+    var res = self~$ProbeCollection$_fun_get_collection_data();
+    return $ProbeCollectionDataView$_to_external(res);
+}
+
+_ %get_nft_address_by_index(int $index) method_id(92067) {
+    int $index = $index;
+    var self = $ProbeCollection$_contract_load();
+    var res = self~$ProbeCollection$_fun_get_nft_address_by_index($index);
+    return res;
+}
+
+_ %get_nft_content(int $index, cell $individual_content) method_id(68445) {
+    int $index = $index;
+    cell $individual_content = $individual_content;
+    var self = $ProbeCollection$_contract_load();
+    var res = self~$ProbeCollection$_fun_get_nft_content($index, $individual_content);
+    return res;
+}
+
+;;
+;; Routing of a Contract ProbeCollection
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'next_index, $self'collection_content, $self'contents) = $ProbeCollection$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ProbeMintAll message
+    if (op == 0x50524f42) {
+        var $msg'item_value = in_msg~load_varuint16();
+        int $i = 0;
+        while (($i < $self'next_index)) {
+            var ($init'code, $init'data) = $ProbeItem$_init_child($global_myAddress(), $i, $self'owner);
+            $global_send($SendParameters$_constructor_to_value_mode_bounce_code_data_body($global_contractAddress(($init'code, $init'data)), $msg'item_value, 2, false, $init'code, $init'data, $global_emptyCell()));
+            $i = $i + 1;
+        }
+        $ProbeCollection$_contract_store(($self'owner, $self'next_index, $self'collection_content, $self'contents));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $ProbeCollection$_contract_store(($self'owner, $self'next_index, $self'collection_content, $self'contents));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
