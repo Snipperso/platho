@@ -4,6 +4,11 @@
 // the page would otherwise stay a silent dark shell. After a timeout this
 // shows what went wrong instead. CSP note: styles go through CSSOM property
 // assignments because style-src 'self' forbids inline style attributes.
+//
+// User-facing copy is English-only on purpose: this screen is served to every
+// visitor regardless of locale, so any other language hardcoded here would
+// leak the team's origin. Keep it English-only and ASCII (OPSEC invariant,
+// enforced by tests/web-no-locale-leak.test.ts).
 (function () {
   'use strict';
 
@@ -79,14 +84,14 @@
     var midBoot = state === 'started' || state === 'error';
     var title = styled('div', { fontSize: '18px', fontWeight: '600', marginBottom: '12px' });
     title.textContent = midBoot
-      ? 'Platho запустился не полностью · Platho boot did not finish'
-      : 'Platho не запустился · Platho failed to start';
+      ? 'Platho boot did not finish'
+      : 'Platho failed to start';
     overlay.appendChild(title);
 
     var hint = styled('div', { marginBottom: '16px', color: '#b7c0c9' });
     hint.textContent = midBoot
-      ? 'Часть приложения может не отвечать. Пожалуйста, пришлите скриншот этого экрана. · Parts of the app may not respond. Please share a screenshot of this screen.'
-      : 'Обновите iOS/Safari до последней версии и откройте platho.app в обычном Safari, не во встроенном браузере другого приложения. · Update iOS/Safari and open platho.app in standalone Safari, not an in-app browser.';
+      ? 'Parts of the app may not respond. Please share a screenshot of this screen.'
+      : 'Update your browser to the latest version and open platho.app directly, not inside another app in-app browser.';
     overlay.appendChild(hint);
 
     var appError = document.documentElement.getAttribute('data-platho-app-error');
@@ -94,7 +99,7 @@
 
     if (bootErrors.length > 0) {
       var errorsTitle = styled('div', { fontWeight: '600', marginBottom: '6px' });
-      errorsTitle.textContent = 'Технические детали · Details:';
+      errorsTitle.textContent = 'Details:';
       overlay.appendChild(errorsTitle);
       for (var i = 0; i < bootErrors.length; i += 1) {
         var line = styled('div', {
@@ -124,7 +129,7 @@
       marginRight: '10px',
     });
     reload.type = 'button';
-    reload.textContent = 'Перезагрузить · Reload';
+    reload.textContent = 'Reload';
     reload.addEventListener('click', function () {
       window.location.reload();
     });
@@ -140,7 +145,7 @@
       fontWeight: '600',
     });
     dismiss.type = 'button';
-    dismiss.textContent = 'Продолжить · Continue';
+    dismiss.textContent = 'Continue';
     dismiss.addEventListener('click', function () {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     });

@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "name": "SvgRenderProbeItem",
+      "path": "contracts/_probe/SvgRenderProbeItem.tact",
+      "output": "build/_probe/SvgRenderProbeItem"
+    },
+    {
+      "name": "ProbeCollection",
+      "path": "contracts/_probe/ProbeCollection.tact",
+      "output": "build/_probe/ProbeCollection"
+    }
+  ]
+}

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'platho-pwa-prototype-v493';
+const CACHE_NAME = 'platho-pwa-prototype-v495';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=140',
   './app.js?v=426',
-  './boot-guard.js?v=2',
+  './boot-guard.js?v=3',
   './platho-config.mjs?v=73',
   './capsule-part-policy.mjs?v=3',
   './message-pricing-policy.mjs?v=12',
@@ -16,7 +16,7 @@ const ASSETS = [
   './ton-mnemonic-wordlist.mjs?v=1',
   './pwa-contract-transactions.mjs?v=28',
   './publish-batch-orchestration.mjs?v=2',
-  './vault-ton-rpc-provider.mjs?v=38',
+  './vault-ton-rpc-provider.mjs?v=39',
   './ton-dns-provider.mjs?v=21',
   './capsulehub-ton-rpc-provider.mjs?v=36',
   './ath-ton-rpc-provider.mjs?v=23',
