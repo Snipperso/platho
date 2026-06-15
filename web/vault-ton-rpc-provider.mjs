@@ -130,18 +130,25 @@ function isTonRpcHardTransportError(error) {
 }
 
 function noteTonRpcTransportFailure(transport, error, deadRetryMs = TON_RPC_TRANSPORT_DEAD_RETRY_MS) {
-  if (!transport || !isTonRpcHardTransportError(error)) return;
+  if (!transport) return;
+  const status = Number(error?.status ?? 0);
+  const code = String(error?.code ?? '').toUpperCase();
+  // A verifier-only transport is unusable as the second verifier when it answers
+  // 401/403 (policy denial, e.g. keyless toncenter blocked for this network) OR
+  // 429/rate-limited (keyless toncenter is ~1 rps and cannot keep up as a live
+  // verifier under sync load). Either way, park it at once so dual-provider
+  // verification degrades to the live gateway via criticalChainReadOptions
+  // instead of throwing "verification unavailable" on every critical read and
+  // re-hammering the throttled host each cycle. Primaries keep the failure
+  // threshold so an app-level 4xx -- or a transient 429 -- cannot park the main
+  // gateway by accident (429 is never a hard error for a non-verifier transport).
+  const verifierUnavailable = transport?.verifierOnly === true
+    && (status === 401 || status === 403 || status === 429 || code === 'RATE_LIMITED');
+  if (!verifierUnavailable && !isTonRpcHardTransportError(error)) return;
   const state = tonRpcTransportHealthState(transport);
   state.consecutiveHardFailures += 1;
   state.lastHardFailureAt = Date.now();
-  // 401/403 from a verifier-only transport is a deterministic policy denial
-  // (for example keyless toncenter blocked for the user's network); park it
-  // at once so verification degrades immediately instead of burning a retry
-  // ladder on every fresh session. Primaries keep the failure threshold so
-  // an app-level 4xx cannot park the main gateway by accident.
-  const status = Number(error?.status ?? 0);
-  const deterministicDenial = transport?.verifierOnly === true && (status === 401 || status === 403);
-  if (deterministicDenial) {
+  if (verifierUnavailable) {
     state.deadUntil = Date.now() + Math.max(
       finiteNonNegativeMs(deadRetryMs, TON_RPC_TRANSPORT_DEAD_RETRY_MS),
       TON_RPC_VERIFIER_DENIAL_PARK_MS,

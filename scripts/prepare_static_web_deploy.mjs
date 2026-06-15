@@ -30,6 +30,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'recipient-identities.mjs',
   'encrypted-message-store.mjs',
   'pwa-contract-transactions.mjs',
+  'publish-batch-orchestration.mjs',
   'platho-wallet.mjs',
   'ton-mnemonic-wordlist.mjs',
   'vault-ton-rpc-provider.mjs',

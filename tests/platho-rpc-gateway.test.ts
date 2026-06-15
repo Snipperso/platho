@@ -57,7 +57,7 @@ describe('Platho RPC gateway', () => {
     expect(gateway).not.toMatch(/UPSTREAM_AUTH|Authorization/);
     expect(envExample).toMatch(/PLATHO_RPC_TONCENTER_API_KEY_FILE=\/etc\/platho\/toncenter-mainnet\.key/);
     expect(envExample).toMatch(/PLATHO_RPC_TONCENTER_AUTH_RETRY_MS=60000/);
-    expect(envExample).toMatch(/PLATHO_RPC_ALLOWED_MESSAGE_OPCODES=0xa4f862c0,0x8c2a76b7,0x874e576a/);
+    expect(envExample).toMatch(/PLATHO_RPC_ALLOWED_MESSAGE_OPCODES=0xa4f862c0,0xa4f862d1,0x8c2a76b7,0x874e576a/);
     expect(envExample).not.toMatch(/Bearer|QuickNode|Chainstack/);
     expect(config).toMatch(/sendBocEndpoint:\s*'https:\/\/rpc\.platho\.app\/api\/v3\/message'/);
     // Direct TonCenter endpoints in the PWA are the keyless emergency

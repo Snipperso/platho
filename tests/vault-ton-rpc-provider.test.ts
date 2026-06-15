@@ -1162,6 +1162,80 @@ describe('Vault TON RPC provider', () => {
     })).resolves.toMatchObject({ stack: [num(7n)] });
   });
 
+  it('VAULT-RPC-04I8B: a 429 rate-limited verifier parks immediately and degrades like a denial', async () => {
+    const calls: string[] = [];
+    const transport = createTonRpcTransport({
+      primaryProviderId: 'platho-rpc',
+      fallbackProviderIds: [],
+      providers: [
+        {
+          id: 'platho-rpc',
+          kind: 'platho-rpc',
+          runGetMethodEndpoint: 'https://rpc.platho.example/api/v3/runGetMethod',
+        },
+        {
+          id: 'toncenter-direct',
+          kind: 'toncenter-v3',
+          verifierOnly: true,
+          emergencyFallback: true,
+          runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
+        },
+      ],
+      requestSpacingMs: 0,
+      rateLimitKey: `verifier-429-${Math.random()}`,
+      // Keyless toncenter is ~1 rps; under sync load it answers 429, not 403.
+      // A rate-limited verifier must park exactly like a denied one so the app
+      // degrades to the live gateway instead of re-hammering the throttled host
+      // and throwing "verification unavailable" on every critical read.
+      transportDeadRetryMs: 1,
+      verifyCriticalReads: true,
+      criticalMethods: ['get_user'],
+      fetch: async (url: string) => {
+        const endpoint = String(url);
+        calls.push(endpoint);
+        if (endpoint.includes('toncenter.example')) {
+          return {
+            ok: false,
+            status: 429,
+            async json() {
+              return { ok: false };
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { exit_code: 0, stack: [num(7n)] };
+          },
+        };
+      },
+    });
+
+    expect(transport?.isVerificationDegraded()).toBe(false);
+    const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
+    // The first verified read parks the 429 verifier (no failure-count warm-up).
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    expect(transport?.isVerificationDegraded()).toBe(true);
+    // Primary stays healthy: this is verification degradation, not the
+    // censorship-survival primary-parked mode.
+    expect(transport?.isDegraded()).toBe(false);
+    // The rate-limit park lasts minutes, not the 1ms dead-retry window: a short
+    // sleep does not re-probe the throttled verifier, so it stays parked and
+    // verified reads stay degraded instead of re-throwing each cycle.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(transport?.isVerificationDegraded()).toBe(true);
+    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
+    expect(toncenterCalls).toHaveLength(1);
+    // Unverified reads keep flowing through the healthy primary.
+    await expect(transport?.runGetMethod({
+      ...call,
+      verify: false,
+      allowUnverifiedCriticalRead: true,
+    })).resolves.toMatchObject({ stack: [num(7n)] });
+  });
+
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {
     const primary = {
       kind: 'primary-rpc',
