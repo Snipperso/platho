@@ -1,0 +1,156 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/platho/build/_probe/SvgRenderProbeItem/SvgRenderProbeItem_SvgRenderProbeItem.fc` 
+PROGRAM{
+  DECLPROC $ProbeOnchainContent$_store
+  DECLPROC $ProbeOnchainContent$_store_cell
+  DECLPROC $SvgRenderProbeItem$_store
+  DECLPROC $SvgRenderProbeItem$_load
+  DECLPROC $ProbeNftDataView$_to_external
+  DECLPROC $SvgRenderProbeItem$init$_load
+  DECLPROC $SvgRenderProbeItem$_contract_init
+  DECLPROC $SvgRenderProbeItem$_contract_load
+  DECLPROC $SvgRenderProbeItem$_contract_store
+  DECLPROC $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content
+  DECLPROC $ProbeOnchainContent$_constructor_marker_metadata
+  DECLPROC $SvgRenderProbeItem$_fun_get_nft_data
+  DECLPROC $SvgRenderProbeItem$_fun_get_config
+  102351 DECLMETHOD %get_nft_data
+  103798 DECLMETHOD %get_config
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  $ProbeOnchainContent$_store PROCINLINE:<{
+    s0 s2 XCHG
+    8 STU
+    STDICT
+  }>
+  $ProbeOnchainContent$_store_cell PROCINLINE:<{
+    -ROT
+    $ProbeOnchainContent$_store INLINECALLDICT
+    ENDC
+  }>
+  $SvgRenderProbeItem$_store PROCINLINE:<{
+    s2 s3 XCHG2
+    8 STU
+    STSLICE
+    STDICT
+  }>
+  $SvgRenderProbeItem$_load PROCINLINE:<{
+    8 LDU
+    LDMSGADDR
+    LDDICT
+    3 -ROLL
+  }>
+  $ProbeNftDataView$_to_external PROCINLINE:<{
+  }>
+  $SvgRenderProbeItem$init$_load PROCINLINE:<{
+    257 PUSHINT
+    LDIX
+    LDMSGADDR
+    LDDICT
+    3 -ROLL
+  }>
+  $SvgRenderProbeItem$_contract_init PROCINLINE:<{
+  }>
+  $SvgRenderProbeItem$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $SvgRenderProbeItem$_load INLINECALLDICT
+      1 3 BLKDROP2
+    }>ELSE<{
+      $SvgRenderProbeItem$init$_load INLINECALLDICT
+      s0 s3 XCHG
+      ENDS
+      ROT
+      $SvgRenderProbeItem$_contract_init INLINECALLDICT
+    }>
+  }>
+  $SvgRenderProbeItem$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    3 -ROLL
+    $SvgRenderProbeItem$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content PROCINLINE:<{
+  }>
+  $ProbeOnchainContent$_constructor_marker_metadata PROCINLINE:<{
+  }>
+  $SvgRenderProbeItem$_fun_get_nft_data PROCREF:<{
+    TRUE
+    0 PUSHINT
+    PUSHNULL
+    s1 s3 PUSH2
+    $ProbeOnchainContent$_constructor_marker_metadata INLINECALLDICT
+    NEWC
+    $ProbeOnchainContent$_store_cell INLINECALLDICT
+    s5 s(-1) PUXC
+    $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content INLINECALLDICT
+  }>
+  $SvgRenderProbeItem$_fun_get_config PROCREF:<{
+    s2 PUSH
+  }>
+  %get_nft_data PROC:<{
+    $SvgRenderProbeItem$_contract_load INLINECALLDICT
+    $SvgRenderProbeItem$_fun_get_nft_data INLINECALLDICT
+    3 5 BLKDROP2
+    $ProbeNftDataView$_to_external INLINECALLDICT
+  }>
+  %get_config PROC:<{
+    $SvgRenderProbeItem$_contract_load INLINECALLDICT
+    $SvgRenderProbeItem$_fun_get_config INLINECALLDICT
+    3 1 BLKDROP2
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $SvgRenderProbeItem$_contract_load INLINECALLDICT
+    s0 s4 XCHG
+    IFJMP:<{
+      4 BLKDROP
+    }>
+    0 PUSHINT
+    s3 PUSH
+    SBITS
+    DUP
+    31 GTINT
+    IF:<{
+      NIP
+      s0 s3 XCHG
+      32 LDU
+      DROP
+    }>ELSE<{
+      s4 POP
+    }>
+    0 EQINT
+    s0 s3 XCHG
+    33 LESSINT
+    s1 s3 XCHG
+    AND
+    IFJMP:<{
+      s0 s2 XCHG
+      $SvgRenderProbeItem$_contract_store INLINECALLDICT
+    }>
+    3 BLKDROP
+    130 THROW
+  }>
+}END>c

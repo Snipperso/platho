@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-15T15:18:41.304Z",
+  "generatedAt": "2026-06-15T16:22:41.681Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -10,12 +10,12 @@
   "runtime": {
     "fileCount": 130,
     "totalBytes": 3197012,
-    "bundleSha256": "5f939a4a2fadd4dc2c6a24f6217da00bb7a5f615d0a8f6cd0ecae3d26c3f5874",
+    "bundleSha256": "d57be31ca28a01f323fa03666e858cd51e72078dcdbd593e306061cbf2782ded",
     "files": [
       {
         "path": "app.js",
         "bytes": 723955,
-        "sha256": "7e987c7b3ebd850309949f31e525bcd124bdb277d12f3ce17ee3ee36f9ef78ec"
+        "sha256": "ccdf9c77b7fc253b3f1e384905cce12b404dbf59f4295b38f47e23791cfa0a71"
       },
       {
         "path": "assets/icons/back.svg",
@@ -225,7 +225,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 15275,
-        "sha256": "f1478d8d4138ff53aa0d2e98fe7f7c82a105aa0e3374ab3388865fa0bb969868"
+        "sha256": "8d55bc9a5f412baa4e990801e611b71139d0fec3fde1dec2ac3cf321f00895cf"
       },
       {
         "path": "platho-wallet.mjs",
@@ -275,7 +275,7 @@
       {
         "path": "sw.js",
         "bytes": 6517,
-        "sha256": "117fcd696b45c2500e5889bb89f63e9332f9523e019f3511242d18ed992520e2"
+        "sha256": "73cde5f0460041c9ef31a0874f3f1b075f95db23818b5980412bf9d4623ba72f"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -917,18 +917,11 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
   "blockers": [],
   "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION",
-    "MAINNET_GENESIS_NOT_VERIFIED"
+    "STATIC_PACKAGE_IS_NON_PRODUCTION"
   ],
-  "productionFindings": [
-    {
-      "id": "MAINNET_GENESIS_NOT_VERIFIED",
-      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
-      "message": "Current release candidate has no verified final mainnet genesis evidence."
-    }
-  ]
+  "productionFindings": []
 }

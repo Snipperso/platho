@@ -100,16 +100,11 @@
     "m17_gas_report_passes": true
   },
   "manifest": {
-    "stored_hash": "c551be39a2bcd81d599234c26d5d5a21053741e36d77ae4b14c9f846320638c6",
-    "rebuilt_hash": "c551be39a2bcd81d599234c26d5d5a21053741e36d77ae4b14c9f846320638c6",
+    "stored_hash": "4380cfc0bee0df6f363cd6f98d041bf9024df7c1c4828e8aac8ab78cc0faec4a",
+    "rebuilt_hash": "4380cfc0bee0df6f363cd6f98d041bf9024df7c1c4828e8aac8ab78cc0faec4a",
     "match": true,
-    "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "blockers_before_final_genesis": [
-      "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
-      "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
-      "ATH_LONG_TERM_VESTING_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VESTING_ATH_WALLET_BEFORE_FINAL_GENESIS",
-      "VAULT_ACTIVITY_AIRDROP_ALLOCATION_MUST_BE_FUNDED_IN_OFFICIAL_VAULT_ATH_WALLET_BEFORE_FINAL_GENESIS"
-    ]
+    "status": "FINAL_GENESIS",
+    "blockers_before_final_genesis": []
   },
   "stable_artifact_lock": {
     "artifacts/CURRENT_CODE_HASHES.txt": "f375e2a4162842a89208ae6900bf3abb888425cbd466e7858639d19c7755a373",
@@ -130,8 +125,8 @@
     "artifacts/username_nft_item_vectors.json": "a257f1bdc24800cb94c2bea13a9be3103d7f140f89ada0cba6cf138c8a6592a4",
     "artifacts/username_registry_foundation_vectors.json": "f83ee7d1b67465b49167443e0b23cb64cf6312078967ad4f16e7add6606a2798",
     "artifacts/username_registry_mint_vectors.json": "382c39f5c43ddbc1bd08e683ec34c3d73f232f3a04fe81ec68b7a326f1a6567d",
-    "artifacts/deployment_manifest_implemented_subset_m15.json": "9f51e18771908bdba923190bd53507176c8a3edc3a9a268bbcbc24f19215030e",
-    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "75908cf6c0fc03278d7c5207200dfb07f54ee1b1cb077812ed906abbc4fcff9e",
+    "artifacts/deployment_manifest_implemented_subset_m15.json": "4305cb01282c7807199c09b23cc21cd05bbd2f94c6da89acb309c74fc6005040",
+    "artifacts/DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15_HASH.txt": "695d4a4caca1a8e22790e9710d8f3469ace259d6ec681d410c83d68aea09e90a",
     "artifacts/m16_conformance_report.json": "429263f20dd30cd9d3dea105e0bf832ac74df79fa1d4a521b3f7ec0db106e412",
     "artifacts/m17_gas_reserve_sanity_report.json": "b43f0bc809e984576980786b3014417de4ddeb3b256bc4a2c2dd833594dad61b",
     "artifacts/platho_v1_open_values_v0_18_artifact_integrity.md": "a7c1973794154e626df35e5d0100ad941ac4d83b362864840b012b74268d94bb",
@@ -282,7 +277,7 @@
     "tests\\publish-reserve-pricing-artifact.test.ts": "9ca161ecf3ed080aa56725d85234a91ae4e632a2961086ab763f034c9230fb56",
     "tests\\pwa-chain-self-sufficiency.test.ts": "4da865526246f3d0e25efafcabade5ce19ded56e5af4aaaa73f726b16661b748",
     "tests\\pwa-contract-transactions.test.ts": "f54052d1c734ed888326952ea777f804fca5c0d0ff03fb26c3b93a3176da4fd8",
-    "tests\\pwa-runtime-config.test.ts": "c11e83da7143cf2d20325977ff160cf4bc5b8e8b847496bef513c602c00bf7ed",
+    "tests\\pwa-runtime-config.test.ts": "92f309830fb29eade0eb60a890fcef73d4fec60bd33b9b9efb51605241d316ac",
     "tests\\recipient-identities.test.ts": "a1a0a0120f841145d878c56385ad964a6febcd93ca04b17ea18741742c576bdd",
     "tests\\release-truth-single-source.test.ts": "a522ba35da3e907cc3b04ba665ec1ecf3bbda5cca08e55c825e9c4cb093f324e",
     "tests\\spec-onchain-message-source.test.ts": "22af83b81bda1d35d7f19db3a51c0436739126a420fc9b4f6dd6de6b72e11072",

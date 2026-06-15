@@ -1,0 +1,179 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; ProbeCollection_ProbeItem.headers.fc
+;;
+;; Header files for ProbeItem
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $ProbeItem$_store
+builder $ProbeItem$_store(builder build_0, (slice, int, slice) v) inline;
+
+;; $ProbeItem$_load
+(slice, ((slice, int, slice))) $ProbeItem$_load(slice sc_0) inline;
+
+;; $ProbeItemDataView$_to_external
+(int, int, slice, slice, cell) $ProbeItemDataView$_to_external(((int, int, slice, slice, cell)) v) inline;
+
+;; $ProbeItem$init$_load
+(slice, ((slice, int, slice))) $ProbeItem$init$_load(slice sc_0) inline;
+
+;; $ProbeItem$_contract_init
+(slice, int, slice) $ProbeItem$_contract_init(slice $collection, int $index, slice $owner) impure inline;
+
+;; $ProbeItem$_contract_load
+(slice, int, slice) $ProbeItem$_contract_load() impure inline;
+
+;; $ProbeItem$_contract_store
+() $ProbeItem$_contract_store((slice, int, slice) v) impure inline;
+
+;; $ProbeItemDataView$_constructor_init_index_collection_address_owner_address_individual_content
+((int, int, slice, slice, cell)) $ProbeItemDataView$_constructor_init_index_collection_address_owner_address_individual_content(int $init, int $index, slice $collection_address, slice $owner_address, cell $individual_content) inline;
+
+;; $ProbeItem$_fun_get_nft_data
+((slice, int, slice), (int, int, slice, slice, cell)) $ProbeItem$_fun_get_nft_data((slice, int, slice) $self) impure inline_ref;
+
+
+;; ProbeCollection_ProbeItem.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+;; ProbeCollection_ProbeItem.storage.fc
+;;
+;; Type: ProbeItemDataView
+;; TLB: _ init:bool index:int257 collection_address:address owner_address:address individual_content:^cell = ProbeItemDataView
+;;
+
+(int, int, slice, slice, cell) $ProbeItemDataView$_to_external(((int, int, slice, slice, cell)) v) inline {
+    var (v'init, v'index, v'collection_address, v'owner_address, v'individual_content) = v; 
+    return (v'init, v'index, v'collection_address, v'owner_address, v'individual_content);
+}
+
+((int, int, slice, slice, cell)) $ProbeItemDataView$_constructor_init_index_collection_address_owner_address_individual_content(int $init, int $index, slice $collection_address, slice $owner_address, cell $individual_content) inline {
+    return ($init, $index, $collection_address, $owner_address, $individual_content);
+}
+
+;;
+;; Type: ProbeItem
+;; TLB: _ collection:address index:uint64 owner:address = ProbeItem
+;;
+
+builder $ProbeItem$_store(builder build_0, (slice, int, slice) v) inline {
+    var (v'collection, v'index, v'owner) = v;
+    build_0 = build_0.store_slice(v'collection);
+    build_0 = build_0.store_uint(v'index, 64);
+    build_0 = build_0.store_slice(v'owner);
+    return build_0;
+}
+
+(slice, ((slice, int, slice))) $ProbeItem$_load(slice sc_0) inline {
+    var v'collection = sc_0~load_msg_addr();
+    var v'index = sc_0~load_uint(64);
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'collection, v'index, v'owner));
+}
+
+(slice, ((slice, int, slice))) $ProbeItem$init$_load(slice sc_0) inline {
+    var v'collection = sc_0~load_msg_addr();
+    var v'index = sc_0~load_int(257);
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'collection, v'index, v'owner));
+}
+
+(slice, int, slice) $ProbeItem$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$ProbeItem$_load();
+    }
+    else {
+        (slice $collection, int $index, slice $owner) = $sc~$ProbeItem$init$_load();
+        $sc.end_parse();
+        return $ProbeItem$_contract_init($collection, $index, $owner);
+    }
+}
+
+() $ProbeItem$_contract_store((slice, int, slice) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $ProbeItem$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract ProbeItem functions
+;;
+
+(slice, int, slice) $ProbeItem$_contract_init(slice $collection, int $index, slice $owner) impure inline {
+    var (($self'collection, $self'index, $self'owner)) = (null(), null(), null());
+    $self'collection = $collection;
+    $self'index = $index;
+    $self'owner = $owner;
+    return ($self'collection, $self'index, $self'owner);
+}
+
+((slice, int, slice), (int, int, slice, slice, cell)) $ProbeItem$_fun_get_nft_data((slice, int, slice) $self) impure inline_ref {
+    var (($self'collection, $self'index, $self'owner)) = $self;
+    var $fresh$ret_0 = $ProbeItemDataView$_constructor_init_index_collection_address_owner_address_individual_content(true, $self'index, $self'collection, $self'owner, $Builder$_fun_endCell(store_uint(store_uint($global_beginCell(), 0, 8), 0, 1)));
+    return (($self'collection, $self'index, $self'owner), $fresh$ret_0);
+}
+
+;;
+;; Get methods of a Contract ProbeItem
+;;
+
+_ %get_nft_data() method_id(102351) {
+    var self = $ProbeItem$_contract_load();
+    var res = self~$ProbeItem$_fun_get_nft_data();
+    return $ProbeItemDataView$_to_external(res);
+}
+
+;;
+;; Routing of a Contract ProbeItem
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'collection, $self'index, $self'owner) = $ProbeItem$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $ProbeItem$_contract_store(($self'collection, $self'index, $self'owner));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

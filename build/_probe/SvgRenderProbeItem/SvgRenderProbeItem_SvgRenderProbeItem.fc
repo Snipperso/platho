@@ -1,0 +1,215 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; SvgRenderProbeItem_SvgRenderProbeItem.headers.fc
+;;
+;; Header files for SvgRenderProbeItem
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; $ProbeOnchainContent$_store
+builder $ProbeOnchainContent$_store(builder build_0, (int, cell) v) inline;
+
+;; $ProbeOnchainContent$_store_cell
+cell $ProbeOnchainContent$_store_cell((int, cell) v, builder b) inline;
+
+;; $SvgRenderProbeItem$_store
+builder $SvgRenderProbeItem$_store(builder build_0, (int, slice, cell) v) inline;
+
+;; $SvgRenderProbeItem$_load
+(slice, ((int, slice, cell))) $SvgRenderProbeItem$_load(slice sc_0) inline;
+
+;; $ProbeNftDataView$_to_external
+(int, int, slice, slice, cell) $ProbeNftDataView$_to_external(((int, int, slice, slice, cell)) v) inline;
+
+;; $SvgRenderProbeItem$init$_load
+(slice, ((int, slice, cell))) $SvgRenderProbeItem$init$_load(slice sc_0) inline;
+
+;; $SvgRenderProbeItem$_contract_init
+(int, slice, cell) $SvgRenderProbeItem$_contract_init(int $config, slice $owner_address, cell $metadata) impure inline;
+
+;; $SvgRenderProbeItem$_contract_load
+(int, slice, cell) $SvgRenderProbeItem$_contract_load() impure inline;
+
+;; $SvgRenderProbeItem$_contract_store
+() $SvgRenderProbeItem$_contract_store((int, slice, cell) v) impure inline;
+
+;; $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content
+((int, int, slice, slice, cell)) $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content(int $init, int $index, slice $collection_address, slice $owner_address, cell $individual_content) inline;
+
+;; $ProbeOnchainContent$_constructor_marker_metadata
+((int, cell)) $ProbeOnchainContent$_constructor_marker_metadata(int $marker, cell $metadata) inline;
+
+;; $SvgRenderProbeItem$_fun_get_nft_data
+((int, slice, cell), (int, int, slice, slice, cell)) $SvgRenderProbeItem$_fun_get_nft_data((int, slice, cell) $self) impure inline_ref;
+
+;; $SvgRenderProbeItem$_fun_get_config
+((int, slice, cell), int) $SvgRenderProbeItem$_fun_get_config((int, slice, cell) $self) impure inline_ref;
+
+
+;; SvgRenderProbeItem_SvgRenderProbeItem.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+;; SvgRenderProbeItem_SvgRenderProbeItem.storage.fc
+;;
+;; Type: ProbeNftDataView
+;; TLB: _ init:bool index:int257 collection_address:address owner_address:address individual_content:^cell = ProbeNftDataView
+;;
+
+(int, int, slice, slice, cell) $ProbeNftDataView$_to_external(((int, int, slice, slice, cell)) v) inline {
+    var (v'init, v'index, v'collection_address, v'owner_address, v'individual_content) = v; 
+    return (v'init, v'index, v'collection_address, v'owner_address, v'individual_content);
+}
+
+((int, int, slice, slice, cell)) $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content(int $init, int $index, slice $collection_address, slice $owner_address, cell $individual_content) inline {
+    return ($init, $index, $collection_address, $owner_address, $individual_content);
+}
+
+;;
+;; Type: ProbeOnchainContent
+;; TLB: _ marker:uint8 metadata:dict<uint256, ^cell> = ProbeOnchainContent
+;;
+
+builder $ProbeOnchainContent$_store(builder build_0, (int, cell) v) inline {
+    var (v'marker, v'metadata) = v;
+    build_0 = build_0.store_uint(v'marker, 8);
+    build_0 = build_0.store_dict(v'metadata);
+    return build_0;
+}
+
+cell $ProbeOnchainContent$_store_cell((int, cell) v, builder b) inline {
+    return $ProbeOnchainContent$_store(b, v).end_cell();
+}
+
+((int, cell)) $ProbeOnchainContent$_constructor_marker_metadata(int $marker, cell $metadata) inline {
+    return ($marker, $metadata);
+}
+
+;;
+;; Type: SvgRenderProbeItem
+;; TLB: _ config:uint8 owner_address:address metadata:dict<uint256, ^cell> = SvgRenderProbeItem
+;;
+
+builder $SvgRenderProbeItem$_store(builder build_0, (int, slice, cell) v) inline {
+    var (v'config, v'owner_address, v'metadata) = v;
+    build_0 = build_0.store_uint(v'config, 8);
+    build_0 = build_0.store_slice(v'owner_address);
+    build_0 = build_0.store_dict(v'metadata);
+    return build_0;
+}
+
+(slice, ((int, slice, cell))) $SvgRenderProbeItem$_load(slice sc_0) inline {
+    var v'config = sc_0~load_uint(8);
+    var v'owner_address = sc_0~load_msg_addr();
+    var v'metadata = sc_0~load_dict();
+    return (sc_0, (v'config, v'owner_address, v'metadata));
+}
+
+(slice, ((int, slice, cell))) $SvgRenderProbeItem$init$_load(slice sc_0) inline {
+    var v'config = sc_0~load_int(257);
+    var v'owner_address = sc_0~load_msg_addr();
+    var v'metadata = sc_0~load_dict();
+    return (sc_0, (v'config, v'owner_address, v'metadata));
+}
+
+(int, slice, cell) $SvgRenderProbeItem$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$SvgRenderProbeItem$_load();
+    }
+    else {
+        (int $config, slice $owner_address, cell $metadata) = $sc~$SvgRenderProbeItem$init$_load();
+        $sc.end_parse();
+        return $SvgRenderProbeItem$_contract_init($config, $owner_address, $metadata);
+    }
+}
+
+() $SvgRenderProbeItem$_contract_store((int, slice, cell) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $SvgRenderProbeItem$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract SvgRenderProbeItem functions
+;;
+
+(int, slice, cell) $SvgRenderProbeItem$_contract_init(int $config, slice $owner_address, cell $metadata) impure inline {
+    var (($self'config, $self'owner_address, $self'metadata)) = (null(), null(), null());
+    $self'config = $config;
+    $self'owner_address = $owner_address;
+    $self'metadata = $metadata;
+    return ($self'config, $self'owner_address, $self'metadata);
+}
+
+((int, slice, cell), (int, int, slice, slice, cell)) $SvgRenderProbeItem$_fun_get_nft_data((int, slice, cell) $self) impure inline_ref {
+    var (($self'config, $self'owner_address, $self'metadata)) = $self;
+    var $fresh$ret_0 = $ProbeNftDataView$_constructor_init_index_collection_address_owner_address_individual_content(true, 0, null(), $self'owner_address, $ProbeOnchainContent$_store_cell($ProbeOnchainContent$_constructor_marker_metadata(0, $self'metadata), begin_cell()));
+    return (($self'config, $self'owner_address, $self'metadata), $fresh$ret_0);
+}
+
+((int, slice, cell), int) $SvgRenderProbeItem$_fun_get_config((int, slice, cell) $self) impure inline_ref {
+    var (($self'config, $self'owner_address, $self'metadata)) = $self;
+    var $fresh$ret_1 = $self'config;
+    return (($self'config, $self'owner_address, $self'metadata), $fresh$ret_1);
+}
+
+;;
+;; Get methods of a Contract SvgRenderProbeItem
+;;
+
+_ %get_nft_data() method_id(102351) {
+    var self = $SvgRenderProbeItem$_contract_load();
+    var res = self~$SvgRenderProbeItem$_fun_get_nft_data();
+    return $ProbeNftDataView$_to_external(res);
+}
+
+_ %get_config() method_id(103798) {
+    var self = $SvgRenderProbeItem$_contract_load();
+    var res = self~$SvgRenderProbeItem$_fun_get_config();
+    return res;
+}
+
+;;
+;; Routing of a Contract SvgRenderProbeItem
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'config, $self'owner_address, $self'metadata) = $SvgRenderProbeItem$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        $SvgRenderProbeItem$_contract_store(($self'config, $self'owner_address, $self'metadata));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
