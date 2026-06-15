@@ -33,6 +33,25 @@ const OP_USERNAME_BIND_OFFICIAL_ATH_WALLET: Int = 0x663DF03D;
 const OP_USERNAME_BIND_VAULT: Int = 0x60A61104;
 const OP_SEAL_GENESIS: Int = 0x3A12D1AD;
 
+// base64 alphabet lookup by 6-bit index -> ASCII code (global inline: cheaper
+// calling convention than a contract method in the hot encoder loop).
+inline fun b64Code(v: Int): Int {
+    if (v < 26) { return 65 + v; }          // 'A'..'Z'
+    if (v < 52) { return 71 + v; }          // 'a'..'z'  (97 + (v-26))
+    if (v < 62) { return v - 4; }           // '0'..'9'  (48 + (v-52))
+    if (v == 62) { return 43; }             // '+'
+    return 47;                              // '/'
+}
+
+// Encode 24 bits (one 3-byte group) into 4 base64 ASCII codes packed into a
+// single 32-bit integer (big-endian char order).
+inline fun b64Quad(g: Int): Int {
+    return (b64Code((g >> 18) & 63) << 24)
+        | (b64Code((g >> 12) & 63) << 16)
+        | (b64Code((g >> 6) & 63) << 8)
+        | b64Code(g & 63);
+}
+
 message(0x663DF03D) BindOfficialAthWallet {
     deployment_manifest_hash: Int as uint256;
     official_ath_wallet_address: Address;
@@ -693,246 +712,121 @@ contract UsernameRegistry {
         return b;
     }
 
-    fun appendSvgUriTile(b: StringBuilder, tileStart: String, ch: Int): StringBuilder {
-        b.append(tileStart);
-        b = self.appendUsernameSvgChar(b, ch);
-        b.append("%3C%2Ftext%3E");
-        return b;
-    }
-
     fun appendEpicTile(b: StringBuilder, i: Int, ch: Int): StringBuilder {
-        if (i == 0) { return self.appendSvgTile(b, "<rect x=\"169\" y=\"378\" width=\"152\" height=\"152\" rx=\"30\" fill=\"url(#tile)\"/><text x=\"245\" y=\"474\" fill=\"#06100d\" font-family=\"Arial,sans-serif\" font-size=\"76\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 1) { return self.appendSvgTile(b, "<rect x=\"347\" y=\"378\" width=\"152\" height=\"152\" rx=\"30\" fill=\"url(#tile)\"/><text x=\"423\" y=\"474\" fill=\"#06100d\" font-family=\"Arial,sans-serif\" font-size=\"76\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 2) { return self.appendSvgTile(b, "<rect x=\"525\" y=\"378\" width=\"152\" height=\"152\" rx=\"30\" fill=\"url(#tile)\"/><text x=\"601\" y=\"474\" fill=\"#06100d\" font-family=\"Arial,sans-serif\" font-size=\"76\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 3) { return self.appendSvgTile(b, "<rect x=\"703\" y=\"378\" width=\"152\" height=\"152\" rx=\"30\" fill=\"url(#tile)\"/><text x=\"779\" y=\"474\" fill=\"#06100d\" font-family=\"Arial,sans-serif\" font-size=\"76\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+        if (i == 0) { return self.appendSvgTile(b, "<rect x=\"169\" y=\"374\" width=\"152\" height=\"152\" rx=\"20\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"245\" y=\"478\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"97\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 1) { return self.appendSvgTile(b, "<rect x=\"347\" y=\"374\" width=\"152\" height=\"152\" rx=\"20\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"423\" y=\"478\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"97\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 2) { return self.appendSvgTile(b, "<rect x=\"525\" y=\"374\" width=\"152\" height=\"152\" rx=\"20\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"601\" y=\"478\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"97\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 3) { return self.appendSvgTile(b, "<rect x=\"703\" y=\"374\" width=\"152\" height=\"152\" rx=\"20\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"779\" y=\"478\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"97\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         return b;
     }
 
     fun appendRareTile(b: StringBuilder, i: Int, ch: Int): StringBuilder {
-        if (i == 0) { return self.appendSvgTile(b, "<rect x=\"162\" y=\"392\" width=\"132\" height=\"132\" rx=\"26\" fill=\"url(#tile)\"/><text x=\"228\" y=\"477\" fill=\"#07100f\" font-family=\"Arial,sans-serif\" font-size=\"66\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 1) { return self.appendSvgTile(b, "<rect x=\"304\" y=\"392\" width=\"132\" height=\"132\" rx=\"26\" fill=\"url(#tile)\"/><text x=\"370\" y=\"477\" fill=\"#07100f\" font-family=\"Arial,sans-serif\" font-size=\"66\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 2) { return self.appendSvgTile(b, "<rect x=\"446\" y=\"392\" width=\"132\" height=\"132\" rx=\"26\" fill=\"url(#tile)\"/><text x=\"512\" y=\"477\" fill=\"#07100f\" font-family=\"Arial,sans-serif\" font-size=\"66\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 3) { return self.appendSvgTile(b, "<rect x=\"588\" y=\"392\" width=\"132\" height=\"132\" rx=\"26\" fill=\"url(#tile)\"/><text x=\"654\" y=\"477\" fill=\"#07100f\" font-family=\"Arial,sans-serif\" font-size=\"66\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 4) { return self.appendSvgTile(b, "<rect x=\"730\" y=\"392\" width=\"132\" height=\"132\" rx=\"26\" fill=\"url(#tile)\"/><text x=\"796\" y=\"477\" fill=\"#07100f\" font-family=\"Arial,sans-serif\" font-size=\"66\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+        if (i == 0) { return self.appendSvgTile(b, "<rect x=\"162\" y=\"386\" width=\"132\" height=\"132\" rx=\"17\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"228\" y=\"476\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"84\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 1) { return self.appendSvgTile(b, "<rect x=\"304\" y=\"386\" width=\"132\" height=\"132\" rx=\"17\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"370\" y=\"476\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"84\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 2) { return self.appendSvgTile(b, "<rect x=\"446\" y=\"386\" width=\"132\" height=\"132\" rx=\"17\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"512\" y=\"476\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"84\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 3) { return self.appendSvgTile(b, "<rect x=\"588\" y=\"386\" width=\"132\" height=\"132\" rx=\"17\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"654\" y=\"476\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"84\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 4) { return self.appendSvgTile(b, "<rect x=\"730\" y=\"386\" width=\"132\" height=\"132\" rx=\"17\" fill=\"#151a1d\" stroke=\"url(#tier-tile)\" stroke-width=\"4\"/><text x=\"796\" y=\"476\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"84\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         return b;
     }
 
     fun appendCommonSingleTile(b: StringBuilder, len: Int, i: Int, ch: Int): StringBuilder {
         if (len == 6) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"292\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"380\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"644\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"732\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"292\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"380\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"644\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"732\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (len == 7) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"208\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"248\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"296\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"336\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"424\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"512\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"600\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"648\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"688\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"736\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"776\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"208\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"248\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"296\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"336\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"424\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"512\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"600\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"648\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"688\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"736\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"776\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (len == 8) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"164\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"204\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"292\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"380\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"644\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"732\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 7) { return self.appendSvgTile(b, "<rect x=\"780\" y=\"418\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"820\" y=\"472\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"164\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"204\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"292\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"380\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"644\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"732\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 7) { return self.appendSvgTile(b, "<rect x=\"780\" y=\"418\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"820\" y=\"474\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         return b;
     }
 
     fun appendCommonTopTile(b: StringBuilder, i: Int, ch: Int): StringBuilder {
-        if (i == 0) { return self.appendSvgTile(b, "<rect x=\"164\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"204\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 1) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"292\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 2) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"380\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 3) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 4) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 5) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"644\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 6) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"732\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-        if (i == 7) { return self.appendSvgTile(b, "<rect x=\"780\" y=\"372\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"820\" y=\"426\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+        if (i == 0) { return self.appendSvgTile(b, "<rect x=\"164\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"204\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 1) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"292\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 2) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"380\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 3) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 4) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 5) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"644\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 6) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"732\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+        if (i == 7) { return self.appendSvgTile(b, "<rect x=\"780\" y=\"372\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"820\" y=\"428\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         return b;
     }
 
     fun appendCommonSecondTile(b: StringBuilder, rem: Int, i: Int, ch: Int): StringBuilder {
         if (rem == 1) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"512\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"512\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 2) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 3) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"424\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"512\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"600\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"424\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"512\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"600\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 4) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"380\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"644\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"380\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"644\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 5) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"296\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"336\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"424\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"512\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"600\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"648\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"688\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"296\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"336\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"424\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"512\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"600\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"648\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"688\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 6) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"292\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"380\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"644\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"732\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"292\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"380\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"644\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"732\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 7) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"208\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"248\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"296\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"336\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"424\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"512\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"600\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"648\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"688\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"736\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"776\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"208\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"248\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"296\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"336\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"384\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"424\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"472\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"512\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"560\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"600\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"648\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"688\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"736\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"776\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         if (rem == 8) {
-            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"164\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"204\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"292\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"380\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"468\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"556\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"644\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"732\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
-            if (i == 7) { return self.appendSvgTile(b, "<rect x=\"780\" y=\"464\" width=\"80\" height=\"80\" rx=\"16\" fill=\"url(#tile)\"/><text x=\"820\" y=\"518\" fill=\"#04120f\" font-family=\"Arial,sans-serif\" font-size=\"42\" font-weight=\"900\" text-anchor=\"middle\">", ch); }
+            if (i == 0) { return self.appendSvgTile(b, "<rect x=\"164\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"204\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 1) { return self.appendSvgTile(b, "<rect x=\"252\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"292\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 2) { return self.appendSvgTile(b, "<rect x=\"340\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"380\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 3) { return self.appendSvgTile(b, "<rect x=\"428\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"468\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 4) { return self.appendSvgTile(b, "<rect x=\"516\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"556\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 5) { return self.appendSvgTile(b, "<rect x=\"604\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"644\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 6) { return self.appendSvgTile(b, "<rect x=\"692\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"732\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
+            if (i == 7) { return self.appendSvgTile(b, "<rect x=\"780\" y=\"464\" width=\"80\" height=\"80\" rx=\"13\" fill=\"#151a1d\" stroke=\"#283136\" stroke-width=\"2\"/><text x=\"820\" y=\"520\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"52\" font-weight=\"850\" text-anchor=\"middle\">", ch); }
         }
         return b;
     }
-
-
-    fun appendEpicUriTile(b: StringBuilder, i: Int, ch: Int): StringBuilder {
-        if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22169%22%20y%3D%22378%22%20width%3D%22152%22%20height%3D%22152%22%20rx%3D%2230%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22245%22%20y%3D%22474%22%20fill%3D%22%2306100d%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2276%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22347%22%20y%3D%22378%22%20width%3D%22152%22%20height%3D%22152%22%20rx%3D%2230%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22423%22%20y%3D%22474%22%20fill%3D%22%2306100d%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2276%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22525%22%20y%3D%22378%22%20width%3D%22152%22%20height%3D%22152%22%20rx%3D%2230%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22601%22%20y%3D%22474%22%20fill%3D%22%2306100d%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2276%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22703%22%20y%3D%22378%22%20width%3D%22152%22%20height%3D%22152%22%20rx%3D%2230%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22779%22%20y%3D%22474%22%20fill%3D%22%2306100d%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2276%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        return b;
-    }
-
-    fun appendRareUriTile(b: StringBuilder, i: Int, ch: Int): StringBuilder {
-        if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22162%22%20y%3D%22392%22%20width%3D%22132%22%20height%3D%22132%22%20rx%3D%2226%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22228%22%20y%3D%22477%22%20fill%3D%22%2307100f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2266%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22304%22%20y%3D%22392%22%20width%3D%22132%22%20height%3D%22132%22%20rx%3D%2226%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22370%22%20y%3D%22477%22%20fill%3D%22%2307100f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2266%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22446%22%20y%3D%22392%22%20width%3D%22132%22%20height%3D%22132%22%20rx%3D%2226%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22477%22%20fill%3D%22%2307100f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2266%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22588%22%20y%3D%22392%22%20width%3D%22132%22%20height%3D%22132%22%20rx%3D%2226%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22654%22%20y%3D%22477%22%20fill%3D%22%2307100f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2266%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22730%22%20y%3D%22392%22%20width%3D%22132%22%20height%3D%22132%22%20rx%3D%2226%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22796%22%20y%3D%22477%22%20fill%3D%22%2307100f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2266%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        return b;
-    }
-
-    fun appendCommonUriSingleTile(b: StringBuilder, len: Int, i: Int, ch: Int): StringBuilder {
-        if (len == 6) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22252%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22292%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22340%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22380%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22604%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22644%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22692%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22732%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (len == 7) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22208%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22248%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22296%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22336%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22384%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22424%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22472%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22560%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22600%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22648%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22688%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 6) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22736%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22776%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (len == 8) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22164%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22204%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22252%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22292%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22340%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22380%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22604%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22644%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 6) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22692%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22732%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 7) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22780%22%20y%3D%22418%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22820%22%20y%3D%22472%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        return b;
-    }
-
-    fun appendCommonUriTopTile(b: StringBuilder, i: Int, ch: Int): StringBuilder {
-        if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22164%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22204%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22252%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22292%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22340%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22380%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22604%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22644%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 6) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22692%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22732%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        if (i == 7) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22780%22%20y%3D%22372%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22820%22%20y%3D%22426%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        return b;
-    }
-
-    fun appendCommonUriSecondTile(b: StringBuilder, rem: Int, i: Int, ch: Int): StringBuilder {
-        if (rem == 1) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22472%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 2) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 3) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22384%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22424%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22472%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22560%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22600%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 4) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22340%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22380%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22604%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22644%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 5) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22296%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22336%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22384%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22424%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22472%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22560%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22600%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22648%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22688%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 6) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22252%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22292%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22340%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22380%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22604%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22644%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22692%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22732%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 7) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22208%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22248%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22296%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22336%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22384%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22424%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22472%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22560%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22600%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22648%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22688%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 6) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22736%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22776%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        if (rem == 8) {
-            if (i == 0) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22164%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22204%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 1) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22252%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22292%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 2) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22340%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22380%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 3) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22428%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22468%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 4) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22516%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22556%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 5) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22604%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22644%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 6) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22692%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22732%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-            if (i == 7) { return self.appendSvgUriTile(b, "%3Crect%20x%3D%22780%22%20y%3D%22464%22%20width%3D%2280%22%20height%3D%2280%22%20rx%3D%2216%22%20fill%3D%22url(%23tile)%22%2F%3E%3Ctext%20x%3D%22820%22%20y%3D%22518%22%20fill%3D%22%2304120f%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E", ch); }
-        }
-        return b;
-    }
-
 
     fun appendUsernameTiles(b: StringBuilder, usernameCell: Cell, username_len: Int): StringBuilder {
         let cursor: Slice = usernameCell.beginParse();
@@ -976,49 +870,6 @@ contract UsernameRegistry {
         return b;
     }
 
-
-    fun appendUsernameUriTiles(b: StringBuilder, usernameCell: Cell, username_len: Int): StringBuilder {
-        let cursor: Slice = usernameCell.beginParse();
-        let i: Int = 0;
-        if (username_len == 4) {
-            while (i < 4) {
-                let ch: Int = cursor.loadUint(8);
-                b = self.appendEpicUriTile(b, i, ch);
-                i += 1;
-            }
-            return b;
-        }
-        if (username_len == 5) {
-            while (i < 5) {
-                let ch: Int = cursor.loadUint(8);
-                b = self.appendRareUriTile(b, i, ch);
-                i += 1;
-            }
-            return b;
-        }
-        if (username_len <= 8) {
-            while (i < username_len) {
-                let ch: Int = cursor.loadUint(8);
-                b = self.appendCommonUriSingleTile(b, username_len, i, ch);
-                i += 1;
-            }
-            return b;
-        }
-        while (i < 8) {
-            let ch: Int = cursor.loadUint(8);
-            b = self.appendCommonUriTopTile(b, i, ch);
-            i += 1;
-        }
-        let j: Int = 0;
-        let rem: Int = username_len - 8;
-        while (j < rem) {
-            let ch: Int = cursor.loadUint(8);
-            b = self.appendCommonUriSecondTile(b, rem, j, ch);
-            j += 1;
-        }
-        return b;
-    }
-
     fun appendSvgUsernameLine(b: StringBuilder, usernameCell: Cell, username_len: Int): StringBuilder {
         let cursor: Slice = usernameCell.beginParse();
         let i: Int = 0;
@@ -1030,99 +881,243 @@ contract UsernameRegistry {
         return b;
     }
 
-    fun appendSvgUriUsernameLine(b: StringBuilder, usernameCell: Cell, username_len: Int): StringBuilder {
-        return self.appendSvgUsernameLine(b, usernameCell, username_len);
+    fun appendLengthNumber(b: StringBuilder, n: Int): StringBuilder {
+        if (n >= 10) {
+            let tens: Int = n / 10;
+            b = self.appendUsernameSvgChar(b, 48 + tens);
+        }
+        b = self.appendUsernameSvgChar(b, 48 + (n % 10));
+        return b;
     }
 
     fun appendSvgDefs(b: StringBuilder, username_len: Int): StringBuilder {
-        b.append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\" role=\"img\"><defs><linearGradient id=\"bg\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#050807\"/><stop offset=\".55\" stop-color=\"#071411\"/><stop offset=\"1\" stop-color=\"#05080a\"/></linearGradient>");
+        b.append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\" role=\"img\"><defs><linearGradient id=\"bg\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#0d1113\"/><stop offset=\"1\" stop-color=\"#0b0d0f\"/></linearGradient><linearGradient id=\"teal\" x1=\"0\" y1=\"1\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#2be6ad\"/><stop offset=\".55\" stop-color=\"#30d5b0\"/><stop offset=\"1\" stop-color=\"#25c99b\"/></linearGradient>");
         if (username_len == 4) {
-            b.append("<linearGradient id=\"accent\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#fff5b7\" stop-opacity=\"0\"/><stop offset=\".18\" stop-color=\"#fff5b7\"/><stop offset=\".55\" stop-color=\"#f4b84b\"/><stop offset=\".92\" stop-color=\"#fff0a0\" stop-opacity=\"0\"/></linearGradient><linearGradient id=\"tile\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#fff6b8\"/><stop offset=\".52\" stop-color=\"#f2ba4b\"/><stop offset=\"1\" stop-color=\"#7d5520\"/></linearGradient>");
+            b.append("<linearGradient id=\"common-line\" x1=\"104\" y1=\"0\" x2=\"920\" y2=\"0\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#0b0d0f\" stop-opacity=\"0\"/><stop offset=\".06\" stop-color=\"#8d6727\" stop-opacity=\".74\"/><stop offset=\".5\" stop-color=\"#f0c76b\"/><stop offset=\".94\" stop-color=\"#8d6727\" stop-opacity=\".74\"/><stop offset=\"1\" stop-color=\"#0b0d0f\" stop-opacity=\"0\"/></linearGradient><linearGradient id=\"tier-tile\" x1=\"0\" y1=\"374\" x2=\"0\" y2=\"526\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#f6d98b\"/><stop offset=\".48\" stop-color=\"#d7ad57\"/><stop offset=\"1\" stop-color=\"#8d6727\"/></linearGradient>");
         } else {
             if (username_len == 5) {
-                b.append("<linearGradient id=\"accent\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#eef4f8\" stop-opacity=\"0\"/><stop offset=\".18\" stop-color=\"#eef4f8\"/><stop offset=\".55\" stop-color=\"#aab8c3\"/><stop offset=\".92\" stop-color=\"#ffffff\" stop-opacity=\"0\"/></linearGradient><linearGradient id=\"tile\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#f4f8fa\"/><stop offset=\".52\" stop-color=\"#aeb8c1\"/><stop offset=\"1\" stop-color=\"#65727e\"/></linearGradient>");
+                b.append("<linearGradient id=\"common-line\" x1=\"104\" y1=\"0\" x2=\"920\" y2=\"0\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#0b0d0f\" stop-opacity=\"0\"/><stop offset=\".06\" stop-color=\"#727b80\" stop-opacity=\".78\"/><stop offset=\".5\" stop-color=\"#e1e8e6\"/><stop offset=\".94\" stop-color=\"#727b80\" stop-opacity=\".78\"/><stop offset=\"1\" stop-color=\"#0b0d0f\" stop-opacity=\"0\"/></linearGradient><linearGradient id=\"tier-tile\" x1=\"0\" y1=\"386\" x2=\"0\" y2=\"518\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#eef4f2\"/><stop offset=\".48\" stop-color=\"#b9c3c3\"/><stop offset=\"1\" stop-color=\"#687279\"/></linearGradient>");
             } else {
-                b.append("<linearGradient id=\"accent\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#27d4ad\" stop-opacity=\"0\"/><stop offset=\".18\" stop-color=\"#27d4ad\"/><stop offset=\".55\" stop-color=\"#1ea487\"/><stop offset=\".92\" stop-color=\"#27d4ad\" stop-opacity=\"0\"/></linearGradient><linearGradient id=\"tile\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#39e3bf\"/><stop offset=\".55\" stop-color=\"#24b995\"/><stop offset=\"1\" stop-color=\"#145546\"/></linearGradient>");
+                b.append("<linearGradient id=\"common-line\" x1=\"104\" y1=\"0\" x2=\"920\" y2=\"0\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#0b0d0f\" stop-opacity=\"0\"/><stop offset=\".06\" stop-color=\"#1e262a\" stop-opacity=\".62\"/><stop offset=\".5\" stop-color=\"#30d5b0\"/><stop offset=\".94\" stop-color=\"#1e262a\" stop-opacity=\".62\"/><stop offset=\"1\" stop-color=\"#0b0d0f\" stop-opacity=\"0\"/></linearGradient>");
             }
         }
         b.append("</defs>");
         return b;
     }
 
-
-    fun appendSvgUriDefs(b: StringBuilder, username_len: Int): StringBuilder {
-        b.append("%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20role%3D%22img%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23050807%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23071411%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2305080a%22%2F%3E%3C%2FlinearGradient%3E");
-        if (username_len == 4) {
-            b.append("%3ClinearGradient%20id%3D%22accent%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff5b7%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%22.18%22%20stop-color%3D%22%23fff5b7%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23f4b84b%22%2F%3E%3Cstop%20offset%3D%22.92%22%20stop-color%3D%22%23fff0a0%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22tile%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff6b8%22%2F%3E%3Cstop%20offset%3D%22.52%22%20stop-color%3D%22%23f2ba4b%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237d5520%22%2F%3E%3C%2FlinearGradient%3E");
-        } else {
-            if (username_len == 5) {
-                b.append("%3ClinearGradient%20id%3D%22accent%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23eef4f8%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%22.18%22%20stop-color%3D%22%23eef4f8%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23aab8c3%22%2F%3E%3Cstop%20offset%3D%22.92%22%20stop-color%3D%22%23ffffff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22tile%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f4f8fa%22%2F%3E%3Cstop%20offset%3D%22.52%22%20stop-color%3D%22%23aeb8c1%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2365727e%22%2F%3E%3C%2FlinearGradient%3E");
-            } else {
-                b.append("%3ClinearGradient%20id%3D%22accent%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2327d4ad%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%22.18%22%20stop-color%3D%22%2327d4ad%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%231ea487%22%2F%3E%3Cstop%20offset%3D%22.92%22%20stop-color%3D%22%2327d4ad%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22tile%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2339e3bf%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%2324b995%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23145546%22%2F%3E%3C%2FlinearGradient%3E");
-            }
-        }
-        b.append("%3C%2Fdefs%3E");
-        return b;
-    }
-
-
     fun appendSvgShell(b: StringBuilder, usernameCell: Cell, username_len: Int): StringBuilder {
         b = self.appendSvgDefs(b, username_len);
-        b.append("<rect width=\"1024\" height=\"1024\" fill=\"url(#bg)\"/><rect x=\"52\" y=\"52\" width=\"920\" height=\"920\" rx=\"78\" fill=\"#07100f\" stroke=\"#1b2a29\" stroke-width=\"3\"/><path d=\"M104 260Q104 108 256 108H920\" fill=\"none\" stroke=\"url(#accent)\" stroke-width=\"10\" stroke-linecap=\"round\" opacity=\".42\"/><path d=\"M104 796Q104 916 224 916H888\" fill=\"none\" stroke=\"url(#accent)\" stroke-width=\"8\" stroke-linecap=\"round\" opacity=\".24\"/><rect x=\"112\" y=\"108\" width=\"108\" height=\"108\" rx=\"28\" fill=\"#0b1514\" stroke=\"#1f3432\" stroke-width=\"2\"/>");
-        b.append("<svg x=\"124\" y=\"120\" width=\"88\" height=\"88\" viewBox=\"0 0 512 512\" overflow=\"visible\"><g transform=\"translate(0 512) scale(1 -1)\"><path fill=\"#28d7b1\" fill-rule=\"evenodd\" d=\"M167.5 432.1 L330.5 432.1 L346.5 429.9 L364.5 424.8 L380.5 417.7 L393.5 409.6 L404.5 401.0 L416.0 389.5 L425.8 376.5 L435.9 358.5 L441.7 343.5 L445.9 325.5 L446.9 296.5 L445.8 285.5 L442.8 271.5 L435.7 251.5 L425.9 233.5 L416.9 221.5 L402.5 207.1 L387.5 196.1 L362.5 184.1 L348.5 180.1 L334.5 178.0 L221.5 177.2 L220.5 79.2 L137.5 79.4 L137.2 139.5 L166.5 140.2 L166.8 174.5 L136.5 175.1 L135.6 174.5 L135.7 163.5 L134.5 162.8 L104.1 163.5 L104.5 192.7 L134.5 192.9 L135.5 193.5 L135.4 220.5 L136.2 221.5 L166.8 222.5 L166.5 253.0 L135.5 253.3 L134.5 235.2 L105.5 235.1 L104.1 236.5 L104.3 264.5 L134.5 265.3 L135.5 292.5 L197.5 292.7 L198.4 293.5 L198.0 323.5 L166.8 324.5 L16");
-        b.append("7.3 364.5 L198.4 365.5 L198.3 394.5 L166.9 395.5 L166.7 430.5 L167.5 432.1 Z M104.5 407.6 L134.9 407.5 L134.5 377.7 L104.5 377.9 L104.5 407.6 Z M221.5 372.3 L221.5 237.2 L322.5 237.1 L329.5 238.1 L342.5 242.1 L352.5 247.4 L359.5 252.8 L369.6 263.5 L377.0 275.5 L381.5 288.5 L383.1 298.5 L382.7 316.5 L379.7 327.5 L374.8 338.5 L368.9 347.5 L358.5 357.9 L344.5 366.7 L332.5 370.8 L322.5 372.4 L221.5 372.3 Z M65.5 324.3 L93.5 324.3 L93.9 294.5 L64.9 294.5 L64.6 322.5 L65.5 324.3 Z\"/></g></svg><text x=\"244\" y=\"152\" fill=\"#d7ebe6\" font-family=\"Arial,sans-serif\" font-size=\"48\" font-weight=\"800\">Platho usernames</text>");
+        b.append("<rect width=\"1024\" height=\"1024\" fill=\"url(#bg)\"/><rect x=\"76\" y=\"76\" width=\"872\" height=\"872\" rx=\"44\" fill=\"#111417\" stroke=\"#283136\" stroke-width=\"2\"/><rect x=\"104\" y=\"104\" width=\"816\" height=\"816\" rx=\"28\" fill=\"#0b0d0f\" stroke=\"#1e262a\" stroke-width=\"2\"/>");
         if (username_len == 4) {
-            b.append("<text x=\"244\" y=\"202\" fill=\"#f2ba4b\" font-family=\"Arial,sans-serif\" font-size=\"28\" font-weight=\"800\" letter-spacing=\"4\">EPIC</text>");
+            b.append("<path d=\"M104 104h816\" stroke=\"url(#common-line)\" stroke-width=\"6\" stroke-linecap=\"round\"/><path d=\"M104 920h816\" stroke=\"url(#common-line)\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\".44\"/>");
         } else {
             if (username_len == 5) {
-                b.append("<text x=\"244\" y=\"202\" fill=\"#d9e1e6\" font-family=\"Arial,sans-serif\" font-size=\"28\" font-weight=\"800\" letter-spacing=\"4\">RARE</text>");
+                b.append("<path d=\"M104 104h816\" stroke=\"url(#common-line)\" stroke-width=\"6\" stroke-linecap=\"round\"/><path d=\"M104 920h816\" stroke=\"url(#common-line)\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\".44\"/>");
             } else {
-                b.append("<text x=\"244\" y=\"202\" fill=\"#27d4ad\" font-family=\"Arial,sans-serif\" font-size=\"28\" font-weight=\"800\" letter-spacing=\"4\">COMMON</text>");
+                b.append("<path d=\"M104 104h816\" stroke=\"url(#common-line)\" stroke-width=\"6\" stroke-linecap=\"round\"/><path d=\"M104 920h816\" stroke=\"url(#common-line)\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\".44\"/>");
             }
         }
-        b.append("<rect x=\"104\" y=\"276\" width=\"816\" height=\"408\" rx=\"52\" fill=\"#091211\" stroke=\"#1b2d2b\" stroke-width=\"3\"/><path d=\"M154 318H870\" stroke=\"url(#accent)\" stroke-width=\"12\" stroke-linecap=\"round\" opacity=\".38\"/>");
+        b.append("<rect x=\"124\" y=\"122\" width=\"94\" height=\"94\" rx=\"22\" fill=\"#111417\" stroke=\"#1e262a\"/><g transform=\"matrix(0.160156 0 0 -0.160156 130 210)\"><path fill=\"url(#teal)\" fill-rule=\"evenodd\" d=\"");
+        b.append("M167.5 432.1 L330.5 432.1 L346.5 429.9 L364.5 424.8 L380.5 417.7 L393.5 409.6 L404.5 401.0 L416.0 389.5 L425.8 376.5 L435.9 358.5 L441.7 343.5 L445.9 325.5 L446.9 296.5 L445.8 285.5 L442.8 271.5 L435.7 251.5 L425.9 233.5 L416.9 221.5 L402.5 207.1 L387.5 196.1 L362.5 184.1 L348.5 180.1 L334.5 178.0 L221.5 177.2 L220.5 79.2 L137.5 79.4 L137.2 139.5 L166.5 140.2 L166.8 174.5 L136.5 175.1 L135.6 174.5 L135.7 163.5 L134.5 162.8 L104.1 163.5 L104.5 192.7 L134.5 192.9 L135.5 193.5 L135.4 220.5 L136.2 221.5 L166.8 222.5 L166.5 253.0 L135.5 253.3 L134.5 235.2 L105.5 235.1 L104.1 236.5 L104.3 264.5 L134.5 265.3 L135.5 292.5 L197.5 292.7 L198.4 293.5 L198.0 323.5 L166.8 324.5 L167.3 364.5 L198.4 365.5 L198.3 394.5 L166.9 395.5 L166.7 430.5 L167.5 432.1 Z M104.5 407.6 L134.9 407.5 L134.5 377.7 L104.5 377.9 L104.5 407.6 Z M221.5 372.3 L221.5 237.2 L322.5 237.1 L329.5 238.1 L342.5 242.1 L352.5 247.4 L359.5 252.8 L369.6 263.5 L377.0 275.5 L381.5 288.5 L383.1 298.5 L382.7 316.5 L379.7 327.5 L374.8 338.5 L368.9 347.5 L358.5 357.9 L344.5 366.7 L332.5 370.8 L322.5 372.4 L221.5 372.3 Z M65.5 324.3 L93.5 324.3 L93.9 294.5 L64.9 294.5 L64.6 322.5 L65.5 324.3 Z");
+        b.append("\"/></g><text x=\"244\" y=\"176\" fill=\"#f4f7f5\" font-family=\"Arial,sans-serif\" font-size=\"34\" font-weight=\"800\">Platho usernames</text>");
+        if (username_len == 4) {
+            b.append("<rect x=\"732\" y=\"134\" width=\"156\" height=\"58\" rx=\"12\" fill=\"#17130b\" stroke=\"#d7ad57\" stroke-opacity=\".68\"/><text x=\"810\" y=\"173\" fill=\"#f0c76b\" font-family=\"Arial,sans-serif\" font-size=\"25\" font-weight=\"900\" text-anchor=\"middle\">EPIC</text><circle cx=\"512\" cy=\"512\" r=\"280\" fill=\"none\" stroke=\"#d7ad57\" stroke-width=\"2\" opacity=\".09\"/><circle cx=\"512\" cy=\"512\" r=\"218\" fill=\"none\" stroke=\"#f0c76b\" stroke-width=\"2\" opacity=\".13\"/>");
+        } else {
+            if (username_len == 5) {
+                b.append("<rect x=\"732\" y=\"134\" width=\"156\" height=\"58\" rx=\"12\" fill=\"#14171a\" stroke=\"#b9c3c3\" stroke-opacity=\".68\"/><text x=\"810\" y=\"173\" fill=\"#d9e0df\" font-family=\"Arial,sans-serif\" font-size=\"25\" font-weight=\"900\" text-anchor=\"middle\">RARE</text><circle cx=\"512\" cy=\"512\" r=\"280\" fill=\"none\" stroke=\"#b9c3c3\" stroke-width=\"2\" opacity=\".09\"/><circle cx=\"512\" cy=\"512\" r=\"218\" fill=\"none\" stroke=\"#d9e0df\" stroke-width=\"2\" opacity=\".13\"/>");
+            } else {
+                b.append("<rect x=\"732\" y=\"134\" width=\"156\" height=\"58\" rx=\"12\" fill=\"#111417\" stroke=\"#283136\"/><text x=\"810\" y=\"173\" fill=\"#96a19c\" font-family=\"Arial,sans-serif\" font-size=\"25\" font-weight=\"900\" text-anchor=\"middle\">COMMON</text><circle cx=\"512\" cy=\"512\" r=\"280\" fill=\"none\" stroke=\"#30d5b0\" stroke-width=\"2\" opacity=\".09\"/><circle cx=\"512\" cy=\"512\" r=\"218\" fill=\"none\" stroke=\"#66726d\" stroke-width=\"2\" opacity=\".13\"/>");
+            }
+        }
+        b.append("<rect x=\"122\" y=\"312\" width=\"780\" height=\"350\" rx=\"32\" fill=\"#111417\" fill-opacity=\".94\" stroke=\"#283136\" stroke-width=\"2\"/><g>");
         b = self.appendUsernameTiles(b, usernameCell, username_len);
-        b.append("<text x=\"512\" y=\"604\" fill=\"#dff8f2\" font-family=\"Arial,sans-serif\" font-size=\"58\" font-weight=\"900\" text-anchor=\"middle\">.ath</text><path d=\"M176 624H848\" stroke=\"url(#accent)\" stroke-width=\"6\" stroke-linecap=\"round\" opacity=\".58\"/><text x=\"512\" y=\"754\" fill=\"#d7ebe6\" font-family=\"Arial,sans-serif\" font-size=\"44\" font-weight=\"800\" text-anchor=\"middle\">");
-        b = self.appendSvgUsernameLine(b, usernameCell, username_len);
-        b.append(".ath</text><text x=\"512\" y=\"826\" fill=\"#68807a\" font-family=\"Arial,sans-serif\" font-size=\"26\" font-weight=\"700\" letter-spacing=\"3\" text-anchor=\"middle\">PLATHO USERNAME</text><text x=\"512\" y=\"890\" fill=\"#2f7062\" font-family=\"Arial,sans-serif\" font-size=\"22\" font-weight=\"700\" letter-spacing=\"4\" text-anchor=\"middle\">ON-CHAIN SVG</text></svg>");
-        return b;
-    }
-
-
-    fun appendSvgUriShell(b: StringBuilder, usernameCell: Cell, username_len: Int): StringBuilder {
-        b = self.appendSvgUriDefs(b, username_len);
-        b.append("%3Crect%20width%3D%221024%22%20height%3D%221024%22%20fill%3D%22url(%23bg)%22%2F%3E%3Crect%20x%3D%2252%22%20y%3D%2252%22%20width%3D%22920%22%20height%3D%22920%22%20rx%3D%2278%22%20fill%3D%22%2307100f%22%20stroke%3D%22%231b2a29%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M104%20260Q104%20108%20256%20108H920%22%20fill%3D%22none%22%20stroke%3D%22url(%23accent)%22%20stroke-width%3D%2210%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.42%22%2F%3E%3Cpath%20d%3D%22M104%20796Q104%20916%20224%20916H888%22%20fill%3D%22none%22%20stroke%3D%22url(%23accent)%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.24%22%2F%3E%3Crect%20x%3D%22112%22%20y%3D%22108%22%20width%3D%22108%22%20height%3D%22108%22%20rx%3D%2228%22%20fill%3D%22%230b1514%22%20stroke%3D%22%231f3432%22%20stroke-width%3D%222%22%2F%3E");
-        b.append("%3Csvg%20x%3D%22124%22%20y%3D%22120%22%20width%3D%2288%22%20height%3D%2288%22%20viewBox%3D%220%200%20512%20512%22%20overflow%3D%22visible%22%3E%3Cg%20transform%3D%22translate(0%20512)%20scale(1%20-1)%22%3E%3Cpath%20fill%3D%22%2328d7b1%22%20fill-rule%3D%22evenodd%22%20d%3D%22M167.5%20432.1%20L330.5%20432.1%20L346.5%20429.9%20L364.5%20424.8%20L380.5%20417.7%20L393.5%20409.6%20L404.5%20401.0%20L416.0%20389.5%20L425.8%20376.5%20L435.9%20358.5%20L441.7%20343.5%20L445.9%20325.5%20L446.9%20296.5%20L445.8%20285.5%20L442.8%20271.5%20L435.7%20251.5%20L425.9%20233.5%20L416.9%20221.5%20L402.5%20207.1%20L387.5%20196.1%20L362.5%20184.1%20L348.5%20180.1%20L334.5%20178.0%20L221.5%20177.2%20L220.5%2079.2%20L137.5%2079.4%20L137.2%20139.5%20L166.5%20140.2%20L166.8%20174.5%20L136.5%20175.1%20L135.6%20174.5%20L135.7%20163.5%20L134.5%20162.8%20L104.1%20163.5%2");
-        b.append("0L104.5%20192.7%20L134.5%20192.9%20L135.5%20193.5%20L135.4%20220.5%20L136.2%20221.5%20L166.8%20222.5%20L166.5%20253.0%20L135.5%20253.3%20L134.5%20235.2%20L105.5%20235.1%20L104.1%20236.5%20L104.3%20264.5%20L134.5%20265.3%20L135.5%20292.5%20L197.5%20292.7%20L198.4%20293.5%20L198.0%20323.5%20L166.8%20324.5%20L167.3%20364.5%20L198.4%20365.5%20L198.3%20394.5%20L166.9%20395.5%20L166.7%20430.5%20L167.5%20432.1%20Z%20M104.5%20407.6%20L134.9%20407.5%20L134.5%20377.7%20L104.5%20377.9%20L104.5%20407.6%20Z%20M221.5%20372.3%20L221.5%20237.2%20L322.5%20237.1%20L329.5%20238.1%20L342.5%20242.1%20L352.5%20247.4%20L359.5%20252.8%20L369.6%20263.5%20L377.0%20275.5%20L381.5%20288.5%20L383.1%20298.5%20L382.7%20316.5%20L379.7%20327.5%20L374.8%20338.5%20L368.9%20347.5%20L358.5%20357.9%20L344.5%20366.7%20L332.5%20370.8%20L322.5%20372.4%20L221.5%20372.3%20Z%20M65.");
-        b.append("5%20324.3%20L93.5%20324.3%20L93.9%20294.5%20L64.9%20294.5%20L64.6%20322.5%20L65.5%20324.3%20Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E%3Ctext%20x%3D%22244%22%20y%3D%22152%22%20fill%3D%22%23d7ebe6%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2248%22%20font-weight%3D%22800%22%3EPlatho%20usernames%3C%2Ftext%3E");
+        b.append("</g>");
         if (username_len == 4) {
-            b.append("%3Ctext%20x%3D%22244%22%20y%3D%22202%22%20fill%3D%22%23f2ba4b%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%224%22%3EEPIC%3C%2Ftext%3E");
+            b.append("<text x=\"512\" y=\"592\" fill=\"#f0c76b\" font-family=\"Arial,sans-serif\" font-size=\"44\" font-weight=\"850\" text-anchor=\"middle\">.ath</text>");
         } else {
             if (username_len == 5) {
-                b.append("%3Ctext%20x%3D%22244%22%20y%3D%22202%22%20fill%3D%22%23d9e1e6%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%224%22%3ERARE%3C%2Ftext%3E");
+                b.append("<text x=\"512\" y=\"592\" fill=\"#d9e0df\" font-family=\"Arial,sans-serif\" font-size=\"44\" font-weight=\"850\" text-anchor=\"middle\">.ath</text>");
             } else {
-                b.append("%3Ctext%20x%3D%22244%22%20y%3D%22202%22%20fill%3D%22%2327d4ad%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%224%22%3ECOMMON%3C%2Ftext%3E");
+                b.append("<text x=\"512\" y=\"592\" fill=\"#30d5b0\" font-family=\"Arial,sans-serif\" font-size=\"44\" font-weight=\"850\" text-anchor=\"middle\">.ath</text>");
             }
         }
-        b.append("%3Crect%20x%3D%22104%22%20y%3D%22276%22%20width%3D%22816%22%20height%3D%22408%22%20rx%3D%2252%22%20fill%3D%22%23091211%22%20stroke%3D%22%231b2d2b%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M154%20318H870%22%20stroke%3D%22url(%23accent)%22%20stroke-width%3D%2212%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.38%22%2F%3E");
-        b = self.appendUsernameUriTiles(b, usernameCell, username_len);
-        b.append("%3Ctext%20x%3D%22512%22%20y%3D%22604%22%20fill%3D%22%23dff8f2%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2258%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3E.ath%3C%2Ftext%3E%3Cpath%20d%3D%22M176%20624H848%22%20stroke%3D%22url(%23accent)%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.58%22%2F%3E%3Ctext%20x%3D%22512%22%20y%3D%22754%22%20fill%3D%22%23d7ebe6%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22800%22%20text-anchor%3D%22middle%22%3E");
-        b = self.appendSvgUriUsernameLine(b, usernameCell, username_len);
-        b.append(".ath%3C%2Ftext%3E%3Ctext%20x%3D%22512%22%20y%3D%22826%22%20fill%3D%22%2368807a%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2226%22%20font-weight%3D%22700%22%20letter-spacing%3D%223%22%20text-anchor%3D%22middle%22%3EPLATHO%20USERNAME%3C%2Ftext%3E%3Ctext%20x%3D%22512%22%20y%3D%22890%22%20fill%3D%22%232f7062%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2222%22%20font-weight%3D%22700%22%20letter-spacing%3D%224%22%20text-anchor%3D%22middle%22%3EON-CHAIN%20SVG%3C%2Ftext%3E%3C%2Fsvg%3E");
+        if (username_len == 4) {
+            b.append("<path d=\"M176 612h672\" stroke=\"#d7ad57\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\".70\"/><text x=\"512\" y=\"640\" fill=\"#b7aa8e\" font-family=\"Arial,sans-serif\" font-size=\"24\" font-weight=\"800\" text-anchor=\"middle\">");
+        } else {
+            if (username_len == 5) {
+                b.append("<path d=\"M176 612h672\" stroke=\"#b9c3c3\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\".70\"/><text x=\"512\" y=\"640\" fill=\"#aeb8b8\" font-family=\"Arial,sans-serif\" font-size=\"24\" font-weight=\"800\" text-anchor=\"middle\">");
+            } else {
+                b.append("<path d=\"M176 612h672\" stroke=\"#30d5b0\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\".65\"/><text x=\"512\" y=\"640\" fill=\"#96a19c\" font-family=\"Arial,sans-serif\" font-size=\"24\" font-weight=\"800\" text-anchor=\"middle\">");
+            }
+        }
+        b = self.appendLengthNumber(b, username_len);
+        if (username_len <= 5) {
+            b.append(" LETTER USERNAME</text>");
+        } else {
+            b.append(" CHARACTER USERNAME</text>");
+        }
+        b.append("<text x=\"512\" y=\"760\" fill=\"#66726d\" font-family=\"Arial,sans-serif\" font-size=\"24\" font-weight=\"750\" text-anchor=\"middle\">transferable on-chain identity</text></svg>");
         return b;
-    }
-
-    fun imageCell(usernameCell: Cell, username_len: Int): Cell {
-        let b: StringBuilder = beginTailString();
-        b.append("data:image/svg+xml,");
-        b = self.appendSvgUriShell(b, usernameCell, username_len);
-        return b.toCell();
     }
 
     fun imageDataCell(usernameCell: Cell, username_len: Int): Cell {
         let b: StringBuilder = beginTailString();
         b = self.appendSvgShell(b, usernameCell, username_len);
         return b.toCell();
+    }
+
+    // ---------------------------------------------------------------------
+    // Optimized on-chain base64 encoder.
+    //
+    // Reads the raw-SVG snake cell byte-by-byte (loadUint(8) across loadRef()
+    // boundaries) and WRITES base64 output as raw bytes (storeUint(code, 8))
+    // into hand-managed snake segments. No per-byte cell allocation, no
+    // per-char StringBuilder.append(String). Standard 3->4 with '=' padding.
+    //
+    // Output snake layout: head cell holds the data-URI prefix
+    // "data:image/svg+xml;base64," followed by base64 bytes, then chains via a
+    // single ref to the next segment, etc. (NFT image snake format, no leading
+    // null byte: the IMAGE key is an off-chain-style ASCII URI, mirrored by the
+    // contract's prior data:image/svg+xml, layout.)
+    //
+    // Segments are buffered tail-first via recursion so the snake reads
+    // head-first without a map.
+    // ---------------------------------------------------------------------
+
+    // Encode an already-built raw-SVG snake cell to a base64 data-URI snake cell.
+    // `rawSvg` is the image_data cell built with beginTailString() (leading null
+    // marker byte); we skip that one marker byte and base64 exactly the SVG bytes.
+    //
+    // Performance: the input snake is byte-aligned, so we pull 24-bit (3-byte)
+    // groups with a single loadUint(24) on the fast path and emit a 32-bit packed
+    // quad with one storeUint(.,32). A small bit-accumulator carries the <24-bit
+    // remainder across snake-cell (loadRef) boundaries. Output segments are
+    // collected in a map and stitched head-first at the end.
+    fun imageCell(rawSvg: Cell): Cell {
+        let inS: Slice = rawSvg.beginParse();
+        inS.loadUint(8); // skip the snake-string marker byte
+
+        let segs: map<Int as uint16, Cell> = emptyMap();
+        let segCount: Int = 0;
+        let ob: Builder = beginCell();
+        ob = ob.storeSlice("data:image/svg+xml;base64,".asSlice());
+        let obBits: Int = ob.bits();
+
+        // bit accumulator (carry < 24 bits across cell boundaries / partial reads)
+        let acc: Int = 0;
+        let accBits: Int = 0;
+
+        let done: Bool = false;
+        while (!done) {
+            // FAST PATH A0: the current cell holds four whole 24-bit groups (96 bits
+            // = 12 input bytes -> 16 output chars / 128 output bits). One loadUint(96)
+            // + four packed storeUint(.,32) maximally amortizes loop/load/store cost.
+            if ((accBits == 0) && (inS.bits() >= 96)) {
+                if (obBits + 128 > 1016) {
+                    segs.set(segCount, ob.endCell());
+                    segCount += 1;
+                    ob = beginCell();
+                    obBits = 0;
+                }
+                let four: Int = inS.loadUint(96);
+                ob = ob.storeUint(b64Quad((four >> 72) & 0xFFFFFF), 32)
+                       .storeUint(b64Quad((four >> 48) & 0xFFFFFF), 32)
+                       .storeUint(b64Quad((four >> 24) & 0xFFFFFF), 32)
+                       .storeUint(b64Quad(four & 0xFFFFFF), 32);
+                obBits += 128;
+            } else if ((accBits == 0) && (inS.bits() >= 48)) {
+            // FAST PATH A: the current cell holds two whole 24-bit groups (48 bits).
+            // Pull both with one loadUint(48) and emit 64 output bits, halving the
+            // loop-control + load/store count for the common case.
+                if (obBits + 64 > 1016) {
+                    segs.set(segCount, ob.endCell());
+                    segCount += 1;
+                    ob = beginCell();
+                    obBits = 0;
+                }
+                let two: Int = inS.loadUint(48);
+                ob = ob.storeUint(b64Quad((two >> 24) & 0xFFFFFF), 32).storeUint(b64Quad(two & 0xFFFFFF), 32);
+                obBits += 64;
+            } else if ((accBits == 0) && (inS.bits() >= 24)) {
+                // FAST PATH B: one whole 24-bit group remains in the current cell.
+                if (obBits + 32 > 1016) {
+                    segs.set(segCount, ob.endCell());
+                    segCount += 1;
+                    ob = beginCell();
+                    obBits = 0;
+                }
+                ob = ob.storeUint(b64Quad(inS.loadUint(24)), 32);
+                obBits += 32;
+            } else {
+                // SLOW PATH: refill the accumulator up to >=24 bits across cell refs.
+                while ((accBits < 24) && ((inS.bits() > 0) || (inS.refs() > 0))) {
+                    if (inS.bits() == 0) {
+                        inS = inS.loadRef().beginParse();
+                    } else {
+                        let want: Int = 24 - accBits;          // 8, 16, or 24 wanted
+                        let avail: Int = inS.bits();
+                        let take: Int = want;
+                        if (avail < take) { take = avail; }
+                        acc = (acc << take) | inS.loadUint(take);
+                        accBits += take;
+                    }
+                }
+                if (accBits >= 24) {
+                    if (obBits + 32 > 1016) {
+                        segs.set(segCount, ob.endCell());
+                        segCount += 1;
+                        ob = beginCell();
+                        obBits = 0;
+                    }
+                    let g: Int = (acc >> (accBits - 24)) & 0xFFFFFF;
+                    ob = ob.storeUint(b64Quad(g), 32);
+                    obBits += 32;
+                    accBits -= 24;
+                    if (accBits == 0) {
+                        acc = 0;
+                    } else {
+                        acc = acc & ((1 << accBits) - 1);
+                    }
+                } else {
+                    done = true;
+                }
+            }
+        }
+        // Tail group: accBits is 0, 8, or 16 here.
+        if (accBits == 8) {
+            let b0: Int = acc & 0xFF;
+            let c0: Int = b64Code((b0 >> 2) & 63);
+            let c1: Int = b64Code((b0 << 4) & 63);
+            if (obBits + 32 > 1016) {
+                segs.set(segCount, ob.endCell());
+                segCount += 1;
+                ob = beginCell();
+                obBits = 0;
+            }
+            ob = ob.storeUint(c0, 8).storeUint(c1, 8).storeUint(61, 8).storeUint(61, 8); // '=='
+        }
+        if (accBits == 16) {
+            let w: Int = acc & 0xFFFF;
+            let c0: Int = b64Code((w >> 10) & 63);
+            let c1: Int = b64Code((w >> 4) & 63);
+            let c2: Int = b64Code((w << 2) & 63);
+            if (obBits + 32 > 1016) {
+                segs.set(segCount, ob.endCell());
+                segCount += 1;
+                ob = beginCell();
+                obBits = 0;
+            }
+            ob = ob.storeUint(c0, 8).storeUint(c1, 8).storeUint(c2, 8).storeUint(61, 8); // '='
+        }
+        // Stitch segments head-first: segs[0] is the head, tail is the active builder.
+        let chained: Cell = ob.endCell();
+        let k: Int = segCount - 1;
+        while (k >= 0) {
+            let seg: Slice = segs.get(k)!!.beginParse();
+            chained = beginCell().storeSlice(seg).storeRef(chained).endCell();
+            k -= 1;
+        }
+        return chained;
     }
 
     get fun get_username_price(name_len: Int): UsernamePriceView {
@@ -1155,8 +1150,10 @@ contract UsernameRegistry {
         throwUnless(19353, (username_len >= 4) && (username_len <= USERNAME_MAX_LENGTH));
         let usernameCell: Cell = beginCell().storeSlice(s.loadBits(username_len * 8)).endCell();
         let metadata: map<Int as uint256, Cell> = content.metadata;
-        metadata.set(USERNAME_COLLECTION_METADATA_KEY_IMAGE, self.imageCell(usernameCell, username_len));
-        metadata.set(USERNAME_COLLECTION_METADATA_KEY_IMAGE_DATA, self.imageDataCell(usernameCell, username_len));
+        // Build the raw SVG once; reuse it for image_data and as the base64 source.
+        let rawSvg: Cell = self.imageDataCell(usernameCell, username_len);
+        metadata.set(USERNAME_COLLECTION_METADATA_KEY_IMAGE, self.imageCell(rawSvg));
+        metadata.set(USERNAME_COLLECTION_METADATA_KEY_IMAGE_DATA, rawSvg);
         return UsernameNftOnchainContent { marker: 0, metadata: metadata }.toCell();
     }
 

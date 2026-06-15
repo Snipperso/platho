@@ -25,14 +25,19 @@ function nameHash(name: string): bigint {
     .toString('hex'));
 }
 
-function readSnakeText(cell: Cell): string {
+// Read a TEP-64 snake string. `hasMarker` (default true) consumes the leading
+// 0x00 snake-string marker byte (name/description/image_data). The base64 IMAGE
+// URI is an off-chain-style ASCII snake with NO leading marker byte.
+function readSnakeText(cell: Cell, hasMarker = true): string {
   let current: Cell | null = cell;
   let first = true;
   const chunks: Buffer[] = [];
   while (current) {
     const slice = current.beginParse();
     if (first) {
-      expect(slice.loadUint(8)).toBe(0);
+      if (hasMarker) {
+        expect(slice.loadUint(8)).toBe(0);
+      }
       first = false;
     }
     chunks.push(slice.loadBuffer(Math.floor(slice.remainingBits / 8)));
@@ -105,15 +110,34 @@ describe('UsernameRegistry collection-render', () => {
       expect(svg.startsWith('<svg')).toBe(true);
       expect(svg).toContain('linearGradient');
       expect(svg).toContain(label);                  // tier badge
-      expect(svg).toContain('PLATHO USERNAME');
-      expect(svg).toContain(`${username}.ath`);      // rendered username line
+
+      // Bottom caption is "<len> LETTER USERNAME" (<=5) or "<len> CHARACTER USERNAME" (>5).
+      const unit = username.length <= 5 ? 'LETTER' : 'CHARACTER';
+      expect(svg).toContain(`>${username.length} ${unit} USERNAME<`);
+      expect(svg).toContain('transferable on-chain identity');
+      expect(svg).toContain('>.ath</text>');         // standalone .ath suffix
       for (const ch of new Set(username)) {
         expect(svg).toContain(`>${ch}</text>`);      // per-character tile
       }
 
-      const imageUri = readSnakeText(dict.get(metadataKey('image'))!);
-      expect(imageUri.startsWith('data:image/svg+xml,')).toBe(true);
+      // --- Tonapi-renderable fixed markup (the two on-chain-render fixes) ---
+      // 1. Teal gradient uses objectBoundingBox coords (no userSpaceOnUse).
+      expect(svg).toContain('<linearGradient id="teal" x1="0" y1="1" x2="1" y2="0">');
+      expect(svg).not.toMatch(/id="teal"[^>]*gradientUnits="userSpaceOnUse"/);
+      // 2. Logo is a flattened top-level <g matrix>, not a nested <svg>.
+      expect(svg).toContain('transform="matrix(0.160156 0 0 -0.160156 130 210)"');
+      expect(svg).not.toContain('viewBox="0 0 512 512"');
+      expect(svg).not.toContain('translate(0 512) scale(1 -1)');
+      // Single SVG root: exactly one opening/closing <svg> tag.
+      expect((svg.match(/<svg\b/g) ?? []).length).toBe(1);
+      expect((svg.match(/<\/svg>/g) ?? []).length).toBe(1);
+
+      const imageUri = readSnakeText(dict.get(metadataKey('image'))!, false);
+      expect(imageUri.startsWith('data:image/svg+xml;base64,')).toBe(true);
       expect(imageUri).not.toMatch(/^https?:|^ipfs:/);
+      // The base64 image must decode byte-for-byte to the image_data SVG.
+      const decoded = Buffer.from(imageUri.slice('data:image/svg+xml;base64,'.length), 'base64').toString('utf8');
+      expect(decoded).toBe(svg);
     });
   }
 
@@ -126,12 +150,17 @@ describe('UsernameRegistry collection-render', () => {
     const svg = readSnakeText(dict.get(metadataKey('image_data'))!);
 
     expect(svg).toContain('COMMON');
-    expect(svg).toContain('wwwwwwwwwwwwwwww.ath');
+    expect(svg).toContain('>16 CHARACTER USERNAME<');   // bottom caption
+    expect(svg).toContain('>.ath</text>');              // standalone .ath suffix
     expect((svg.match(/>w<\/text>/g) ?? []).length).toBe(16);
     expect(svg).toContain('x="164" y="372" width="80" height="80"'); // top-left tile
     expect(svg).toContain('x="780" y="372" width="80" height="80"'); // top-right tile
     expect(svg).toContain('x="164" y="464" width="80" height="80"'); // bottom-left tile
     expect(svg).toContain('x="780" y="464" width="80" height="80"'); // bottom-right tile
+    // Fixed (tonapi-renderable) markup carried by every tier/length.
+    expect(svg).toContain('<linearGradient id="teal" x1="0" y1="1" x2="1" y2="0">');
+    expect(svg).toContain('transform="matrix(0.160156 0 0 -0.160156 130 210)"');
+    expect(svg).not.toContain('viewBox="0 0 512 512"');
   });
 
   it('RENDER-02: rejects content whose name is too short to carry a 4..16 char username', async () => {
