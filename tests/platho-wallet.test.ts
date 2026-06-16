@@ -202,6 +202,107 @@ describe('embedded Platho wallet', () => {
     expect(sent).toBe(false);
   });
 
+  it('PLATHO-WALLET-04E: deploys a fresh uninitialized wallet on its first transfer with seqno 0', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const message = {
+      address: `0:${'33'.repeat(32)}`,
+      amount: '1000000',
+      payload: null,
+    };
+    let accountStateCalls = 0;
+    let sentBoc: any = null;
+    const transport = {
+      async runGetMethod() {
+        // A never-deployed account aborts the seqno get-method (TON exit_code -13).
+        throw new Error('TON RPC get-method exit code -13');
+      },
+      async getAccountState(input: any) {
+        accountStateCalls += 1;
+        expect(input?.address).toBe(wallet.address);
+        return { ok: true, result: { state: 'uninitialized', balance: '1000000000' } };
+      },
+      async sendBoc(input: any) {
+        sentBoc = input;
+        return { ok: true };
+      },
+    };
+
+    await expect(getPlathoWalletSeqno(wallet, transport)).resolves.toBe(0);
+
+    const built = await buildPlathoWalletExternalBoc(wallet, message, { transport });
+    // seqno 0 deterministically attaches the wallet stateInit (deploy-on-first-tx).
+    expect(built.seqno).toBe(0);
+    expect(Cell.fromBoc(Buffer.from(built.boc, 'base64'))).toHaveLength(1);
+
+    const result = await sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, {
+      transport,
+    });
+    expect(result.seqno).toBe(0);
+    expect(sentBoc).not.toBeNull();
+    expect(accountStateCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it('PLATHO-WALLET-04F: still refuses to sign when a deployed wallet seqno read fails', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const message = {
+      address: `0:${'44'.repeat(32)}`,
+      amount: '1000000',
+      payload: null,
+    };
+    let sent = false;
+    const transport = {
+      async runGetMethod() {
+        throw new Error('rpc down');
+      },
+      async getAccountState() {
+        // The wallet is deployed; the seqno read merely failed (RPC unreachable
+        // or lying). Signing with fallback seqno 0 here would be unsafe.
+        return { ok: true, result: { state: 'active', balance: '5000000000' } };
+      },
+      async sendBoc() {
+        sent = true;
+        return { ok: true };
+      },
+    };
+
+    await expect(getPlathoWalletSeqno(wallet, transport)).rejects.toThrow(/seqno read failed|fallback seqno 0/i);
+    await expect(sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, {
+      transport,
+    })).rejects.toThrow(/seqno read failed|fallback seqno 0/i);
+    expect(sent).toBe(false);
+  });
+
+  it('PLATHO-WALLET-04G: a structured exit_code -13 resolves to seqno 0 with no account-state read', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const message = {
+      address: `0:${'55'.repeat(32)}`,
+      amount: '1000000',
+      payload: null,
+    };
+    let sentBoc: any = null;
+    const transport = {
+      async runGetMethod() {
+        // A never-deployed account: the toncenter transport surfaces exit_code -13
+        // as a structured error.exitCode. No getAccountState on this transport on
+        // purpose — the fast path must resolve seqno 0 without one.
+        const error: any = new Error('TON RPC get-method exit code -13');
+        error.exitCode = -13;
+        throw error;
+      },
+      async sendBoc(input: any) {
+        sentBoc = input;
+        return { ok: true };
+      },
+    };
+
+    await expect(getPlathoWalletSeqno(wallet, transport)).resolves.toBe(0);
+    const result = await sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, {
+      transport,
+    });
+    expect(result.seqno).toBe(0);
+    expect(sentBoc).not.toBeNull();
+  });
+
   it('PLATHO-WALLET-05: encrypts to a recipient Vault key record derived from their wallet recovery phrase', async () => {
     const alice = await createPlathoWallet({ mnemonic });
     const bob = await createPlathoWallet({ mnemonic: bobMnemonic });

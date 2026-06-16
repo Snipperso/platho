@@ -11,6 +11,7 @@ export class VaultTonRpcProviderError extends Error {
     if (options.status !== undefined) this.status = options.status;
     if (options.code !== undefined) this.code = options.code;
     if (options.retryAfterMs !== undefined) this.retryAfterMs = options.retryAfterMs;
+    if (options.exitCode !== undefined) this.exitCode = options.exitCode;
   }
 }
 
@@ -26,6 +27,14 @@ const TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES = 512;
 const TONCENTER_MESSAGES_CACHE_TTL_MS = 300_000;
 const TONCENTER_MESSAGES_CACHE_MAX_ENTRIES = 128;
 const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
+// TON aborts a get-method run against an account that has no code (e.g. a
+// never-deployed wallet) with this exit code. It is a definitive on-chain
+// answer that every node agrees on — not a transport failure — so a caller that
+// opts in (the wallet seqno read, which treats it as "seqno 0, deploy on first
+// transfer") can stop the multi-transport fallback the moment it sees it,
+// instead of spending the censorship-survival transports re-asking a settled
+// question.
+const TON_GET_METHOD_UNINITIALIZED_EXIT_CODE = -13;
 const TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
   'get_state',
@@ -127,6 +136,10 @@ function isTonRpcHardTransportError(error) {
   if (status >= 400) return true;
   if (String(error?.name ?? '') === 'TypeError') return true;
   return /failed to fetch|network|dns|connection|load failed/i.test(String(error?.message ?? error ?? ''));
+}
+
+function tonRpcErrorIsUninitializedAccount(error) {
+  return Number(error?.exitCode) === TON_GET_METHOD_UNINITIALIZED_EXIT_CODE;
 }
 
 function noteTonRpcTransportFailure(transport, error, deadRetryMs = TON_RPC_TRANSPORT_DEAD_RETRY_MS) {
@@ -1359,7 +1372,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
           const json = await response.json();
           const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
           if (Number(exitCode) !== 0) {
-            throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`);
+            throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`, { exitCode: Number(exitCode) });
           }
           writeRunGetMethodCache(cacheKey, json, resolvedCacheTtlMs, runGetMethodCacheMaxEntries);
           return json;
@@ -1792,6 +1805,19 @@ export function createFallbackTonRpcTransport(options = {}) {
         break;
       } catch (error) {
         lastError = error;
+        // A get-method abort on a code-less account (TON exit_code -13) is a
+        // definitive on-chain answer, not a transport miss — every node agrees
+        // the account has no code. When the caller opts in (the wallet seqno
+        // read, which treats it as "deploy on first transfer"), surface it at
+        // once instead of exhausting — and loading — the censorship-survival
+        // fallback transports on a settled question. It is not a transport
+        // failure, so the primary is intentionally left unparked.
+        if (
+          tonRpcErrorIsUninitializedAccount(error)
+          && (call?.stopOnUninitializedAccount === true || requestOptions.stopOnUninitializedAccount === true)
+        ) {
+          throw error;
+        }
         noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
       }
     }

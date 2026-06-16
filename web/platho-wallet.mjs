@@ -444,6 +444,54 @@ function walletSeqnoUnavailableError(message, cause) {
   return error;
 }
 
+// TON aborts the `seqno` get-method on an account with no code (a never-deployed
+// wallet) with this exit code. The toncenter transport surfaces it as
+// error.exitCode. It is a definitive "wallet not deployed yet" signal, so the
+// first transfer carries the stateInit to deploy it (seqno is provably 0).
+const TON_GET_METHOD_UNINITIALIZED_EXIT_CODE = -13;
+
+function tonRpcExitCodeIsUninitializedAccount(error) {
+  return Number(error?.exitCode) === TON_GET_METHOD_UNINITIALIZED_EXIT_CODE;
+}
+
+// Account statuses (TON Center v2 `state` / v3 `status`) that mean the wallet
+// contract has no code on chain yet. Such an account has no persistent state,
+// so its seqno is provably 0 and its first external must carry the wallet
+// stateInit to deploy it. `frozen` is intentionally excluded — a frozen account
+// retains prior state and is NOT safe to treat as seqno 0.
+const UNINITIALIZED_WALLET_ACCOUNT_STATUSES = new Set([
+  'uninitialized', 'uninit', 'nonexist', 'nonexistent', 'empty', 'none',
+]);
+
+function readWalletAccountStatus(state) {
+  const raw = state?.state
+    ?? state?.status
+    ?? state?.account_state
+    ?? state?.result?.state
+    ?? state?.result?.status
+    ?? state?.result?.account_state
+    ?? state?.account?.state
+    ?? state?.account?.status
+    ?? null;
+  return typeof raw === 'string' ? raw.trim().toLowerCase() : null;
+}
+
+// A freshly created wallet has no contract code on chain until its first
+// outgoing transfer, so the `seqno` get-method aborts (TON exit_code -13) even
+// when the RPC is perfectly healthy. Confirm the account really is
+// uninitialized — distinct from a deployed wallet whose read merely failed —
+// before treating its seqno as a safe 0.
+async function walletAccountIsUninitialized(wallet, transport) {
+  if (typeof transport?.getAccountState !== 'function') return false;
+  try {
+    const state = await transport.getAccountState({ address: wallet.address }, { skipIfRateLimited: false });
+    const status = readWalletAccountStatus(state);
+    return status != null && UNINITIALIZED_WALLET_ACCOUNT_STATUSES.has(status);
+  } catch {
+    return false;
+  }
+}
+
 export async function getPlathoWalletSeqno(wallet, transport, options = {}) {
   if (!transport?.runGetMethod) {
     if (options.allowSeqnoFallback === true) return 0;
@@ -454,9 +502,24 @@ export async function getPlathoWalletSeqno(wallet, transport, options = {}) {
       address: wallet.address,
       method: 'seqno',
       stack: [],
+      // A never-deployed wallet aborts this get-method with exit_code -13. Tell
+      // the fallback transport that is a definitive answer, so it does not
+      // exhaust (and load) the censorship-survival fallback transports just to
+      // rediscover the wallet is undeployed.
+      stopOnUninitializedAccount: true,
     }));
   } catch (error) {
     if (options.allowSeqnoFallback === true) return 0;
+    // Fast path: a structured uninitialized-account abort (exit_code -13) already
+    // proves the wallet has no code yet, so its seqno is provably 0 and its first
+    // transfer carries the stateInit to deploy it — no extra account read needed.
+    if (tonRpcExitCodeIsUninitializedAccount(error)) return 0;
+    // Slow path: the read failed without a definitive -13 (e.g. a transport that
+    // does not surface exit codes, or a network error). Confirm the account
+    // really is uninitialized before falling back; a *deployed* wallet whose read
+    // merely failed (RPC unreachable or lying) must still refuse, to avoid
+    // signing with a stale seqno and burning the user's funds.
+    if (await walletAccountIsUninitialized(wallet, transport)) return 0;
     throw walletSeqnoUnavailableError('TON RPC seqno read failed; refusing to sign with fallback seqno 0', error);
   }
 }
