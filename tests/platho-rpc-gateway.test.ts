@@ -68,7 +68,7 @@ describe('Platho RPC gateway', () => {
     expect(config).not.toMatch(/PLATHO_RPC_TONCENTER_API_KEY|X-API-Key|toncenter-mainnet\.key|apiKey:/);
   });
 
-  it('RPC-GATEWAY-02D: toncenter read failures fall back to anonymous TON Access for get-methods and account only', () => {
+  it('RPC-GATEWAY-02D: reads fall back to TON Access for get-methods and account; broadcast adds a redundant Orbs sendBoc; history stays toncenter-only', () => {
     const gateway = readFileSync(gatewayPath, 'utf8');
     const envExample = readFileSync('deploy/platho-rpc-gateway.env.example', 'utf8');
     const runGetMethodBranch = gateway.slice(
@@ -100,11 +100,17 @@ describe('Platho RPC gateway', () => {
     expect(runGetMethodBranch).toMatch(/normalize_run_get_method_response\(upstream\)/);
     expect(accountBranch).toMatch(/read_fallback_reason\(error\)/);
     expect(accountBranch).toMatch(/log_upstream_fallback\(kind, reason\)/);
-    // Broadcast and message history have no TON Access v2 equivalent and must
-    // never silently change upstream.
-    expect(messageBranch).not.toMatch(/ton_access_base|read_fallback_reason/);
+    // Broadcast does NOT "fall back" on error but submits a REDUNDANT copy through the
+    // Orbs v2 /sendBoc path (idempotent external) so delivery never hinges on toncenter
+    // alone — the documented ACK-without-delivery failure mode. Message HISTORY has no
+    // v2 equivalent and stays toncenter-only.
+    expect(gateway).toMatch(/BROADCAST_REDUNDANT_FALLBACK = os\.getenv\("PLATHO_RPC_BROADCAST_REDUNDANT_FALLBACK"/);
+    expect(messageBranch).toMatch(/if BROADCAST_REDUNDANT_FALLBACK:/);
+    expect(messageBranch).toMatch(/ton_access_base\(\)\}\/sendBoc/);
+    expect(messageBranch).toMatch(/log_upstream_fallback\("message"/);
     expect(messagesBranch).not.toMatch(/ton_access_base|read_fallback_reason/);
     expect(envExample).toMatch(/PLATHO_RPC_TON_ACCESS_READ_FALLBACK=1/);
+    expect(envExample).toMatch(/PLATHO_RPC_BROADCAST_REDUNDANT_FALLBACK=1/);
   });
 
   it('RPC-GATEWAY-02C: message history allowlist tracks the production Vault and CapsuleHub', () => {

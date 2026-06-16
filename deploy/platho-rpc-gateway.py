@@ -98,6 +98,13 @@ TON_ACCESS_NODE_TTL_MS = int(os.getenv("PLATHO_RPC_TON_ACCESS_NODE_TTL_MS", "600
 # anonymous TON Access (Orbs) v2 path. Broadcast and message history have no
 # v2 equivalent and intentionally never fall back.
 TON_ACCESS_READ_FALLBACK = os.getenv("PLATHO_RPC_TON_ACCESS_READ_FALLBACK", "1").strip().lower() not in ("0", "false", "off", "no")
+# Broadcast resilience: toncenter v3 /message can ACK (HTTP 200 + message_hash) WITHOUT the
+# external actually reaching the network (upstream queue/timeout — the documented gateway
+# upstream-timeout failure mode). When enabled, every broadcast is ALSO submitted through the
+# keyless Orbs (TON Access) v2 /sendBoc path, so delivery no longer depends on a single
+# provider. The external is idempotent (fixed wallet seqno) — a duplicate broadcast is
+# harmless: at most one copy is ever accepted on-chain.
+BROADCAST_REDUNDANT_FALLBACK = os.getenv("PLATHO_RPC_BROADCAST_REDUNDANT_FALLBACK", "1").strip().lower() not in ("0", "false", "off", "no")
 TONCENTER_V3_BASE = os.getenv("PLATHO_RPC_TONCENTER_V3_BASE", "https://toncenter.com/api/v3").rstrip("/")
 TONCENTER_V2_BASE = os.getenv("PLATHO_RPC_TONCENTER_V2_BASE", "https://toncenter.com/api/v2").rstrip("/")
 TONCENTER_API_KEY = os.getenv("PLATHO_RPC_TONCENTER_API_KEY", "").strip()
@@ -557,11 +564,34 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
                     self.send_json(503, {"ok": False, "error": "message broadcast is not supported by this upstream"})
                     return
                 request = validated_send_message_payload(self.read_body())
-                status, upstream = fetch_toncenter_json(
-                    f"{TONCENTER_V3_BASE}/message",
-                    method="POST",
-                    body=request,
-                )
+                status, upstream, primary_error = None, None, None
+                try:
+                    status, upstream = fetch_toncenter_json(
+                        f"{TONCENTER_V3_BASE}/message",
+                        method="POST",
+                        body=request,
+                    )
+                except (HTTPError, URLError, TimeoutError) as error:
+                    primary_error = error
+                    log_upstream_error(kind, error, http_error_detail(error) if isinstance(error, HTTPError) else "")
+                # toncenter v3 can ACK a broadcast without it reaching the network; submit the
+                # same idempotent external through the Orbs v2 /sendBoc path too so delivery is
+                # provider-independent. Best-effort: failure here never masks a primary success.
+                if BROADCAST_REDUNDANT_FALLBACK:
+                    try:
+                        fb_status, fb_upstream = fetch_json(
+                            f"{ton_access_base()}/sendBoc",
+                            method="POST",
+                            body={"boc": request["boc"]},
+                        )
+                        log_upstream_fallback("message", "redundant" if primary_error is None else f"primary_{read_fallback_reason(primary_error) or 'error'}")
+                        if status is None:
+                            status, upstream = fb_status, fb_upstream
+                    except (HTTPError, URLError, TimeoutError, RuntimeError) as fb_error:
+                        detail = http_error_detail(fb_error) if isinstance(fb_error, HTTPError) else str(fb_error)
+                        log_upstream_error("message_fallback", fb_error, detail)
+                if status is None:
+                    raise primary_error
                 self.send_json(status, upstream)
                 return
             if kind == "messages":
