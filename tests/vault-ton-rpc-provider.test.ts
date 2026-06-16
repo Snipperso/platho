@@ -1271,6 +1271,42 @@ describe('Vault TON RPC provider', () => {
     expect(fallbackCalls).toEqual(['read:get_global', 'send']);
   });
 
+  it('VAULT-RPC-04K: stops the read fallback on a definitive uninitialized-account (-13) only when the caller opts in', async () => {
+    const makeTransports = () => {
+      const calls: string[] = [];
+      const uninitialized = (kind: string) => ({
+        kind,
+        async runGetMethod(call: any) {
+          calls.push(`${kind}:${call.method}`);
+          // A code-less (never-deployed) account aborts the get-method with -13,
+          // surfaced as a structured error.exitCode by the toncenter transport.
+          const error: any = new Error('TON RPC get-method exit code -13');
+          error.exitCode = -13;
+          throw error;
+        },
+      });
+      const primary = uninitialized('primary-rpc');
+      const fallback = uninitialized('fallback-rpc');
+      return { calls, transport: createFallbackTonRpcTransport({ transports: [primary, fallback] }) };
+    };
+
+    // Opt-in (the wallet seqno read): the primary's -13 is a definitive on-chain
+    // answer, so the emergency/fallback transport is never touched.
+    const optIn = makeTransports();
+    await expect(optIn.transport?.runGetMethod({
+      address: VAULT, method: 'seqno', stack: [], stopOnUninitializedAccount: true,
+    })).rejects.toMatchObject({ exitCode: -13 });
+    expect(optIn.calls).toEqual(['primary-rpc:seqno']);
+
+    // No opt-in (e.g. a Vault getter read): the existing behavior is preserved —
+    // the candidate loop still exhausts every transport before failing.
+    const noOptIn = makeTransports();
+    await expect(noOptIn.transport?.runGetMethod({
+      address: VAULT, method: 'get_global', stack: [],
+    })).rejects.toMatchObject({ exitCode: -13 });
+    expect(noOptIn.calls).toEqual(['primary-rpc:get_global', 'fallback-rpc:get_global']);
+  });
+
   it('VAULT-RPC-04J1: read-only send fallback does not replace the real broadcast error', async () => {
     const primary = {
       kind: 'toncenter-send',
