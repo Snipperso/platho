@@ -3,6 +3,7 @@ import { Address, beginCell, Cell, Dictionary, contractAddress, toNano, TupleRea
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
+import { readFileSync } from 'fs';
 
 // Measurement harness for the on-chain PERCENT data-URI SVG image path.
 // Deploys UsernameRegistry, calls get_nft_content via blockchain.runGetMethod with a
@@ -17,6 +18,18 @@ import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_Use
 
 const PERCENT_PREFIX = 'data:image/svg+xml,';
 const GAS_CEILING = 3_000_000n;
+
+// Option B: glyph/static art parts live in the `art` dict (uploaded at genesis). The
+// gas measurement reflects get_nft_content reading them via cell.asSlice().asString().
+const ART_PAYLOAD: Record<string, string> = JSON.parse(readFileSync('artifacts/username_art_v2/art_payload.json', 'utf8'));
+function plainSnake(s: string): Cell {
+  const bytes = Buffer.from(s, 'utf8'); const CHUNK = 127; const chunks: Buffer[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) chunks.push(bytes.subarray(i, i + CHUNK));
+  if (chunks.length === 0) chunks.push(Buffer.alloc(0));
+  let next: Cell | null = null;
+  for (let i = chunks.length - 1; i >= 0; i--) { const b = beginCell().storeBuffer(chunks[i]); if (next) b.storeRef(next); next = b.endCell(); }
+  return next!;
+}
 
 function fixtureAddress(label: string, workchain = 0): Address {
   return new Address(workchain, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());
@@ -75,8 +88,13 @@ async function deployRegistry() {
   );
   const addr = contractAddress(0, init);
   await blockchain.setShardAccount(addr, createShardAccount({
-    address: addr, code: init.code, data: init.data, balance: toNano('2'), workchain: 0,
+    address: addr, code: init.code, data: init.data, balance: toNano('5'), workchain: 0,
   }));
+  // Upload all art parts as the genesis controller (deployer) so image_data renders the glyphs.
+  const registry = blockchain.openContract(new UsernameRegistry(addr, init));
+  for (const k of Object.keys(ART_PAYLOAD).map(Number).sort((a, b) => a - b)) {
+    await registry.send(deployer.getSender(), { value: toNano('0.05') }, { $$type: 'UploadArt', key: BigInt(k), data: plainSnake(ART_PAYLOAD[String(k)]) });
+  }
   return { blockchain, addr };
 }
 
@@ -100,7 +118,7 @@ describe('UsernameRegistry percent image gas measurement', () => {
   // Every valid length 4..16 (HARD GATE asserts < 3M across ALL of them).
   const lengths = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
-  it('MEASURE: get_nft_content gas per name length < 3M + percent round-trip', async () => {
+  it('MEASURE: get_nft_content gas per name length < 3M + text/paths layer split', async () => {
     const { blockchain, addr } = await deployRegistry();
     const GAS_LIMIT = 1_000_000_000n; // very high so the getter always completes
 
@@ -121,17 +139,41 @@ describe('UsernameRegistry percent image gas measurement', () => {
       expect(slice.loadUint(8)).toBe(0);
       const dict = slice.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
 
-      const imageStr = readSnakeBytes(dict.get(metadataKey('image'))!, false).toString('utf8');
+      // REGRESSION GUARD (TEP-64): EVERY on-chain content value MUST begin with the
+      // 0x00 snake marker. A missing marker on `image` (the beginString regression)
+      // is neither snake (0x00) nor chunked (0x01), so tonapi / GetGems / Tonkeeper
+      // reject the ENTIRE content dict -> blank metadata. Assert it on every value.
+      for (const key of ['name', 'description', 'image', 'image_data'] as const) {
+        const valueCell = dict.get(metadataKey(key));
+        expect(valueCell, `metadata value ${key} present`).toBeTruthy();
+        expect(valueCell!.beginParse().loadUint(8), `${key} TEP-64 0x00 snake marker`).toBe(0);
+      }
+
+      const imageStr = readSnakeBytes(dict.get(metadataKey('image'))!, true).toString('utf8');
       const rawSvg = readSnakeBytes(dict.get(metadataKey('image_data'))!, true).toString('utf8');
 
       // image is a PERCENT data-URI, not base64.
       expect(imageStr.startsWith(PERCENT_PREFIX)).toBe(true);
       expect(imageStr.startsWith('data:image/svg+xml;base64,')).toBe(false);
-      // percent-decode(image) == image_data, byte-for-byte.
-      const decoded = percentDecode(imageStr.slice(PERCENT_PREFIX.length));
-      expect(decoded).toBe(rawSvg);
+      // ARCHITECTURE (text-as-paths render fix): the two image layers are now
+      // DIFFERENT by design (no longer a byte-for-byte round-trip):
+      //   image      = percent data-URI, TEXT SVG  -> GetGems / browsers / Plato app
+      //                render it with their system fonts (proven working).
+      //   image_data = raw, PATHS SVG (Arimo glyph outlines) -> tonapi / Tonkeeper
+      //                rasterize it WITHOUT system fonts, so every glyph is a vector
+      //                <path> and renders correctly (text-as-text would be tofu).
+      const decodedImage = percentDecode(imageStr.slice(PERCENT_PREFIX.length));
+      expect(decodedImage.startsWith('<svg')).toBe(true);
+      expect(decodedImage.endsWith('</svg>')).toBe(true);
+      // image (browser text layer): keeps <text> + Arial font-family.
+      expect(decodedImage.includes('<text')).toBe(true);
+      expect(decodedImage.includes('font-family="Arial')).toBe(true);
+      // image_data (fontless paths layer): NO <text>, NO font-family — pure outlines.
       expect(rawSvg.startsWith('<svg')).toBe(true);
       expect(rawSvg.endsWith('</svg>')).toBe(true);
+      expect(rawSvg.includes('<text')).toBe(false);
+      expect(rawSvg.includes('font-family')).toBe(false);
+      expect(rawSvg.includes('<path')).toBe(true);
 
       // HARD GATE: getter gas must be well under the base64 ~5M ceiling.
       expect(res.gasUsed).toBeLessThan(GAS_CEILING);
@@ -146,8 +188,7 @@ describe('UsernameRegistry percent image gas measurement', () => {
       console.log(`len=${String(r.len).padStart(2)}  gas=${String(r.gas).padStart(10)}  rawSvgBytes=${r.rawLen}  imageUriBytes=${r.imgLen}  ${r.gas < GAS_CEILING ? 'OK' : 'OVER'}`);
     }
 
-    // Explicit round-trip log for the constraint-required lengths.
     // eslint-disable-next-line no-console
-    console.log('ROUNDTRIP lengths 4,5,6,16: percent-decode(image) == image_data: PASS');
+    console.log('LAYERS: image=percent TEXT (browser fonts), image_data=raw PATHS (fontless) — verified all lengths');
   }, 120000);
 });

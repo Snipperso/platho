@@ -143,6 +143,9 @@ async function setupRegistry(label: string) {
     deployment_manifest_hash: MANIFEST_HASH,
     vault_address: vaultAddress,
   } as BindUsernameVault);
+  // Art upload is DECOUPLED from the genesis seal (locked separately by SealArt), so the
+  // storage-economics model — which measures mint/refund value flow, not rendering — seals
+  // the genesis with an empty art dict (uploading 56 parts x 7 cases would only add latency).
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: MANIFEST_HASH,
@@ -165,7 +168,7 @@ function mintBody(owner: Address, name: string, amount: bigint, queryId: bigint,
 }
 
 async function sendMint(ctx: Setup, owner: Address, name: string, amount: bigint, queryId: bigint, value = USERNAME_NOTIFY_VALUE) {
-  await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWallet), { value }, mintBody(owner, name, amount, queryId, ctx.vaultAddress));
+  return await ctx.registry.send(ctx.blockchain.sender(ctx.officialAthWallet), { value }, mintBody(owner, name, amount, queryId, ctx.vaultAddress));
 }
 
 function assertNonNegative(label: string, value: bigint) {
