@@ -4619,6 +4619,100 @@ export function dictValueParserUsernameCollectionOnchainContent(): DictionaryVal
     }
 }
 
+export type UploadArt = {
+    $$type: 'UploadArt';
+    key: bigint;
+    data: Cell;
+}
+
+export function storeUploadArt(src: UploadArt) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1486822296, 32);
+        b_0.storeUint(src.key, 16);
+        b_0.storeRef(src.data);
+    };
+}
+
+export function loadUploadArt(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1486822296) { throw Error('Invalid prefix'); }
+    const _key = sc_0.loadUintBig(16);
+    const _data = sc_0.loadRef();
+    return { $$type: 'UploadArt' as const, key: _key, data: _data };
+}
+
+export function loadTupleUploadArt(source: TupleReader) {
+    const _key = source.readBigNumber();
+    const _data = source.readCell();
+    return { $$type: 'UploadArt' as const, key: _key, data: _data };
+}
+
+export function loadGetterTupleUploadArt(source: TupleReader) {
+    const _key = source.readBigNumber();
+    const _data = source.readCell();
+    return { $$type: 'UploadArt' as const, key: _key, data: _data };
+}
+
+export function storeTupleUploadArt(source: UploadArt) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.key);
+    builder.writeCell(source.data);
+    return builder.build();
+}
+
+export function dictValueParserUploadArt(): DictionaryValue<UploadArt> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeUploadArt(src)).endCell());
+        },
+        parse: (src) => {
+            return loadUploadArt(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type SealArt = {
+    $$type: 'SealArt';
+}
+
+export function storeSealArt(src: SealArt) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(3513294426, 32);
+    };
+}
+
+export function loadSealArt(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 3513294426) { throw Error('Invalid prefix'); }
+    return { $$type: 'SealArt' as const };
+}
+
+export function loadTupleSealArt(source: TupleReader) {
+    return { $$type: 'SealArt' as const };
+}
+
+export function loadGetterTupleSealArt(source: TupleReader) {
+    return { $$type: 'SealArt' as const };
+}
+
+export function storeTupleSealArt(source: SealArt) {
+    const builder = new TupleBuilder();
+    return builder.build();
+}
+
+export function dictValueParserSealArt(): DictionaryValue<SealArt> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeSealArt(src)).endCell());
+        },
+        parse: (src) => {
+            return loadSealArt(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type UsernameRegistry$Data = {
     $$type: 'UsernameRegistry$Data';
     official_ath_wallet_address: Address;
@@ -4642,6 +4736,9 @@ export type UsernameRegistry$Data = {
     pending_burn_flushes: Dictionary<bigint, PendingAthBurnFlush>;
     pending_burn_flush_count: bigint;
     genesis_controller_address: Address;
+    art: Dictionary<number, Cell>;
+    art_count: bigint;
+    art_sealed: boolean;
 }
 
 export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
@@ -4671,6 +4768,9 @@ export function storeUsernameRegistry$Data(src: UsernameRegistry$Data) {
         b_3.storeDict(src.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush());
         b_3.storeUint(src.pending_burn_flush_count, 64);
         b_3.storeAddress(src.genesis_controller_address);
+        b_3.storeDict(src.art, Dictionary.Keys.Uint(16), Dictionary.Values.Cell());
+        b_3.storeUint(src.art_count, 16);
+        b_3.storeBit(src.art_sealed);
         b_2.storeRef(b_3.endCell());
         b_1.storeRef(b_2.endCell());
         b_0.storeRef(b_1.endCell());
@@ -4703,7 +4803,10 @@ export function loadUsernameRegistry$Data(slice: Slice) {
     const _pending_burn_flushes = Dictionary.load(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), sc_3);
     const _pending_burn_flush_count = sc_3.loadUintBig(64);
     const _genesis_controller_address = sc_3.loadAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    const _art = Dictionary.load(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), sc_3);
+    const _art_count = sc_3.loadUintBig(16);
+    const _art_sealed = sc_3.loadBit();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed };
 }
 
 export function loadTupleUsernameRegistry$Data(source: TupleReader) {
@@ -4729,7 +4832,10 @@ export function loadTupleUsernameRegistry$Data(source: TupleReader) {
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    const _art = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
+    const _art_count = source.readBigNumber();
+    const _art_sealed = source.readBoolean();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed };
 }
 
 export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
@@ -4754,7 +4860,10 @@ export function loadGetterTupleUsernameRegistry$Data(source: TupleReader) {
     const _pending_burn_flushes = Dictionary.loadDirect(Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush(), source.readCellOpt());
     const _pending_burn_flush_count = source.readBigNumber();
     const _genesis_controller_address = source.readAddress();
-    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address };
+    const _art = Dictionary.loadDirect(Dictionary.Keys.Uint(16), Dictionary.Values.Cell(), source.readCellOpt());
+    const _art_count = source.readBigNumber();
+    const _art_sealed = source.readBoolean();
+    return { $$type: 'UsernameRegistry$Data' as const, official_ath_wallet_address: _official_ath_wallet_address, vault_address: _vault_address, ath_master_address: _ath_master_address, treasury_ath_receiver_address: _treasury_ath_receiver_address, official_ath_wallet_bound: _official_ath_wallet_bound, vault_bound: _vault_bound, sealed: _sealed, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, name_record_count: _name_record_count, pending_mint_count: _pending_mint_count, treasury_due_ath: _treasury_due_ath, burn_due_ath: _burn_due_ath, name_records: _name_records, pending_mints: _pending_mints, pending_item_to_name_hash: _pending_item_to_name_hash, pending_treasury_flushes: _pending_treasury_flushes, pending_treasury_flush_count: _pending_treasury_flush_count, pending_burn_flushes: _pending_burn_flushes, pending_burn_flush_count: _pending_burn_flush_count, genesis_controller_address: _genesis_controller_address, art: _art, art_count: _art_count, art_sealed: _art_sealed };
 }
 
 export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
@@ -4780,6 +4889,9 @@ export function storeTupleUsernameRegistry$Data(source: UsernameRegistry$Data) {
     builder.writeCell(source.pending_burn_flushes.size > 0 ? beginCell().storeDictDirect(source.pending_burn_flushes, Dictionary.Keys.BigInt(257), dictValueParserPendingAthBurnFlush()).endCell() : null);
     builder.writeNumber(source.pending_burn_flush_count);
     builder.writeAddress(source.genesis_controller_address);
+    builder.writeCell(source.art.size > 0 ? beginCell().storeDictDirect(source.art, Dictionary.Keys.Uint(16), Dictionary.Values.Cell()).endCell() : null);
+    builder.writeNumber(source.art_count);
+    builder.writeBoolean(source.art_sealed);
     return builder.build();
 }
 
@@ -4967,7 +5079,9 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"PendingAthBurnFlushView","header":null,"fields":[{"name":"exists","type":{"kind":"simple","type":"bool","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"created_at","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"UsernameCollectionDataView","header":null,"fields":[{"name":"next_item_index","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"collection_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"UsernameCollectionOnchainContent","header":null,"fields":[{"name":"marker","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"metadata","type":{"kind":"dict","key":"uint","keyFormat":256,"value":"cell","valueFormat":"ref"}}]},
-    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"UploadArt","header":1486822296,"fields":[{"name":"key","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"data","type":{"kind":"simple","type":"cell","optional":false}}]},
+    {"name":"SealArt","header":3513294426,"fields":[]},
+    {"name":"UsernameRegistry$Data","header":null,"fields":[{"name":"official_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"vault_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_ath_receiver_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"official_ath_wallet_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"vault_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"name_record_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_mint_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"treasury_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"burn_due_ath","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"name_records","type":{"kind":"dict","key":"int","value":"NameRecord","valueFormat":"ref"}},{"name":"pending_mints","type":{"kind":"dict","key":"int","value":"PendingUsernameMint","valueFormat":"ref"}},{"name":"pending_item_to_name_hash","type":{"kind":"dict","key":"address","value":"int"}},{"name":"pending_treasury_flushes","type":{"kind":"dict","key":"int","value":"PendingAthTreasuryFlush","valueFormat":"ref"}},{"name":"pending_treasury_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"pending_burn_flushes","type":{"kind":"dict","key":"int","value":"PendingAthBurnFlush","valueFormat":"ref"}},{"name":"pending_burn_flush_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"art","type":{"kind":"dict","key":"uint","keyFormat":16,"value":"cell","valueFormat":"ref"}},{"name":"art_count","type":{"kind":"simple","type":"uint","optional":false,"format":16}},{"name":"art_sealed","type":{"kind":"simple","type":"bool","optional":false}}]},
 ]
 
 const UsernameNFTItem_opcodes = {
@@ -5011,6 +5125,8 @@ const UsernameNFTItem_opcodes = {
     "FlushBurnAthDue": 3919758027,
     "PrunePendingUsernameMint": 932634413,
     "UsernameRegistryTopUpStorageReserve": 179986205,
+    "UploadArt": 1486822296,
+    "SealArt": 3513294426,
 }
 
 const UsernameNFTItem_getters: ABIGetter[] = [
