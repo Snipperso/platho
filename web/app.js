@@ -27,7 +27,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=13';
+} from './platho-wallet.mjs?v=14';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=74';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=76';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=39';
+} from './vault-ton-rpc-provider.mjs?v=40';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -132,19 +132,19 @@ import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
 } from './publish-batch-orchestration.mjs?v=2';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=23';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=24';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=36';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=25';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=21';
+} from './capsulehub-ton-rpc-provider.mjs?v=37';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=26';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=22';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=28';
+} from './username-ton-rpc-provider.mjs?v=29';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v426';
+const PLATHO_APP_RUNTIME_VERSION = 'v429';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -13580,7 +13580,15 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
   }
 }
 
-function queueVaultPostTransactionRefresh() {
+function queueVaultPostTransactionRefresh(options = {}) {
+  // Account activation (RegisterMessagingKeys) only settles on-chain a few seconds
+  // to ~a minute after the external is sent — longer when the verifier is rate-
+  // limited. The immediate refresh below almost always runs BEFORE the Vault has
+  // created the user, so current_key_id is still 0. When the caller is waiting on
+  // activation, the delayed refreshes must KEEP re-reading activation until it
+  // confirms (pollActivation); otherwise the button stays on "Activate" even after
+  // the account activated, and only a second manual press would catch it up.
+  const pollActivation = options.pollActivation === true;
   markNavVaultBalancePending('transaction submitted', {
     resetRetry: true,
     retry: true,
@@ -13590,10 +13598,13 @@ function queueVaultPostTransactionRefresh() {
     if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
     if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
   });
-  for (const delayMs of VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS) {
+  const delays = pollActivation
+    ? [...VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS, 90_000]
+    : VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS;
+  for (const delayMs of delays) {
     setTimeout(() => {
       if (!plathoWallet?.address) return;
-      refreshVaultNow({ includeActivation: false }).catch((error) => {
+      refreshVaultNow({ includeActivation: pollActivation }).catch((error) => {
         if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
         if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
       });
@@ -14912,7 +14923,7 @@ async function submitVaultRegisterMessagingKeys() {
     userExists: user.exists === true,
   });
   vaultDraftStatus.textContent = 'activation sent';
-  queueVaultPostTransactionRefresh();
+  queueVaultPostTransactionRefresh({ pollActivation: true });
   return result;
 }
 
