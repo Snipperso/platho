@@ -46,7 +46,7 @@
 import { readFileSync } from 'node:fs';
 import { Address, Cell, beginCell, contractAddress, internal, storeMessage, SendMode, toNano, fromNano } from '@ton/core';
 import { mnemonicToPrivateKey } from '@ton/crypto';
-import { WalletContractV4 } from '@ton/ton';
+import { WalletContractV4, WalletContractV5R1, WalletContractV3R2 } from '@ton/ton';
 
 // ----------------------------------------------------------------------------
 // Constants
@@ -80,7 +80,28 @@ async function gwGetState(addr) {
   if (!j || j.ok !== true) throw new Error(`getAddressInformation(${addr}): ${j && j.error ? j.error : 'HTTP ' + r.status}`);
   return j.result;
 }
+const SEND_VIA = (process.env.PLATHO_SEND_VIA || 'gateway').toLowerCase(); // 'gateway' | 'orbs' (diagnostic: bypass toncenter via the keyless Orbs v2 sendBoc path)
+async function orbsV2Base() {
+  const r = await fetch('https://ton.access.orbs.network/mngr/nodes?npm_version=2.3.0');
+  const nodes = await r.json();
+  const healthy = (Array.isArray(nodes) ? nodes : []).filter((n) => String(n.Healthy) === '1' && n?.Mngr?.health?.['v2-mainnet'] === true);
+  if (!healthy.length) throw new Error('no healthy Orbs v2-mainnet node');
+  const n = healthy[Math.floor(Math.random() * healthy.length)];
+  return `https://ton.access.orbs.network/${n.NodeId}/1/mainnet/toncenter-api-v2`;
+}
 async function gwSendBoc(bocB64) {
+  if (SEND_VIA === 'orbs') {
+    const base = await orbsV2Base();
+    const r = await fetch(`${base}/jsonRPC`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 'platho', method: 'sendBoc', params: { boc: bocB64 } }),
+    });
+    const text = await r.text();
+    let body; try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 400) }; }
+    console.log('  (send via Orbs v2 sendBoc:', base.replace(/\/[^/]+\/1\//, '/<node>/1/'), ')');
+    return { httpStatus: r.status, ok: r.ok, body };
+  }
   const r = await fetch(`${GATEWAY}/api/v3/message`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -126,11 +147,12 @@ async function main() {
     die(`collection address drift: JSON code+data derive to ${recomputed.toRawString()} but JSON address is ${expectedCollection.toRawString()}. Regenerate the input.`);
   }
 
-  // --- deployer == owner: the proven WalletContractV4 from the testnet-probe seed ---
+  // --- deployer == owner: auto-detect the wallet version matching the collection owner ---
   const words = readFileSync(DEPLOYER_SECRET_PATH, 'utf8').trim().split(/\s+/).filter(Boolean);
   if (words.length !== 24) die(`deployer-secret file ${DEPLOYER_SECRET_PATH} must contain 24 words (got ${words.length})`);
   const key = await mnemonicToPrivateKey(words);
-  const wallet = WalletContractV4.create({ workchain: 0, publicKey: key.publicKey });
+  const candidates = [WalletContractV5R1, WalletContractV4, WalletContractV3R2].filter(Boolean).map((C) => C.create({ workchain: 0, publicKey: key.publicKey }));
+  const wallet = candidates.find((w) => w.address.equals(ownerFromJson)) || candidates[0];
 
   // --- HARD-CHECK: the collection's baked owner must equal the V4 deployer/owner ---
   if (!wallet.address.equals(ownerFromJson)) {
@@ -164,7 +186,7 @@ async function main() {
   console.log('  input          :', INPUT_PATH, `(svg ${input.svgBytes} bytes, generated ${input.generatedAt})`);
   console.log('  collection code:', collectionCode.hash().toString('hex'));
   console.log('  collection data:', collectionData.hash().toString('hex'));
-  console.log('  deployer/owner :', `WalletContractV4 (wc 0, ${walletStateName}) — owner + signs/broadcasts/pays`);
+  console.log('  deployer/owner :', `deployer wallet (wc 0, ${walletStateName}) — owner + signs/broadcasts/pays`);
   console.log('    UQ (mainnet) :', wallet.address.toString({ urlSafe: true, bounceable: false }));
   console.log('    raw          :', wallet.address.toRawString());
   console.log('    balance      :', fmtTon(walletBalance), 'TON');
