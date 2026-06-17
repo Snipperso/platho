@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v433<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v433'/);
+    expect(html).toMatch(/id="appVersionLabel">v434<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v434'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1893,6 +1893,34 @@ describe('PWA runtime config guard', () => {
     expect(statusText).toMatch(/incompletePrivateStreamCount \?\? 0\) > 0/);
     expect(statusText).toMatch(/message parts pending/);
     expect(statusText).toMatch(/Number\(result\.skipped \?\? 0\) > 0/);
+  });
+
+  it('PWA-RECEIVE-RETRY-01: a session-skipped private entry auto-retries cross-session and surfaces "undelivered", never silently buried', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // A persistent cross-session stuck-entry store exists (mirrors the body-history store).
+    expect(app).toMatch(/function rememberPrivateStuckEntry\(address, entryId, message\)/);
+    expect(app).toMatch(/function privateStuckEntryRetryEntryIds\(address, options = \{\}\)/);
+    expect(app).toMatch(/function privateStuckEntrySurfacedCount\(address\)/);
+    expect(app).toMatch(/const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8/);
+    // Capped (promoted-undelivered) entries stop being re-fetched (filtered before the cooldown).
+    expect(app).toMatch(/>= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP\) continue/);
+    const scan = app.slice(
+      app.indexOf('const scanPrivateEntryId = async'),
+      app.indexOf('let indexEntriesScanned'),
+    );
+    // ELSE fast-path: a persisted/replayed stuck entry NEVER returns ok:false (which
+    // would break the retryEntryIds replay loop); it bumps the cross-session strike.
+    expect(scan).toMatch(/const alreadyStuck = source === 'history-retry' \|\| hasPrivateStuckEntry\(address, entryId\)/);
+    expect(scan).toMatch(/const crossStrikes = rememberPrivateStuckEntry\(address, entryId, message\)/);
+    // Cleared only on genuine success (empty / open-ok).
+    expect(scan).toMatch(/clearPrivateStuckEntry\(address, entryId\)/);
+    // The replay set unions the stuck ids (cross-session re-scan regardless of the cursor).
+    expect(app).toMatch(/privateStuckEntryRetryEntryIds\(address, \{ forceStuckRetry: options\.forceHistoryRetry === true \}\)/);
+    // Surfacing: count read from the STORE (survives reload), gates "Synced" off, dedicated label.
+    expect(app).toMatch(/const undeliveredCount = privateStuckEntrySurfacedCount\(address\)/);
+    expect(app).toMatch(/Number\(result\.undeliveredCount \?\? 0\) === 0/);
+    expect(app).toMatch(/'private_entry_undelivered'/);
+    expect(app).toMatch(/undelivered`/);
   });
 
   it('PWA-DOUBLEPUBLISH-01: a possibly-delivered external is never fresh-re-signed under a new nonce', () => {
@@ -3811,7 +3839,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function privateBodyHistoryRetryEntryIds\(address, options = \{\}\)/);
     expect(app).toMatch(/const force = options\.forceHistoryRetry === true/);
     expect(app).toMatch(/const retryLimit = force \? PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT/);
-    expect(syncSource).toMatch(/const retryEntryIds = privateBodyHistoryRetryEntryIds\(address/);
+    expect(syncSource).toMatch(/const retryEntryIds = \[\.\.\.new Set\(\[/);
+    expect(syncSource).toMatch(/\.\.\.privateBodyHistoryRetryEntryIds\(address, \{ forceHistoryRetry: options\.forceHistoryRetry === true \}\)/);
+    expect(syncSource).toMatch(/\.\.\.privateStuckEntryRetryEntryIds\(address, \{ forceStuckRetry: options\.forceHistoryRetry === true \}\)/);
     expect(syncSource).toMatch(/for \(const entryId of retryEntryIds\)/);
     expect(syncSource).toMatch(/rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
     expect(syncSource).toMatch(/clearPrivateBodyHistoryUnavailable\(address, entryId\)/);
@@ -3846,7 +3876,7 @@ describe('PWA runtime config guard', () => {
     // A persistently failing entry is skipped after three passes instead of
     // freezing the cursor into a forever-resyncing loop.
     expect(syncSource).toMatch(/PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER/);
-    expect(syncSource).toMatch(/rememberPrivateScanLog\(entryId, 'error-skip'\)/);
+    expect(syncSource).toMatch(/crossStrikes >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP \? 'undelivered' : 'error-skip'/);
     expect(syncSource).toMatch(/function scheduleMessageAutoSync/);
     expect(syncSource).toMatch(/beginMessageSyncUi\(\)/);
     expect(syncSource).toMatch(/syncPrivateCapsulesFromChainOnce\(\{ mode: 'auto' \}\)/);
@@ -3931,11 +3961,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v504/);
+    expect(sw).toMatch(/platho-pwa-prototype-v505/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=433/);
+    expect(sw).toMatch(/\.\/app\.js\?v=434/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);

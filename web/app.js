@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v433';
+const PLATHO_APP_RUNTIME_VERSION = 'v434';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -571,6 +571,17 @@ const PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT = 16;
 // failed passes the entry is skipped for the session and kept visible in the
 // debug surface instead.
 const PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER = 3;
+// A session-skipped unknown-error entry (above) is otherwise buried forever (the
+// cursor advances past it and the in-memory strike count dies on reload). Persist
+// it so later sessions re-scan it (via the retryEntryIds replay, never via cursor
+// manipulation — that would re-arm the perpetual catch-up loop). After this many
+// CROSS-session strikes it is promoted to a surfaced "undelivered" gap and stops
+// being re-fetched. Tuned to mirror the body-history retry store above.
+const PRIVATE_CHAIN_STUCK_ENTRY_STORAGE_PREFIX = 'platho.private.chain.stuck.entry.v1';
+const PRIVATE_CHAIN_STUCK_ENTRY_LIMIT = 200;
+const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_AUTO_LIMIT = 2;
+const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_MANUAL_LIMIT = 16;
+const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8;
 const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho.private.chain.head.repair.v1';
 const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8;
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
@@ -2237,7 +2248,8 @@ function completeMessageSyncUi(result) {
     && Number(result.historyUnavailableCount ?? 0) === 0
     && Number(result.skipped ?? 0) === 0
     && Number(result.incompletePrivateStreamCount ?? 0) === 0
-    && !['body_history_unavailable', 'catch_up_pending', 'private_key_open_failed', 'partial_stream_pending', 'index_limit_without_cursor'].includes(String(result.reason ?? ''));
+    && Number(result.undeliveredCount ?? 0) === 0
+    && !['body_history_unavailable', 'catch_up_pending', 'private_key_open_failed', 'partial_stream_pending', 'index_limit_without_cursor', 'private_entry_undelivered'].includes(String(result.reason ?? ''));
   messageAutoSyncPhase = complete ? 'synced' : 'delayed';
   messageAutoSyncLastErrorLabel = complete ? null : status;
   refreshConversationSubtitle();
@@ -4925,6 +4937,124 @@ function privateBodyHistoryRetryEntryIds(address, options = {}) {
   return ids;
 }
 
+// Cross-session "stuck entry" store (#9): a private index entry that the per-session
+// 3-strikes unknown-error skip would otherwise bury forever (cursor advances past it,
+// in-memory counter dies on reload). Persisted here so later sessions re-scan it via
+// the retryEntryIds replay (NOT via cursor manipulation), bounded by a cooldown +
+// auto-limit + a cross-session strike cap; once capped it becomes a surfaced
+// "undelivered" gap and stops being re-fetched. Mirrors the body-history store above.
+function privateChainStuckEntryStorageKey(address = configuredCapsuleHubAddress()) {
+  const hub = address ?? 'no-capsulehub';
+  const keyId = localRecipientKeyPair?.keyId ?? 'no-key';
+  return `${PRIVATE_CHAIN_STUCK_ENTRY_STORAGE_PREFIX}:${hub}:${keyId}`;
+}
+
+function normalizePrivateStuckEntryRecord(record) {
+  const entryId = record?.entryId ?? record?.entry_id ?? record;
+  if (!/^[0-9]+$/.test(String(entryId ?? ''))) return null;
+  const strikes = Math.max(1, Math.floor(Number(record?.strikes ?? 1)) || 1);
+  return {
+    entryId: String(entryId),
+    strikes,
+    lastError: record?.lastError ? String(record.lastError).slice(0, 200) : null,
+    firstSeenAt: record?.firstSeenAt ? String(record.firstSeenAt) : new Date().toISOString(),
+    lastSeenAt: record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString(),
+  };
+}
+
+function readPrivateStuckEntries(address) {
+  try {
+    const raw = localStorageOrNull()?.getItem(privateChainStuckEntryStorageKey(address));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(normalizePrivateStuckEntryRecord)
+      .filter(Boolean)
+      .slice(-PRIVATE_CHAIN_STUCK_ENTRY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function writePrivateStuckEntries(address, records) {
+  try {
+    const normalized = (records ?? [])
+      .map(normalizePrivateStuckEntryRecord)
+      .filter(Boolean)
+      .slice(-PRIVATE_CHAIN_STUCK_ENTRY_LIMIT);
+    const storage = localStorageOrNull();
+    if (!storage) return;
+    if (normalized.length === 0) storage.removeItem(privateChainStuckEntryStorageKey(address));
+    else storage.setItem(privateChainStuckEntryStorageKey(address), JSON.stringify(normalized));
+  } catch {
+    // Non-persistent mode retries stuck entries only within the current session.
+  }
+}
+
+function hasPrivateStuckEntry(address, entryId) {
+  const id = String(entryId ?? '');
+  if (!/^[0-9]+$/.test(id)) return false;
+  return readPrivateStuckEntries(address).some((record) => record.entryId === id);
+}
+
+function rememberPrivateStuckEntry(address, entryId, message) {
+  const id = String(entryId ?? '');
+  if (!/^[0-9]+$/.test(id)) return 0;
+  const records = readPrivateStuckEntries(address);
+  const prior = records.find((record) => record.entryId === id);
+  const strikes = (Number(prior?.strikes ?? 0) || 0) + 1;
+  const remaining = records.filter((record) => record.entryId !== id);
+  remaining.push({
+    entryId: id,
+    strikes,
+    lastError: message ? String(message).slice(0, 200) : (prior?.lastError ?? null),
+    firstSeenAt: prior?.firstSeenAt ?? new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+  });
+  writePrivateStuckEntries(address, remaining);
+  return strikes;
+}
+
+function clearPrivateStuckEntry(address, entryId) {
+  const id = String(entryId ?? '');
+  if (!/^[0-9]+$/.test(id)) return;
+  const remaining = readPrivateStuckEntries(address).filter((record) => record.entryId !== id);
+  writePrivateStuckEntries(address, remaining);
+}
+
+function privateStuckEntryRetryEntryIds(address, options = {}) {
+  const ids = [];
+  const records = readPrivateStuckEntries(address);
+  const force = options.forceStuckRetry === true;
+  const retryLimit = force ? PRIVATE_CHAIN_STUCK_ENTRY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_STUCK_ENTRY_RETRY_AUTO_LIMIT;
+  const now = Date.now();
+  for (const record of records) {
+    // Promoted-undelivered entries (strikes at the cap) stop being re-fetched —
+    // filtered BEFORE the cooldown so they never consume the auto-retry budget.
+    if ((Number(record.strikes ?? 0) || 0) >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP) continue;
+    if (!force) {
+      const lastSeenMs = Date.parse(record.lastSeenAt ?? '');
+      if (Number.isFinite(lastSeenMs) && now - lastSeenMs < PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS) continue;
+    }
+    try {
+      const id = BigInt(record.entryId);
+      if (id < 0n) continue;
+      ids.push(id);
+    } catch {
+      // Ignore corrupt local retry records.
+    }
+    if (ids.length >= retryLimit) break;
+  }
+  return ids;
+}
+
+function privateStuckEntrySurfacedCount(address) {
+  return readPrivateStuckEntries(address)
+    .filter((record) => (Number(record.strikes ?? 0) || 0) >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP)
+    .length;
+}
+
 function base64UrlToBytes(value) {
   const text = String(value ?? '');
   if (!/^[A-Za-z0-9_-]*$/.test(text)) throw new Error('Invalid base64url value');
@@ -5800,6 +5930,7 @@ function privateSyncResult(fields = {}) {
     historyUnavailableCount: Number(fields.historyUnavailableCount ?? 0),
     historyUnavailableEntries: Array.isArray(fields.historyUnavailableEntries) ? fields.historyUnavailableEntries : [],
     incompletePrivateStreamCount: Number(fields.incompletePrivateStreamCount ?? 0),
+    undeliveredCount: Number(fields.undeliveredCount ?? 0),
     rateLimited: fields.rateLimited === true,
     rpcDelayed: fields.rpcDelayed === true,
     unchanged: fields.unchanged === true,
@@ -5891,6 +6022,10 @@ function privateSyncStatusText(result) {
   }
   if (result.reason === 'catch_up_pending') {
     return result.imported > 0 ? 'new messages, catch-up pending' : `catch-up ${result.catchUpRemaining ?? 0} left`;
+  }
+  if (result.reason === 'private_entry_undelivered' || Number(result.undeliveredCount ?? 0) > 0) {
+    const n = Number(result.undeliveredCount ?? 0) || 1;
+    return result.imported > 0 ? `new messages, ${n} undelivered` : (n === 1 ? '1 undelivered' : `${n} undelivered`);
   }
   if (Number(result.incompletePrivateStreamCount ?? 0) > 0) {
     return result.imported > 0 ? 'new messages, parts pending' : 'message parts pending';
@@ -5992,9 +6127,15 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   const canPersistPrivateIndexCursor = cursorPersistence !== 'disabled_unverified';
   const recipientHead = privateIndexLatestLink(recipientIndex);
   const senderHead = privateIndexLatestLink(senderIndex);
-  const retryEntryIds = privateBodyHistoryRetryEntryIds(address, {
-    forceHistoryRetry: options.forceHistoryRetry === true,
-  });
+  // Replay set: body-history gaps + cross-session stuck entries (#9), re-scanned
+  // regardless of the advanced cursor. De-duped by value (an id can sit in both
+  // stores). Manual "Sync messages" (forceHistoryRetry) uses the manual limits for
+  // both. The stuck ids are made safe for the {ok:false}-break replay loop by the
+  // fast-path in scanPrivateEntryId (a persisted stuck entry returns {ok:true}).
+  const retryEntryIds = [...new Set([
+    ...privateBodyHistoryRetryEntryIds(address, { forceHistoryRetry: options.forceHistoryRetry === true }),
+    ...privateStuckEntryRetryEntryIds(address, { forceStuckRetry: options.forceHistoryRetry === true }),
+  ].map((id) => id.toString()))].map((id) => BigInt(id));
   const baseLimit = privateIndexSyncReadLimit(options);
   const limit = !canPersistPrivateIndexCursor && quickSync
     ? Math.max(baseLimit, PRIVATE_CHAIN_INDEX_READ_LIMIT)
@@ -6036,6 +6177,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         scannedPrivateEntryIds.add(entryIdKey);
         rememberPrivateScanLog(entryId, 'empty');
         clearPrivateBodyHistoryUnavailable(address, entryId);
+        clearPrivateStuckEntry(address, entryId);
         return { ok: true, entry };
       }
       entry = await resolvePrivateEntryBody(provider, entry, address, readOptions);
@@ -6075,6 +6217,10 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         if (added) imported += 1;
       }
       rememberPrivateScanLog(entryId, `open-${opened.openedAs ?? 'ok'}`);
+      // Genuine success (the entry opened): it is no longer a stuck/undelivered
+      // candidate. (Clear here, NOT before the open at the body-history clear, so a
+      // resolve-ok-but-open-fails entry keeps accumulating its cross-session strike.)
+      clearPrivateStuckEntry(address, entryId);
       return { ok: true, entry };
     } catch (error) {
       const message = String(error?.message ?? error);
@@ -6123,16 +6269,24 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         const failureKey = `${address}:${entryIdKey}`;
         const failures = (privateScanUnknownErrorCounts.get(failureKey) ?? 0) + 1;
         privateScanUnknownErrorCounts.set(failureKey, failures);
-        if (failures >= PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER) {
-          // This entry has failed identically across multiple passes; it must
-          // not pin the cursor into a permanent resync loop. Skip it for the
-          // session and keep the diagnostic reachable from the debug surface.
+        // A persisted stuck entry (or ANY replay of one — source 'history-retry')
+        // must NEVER return {ok:false}: the retryEntryIds replay loop breaks on the
+        // first !ok, which would stall the whole pass + the cursor every session
+        // (a worse loop than v419-v421). Mirror body-history's non-blocking
+        // {ok:true} contract — bump the CROSS-session strike and session-skip at
+        // once (one read, never scanComplete=false). A FRESH unknown error reached
+        // by the index walk keeps the per-session 3-strikes ramp so a one-off blip
+        // does not pin the page before the entry is persisted.
+        const alreadyStuck = source === 'history-retry' || hasPrivateStuckEntry(address, entryId);
+        if (alreadyStuck || failures >= PRIVATE_SCAN_UNKNOWN_ERROR_SKIP_AFTER) {
+          const crossStrikes = rememberPrivateStuckEntry(address, entryId, message);
           scannedPrivateEntryIds.add(entryIdKey);
-          rememberPrivateScanLog(entryId, 'error-skip');
+          rememberPrivateScanLog(entryId, crossStrikes >= PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP ? 'undelivered' : 'error-skip');
           globalThis.plathoLastPrivateSyncBlockedEntry = {
             entryId: entryIdKey,
             message,
             failures,
+            crossStrikes,
             at: new Date().toISOString(),
           };
           skipped += 1;
@@ -6330,6 +6484,11 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     for (const write of cursorWrites) writePrivateChainIndexCursor(address, write.role, write.cursor);
     for (const write of headRepairWrites) writePrivateChainHeadRepairLink(address, write.role, write.link);
   }
+  // Entries promoted past the cross-session strike cap (#9): a permanently surfaced
+  // "undelivered" gap. Read from the STORE (not the per-run skipped counter) so it
+  // survives reload, when skipped resets to 0 while the cursor sits past the entry —
+  // exactly the false "Synced" this guards against.
+  const undeliveredCount = privateStuckEntrySurfacedCount(address);
   const reason = bodyHistoryError
     ? 'body_history_unavailable'
     : privateKeyOpenError
@@ -6338,7 +6497,9 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         ? 'partial_stream_pending'
         : indexLimitReachedWithoutCursor
           ? 'index_limit_without_cursor'
-          : (catchUpRemaining > 0 ? 'catch_up_pending' : null);
+          : undeliveredCount > 0
+            ? 'private_entry_undelivered'
+            : (catchUpRemaining > 0 ? 'catch_up_pending' : null);
   const fullScanComplete = scanComplete
     && catchUpRemaining === 0
     && !hasFreshPartial
@@ -6372,6 +6533,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
     incompletePrivateStreamCount,
+    undeliveredCount,
     catchUpRemaining,
     indexLimitReachedWithoutCursor,
     reason,
@@ -6387,6 +6549,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
     incompletePrivateStreamCount,
+    undeliveredCount,
     catchUpRemaining,
     indexLimitReachedWithoutCursor,
     indexReadFallback,
