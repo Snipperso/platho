@@ -1,6 +1,6 @@
 # Platho Static Web Deploy Prep
 
-Status: BLOCKED_BY_PREPROD
+Status: PRODUCTION_STATIC_PACKAGE_READY
 Mode: production
 Domain: platho.app
 Output: C:\platho\artifacts\platho-web-static-production
@@ -10,7 +10,7 @@ Output: C:\platho\artifacts\platho-web-static-production
 ```text
 fileCount=130
 totalBytes=3202547
-bundleSha256=ad38613192d024521faba60f1912b887151c5359621d8ba608e8e7945d87bb66
+bundleSha256=bdbb2c700e7ef86be69086ad58ab2afad523e6fa262440820ed8b91e71075c89
 noBackendRuntime=true
 ```
 
@@ -21,11 +21,11 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: false
+- productionMarkersCleared: true
 
 ## Blockers
 
-- MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH
+None
 
 ## Warnings
 
@@ -33,4 +33,4 @@ None
 
 ## Production Findings
 
-- MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH: MAINNET_GENESIS_VERIFIED=true must match current build code hashes: username_registry. (artifacts/mainnet_genesis_verify_input.json)
+None
