@@ -5,18 +5,16 @@ import { createHash } from 'crypto';
 import { UsernameRegistry } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 import { readFileSync } from 'fs';
 
-// Measurement harness for the on-chain PERCENT data-URI SVG image path.
+// Measurement harness for the on-chain image_data (raw PATHS SVG) getter.
 // Deploys UsernameRegistry, calls get_nft_content via blockchain.runGetMethod with a
 // high gas limit (so it completes for measurement), reads back gasUsed, and verifies
-// the percent image round-trips to the raw image_data SVG bytes.
+// image_data is a fontless paths SVG. HARD GATE: gas < 3,000,000 for ALL lengths 4..16.
 //
-// The `image` metadata value is a percent data-URI ("data:image/svg+xml,<percent>"),
-// NOT base64. Base64 made this getter cost ~3.3-5M gas (one table lookup per 3-byte
-// group over the ~3KB SVG), risking tonapi's get-method gas limit -> blank in
-// Tonkeeper. Percent is chunk-granular and cheap (~2M). HARD GATE: gas < 3,000,000
-// for ALL valid lengths 4..16.
+// The percent `image` field was REMOVED: its font-based statics bloated the registry
+// code past the 65535-byte external deploy limit. image_data renders fontless on
+// tonapi/Tonkeeper AND GetGems (verified live on an image_data-only mainnet probe), so
+// it is the single render source — there is no longer a second `image` layer.
 
-const PERCENT_PREFIX = 'data:image/svg+xml,';
 const GAS_CEILING = 3_000_000n;
 
 // Option B: glyph/static art parts live in the `art` dict (uploaded at genesis). The
@@ -106,23 +104,15 @@ function nameOfLength(n: number): string {
   return s;
 }
 
-// Decode a percent-encoded URI body the way a browser / GetGems / decodeURIComponent
-// would: turn each %XX into its byte, pass everything else through. The contract only
-// emits %XX for the reserved set (space " # , / : < = > and never a literal %), so a
-// straight percent decode is exact.
-function percentDecode(s: string): string {
-  return Buffer.from(s.replace(/%([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16))), 'latin1').toString('utf8');
-}
-
-describe('UsernameRegistry percent image gas measurement', () => {
+describe('UsernameRegistry image_data gas measurement', () => {
   // Every valid length 4..16 (HARD GATE asserts < 3M across ALL of them).
   const lengths = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
-  it('MEASURE: get_nft_content gas per name length < 3M + text/paths layer split', async () => {
+  it('MEASURE: get_nft_content gas per name length < 3M, image_data fontless paths, no percent image', async () => {
     const { blockchain, addr } = await deployRegistry();
     const GAS_LIMIT = 1_000_000_000n; // very high so the getter always completes
 
-    const rows: { len: number; gas: bigint; imgLen: number; rawLen: number }[] = [];
+    const rows: { len: number; gas: bigint; rawLen: number }[] = [];
 
     for (const len of lengths) {
       const username = nameOfLength(len);
@@ -140,34 +130,16 @@ describe('UsernameRegistry percent image gas measurement', () => {
       const dict = slice.loadDict(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
 
       // REGRESSION GUARD (TEP-64): EVERY on-chain content value MUST begin with the
-      // 0x00 snake marker. A missing marker on `image` (the beginString regression)
-      // is neither snake (0x00) nor chunked (0x01), so tonapi / GetGems / Tonkeeper
-      // reject the ENTIRE content dict -> blank metadata. Assert it on every value.
-      for (const key of ['name', 'description', 'image', 'image_data'] as const) {
+      // 0x00 snake marker, else tonapi / GetGems / Tonkeeper reject the ENTIRE dict.
+      for (const key of ['name', 'description', 'image_data'] as const) {
         const valueCell = dict.get(metadataKey(key));
         expect(valueCell, `metadata value ${key} present`).toBeTruthy();
         expect(valueCell!.beginParse().loadUint(8), `${key} TEP-64 0x00 snake marker`).toBe(0);
       }
+      // The percent `image` field was REMOVED — image_data is the SOLE render layer.
+      expect(dict.get(metadataKey('image')), 'percent image must be absent').toBeUndefined();
 
-      const imageStr = readSnakeBytes(dict.get(metadataKey('image'))!, true).toString('utf8');
       const rawSvg = readSnakeBytes(dict.get(metadataKey('image_data'))!, true).toString('utf8');
-
-      // image is a PERCENT data-URI, not base64.
-      expect(imageStr.startsWith(PERCENT_PREFIX)).toBe(true);
-      expect(imageStr.startsWith('data:image/svg+xml;base64,')).toBe(false);
-      // ARCHITECTURE (text-as-paths render fix): the two image layers are now
-      // DIFFERENT by design (no longer a byte-for-byte round-trip):
-      //   image      = percent data-URI, TEXT SVG  -> GetGems / browsers / Plato app
-      //                render it with their system fonts (proven working).
-      //   image_data = raw, PATHS SVG (Arimo glyph outlines) -> tonapi / Tonkeeper
-      //                rasterize it WITHOUT system fonts, so every glyph is a vector
-      //                <path> and renders correctly (text-as-text would be tofu).
-      const decodedImage = percentDecode(imageStr.slice(PERCENT_PREFIX.length));
-      expect(decodedImage.startsWith('<svg')).toBe(true);
-      expect(decodedImage.endsWith('</svg>')).toBe(true);
-      // image (browser text layer): keeps <text> + Arial font-family.
-      expect(decodedImage.includes('<text')).toBe(true);
-      expect(decodedImage.includes('font-family="Arial')).toBe(true);
       // image_data (fontless paths layer): NO <text>, NO font-family — pure outlines.
       expect(rawSvg.startsWith('<svg')).toBe(true);
       expect(rawSvg.endsWith('</svg>')).toBe(true);
@@ -178,17 +150,17 @@ describe('UsernameRegistry percent image gas measurement', () => {
       // HARD GATE: getter gas must be well under the base64 ~5M ceiling.
       expect(res.gasUsed).toBeLessThan(GAS_CEILING);
 
-      rows.push({ len, gas: res.gasUsed, imgLen: imageStr.length, rawLen: rawSvg.length });
+      rows.push({ len, gas: res.gasUsed, rawLen: rawSvg.length });
     }
 
     // eslint-disable-next-line no-console
-    console.log('\\n=== PERCENT GETTER GAS TABLE (gate: < 3,000,000) ===');
+    console.log('\\n=== image_data GETTER GAS TABLE (gate: < 3,000,000) ===');
     for (const r of rows) {
       // eslint-disable-next-line no-console
-      console.log(`len=${String(r.len).padStart(2)}  gas=${String(r.gas).padStart(10)}  rawSvgBytes=${r.rawLen}  imageUriBytes=${r.imgLen}  ${r.gas < GAS_CEILING ? 'OK' : 'OVER'}`);
+      console.log(`len=${String(r.len).padStart(2)}  gas=${String(r.gas).padStart(10)}  image_dataBytes=${r.rawLen}  ${r.gas < GAS_CEILING ? 'OK' : 'OVER'}`);
     }
 
     // eslint-disable-next-line no-console
-    console.log('LAYERS: image=percent TEXT (browser fonts), image_data=raw PATHS (fontless) — verified all lengths');
+    console.log('LAYER: image_data=raw PATHS (fontless) — sole render source, verified all lengths');
   }, 120000);
 });
