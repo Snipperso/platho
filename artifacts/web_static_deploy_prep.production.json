@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-16T09:56:59.948Z",
+  "generatedAt": "2026-06-17T13:51:01.223Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "BLOCKED_BY_PREPROD",
-  "productionReady": false,
+  "status": "PRODUCTION_STATIC_PACKAGE_READY",
+  "productionReady": true,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 130,
     "totalBytes": 3202547,
-    "bundleSha256": "ad38613192d024521faba60f1912b887151c5359621d8ba608e8e7945d87bb66",
+    "bundleSha256": "bdbb2c700e7ef86be69086ad58ab2afad523e6fa262440820ed8b91e71075c89",
     "files": [
       {
         "path": "app.js",
         "bytes": 724738,
-        "sha256": "318f32bd9197b8ecd39ae3e14a47fbf5d8e31743c3d06e0dbe3720e994b8d76f"
+        "sha256": "afcdceafb9b6738a30ed30207e4408011c4348ef909a0b2aeb64eef425c86ce0"
       },
       {
         "path": "assets/icons/back.svg",
@@ -225,7 +225,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 15275,
-        "sha256": "8ff5c7bfa7053246620fdff084b30ec90f1e0147482e563e6a723de4e0e227e3"
+        "sha256": "de63db339288c0853f09c46f59e94643dae7233bfc8fb56f07fef1fc8b732679"
       },
       {
         "path": "platho-wallet.mjs",
@@ -275,7 +275,7 @@
       {
         "path": "sw.js",
         "bytes": 6517,
-        "sha256": "549aaf0458a7335c30942b21bcc078351ced47adcac397c05a6ded275799b353"
+        "sha256": "204e80401ef8891690fd746651cc8c6c3d0df217a11c93891401573bf5e733e9"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -917,17 +917,9 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
-  "blockers": [
-    "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH"
-  ],
+  "blockers": [],
   "warnings": [],
-  "productionFindings": [
-    {
-      "id": "MAINNET_GENESIS_CURRENT_CODE_HASH_MISMATCH",
-      "file": "artifacts/mainnet_genesis_verify_input.json",
-      "message": "MAINNET_GENESIS_VERIFIED=true must match current build code hashes: username_registry."
-    }
-  ]
+  "productionFindings": []
 }
