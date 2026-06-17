@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v431<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v431'/);
+    expect(html).toMatch(/id="appVersionLabel">v432<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v432'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1863,6 +1863,36 @@ describe('PWA runtime config guard', () => {
     expect(postTx).toMatch(/if \(pollActivation\) \{[\s\S]*plathoAccountActivationPending = false;[\s\S]*refreshMessagingControls\(\)/);
     // A wallet switch clears any pending lock left from the previous wallet.
     expect(walletChange).toMatch(/plathoAccountActivationPending = false;/);
+  });
+
+  it('PWA-DELIVERY-01: "Synced" is never reported while messages are pending, skipped, or dropped', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The 'synced' phase requires genuinely nothing pending/skipped/dropped — a
+    // false "✓ Synced" while entries are skipped/un-bodied is the receive-gap bug.
+    const gate = app.slice(
+      app.indexOf('function completeMessageSyncUi'),
+      app.indexOf('function failMessageSyncUi'),
+    );
+    expect(gate).toMatch(/Number\(result\.skipped \?\? 0\) === 0/);
+    expect(gate).toMatch(/Number\(result\.incompletePrivateStreamCount \?\? 0\) === 0/);
+    expect(gate).toMatch(/'private_key_open_failed'/);
+    expect(gate).toMatch(/'partial_stream_pending'/);
+    expect(gate).toMatch(/'index_limit_without_cursor'/);
+    expect(gate).toMatch(/messageAutoSyncPhase = complete \? 'synced' : 'delayed'/);
+    // The incomplete-multipart count is surfaced into the result so the gate + labels see it.
+    const resultBuilder = app.slice(
+      app.indexOf('function privateSyncResult'),
+      app.indexOf('function privateIndexLinkValue'),
+    );
+    expect(resultBuilder).toMatch(/incompletePrivateStreamCount: Number\(fields\.incompletePrivateStreamCount \?\? 0\)/);
+    // Honest labels for the pending / delayed states.
+    const statusText = app.slice(
+      app.indexOf('function privateSyncStatusText'),
+      app.indexOf('async function syncPrivateCapsulesFromChain'),
+    );
+    expect(statusText).toMatch(/incompletePrivateStreamCount \?\? 0\) > 0/);
+    expect(statusText).toMatch(/message parts pending/);
+    expect(statusText).toMatch(/Number\(result\.skipped \?\? 0\) > 0/);
   });
 
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
@@ -3844,7 +3874,16 @@ describe('PWA runtime config guard', () => {
     const unreadableBranchSource = syncSource.slice(unreadableBranchIndex, unreadableBranchEnd);
 
     expect(unreadableHelperSource).toMatch(/if \(isPrivateOpenKeyMismatchError\(error\)\) return true/);
-    expect(keyMismatchHelperSource).toMatch(/operation-specific\|unavailable/);
+    expect(keyMismatchHelperSource).toMatch(/key mismatch\|expired\|operation-specific/);
+    // The transient-RPC token "unavailable" must NOT be in the permanent-unreadable
+    // classifier — a transient RPC error (e.g. "TON RPC verification unavailable")
+    // must re-walk, not be dropped forever while the header still says "Synced".
+    expect(keyMismatchHelperSource).not.toMatch(/unavailable/);
+    // The transient guard sits BEFORE the unreadable branch so transient failures
+    // pin the cursor (re-walk) instead of falling into the permanent drop.
+    const transientGuardIndex = syncSource.indexOf('isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error)');
+    expect(transientGuardIndex).toBeGreaterThanOrEqual(0);
+    expect(transientGuardIndex).toBeLessThan(unreadableBranchIndex);
     expect(unreadableHelperSource).toMatch(/private capsule\|platho private capsule\|capsulehub private entry\|compact body/);
     expect(unreadableHelperSource).toMatch(/header0\|header1\|sender signature\|magic mismatch\|body size mismatch/);
     expect(unreadableHelperSource).toMatch(/suite mismatch\|hash mismatch\|invalid platho private capsule/);
@@ -3865,11 +3904,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v502/);
+    expect(sw).toMatch(/platho-pwa-prototype-v503/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=431/);
+    expect(sw).toMatch(/\.\/app\.js\?v=432/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
