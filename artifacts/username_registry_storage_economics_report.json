@@ -3,7 +3,7 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "username_registry": "eb8b3ffad3a2da34d4c10e1ab8b2918f87e40c39b175cb46600d0a6ec7f59990",
+    "username_registry": "b496e93d3e523b564b0af826eb2d80faec38fdb9ff495cb5b35f8552d408d189",
     "username_nft_item": "73d19a15d46c24d0eda7047d073490b7166d01322399751108be40ae2fda2eab"
   },
   "note": "Sandbox evidence that username mint and item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records and UsernameNFTItem state.",
@@ -22,11 +22,11 @@
     {
       "label": "SUCCESS_4_CHAR",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "97212931",
+      "raw_balance_delta_nanotons": "96914798",
       "item_balance_delta_nanotons": "496052598",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "91212931",
+      "retained_margin_vs_registry_endowment_nanotons": "90914798",
       "item_margin_vs_floor_nanotons": "480152598",
       "name_record_count": "1",
       "pending_mint_count": "0"
@@ -34,11 +34,11 @@
     {
       "label": "SUCCESS_5_CHAR",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "97152063",
+      "raw_balance_delta_nanotons": "96853930",
       "item_balance_delta_nanotons": "495997998",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "91152063",
+      "retained_margin_vs_registry_endowment_nanotons": "90853930",
       "item_margin_vs_floor_nanotons": "480097998",
       "name_record_count": "1",
       "pending_mint_count": "0"
@@ -46,11 +46,11 @@
     {
       "label": "SUCCESS_6_PLUS",
       "kind": "successful_mint",
-      "raw_balance_delta_nanotons": "97094130",
+      "raw_balance_delta_nanotons": "96795997",
       "item_balance_delta_nanotons": "495943398",
       "expected_registry_endowment_nanotons": "6000000",
       "expected_item_floor_nanotons": "15900000",
-      "retained_margin_vs_registry_endowment_nanotons": "91094130",
+      "retained_margin_vs_registry_endowment_nanotons": "90795997",
       "item_margin_vs_floor_nanotons": "480043398",
       "name_record_count": "1",
       "pending_mint_count": "0"
@@ -58,11 +58,11 @@
     {
       "label": "ITEM_DEPLOY_BOUNCE_REFUND_REQUEST",
       "kind": "item_bounce",
-      "raw_balance_delta_nanotons": "505958193",
+      "raw_balance_delta_nanotons": "505651526",
       "item_balance_delta_nanotons": "0",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "0",
-      "retained_margin_vs_registry_endowment_nanotons": "505958193",
+      "retained_margin_vs_registry_endowment_nanotons": "505651526",
       "item_margin_vs_floor_nanotons": "0",
       "name_record_count": "0",
       "pending_mint_count": "0"
@@ -71,11 +71,11 @@
       "label": "ITEM_RESEND_ACK_CALLER_FUNDED",
       "kind": "item_resend",
       "raw_balance_delta_nanotons": "0",
-      "item_balance_delta_nanotons": "3051796",
+      "item_balance_delta_nanotons": "3014329",
       "expected_registry_endowment_nanotons": "0",
       "expected_item_floor_nanotons": "15900000",
       "retained_margin_vs_registry_endowment_nanotons": "0",
-      "item_margin_vs_floor_nanotons": "483095194",
+      "item_margin_vs_floor_nanotons": "483057727",
       "name_record_count": "1",
       "pending_mint_count": "0"
     },
@@ -104,6 +104,6 @@
       "pending_mint_count": "0"
     }
   ],
-  "worst_registry_margin_nanotons": "91094130",
+  "worst_registry_margin_nanotons": "90795997",
   "worst_item_margin_nanotons": "480043398"
 }

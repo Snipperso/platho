@@ -153,23 +153,11 @@ describe('UsernameRegistry collection-render', () => {
       expect((svg.match(/<svg\b/g) ?? []).length).toBe(1);
       expect((svg.match(/<\/svg>/g) ?? []).length).toBe(1);
 
-      // image = the TEXT percent data-URI: GetGems / browsers / Plato app render it
-      // with system fonts. Human-readable content lives here (the paths layer can't be
-      // grepped for text). image and image_data are DIFFERENT by design (no round-trip).
-      const imageUri = readSnakeText(dict.get(metadataKey('image'))!); // hasMarker=true (0x00 asserted)
-      expect(imageUri.startsWith('data:image/svg+xml,')).toBe(true);
-      expect(imageUri.startsWith('data:image/svg+xml;base64,')).toBe(false);
-      expect(imageUri).not.toMatch(/^https?:|^ipfs:/);
-      const text = percentDecode(imageUri.slice('data:image/svg+xml,'.length));
-      expect(text).toContain(label);                 // tier badge
-      const unit = username.length <= 5 ? 'LETTER' : 'CHARACTER';
-      expect(text).toContain(`>${username.length} ${unit} USERNAME<`);
-      expect(text).toContain('transferable on-chain identity');
-      expect(text).toContain('>.ath</text>');        // standalone .ath suffix
-      for (const ch of new Set(username)) {
-        expect(text).toContain(`>${ch}</text>`);     // per-character tile
-      }
-      expect(text).not.toBe(svg);                    // text layer != paths layer
+      // NO percent `image` field: it was REMOVED — its font-based statics bloated the
+      // registry code past the 65535-byte external deploy limit. image_data renders
+      // fontless on tonapi/Tonkeeper AND GetGems (verified live on an image_data-only
+      // probe), so it is the single render source; indexers must see NO `image` key.
+      expect(dict.get(metadataKey('image'))).toBeUndefined();
     });
   }
 
@@ -192,13 +180,8 @@ describe('UsernameRegistry collection-render', () => {
     expect(svg).toContain('transform="matrix(0.160156 0 0 -0.160156 130 210)"');
     expect(svg).not.toContain('viewBox="0 0 512 512"');
 
-    // image = TEXT layer: human-readable caption + COMMON + per-char tiles.
-    const imageUri = readSnakeText(dict.get(metadataKey('image'))!);
-    const text = percentDecode(imageUri.slice('data:image/svg+xml,'.length));
-    expect(text).toContain('COMMON');
-    expect(text).toContain('>16 CHARACTER USERNAME<');   // bottom caption
-    expect(text).toContain('>.ath</text>');              // standalone .ath suffix
-    expect((text.match(/>w<\/text>/g) ?? []).length).toBe(16);
+    // NO percent `image` field (removed — see RENDER-01). image_data is the sole render layer.
+    expect(dict.get(metadataKey('image'))).toBeUndefined();
   });
 
   it('RENDER-02: rejects content whose name is too short to carry a 4..16 char username', async () => {

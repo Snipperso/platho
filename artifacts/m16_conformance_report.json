@@ -95,8 +95,8 @@
     },
     {
       "contract": "UsernameRegistry.tact",
-      "non_comment_lines": 1216,
-      "receive_handlers": 14,
+      "non_comment_lines": 1121,
+      "receive_handlers": 16,
       "bounced_handlers": 3,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -159,8 +159,8 @@
       "match": true
     },
     "USERNAME_REGISTRY_CODE_HASH": {
-      "built": "eb8b3ffad3a2da34d4c10e1ab8b2918f87e40c39b175cb46600d0a6ec7f59990",
-      "pinned": "eb8b3ffad3a2da34d4c10e1ab8b2918f87e40c39b175cb46600d0a6ec7f59990",
+      "built": "b496e93d3e523b564b0af826eb2d80faec38fdb9ff495cb5b35f8552d408d189",
+      "pinned": "b496e93d3e523b564b0af826eb2d80faec38fdb9ff495cb5b35f8552d408d189",
       "match": true
     },
     "VAULT_CODE_HASH": {
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "c551be39a2bcd81d599234c26d5d5a21053741e36d77ae4b14c9f846320638c6",
+    "manifest_hash_hex": "c7810ecc1f34b442d8e190e9dcd7c6409f81dd1dccb2a0858ec6773c79ea80c9",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",
