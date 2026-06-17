@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v432';
+const PLATHO_APP_RUNTIME_VERSION = 'v433';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16141,6 +16141,18 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
       } catch (error) {
         const sentBeforeFailure = Boolean(batch.result);
         const ambiguousBroadcast = !sentBeforeFailure && isAmbiguousTonRpcBroadcastError(error);
+        // If the external may have landed (sent-before-failure, or an ambiguous
+        // broadcast that the success path at line ~16101 never reached because
+        // sendVaultExternalBoc threw), the nonce is consumed from the client's
+        // view — raise the floor exactly like the success path and the single-
+        // external helpers, so no later signing attempt can under-shoot the
+        // consumed nonce. A definitive <500 reject leaves both flags false and is
+        // correctly skipped. (Cross-path consistency / defense-in-depth; the
+        // dropped-recovery guard does not depend on it — it reads the chain nonce
+        // fresh.)
+        if ((sentBeforeFailure || ambiguousBroadcast) && batch.clientNonce !== undefined && batch.clientNonce !== null) {
+          raiseVaultPublishNonceFloor(owner, batch.clientNonce + 1n);
+        }
         const nextStatus = sentBeforeFailure || ambiguousBroadcast ? PUBLISH_PART_STATUS_UNKNOWN : PUBLISH_PART_STATUS_FAILED;
         // The whole batch shares the fate of its single external.
         for (const item of batch.items) {
@@ -16471,10 +16483,23 @@ function publishPartSignedAndUnconfirmed(part) {
 // completed walk without a payload match is proof the publish never landed.
 async function provePublishPartAbsentFromSenderIndex(publishState, part) {
   if (!localRecipientKeyPair?.keyId) return 'inconclusive';
+  // A fresh re-sign is the only double-spend-capable action, so an 'absent'
+  // verdict that authorizes one must rest on a VERIFIED read. (a) This walk holds
+  // ONLY private entries — a public part can never appear here, so never infer
+  // its absence (latent-hole guard). (b) In degraded-verification survival mode
+  // no read can be trusted to prove absence — return 'inconclusive' so the part
+  // is never re-signed; it keeps idempotently re-broadcasting its one real
+  // external (the only action that cannot double-publish).
+  if (publishPartKind(part) !== 'private') return 'inconclusive';
+  if (tonRpcVerificationStructurallyDegraded()) return 'inconclusive';
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) return 'inconclusive';
   const { provider, address } = resolved;
-  const readOptions = publishConfirmReadOptions(address, { requestTimeoutMs: 6_000 });
+  // Force VERIFIED fail-closed for the absence determination — do not let
+  // publishConfirmReadOptions silently degrade to a single unverified replica
+  // (a lagging replica that has not yet indexed a landed entry is exactly how a
+  // false 'absent' -> double publish arises).
+  const readOptions = { ...publishConfirmReadOptions(address, { requestTimeoutMs: 6_000 }), verify: true, allowUnverifiedCriticalRead: false };
   const broadcastAtS = Math.floor(Date.parse(part.lastBroadcastAt ?? '') / 1000);
   if (!Number.isFinite(broadcastAtS)) return 'inconclusive';
   const cutoffS = broadcastAtS - PRIVATE_PUBLISH_DROPPED_RECOVERY_BROADCAST_MARGIN_S;
@@ -16533,10 +16558,14 @@ async function recoverDroppedSignedPublishParts(message) {
     && (Number(part.droppedRecoveryCount ?? 0) || 0) < PRIVATE_PUBLISH_DROPPED_RECOVERY_MAX_RESIGNS);
   if (candidates.length === 0) return { resigned: 0, confirmed: 0 };
   let chainNonce = null;
+  let chainProvider = null;
+  let owner = null;
+  let vaultAddress = null;
   try {
-    const provider = await resolveVaultChainProvider();
-    const owner = requirePlathoWalletAddress();
-    chainNonce = await readVaultPublishNonce(provider, owner, {
+    chainProvider = await resolveVaultChainProvider();
+    owner = requirePlathoWalletAddress();
+    vaultAddress = requireVaultAddress();
+    chainNonce = await readVaultPublishNonce(chainProvider, owner, {
       ignoreNonceBarrier: true,
       verify: false,
       allowUnverifiedCriticalRead: true,
@@ -16549,6 +16578,11 @@ async function recoverDroppedSignedPublishParts(message) {
   let resigned = 0;
   let confirmed = 0;
   for (const part of candidates) {
+    // Dropped-recovery is the ONLY fresh-re-sign path, and its absence proof walks
+    // the PRIVATE sender index — which structurally cannot hold a public part. Never
+    // re-sign a public part here (latent-hole guard); the receipt ring / public
+    // entry scan settle those.
+    if (publishPartKind(part) !== 'private') continue;
     let clientNonce = null;
     try {
       clientNonce = BigInt(part.clientNonce);
@@ -16563,7 +16597,48 @@ async function recoverDroppedSignedPublishParts(message) {
       confirmed += 1;
       continue;
     }
+    // 'inconclusive' (degraded verification / indexing lag / read failure): the
+    // nonce is consumed but we CANNOT prove the entry absent — never re-sign (a
+    // fresh re-sign of an external that actually landed is the double publish).
+    // Leave the part UNKNOWN: its idempotent same-nonce re-broadcast keeps trying
+    // the one real external, and the partial-retry deadline surfaces it as a
+    // manual-retry block if it stays unconfirmable. Only a proven 'absent' proceeds.
     if (verdict !== 'absent') continue;
+    // Belt-and-suspenders before clearing the signed attempt: cross-check the
+    // kind-agnostic receipt ring (immune to sender-index replica lag) with a
+    // VERIFIED read. CONFIRMED confirms the part (no re-sign); any other non-EVICTED
+    // status (PROCESSING in-flight, or REJECTED/BOUNCED the confirm path resolves)
+    // is not a confirmed drop. Only a missing/EVICTED receipt (no proof either way)
+    // lets the verified 'absent' authorize a fresh re-sign; a failed verified
+    // receipt read also blocks it.
+    let receiptInterp = null;
+    try {
+      receiptInterp = await readBatchPublishReceipt(chainProvider, vaultAddress, owner, clientNonce, {
+        verify: true,
+        priority: 'critical',
+        cacheTtlMs: 0,
+        requestTimeoutMs: 6_000,
+      });
+    } catch {
+      continue;
+    }
+    if (receiptInterp && receiptInterp.status === BATCH_PUBLISH_RECEIPT_STATUS.CONFIRMED) {
+      const firstEntryId = receiptInterp.firstEntryId === undefined || receiptInterp.firstEntryId === null
+        ? null
+        : BigInt(receiptInterp.firstEntryId);
+      const batchPartIndex = Number(part.batchPartIndex ?? 0) || 0;
+      const entryId = firstEntryId === null ? null : firstEntryId + BigInt(batchPartIndex);
+      setPublishPartStatus(publishState, part.index, PUBLISH_PART_STATUS_CAPSULEHUB_CONFIRMED, {
+        entryId: entryId === null ? (part.entryId ?? null) : String(entryId),
+        confirmedBy: 'dropped_recovery_receipt',
+        error: null,
+      });
+      confirmed += 1;
+      continue;
+    }
+    if (receiptInterp && receiptInterp.status !== BATCH_PUBLISH_RECEIPT_STATUS.EVICTED) {
+      continue;
+    }
     const previousStatus = part.status;
     const droppedRecoveryCount = (Number(part.droppedRecoveryCount ?? 0) || 0) + 1;
     clearPublishPartSignedAttempt(part);
