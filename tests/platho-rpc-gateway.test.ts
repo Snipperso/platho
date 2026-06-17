@@ -113,6 +113,25 @@ describe('Platho RPC gateway', () => {
     expect(envExample).toMatch(/PLATHO_RPC_BROADCAST_REDUNDANT_FALLBACK=1/);
   });
 
+  it('RPC-GATEWAY-02E: unknown-delivery broadcast returns 202 unconfirmed, not a false 500', () => {
+    const gateway = readFileSync(gatewayPath, 'utf8');
+    const messageBranch = gateway.slice(
+      gateway.indexOf('if kind == "message":'),
+      gateway.indexOf('if kind == "messages":'),
+    );
+    // When neither toncenter nor the redundant Orbs leg cleanly ACKs, the external
+    // is idempotent and delivery is UNKNOWN. The gateway must NOT surface a bare
+    // upstream 500 here (the documented false-500 that makes the PWA mark a
+    // possibly-delivered message as failed and cascade a burst to "not sent").
+    // Only a definitive client-side 4xx (other than 429) still propagates as a
+    // hard rejection; everything else reports 202 "unconfirmed" so the client
+    // confirms via a nonce read / idempotent re-broadcast.
+    expect(messageBranch).toMatch(/primary_status = primary_error\.code if isinstance\(primary_error, HTTPError\) else None/);
+    expect(messageBranch).toMatch(/if primary_status is not None and 400 <= primary_status < 500 and primary_status != 429:\s*\n\s*raise primary_error/);
+    expect(messageBranch).toMatch(/payload = \{"ok": True, "delivery": "unconfirmed"\}/);
+    expect(messageBranch).toMatch(/self\.send_json\(202, payload\)/);
+  });
+
   it('RPC-GATEWAY-02C: message history allowlist tracks the production Vault and CapsuleHub', () => {
     const envExample = readFileSync('deploy/platho-rpc-gateway.env.example', 'utf8');
     const destinations = envValue(envExample, 'PLATHO_RPC_ALLOWED_MESSAGE_DESTINATIONS').split(',');

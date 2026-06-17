@@ -591,7 +591,29 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
                         detail = http_error_detail(fb_error) if isinstance(fb_error, HTTPError) else str(fb_error)
                         log_upstream_error("message_fallback", fb_error, detail)
                 if status is None:
-                    raise primary_error
+                    # Neither leg cleanly ACKed. Distinguish a DEFINITIVE rejection
+                    # from UNKNOWN delivery. A toncenter 4xx (other than 429) means
+                    # the external itself is bad (invalid BOC / underfunded / bad
+                    # request) — propagate it so the client fails fast. Anything else
+                    # (toncenter 5xx, timeout, URL error, or 429) leaves delivery
+                    # UNKNOWN: toncenter may have applied the idempotent external
+                    # before erroring, and the redundant Orbs leg did not confirm.
+                    # Returning a bare 500 here is the documented "false 500" that
+                    # makes the PWA treat a possibly-delivered message as failed.
+                    # The external is idempotent (fixed seqno), so report 202
+                    # "unconfirmed" and let the client confirm via a nonce read /
+                    # idempotent re-broadcast instead of surfacing a hard error.
+                    primary_status = primary_error.code if isinstance(primary_error, HTTPError) else None
+                    if primary_status is not None and 400 <= primary_status < 500 and primary_status != 429:
+                        raise primary_error
+                    detail = http_error_detail(primary_error) if isinstance(primary_error, HTTPError) else str(primary_error)
+                    payload = {"ok": True, "delivery": "unconfirmed"}
+                    if primary_status is not None:
+                        payload["upstream_status"] = primary_status
+                    if detail:
+                        payload["upstream_error"] = detail
+                    self.send_json(202, payload)
+                    return
                 self.send_json(status, upstream)
                 return
             if kind == "messages":

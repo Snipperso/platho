@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v430<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v430'/);
+    expect(html).toMatch(/id="appVersionLabel">v431<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v431'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1863,6 +1863,48 @@ describe('PWA runtime config guard', () => {
     expect(postTx).toMatch(/if \(pollActivation\) \{[\s\S]*plathoAccountActivationPending = false;[\s\S]*refreshMessagingControls\(\)/);
     // A wallet switch clears any pending lock left from the previous wallet.
     expect(walletChange).toMatch(/plathoAccountActivationPending = false;/);
+  });
+
+  it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const vaultRpc = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    const capsuleRpc = readFileSync('web/capsulehub-ton-rpc-provider.mjs', 'utf8');
+
+    // #6: the keyword hard-fail guard only fires for definitive client-side <500
+    // rejections, so a 5xx (possibly-delivered) broadcast is never marked rejected.
+    const ambiguous = app.slice(
+      app.indexOf('function isAmbiguousTonRpcBroadcastError'),
+      app.indexOf('function privateSendRetryDelayMs'),
+    );
+    expect(ambiguous).toMatch(/\?\? 0\) < 500/);
+    expect(ambiguous).toMatch(/exit code\|not enough vault ton\|nonce\/i\.test\(message\)\) return false/);
+
+    // #2: a pre-send FAILED part (nothing left the device) shows a neutral
+    // "queued, retrying", never a red terminal "not sent".
+    const meta = app.slice(
+      app.indexOf('function publishStateMeta'),
+      app.indexOf('function isVaultPublishPartialError'),
+    );
+    expect(meta).toMatch(/publishStateHasRetryableSendParts\(publishState\) \? 'queued, retrying' : 'not sent'/);
+
+    // #3: the private composer rejects new sends while the RPC is in active
+    // rate-limit backoff (backpressure). The "RPC busy" copy is unique to the
+    // private gate (the public composer's tonRpcLimited() gate returns silently),
+    // so assert it sits directly inside a tonRpcLimited() guard.
+    expect(app).toMatch(/if \(tonRpcLimited\(\)\) \{[\s\S]{0,800}?RPC busy, send again in a moment/);
+
+    // #4: a PRIMARY (non-emergency) gateway HTTP-5xx on sendBoc stops the loop
+    // (confirm-via-read) rather than re-broadcasting to the keyless emergency
+    // toncenter; connectivity death (no HTTP status) still falls through.
+    expect(vaultRpc).toMatch(/&& !isEmergencyFallbackTransport\(transport\)/);
+    expect(vaultRpc).toMatch(/\?\? 0\) >= 500\s*\n\s*\) throw error/);
+
+    // #5: the message-history path parks a verifier that 429s and skips parked
+    // transports, closing the direct toncenter /messages 429 leak.
+    expect(vaultRpc).toMatch(/export function noteTonRpcReadTransportRateLimited\(transport, error\)/);
+    expect(capsuleRpc).toMatch(/import \{ decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited \}/);
+    expect(capsuleRpc).toMatch(/if \(isTonRpcTransportDead\(resolved\)\) continue;/);
+    expect(capsuleRpc).toMatch(/noteTonRpcReadTransportRateLimited\(historyTransport, error\)/);
   });
 
   it('PWA-CAPSULE-ENTRY-VERIFY-01: CapsuleHub sync verifies entry anchors before trusting history bodies', () => {
@@ -3823,23 +3865,23 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v501/);
+    expect(sw).toMatch(/platho-pwa-prototype-v502/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=430/);
+    expect(sw).toMatch(/\.\/app\.js\?v=431/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=14/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=28/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=40/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=41/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=26/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=24/);
     expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=22/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=29/);

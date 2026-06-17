@@ -179,6 +179,18 @@ function noteTonRpcTransportSuccess(transport) {
   state.lastOkAt = Date.now();
 }
 
+export function noteTonRpcReadTransportRateLimited(transport, error) {
+  // Park a verifier-only read transport that just rate-limited (429) on a code
+  // path that calls it DIRECTLY (e.g. CapsuleHub message-history getMessages)
+  // rather than through callRead. Without this, that path keeps hammering the
+  // throttled keyless verifier (~1 rps) every cycle — the direct toncenter
+  // /api/v3/messages 429 storm seen under burst load. Reuses the same health map
+  // + verifier-denial park window as the get-method read path; a non-verifier
+  // (gateway) 429 is a no-op here (429 never parks a primary), so it is safe to
+  // call for any history transport.
+  noteTonRpcTransportFailure(transport, error);
+}
+
 export function resetTonRpcTransportHealthForTests() {
   tonRpcTransportHealth.clear();
 }
@@ -1887,6 +1899,20 @@ export function createFallbackTonRpcTransport(options = {}) {
         lastError = error;
         if (methodName === 'sendBoc' && isSendBocTransportUnavailableError(error)) continue;
         noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
+        // A PRIMARY (non-emergency) gateway that answered with an HTTP 5xx is
+        // reachable and has ALREADY run its own server-side redundant broadcast
+        // (Orbs /sendBoc). Falling through to the keyless emergency toncenter here
+        // only re-broadcasts the same external — burning its ~1 rps quota (which
+        // the confirmation reads need) and producing a second 500. The external is
+        // idempotent and may already be on-chain, so stop and let the caller
+        // confirm via a nonce read instead of dual-broadcasting. Connectivity death
+        // (a blocked gateway: no HTTP status) is NOT caught here and still falls
+        // through to the emergency send path — the censorship-survival invariant.
+        if (
+          methodName === 'sendBoc'
+          && !isEmergencyFallbackTransport(transport)
+          && Number(error?.status ?? error?.response?.status ?? 0) >= 500
+        ) throw error;
         // Re-broadcasting the same BOC is idempotent on TON, so connectivity
         // failures (including 4xx host blocks) fall through to the next
         // transport; only definitive application-level rejections stop here.

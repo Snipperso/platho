@@ -128,7 +128,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: 'b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=40',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=41',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
