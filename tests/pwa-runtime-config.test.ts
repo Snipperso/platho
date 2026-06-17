@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v429<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v429'/);
+    expect(html).toMatch(/id="appVersionLabel">v430<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v430'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1827,6 +1827,42 @@ describe('PWA runtime config guard', () => {
     expect(render).toMatch(/messageInput\.disabled = !canEditPrivateDraft/);
     expect(render).toMatch(/sendButton\) sendButton\.disabled = !canSendPrivate/);
     expect(addButton).toMatch(/if \(!canEditPrivateComposerDraft\(\)\)/);
+  });
+
+  it('PWA-ACTIVATION-03: the activation row shows in-flight progress and stays non-clickable until confirmed', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const submit = app.slice(
+      app.indexOf('async function submitVaultRegisterMessagingKeys'),
+      app.indexOf('async function confirmPlathoAccountActivation'),
+    );
+    const controls = app.slice(
+      app.indexOf('function refreshMessagingControls'),
+      app.indexOf('function setView'),
+    );
+    const postTx = app.slice(
+      app.indexOf('function queueVaultPostTransactionRefresh'),
+      app.indexOf('function queueVaultRefreshAfterWalletChange'),
+    );
+    const walletChange = app.slice(
+      app.indexOf('function queueVaultRefreshAfterWalletChange'),
+      app.indexOf('async function resolveUsernameRegistryProvider'),
+    );
+
+    // A single in-flight lock declared at module scope.
+    expect(app).toMatch(/let plathoAccountActivationPending = false;/);
+    // The lock is raised the moment the activation external is broadcast.
+    expect(submit).toMatch(/plathoAccountActivationPending = true;[\s\S]*queueVaultPostTransactionRefresh\(\{ pollActivation: true \}\)/);
+    // While pending and not yet active, the row stays disabled and shows progress
+    // instead of reverting to the clickable "Activate / fee" resting state — the bug
+    // where the button looked like it ignored the first press.
+    expect(controls).toMatch(/if \(accountActive\) plathoAccountActivationPending = false;/);
+    expect(controls).toMatch(/const activationPending = plathoAccountActivationPending && !accountActive/);
+    expect(controls).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending \|\| activationPending/);
+    expect(controls).toMatch(/activationPending\s*\?\s*'activating'/);
+    // Safety release so a dropped/failed activation never strands the row spinning.
+    expect(postTx).toMatch(/if \(pollActivation\) \{[\s\S]*plathoAccountActivationPending = false;[\s\S]*refreshMessagingControls\(\)/);
+    // A wallet switch clears any pending lock left from the previous wallet.
+    expect(walletChange).toMatch(/plathoAccountActivationPending = false;/);
   });
 
   it('PWA-CAPSULE-ENTRY-VERIFY-01: CapsuleHub sync verifies entry anchors before trusting history bodies', () => {
@@ -3787,13 +3823,13 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v499/);
+    expect(sw).toMatch(/platho-pwa-prototype-v501/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=429/);
+    expect(sw).toMatch(/\.\/app\.js\?v=430/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=76/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=37/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
