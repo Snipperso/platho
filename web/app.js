@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v429';
+const PLATHO_APP_RUNTIME_VERSION = 'v430';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -495,6 +495,7 @@ const vaultPublishNonceFloorByOwner = new Map();
 let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
+let plathoAccountActivationPending = false;
 let privateSendRetrySeq = 0;
 const privateSendRetryJobs = new Map();
 let privatePublishConfirmSeq = 0;
@@ -9108,13 +9109,24 @@ function refreshMessagingControls() {
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = !(plathoWallet || storedWalletAddressForCopy());
   if (walletDisplayModeSelect) walletDisplayModeSelect.disabled = !plathoWallet;
-  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet || accountActive || appShellReloadPending;
+  // An activation external is in flight from the moment submitVaultRegisterMessagingKeys
+  // broadcasts it; the Vault only creates the user a few seconds to ~a minute later.
+  // Until current_key_id flips (accountActive), keep the row showing progress and
+  // non-clickable instead of reverting to the resting "Activate / fee" state — otherwise
+  // the button looks like it ignored the first press and the user re-clicks.
+  // queueVaultPostTransactionRefresh clears the flag once activation confirms or its
+  // poll horizon elapses; a wallet change resets it.
+  if (accountActive) plathoAccountActivationPending = false;
+  const activationPending = plathoAccountActivationPending && !accountActive && Boolean(plathoWallet) && !appShellReloadPending;
+  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet || accountActive || appShellReloadPending || activationPending;
   setText(vaultDraftStatus, !plathoWallet
     ? 'wallet required'
     : appShellReloadPending
       ? 'reload app'
       : accountActive
       ? 'active'
+      : activationPending
+      ? 'activating'
       : `${plathoAccountActivationFeeLabel()} TON`);
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
@@ -13610,9 +13622,24 @@ function queueVaultPostTransactionRefresh(options = {}) {
       });
     }, delayMs);
   }
+  if (pollActivation) {
+    // Safety release: if activation never settles within the poll horizon (dropped
+    // external, failed compute, abandoned tab), drop the in-flight lock so the row
+    // returns to a clickable "Activate" state for a retry instead of spinning forever.
+    const releaseDelayMs = Math.max(...delays) + 5_000;
+    setTimeout(() => {
+      if (plathoAccountActivationPending && !hasActivePlathoAccount()) {
+        plathoAccountActivationPending = false;
+        refreshMessagingControls();
+      }
+    }, releaseDelayMs);
+  }
 }
 
 function queueVaultRefreshAfterWalletChange() {
+  // A pending activation belongs to the previous wallet; never carry the in-flight
+  // lock across a wallet switch (the new wallet's activation state is read fresh).
+  plathoAccountActivationPending = false;
   markNavVaultBalancePending('wallet changed', {
     resetRetry: true,
     retry: true,
@@ -14922,6 +14949,7 @@ async function submitVaultRegisterMessagingKeys() {
   const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
     userExists: user.exists === true,
   });
+  plathoAccountActivationPending = true;
   vaultDraftStatus.textContent = 'activation sent';
   queueVaultPostTransactionRefresh({ pollActivation: true });
   return result;
