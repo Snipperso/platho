@@ -43,7 +43,7 @@ import {
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=40';
+} from './vault-ton-rpc-provider.mjs?v=41';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -136,7 +136,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=37';
+} from './capsulehub-ton-rpc-provider.mjs?v=38';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=26';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=22';
 import {
@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v430';
+const PLATHO_APP_RUNTIME_VERSION = 'v431';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -7755,7 +7755,13 @@ function isRecoverablePrivateSendError(error) {
 
 function isAmbiguousTonRpcBroadcastError(error) {
   const message = String(error?.message ?? error ?? '');
-  if (/rejected|bad request|invalid boc|invalid message|exit code|not enough vault ton|nonce/i.test(message)) return false;
+  // App-level definitive rejections (bad BOC / bad nonce / underfunded) only ever
+  // arrive as client-side <500 responses. A 5xx is a server/upstream failure whose
+  // delivery is UNKNOWN even if its body happens to contain one of these words, so
+  // gate the keyword hard-fail to <500 and let 5xx fall through to ambiguous →
+  // confirm-via-read (never falsely mark a possibly-delivered external as rejected).
+  if (Number(error?.status ?? error?.response?.status ?? 0) < 500
+    && /rejected|bad request|invalid boc|invalid message|exit code|not enough vault ton|nonce/i.test(message)) return false;
   if (isTonRpcRateLimitError(error)) return false;
   if (Number(error?.status ?? error?.response?.status ?? 0) >= 500) return true;
   return error?.code === 'TIMEOUT'
@@ -10181,6 +10187,18 @@ composer?.addEventListener('submit', async (event) => {
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshMessagingControls();
+    return;
+  }
+  if (tonRpcLimited()) {
+    // Backpressure: while the TON RPC is in an active rate-limit backoff, reject
+    // new sends instead of piling another fan of verify:true pre-send reads onto
+    // the already-throttled keyless verifier (the burst self-amplification that
+    // turns one 429 into a storm). Mirrors the public composer gate (10128).
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = 'RPC busy, send again in a moment';
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+    refreshPrivateSendButtonState();
     return;
   }
 
@@ -15227,7 +15245,14 @@ function publishStateMeta(publishState) {
   if (pending > 0 || publishState?.status === VAULT_PUBLISH_STATUS_SUBMITTED) {
     return total === 1 ? 'submitted, confirming' : `submitted ${pending}/${total}, confirming`;
   }
-  if (publishState?.status === 'failed') return 'not sent';
+  if (publishState?.status === 'failed') {
+    // A pre-send failure (RPC 429/500/verification-degraded before anything left
+    // the device) flips the part to FAILED while it is still queued for retry.
+    // Show a neutral "queued, retrying" then, not a red terminal "not sent" — the
+    // genuinely-terminal red is written straight to message.meta by the retry-
+    // exhausted / blocked paths, which never route through here.
+    return publishStateHasRetryableSendParts(publishState) ? 'queued, retrying' : 'not sent';
+  }
   return total > 1 ? `sending ${total} parts` : 'sending';
 }
 

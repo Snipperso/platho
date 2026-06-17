@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { decodeTonAddressSliceBoc } from './vault-ton-rpc-provider.mjs?v=40';
+import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=41';
 import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=28';
 
 const CAPSULEHUB_OPS = Object.freeze({
@@ -129,6 +129,10 @@ function messageHistoryTransports(transport) {
   for (const item of transports) {
     const resolved = item?.transport ?? item;
     if (resolved?.supportsMessageHistory === false) continue;
+    // Skip a transport parked by a prior 429 (the keyless verifier) so the body-
+    // history lookup stops re-hammering the throttled host every cycle. The live
+    // gateway is never parked by a 429, so it stays in the list.
+    if (isTonRpcTransportDead(resolved)) continue;
     if (resolved?.getMessages && !out.includes(resolved)) out.push(resolved);
   }
   return out;
@@ -837,6 +841,7 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
       for (const params of attempts) {
         const limit = Math.max(1, Number(params.limit ?? CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT));
         for (const historyTransport of historyTransports) {
+          if (isTonRpcTransportDead(historyTransport)) continue;
           try {
             for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
               const pageParams = pagedMessageParams(params, pageIndex);
@@ -854,6 +859,12 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
           } catch (error) {
             lastHistoryError = error;
             historyScanIncomplete = true;
+            if (Number(error?.status ?? 0) === 429 || String(error?.code ?? '').toUpperCase() === 'RATE_LIMITED') {
+              // The keyless verifier rate-limited on a direct getMessages call; park
+              // it so the next attempt/cycle skips it instead of re-hammering
+              // /api/v3/messages every time. The live gateway (primary) is a no-op.
+              noteTonRpcReadTransportRateLimited(historyTransport, error);
+            }
             if (params.body_hash !== undefined) continue;
             continue;
           }
