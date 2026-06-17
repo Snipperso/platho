@@ -59,14 +59,16 @@ async function gwGetState(addr: string) {
   return j.result;
 }
 async function gwRunGet(addr: string, method: string): Promise<string> {
-  const r = await fetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) });
-  const j: any = await r.json();
-  return j?.stack?.[0]?.value ?? j?.result?.stack?.[0]?.[1] ?? '0';
+  // toncenter v2 FIRST: the gateway runGetMethod returns stale/0 for hot registry state.
+  try { const r = await fetch('https://toncenter.com/api/v2/runGetMethod', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); const v = j?.result?.stack?.[0]?.[1]; if (typeof v === 'string') return v; } catch {}
+  try { const r = await fetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); return j?.stack?.[0]?.value ?? j?.result?.stack?.[0]?.[1] ?? '0'; } catch { return '0'; }
 }
 async function gwSendBoc(bocB64: string) {
-  const r = await fetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) });
-  const text = await r.text(); let body: any; try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 300) }; }
-  return { httpStatus: r.status, ok: r.ok, body };
+  // Redundant: gateway intermittently ACKs without delivering; also push to toncenter v2.
+  const parts: string[] = []; let anyOk = false;
+  try { const r = await fetch('https://toncenter.com/api/v2/sendBoc', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`toncenter ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('toncenter ERR'); }
+  try { const r = await fetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`gateway ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('gateway ERR'); }
+  return { httpStatus: 0, ok: anyOk, body: parts.join(' | ') };
 }
 
 async function main() {
@@ -88,7 +90,9 @@ async function main() {
   }));
 
   // Controller wallet (genesis controller). Detect funded version like the D09 tool.
-  const words = readFileSync(mnemonicFile, 'utf8').trim().split(/\s+/).filter(Boolean);
+  const rawSeed = readFileSync(mnemonicFile, 'utf8').replace(/^﻿/, '').trim();
+  let words: string[];
+  try { const jp = JSON.parse(rawSeed); words = Array.isArray(jp) ? jp.map((w: any) => String(w).trim()).filter(Boolean) : rawSeed.split(/\s+/).filter(Boolean); } catch { words = rawSeed.split(/\s+/).filter(Boolean); }
   if (words.length !== 24) die(`mnemonic file must contain 24 words (got ${words.length})`);
   const key = await mnemonicToPrivateKey(words);
   const factories = ([['v5r1', (TonLib as any).WalletContractV5R1], ['v4r2', TonLib.WalletContractV4], ['v3r2', TonLib.WalletContractV3R2]] as [string, any][]).filter(([, C]) => C && typeof C.create === 'function');
@@ -108,11 +112,12 @@ async function main() {
   for (let i = 0; i < bodies.length; i += BATCH) batches.push(bodies.slice(i, i + BATCH));
 
   let seqno = Number(BigInt(await gwRunGet(wallet.address.toString(), 'seqno')));
+  const alreadyUploaded = Number(BigInt(await gwRunGet(registry.toString(), 'get_art_count'))) === bodies.length;
   console.log('\n=== UploadArt plan ===');
   console.log('  registry :', registry.toString({ urlSafe: true, bounceable: true }));
   console.log('  wallet   :', wallet.address.toString({ urlSafe: true, bounceable: false }), `(${chosen.name}, ${fmtTon(chosen.balance)} TON, seqno=${seqno})`);
   console.log('  parts    :', bodies.length, '| batches:', batches.length, `(<=${BATCH}/external) | seal:`, doSeal);
-  const need = ITEM_VALUE * BigInt(bodies.length) + toNano('0.5');
+  const need = (alreadyUploaded ? 0n : ITEM_VALUE * BigInt(bodies.length)) + toNano('0.5');
   if (chosen.balance < need) die(`controller needs ~${fmtTon(need)} TON; has ${fmtTon(chosen.balance)}. Fund it.`);
 
   // Pre-flight: build + size-check every external (dry).
@@ -120,7 +125,7 @@ async function main() {
   let sq = seqno;
   for (const batch of batches) {
     const messages = batch.map((b) => internal({ to: registry, value: ITEM_VALUE, bounce: true, body: b.body }));
-    const transfer = wallet.createTransfer({ seqno: sq, secretKey: key.secretKey, sendMode: SendMode.PAY_GAS_SEPARATELY, messages });
+    const transfer = wallet.createTransfer({ seqno: sq, secretKey: key.secretKey, sendMode: SendMode.PAY_GAS_SEPARATELY, messages, timeout: Math.floor(Date.now() / 1000) + 1800 });
     const ext = beginCell().store(storeMessage({ info: { type: 'external-in', src: null, dest: wallet.address, importFee: 0n }, init: null, body: transfer })).endCell();
     const boc = ext.toBoc();
     if (boc.length >= EXT_LIMIT) die(`external for keys [${batch.map((b) => b.key).join(',')}] is ${boc.length} bytes (>= ${EXT_LIMIT})`);
@@ -135,26 +140,40 @@ async function main() {
   }
 
   // Broadcast each external, waiting for seqno to advance before the next (sequential nonce).
-  for (let i = 0; i < externals.length; i++) {
+  if (alreadyUploaded) { console.log('  registry art_count already == parts — skipping upload, sealing only.'); }
+  else for (let i = 0; i < externals.length; i++) {
     const e = externals[i];
     console.log(`  [${i + 1}/${externals.length}] keys [${e.keys.join(',')}] (${e.bytes}B, seqno ${seqno}) ...`);
-    const res = await gwSendBoc(e.boc.toString('base64'));
-    if (!res.ok) die(`gateway rejected batch ${i + 1}: ${JSON.stringify(res.body).slice(0, 200)}`);
-    for (let t = 0; t < 30; t++) { await sleep(3000); const s = Number(BigInt(await gwRunGet(wallet.address.toString(), 'seqno'))); if (s > seqno) { seqno = s; break; } }
+    let advanced = false;
+    for (let attempt = 1; attempt <= 3 && !advanced; attempt++) {
+      const res = await gwSendBoc(e.boc.toString('base64'));
+      console.log(`      send#${attempt} ${res.ok ? 'OK' : 'REJ'} [${res.body}]`);
+      if (!res.ok && attempt === 1) die(`both endpoints rejected batch ${i + 1}: ${res.body}`);
+      for (let t = 0; t < 40 && !advanced; t++) { await sleep(3000); const s = Number(BigInt(await gwRunGet(wallet.address.toString(), 'seqno'))); if (s > seqno) { seqno = s; advanced = true; } }
+    }
+    if (!advanced) die(`batch ${i + 1} did not land after 3 attempts (~6min) — stopping; re-run (idempotent) to resume`);
   }
-  const count = Number(BigInt(await gwRunGet(registry.toString(), 'get_art_count')));
-  console.log('  uploaded. registry art_count =', count, '/ 56');
-  if (count !== 56) die(`art_count is ${count}, expected 56 — some uploads did not land; re-run (idempotent) before sealing.`);
+  if (!alreadyUploaded) {
+    let count = 0;
+    for (let t = 0; t < 6; t++) { count = Number(BigInt(await gwRunGet(registry.toString(), 'get_art_count'))); if (count === 56) break; await sleep(4000); }
+    console.log('  uploaded. registry art_count =', count, '/ 56');
+    if (count !== 56) die(`art_count is ${count}, expected 56 — some uploads did not land; re-run (idempotent) before sealing.`);
+  } else { console.log('  art_count confirmed 56 at start — proceeding to seal.'); }
 
   if (doSeal) {
     console.log('  sending SealArt ...');
     const sealBody = beginCell().store(storeSealArt({ $$type: 'SealArt' })).endCell();
-    const transfer = wallet.createTransfer({ seqno, secretKey: key.secretKey, sendMode: SendMode.PAY_GAS_SEPARATELY, messages: [internal({ to: registry, value: ITEM_VALUE, bounce: true, body: sealBody })] });
+    const transfer = wallet.createTransfer({ seqno, secretKey: key.secretKey, sendMode: SendMode.PAY_GAS_SEPARATELY, messages: [internal({ to: registry, value: ITEM_VALUE, bounce: true, body: sealBody })], timeout: Math.floor(Date.now() / 1000) + 1800 });
     const ext = beginCell().store(storeMessage({ info: { type: 'external-in', src: null, dest: wallet.address, importFee: 0n }, init: null, body: transfer })).endCell();
-    const res = await gwSendBoc(ext.toBoc().toString('base64'));
-    if (!res.ok) die(`gateway rejected SealArt: ${JSON.stringify(res.body).slice(0, 200)}`);
-    for (let t = 0; t < 30; t++) { await sleep(3000); const sealed = (await gwRunGet(registry.toString(), 'get_art_sealed')) !== '0'; if (sealed) { console.log('  ✅ art_sealed = true. Art is locked.'); return; } }
-    console.log('  SealArt sent; art_sealed not yet observed — verify on the explorer.');
+    let sealed = false;
+    for (let attempt = 1; attempt <= 3 && !sealed; attempt++) {
+      const res = await gwSendBoc(ext.toBoc().toString('base64'));
+      console.log(`      seal send#${attempt} ${res.ok ? 'OK' : 'REJ'} [${res.body}]`);
+      if (!res.ok && attempt === 1) die(`both endpoints rejected SealArt: ${res.body}`);
+      for (let t = 0; t < 40 && !sealed; t++) { await sleep(3000); if ((await gwRunGet(registry.toString(), 'get_art_sealed')) !== '0') sealed = true; }
+    }
+    if (sealed) { console.log('  ✅ art_sealed = true. Art is locked.'); return; }
+    console.log('  SealArt sent; art_sealed not yet observed — verify + re-run --seal.');
   } else {
     console.log('  art uploaded but NOT sealed. Re-run with --seal once verified.');
   }
