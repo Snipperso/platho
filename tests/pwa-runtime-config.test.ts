@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v432<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v432'/);
+    expect(html).toMatch(/id="appVersionLabel">v433<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v433'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1893,6 +1893,33 @@ describe('PWA runtime config guard', () => {
     expect(statusText).toMatch(/incompletePrivateStreamCount \?\? 0\) > 0/);
     expect(statusText).toMatch(/message parts pending/);
     expect(statusText).toMatch(/Number\(result\.skipped \?\? 0\) > 0/);
+  });
+
+  it('PWA-DOUBLEPUBLISH-01: a possibly-delivered external is never fresh-re-signed under a new nonce', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const prove = app.slice(
+      app.indexOf('async function provePublishPartAbsentFromSenderIndex'),
+      app.indexOf('async function recoverDroppedSignedPublishParts'),
+    );
+    const recover = app.slice(
+      app.indexOf('async function recoverDroppedSignedPublishParts'),
+      app.indexOf('function privateSendRetryKey'),
+    );
+    // The absence proof that authorizes a fresh re-sign is private-only and rests
+    // on a VERIFIED read; in degraded verification it returns 'inconclusive' (no re-sign).
+    expect(prove).toMatch(/if \(publishPartKind\(part\) !== 'private'\) return 'inconclusive'/);
+    expect(prove).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) return 'inconclusive'/);
+    expect(prove).toMatch(/verify: true, allowUnverifiedCriticalRead: false/);
+    // Dropped-recovery never re-signs a public part, never re-signs on a non-'absent'
+    // verdict, and cross-checks a VERIFIED receipt before clearing the signed attempt.
+    expect(recover).toMatch(/if \(publishPartKind\(part\) !== 'private'\) continue/);
+    expect(recover).toMatch(/if \(verdict !== 'absent'\) continue/);
+    expect(recover).toMatch(/readBatchPublishReceipt\(chainProvider, vaultAddress, owner, clientNonce, \{/);
+    expect(recover).toMatch(/BATCH_PUBLISH_RECEIPT_STATUS\.CONFIRMED/);
+    // The clear+reset (fresh re-sign) happens only after the receipt is missing/EVICTED.
+    expect(recover).toMatch(/status !== BATCH_PUBLISH_RECEIPT_STATUS\.EVICTED\) \{\s*\n\s*continue/);
+    // The ambiguous batch catch raises the monotonic nonce floor (cross-path consistency).
+    expect(app).toMatch(/raiseVaultPublishNonceFloor\(owner, batch\.clientNonce \+ 1n\)/);
   });
 
   it('PWA-SEND-RELIABILITY-01: burst-send hardening — no false-fail, no dual-broadcast, no read storm', () => {
@@ -3904,11 +3931,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v503/);
+    expect(sw).toMatch(/platho-pwa-prototype-v504/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=432/);
+    expect(sw).toMatch(/\.\/app\.js\?v=433/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
