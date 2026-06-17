@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v431';
+const PLATHO_APP_RUNTIME_VERSION = 'v432';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2235,7 +2235,9 @@ function completeMessageSyncUi(result) {
     && result.scanComplete === true
     && result.rateLimited !== true
     && Number(result.historyUnavailableCount ?? 0) === 0
-    && !['body_history_unavailable', 'catch_up_pending'].includes(String(result.reason ?? ''));
+    && Number(result.skipped ?? 0) === 0
+    && Number(result.incompletePrivateStreamCount ?? 0) === 0
+    && !['body_history_unavailable', 'catch_up_pending', 'private_key_open_failed', 'partial_stream_pending', 'index_limit_without_cursor'].includes(String(result.reason ?? ''));
   messageAutoSyncPhase = complete ? 'synced' : 'delayed';
   messageAutoSyncLastErrorLabel = complete ? null : status;
   refreshConversationSubtitle();
@@ -5770,7 +5772,12 @@ function isBodyHistoryUnavailableError(error) {
 }
 
 function isPrivateOpenKeyMismatchError(error) {
-  return /recipient|decrypt|key mismatch|expired|operation-specific|unavailable/i.test(String(error?.message ?? error ?? ''));
+  // NOTE: keep ONLY deterministic key/decrypt-mismatch tokens here. A message
+  // matching this regex is treated as a PERMANENTLY unreadable capsule (the cursor
+  // advances past it). Transient RPC errors (verification/timeout/5xx) must
+  // re-walk, NOT drop — they are caught by the transient guard in
+  // scanPrivateEntryId before this classifier is ever consulted.
+  return /recipient|decrypt|key mismatch|expired|operation-specific/i.test(String(error?.message ?? error ?? ''));
 }
 
 function isPrivateUnreadableCapsuleError(error) {
@@ -5792,6 +5799,7 @@ function privateSyncResult(fields = {}) {
     indexReadFallback: fields.indexReadFallback ?? null,
     historyUnavailableCount: Number(fields.historyUnavailableCount ?? 0),
     historyUnavailableEntries: Array.isArray(fields.historyUnavailableEntries) ? fields.historyUnavailableEntries : [],
+    incompletePrivateStreamCount: Number(fields.incompletePrivateStreamCount ?? 0),
     rateLimited: fields.rateLimited === true,
     rpcDelayed: fields.rpcDelayed === true,
     unchanged: fields.unchanged === true,
@@ -5883,6 +5891,12 @@ function privateSyncStatusText(result) {
   }
   if (result.reason === 'catch_up_pending') {
     return result.imported > 0 ? 'new messages, catch-up pending' : `catch-up ${result.catchUpRemaining ?? 0} left`;
+  }
+  if (Number(result.incompletePrivateStreamCount ?? 0) > 0) {
+    return result.imported > 0 ? 'new messages, parts pending' : 'message parts pending';
+  }
+  if (Number(result.skipped ?? 0) > 0) {
+    return result.imported > 0 ? 'new messages, some delayed' : 'some messages delayed';
   }
   if (result.ok === false || result.scanComplete === false) return 'sync incomplete';
   return result.imported > 0 ? 'new messages' : 'up to date';
@@ -6080,6 +6094,16 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         rememberPrivateBodyHistoryUnavailable(address, entry, entryId);
         skipped += 1;
         return { ok: true, entry };
+      } else if (isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error)) {
+        // A transient RPC failure (verification-unavailable, 5xx, timeout, network,
+        // disagreement) is NOT a permanently-unreadable capsule. Pin the cursor like
+        // the rate-limit branch so this entry is re-walked on the next cycle once the
+        // RPC recovers, instead of being dropped forever while the header still says
+        // "Synced" (the historical /unavailable/i landmine). Genuine deterministic
+        // crypto/structural mismatches still fall through to the unreadable branch.
+        rememberPrivateScanLog(entryId, 'transient');
+        scanComplete = false;
+        return { ok: false, entry };
       } else if (isPrivateUnreadableCapsuleError(error)) {
         scannedPrivateEntryIds.add(entryIdKey);
         clearPrivateBodyHistoryUnavailable(address, entryId);
@@ -6362,6 +6386,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     blockedEntryId: blockedEntryId?.toString?.() ?? null,
     historyUnavailableCount: historyUnavailableEntries.length,
     historyUnavailableEntries,
+    incompletePrivateStreamCount,
     catchUpRemaining,
     indexLimitReachedWithoutCursor,
     indexReadFallback,
