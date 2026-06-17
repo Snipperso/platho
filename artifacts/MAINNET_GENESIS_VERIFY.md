@@ -3,15 +3,15 @@
 Status: MAINNET_GENESIS_VERIFIED
 
 - mainnet_genesis_verified: true
-- checked_manifest_hash: 8a7a5f51f0e9233f469801a6600d1e87b45c6ae52094cb297a722873dc884d13
+- checked_manifest_hash: b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae
 - input_source: artifacts/mainnet_genesis_verify_input.json
-- input_sha256: dedd1fd6147aa9ca1e92745e157bd26526e5c0da6f2f2ce27fe8fab9619a42b2
+- input_sha256: 395a93a4519441776ad56109aeabcca77f2668bde5fc197dfdfaad4986b70307
 
 ## Evidence refs
 
-- getterSnapshotSource: live-rpc/platho-toncenter/2026-06-16T07:08:34.121Z
-- codeHashProofSource: artifacts/CURRENT_CODE_HASHES.txt#sha256=ee5d9e3cf3afde38e14b2d91255925c43679db5d0c1123ddff4d62c6f7aee102
-- finalManifestSource: artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=8a7a5f51f0e9233f469801a6600d1e87b45c6ae52094cb297a722873dc884d13
+- getterSnapshotSource: live-rpc/platho-toncenter/2026-06-17T12:58:50.792Z
+- codeHashProofSource: artifacts/CURRENT_CODE_HASHES.txt#sha256=50ab91f6541e938de45f0af5bb4d4c225062acfdd8f2ba32b6e5b607a211656c
+- finalManifestSource: artifacts/local/mainnet_final_manifest_draft.json#manifest_hash_hex=b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae
 
 ## Issues
 
