@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v444';
+const PLATHO_APP_RUNTIME_VERSION = 'v445';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1966,9 +1966,47 @@ function hideIdentityPopover() {
   identityMenuButton?.setAttribute('aria-expanded', 'false');
 }
 
+// Set or edit the thread's private local label from the "Display as" menu. A thread created via New Chat
+// can be given a local label up front, but a thread auto-created from an INCOMING message could not — the
+// menu only ever offered an existing local-label as a display choice, never a way to add one. This closes
+// that gap: any thread can now be (re)named locally. The label never leaves the device (it is not sent to
+// the other side); it is persisted in the thread snapshot exactly like the displayIdentity preference.
+async function promptThreadLocalLabel(thread) {
+  if (!thread) return;
+  const current = typeof thread.localLabel === 'string' ? thread.localLabel : '';
+  const result = await openActionDialog({
+    title: current ? 'Edit local name' : 'Set local name',
+    hint: 'A private label shown only on this device. It is never sent to the other side. Leave empty to clear it.',
+    submitLabel: 'Save',
+    fields: [
+      {
+        id: 'localLabel',
+        label: 'Local name',
+        placeholder: 'Optional, e.g. Anonymous',
+        value: current,
+        required: false,
+        autocomplete: 'off',
+      },
+    ],
+  });
+  if (!result) return;
+  const next = (result.localLabel ?? '').trim();
+  if (next) {
+    thread.localLabel = next;
+    thread.displayIdentity = null; // show the just-set local name
+  } else if (thread.localLabel) {
+    delete thread.localLabel;
+    // The cleared label may have been the shown name; applyThreadDisplayFields falls back to the identity.
+  }
+  applyThreadDisplayFields(thread);
+  renderThreads();
+  renderConversation();
+  persistThreadDisplayPreference(thread);
+}
+
 function showIdentityPopover(thread, anchor) {
   const options = identityDisplayOptions(thread);
-  if (options.length === 0 || !anchor) return;
+  if (!thread || !anchor) return;
   const selectedKey = selectedIdentityDisplayOptionKey(thread);
   const popover = ensureIdentityPopover();
   popover.setAttribute('role', 'menu');
@@ -1987,6 +2025,22 @@ function showIdentityPopover(thread, anchor) {
       persistThreadDisplayPreference(thread);
     }));
   }
+  // Always offer a way to set/edit the private local name — so a thread auto-created from an incoming
+  // message (which never went through New Chat's local-label field) can still be named locally.
+  const localNameRow = document.createElement('button');
+  localNameRow.type = 'button';
+  localNameRow.className = 'identity-variant identity-variant-action';
+  localNameRow.setAttribute('role', 'menuitem');
+  const localNameLabel = document.createElement('strong');
+  localNameLabel.textContent = thread.localLabel ? 'Edit local name' : 'Set local name';
+  const localNameType = document.createElement('span');
+  localNameType.textContent = 'Only shown on this device';
+  localNameRow.append(localNameLabel, localNameType);
+  localNameRow.addEventListener('click', () => {
+    hideIdentityPopover();
+    promptThreadLocalLabel(thread).catch((error) => console.error(error));
+  });
+  popover.append(localNameRow);
   const rect = anchor.getBoundingClientRect();
   popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
   popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 220)}px`;
@@ -2000,7 +2054,7 @@ function renderConversationIdentity(thread) {
   if (!identity) {
     activeTitle.textContent = labelText;
     if (identityMenuButton) {
-      identityMenuButton.hidden = identityDisplayOptions(thread).length <= 1;
+      identityMenuButton.hidden = identityDisplayOptions(thread).length < 1;
       identityMenuButton.setAttribute('aria-label', `Choose display name for ${labelText}`);
       identityMenuButton.setAttribute('title', 'Choose display name');
     }
