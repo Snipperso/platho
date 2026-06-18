@@ -153,7 +153,54 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v446';
+const PLATHO_APP_RUNTIME_VERSION = 'v447';
+
+// Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
+// console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
+// next beat is ~N ms late, so (gap - interval) is the stall. runtimeDiagnostics.currentOp records what was
+// running (set around heavy ops via markRuntimeOp), so a stall is ATTRIBUTED — e.g. a single multi-second
+// ML-KEM decapsulate surfaces worstStallOp='sync-decap' with worstStallMs ≈ worstEntryMs, which yielding
+// BETWEEN entries cannot fix (a single synchronous decapsulate can't be split) and would point to a Worker.
+// Surfaced in the #privateDebugLog panel (copyable) and on globalThis.plathoRuntimeDiagnostics.
+const runtimeDiagnostics = {
+  startedAt: new Date().toISOString(),
+  currentOp: 'idle',
+  worstStallMs: 0,
+  worstStallOp: null,
+  worstStallAt: null,
+  lastStallMs: 0,
+  stallCount: 0,
+  worstEntryMs: 0,
+  lastSync: null,
+};
+globalThis.plathoRuntimeDiagnostics = runtimeDiagnostics;
+function markRuntimeOp(op) {
+  runtimeDiagnostics.currentOp = op;
+}
+const RUNTIME_DIAG_HEARTBEAT_MS = 1_000;
+const RUNTIME_DIAG_STALL_THRESHOLD_MS = 200;
+let runtimeDiagLastBeatAt = 0;
+let runtimeDiagStarted = false;
+function startRuntimeDiagnostics() {
+  if (runtimeDiagStarted || typeof window === 'undefined' || typeof window.setInterval !== 'function') return;
+  runtimeDiagStarted = true;
+  runtimeDiagLastBeatAt = Date.now();
+  window.setInterval(() => {
+    const now = Date.now();
+    const gap = now - runtimeDiagLastBeatAt;
+    runtimeDiagLastBeatAt = now;
+    const stall = gap - RUNTIME_DIAG_HEARTBEAT_MS;
+    if (stall < RUNTIME_DIAG_STALL_THRESHOLD_MS) return;
+    runtimeDiagnostics.stallCount += 1;
+    runtimeDiagnostics.lastStallMs = stall;
+    if (stall > runtimeDiagnostics.worstStallMs) {
+      runtimeDiagnostics.worstStallMs = stall;
+      runtimeDiagnostics.worstStallOp = runtimeDiagnostics.currentOp;
+      runtimeDiagnostics.worstStallAt = new Date(now).toISOString();
+    }
+  }, RUNTIME_DIAG_HEARTBEAT_MS);
+}
+startRuntimeDiagnostics();
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2236,8 +2283,16 @@ function privateDebugLines(thread = activeThread()) {
   const senderCursor = sync.senderCursor ?? {};
   const indexError = sync.indexReadError ? ` idxErr=${debugTiny(sync.indexReadError, '-')}` : '';
   const indexFallback = sync.indexReadFallback ? ` idxFallback=${debugTiny(sync.indexReadFallback, '-')}` : '';
+  const diag = runtimeDiagnostics;
+  const diagSync = diag.lastSync
+    ? `${diag.lastSync.ms}ms/${diag.lastSync.entries}e imp=${diag.lastSync.imported} ${diag.lastSync.mode}`
+    : '-';
+  const diagHw = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || '?';
+  const diagMem = (typeof navigator !== 'undefined' && navigator.deviceMemory) || '?';
   return [
     `${PLATHO_APP_RUNTIME_VERSION} key=${shortKeyId(localRecipientKeyPair?.keyId)} phase=${phase}${error}`,
+    `diag op=${diag.currentOp} stallWorst=${Math.round(diag.worstStallMs)}ms@${diag.worstStallOp ?? '-'} stalls=${diag.stallCount} stallLast=${Math.round(diag.lastStallMs)}ms`,
+    `diag entryWorst=${Math.round(diag.worstEntryMs)}ms lastSync=${diagSync} hw=${diagHw} mem=${diagMem}`,
     `idx=${sync.indexKeyId ?? '-'} rh=${sync.recipientHead ?? '-'} sh=${sync.senderHead ?? '-'} mode=${sync.mode ?? '-'}`,
     `rc=${recipientCursor.processedHeadLink ?? '-'}:${recipientCursor.resumeLink ?? '-'} sc=${senderCursor.processedHeadLink ?? '-'}:${senderCursor.resumeLink ?? '-'}`,
     `imp=${sync.imported ?? 0} skip=${sync.skipped ?? 0} inc=${sync.incompletePrivateStreamCount ?? 0} catch=${sync.catchUpRemaining ?? 0}`,
@@ -6463,7 +6518,11 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         nextLink = 0n;
         break;
       }
+      markRuntimeOp('sync-decap');
+      const entryStartedAt = Date.now();
       const result = await scanPrivateEntryId(entryId, { source: role });
+      const entryMs = Date.now() - entryStartedAt;
+      if (entryMs > runtimeDiagnostics.worstEntryMs) runtimeDiagnostics.worstEntryMs = entryMs;
       if (!result.ok) {
         scanComplete = false;
         return;
@@ -6719,11 +6778,22 @@ async function syncPrivateCapsulesFromChain(options = {}) {
 
 async function syncPrivateCapsulesFromChainOnce(options = {}) {
   if (privateChainSyncPromise) return privateChainSyncPromise;
+  const syncStartedAt = Date.now();
+  markRuntimeOp('sync');
   privateChainSyncPromise = syncPrivateCapsulesFromChain(options);
   try {
-    return await privateChainSyncPromise;
+    const result = await privateChainSyncPromise;
+    runtimeDiagnostics.lastSync = {
+      ms: Date.now() - syncStartedAt,
+      entries: Number(result?.indexEntriesScanned ?? 0) + Number(result?.headRepairScanned ?? 0) + Number(result?.historyRetryScanned ?? 0),
+      imported: Number(result?.imported ?? 0),
+      mode: result?.mode ?? options?.mode ?? '-',
+      at: new Date().toISOString(),
+    };
+    return result;
   } finally {
     privateChainSyncPromise = null;
+    markRuntimeOp('idle');
   }
 }
 
