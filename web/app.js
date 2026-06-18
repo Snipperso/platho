@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=78';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=79';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=42';
+} from './vault-ton-rpc-provider.mjs?v=43';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -133,19 +133,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=2';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=24';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=25';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=38';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=26';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=22';
+} from './capsulehub-ton-rpc-provider.mjs?v=39';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=27';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=23';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=29';
+} from './username-ton-rpc-provider.mjs?v=30';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v441';
+const PLATHO_APP_RUNTIME_VERSION = 'v442';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
