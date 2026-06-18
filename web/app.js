@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v448';
+const PLATHO_APP_RUNTIME_VERSION = 'v449';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -533,6 +533,9 @@ const privateScanUnknownErrorCounts = new Map();
 let privateOutboundWorkDepth = 0;
 let vaultPublishSendLock = Promise.resolve();
 let vaultPublishSendWaiters = 0;
+// Deadline until which a background auto-lock is DEFERRED because a send is actively holding the key
+// (set once at first defer, never re-armed — so a wedged send cannot pin the wallet unlocked past the cap).
+let vaultSendInFlightUntil = 0;
 // Resolves when the most recently broadcast vault external is reflected in
 // the on-chain publish nonce. Pre-sign user/nonce reads await it so that
 // back-to-back signed actions cannot race the strictly sequential contract
@@ -574,6 +577,11 @@ const PLATHO_WALLET_KDF_ITERATIONS = 350_000;
 const PLATHO_WALLET_PASSWORD_MIN_LENGTH = 10;
 const PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH = 20;
 const WALLET_AUTO_LOCK_MS = 10 * 60 * 1000;
+// Max time a background auto-lock may be deferred while a send actively needs the key. Covers the worst
+// legitimate multi-external send: one inter-batch nonce-confirm wait (90s) + the final broadcast + the
+// ~10s stale-read floor reconciliation. Far tighter (4x) than the 10min idle backstop, and only engages
+// during an active send (idle background still locks immediately).
+const SEND_LOCK_MAX_GRACE_MS = 150 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
@@ -1701,7 +1709,11 @@ function markWalletUnlocked() {
 }
 
 function shouldIgnoreTransientWalletLock() {
-  return Boolean(activeActionDialog) || (Date.now() - lastWalletUnlockAt) < 8000;
+  return Boolean(activeActionDialog)
+    || (Date.now() - lastWalletUnlockAt) < 8000
+    // Don't tear down an in-flight send on a brief background: defer the lock while signing/broadcasting
+    // actively holds the key (bounded by SEND_LOCK_MAX_GRACE_MS). Confirmation is keyless and not counted.
+    || shouldDeferLockForActiveSend();
 }
 
 function shouldDeferServiceWorkerReload() {
@@ -6850,6 +6862,26 @@ function clearMessageAutoSyncTimer() {
 
 function privateOutboundWorkActive() {
   return privateOutboundWorkDepth > 0;
+}
+
+// True while a send is actively holding the auth key (the vault send-lock is held for the sign+broadcast
+// loop of BOTH private and public sends, or a private re-sign/recovery job is mid-flight). Confirmation is
+// keyless and intentionally NOT counted here, so the wallet may lock once broadcasting is done.
+function vaultSendNeedsKeyNow() {
+  const needsKey = vaultPublishSendWaiters > 0 || privateOutboundWorkActive();
+  if (!needsKey) vaultSendInFlightUntil = 0;
+  return needsKey;
+}
+
+// Whether a background auto-lock should be DEFERRED right now because a send still needs the key. The
+// grace deadline is set ONCE at the first defer and is never refreshed by later background events, so a
+// wedged send can defer the lock by at most SEND_LOCK_MAX_GRACE_MS; after that it locks normally and the
+// existing fail-closed re-sign path governs resumption.
+function shouldDeferLockForActiveSend() {
+  if (!vaultSendNeedsKeyNow()) return false;
+  const now = Date.now();
+  if (vaultSendInFlightUntil === 0) vaultSendInFlightUntil = now + SEND_LOCK_MAX_GRACE_MS;
+  return now < vaultSendInFlightUntil;
 }
 
 function beginPrivateOutboundWork() {
@@ -16543,6 +16575,10 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
     totalMaxCharge,
   } = prepared;
   await options.onReadyToSend?.(publishState);
+  // Persist the PUBLIC sender address on the publish state so the keyless resume paths (idempotent
+  // re-broadcast + receipt confirmation) can run after a background lock without the wallet key — the
+  // address is not secret, and resolvePublishOwner refuses if a different account later unlocks.
+  if (publishState && !publishState.ownerWallet) publishState.ownerWallet = owner;
   let lastResult = null;
   // VPB2: the flat per-capsule charge plan is packed into batches of
   // 1..MAX_BATCH_PARTS contiguous same-kind items; each batch is ONE signed
@@ -16877,11 +16913,26 @@ function publishPartLastBroadcastAgeMs(part) {
   return Number.isFinite(parsed) ? Math.max(0, Date.now() - parsed) : Infinity;
 }
 
+// The owner address for a KEYLESS resume (idempotent re-broadcast + receipt confirm) of an already-signed
+// publish. Prefer the live unlocked wallet; fall back to the address persisted on publishState (a public
+// address, stamped at sign time) so these read/idempotent paths run after a background lock. Returns null
+// if a DIFFERENT account is now unlocked (never act under the wrong owner) — callers skip gracefully.
+function resolvePublishOwner(publishState) {
+  const live = plathoWallet?.address ?? null;
+  const stored = publishState?.ownerWallet ?? null;
+  if (live && stored && rawWalletAddress(live) !== rawWalletAddress(stored)) return null;
+  return live ?? stored ?? null;
+}
+
 async function retryUnconfirmedVaultPublishBroadcasts(publishState, options = {}) {
   const retryableParts = (publishState?.parts ?? []).filter((part) => publishPartNeedsBroadcastRetry(part));
   if (retryableParts.length === 0) return 0;
   const provider = await resolveVaultChainProvider();
-  const owner = options.owner ?? requirePlathoWalletAddress();
+  // Keyless re-broadcast: an already-signed, fixed-nonce external is idempotent (the contract rejects a
+  // re-used nonce), so it does not need the wallet key — only the (public) owner address. Skip gracefully
+  // if no owner is resolvable (locked + no stored address, or a different account unlocked).
+  const owner = options.owner ?? resolvePublishOwner(publishState);
+  if (!owner) return 0;
   const deadlineAt = publishConfirmDeadlineAt({
     deadlineMs: options.deadlineMs ?? PRIVATE_PUBLISH_BROADCAST_RETRY_DEADLINE_MS,
   });
@@ -17102,7 +17153,12 @@ async function recoverDroppedSignedPublishParts(message) {
   let vaultAddress = null;
   try {
     chainProvider = await resolveVaultChainProvider();
-    owner = requirePlathoWalletAddress();
+    // Keyless-resolvable owner so the confirm-only branches (found / receipt-CONFIRMED) run after a lock.
+    // The fresh-re-sign branch downstream stays key-gated: provePublishPartAbsentFromSenderIndex returns
+    // 'inconclusive' without localRecipientKeyPair?.keyId, and requireVaultAuthSecretKey needs the auth key,
+    // so a LOCKED session can never re-sign here — parts only idempotently re-broadcast their one external.
+    owner = resolvePublishOwner(publishState);
+    if (!owner) return { resigned: 0, confirmed: 0 };
     vaultAddress = requireVaultAddress();
     chainNonce = await readVaultPublishNonce(chainProvider, owner, {
       ignoreNonceBarrier: true,
@@ -17601,7 +17657,7 @@ async function runPrivatePublishConfirmationRetry(context) {
         queueTimeoutMs: PRIVATE_PUBLISH_CONFIRM_RECOVERY_QUEUE_TIMEOUT_MS,
       };
     const confirmStartedAt = Date.now();
-    await confirmCapsuleHubPublishEntries(message.publishState, confirmOptions);
+    await confirmCapsuleHubPublishEntries(message.publishState, { ...confirmOptions, owner: resolvePublishOwner(message.publishState) });
     const droppedRecovery = message.publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
       ? { resigned: 0, confirmed: 0 }
       : await recoverDroppedSignedPublishParts(message);
