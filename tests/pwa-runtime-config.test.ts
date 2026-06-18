@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v447<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v447'/);
+    expect(html).toMatch(/id="appVersionLabel">v448<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v448'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -391,8 +391,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/closeOnBackdropClick/);
     expect(app).toMatch(/pointerStartedOnBackdrop/);
     expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop === false/);
-    expect(app).toMatch(/actionCancelButton\.hidden = !dismissible/);
-    expect(app).toMatch(/actionCancelButton\.disabled = !dismissible/);
+    expect(app).toMatch(/actionCancelButton\.hidden = !cancellable/);
+    expect(app).toMatch(/actionCancelButton\.disabled = !cancellable/);
     expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop !== false\) closeActionDialog\(null\)/);
     expect(app).toMatch(/dismissOnBackdrop = true/);
     expect(app).toMatch(/dismissOnBackdrop,/);
@@ -1658,6 +1658,34 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/markRuntimeOp\('sync-decap'\)/);
     expect(app).toMatch(/if \(entryMs > runtimeDiagnostics\.worstEntryMs\) runtimeDiagnostics\.worstEntryMs = entryMs/);
     expect(app).toMatch(/diag op=\$\{diag\.currentOp\}/);
+    // v448: the diagnostics panel + copy button are mirrored into the Profile tab, so a freeze can be
+    // captured on a device that has not opened a private dialog yet (the in-chat panel needs an open thread).
+    const html = readFileSync('web/index.html', 'utf8');
+    expect(html).toMatch(/id="profileDiagnosticsLog"/);
+    expect(html).toMatch(/id="copyProfileDiagnosticsButton"/);
+    expect(app).toMatch(/function runtimeDiagnosticsText\(\)/);
+    expect(app).toMatch(/function refreshProfileDiagnostics\(\)/);
+    expect(app).toMatch(/if \(view === 'profile'\) refreshProfileDiagnostics\(\)/);
+    expect(app).toMatch(/copyProfileDiagnosticsButton\?\.addEventListener\('click'/);
+  });
+
+  it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // openActionDialog decouples the close (✕) button (cancellable) from outside-click/Escape (dismissOnBackdrop).
+    expect(app).toMatch(/const cancellable = config\.cancellable \?\? dismissible/);
+    expect(app).toMatch(/actionCancelButton\.hidden = !cancellable/);
+    // the ✕ handler is gated on cancellable (NOT on dismissOnBackdrop), so the ✕ works even when backdrop-dismiss is off.
+    expect(app).toMatch(/actionCancelButton\?\.addEventListener\('click', \(\) => \{\s*if \(activeActionDialog\?\.cancellable === false\) return/);
+    // backdrop click + Escape stay gated on dismissOnBackdrop, so dismissOnBackdrop:false blocks BOTH.
+    expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop === false\) return/);
+    expect(app).toMatch(/if \(activeActionDialog\?\.dismissOnBackdrop !== false\) closeActionDialog\(null\)/);
+    // the unlock flow opens its password dialog with dismissOnBackdrop:false + cancellable:true.
+    const unlockSource = app.slice(
+      app.indexOf('async function requestAndDecryptEncryptedWallet'),
+      app.indexOf('async function readStoredPlathoWallet'),
+    );
+    expect(unlockSource).toMatch(/dismissOnBackdrop: false/);
+    expect(unlockSource).toMatch(/cancellable: true/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4117,11 +4145,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v518/);
+    expect(sw).toMatch(/platho-pwa-prototype-v519/);
     expect(sw).toMatch(/\.\/styles\.css\?v=142/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=447/);
+    expect(sw).toMatch(/\.\/app\.js\?v=448/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);

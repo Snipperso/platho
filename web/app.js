@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v447';
+const PLATHO_APP_RUNTIME_VERSION = 'v448';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -320,6 +320,9 @@ const activeTitle = document.querySelector('#activeTitle');
 const activeSubtitle = document.querySelector('#activeSubtitle');
 const privateDebugLog = document.querySelector('#privateDebugLog');
 const copyPrivateDebugButton = document.querySelector('#copyPrivateDebugButton');
+const profileDiagnosticsLog = document.querySelector('#profileDiagnosticsLog');
+const copyProfileDiagnosticsButton = document.querySelector('#copyProfileDiagnosticsButton');
+const copyProfileDiagnosticsStatus = document.querySelector('#copyProfileDiagnosticsStatus');
 const backToChatsButton = document.querySelector('#backToChatsButton');
 const identityMenuButton = document.querySelector('#identityMenuButton');
 const search = document.querySelector('#threadSearch');
@@ -2317,6 +2320,30 @@ function refreshPrivateDebugLog() {
   if (copyPrivateDebugButton) copyPrivateDebugButton.disabled = privateDebugLog.textContent.trim().length === 0;
 }
 
+// Self-contained runtime diagnostics text (no thread/dialog needed) for the Profile panel — so a freeze can
+// be captured on a device that hasn't opened a private chat yet. Surfaces the main-thread stall detector +
+// per-entry decapsulate timing + device specs.
+function runtimeDiagnosticsText() {
+  const d = runtimeDiagnostics;
+  const sync = d.lastSync;
+  const hw = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || '?';
+  const mem = (typeof navigator !== 'undefined' && navigator.deviceMemory) || '?';
+  const err = messageAutoSyncLastErrorLabel ? ` err=${debugTiny(messageAutoSyncLastErrorLabel, '-')}` : '';
+  return [
+    `${PLATHO_APP_RUNTIME_VERSION} op=${d.currentOp} hw=${hw} mem=${mem}`,
+    `stallWorst=${Math.round(d.worstStallMs)}ms@${d.worstStallOp ?? '-'} stalls=${d.stallCount} stallLast=${Math.round(d.lastStallMs)}ms`,
+    `entryWorst=${Math.round(d.worstEntryMs)}ms lastSync=${sync ? `${sync.ms}ms/${sync.entries}e imp=${sync.imported} ${sync.mode}` : '-'}`,
+    `phase=${messageAutoSyncPhase || 'idle'}${err}`,
+    `since=${d.startedAt}`,
+  ].join('\n');
+}
+
+function refreshProfileDiagnostics() {
+  if (!profileDiagnosticsLog) return;
+  profileDiagnosticsLog.textContent = runtimeDiagnosticsText();
+  if (copyProfileDiagnosticsButton) copyProfileDiagnosticsButton.disabled = false;
+}
+
 let privateDebugCopyStatusTimer = null;
 
 function setPrivateDebugCopyButtonStatus(label, durationMs = 1400) {
@@ -2642,10 +2669,15 @@ async function openActionDialog(config = {}) {
   if (activeActionDialog) closeActionDialog(null);
   return new Promise((resolve) => {
     const dismissible = config.dismissOnBackdrop !== false;
+    // `cancellable` (the explicit ✕ close button) is DECOUPLED from `dismissOnBackdrop` (click-outside /
+    // Escape dismiss). Defaults to dismissible for back-compat, but a caller can keep the ✕ working while
+    // forbidding outside-click/Escape dismissal (e.g. the Unlock-wallet dialog: closeable ONLY via the ✕).
+    const cancellable = config.cancellable ?? dismissible;
     activeActionDialog = {
       resolve,
       summary: config.summary,
       dismissOnBackdrop: dismissible,
+      cancellable,
     };
     actionTitle.textContent = config.title ?? 'Action';
     actionHint.textContent = config.hint ?? 'Review details before signing.';
@@ -2654,8 +2686,8 @@ async function openActionDialog(config = {}) {
     actionForm.method = config.formMethod ?? 'post';
     actionForm.action = config.formAction ?? window.location.href;
     if (actionCancelButton) {
-      actionCancelButton.hidden = !dismissible;
-      actionCancelButton.disabled = !dismissible;
+      actionCancelButton.hidden = !cancellable;
+      actionCancelButton.disabled = !cancellable;
     }
     actionSubmitButton.textContent = config.submitLabel ?? 'Continue';
     actionSubmitButton.disabled = false;
@@ -7597,6 +7629,7 @@ async function requestWalletPasswordInput({
   confirm = false,
   create = false,
   dismissOnBackdrop = true,
+  cancellable = true,
   passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
   passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
   summary = [],
@@ -7637,6 +7670,7 @@ async function requestWalletPasswordInput({
     tone,
     submitLabel,
     dismissOnBackdrop,
+    cancellable,
     formAutocomplete: 'on',
     fields,
     summary,
@@ -7700,6 +7734,9 @@ async function requestAndDecryptEncryptedWallet(record, {
       hint: feedback,
       tone,
       submitLabel,
+      // Unlock dialog closes ONLY via the explicit ✕ — no click-outside / Escape dismiss (owner request).
+      dismissOnBackdrop: false,
+      cancellable: true,
       passwordManagerUsername: record?.address,
       passwordManagerNetworkGlobalId: record?.networkGlobalId,
       summary: [
@@ -9583,6 +9620,7 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
+  if (view === 'profile') refreshProfileDiagnostics();
   if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
     beginMessageSyncUi();
     syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).then((result) => {
@@ -9983,7 +10021,7 @@ newChatForm?.addEventListener('submit', (event) => {
   }
 });
 actionCancelButton?.addEventListener('click', () => {
-  if (activeActionDialog?.dismissOnBackdrop === false) return;
+  if (activeActionDialog?.cancellable === false) return;
   closeActionDialog(null);
 });
 closeOnBackdropClick(actionDialog, () => closeActionDialog(null));
@@ -10896,6 +10934,17 @@ copyPrivateDebugButton?.addEventListener('click', async () => {
     console.error(error);
   } finally {
     refreshPrivateDebugLog();
+  }
+});
+
+copyProfileDiagnosticsButton?.addEventListener('click', async () => {
+  refreshProfileDiagnostics();
+  try {
+    await copyTextToClipboard(profileDiagnosticsLog?.textContent ?? '');
+    setText(copyProfileDiagnosticsStatus, 'copied');
+  } catch (error) {
+    setText(copyProfileDiagnosticsStatus, 'copy blocked');
+    console.error(error);
   }
 });
 
