@@ -44,20 +44,28 @@ const SIZE_CLASSES = [1, 2, 4, 8, 16, 32] as const;
 const PART_COUNTS = [1, 8] as const;
 
 // canonical_total measured in the sandbox by binary-searching the RJ_UNDERPRICED -> success boundary
-// (see the throwaway harness used to derive the model). Keyed kind|size|parts. The 32K x 8 shape exceeds the
-// config-43 external-message ceiling (256KB > 65535 bytes) and is unsendable, so it is omitted from the matrix.
+// (see the throwaway harness used to derive the model). Keyed kind|size|parts.
+//
+// SINGLE-EXTERNAL shapes only. An x8 batch of LARGE capsules serializes past TON's config-43 external-message
+// ceiling (65535 bytes) and a real validator DROPS it at ingest before the Vault runs — the @ton/sandbox used
+// here does NOT enforce that ceiling, which is why these shapes looked "sendable" in the harness. The byte-
+// aware packer (groupPublishItemsIntoBatches) now SPLITS such groups into multiple sub-65535 externals, so
+// they are no longer a single signed batch and their single-external canonical_total is moot. Omitted x8
+// shapes whose one-external serialization exceeds the ceiling: private 8K/16K/32K and public 8K/16K/32K, plus
+// private 4K (over the packer's conservative budget). Their delivery + pricing are covered by the matching
+// 1-part entries (the split yields single-part externals on the proven 1-part path) and by WPP-AMORTIZE.
 const MEASURED_CANONICAL_TOTAL: Record<string, bigint> = {
   'private|1|1': 151_886_475n, 'private|1|8': 346_856_548n,
   'private|2|1': 152_485_942n, 'private|2|8': 351_652_282n,
-  'private|4|1': 153_684_875n, 'private|4|8': 361_243_749n,
-  'private|8|1': 156_082_742n, 'private|8|8': 380_426_684n,
-  'private|16|1': 160_885_142n, 'private|16|8': 418_845_887n,
+  'private|4|1': 153_684_875n,
+  'private|8|1': 156_082_742n,
+  'private|16|1': 160_885_142n,
   'private|32|1': 170_483_276n,
   'public|1|1': 156_209_342n, 'public|1|8': 381_245_348n,
   'public|2|1': 156_808_808n, 'public|2|8': 386_041_082n,
   'public|4|1': 158_007_742n, 'public|4|8': 395_632_549n,
-  'public|8|1': 160_405_609n, 'public|8|8': 414_815_484n,
-  'public|16|1': 165_208_009n, 'public|16|8': 453_234_686n,
+  'public|8|1': 160_405_609n,
+  'public|16|1': 165_208_009n,
   'public|32|1': 174_806_143n,
 };
 
@@ -187,4 +195,68 @@ describe('VPB2 client publish pricing: the re-derived hold never underprices the
       }
     }
   });
+});
+
+// Session: oversized-external split. A 64KB private image (two size_class-32 capsules) used to be packed into
+// ONE 2-part external whose serialized size (~70KB) exceeds TON's max_ext_msg_size (65535) — the network DROPS
+// it at ingest before the Vault runs, so the publish stranded at "submitted 2/2, confirming" forever and the
+// recipient never received it (the SAME image published fine as a smaller, unpadded public avatar). The byte-
+// aware packer now keeps each external under the ceiling, so a large multi-capsule private image rides one part
+// per external (the proven-good single-part path); a fail-closed guard in buildBatchPublishExternalBoc ensures
+// an oversized external can never be silently signed/broadcast again.
+describe('VPB2 oversized-external split: large multi-capsule private publishes stay under max_ext_msg_size', () => {
+  it('WPP-SPLIT-32K-x2: two 32K private capsules split into two externals, not one oversized batch', () => {
+    const batches = groupPublishItemsIntoBatches(buildItems(KIND_PRIVATE, 32, 2));
+    expect(batches).toHaveLength(2);
+    expect(batches[0].items).toHaveLength(1);
+    expect(batches[1].items).toHaveLength(1);
+  });
+
+  it('WPP-SPLIT-SMALL-x8: eight tiny (1K) private capsules still amortize into ONE batch', () => {
+    const batches = groupPublishItemsIntoBatches(buildItems(KIND_PRIVATE, 1, 8));
+    expect(batches).toHaveLength(1);
+    expect(batches[0].items).toHaveLength(8);
+  });
+
+  it('WPP-SPLIT-DELIVERS: both split externals of a 64KB (2x32K) private image are accepted on-chain', async () => {
+    const env = await deployBoundSealedPair();
+    const { blockchain, vault, vaultAddress, user } = env;
+    await registerHybrid(vault, user);
+    await depositTon(vault, user, toNano('20'));
+    const batches = groupPublishItemsIntoBatches(buildItems(KIND_PRIVATE, 32, 2));
+    expect(batches).toHaveLength(2);
+    for (const batch of batches) {
+      const nonce = (await vault.getGetUser(user.address)).publish_nonce;
+      const built = await buildBatchExternalFromPublishItems(batch, {
+        owner: user.address.toRawString(),
+        clientNonce: nonce,
+        vaultAddress: vaultAddress.toRawString(),
+        manifestHash: `0x${MANIFEST_HASH.toString(16).padStart(64, '0')}`,
+        authSecretKey: AUTH_SECRET_KEY,
+      });
+      // Each split external is under the 65535-byte validator ingest ceiling (real validators drop larger).
+      expect(Buffer.from(built.boc, 'base64').length).toBeLessThanOrEqual(65535);
+      const bodyCell = Cell.fromBoc(Buffer.from(tonCell.serializeBoc(built.bodyCell)))[0];
+      await blockchain.sendMessage(external({ to: vaultAddress, body: bodyCell }));
+      const slot = (await vault.getGetUserReceipts(user.address)).receipts.get(Number(nonce % RING));
+      expect(slot, 'each split external must be accepted (not pre-accept rejected)').toBeDefined();
+      expect(slot!.part_count).toBe(1n);
+      expect([RES_PROCESSING, RES_CONFIRMED]).toContain(slot!.result);
+    }
+  }, 30000);
+
+  it('WPP-OVERSIZE-GUARD: forcing two 32K private parts into one external fails closed (never silently dropped)', async () => {
+    const env = await deployBoundSealedPair();
+    const { vaultAddress, user } = env;
+    // Bypass the byte-aware packer to reconstruct the pre-fix oversized shape: two 32K private parts, ONE external.
+    const items = buildItems(KIND_PRIVATE, 32, 2);
+    const forcedBatch = { items, kind: KIND_PRIVATE, kindLabel: 'private', partIndexes: [0, 1] };
+    await expect(buildBatchExternalFromPublishItems(forcedBatch, {
+      owner: user.address.toRawString(),
+      clientNonce: 0n,
+      vaultAddress: vaultAddress.toRawString(),
+      manifestHash: `0x${MANIFEST_HASH.toString(16).padStart(64, '0')}`,
+      authSecretKey: AUTH_SECRET_KEY,
+    })).rejects.toThrow(/max_ext_msg_size/);
+  }, 30000);
 });

@@ -13,7 +13,7 @@ import {
   batchChargeFloor,
   buildBatchPublishExternalBoc,
   buildBatchPublishPartsRoot,
-} from './pwa-contract-transactions.mjs?v=28';
+} from './pwa-contract-transactions.mjs?v=29';
 import { batchHoldNanotons } from './message-pricing-policy.mjs?v=12';
 
 export { MAX_BATCH_PARTS };
@@ -34,11 +34,42 @@ function publishItemKindBigInt(label) {
   return label === 'public' ? VAULT_PUBLISH_KIND.PUBLIC : VAULT_PUBLISH_KIND.PRIVATE;
 }
 
+// TON validators DROP an inbound external BoC larger than max_ext_msg_size (config-43 = 65535 bytes) BEFORE
+// the Vault's external() receiver runs (contracts/Vault.tact EXT_HARD_BITS = 65535*8; the node never even
+// bounces it). So a multi-part batch external MUST stay under that ceiling. A private HYBRID body is padded
+// to size_class*1024 + ~1204 bytes and carries TWO header cells, so TWO large (size_class 16/32) private
+// image capsules packed into one external overflow 65535 and the broadcast is silently lost (parts pinned at
+// SENT, submittedCount=0 forever, recipient never receives it). Public/avatar bodies are smaller (variable-
+// length, ONE header) — which is exactly why the SAME image published fine as an avatar but not as a private
+// message. We therefore bound each batch by an ESTIMATED serialized size and force a new batch before the
+// ceiling: large capsules ride ONE part per external (the proven-good single-part path), small capsules
+// (text) still amortize up to MAX_BATCH_PARTS. The estimate is anchored on size_class (always present on a
+// charge-plan item, the contract's own body-sizing unit), so the HOLD-quote grouping and the SEND grouping
+// are byte-for-byte identical and no phantom "Price changed" recheck can fire. buildBatchPublishExternalBoc
+// hard-asserts the REAL serialized length as a fail-closed backstop if this estimate is ever too loose.
+const MAX_BATCH_EXTERNAL_BYTES = 62000;            // < 65535 hard ceiling; margin for signed root + 64-byte
+                                                   // signature + external envelope + BoC cell framing.
+const PRIVATE_PART_NONBODY_OVERHEAD_BYTES = 4000;  // ~1204 body padding + two header cells + cell framing.
+const PUBLIC_PART_NONBODY_OVERHEAD_BYTES = 1200;   // single header + cell framing.
+
+// PURE. Conservative serialized-byte estimate of one publish item's contribution to its batch external.
+// Over-estimates (so the packer over-splits rather than under-splits — the latter would trip the hard guard);
+// uses size_class (the on-chain body unit, length <= size_class*1024) so it is identical at quote and send.
+export function estimatePublishItemExternalBytes(item) {
+  const sizeClass = Number(publishItemSizeClass(item)) || 1;
+  const bodyBytes = sizeClass * 1024;
+  const overhead = publishItemKindLabel(item) === 'public'
+    ? PUBLIC_PART_NONBODY_OVERHEAD_BYTES
+    : PRIVATE_PART_NONBODY_OVERHEAD_BYTES;
+  return bodyBytes + overhead;
+}
+
 // PURE. Greedily pack the flat per-capsule items into contiguous batches of 1..MAX_BATCH_PARTS items where all
-// items in a batch share the same kind. Order is preserved: a batch boundary is forced by a kind change or by
-// hitting MAX_BATCH_PARTS. Returns an array of { items, kind, kindLabel, partIndexes } where partIndexes carries
-// the ORIGINAL flat position of each item (the part's index within publishState.parts), and the part's index
-// WITHIN the batch is its position in `items` (0-based) — that is the EPI1 part_index.
+// items in a batch share the same kind AND the batch's estimated serialized external stays under
+// MAX_BATCH_EXTERNAL_BYTES. Order is preserved: a batch boundary is forced by a kind change, by hitting
+// MAX_BATCH_PARTS, or by the byte budget. Returns an array of { items, kind, kindLabel, partIndexes } where
+// partIndexes carries the ORIGINAL flat position of each item (the part's index within publishState.parts),
+// and the part's index WITHIN the batch is its position in `items` (0-based) — that is the EPI1 part_index.
 export function groupPublishItemsIntoBatches(items) {
   const flat = (items ?? []).filter(Boolean);
   const batches = [];
@@ -47,11 +78,16 @@ export function groupPublishItemsIntoBatches(items) {
     const item = flat[flatIndex];
     const kindLabel = publishItemKindLabel(item);
     const originalIndex = item.partIndex ?? flatIndex;
+    const itemBytes = estimatePublishItemExternalBytes(item);
     const sameKind = current && current.kindLabel === kindLabel;
     const hasRoom = current && current.items.length < MAX_BATCH_PARTS;
-    if (sameKind && hasRoom) {
+    // A lone part always starts its own batch (never split a single capsule); the byte budget only blocks
+    // ADDING a further part to an existing batch.
+    const fitsBytes = current && (current.bytes + itemBytes) <= MAX_BATCH_EXTERNAL_BYTES;
+    if (sameKind && hasRoom && fitsBytes) {
       current.items.push(item);
       current.partIndexes.push(originalIndex);
+      current.bytes += itemBytes;
       continue;
     }
     current = {
@@ -59,6 +95,7 @@ export function groupPublishItemsIntoBatches(items) {
       kind: publishItemKindBigInt(kindLabel),
       kindLabel,
       partIndexes: [originalIndex],
+      bytes: itemBytes,
     };
     batches.push(current);
   }
