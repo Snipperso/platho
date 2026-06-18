@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v436';
+const PLATHO_APP_RUNTIME_VERSION = 'v437';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -17149,6 +17149,7 @@ function ensurePendingPrivateSendRetry(thread, message, error = { message: 'resu
 
 function privatePublishConfirmStoppedStatusText(error = null) {
   if (error?.code === 'STALE_PRIVATE_PUBLISH') return 'not confirmed: chain lookup expired';
+  if (error?.code === 'CONFIRM_RETRY_EXHAUSTED') return 'not confirmed: send timed out';
   if (error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED') {
     return /limit/i.test(String(error?.message ?? ''))
       ? 'not confirmed: partial publish retry limit reached'
@@ -17215,6 +17216,18 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   if (stopPartialPrivatePublishRecovery(context)) return;
   if (isStalePrivatePendingPublishConfirmation(message)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
+    return;
+  }
+  // Bounded auto-confirm. After the active-attempt budget with NOTHING confirmed (or a hard backstop
+  // even with partial progress), STOP the otherwise-endless 30s background retry and surface a Retry
+  // button instead of spinning on "submitted N/N, confirming" forever. The age-based 24h stale above
+  // never fires for a genuinely-stuck message because each confirm pass bumps publishState.updatedAt,
+  // resetting privatePendingPublishAgeMs — so this attempt cap is the real terminal guard.
+  if (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
+    && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && (Number(message.publishState?.confirmedCount ?? 0) === 0
+      || attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT * 4)) {
+    stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
   }
   clearPrivateMessageManualRecovery(message);
