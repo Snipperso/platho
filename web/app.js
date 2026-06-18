@@ -131,6 +131,7 @@ import {
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
+  batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=2';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=24';
 import {
@@ -152,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v435';
+const PLATHO_APP_RUNTIME_VERSION = 'v436';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -496,6 +497,11 @@ let tonRpcLimitedUntil = 0;
 let tonRpcLimitedTimer = null;
 let pendingServiceWorkerAppShellReload = false;
 let plathoAccountActivationPending = false;
+// Mirrors plathoAccountActivationPending (the v430 activation-row fix) for the profile-avatar row:
+// while a multi-capsule avatar publish/confirm/registry update is in flight (foreground submit OR a
+// scheduled background recovery), the "Set avatar" button stays disabled so it cannot be re-clicked
+// into a parallel attempt or look like it ignored the press.
+let plathoProfileAvatarPending = false;
 let privateSendRetrySeq = 0;
 const privateSendRetryJobs = new Map();
 let privatePublishConfirmSeq = 0;
@@ -611,6 +617,14 @@ const PROFILE_AVATAR_PUBLISH_CONFIRM_DEADLINE_MS = 120 * 1000;
 const PROFILE_AVATAR_ROUTE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000];
 const PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 180_000];
 const PROFILE_AVATAR_RECOVERY_LOCAL_PENDING_MS = 15 * 60 * 1000;
+// After this many auto-recovery passes (~16 min at the backoff above) a still-unconfirmed avatar
+// stops auto-spinning and parks at a retryable "avatar needs retry" terminal state instead of an
+// endless "confirming". The job stays persisted so a manual re-pick RESUMES it (no re-publish /
+// no double-charge); the per-part capsules are content-addressed so a resume re-finds them.
+const PROFILE_AVATAR_RECOVERY_MAX_AUTO_ATTEMPTS = 8;
+// Bounded in-flight retries for a rate-limited PRE-publish preflight so "RPC busy - retrying" is
+// truthful (the await stays in flight, keeping the button locked) instead of a dead-end status.
+const PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS = [4_000, 8_000, 15_000, 30_000, 30_000, 30_000];
 const USERNAME_MINT_CONFIRM_ATTEMPTS = 20;
 const USERNAME_MINT_CONFIRM_DELAY_MS = 1500;
 const USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS = 240;
@@ -1561,7 +1575,20 @@ function setProfileActionStatus(node, text, state = '') {
   }
 }
 
+function setProfileAvatarPending(pending) {
+  const next = Boolean(pending);
+  if (plathoProfileAvatarPending === next) return;
+  plathoProfileAvatarPending = next;
+  refreshMessagingControls();
+}
+
 function setProfileAvatarStatus(text, state = 'busy') {
+  // Any terminal outcome releases the in-flight lock so the "Set avatar" button becomes clickable
+  // again: an error tone, the success tone (''), or an "avatar active"/"active, ..." status. All
+  // in-flight statuses (busy/default tone) keep the lock held.
+  if (state === 'error' || state === '' || /^(avatar active|active,)/.test(String(text ?? ''))) {
+    setProfileAvatarPending(false);
+  }
   setProfileActionStatus(setAvatarStatus, text, state);
 }
 
@@ -1685,6 +1712,7 @@ function lockPlathoWallet(status = 'Wallet locked', options = {}) {
   }
   clearWalletAutoLockTimer();
   clearVaultAutoRefreshTimer();
+  pauseProfileAvatarPublishRecoveryTimers();
   plathoWallet = null;
   localIdentity = null;
   localVaultAuthKeyPair = null;
@@ -4021,6 +4049,17 @@ async function readAvatarPartsFromCapsuleHub(ownerWallet, pointer, options = {})
   return (await assembledAvatarPartGroup(parts, pointer))?.imageUrl ?? null;
 }
 
+function minPublicEntryIdFromPublishState(publishState) {
+  let min = null;
+  for (const part of publishState?.parts ?? []) {
+    if (publishPartKind(part) !== 'public') continue;
+    const value = publicEntryIdBigInt(part?.entryId);
+    if (value === null || value < 0n) continue;
+    if (min === null || value < min) min = value;
+  }
+  return min;
+}
+
 async function findPublishedAvatarEntries(ownerWallet, pointer) {
   const resolved = await resolveCapsuleHubProvider();
   if (!resolved) throw new Error('CapsuleHub provider is required to confirm avatar capsules');
@@ -4028,30 +4067,54 @@ async function findPublishedAvatarEntries(ownerWallet, pointer) {
   const readOptions = criticalCapsuleHubReadOptions(address);
   const expectedParts = Number(pointer.avatarPartCount ?? 0);
   if (!Number.isSafeInteger(expectedParts) || expectedParts <= 0) throw new Error('Avatar part count is invalid');
-  const state = await provider.getState(readOptions);
-  const latest = BigInt(state.public_latest_id ?? 0n);
   const parts = [];
-  const limit = BigInt(Math.max(PROFILE_AVATAR_FALLBACK_SCAN_LIMIT, expectedParts + PROFILE_AVATAR_ENTRY_SCAN_PADDING));
-  const floor = latest > limit ? latest - limit : 0n;
-  for (let entryId = latest - 1n; entryId >= floor; entryId -= 1n) {
-    const entry = await provider.getPublicEntry(entryId, readOptions);
-    if (entry.exists === true) {
+  // Fast path: when the publish already assigned a first entry id, the batch parts are contiguous
+  // from there, so read a SMALL window (parts + a little slack) instead of scanning thousands of
+  // entries from the chain tip. This keeps a 2-part confirm to a handful of reads — decisive under a
+  // throttled ~1rps verifier where the wide latest-down scan is what makes it stall for minutes.
+  const targetedStart = publicEntryIdBigInt(pointer.avatarEntryId ?? pointer.avatar_entry_id);
+  if (targetedStart !== null && targetedStart >= 0n) {
+    const targetedEnd = targetedStart + BigInt(expectedParts + 8);
+    for (let entryId = targetedStart; entryId <= targetedEnd; entryId += 1n) {
+      const entry = await provider.getPublicEntry(entryId, readOptions);
+      if (entry.exists !== true) continue;
       const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
-      if (!payload) {
-        if (entryId === 0n) break;
-        continue;
-      }
+      if (!payload) continue;
       payload.authorWallet = String(entry.author_wallet ?? '');
-      if (publicAvatarPartMatches(payload, ownerWallet, pointer)) {
-        parts.push({
-          ...payload,
-          entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
-          imageBytes: payload.imageBytes ?? payload.image_bytes,
-        });
-        if (avatarPartsCompleteForPointer(parts, pointer)) break;
-      }
+      if (!publicAvatarPartMatches(payload, ownerWallet, pointer)) continue;
+      parts.push({
+        ...payload,
+        entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
+        imageBytes: payload.imageBytes ?? payload.image_bytes,
+      });
+      if (avatarPartsCompleteForPointer(parts, pointer)) break;
     }
-    if (entryId === 0n) break;
+  }
+  if (!avatarPartsCompleteForPointer(parts, pointer)) {
+    const state = await provider.getState(readOptions);
+    const latest = BigInt(state.public_latest_id ?? 0n);
+    const limit = BigInt(Math.max(PROFILE_AVATAR_FALLBACK_SCAN_LIMIT, expectedParts + PROFILE_AVATAR_ENTRY_SCAN_PADDING));
+    const floor = latest > limit ? latest - limit : 0n;
+    for (let entryId = latest - 1n; entryId >= floor; entryId -= 1n) {
+      const entry = await provider.getPublicEntry(entryId, readOptions);
+      if (entry.exists === true) {
+        const payload = await resolvePublicEntryPayload(provider, entry, address, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES });
+        if (!payload) {
+          if (entryId === 0n) break;
+          continue;
+        }
+        payload.authorWallet = String(entry.author_wallet ?? '');
+        if (publicAvatarPartMatches(payload, ownerWallet, pointer)) {
+          parts.push({
+            ...payload,
+            entryId: entry.entry_id?.toString?.() ?? entryId.toString(),
+            imageBytes: payload.imageBytes ?? payload.image_bytes,
+          });
+          if (avatarPartsCompleteForPointer(parts, pointer)) break;
+        }
+      }
+      if (entryId === 0n) break;
+    }
   }
   const assembled = await assembledAvatarPartGroup(parts, pointer);
   if (!assembled?.imageUrl) return null;
@@ -7603,6 +7666,7 @@ async function loadPlathoWallet() {
         retryDelayMs: 0,
       });
       refreshOwnProfileAvatar().catch((error) => console.error(error));
+      resumeProfileAvatarPublishRecoveryForOwner(wallet.address);
     }
     return wallet;
   })();
@@ -8464,7 +8528,11 @@ async function confirmPublishPriceIncrease({ previousHold, finalHold, previousNe
   const newHold = nonNegativeBigInt(finalHold);
   const oldCost = nonNegativeBigInt(previousNetCost);
   const newCost = nonNegativeBigInt(finalNetCost);
-  if (newHold <= oldHold && newCost <= oldCost) return true;
+  // Only a higher NET COST (a real, non-refundable debit increase) needs confirmation. A higher
+  // hold alone is a fully-refundable over-reserve and must NOT alarm — otherwise every multi-capsule
+  // batch (whose amortized batch hold and the per-part canonical sum legitimately differ by one
+  // SHARED_BASE per extra part) would prompt spuriously even though the chain price is unchanged.
+  if (newCost <= oldCost) return true;
   const result = await openActionDialog({
     title: 'Price changed',
     hint: 'The chain returned a higher fresh price before signing. Nothing is sent unless you confirm the new price.',
@@ -9326,7 +9394,7 @@ function refreshMessagingControls() {
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
   if (mintUsernameButton) mintUsernameButton.disabled = false;
   if (linkUsernameButton) linkUsernameButton.disabled = false;
-  if (setAvatarButton) setAvatarButton.disabled = false;
+  if (setAvatarButton) setAvatarButton.disabled = plathoProfileAvatarPending;
   if (paymentCheckButton) paymentCheckButton.disabled = !canSendPrivate;
   if (privateImageButton) privateImageButton.disabled = !canEditPrivateDraft;
   if (privateComposerAddButton) privateComposerAddButton.disabled = !canEditPrivateDraft;
@@ -10278,7 +10346,11 @@ profileAvatarInput?.addEventListener('change', async () => {
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     if (rateLimited || isTonRpcRecoverableReadError(error)) {
-      setProfileAvatarStatus(TON_RPC_CONNECTING_STATUS, 'busy');
+      // submitProfileAvatarUpdate retries a rate-limited preflight in-flight and parks a recovery
+      // job for post-publish rate limits, so a rate-limit error that reaches HERE means the bounded
+      // retry budget was exhausted. Surface a truthful, retryable terminal state (releases the
+      // pending lock so the button is clickable) instead of a "retrying" status that never retries.
+      setProfileAvatarStatus('avatar needs retry', 'error');
     } else {
       const message = String(error?.avatarDiagnosticStatus ?? error?.message ?? 'avatar blocked');
       setProfileAvatarStatus(message, 'error');
@@ -10286,7 +10358,10 @@ profileAvatarInput?.addEventListener('change', async () => {
     }
   } finally {
     if (profileAvatarInput) profileAvatarInput.value = '';
-    setAvatarButton?.toggleAttribute('disabled', false);
+    // Reflect the in-flight lock rather than unconditionally re-enabling: while a background avatar
+    // recovery is still running plathoProfileAvatarPending stays true and the button remains disabled;
+    // it re-enables only once the update reaches a terminal state.
+    refreshMessagingControls();
   }
 });
 
@@ -13038,6 +13113,33 @@ function clearProfileAvatarPublishRecovery(jobOrKey) {
   refreshProfileAvatarRecoveryDebug();
 }
 
+function pauseProfileAvatarPublishRecoveryTimers() {
+  // Wallet locked: cancel every avatar recovery timer so none fires during the locked window and
+  // none resumes on its own afterwards. Resumption is intentional + owner-scoped on unlock. This
+  // removes the "spontaneous retry after unlock" caused by a self-re-arming timer surviving the lock.
+  let paused = false;
+  for (const job of profileAvatarPublishRecoveryJobs.values()) {
+    if (!job) continue;
+    if (job.timer) window.clearTimeout(job.timer);
+    job.timer = null;
+    if (job.status !== 'needs_retry') job.status = 'paused';
+    paused = true;
+  }
+  if (paused) refreshProfileAvatarRecoveryDebug();
+}
+
+function resumeProfileAvatarPublishRecoveryForOwner(ownerWallet) {
+  // Unlock: re-arm only the matching owner's PAUSED jobs (capped 'needs_retry' jobs stay terminal so
+  // they are not auto-re-parked). scheduleProfileAvatarPublishRecovery still honours the attempts cap.
+  if (!ownerWallet) return;
+  for (const job of [...profileAvatarPublishRecoveryJobs.values()]) {
+    if (!job || job.status !== 'paused') continue;
+    if (!sameWalletAddress(job.owner ?? '', ownerWallet)) continue;
+    setProfileAvatarPending(true);
+    scheduleProfileAvatarPublishRecovery(job, 0);
+  }
+}
+
 function profileAvatarRecoveryDelayMs(job) {
   const attempt = Math.max(0, Number(job?.attempts ?? 0) || 0);
   const index = Math.min(attempt, PROFILE_AVATAR_RECOVERY_RETRY_DELAYS_MS.length - 1);
@@ -13048,6 +13150,18 @@ function scheduleProfileAvatarPublishRecovery(context, delayMs = null) {
   const job = rememberProfileAvatarPublishRecovery(context);
   if (!job) return null;
   if (job.timer) window.clearTimeout(job.timer);
+  if (Number(job.attempts ?? 0) >= PROFILE_AVATAR_RECOVERY_MAX_AUTO_ATTEMPTS) {
+    // Auto-retry budget spent: stop the endless "confirming" spin. PARK the job (kept persisted, so
+    // a manual re-pick RESUMES it rather than re-publishing) and surface a retryable terminal state
+    // that releases the button lock. submitProfileAvatarUpdate resets attempts on a manual resume.
+    job.timer = null;
+    job.status = 'needs_retry';
+    job.nextRetryAt = null;
+    writeProfileAvatarPublishRecovery(job);
+    setProfileAvatarStatus('avatar needs retry', 'error');
+    refreshProfileAvatarRecoveryDebug();
+    return job;
+  }
   const waitMs = Number.isFinite(Number(delayMs))
     ? Math.max(0, Math.floor(Number(delayMs)))
     : profileAvatarRecoveryDelayMs(job);
@@ -13224,7 +13338,12 @@ async function runProfileAvatarPublishRecovery(key) {
   const job = profileAvatarPublishRecoveryJobs.get(key);
   if (!job) return null;
   if (!plathoWallet?.address || !sameWalletAddress(plathoWallet.address, job.owner)) {
-    scheduleProfileAvatarPublishRecovery(job, profileAvatarRecoveryDelayMs(job));
+    // Wallet locked or switched: PAUSE (do not re-arm). The unlock path resumes the matching owner's
+    // jobs intentionally, so a recovery timer can no longer survive a lock and re-fire on its own.
+    if (job.timer) window.clearTimeout(job.timer);
+    job.timer = null;
+    job.status = 'paused';
+    writeProfileAvatarPublishRecovery(job);
     return null;
   }
   job.attempts = (Number(job.attempts ?? 0) || 0) + 1;
@@ -14518,10 +14637,16 @@ async function submitProfileAvatarUpdate(avatar) {
   const avatarHash = await sha256Hex(avatar.bytes);
   const existingRecovery = profileAvatarPublishRecoveryFor(owner, avatarHash);
   if (existingRecovery) {
+    // Manual re-pick of the same image RESUMES the parked/in-flight job (never re-publishes — the
+    // per-part capsules are content-addressed) and grants a fresh auto-retry budget so a
+    // user-initiated retry is not immediately re-parked by the attempts cap.
+    existingRecovery.attempts = 0;
+    setProfileAvatarPending(true);
     setProfileAvatarStatus('avatar still confirming');
     scheduleProfileAvatarPublishRecovery(existingRecovery, 0);
     return existingRecovery;
   }
+  setProfileAvatarPending(true);
   setProfileAvatarStatus('checking current avatar');
   const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: true });
   if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
@@ -14572,13 +14697,30 @@ async function submitProfileAvatarUpdate(avatar) {
 
   setProfileAvatarStatus('checking Vault balance');
   try {
-    await assertVaultProfileAvatarCanStart(owner, parts.length);
+    for (let preflightAttempt = 0; ; preflightAttempt += 1) {
+      try {
+        await assertVaultProfileAvatarCanStart(owner, parts.length);
+        break;
+      } catch (error) {
+        const rateLimited = noteTonRpcRateLimit(error);
+        const recoverableRpc = !rateLimited && isTonRpcRecoverableReadError(error);
+        if ((!rateLimited && !recoverableRpc) || preflightAttempt >= PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS.length) {
+          throw error;
+        }
+        // Truthful "RPC busy - retrying": the await stays in flight (button stays locked via the
+        // pending flag) and actually retries the preflight read on the next backoff tick.
+        setProfileAvatarStatus(TON_RPC_CONNECTING_STATUS, 'busy');
+        await delay(PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS[Math.min(preflightAttempt, PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS.length - 1)]);
+      }
+    }
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     const recoverableRpc = !rateLimited && isTonRpcRecoverableReadError(error);
+    // Bounded retry exhausted (or a hard error): land on a retryable terminal state that releases
+    // the pending lock, not a "retrying" status that no longer retries.
     setProfileAvatarStatus(
-      rateLimited || recoverableRpc ? TON_RPC_CONNECTING_STATUS : String(error?.message ?? 'avatar blocked'),
-      rateLimited || recoverableRpc ? 'busy' : 'error',
+      rateLimited || recoverableRpc ? 'avatar needs retry' : String(error?.message ?? 'avatar blocked'),
+      'error',
     );
     throw error;
   }
@@ -14674,7 +14816,14 @@ async function submitProfileAvatarUpdate(avatar) {
       && publishResult?.status !== VAULT_PUBLISH_STATUS_PARTIAL
     ) {
       setProfileAvatarStatus('publish blocked', 'error');
+      setProfileAvatarPending(false);
       return publishResult;
+    }
+    // Record the assigned first entry id so confirm reads (and the recovery job, which shares this
+    // pointer object) use the cheap targeted window instead of the wide latest-down scan.
+    if (publishResult?.publishState && pendingPointer.avatarEntryId === undefined) {
+      const knownFirstEntryId = minPublicEntryIdFromPublishState(publishResult.publishState);
+      if (knownFirstEntryId !== null) pendingPointer.avatarEntryId = knownFirstEntryId.toString();
     }
     setProfileAvatarStatus('confirming avatar capsules');
     try {
@@ -16122,14 +16271,25 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
       : 'PublishPrivateFromVaultBalance';
     chargePlans.push({ capsuleId: capsule.id, messageType, publish, maxCharge, partIndex: index });
   }
+  // The signed batch external clears the AMORTIZED batchMaxChargeForItems (SHARED_BASE charged ONCE
+  // per batch), NOT the per-capsule canonical SUM accumulated above (which counts a full SHARED_BASE
+  // for every part). Group the charge plan exactly as the send leg does and sum the per-batch
+  // amortized holds (re-adding the per-part network surcharge, which batchMaxChargeForItems excludes),
+  // so the affordability gate and the price-change recheck match what is actually signed. This stops a
+  // multi-capsule send from being falsely blocked on balance or flagged with a phantom "Price changed".
+  const groupedBatchesForHold = groupPublishItemsIntoBatches(chargePlans);
+  const finalHold = groupedBatchesForHold.reduce(
+    (sum, batch) => sum + batchMaxChargeForItems(batch.items),
+    0n,
+  ) + surcharge * BigInt(normalizedCapsules.length);
   const balance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
-  if (balance < totalMaxCharge) {
+  if (balance < finalHold) {
     throw new Error('Vault GRAM balance is too low for this publish');
   }
-  const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length, quotedProfiles);
+  const finalNetCost = composerNetCostFromHoldNanotons(finalHold, normalizedCapsules.length, quotedProfiles);
   if (!(await confirmPublishPriceIncrease({
     previousHold: quotedHold,
-    finalHold: totalMaxCharge,
+    finalHold,
     previousNetCost: quotedNetCost,
     finalNetCost,
     parts: normalizedCapsules.length,
@@ -16138,7 +16298,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   }
   if (!(await confirmHighNetworkFeeSurcharge({
     surcharge,
-    finalHold: totalMaxCharge,
+    finalHold,
     finalNetCost,
     parts: normalizedCapsules.length,
   }))) {
@@ -16151,7 +16311,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
     user,
     publishState,
     results: chargePlans,
-    totalMaxCharge,
+    totalMaxCharge: finalHold,
     finalNetCost,
   };
 }

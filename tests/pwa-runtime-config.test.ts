@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v435<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v435'/);
+    expect(html).toMatch(/id="appVersionLabel">v436<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v436'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -957,7 +957,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function rememberLocalPublicPost'),
     );
     const quoteIndex = prepareSource.indexOf('const quotedProfiles = composerPublishProfilesForCapsules(normalizedCapsules)');
-    const freshIndex = prepareSource.indexOf('const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length, quotedProfiles)');
+    const freshIndex = prepareSource.indexOf('const finalNetCost = composerNetCostFromHoldNanotons(finalHold, normalizedCapsules.length, quotedProfiles)');
     const confirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
 
     expect(quoteIndex).toBeGreaterThanOrEqual(0);
@@ -969,6 +969,76 @@ describe('PWA runtime config guard', () => {
     expect(prepareSource).toMatch(/throw publishPriceChangeCancelledError\(\)/);
     expect(publishSource).toMatch(/const prepared = await prepareCapsulesThroughVault\(capsules, options\)/);
     expect(publishSource).toMatch(/return sendPreparedCapsulesThroughVault\(prepared, options\)/);
+  });
+
+  it('PWA-CONFIG-01D3: multi-capsule price recheck uses the amortized batch hold and confirms only on a net-cost rise', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const prepareSource = app.slice(
+      app.indexOf('async function prepareCapsulesThroughVault'),
+      app.indexOf('async function sendPreparedCapsulesThroughVault'),
+    );
+    const confirmSource = app.slice(
+      app.indexOf('async function confirmPublishPriceIncrease'),
+      app.indexOf('async function confirmHighNetworkFeeSurcharge'),
+    );
+    // finalHold is the grouped AMORTIZED batch hold (SHARED_BASE once per batch) + per-part surcharge,
+    // matching the actually-signed batchMaxChargeForItems — NOT the per-capsule canonical sum (which
+    // N-counts SHARED_BASE and produced the phantom multi-capsule "Price changed" dialog + over-strict
+    // balance gate).
+    expect(app).toMatch(/batchMaxChargeForItems,\s*\n\} from '\.\/publish-batch-orchestration\.mjs/);
+    expect(prepareSource).toMatch(/const groupedBatchesForHold = groupPublishItemsIntoBatches\(chargePlans\)/);
+    expect(prepareSource).toMatch(/batchMaxChargeForItems\(batch\.items\)/);
+    expect(prepareSource).toMatch(/\+ surcharge \* BigInt\(normalizedCapsules\.length\)/);
+    expect(prepareSource).toMatch(/if \(balance < finalHold\)/);
+    expect(prepareSource).toMatch(/finalHold,\s+previousNetCost: quotedNetCost/);
+    expect(prepareSource).toMatch(/totalMaxCharge: finalHold/);
+    // The dialog must fire ONLY on a real net-cost increase, never on a refundable hold-only delta.
+    expect(confirmSource).toMatch(/if \(newCost <= oldCost\) return true;/);
+    expect(confirmSource).not.toMatch(/if \(newHold <= oldHold && newCost <= oldCost\) return true;/);
+  });
+
+  it('PWA-AVATAR-PENDING-01: avatar row holds an in-flight lock, retries the preflight truthfully, caps recovery, and pauses timers on lock', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Dedicated in-flight lock mirroring the v430 activation-row pending flag.
+    expect(app).toMatch(/let plathoProfileAvatarPending = false;/);
+    expect(app).toMatch(/setAvatarButton\.disabled = plathoProfileAvatarPending/);
+    expect(app).toMatch(/function setProfileAvatarPending\(pending\)/);
+    // setProfileAvatarStatus releases the lock on any terminal outcome (error / success / active).
+    expect(app).toMatch(/if \(state === 'error' \|\| state === '' \|\|/);
+    // Input handler reflects the lock via refreshMessagingControls instead of unconditionally re-enabling.
+    const handlerSource = app.slice(
+      app.indexOf("profileAvatarInput?.addEventListener('change'"),
+      app.indexOf("privateClearImageButton?.addEventListener('click'"),
+    );
+    expect(handlerSource).toMatch(/refreshMessagingControls\(\);/);
+    expect(handlerSource).not.toMatch(/setAvatarButton\?\.toggleAttribute\('disabled', false\)/);
+    expect(handlerSource).toMatch(/setProfileAvatarStatus\('avatar needs retry', 'error'\)/);
+    // Pre-publish preflight retries IN FLIGHT (truthful "RPC busy - retrying"), bounded by the delay table.
+    expect(app).toMatch(/for \(let preflightAttempt = 0;/);
+    expect(app).toMatch(/PROFILE_AVATAR_PREFLIGHT_RETRY_DELAYS_MS = \[/);
+    expect(app).toMatch(/setProfileAvatarPending\(true\)/);
+    // Recovery auto-retry is capped → parks at a retryable terminal state (no infinite "confirming").
+    const scheduleSource = app.slice(
+      app.indexOf('function scheduleProfileAvatarPublishRecovery'),
+      app.indexOf('async function findProfileAvatarPublishedEntriesFromRecovery'),
+    );
+    expect(scheduleSource).toMatch(/job\.attempts \?\? 0\) >= PROFILE_AVATAR_RECOVERY_MAX_AUTO_ATTEMPTS/);
+    expect(scheduleSource).toMatch(/job\.status = 'needs_retry'/);
+    // Recovery timers paused on wallet lock, resumed owner-scoped on unlock (kills the spontaneous re-fire).
+    expect(app).toMatch(/function pauseProfileAvatarPublishRecoveryTimers/);
+    expect(app).toMatch(/function resumeProfileAvatarPublishRecoveryForOwner/);
+    expect(app).toMatch(/resumeProfileAvatarPublishRecoveryForOwner\(wallet\.address\)/);
+    const lockSource = app.slice(
+      app.indexOf('function lockPlathoWallet'),
+      app.indexOf('function lockPlathoWalletForBackground'),
+    );
+    expect(lockSource).toMatch(/pauseProfileAvatarPublishRecoveryTimers\(\)/);
+    // Confirm reads target the known first entry id before the wide latest-down scan.
+    const findSource = app.slice(
+      app.indexOf('async function findPublishedAvatarEntries'),
+      app.indexOf('async function findConfirmedAvatarEntriesFromPublishState'),
+    );
+    expect(findSource).toMatch(/const targetedStart = publicEntryIdBigInt\(pointer\.avatarEntryId/);
   });
 
   it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before send-time BOC signing', () => {
@@ -987,7 +1057,7 @@ describe('PWA runtime config guard', () => {
     );
     const capIndex = prepareSource.indexOf('assertNetworkFeeSurchargeWithinCap();');
     const surchargeIndex = prepareSource.indexOf('const surcharge = currentNetworkFeeSurchargeNanotons()');
-    const balanceIndex = prepareSource.indexOf('if (balance < totalMaxCharge)');
+    const balanceIndex = prepareSource.indexOf('if (balance < finalHold)');
     const priceConfirmIndex = prepareSource.indexOf('confirmPublishPriceIncrease');
     const surchargeConfirmIndex = prepareSource.indexOf('confirmHighNetworkFeeSurcharge');
     // VPB2: send-time signing builds ONE batch external per grouped batch, not one VPB1 external per capsule.
@@ -1661,7 +1731,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending/);
     expect(app).toMatch(/mintUsernameButton\.disabled = false/);
     expect(app).toMatch(/linkUsernameButton\.disabled = false/);
-    expect(app).toMatch(/setAvatarButton\.disabled = false/);
+    expect(app).toMatch(/setAvatarButton\.disabled = plathoProfileAvatarPending/);
     expect(app).toMatch(/if \(!plathoWallet\) \{[\s\S]*flashWalletIdentityStatus\('create wallet first'\)/);
     expect(app).not.toMatch(/mintUsernameButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).not.toMatch(/setAvatarButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
@@ -3961,11 +4031,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v506/);
+    expect(sw).toMatch(/platho-pwa-prototype-v507/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=435/);
+    expect(sw).toMatch(/\.\/app\.js\?v=436/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
