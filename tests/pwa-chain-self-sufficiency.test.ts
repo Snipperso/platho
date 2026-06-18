@@ -90,9 +90,9 @@ describe('PWA on-chain self-sufficiency', () => {
     ]);
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('platho-rpc-mainnet');
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).not.toContain('toncenter-mainnet');
-    // Keyless TonCenter is a verifier in normal operation and a full
-    // censorship-survival fallback (reads, sends, history) when the Platho
-    // RPC gateway is blocked; it is never a normal config-order fallback.
+    // Keyless TonCenter is NEVER an "on equal footing" routine verifier — it is strictly a
+    // censorship-survival emergency fallback (reads, sends, history) for when the Platho RPC
+    // gateway is wholly unreachable; it is never a normal config-order fallback either.
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.verifierOnly).toBe(true);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.emergencyFallback).toBe(true);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.sendBocEndpoint).toBe('https://toncenter.com/api/v3/message');

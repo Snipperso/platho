@@ -235,7 +235,7 @@ button:disabled,
 
 .rail-vault-balance {
   display: grid;
-  grid-template-rows: 11px 14px 14px;
+  grid-template-rows: auto auto auto;
   align-content: center;
   justify-items: center;
   gap: 3px;
@@ -262,7 +262,10 @@ button:disabled,
   max-width: 100%;
   overflow: hidden;
   color: var(--text);
-  font-size: 10px;
+  /* "GRAM" is a char wider than "TON"; 9px keeps "N.NNNN GRAM" on one line in the narrow rail,
+     and auto-height rows + normal wrapping let a longer value drop cleanly to a second line
+     instead of overlapping the row below (the fixed 14px rows used to clip/overlap it). */
+  font-size: 9px;
   font-weight: 800;
   line-height: 1.05;
   overflow-wrap: normal;

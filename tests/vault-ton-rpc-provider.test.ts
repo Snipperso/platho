@@ -827,7 +827,7 @@ describe('Vault TON RPC provider', () => {
     ]);
   });
 
-  it('VAULT-RPC-04I4: verifier-only providers verify critical reads and serve reads only as emergency fallback', async () => {
+  it('VAULT-RPC-04I4: emergency-fallback providers are never critical-read verifiers; they serve reads/sends only as emergency fallback', async () => {
     const calls: string[] = [];
     const transport = createTonRpcTransport({
       primaryProviderId: 'platho-rpc',
@@ -885,26 +885,31 @@ describe('Vault TON RPC provider', () => {
       },
     });
 
+    // A critical read with explicit verify:true is NEVER cross-verified against the keyless
+    // emergency transport (it is not an "on equal footing" verifier). With no other (gateway)
+    // verifier alive, the verified read fails closed; callers treat that as inconclusive / degrade
+    // to unverified — they must not consult the keyless host for verification.
     await expect(transport?.runGetMethod({
       address: VAULT,
       method: 'get_user',
       stack: [],
       verify: true,
-    })).resolves.toMatchObject({ stack: [num(7n)] });
-    // A failing primary read falls through to the verifier-only transport in
-    // emergency-fallback mode instead of failing the read outright.
+    })).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // A failing primary read still falls through to the emergency transport as a PRIMARY-read
+    // fallback (the censorship-survival path), not as a verifier.
     await expect(transport?.runGetMethod({
       address: VAULT,
       method: 'get_receive_intent',
       stack: [],
     })).resolves.toMatchObject({ stack: [num(7n)] });
-    // Sends still prefer the healthy primary; the verifier stays out of
-    // normal broadcast duty.
+    // Sends still prefer the healthy primary; the emergency transport stays out of normal
+    // broadcast duty.
     await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
 
+    // The keyless emergency transport is NEVER consulted for verification (no toncenter get_user);
+    // it appears only as the primary-read fallback for the 503'd get_receive_intent.
     expect(calls).toEqual([
       'https://rpc.platho.example/api/v3/runGetMethod:get_user',
-      'https://toncenter.example/api/v3/runGetMethod:get_user',
       'https://rpc.platho.example/api/v3/runGetMethod:get_receive_intent',
       'https://toncenter.example/api/v3/runGetMethod:get_receive_intent',
       'https://rpc.platho.example/api/v3/message',
@@ -1036,7 +1041,7 @@ describe('Vault TON RPC provider', () => {
     ]);
   });
 
-  it('VAULT-RPC-04I7: skips a parked verifier instead of paying its timeout on every critical read', async () => {
+  it('VAULT-RPC-04I7: never consults the keyless emergency transport as a critical-read verifier', async () => {
     const calls: string[] = [];
     const transport = createTonRpcTransport({
       primaryProviderId: 'platho-rpc',
@@ -1077,15 +1082,18 @@ describe('Vault TON RPC provider', () => {
     });
 
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
+    // The keyless emergency transport is the only other read transport, but it is NEVER used as a
+    // verifier — so a verify:true read finds no eligible verifier and fails closed every time.
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
 
+    // It is skipped before any request is issued, so its ~1 rps host is never touched for verification.
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
-    expect(toncenterCalls).toHaveLength(2);
+    expect(toncenterCalls).toHaveLength(0);
   });
 
-  it('VAULT-RPC-04I8: a 403 verifier parks immediately and reports structural verification degradation', async () => {
+  it('VAULT-RPC-04I8: a keyless (403-prone) emergency transport is never a verifier; verification degrades to the single gateway', async () => {
     const calls: string[] = [];
     const transport = createTonRpcTransport({
       primaryProviderId: 'platho-rpc',
@@ -1136,25 +1144,23 @@ describe('Vault TON RPC provider', () => {
       },
     });
 
-    expect(transport?.isVerificationDegraded()).toBe(false);
+    // Only ONE non-emergency (gateway) read transport exists, so cross-read verification is
+    // structurally degraded from the start — the keyless emergency transport does NOT count as a
+    // verifier and is never consulted as one.
+    expect(transport?.isVerificationDegraded()).toBe(true);
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
-    // The very first verified read parks the 403 verifier (no failure-count
-    // warm-up) so the app can degrade within the same user action.
+    // A verify:true read finds no eligible (gateway) verifier and fails closed — WITHOUT ever
+    // touching the keyless emergency host, so its 403/429 limits never matter for verification.
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
     expect(transport?.isVerificationDegraded()).toBe(true);
-    // Primary stays healthy: this is verification degradation, not the
-    // censorship-survival primary-parked mode.
+    // Primary stays healthy: this is verification degradation, not the censorship-survival
+    // primary-parked mode (the gateway is still the live read/send source).
     expect(transport?.isDegraded()).toBe(false);
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
-    // Despite transportDeadRetryMs:1, the denial park lasts minutes: a short
-    // sleep does not re-probe the verifier, so it stays parked and verified
-    // reads stay degraded instead of re-throwing each cycle.
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(transport?.isVerificationDegraded()).toBe(true);
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // The keyless emergency transport is never consulted for verification, ever.
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
-    expect(toncenterCalls).toHaveLength(1);
-    // Unverified reads keep flowing through the healthy primary.
+    expect(toncenterCalls).toHaveLength(0);
+    // Unverified reads keep flowing through the healthy primary (trust the gateway).
     await expect(transport?.runGetMethod({
       ...call,
       verify: false,
@@ -1162,7 +1168,7 @@ describe('Vault TON RPC provider', () => {
     })).resolves.toMatchObject({ stack: [num(7n)] });
   });
 
-  it('VAULT-RPC-04I8B: a 429 rate-limited verifier parks immediately and degrades like a denial', async () => {
+  it('VAULT-RPC-04I8B: a keyless (429-prone) emergency transport is never a verifier; a single-gateway topology stays degraded', async () => {
     const calls: string[] = [];
     const transport = createTonRpcTransport({
       primaryProviderId: 'platho-rpc',
@@ -1212,23 +1218,22 @@ describe('Vault TON RPC provider', () => {
       },
     });
 
-    expect(transport?.isVerificationDegraded()).toBe(false);
+    // Single gateway (non-emergency) read transport → cross-read verification is structurally
+    // degraded; the keyless emergency transport is not a verifier and is never hit as one.
+    expect(transport?.isVerificationDegraded()).toBe(true);
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
-    // The first verified read parks the 429 verifier (no failure-count warm-up).
+    // verify:true fails closed without consulting the keyless host, so its ~1 rps limit is irrelevant.
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
     expect(transport?.isVerificationDegraded()).toBe(true);
-    // Primary stays healthy: this is verification degradation, not the
-    // censorship-survival primary-parked mode.
+    // Primary stays healthy: verification degradation, not censorship-survival primary-parked mode.
     expect(transport?.isDegraded()).toBe(false);
-    // The rate-limit park lasts minutes, not the 1ms dead-retry window: a short
-    // sleep does not re-probe the throttled verifier, so it stays parked and
-    // verified reads stay degraded instead of re-throwing each cycle.
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(transport?.isVerificationDegraded()).toBe(true);
     await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // Never consulted for verification.
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
-    expect(toncenterCalls).toHaveLength(1);
-    // Unverified reads keep flowing through the healthy primary.
+    expect(toncenterCalls).toHaveLength(0);
+    // Unverified reads keep flowing through the healthy primary (trust the gateway).
     await expect(transport?.runGetMethod({
       ...call,
       verify: false,
