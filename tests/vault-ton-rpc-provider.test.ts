@@ -887,14 +887,16 @@ describe('Vault TON RPC provider', () => {
 
     // A critical read with explicit verify:true is NEVER cross-verified against the keyless
     // emergency transport (it is not an "on equal footing" verifier). With no other (gateway)
-    // verifier alive, the verified read fails closed; callers treat that as inconclusive / degrade
-    // to unverified — they must not consult the keyless host for verification.
+    // verifier alive, cross-verification is STRUCTURALLY impossible, so the lone gateway read —
+    // rpc.platho.app is itself a trusted multi-source endpoint — is SELF-TRUSTED and returned (the
+    // "1 live gateway → trust the gateway, stay alive" degrade). The keyless host is consulted for
+    // nothing; only the gateway primary call is issued.
     await expect(transport?.runGetMethod({
       address: VAULT,
       method: 'get_user',
       stack: [],
       verify: true,
-    })).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    })).resolves.toMatchObject({ stack: [num(7n)] });
     // A failing primary read still falls through to the emergency transport as a PRIMARY-read
     // fallback (the censorship-survival path), not as a verifier.
     await expect(transport?.runGetMethod({
@@ -1083,10 +1085,12 @@ describe('Vault TON RPC provider', () => {
 
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
     // The keyless emergency transport is the only other read transport, but it is NEVER used as a
-    // verifier — so a verify:true read finds no eligible verifier and fails closed every time.
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // verifier — so a verify:true read finds no eligible verifier and, rather than failing closed,
+    // SELF-TRUSTS the lone gateway (rpc.platho.app, itself multi-source) and returns its result
+    // every time.
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
 
     // It is skipped before any request is issued, so its ~1 rps host is never touched for verification.
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
@@ -1149,14 +1153,15 @@ describe('Vault TON RPC provider', () => {
     // verifier and is never consulted as one.
     expect(transport?.isVerificationDegraded()).toBe(true);
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
-    // A verify:true read finds no eligible (gateway) verifier and fails closed — WITHOUT ever
-    // touching the keyless emergency host, so its 403/429 limits never matter for verification.
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // A verify:true read finds no eligible (gateway) verifier; rather than failing closed it
+    // SELF-TRUSTS the lone live gateway (trust the gateway) — WITHOUT ever touching the keyless
+    // emergency host, so its 403/429 limits never matter for verification.
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
     expect(transport?.isVerificationDegraded()).toBe(true);
     // Primary stays healthy: this is verification degradation, not the censorship-survival
     // primary-parked mode (the gateway is still the live read/send source).
     expect(transport?.isDegraded()).toBe(false);
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
     // The keyless emergency transport is never consulted for verification, ever.
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
     expect(toncenterCalls).toHaveLength(0);
@@ -1222,14 +1227,15 @@ describe('Vault TON RPC provider', () => {
     // degraded; the keyless emergency transport is not a verifier and is never hit as one.
     expect(transport?.isVerificationDegraded()).toBe(true);
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
-    // verify:true fails closed without consulting the keyless host, so its ~1 rps limit is irrelevant.
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    // verify:true self-trusts the lone gateway without consulting the keyless host, so its ~1 rps
+    // limit is irrelevant to verification.
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
     expect(transport?.isVerificationDegraded()).toBe(true);
     // Primary stays healthy: verification degradation, not censorship-survival primary-parked mode.
     expect(transport?.isDegraded()).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(transport?.isVerificationDegraded()).toBe(true);
-    await expect(transport?.runGetMethod(call)).rejects.toMatchObject({ code: 'RPC_VERIFICATION_UNAVAILABLE' });
+    await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
     // Never consulted for verification.
     const toncenterCalls = calls.filter((endpoint) => endpoint.includes('toncenter.example'));
     expect(toncenterCalls).toHaveLength(0);
@@ -1523,7 +1529,7 @@ describe('Vault TON RPC provider', () => {
     })).resolves.toMatchObject({ stack: [num(1n)] });
   });
 
-  it('VAULT-RPC-04K1: fails closed when critical read verification has only one provider', async () => {
+  it('VAULT-RPC-04K1: self-trusts the sole live read transport, but fails closed when a verifier was tried yet could not confirm', async () => {
     const onlyProvider = {
       kind: 'only-rpc',
       async runGetMethod() {
@@ -1539,23 +1545,44 @@ describe('Vault TON RPC provider', () => {
       criticalMethods: ['get_global'],
     });
 
-    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
-      code: 'RPC_VERIFICATION_UNAVAILABLE',
+    // A single (non-emergency) read transport is the trusted gateway acting alone: cross-read
+    // verification is structurally impossible, so a critical read SELF-TRUSTS the lone gateway and
+    // returns its result rather than failing closed and bricking the app (the "1 live gateway →
+    // trust the gateway, stay alive" degrade). Failing closed here is exactly the regression that
+    // wedged the Vault balance behind "provider required".
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).resolves.toMatchObject({
+      stack: [num(1n)],
     });
     await expect(transport?.runGetMethod({ address: VAULT, method: 'get_noncritical', stack: [] })).resolves.toMatchObject({
       stack: [num(1n)],
     });
+    // Even an explicit per-call verify:true self-trusts the lone gateway (no second source exists).
     await expect(transport?.runGetMethod({
       address: VAULT,
       method: 'get_noncritical',
       stack: [],
       verify: true,
-    })).rejects.toMatchObject({
+    })).resolves.toMatchObject({ stack: [num(1n)] });
+    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
+
+    // Fail-closed is preserved for the genuinely inconclusive case: when a SECOND (gateway)
+    // verifier exists and is actually tried but errors, the read does NOT silently self-trust —
+    // verification was attempted and could not confirm, so it fails closed (RPC_VERIFICATION_UNAVAILABLE).
+    const flakyVerifier = {
+      kind: 'second-rpc',
+      async runGetMethod() {
+        throw new Error('verifier offline');
+      },
+    };
+    const verifiedPair = createFallbackTonRpcTransport({
+      transports: [onlyProvider, flakyVerifier],
+      verifyCriticalReads: true,
+      criticalMethods: ['get_global'],
+    });
+    await expect(verifiedPair?.runGetMethod({ address: VAULT, method: 'get_global', stack: [] })).rejects.toMatchObject({
       name: 'VaultTonRpcProviderError',
       code: 'RPC_VERIFICATION_UNAVAILABLE',
     });
-    await expect(transport?.sendBoc({ boc: 'te6ccgEBAQEAAgAAAA==' })).resolves.toMatchObject({ ok: true });
   });
 
   it('VAULT-RPC-04K2: compares verified RPC stacks semantically across provider encodings', async () => {
