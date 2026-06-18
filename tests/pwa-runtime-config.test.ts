@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v444<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v444'/);
+    expect(html).toMatch(/id="appVersionLabel">v445<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v445'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -302,6 +302,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/resolvePlathoUsernameOwner\(identity\.value\)/);
     expect(app).toMatch(/sameWalletAddress\(resolved\.ownerWallet, rawWallet\)/);
     expect(app).toMatch(/const senderUsername = opened\?\.payload\?\.senderUsername \?\? opened\?\.payload\?\.sender_username/);
+    // Any thread (incl. one auto-created from an incoming message) can set/edit a private local name from
+    // the "Display as" menu — not only threads created via New Chat's local-label field.
+    expect(app).toMatch(/async function promptThreadLocalLabel\(thread\)/);
+    expect(app).toMatch(/thread\.localLabel = next;\s*thread\.displayIdentity = null/);
+    expect(app).toMatch(/thread\.localLabel \? 'Edit local name' : 'Set local name'/);
+    expect(app).toMatch(/identity-variant-action/);
+    expect(app).toMatch(/promptThreadLocalLabel\(thread\)\.catch/);
+    expect(app).toMatch(/identityMenuButton\.hidden = identityDisplayOptions\(thread\)\.length < 1/);
   });
 
   it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
@@ -4080,11 +4088,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v515/);
+    expect(sw).toMatch(/platho-pwa-prototype-v516/);
     expect(sw).toMatch(/\.\/styles\.css\?v=141/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=444/);
+    expect(sw).toMatch(/\.\/app\.js\?v=445/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
