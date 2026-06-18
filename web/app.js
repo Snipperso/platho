@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v445';
+const PLATHO_APP_RUNTIME_VERSION = 'v446';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -534,6 +534,11 @@ const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
 // a ~1 rps budget, so background sync slows down to protect the send path.
 const MESSAGE_AUTO_SYNC_DEGRADED_MS = 180 * 1000;
 const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
+// Hard deadline for the external (in-app) wallet balance fetch. Without it the bare fetch could hang
+// indefinitely on a slow/blocked endpoint, so the balance "never updates" (the caller awaits it and the
+// poll never settles). On timeout the fetch aborts, the caller catches it and returns null, and the next
+// poll retries — a stale/blank balance with retry instead of a forever-pending read.
+const TON_WALLET_BALANCE_FETCH_TIMEOUT_MS = 10 * 1000;
 const TON_RPC_CONNECTING_STATUS = 'RPC busy - retrying';
 const TON_RPC_LIMIT_FALLBACK_BACKOFF_MS = 60 * 1000;
 const TON_RPC_LIMIT_MIN_BACKOFF_MS = 5 * 1000;
@@ -6427,6 +6432,14 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   let historyRetryScanned = 0;
   let catchUpRemaining = 0;
   let indexLimitReachedWithoutCursor = false;
+  // Each scanned private entry runs a SYNCHRONOUS ML-KEM-768 decapsulate (the dominant CPU cost). On a
+  // slow single-thread device (e.g. iPhone SE2) dozens of these back-to-back in this await chain starve
+  // the main thread — tab clicks and renders queue behind the burst and the UI "freezes" for ~10s. Yield
+  // to the event loop after EVERY entry so at most ONE decapsulate ever runs between event-loop turns:
+  // input/paint get processed between decapsulations and the UI stays responsive. The sync is single-
+  // flight (privateChainSyncPromise guards syncPrivateCapsulesFromChainOnce), so yielding mid-walk cannot
+  // let a second pass interleave. Background sync takes marginally longer wall-clock; the UI never blocks.
+  const cooperativeYield = () => new Promise((resolve) => setTimeout(resolve, 0));
   const walkIndexedRole = async (role, latestHeadLink) => {
     const cursor = forceIndexRescan
       ? normalizePrivateChainIndexCursor(null)
@@ -6457,6 +6470,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       }
       indexEntriesScanned += 1;
       scannedForRole += 1;
+      await cooperativeYield();
       const previousLink = privateIndexPreviousLink(result.entry, role);
       nextLink = previousLink;
       if (previousLink === currentLink) {
@@ -6507,6 +6521,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       }
       headRepairScanned += 1;
       scannedForRole += 1;
+      await cooperativeYield();
       const previousLink = privateIndexPreviousLink(result.entry, role);
       if (previousLink === currentLink) {
         scanComplete = false;
@@ -6521,6 +6536,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     const result = await scanPrivateEntryId(entryId, { source: 'history-retry' });
     historyRetryScanned += 1;
     if (!result.ok) break;
+    await cooperativeYield();
   }
   if (!rateLimitError && scanComplete) {
     await walkIndexedRole('recipient', recipientHead);
@@ -6821,7 +6837,12 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
         // it cannot melt the RPC budget with a 2-second resync loop.
         const progressed = privateSyncImported(result) || Number(result?.skipped ?? 0) > 0;
         messageAutoSyncStallStreak = progressed ? 0 : messageAutoSyncStallStreak + 1;
-        nextSyncDelayMs = Math.min(2_000 * 2 ** Math.min(messageAutoSyncStallStreak, 5), MESSAGE_AUTO_SYNC_MS);
+        // Floor the fast follow-up at 8s. The old 2s minimum re-fired a fresh sync pass (dozens of
+        // synchronous ML-KEM decapsulates) every 2 seconds while a catch-up progressed — fine on a fast
+        // CPU, but on a slow single-thread device it kept the main thread perpetually churning and never
+        // let it settle. 8s lets each (now-cooperative) pass finish and the device breathe between them;
+        // catch-up still drains, just paced.
+        nextSyncDelayMs = Math.max(8_000, Math.min(2_000 * 2 ** Math.min(messageAutoSyncStallStreak, 5), MESSAGE_AUTO_SYNC_MS));
       } else {
         messageAutoSyncStallStreak = 0;
       }
@@ -12442,12 +12463,21 @@ async function loadConnectedVaultGlobal(options = {}) {
   return assertVaultGlobalMatchesConfig(global);
 }
 
+// Max time a critical read may WAIT in the transport's request queue before it is abandoned. The keyless
+// emergency toncenter queue is serial (~1 rps) with a 60s backoff on 429; with the default queueTimeoutMs
+// of 0 (no deadline) a read could sit behind that backoff effectively forever, so balance/critical reads
+// "never finish" on a degraded network. An 8s queue deadline makes such a read fail fast (caller degrades/
+// retries) instead of piling up unbounded. A healthy gateway issues immediately (empty queue), so this
+// never bites normal reads.
+const CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS = 8_000;
+
 function unverifiedCriticalChainReadOptions() {
   return {
     verify: false,
     allowUnverifiedCriticalRead: true,
     priority: 'critical',
     cacheTtlMs: 0,
+    queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS,
   };
 }
 
@@ -12539,14 +12569,22 @@ async function fetchTonWalletBalance(address) {
     const url = new URL(endpoint, window.location.href);
     url.searchParams.set('address', address);
     const apiKey = globalThis.plathoTonRpcApiKey ?? globalThis.PLATHO_TON_RPC_API_KEY ?? appConfig.network?.tonRpc?.apiKey ?? null;
-    const response = await fetch(url.href, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
-      },
-      cache: 'no-store',
-    });
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), TON_WALLET_BALANCE_FETCH_TIMEOUT_MS) : null;
+    let response;
+    try {
+      response = await fetch(url.href, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+        },
+        cache: 'no-store',
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     if (!response.ok) {
       const error = new Error(`GRAM wallet balance HTTP ${response.status}`);
       error.status = response.status;
@@ -12653,7 +12691,7 @@ function criticalChainReadOptions() {
   // single live provider; entry/key payloads stay hash-bound to local
   // expectations and availability wins by explicit product policy.
   if (tonRpcVerificationStructurallyDegraded()) return unverifiedCriticalChainReadOptions();
-  return { verify: true, priority: 'critical', cacheTtlMs: 0 };
+  return { verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS };
 }
 
 function criticalCapsuleHubReadOptions(address) {
@@ -18379,11 +18417,26 @@ async function bootCrypto() {
     setText(vaultRecordStatus, 'checking');
     setText(vaultDraftStatus, 'checking');
     await refreshVaultActivationStatus({ skipGlobal: true });
-    const result = await runPlathoCryptoSelfTest();
-    setText(encryptionStatus, result.hybrid.aadTamperRejected ? 'hybrid passed' : 'review');
+    // The crypto self-test is a DIAGNOSTIC-ONLY status indicator (~9 synchronous ML-KEM-768 ops:
+    // keygen/encap/decap + tamper re-runs); it gates nothing functional. Running it inline here blocked
+    // the first seconds after unlock on a slow single-thread device, compounding the post-unlock burst.
+    // Show a neutral status now, run it deferred (after the first paint + sync start), and fill the real
+    // verdict when it resolves — the message sync below proceeds immediately without waiting on it.
+    setText(encryptionStatus, 'checking');
+    setText(capsulePolicyStatus, 'checking');
     setText(keyAuthStatus, verifiedBundle.signingPublicKey.length === 32 ? 'signed bundle' : 'review');
     refreshMessagingControls();
-    setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
+    new Promise((resolve) => setTimeout(resolve, 0))
+      .then(() => runPlathoCryptoSelfTest())
+      .then((result) => {
+        setText(encryptionStatus, result.hybrid.aadTamperRejected ? 'hybrid passed' : 'review');
+        setText(capsulePolicyStatus, result.capsule.replayRejected ? 'replay guarded' : 'review');
+      })
+      .catch((error) => {
+        console.error(error);
+        setText(encryptionStatus, 'review');
+        setText(capsulePolicyStatus, 'review');
+      });
     if (appShell?.dataset?.view === 'chats') {
       beginMessageSyncUi();
       const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {

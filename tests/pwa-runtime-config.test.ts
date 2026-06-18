@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v445<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v445'/);
+    expect(html).toMatch(/id="appVersionLabel">v446<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v446'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1629,6 +1629,25 @@ describe('PWA runtime config guard', () => {
     expect(optionsSource).toMatch(/verify: true/);
     expect(optionsSource).toMatch(/priority: 'critical'/);
     expect(optionsSource).toMatch(/cacheTtlMs: 0/);
+  });
+
+  it('PWA-SLOW-DEVICE-01: private-sync yields the main thread, self-test is deferred, balance/critical reads have deadlines', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // A+B: cooperative yield after EVERY scanned private entry so a burst of synchronous ML-KEM-768
+    // decapsulations cannot starve the main thread (tab clicks/renders) on a slow single-thread device.
+    expect(app).toMatch(/const cooperativeYield = \(\) => new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\)/);
+    expect(app).toMatch(/scannedForRole \+= 1;\s*await cooperativeYield\(\)/);
+    expect(app).toMatch(/headRepairScanned \+= 1;\s*scannedForRole \+= 1;\s*await cooperativeYield\(\)/);
+    // C: the crypto self-test (diagnostic-only) runs DEFERRED off the unlock critical path, not awaited inline.
+    expect(app).toMatch(/setTimeout\(resolve, 0\)\)\s*\.then\(\(\) => runPlathoCryptoSelfTest\(\)\)/);
+    expect(app).not.toMatch(/const result = await runPlathoCryptoSelfTest\(\)/);
+    // D: external wallet balance fetch has a hard abort timeout; critical chain reads carry a queue deadline
+    // so a read cannot hang forever behind the keyless toncenter 60s backoff.
+    expect(app).toMatch(/const TON_WALLET_BALANCE_FETCH_TIMEOUT_MS = 10 \* 1000/);
+    expect(app).toMatch(/controller\.abort\(\), TON_WALLET_BALANCE_FETCH_TIMEOUT_MS/);
+    expect(app).toMatch(/queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS/);
+    // E: the progressing-catch-up re-fire is floored at 8s so it cannot re-burst the sync every 2s.
+    expect(app).toMatch(/Math\.max\(8_000, Math\.min\(2_000 \* 2 \*\* Math\.min\(messageAutoSyncStallStreak, 5\), MESSAGE_AUTO_SYNC_MS\)\)/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4088,11 +4107,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v516/);
+    expect(sw).toMatch(/platho-pwa-prototype-v517/);
     expect(sw).toMatch(/\.\/styles\.css\?v=141/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=445/);
+    expect(sw).toMatch(/\.\/app\.js\?v=446/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
