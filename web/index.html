@@ -26,7 +26,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel">network</span>
-              <span class="app-version-label" id="appVersionLabel">v447</span>
+              <span class="app-version-label" id="appVersionLabel">v448</span>
             </div>
           </div>
         </div>
@@ -429,6 +429,14 @@
                 <button id="flushAthButton" type="button"><span>Flush ATH</span><strong class="profile-action-status" id="flushAthStatus">checking</strong></button>
               </div>
             </section>
+
+            <section class="profile-section" aria-label="Diagnostics">
+              <h2>Diagnostics</h2>
+              <div class="settings-list">
+                <button id="copyProfileDiagnosticsButton" type="button"><span>Copy diagnostics</span><strong id="copyProfileDiagnosticsStatus">runtime</strong></button>
+              </div>
+              <pre class="private-debug-log" id="profileDiagnosticsLog" aria-live="polite"></pre>
+            </section>
             </div>
           </div>
         </section>
@@ -535,6 +543,6 @@
         </section>
       </div>
     </div>
-    <script src="./app.js?v=447" type="module"></script>
+    <script src="./app.js?v=448" type="module"></script>
   </body>
 </html>
