@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v437';
+const PLATHO_APP_RUNTIME_VERSION = 'v438';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -547,6 +547,11 @@ const PRIVATE_PUBLISH_CONFIRM_RETRY_DELAYS_MS = [1_000, 2_000, 3_000, 5_000, 8_0
 const PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT = 24;
 const PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS = 10 * 60 * 1000;
 const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+// If NOTHING confirms within this window (measured from the message's STABLE creation time, which —
+// unlike publishState.updatedAt — the confirm loop never bumps), stop the auto-retry and surface a
+// manual Retry button. This makes a genuinely-undelivered message recoverable in minutes and, for an
+// already-old stuck message, surfaces Retry immediately on resume instead of after 24 fresh attempts.
+const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 * 60 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
 // Publish + CapsuleHub ACK realistically spans 2-3 basechain blocks; the hot
@@ -17027,6 +17032,15 @@ function privatePendingPublishAgeMs(message) {
   return timestamp === null ? 0 : Math.max(0, Date.now() - timestamp);
 }
 
+// STABLE pending age for the confirm cap: anchored on the message creation time, NOT publishState
+// .updatedAt (which each confirm pass bumps, resetting privatePendingPublishAgeMs). This survives
+// reloads, so a long-stuck no-progress publish surfaces a Retry button promptly instead of restarting
+// its 24-attempt budget every session.
+function privatePendingPublishConfirmAgeMs(message) {
+  const createdAtMs = messageCreatedAtMs(message);
+  return createdAtMs === null ? 0 : Math.max(0, Date.now() - createdAtMs);
+}
+
 function isStalePrivatePendingPublish(message) {
   return privatePendingPublishAgeMs(message) > PRIVATE_PENDING_PUBLISH_STALE_AFTER_MS;
 }
@@ -17223,9 +17237,10 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   // button instead of spinning on "submitted N/N, confirming" forever. The age-based 24h stale above
   // never fires for a genuinely-stuck message because each confirm pass bumps publishState.updatedAt,
   // resetting privatePendingPublishAgeMs — so this attempt cap is the real terminal guard.
-  if (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
-    && message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-    && (Number(message.publishState?.confirmedCount ?? 0) === 0
+  if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && ((Number(message.publishState?.confirmedCount ?? 0) === 0
+        && (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
+          || privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS))
       || attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT * 4)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
@@ -17438,6 +17453,17 @@ function resumePendingPrivatePublishConfirmations() {
         && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
         && isStalePrivatePendingPublishConfirmation(message)) {
         stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
+        continue;
+      }
+      // A publish that has confirmed NOTHING and has been pending past the no-progress deadline
+      // (stable, reload-surviving age) surfaces a manual Retry button IMMEDIATELY on resume, rather
+      // than restarting its per-session attempt budget and spinning on "confirming" for another window.
+      if (privateMessageHasPublishAttempt(message)
+        && message?.privatePublishConfirmStopped !== true
+        && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+        && Number(message?.publishState?.confirmedCount ?? 0) === 0
+        && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
+        stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
         continue;
       }
       if (!hasPendingPrivatePublishConfirmation(message)) continue;
