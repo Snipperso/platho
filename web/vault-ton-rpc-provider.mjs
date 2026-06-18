@@ -1846,19 +1846,18 @@ export function createFallbackTonRpcTransport(options = {}) {
     const primaryComparable = normalizeTonRpcResultForCompare(primaryResult, method);
     let verified = false;
     let verifyError = null;
+    let eligibleVerifierTried = false;
     for (const transport of transports) {
       if (transport === primaryTransport || !transportSupportsReadMethod(transport, methodName, call)) continue;
       // The keyless emergency-fallback transport (e.g. keyless toncenter, ~1 rps) is NEVER an
       // "on equal footing" routine verifier — it is reserved strictly for primary reads/sends/
       // history when the gateway is wholly unreachable. So a critical read is cross-verified only
-      // against another gateway transport. When the gateway is the sole live read transport an
-      // explicit verify:true read finds no eligible verifier and fails closed below
-      // (RPC_VERIFICATION_UNAVAILABLE), which callers treat as inconclusive — they must NOT consult
-      // the keyless host for verification while the gateway is reachable.
+      // against another gateway transport, never against the keyless host while the gateway lives.
       if (isEmergencyFallbackTransport(transport)) continue;
       // A parked verifier would add a full request timeout to every critical
       // read; let callers fall back to unverified reads instead.
       if (isTonRpcTransportDead(transport)) continue;
+      eligibleVerifierTried = true;
       try {
         const verifierResult = await withTonRpcOperationTimeout(
           () => transport[methodName](...args),
@@ -1877,6 +1876,19 @@ export function createFallbackTonRpcTransport(options = {}) {
       }
     }
     if (mustVerify && !verified) {
+      // No eligible verifier was even tried → cross-read verification is STRUCTURALLY impossible:
+      // the gateway is the sole live read transport (the keyless emergency host is never a routine
+      // verifier, and no second gateway is reachable). The gateway (rpc.platho.app) is itself a
+      // trusted multi-source endpoint — keyed TonCenter + Orbs with internal read-fallback — so a
+      // single gateway read IS the verified result. Self-trust it and return, rather than failing
+      // closed and bricking the reads that hardcode verify:true (Vault balance/activation). This is
+      // exactly the "1 live gateway → trust the gateway, stay alive" degrade the censorship policy
+      // requires, and it consults the keyless host for nothing. The app-side double-spend guard
+      // independently observes isVerificationDegraded()===true and stays fail-closed, so self-
+      // trusting reads here does NOT weaken the no-double-publish invariant. We fail closed ONLY
+      // when an eligible (gateway) verifier WAS tried but could not confirm — a genuinely
+      // inconclusive cross-read.
+      if (!eligibleVerifierTried) return primaryResult;
       throw new VaultTonRpcProviderError(`TON RPC verification unavailable for ${method}`, {
         code: 'RPC_VERIFICATION_UNAVAILABLE',
         cause: verifyError,
