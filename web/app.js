@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v438';
+const PLATHO_APP_RUNTIME_VERSION = 'v439';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6843,6 +6843,7 @@ function serializeMessageForHistory(message) {
     attachment: message.attachment ?? null,
     profileVersion: message.profileVersion ?? 0,
     avatarHash: message.avatarHash ?? zeroAvatarHashHex(),
+    dismissed: message.dismissed === true,
   };
 }
 
@@ -6980,6 +6981,9 @@ async function restoreEncryptedMessageHistory() {
     const failed = result.failed ?? [];
     let changed = false;
     for (const item of restored) {
+      // A user-dismissed (terminally-failed, never-delivered) outbound message is not re-hydrated —
+      // it was explicitly cleared from the conversation and must stay gone across reloads.
+      if (item?.message?.dismissed === true) continue;
       const thread = ensureHistoryThread(item.threadId, item.thread, item.message);
       if (thread.messages.some((message) => message.localHistoryId === item.id)) continue;
       const message = {
@@ -17057,7 +17061,7 @@ function stopPrivateSendRetry(context, error = null) {
   message.privateSendRetryStoppedAt = new Date().toISOString();
   message.meta = privateSendRetryExhaustedStatusText(error);
   message.privateManualRetryAvailable = true;
-  message.privateCancelAvailable = privateMessageCanLocalCancel(message);
+  message.privateCancelAvailable = privateMessageCanLocalCancel(message) || privateMessageCanDismissTerminal(message);
   message.privateSendLastError = shortUiErrorText(error, 'send retry stopped');
   thread.state = 'blocked';
   refreshThreadAfterMessageChange(thread);
@@ -17185,7 +17189,7 @@ function stopPrivatePublishConfirmationRetry(context, error = null) {
   message.privatePublishConfirmStoppedAt = new Date().toISOString();
   message.meta = privatePublishConfirmStoppedStatusText(error);
   message.privateManualRetryAvailable = true;
-  message.privateCancelAvailable = false;
+  message.privateCancelAvailable = privateMessageCanLocalCancel(message) || privateMessageCanDismissTerminal(message);
   message.privateSendLastError = shortUiErrorText(error, 'confirmation stopped');
   thread.state = 'blocked';
   refreshThreadAfterMessageChange(thread);
@@ -17525,6 +17529,19 @@ function privateMessageCanLocalCancel(message) {
     && !paymentHasIntent(message.payment);
 }
 
+// A terminally-stopped send/confirm that never fully landed can be DISMISSED (removed locally). This
+// is the safe escape when the no-double-spend guard intentionally refuses to auto-re-sign (e.g. an old
+// message whose absence cannot be proven): dismiss is local-only — it never re-signs or re-publishes —
+// so the user can clear the failed entry and send fresh. Requires a stopped state + not fully confirmed.
+function privateMessageCanDismissTerminal(message) {
+  if (!message) return false;
+  if (message.privatePublishConfirmStopped !== true && message.privateSendRetryStopped !== true) return false;
+  const state = message.publishState;
+  if (!state) return true;
+  return state.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && Number(state.confirmedCount ?? 0) < Math.max(1, Number(state.partCount ?? 1));
+}
+
 function markPrivateMessageManualRecovery(context, error = null, metaText = null) {
   const { thread, message } = context ?? {};
   if (!thread?.messages?.includes(message)) return;
@@ -17576,10 +17593,11 @@ function privateMessageManualActionsElement(thread, message) {
     });
   });
   actions.append(retry);
-  if (message.privateCancelAvailable === true && privateMessageCanLocalCancel(message)) {
+  const canDismissTerminal = privateMessageCanDismissTerminal(message);
+  if (message.privateCancelAvailable === true && (privateMessageCanLocalCancel(message) || canDismissTerminal)) {
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.textContent = 'Cancel';
+    cancel.textContent = privateMessageCanLocalCancel(message) ? 'Cancel' : 'Dismiss';
     cancel.addEventListener('click', () => {
       cancelPrivateMessageFromUi(thread, message);
     });
@@ -17632,9 +17650,17 @@ async function retryPrivateMessageFromUi(thread, message) {
 }
 
 function cancelPrivateMessageFromUi(thread, message) {
-  if (!thread?.messages?.includes(message) || !privateMessageCanLocalCancel(message)) return;
+  if (!thread?.messages?.includes(message)) return;
+  const dismissTerminal = !privateMessageCanLocalCancel(message) && privateMessageCanDismissTerminal(message);
+  if (!privateMessageCanLocalCancel(message) && !dismissTerminal) return;
   clearPrivateSendRetry(message);
   clearPrivatePublishConfirmRetry(message);
+  // A persisted terminal-failed message is flagged dismissed + persisted so restoreEncryptedMessageHistory
+  // skips it on reload. Dismiss is local-only — it never re-signs or re-publishes (no double-spend).
+  if (dismissTerminal && message.localHistoryId) {
+    message.dismissed = true;
+    updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+  }
   thread.messages = (thread.messages ?? []).filter((item) => item !== message);
   refreshThreadAfterMessageChange(thread);
   renderThreads();
