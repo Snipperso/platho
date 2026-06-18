@@ -1848,6 +1848,14 @@ export function createFallbackTonRpcTransport(options = {}) {
     let verifyError = null;
     for (const transport of transports) {
       if (transport === primaryTransport || !transportSupportsReadMethod(transport, methodName, call)) continue;
+      // The keyless emergency-fallback transport (e.g. keyless toncenter, ~1 rps) is NEVER an
+      // "on equal footing" routine verifier — it is reserved strictly for primary reads/sends/
+      // history when the gateway is wholly unreachable. So a critical read is cross-verified only
+      // against another gateway transport. When the gateway is the sole live read transport an
+      // explicit verify:true read finds no eligible verifier and fails closed below
+      // (RPC_VERIFICATION_UNAVAILABLE), which callers treat as inconclusive — they must NOT consult
+      // the keyless host for verification while the gateway is reachable.
+      if (isEmergencyFallbackTransport(transport)) continue;
       // A parked verifier would add a full request timeout to every critical
       // read; let callers fall back to unverified reads instead.
       if (isTonRpcTransportDead(transport)) continue;
@@ -1929,12 +1937,16 @@ export function createFallbackTonRpcTransport(options = {}) {
       return transports.some((transport) => transport?.verifierOnly !== true && isTonRpcTransportDead(transport));
     },
     isVerificationDegraded() {
-      // Dual-provider verification needs at least two live read transports.
-      // A parked verifier (for example keyless toncenter blocked for the
-      // user's network) makes verification structurally impossible even
-      // while the primary gateway stays healthy.
+      // Cross-read verification runs ONLY between gateway (non-emergency) read transports — the
+      // keyless emergency fallback is never a verifier (see callRead). So verification is
+      // structurally degraded when fewer than two NON-emergency read transports are alive, even
+      // if the keyless emergency transport is reachable. This keeps the app-side degraded gate
+      // consistent with callRead, so explicit verify:true callers fall back to unverified /
+      // inconclusive instead of waiting on a non-existent second gateway verifier.
       const aliveReadCapable = transports.filter(
-        (transport) => typeof transport?.runGetMethod === 'function' && !isTonRpcTransportDead(transport),
+        (transport) => typeof transport?.runGetMethod === 'function'
+          && !isEmergencyFallbackTransport(transport)
+          && !isTonRpcTransportDead(transport),
       );
       return aliveReadCapable.length < 2;
     },

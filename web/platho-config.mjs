@@ -82,7 +82,14 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     tonRpc: {
       primaryProviderId: 'user-custom',
       fallbackProviderIds: ['platho-rpc-mainnet'],
-      verifyCriticalReads: true,
+      // The rpc.platho.app gateway is itself multi-source (keyed TonCenter + Orbs, with read
+      // fallback + redundant broadcast), so it is the trusted verified source — the PWA does NOT
+      // routinely cross-verify every critical read against a 2nd transport. Routine cross-verify
+      // would either hammer the keyless emergency toncenter (~1 rps) or fail closed on
+      // gateway-vs-gateway hot-state disagreement (the documented 'confirming' freezes). Safety-
+      // critical reads that genuinely need a cross-check pass an explicit per-call verify:true,
+      // which still NEVER consults the keyless emergency transport (see vault-ton-rpc-provider).
+      verifyCriticalReads: false,
       criticalMethods: [...REQUIRED_TON_RPC_CRITICAL_METHODS],
       providers: [
         {
@@ -128,7 +135,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: 'b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=41',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=42',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,

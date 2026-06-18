@@ -161,7 +161,12 @@ describe('PWA runtime config guard', () => {
       requestSpacingMs: 1500,
     });
     expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('user-custom');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.verifyCriticalReads).toBe(true);
+    // The rpc.platho.app gateway is itself multi-source (keyed TonCenter + Orbs); it is the trusted
+    // verified source, so the PWA does NOT routinely cross-verify every critical read against a 2nd
+    // transport (which would hammer the keyless emergency toncenter or freeze on gateway-vs-gateway
+    // hot-state disagreement). Keyless toncenter stays strictly an emergency primary/send/history
+    // fallback, never an "on equal footing" verifier.
+    expect(PLATHO_APP_CONFIG.network.tonRpc.verifyCriticalReads).toBe(false);
     for (const method of [
       'get_state',
       'get_private_entry',
@@ -247,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v440<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v440'/);
+    expect(html).toMatch(/id="appVersionLabel">v441<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v441'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -702,7 +707,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/data-nav-vault-ton>0 GRAM<\/strong>/);
     expect(html).toMatch(/data-nav-vault-ath>0 ATH<\/strong>/);
     expect(css).toMatch(/\.rail-vault-balance/);
-    expect(css).toMatch(/grid-template-rows:\s*11px 14px 14px/);
+    expect(css).toMatch(/\.rail-vault-balance\s*{[\s\S]*grid-template-rows:\s*auto auto auto/);
     expect(css).toMatch(/\.rail-vault-balance strong\s*{[\s\S]*white-space: normal;/);
     expect(css).toMatch(/\.rail-vault-balance strong\.is-loading/);
     expect(css).toMatch(/\.rail-vault-balance strong\.is-placeholder/);
@@ -4075,13 +4080,13 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v511/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=140/);
+    expect(sw).toMatch(/platho-pwa-prototype-v512/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=141/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=440/);
+    expect(sw).toMatch(/\.\/app\.js\?v=441/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=78/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
@@ -4089,7 +4094,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=15/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=28/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=42/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=26/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=24/);

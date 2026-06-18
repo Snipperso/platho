@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=77';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=78';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=41';
+} from './vault-ton-rpc-provider.mjs?v=42';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v440';
+const PLATHO_APP_RUNTIME_VERSION = 'v441';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
