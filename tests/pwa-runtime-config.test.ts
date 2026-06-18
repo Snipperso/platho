@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v443<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v443'/);
+    expect(html).toMatch(/id="appVersionLabel">v444<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v444'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -4080,18 +4080,18 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v514/);
+    expect(sw).toMatch(/platho-pwa-prototype-v515/);
     expect(sw).toMatch(/\.\/styles\.css\?v=141/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=443/);
+    expect(sw).toMatch(/\.\/app\.js\?v=444/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
-    expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
+    expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=29/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=44/);
