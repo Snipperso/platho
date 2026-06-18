@@ -9,8 +9,8 @@ Output: C:\platho\artifacts\platho-web-static-preview
 
 ```text
 fileCount=130
-totalBytes=3250838
-bundleSha256=80ef4325f62eb81c5abea7894a88f550e58b1c0bec9cbf61c19f994ed12aeb9f
+totalBytes=3254478
+bundleSha256=131276fe9cebbb77871c74d2c01a068b3cc5075e2426dbb5bb0bfafe0c84d8c0
 noBackendRuntime=true
 ```
 

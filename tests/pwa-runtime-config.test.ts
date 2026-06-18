@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v446<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v446'/);
+    expect(html).toMatch(/id="appVersionLabel">v447<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v447'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -261,7 +261,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function copyPrivateDebugText\(\)/);
     expect(app).toMatch(/await copyTextToClipboard\(text\)/);
     expect(css).toMatch(/\.debug-copy-button/);
-    expect(css).toMatch(/\.private-debug-log,[\s\S]*\.debug-copy-button\s*\{[\s\S]*display:\s*none !important;/);
+    // The debug copy button + log panel are VISIBLE again (re-enabled for on-device freeze diagnostics):
+    // the old `display: none !important` hide rule must be gone.
+    expect(css).not.toMatch(/\.private-debug-log,\s*\.debug-copy-button\s*\{\s*display:\s*none/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
     expect(css).toMatch(/\.message\.in \.bubble\s*\{[\s\S]*?justify-self: start;/);
@@ -1648,6 +1650,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS/);
     // E: the progressing-catch-up re-fire is floored at 8s so it cannot re-burst the sync every 2s.
     expect(app).toMatch(/Math\.max\(8_000, Math\.min\(2_000 \* 2 \*\* Math\.min\(messageAutoSyncStallStreak, 5\), MESSAGE_AUTO_SYNC_MS\)\)/);
+    // v447 diagnostics: always-on main-thread stall detector + per-entry decapsulate timing, exposed in the
+    // debug panel and on globalThis.plathoRuntimeDiagnostics, so the freeze can be measured on-device.
+    expect(app).toMatch(/globalThis\.plathoRuntimeDiagnostics = runtimeDiagnostics/);
+    expect(app).toMatch(/function startRuntimeDiagnostics\(\)/);
+    expect(app).toMatch(/const stall = gap - RUNTIME_DIAG_HEARTBEAT_MS/);
+    expect(app).toMatch(/markRuntimeOp\('sync-decap'\)/);
+    expect(app).toMatch(/if \(entryMs > runtimeDiagnostics\.worstEntryMs\) runtimeDiagnostics\.worstEntryMs = entryMs/);
+    expect(app).toMatch(/diag op=\$\{diag\.currentOp\}/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4107,11 +4117,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v517/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=141/);
+    expect(sw).toMatch(/platho-pwa-prototype-v518/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=142/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=446/);
+    expect(sw).toMatch(/\.\/app\.js\?v=447/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
