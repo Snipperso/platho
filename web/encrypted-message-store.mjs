@@ -26,7 +26,16 @@ function assertString(value, name) {
 }
 
 function safeClone(value) {
-  return JSON.parse(JSON.stringify(value));
+  // BigInt-safe deep clone. Persisted records (pending payment checks, message history) can carry BigInt
+  // fields — e.g. a publishResult/vaultPublish max_charge, which the batch-pricing rework made a BigInt.
+  // Plain JSON.stringify throws "Do not know how to serialize a BigInt", which silently stranded the
+  // ledger write (the send itself still went through). Stringify BigInts exactly as app.js safeJsonClone
+  // does — the project-wide convention is to store BigInts as decimal strings (nonces, max_charge in
+  // publishState parts are already stored that way), and the read-back consumers treat these fields as
+  // opaque/diagnostic, never doing arithmetic on the cloned value.
+  return JSON.parse(JSON.stringify(value, (_key, item) => (
+    typeof item === 'bigint' ? item.toString() : item
+  )));
 }
 
 function cryptoApi() {
