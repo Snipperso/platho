@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v438<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v438'/);
+    expect(html).toMatch(/id="appVersionLabel">v439<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v439'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1076,6 +1076,23 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/text\.includes\('not confirmed'\)/);
     expect(app).toMatch(/function privateMessageShouldShowManualActions/);
     expect(app).toMatch(/retry\.textContent = 'Retry'/);
+  });
+
+  it('PWA-PRIVATE-DISMISS-01: a terminally-failed never-delivered private message can be Dismissed (local-only, survives reload)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Dismiss eligibility: a stopped, not-fully-confirmed message — the safe escape when the
+    // no-double-spend guard intentionally refuses to auto-re-sign. Dismiss never re-signs/re-publishes.
+    expect(app).toMatch(/function privateMessageCanDismissTerminal\(message\)/);
+    expect(app).toMatch(/message\.privatePublishConfirmStopped !== true && message\.privateSendRetryStopped !== true/);
+    // Both stop paths make the action available.
+    expect(app).toMatch(/message\.privateCancelAvailable = privateMessageCanLocalCancel\(message\) \|\| privateMessageCanDismissTerminal\(message\)/);
+    // The button is labelled Dismiss for a terminal failure (Cancel only for a pre-send local cancel).
+    expect(app).toMatch(/cancel\.textContent = privateMessageCanLocalCancel\(message\) \? 'Cancel' : 'Dismiss'/);
+    // Dismiss flags + persists the message so the reload restore skips it; it is removed from the thread.
+    expect(app).toMatch(/const dismissTerminal = !privateMessageCanLocalCancel\(message\) && privateMessageCanDismissTerminal\(message\)/);
+    expect(app).toMatch(/if \(dismissTerminal && message\.localHistoryId\) \{\s*\n\s*message\.dismissed = true;/);
+    expect(app).toMatch(/dismissed: message\.dismissed === true/);
+    expect(app).toMatch(/if \(item\?\.message\?\.dismissed === true\) continue;/);
   });
 
   it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before send-time BOC signing', () => {
@@ -4074,11 +4091,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v509/);
+    expect(sw).toMatch(/platho-pwa-prototype-v510/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=438/);
+    expect(sw).toMatch(/\.\/app\.js\?v=439/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
