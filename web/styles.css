@@ -490,10 +490,9 @@ button:disabled,
   background: #0d1012;
 }
 
-.private-debug-log,
-.debug-copy-button {
-  display: none !important;
-}
+/* Debug copy button + log are VISIBLE again (re-enabled for on-device diagnostics): the freeze on
+   slow devices needs real runtime data (main-thread stall detector + sync timing), surfaced in the
+   #privateDebugLog panel and copyable via #copyPrivateDebugButton. */
 
 .install-header-button {
   width: 34px;
