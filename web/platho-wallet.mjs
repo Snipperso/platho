@@ -84,11 +84,11 @@ export function normalizeTonMnemonic(value) {
     .map((word) => String(word).trim().toLowerCase())
     .filter(Boolean);
   if (words.length !== PLATHO_WALLET_MNEMONIC_WORDS) {
-    throw new Error(`TON recovery phrase must contain ${PLATHO_WALLET_MNEMONIC_WORDS} words`);
+    throw new Error(`GRAM recovery phrase must contain ${PLATHO_WALLET_MNEMONIC_WORDS} words`);
   }
   for (const word of words) {
     if (!TON_MNEMONIC_WORD_SET.has(word)) {
-      throw new Error('TON recovery phrase contains a word outside the TON word list');
+      throw new Error('GRAM recovery phrase contains a word outside the GRAM word list');
     }
   }
   return words;
@@ -282,7 +282,7 @@ async function derivePlathoWalletFromKeyMaterial(rootSeed, walletSecretKeyBytes,
 export async function derivePlathoWalletFromMnemonic(mnemonic, options = {}) {
   const words = normalizeTonMnemonic(mnemonic);
   if (!(await validateTonMnemonic(words, options.password ?? ''))) {
-    throw new Error('TON recovery phrase checksum is invalid');
+    throw new Error('GRAM recovery phrase checksum is invalid');
   }
   const walletSecretKey = await tonMnemonicWalletSecretKey(words, options.password ?? '');
   return derivePlathoWalletFromKeyMaterial(

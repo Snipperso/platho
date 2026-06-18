@@ -12,7 +12,7 @@ Private messages are anchored on-chain as encrypted capsule entries. The heavy e
 
 Platho does not hide the cost of this architecture. The blockchain is public. Operations cost money. User mistakes can be irreversible. A lost seed phrase cannot be recovered through support, and Platho is not a permanent archive: compact capsule entries can be pruned after the retention window, while old body retrieval depends on provider history or the user's local cache. This is a hard model.
 
-The personal wallet and the Vault are separated. The wallet remains the root of control: it deposits and withdraws funds, and it controls keys. The Vault is a protective contract layer between the wallet and the public network. The user moves a limited amount of TON/ATH into the Vault, and publishing, protocol payments, and other app operations run through internal balances and signed commands. This reduces direct wallet exposure on-chain and limits how much value is exposed to routine app activity.
+The personal wallet and the Vault are separated. The wallet remains the root of control: it deposits and withdraws funds, and it controls keys. The Vault is a protective contract layer between the wallet and the public network. The user moves a limited amount of GRAM/ATH into the Vault, and publishing, protocol payments, and other app operations run through internal balances and signed commands. This reduces direct wallet exposure on-chain and limits how much value is exposed to routine app activity.
 
 ATH is the protocol utility token. It is used for usernames, avatar updates, and post-airdrop protocol-fee discounts. Its role is tied to actual use inside the app.
 

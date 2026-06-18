@@ -126,7 +126,8 @@ describe('v1 on-chain message source of truth', () => {
     ];
     for (const path of currentFlushDocs) {
       const text = read(path);
-      expect(text, path).toMatch(/partial `?FlushFees`? calls must be at least[\s\S]{0,80}`?0\.010 TON`?/i);
+      const coin = path.startsWith('web/') ? 'GRAM' : 'TON';
+      expect(text, path).toMatch(new RegExp(`partial \`?FlushFees\`? calls must be at least[\\s\\S]{0,80}\`?0\\.010 ${coin}\`?`, 'i'));
       expect(text, path).toMatch(/smaller amount[\s\S]{0,120}entire remaining accrued bucket/i);
       expect(text, path).toMatch(/discounted dust/i);
     }
@@ -157,14 +158,15 @@ describe('v1 on-chain message source of truth', () => {
 
     for (const path of publicPriceDocs) {
       const text = read(path);
-      expect(text, path).toMatch(/from `?0\.0337 TON`?/);
-      expect(text, path).toMatch(/0\.0337 TON/);
-      expect(text, path).toMatch(/0\.0347 TON/);
+      const coin = path.startsWith('web/') ? 'GRAM' : 'TON';
+      expect(text, path).toMatch(new RegExp(`from \`?0\\.0337 ${coin}\`?`));
+      expect(text, path).toMatch(new RegExp(`0\\.0337 ${coin}`));
+      expect(text, path).toMatch(new RegExp(`0\\.0347 ${coin}`));
       expect(text, path).not.toMatch(/from `?0\.030 TON`?/i);
     }
 
     const html = read('web/index.html');
-    expect(html).not.toMatch(/Postquantum . from 0\.0347 TON/);
+    expect(html).not.toMatch(/Postquantum . from 0.0347 GRAM/);
     expect(html).not.toMatch(/Postquantum . from 0\.030 TON/);
   });
 
@@ -184,7 +186,7 @@ describe('v1 on-chain message source of truth', () => {
 
     for (const path of pricingDocs) {
       const text = read(path);
-      expect(text, path).toMatch(/0\.010 TON|10,000,000 nanotons|full protocol-fee discount|discounted_fee = raw_discounted_fee/i);
+      expect(text, path).toMatch(/0.010 GRAM|10,000,000 nanotons|full protocol-fee discount|discounted_fee = raw_discounted_fee/i);
       expect(text, path).not.toMatch(forbiddenOldFeeCopy);
       if (path !== 'artifacts/platho_v1_open_values_v0_6.md') {
         expect(text, path).toMatch(/airdrop_remaining_ath == 0|fully distributed|full `?15,000,000 ATH`? activity airdrop/i);
@@ -194,8 +196,8 @@ describe('v1 on-chain message source of truth', () => {
 
     const app = read('web/app.js');
     expect(app).toMatch(/ATH protocol-fee discount locked until activity airdrop is fully distributed/);
-    expect(app).toMatch(/ATH protocol-fee discount 100% - Platho fee 0 TON/);
-    expect(app).toMatch(/max reduction 0\.010 TON/);
+    expect(app).toMatch(/ATH protocol-fee discount 100% - Platho fee 0 GRAM/);
+    expect(app).toMatch(/max reduction 0.010 GRAM/);
     expect(app).not.toMatch(/ATH discount \$\{percent\}|locked until 15%/);
   });
 
@@ -436,12 +438,13 @@ describe('v1 on-chain message source of truth', () => {
 
     for (const path of vaultAthDocs) {
       const text = read(path);
+      const coin = path.startsWith('web/') ? 'GRAM' : 'TON';
       expect(text, path).toMatch(/manual\s+ordinary\s+ATH\s+transfer/i);
       expect(text, path).toMatch(/official Vault ATHWallet/i);
       expect(text, path).toMatch(/unsupported/i);
       expect(text, path).toMatch(/ATHTransferRequestWithNotify|transfer-with-notify|notify-flow/i);
       expect(text, path).toMatch(/signed external Vault command|Vault auth key \/ owner signing key/i);
-      expect(text, path).toMatch(/internal Vault TON/i);
+      expect(text, path).toMatch(new RegExp(`internal Vault ${coin}`, 'i'));
       expect(text, path).toMatch(/authenticated\s+ACK\/fail\/bounce/i);
       expect(text, path).toMatch(/capped\s+by\s+the\s+reserved\s+internal|reserved internal value/i);
       expect(text, path).not.toMatch(/withdraw returns all excess/i);
