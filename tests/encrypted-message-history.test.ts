@@ -188,4 +188,26 @@ describe('encrypted local message history', () => {
     await store.removePendingPaymentCheck('payment-check:alpha');
     expect((await store.listPendingPaymentChecks()).records).toHaveLength(0);
   });
+
+  it('HISTORY-08: a pending payment check carrying BigInt fields (vaultPublish max_charge) is stored, not dropped', async () => {
+    const store = await createMemoryEncryptedMessageHistoryStore({ maxRecords: 1 });
+    // A real publishResult/vaultPublish carries a BigInt max_charge (the batch-pricing rework made it a
+    // BigInt). Plain JSON.stringify throws "Do not know how to serialize a BigInt", which silently stranded
+    // the ledger write (the send itself still went through). The BigInt-safe safeClone must persist the
+    // record, storing BigInts as decimal strings (project convention) rather than throwing.
+    await store.putPendingPaymentCheck({
+      id: 'payment-check:bigint',
+      intentId: '777',
+      payment: { asset: '0', amount: '1000', intentId: '777', secret32Hex: 'b'.repeat(64) },
+      status: 'publish_submitted',
+      vaultPublish: { status: 'vault-publish-submitted', maxCharge: 223600000n, publishState: { partCount: 2n } },
+      createdAt: NOW,
+    });
+    const pending = await store.listPendingPaymentChecks();
+    expect(pending.records).toHaveLength(1);
+    expect(pending.records[0]).toMatchObject({ id: 'payment-check:bigint', status: 'publish_submitted' });
+    // BigInts survive as decimal strings (never lost, never a throw).
+    expect(pending.records[0].vaultPublish.maxCharge).toBe('223600000');
+    expect(pending.records[0].vaultPublish.publishState.partCount).toBe('2');
+  });
 });

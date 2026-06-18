@@ -32,7 +32,7 @@ import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-st
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
-} from './encrypted-message-store.mjs?v=4';
+} from './encrypted-message-store.mjs?v=5';
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v443';
+const PLATHO_APP_RUNTIME_VERSION = 'v444';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
