@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v437<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v437'/);
+    expect(html).toMatch(/id="appVersionLabel">v438<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v438'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1051,6 +1051,19 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
     expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: send timed out'/);
+    // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
+    // per-session attempt budget (the age is anchored on message creation, not publishState.updatedAt).
+    expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 \* 60 \* 1000/);
+    expect(app).toMatch(/function privatePendingPublishConfirmAgeMs\(message\)/);
+    expect(app).toMatch(/const createdAtMs = messageCreatedAtMs\(message\)/);
+    expect(app).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
+    // Resume immediately surfaces Retry for an already-stuck no-progress message (no confirm round-trip).
+    const resumeSrc = app.slice(
+      app.indexOf('function resumePendingPrivatePublishConfirmations'),
+      app.indexOf('function hasPendingPrivateSendRetry'),
+    );
+    expect(resumeSrc).toMatch(/privatePendingPublishConfirmAgeMs\(message\) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
+    expect(resumeSrc).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
     // Stopping marks the message for manual recovery (the Retry button's render condition).
     const stopSource = app.slice(
       app.indexOf('function stopPrivatePublishConfirmationRetry'),
@@ -2337,7 +2350,7 @@ describe('PWA runtime config guard', () => {
     // GATED on confirmedCount===0 so a partially/fully-confirmed (progressing/delivered) publish still
     // keeps the long background window; and the manual Retry for a fully-submitted message re-confirms
     // (never re-publishes), so no double-send regression.
-    expect(confirmationRetry).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,200}confirmedCount \?\? 0\) === 0[\s\S]{0,160}stopPrivatePublishConfirmationRetry/);
+    expect(confirmationRetry).toMatch(/confirmedCount \?\? 0\) === 0[\s\S]{0,200}attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,200}stopPrivatePublishConfirmationRetry/);
     expect(confirmationRetry).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,120}PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS/);
     expect(sendRetry).toMatch(/isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)/);
     expect(resumeSource).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
@@ -4061,11 +4074,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v508/);
+    expect(sw).toMatch(/platho-pwa-prototype-v509/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=437/);
+    expect(sw).toMatch(/\.\/app\.js\?v=438/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
