@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v448<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v448'/);
+    expect(html).toMatch(/id="appVersionLabel">v449<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v449'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1686,6 +1686,23 @@ describe('PWA runtime config guard', () => {
     );
     expect(unlockSource).toMatch(/dismissOnBackdrop: false/);
     expect(unlockSource).toMatch(/cancellable: true/);
+  });
+
+  it('PWA-SEND-LOCK-01: an in-flight send defers the background lock (bounded), and keyless resume needs no key', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Axis A: defer the background auto-lock while a send actively holds the key, bounded by a max grace,
+    // set ONCE (never re-armed by later background events) so a wedged send can't pin the wallet unlocked.
+    expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 150 \* 1000/);
+    expect(app).toMatch(/function vaultSendNeedsKeyNow\(\)[\s\S]*vaultPublishSendWaiters > 0 \|\| privateOutboundWorkActive\(\)/);
+    expect(app).toMatch(/if \(!needsKey\) vaultSendInFlightUntil = 0/);
+    expect(app).toMatch(/if \(vaultSendInFlightUntil === 0\) vaultSendInFlightUntil = now \+ SEND_LOCK_MAX_GRACE_MS/);
+    expect(app).toMatch(/function shouldIgnoreTransientWalletLock\(\)[\s\S]*shouldDeferLockForActiveSend\(\)/);
+    // Axis C: keyless resume uses the persisted PUBLIC sender address; refuses if a different account unlocked.
+    expect(app).toMatch(/if \(publishState && !publishState\.ownerWallet\) publishState\.ownerWallet = owner/);
+    expect(app).toMatch(/function resolvePublishOwner\(publishState\)[\s\S]*rawWalletAddress\(live\) !== rawWalletAddress\(stored\)\) return null/);
+    expect(app).toMatch(/const owner = options\.owner \?\? resolvePublishOwner\(publishState\);\s*if \(!owner\) return 0/);
+    expect(app).toMatch(/owner = resolvePublishOwner\(publishState\);\s*if \(!owner\) return \{ resigned: 0, confirmed: 0 \}/);
+    expect(app).toMatch(/confirmCapsuleHubPublishEntries\(message\.publishState, \{ \.\.\.confirmOptions, owner: resolvePublishOwner\(message\.publishState\) \}\)/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4145,11 +4162,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v519/);
+    expect(sw).toMatch(/platho-pwa-prototype-v520/);
     expect(sw).toMatch(/\.\/styles\.css\?v=142/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=448/);
+    expect(sw).toMatch(/\.\/app\.js\?v=449/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
