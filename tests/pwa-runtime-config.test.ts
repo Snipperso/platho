@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v436<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v436'/);
+    expect(html).toMatch(/id="appVersionLabel">v437<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v437'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1039,6 +1039,30 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function findConfirmedAvatarEntriesFromPublishState'),
     );
     expect(findSource).toMatch(/const targetedStart = publicEntryIdBigInt\(pointer\.avatarEntryId/);
+  });
+
+  it('PWA-PRIVATE-CONFIRM-RETRY-01: stuck multi-part private confirm is bounded and surfaces a manual Retry button', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // The private publish-confirm auto-retry is capped: after the active-attempt budget with nothing
+    // confirmed (or a hard backstop) it STOPS instead of spinning on "submitted N/N, confirming" via
+    // the endless 30s background retry. (The 24h age-stale never fires because each pass bumps
+    // publishState.updatedAt, so this attempt cap is the real terminal guard.)
+    expect(app).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT/);
+    expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
+    expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
+    expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: send timed out'/);
+    // Stopping marks the message for manual recovery (the Retry button's render condition).
+    const stopSource = app.slice(
+      app.indexOf('function stopPrivatePublishConfirmationRetry'),
+      app.indexOf('function stopPartialPrivatePublishRecovery'),
+    );
+    expect(stopSource).toMatch(/message\.privateManualRetryAvailable = true/);
+    expect(stopSource).toMatch(/message\.privatePublishConfirmStopped = true/);
+    // 'not confirmed: ...' must resolve to a 'failed' status key (not 'sending'), so the Retry button
+    // is eligible; the manual-actions gate + the Retry button itself exist.
+    expect(app).toMatch(/text\.includes\('not confirmed'\)/);
+    expect(app).toMatch(/function privateMessageShouldShowManualActions/);
+    expect(app).toMatch(/retry\.textContent = 'Retry'/);
   });
 
   it('PWA-SEND-01: publish preparation blocks over-cap network surcharge before send-time BOC signing', () => {
@@ -2307,7 +2331,13 @@ describe('PWA runtime config guard', () => {
     expect(confirmationRetry).toMatch(/confirmTimedOut/);
     expect(confirmationRetry).toMatch(/const sendRetryScheduled = ensurePendingPrivateSendRetry\(thread, message/);
     expect(confirmationRetry).toMatch(/Retrying unsent capsule parts/);
-    expect(confirmationRetry).not.toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,160}stopPrivatePublishConfirmationRetry/);
+    // Owner-directed (2026-06-18), SUPERSEDES the prior unbounded background window: a multi-part
+    // publish that confirms NOTHING after the active-attempt budget (or a hard backstop) STOPS and
+    // surfaces a manual Retry instead of spinning forever on "submitted N/N, confirming". The cap is
+    // GATED on confirmedCount===0 so a partially/fully-confirmed (progressing/delivered) publish still
+    // keeps the long background window; and the manual Retry for a fully-submitted message re-confirms
+    // (never re-publishes), so no double-send regression.
+    expect(confirmationRetry).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,200}confirmedCount \?\? 0\) === 0[\s\S]{0,160}stopPrivatePublishConfirmationRetry/);
     expect(confirmationRetry).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT[\s\S]{0,120}PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS/);
     expect(sendRetry).toMatch(/isStalePrivatePendingPublish\(message\) && !privateMessageHasPublishAttempt\(message\)/);
     expect(resumeSource).toMatch(/isStalePrivatePendingPublishConfirmation\(message\)/);
@@ -4031,11 +4061,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v507/);
+    expect(sw).toMatch(/platho-pwa-prototype-v508/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=436/);
+    expect(sw).toMatch(/\.\/app\.js\?v=437/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
