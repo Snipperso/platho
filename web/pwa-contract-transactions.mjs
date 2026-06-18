@@ -43,6 +43,9 @@ export const VAULT_BATCH_PUBLISH_ID_DOMAIN = 0x42504931n;      // "BPI1" batch p
 export const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN = 0x45504931n;    // "EPI1" per-entry publish_id derivation
 export const OP_PUBLISH_BATCH = 0x7e1f5041n;                   // Vault external op for PublishBatchFromVaultBalance
 export const MAX_BATCH_PARTS = 8;                              // mirrors contracts/Vault.tact MAX_BATCH_PARTS
+export const MAX_EXTERNAL_MESSAGE_BYTES = 65535;               // TON max_ext_msg_size (config-43); validators
+                                                               // DROP a larger inbound external BoC before the
+                                                               // contract runs (Vault.tact EXT_HARD_BITS=65535*8).
 export const VPB2_VERSION = 1n;                                // mirrors contracts/Vault.tact VPB2_VERSION
 // Pinned affine charge floor (mirrors contracts/Vault.tact BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * n).
 // Recalibrated 2026-06-14: base = worst-case EXT_HARD import hold (89.63M -> 92M) + reject base compute (0.7M).
@@ -1289,8 +1292,18 @@ export async function buildBatchPublishExternalBoc(params = {}, options = {}) {
     entryPublishIds.push(await computeEntryPublishId(batchPublishId, i));
   }
   const root = externalInMessageCell(vaultAddress, built.bodyCell);
+  const serializedRoot = serializeBoc(root);
+  // Fail-closed backstop. TON validators silently DROP an external BoC larger than max_ext_msg_size
+  // before the Vault's external() receiver runs (no acceptMessage, no nonce bump, no bounce), which strands
+  // the publish at SENT forever. NEVER sign/broadcast an oversized external — surface a deterministic error
+  // so the size-aware packer (groupPublishItemsIntoBatches in publish-batch-orchestration.mjs) can split
+  // instead of broadcasting into the void. This is the last line of defense if the packer's byte estimate
+  // is ever too loose for an unusual capsule shape.
+  if (serializedRoot.length > MAX_EXTERNAL_MESSAGE_BYTES) {
+    throw new RangeError(`batch external is ${serializedRoot.length} bytes, exceeds max_ext_msg_size ${MAX_EXTERNAL_MESSAGE_BYTES}`);
+  }
   return {
-    boc: bytesToBase64(serializeBoc(root)),
+    boc: bytesToBase64(serializedRoot),
     bodyCell: built.bodyCell,
     signedRoot: built.signedRoot,
     signedRootHash: built.signedRootHash,

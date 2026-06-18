@@ -27,7 +27,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=15';
+} from './platho-wallet.mjs?v=16';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -35,15 +35,15 @@ import {
 } from './encrypted-message-store.mjs?v=4';
 import {
   VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=79';
+} from './vault-chain-provider.mjs?v=7';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=80';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=43';
+} from './vault-ton-rpc-provider.mjs?v=44';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
@@ -127,25 +127,25 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=28';
+} from './pwa-contract-transactions.mjs?v=29';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
-} from './publish-batch-orchestration.mjs?v=2';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=25';
+} from './publish-batch-orchestration.mjs?v=3';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=26';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=39';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=27';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=23';
+} from './capsulehub-ton-rpc-provider.mjs?v=40';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=28';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=24';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=30';
+} from './username-ton-rpc-provider.mjs?v=31';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v442';
+const PLATHO_APP_RUNTIME_VERSION = 'v443';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -17241,10 +17241,17 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   // button instead of spinning on "submitted N/N, confirming" forever. The age-based 24h stale above
   // never fires for a genuinely-stuck message because each confirm pass bumps publishState.updatedAt,
   // resetting privatePendingPublishAgeMs — so this attempt cap is the real terminal guard.
+  // Terminal guard. The stable-age branch (privatePendingPublishConfirmAgeMs, anchored on messageCreatedAtMs
+  // — reset-proof, reload-surviving) fires for ANY not-fully-confirmed publish, NOT only confirmedCount===0:
+  // a multi-external publish that lands one part but not the other (confirmedCount in [1, partCount-1]) must
+  // still reach the durable red terminal instead of spinning on "submitted N/N, confirming" forever (the
+  // per-resume scheduleImmediate reset means the attempt-based >=ACTIVE_LIMIT*4 backstop is otherwise never
+  // reached for a partial). The fast attempt>=ACTIVE_LIMIT stop stays gated on confirmedCount===0 (nothing
+  // landed -> fail fast); the *4 backstop is the attempt-based catch-all.
   if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && ((Number(message.publishState?.confirmedCount ?? 0) === 0
-        && (attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT
-          || privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS))
+        && attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT)
+      || privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS
       || attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT * 4)) {
     stopPrivatePublishConfirmationRetry(context, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
     return;
@@ -17459,13 +17466,14 @@ function resumePendingPrivatePublishConfirmations() {
         stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup expired', code: 'STALE_PRIVATE_PUBLISH' });
         continue;
       }
-      // A publish that has confirmed NOTHING and has been pending past the no-progress deadline
-      // (stable, reload-surviving age) surfaces a manual Retry button IMMEDIATELY on resume, rather
-      // than restarting its per-session attempt budget and spinning on "confirming" for another window.
+      // A publish that is NOT fully confirmed and has been pending past the no-progress deadline (stable,
+      // reload-surviving age anchored on messageCreatedAtMs) surfaces the durable red terminal IMMEDIATELY on
+      // resume, rather than restarting its per-session attempt budget and spinning on "confirming" for another
+      // window. This covers a PARTIAL multi-external publish (confirmedCount in [1, partCount-1]) too — the
+      // confirmedCount===0 gate is intentionally absent so a one-of-two-landed image cannot hang forever.
       if (privateMessageHasPublishAttempt(message)
         && message?.privatePublishConfirmStopped !== true
         && message?.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
-        && Number(message?.publishState?.confirmedCount ?? 0) === 0
         && privatePendingPublishConfirmAgeMs(message) >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
         stopPrivatePublishConfirmationRetry({ thread, message }, { message: 'chain lookup timed out', code: 'CONFIRM_RETRY_EXHAUSTED' });
         continue;

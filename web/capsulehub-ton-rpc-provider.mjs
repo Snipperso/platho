@@ -1,6 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=43';
-import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=28';
+import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=44';
+import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=29';
 
 const CAPSULEHUB_OPS = Object.freeze({
   // VPB2 batch ingest (the live redeploy path): ONE Vault->Hub message carries N part bodies.
