@@ -31,16 +31,16 @@ Total supply in atomic units:
 The launch reference price is:
 
 ```text
-1 ATH = 0.001 TON
+1 ATH = 0.001 GRAM
 ```
 
 The launch fully diluted valuation is:
 
 ```text
-100,000,000 ATH * 0.001 TON = 100,000 TON
+100,000,000 ATH * 0.001 GRAM = 100,000 GRAM
 ```
 
-ATH starts from a reference capitalization of `100,000 TON`.
+ATH starts from a reference capitalization of `100,000 GRAM`.
 
 ## Fixed Supply
 
@@ -131,23 +131,23 @@ unsupported: it can increase the raw official wallet balance, but it does not cr
 not be shown by the PWA as a deposit path.
 
 Vault ATH withdrawals are signed external Vault commands. The downstream ATHWallet deployment, transfer, storage, and
-ACK execution reserve is paid from the user's internal Vault TON balance. Vault credits back only authenticated
+ACK execution reserve is paid from the user's internal Vault GRAM balance. Vault credits back only authenticated
 ACK/fail/bounce value it receives, minus the local refund reserve and capped by the reserved internal value. Product
-copy must not promise a complete excess TON refund.
+copy must not promise a complete excess GRAM refund.
 
 ## Activity Price
 
 Public product copy may say messages start from the current exact public base price:
 
 ```text
-from 0.0337 TON
+from 0.0337 GRAM
 ```
 
 Current exact canonical examples before ATH discount are:
 
 ```text
-public post: 0.0337 TON
-hybrid private 1 KiB capsule: 0.0347 TON
+public post: 0.0337 GRAM
+hybrid private 1 KiB capsule: 0.0347 GRAM
 ```
 
 For a successful publish, the user receives:
@@ -159,15 +159,15 @@ For a successful publish, the user receives:
 At the launch reference price:
 
 ```text
-10 ATH * 0.001 TON = 0.01 TON
+10 ATH * 0.001 GRAM = 0.01 GRAM
 ```
 
 This ties the early ATH distribution to real application usage. The reward is an activity bonus, not a refund, cashback,
-rebate, or promise that ATH will compensate the TON cost of a publish. The launch reference value of `10 ATH` can be
-lower than the TON cost of the capsule, and that is intentional: users receive early network ownership for real usage,
+rebate, or promise that ATH will compensate the GRAM cost of a publish. The launch reference value of `10 ATH` can be
+lower than the GRAM cost of the capsule, and that is intentional: users receive early network ownership for real usage,
 not a guaranteed reimbursement.
 
-Product copy may summarize capsule pricing as messages from `0.0337 TON`; current exact canonical examples are 1 KiB public posts from `0.0337 TON` and hybrid private 1 KiB capsules from `0.0347 TON`. Larger public or private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
+Product copy may summarize capsule pricing as messages from `0.0337 GRAM`; current exact canonical examples are 1 KiB public posts from `0.0337 GRAM` and hybrid private 1 KiB capsules from `0.0347 GRAM`. Larger public or private capsule blocks cost more because the selected 1, 2, 4, 8, 16, or 32 KiB
 body changes the Vault/CapsuleHub execution and storage reserve. The reward remains `10 ATH` per successfully finalized
 capsule, regardless of capsule size.
 
@@ -184,18 +184,18 @@ Protocol fee:
 
 | Publish type | Protocol fee |
 | --- | ---: |
-| Public post | 0.010 TON |
-| Hybrid private message | 0.010 TON |
+| Public post | 0.010 GRAM |
+| Hybrid private message | 0.010 GRAM |
 
 The user-facing price includes protocol fee, compact index/header storage endowment, Vault local execution reserve, and the expected ACK refund:
 
 | Publish type | User-facing price |
 | --- | ---: |
-| Public/product label | from 0.0337 TON |
-| Current public post exact example | 0.0337 TON |
-| Current hybrid private 1 KiB exact example | 0.0347 TON |
+| Public/product label | from 0.0337 GRAM |
+| Current public post exact example | 0.0337 GRAM |
+| Current hybrid private 1 KiB exact example | 0.0347 GRAM |
 
-If the PWA receives a higher conservative network estimate, it adds the estimated overage to the canonical max charge, rounded up to clean `0.001 TON` steps. ATH discounts apply to protocol fee, not to network costs or storage reserves. This surcharge is a signed safety margin: if CapsuleHub accepts the publish, the success ACK returns only the fixed publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault TON balance. The part above the canonical required value remains in CapsuleHub as network/storage reserve overage. It is not returned to Vault and is not counted as `accrued_plato_fee_ton` at publish time. Only raw surplus above CapsuleHub's protected reserve may later be swept permissionlessly to FeeAccumulator, where it follows normal treasury/buyback accounting. CapsuleHub stores compact authenticated entry metadata and the body hash; the heavy body is recovered from accepted publish transaction history and verified locally.
+If the PWA receives a higher conservative network estimate, it adds the estimated overage to the canonical max charge, rounded up to clean `0.001 GRAM` steps. ATH discounts apply to protocol fee, not to network costs or storage reserves. This surcharge is a signed safety margin: if CapsuleHub accepts the publish, the success ACK returns only the fixed publish ACK reserve of `30,000,000` nanotons (`0.030 GRAM`). After Vault processes that ACK, the user is credited roughly `25,800,000` nanotons in internal Vault GRAM balance. The part above the canonical required value remains in CapsuleHub as network/storage reserve overage. It is not returned to Vault and is not counted as `accrued_plato_fee_ton` at publish time. Only raw surplus above CapsuleHub's protected reserve may later be swept permissionlessly to FeeAccumulator, where it follows normal treasury/buyback accounting. CapsuleHub stores compact authenticated entry metadata and the body hash; the heavy body is recovered from accepted publish transaction history and verified locally.
 
 ## ATH Discounts
 
@@ -224,25 +224,25 @@ raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 
 discounted_fee = raw_discounted_fee
 ```
 
-The calculation rounds up. With current constants, the full protocol fee is `0.010 TON` (`10,000,000 nanotons`) for both public and private capsules, and the maximum reduction is `0.010 TON` per capsule.
+The calculation rounds up. With current constants, the full protocol fee is `0.010 GRAM` (`10,000,000 nanotons`) for both public and private capsules, and the maximum reduction is `0.010 GRAM` per capsule.
 
 ## Pool Launch
 
-The ATH/TON pool launches after the full `15,000,000 ATH` activity airdrop has been distributed.
+The ATH/GRAM pool launches after the full `15,000,000 ATH` activity airdrop has been distributed.
 
 The launch sequence is:
 
 1. Users receive ATH through real Platho usage.
 2. The full activity airdrop is distributed.
 3. ATH discounts unlock.
-4. The ATH/TON pool launches.
+4. The ATH/GRAM pool launches.
 5. Post-pool route evidence and pricing evidence are frozen.
 6. Buyback split is enabled.
 
 The pool starts from the reference price:
 
 ```text
-1 ATH = 0.001 TON
+1 ATH = 0.001 GRAM
 ```
 
 Initial liquidity allocation:
@@ -251,23 +251,23 @@ Initial liquidity allocation:
 15,000,000 ATH
 ```
 
-TON side at the launch price:
+GRAM side at the launch price:
 
 ```text
-15,000,000 ATH * 0.001 TON = 15,000 TON
+15,000,000 ATH * 0.001 GRAM = 15,000 GRAM
 ```
 
-Protocol fees collected before the pool launch are not expected to fully fund the TON side of initial liquidity. The
+Protocol fees collected before the pool launch are not expected to fully fund the GRAM side of initial liquidity. The
 initial liquidity plan may require project/treasury funding in addition to protocol revenue. This is part of the launch
-bootstrap and does not turn activity rewards into a TON-denominated claim.
+bootstrap and does not turn activity rewards into a GRAM-denominated claim.
 
 The pool launches around a token that has already been distributed through application usage. This separates ATH from an empty listing without a user base.
 
 ## FeeAccumulator
 
-TON protocol fees are collected in `FeeAccumulator`.
+GRAM protocol fees are collected in `FeeAccumulator`.
 
-Before buyback split is enabled, all accumulated TON moves to the treasury bucket:
+Before buyback split is enabled, all accumulated GRAM moves to the treasury bucket:
 
 ```text
 accumulated_ton -> treasury_due_ton
@@ -275,7 +275,7 @@ accumulated_ton -> treasury_due_ton
 
 `buyback_due_ton` does not grow before the split is enabled.
 
-After `EnableBuybackSplit`, accumulated TON is split:
+After `EnableBuybackSplit`, accumulated GRAM is split:
 
 ```text
 50% -> treasury_due_ton
@@ -307,22 +307,22 @@ Buyback is executed through `FeeAccumulator` and `BuybackBurn`.
 BuybackBurn accepts only a full execution envelope:
 
 ```text
-51.05 TON
+51.05 GRAM
 ```
 
 Envelope structure:
 
 ```text
-50.00 TON  - STON.fi offer amount
-1.00 TON   - route forward gas
-0.05 TON   - pTON transfer gas
+50.00 GRAM  - STON.fi offer amount
+1.00 GRAM   - route forward gas
+0.05 GRAM   - pTON transfer gas
 ```
 
-Raw `50 TON` is not a valid buyback chunk. Buyback is accepted only as a full route envelope.
+Raw `50 GRAM` is not a valid buyback chunk. Buyback is accepted only as a full route envelope.
 
 After route freeze, BuybackBurn executes a buyback as follows:
 
-1. Accepts `51.05 TON` only from the bound FeeAccumulator.
+1. Accepts `51.05 GRAM` only from the bound FeeAccumulator.
 2. Records the amount in `reserve_due_ton`.
 3. On `ExecuteBuybackChunk`, consumes one envelope.
 4. Uses the frozen quote and frozen minOut.
@@ -434,9 +434,9 @@ The on-chain utility of ATH is specific:
 - profile avatar pointer updates are paid in ATH through ProfileRegistry;
 - ATH held in the user's internal Vault balance reduces the protocol fee for Vault publishes after the activity-distribution gate;
 - accepted username and avatar fees create treasury due and burn due;
-- BuybackBurn buys ATH with protocol TON fees and burns the received ATH through ATHMaster.
+- BuybackBurn buys ATH with protocol GRAM fees and burns the received ATH through ATHMaster.
 
-Vault publishes are paid in TON. ATH does not pay the whole publish transaction. It reduces the protocol-fee component after the discount gate is open.
+Vault publishes are paid in GRAM. ATH does not pay the whole publish transaction. It reduces the protocol-fee component after the discount gate is open.
 
 This makes ATH demand tied to concrete protocol actions: `.ath` names, avatar updates, post-airdrop Vault protocol-fee discounts, and buyback/burn pressure. MarketStabilitySeller expands available supply only as buyers take the next tranche, so early access is public and deterministic instead of being dominated by a thin pool.
 
@@ -481,35 +481,35 @@ price = ceil(base_tranche_price * current_multiplier * amount / 3,000,000 ATH)
 
 `base_tranche_price` is frozen after pool launch and exactly matches the x1 pricing evidence.
 
-At the launch price `1 ATH = 0.001 TON`, the x1 price of one tranche is:
+At the launch price `1 ATH = 0.001 GRAM`, the x1 price of one tranche is:
 
 ```text
-3,000,000 ATH * 0.001 TON = 3,000 TON
+3,000,000 ATH * 0.001 GRAM = 3,000 GRAM
 ```
 
 Therefore:
 
 | Tranche | Multiplier | Price for 3M ATH | Price per 1 ATH |
 | ---: | ---: | ---: | ---: |
-| 1 | x2 | 6,000 TON | 0.002 TON |
-| 2 | x3 | 9,000 TON | 0.003 TON |
-| 3 | x4 | 12,000 TON | 0.004 TON |
+| 1 | x2 | 6,000 GRAM | 0.002 GRAM |
+| 2 | x3 | 9,000 GRAM | 0.003 GRAM |
+| 3 | x4 | 12,000 GRAM | 0.004 GRAM |
 | ... | ... | ... | ... |
-| 15 | x16 | 48,000 TON | 0.016 TON |
+| 15 | x16 | 48,000 GRAM | 0.016 GRAM |
 | ... | ... | ... | ... |
-| 20 | x21 | 63,000 TON | 0.021 TON |
+| 20 | x21 | 63,000 GRAM | 0.021 GRAM |
 
 A single purchase cannot cross a tranche boundary. This prevents buying ATH from the next tranche at the previous tranche price.
 
-TON revenue is recognized only after ATH is delivered to the buyer. If ATH transfer fails or bounces, the reserve is restored, the buyer receives the paid TON principal back, and treasury due does not increase.
+GRAM revenue is recognized only after ATH is delivered to the buyer. If ATH transfer fails or bounces, the reserve is restored, the buyer receives the paid GRAM principal back, and treasury due does not increase.
 
 After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the ATH price. From that point, price is fully determined by the market: liquidity, available supply, demand for `.ath` names, avatar updates, post-airdrop Vault protocol-fee discounts, and buyback/burn pressure.
 
 Even at the x21 step, reference valuation remains moderate relative to the utility model:
 
 ```text
-1 ATH = 0.021 TON
-100,000,000 ATH = 2,100,000 TON
+1 ATH = 0.021 GRAM
+100,000,000 ATH = 2,100,000 GRAM
 ```
 
 At the x21 step, MarketStabilitySeller has finished its programmed reserve release. After that, ATH price is fully market-determined by liquidity, usage demand, available supply, and buyback/burn pressure. The only remaining protocol allocation is the slow long-term vesting schedule, capped at `100,000 ATH` per year.
@@ -558,11 +558,11 @@ Outgoing internal transfers in ATHWallet are protected by source-side pending ac
 4. Users publish messages through Vault.
 5. A successful publish credits `10 ATH` activity reward.
 6. After the full `15,000,000 ATH` activity airdrop is distributed and `airdrop_remaining_ath == 0`, ATH protocol-fee discounts unlock.
-7. The ATH/TON pool launches at reference price `1 ATH = 0.001 TON`.
+7. The ATH/GRAM pool launches at reference price `1 ATH = 0.001 GRAM`.
 8. Post-pool route evidence and pricing evidence are frozen.
 9. MarketStabilitySeller sells reserve through x2..x21 tranches.
-10. After split is enabled, FeeAccumulator divides protocol TON fees between treasury and buyback.
-11. BuybackBurn buys ATH with TON protocol fees and burns ATH through ATHMaster.
+10. After split is enabled, FeeAccumulator divides protocol GRAM fees between treasury and buyback.
+11. BuybackBurn buys ATH with GRAM protocol fees and burns ATH through ATHMaster.
 12. Username and profile fees create ATH treasury due and ATH burn due.
 13. Total supply gradually decreases through authenticated burns.
 
@@ -575,6 +575,6 @@ ATH connects four layers of Platho:
 3. **Discounts** - ATH balance reduces protocol fee after the distribution gate.
 4. **Supply reduction** - part of ATH fees and buyback output is burned through ATHMaster.
 
-The model begins with fixed supply and reference valuation of `100,000 TON`. The primary user distribution is tied to real paid usage: product copy may say messages start from `0.0337 TON`, while current exact examples are `0.0337 TON` for a 1 KiB public post and `0.0347 TON` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. Larger public or private size classes cost more. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
+The model begins with fixed supply and reference valuation of `100,000 GRAM`. The primary user distribution is tied to real paid usage: product copy may say messages start from `0.0337 GRAM`, while current exact examples are `0.0337 GRAM` for a 1 KiB public post and `0.0347 GRAM` for a hybrid private 1 KiB capsule, plus a `10 ATH` activity bonus per finalized capsule. Larger public or private size classes cost more. That bonus is not a refund, reimbursement, or profit promise. After the first 15% of supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
 
 ATH exists as a working token inside Platho: it is distributed through activity, used in paid actions, reduces protocol fee, is sold from reserve through a defined staircase, and is burned through on-chain burn. After the market-stability staircase, the future ATH price is determined by the market and protocol usage.

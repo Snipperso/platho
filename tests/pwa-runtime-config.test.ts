@@ -247,8 +247,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v434<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v434'/);
+    expect(html).toMatch(/id="appVersionLabel">v435<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v435'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -322,8 +322,8 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Anonymous/);
     expect(html).toMatch(/id="sendWalletTonButton"/);
     expect(html).toMatch(/id="unlockWalletStatus"/);
-    expect(html).toMatch(/Receive TON/);
-    expect(html).toMatch(/Send TON/);
+    expect(html).toMatch(/Receive GRAM/);
+    expect(html).toMatch(/Send GRAM/);
     expect(html).toMatch(/id="exportWalletKeyButton"/);
     expect(html).toMatch(/id="importWalletKeyButton"/);
     expect(html).toMatch(/id="walletKeyBackupInput"/);
@@ -415,7 +415,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/createQrSvgDataUrl/);
     expect(app).toMatch(/submitWalletTonTransfer/);
     expect(app).toMatch(/local Platho wallet, not Vault/);
-    expect(app).toMatch(/TON transfer submitted/);
+    expect(app).toMatch(/GRAM transfer submitted/);
     expect(app).toMatch(/confirmWalletPasswordForExport/);
     expect(app).toMatch(/lockPlathoWallet/);
     expect(app).toMatch(/lockPlathoWalletForBackground/);
@@ -530,7 +530,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
     expect(html).toMatch(/<h2>Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="walletTonBalanceButton"[\s\S]*id="registerVaultKeysButton"/);
-    expect(html).toMatch(/Wallet TON[\s\S]*id="walletTonBalanceStatus"/);
+    expect(html).toMatch(/Wallet GRAM[\s\S]*id="walletTonBalanceStatus"/);
     expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
     expect(html).toMatch(/<h2>Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).toMatch(/Sync messages[\s\S]*tap to sync/);
@@ -578,7 +578,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/setProfileAvatarStatus\('avatar not active yet', 'error'\)/);
     expect(html).toMatch(/<h2>Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
     expect(html).toMatch(/<h2>Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
-    expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ TON fee/);
+    expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ GRAM fee/);
     expect(html).not.toMatch(/Link TON DNS[\s\S]*id="linkedTonDnsStatus"[\s\S]*verify/);
     expect(html).toMatch(/Link \.ath name[\s\S]*id="linkedUsernameStatus"[\s\S]*verify/);
     expect(app).not.toMatch(/linkTonDnsButton\?\.addEventListener\('click'/);
@@ -601,18 +601,18 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function setUsernameMintStatus/);
     expect(app).toMatch(/setUsernameMintStatus\(rateLimited \? TON_RPC_CONNECTING_STATUS : usernameMintStatusText\(error\), rateLimited \? 'busy' : 'error'\)/);
     expect(app).toMatch(/estimatedUsernameMintTonFeeNanotons/);
-    expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\)\} TON from Vault/);
+    expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\)\} GRAM from Vault/);
     expect(app).toMatch(/assertVaultUsernameMintCanStart/);
     expect(app).toMatch(/submitVaultUsernameMint/);
     expect(app).toMatch(/requireUsernameRegistryVaultRoute/);
     expect(app).toMatch(/UsernameRegistry is not bound back to Vault/);
     expect(app).toMatch(/UsernameRegistry official ATH wallet is not the derived registry wallet/);
     expect(app).toMatch(/ATH; 50% goes to burn/);
-    expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ TON fee/);
+    expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ GRAM fee/);
     expect(app).toMatch(/Set profile avatar/);
     expect(app).toMatch(/requestProfileAvatarUploadDetails/);
     expect(app).toMatch(/estimatedProfileAvatarTonFeeNanotons/);
-    expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedProfileAvatarTonFeeNanotons\(attachment\)\)\} TON/);
+    expect(app).toMatch(/up to \$\{formatTonNanotons\(estimatedProfileAvatarTonFeeNanotons\(attachment\)\)\} GRAM/);
     expect(app).toMatch(/Preview final image/);
     expect(html).toMatch(/id="imageLightboxDialog"/);
     expect(html).toMatch(/Full-size preview/);
@@ -699,7 +699,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Flush ATH/);
     expect(html).toMatch(/Wallet and Vault are separate for security/);
     expect(html).toMatch(/data-nav-vault-balance/);
-    expect(html).toMatch(/data-nav-vault-ton>0 TON<\/strong>/);
+    expect(html).toMatch(/data-nav-vault-ton>0 GRAM<\/strong>/);
     expect(html).toMatch(/data-nav-vault-ath>0 ATH<\/strong>/);
     expect(css).toMatch(/\.rail-vault-balance/);
     expect(css).toMatch(/grid-template-rows:\s*11px 14px 14px/);
@@ -735,7 +735,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="vaultMoveAthVaultBalance"[^>]*>0<\/strong>/);
     expect(html).toMatch(/id="vaultMoveTonDirectionButton"/);
     expect(html).toMatch(/id="vaultMoveAthDirectionButton"/);
-    expect(html).toMatch(/Move TON to Vault/);
+    expect(html).toMatch(/Move GRAM to Vault/);
     expect(html).toMatch(/Move ATH to Vault/);
     expect(html).not.toMatch(/Wallet runtime|Key auth|Vault record|Replay store|Local state/);
     expect(app).not.toMatch(/window\.prompt|window\.alert/);
@@ -773,8 +773,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/Add public channel/);
     expect(app).toMatch(/ATH protocol-fee discount/);
     expect(app).toMatch(/locked until activity airdrop is fully distributed/);
-    expect(app).toMatch(/Platho fee 0 TON/);
-    expect(app).toMatch(/max reduction 0\.010 TON/);
+    expect(app).toMatch(/Platho fee 0 GRAM/);
+    expect(app).toMatch(/max reduction 0.010 GRAM/);
     expect(app).not.toMatch(/ATH discount \$\{percent\}/);
     expect(app).not.toMatch(/locked until 15%/);
     expect(app).toMatch(/messageDiscountUnlocked/);
@@ -813,7 +813,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/publish cancelled/);
     expect(app).toMatch(/not sent: cancelled/);
     expect(app).toMatch(/assertVaultHasPrivatePublishHold/);
-    expect(app).toMatch(/Not enough Vault TON/);
+    expect(app).toMatch(/Not enough Vault GRAM/);
     expect(app).not.toMatch(/Checking Vault balance/);
     expect(app).toMatch(/privateComposerKnownVaultTonShortfall/);
     expect(app).toMatch(/networkFeeSurchargeNanotons/);
@@ -1057,7 +1057,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('publicSyncWindowSelect?.addEventListener'),
     );
 
-    expect(helperSource).toMatch(/Activate Platho account before moving TON from Vault/);
+    expect(helperSource).toMatch(/Activate Platho account before moving GRAM from Vault/);
     expect(helperSource).toMatch(/Unlock and activate Platho account before Vault actions/);
     expect(submitSource).toMatch(/vaultActionBlockedStatusText\(error, 'move blocked'\)/);
   });
@@ -3961,11 +3961,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v505/);
+    expect(sw).toMatch(/platho-pwa-prototype-v506/);
     expect(sw).toMatch(/\.\/styles\.css\?v=140/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=434/);
+    expect(sw).toMatch(/\.\/app\.js\?v=435/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=2/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=77/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=38/);
@@ -3973,7 +3973,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=14/);
+    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=15/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=28/);
     expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=41/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=26/);
