@@ -12,7 +12,7 @@ V1 private publishing accepts only `CRYPTO_SUITE_HYBRID = 2`.
 
 ## Key bundles
 
-Every 24-word TON recovery phrase created or imported by the PWA deterministically derives a messaging identity with an encryption key pair and an Ed25519 signing key. The public encryption key material is exported as a public key bundle:
+Every 24-word GRAM recovery phrase created or imported by the PWA deterministically derives a messaging identity with an encryption key pair and an Ed25519 signing key. The public encryption key material is exported as a public key bundle:
 
 - `keyId`: SHA-256 based identifier over the public key material.
 - `x25519PublicKey`: 32-byte classical ECDH public key.
@@ -42,8 +42,8 @@ The signed bundle is a messaging-key self-signature. Wallet ownership is anchore
 
 ## Wallet ownership
 
-The production PWA does not use an external wallet connector. A user creates or imports a normal 24-word TON recovery phrase, and the PWA
-deterministically derives the TON wallet key, a separate Vault auth key, and the messaging encryption/signing keys from that phrase. Vault
+The production PWA does not use an external wallet connector. A user creates or imports a normal 24-word GRAM recovery phrase, and the PWA
+deterministically derives the GRAM wallet key, a separate Vault auth key, and the messaging encryption/signing keys from that phrase. Vault
 activation is the ownership anchor: the embedded wallet signs and sends `RegisterMessagingKeys` from the same wallet that owns the on-chain key record.
 `ReplaceMessagingKeys` rotates only the public receive/messaging key record; it does not rotate the Vault auth key.
 
@@ -55,7 +55,7 @@ Recipients trust a messaging bundle only after checking it against the active Va
 - the decoded ML-KEM-768 key bytes hash to `pq_kem_pubkey_hash`;
 - the active `current_key_id` points at the verified key record.
 
-The profile export/import flow handles the 24-word TON recovery phrase. There is no separate messaging key backup and no
+The profile export/import flow handles the 24-word GRAM recovery phrase. There is no separate messaging key backup and no
 external wallet connection mode in final v1.
 
 ## Compact byte layout
@@ -63,10 +63,10 @@ external wallet connection mode in final v1.
 Private capsule on-chain cells use the final `platho.byte-layout.v1` binary layout. The PWA may wrap capsules in JSON for export/share UI, but the protocol payload is binary bytes, not JSON and not an off-chain pointer. `CapsuleHub` stores compact authenticated headers/indexes plus the body hash; the encrypted body cell stays in the accepted publish transaction body and is reconstructed from TON message history, then verified against the stored hashes.
 
 Every publish goes through Vault as a Vault-balance funded signed external message. The user first funds their internal
-Vault TON balance, then the PWA signs a publish request with the active `auth_pubkey`; a relayer can submit the
+Vault GRAM balance, then the PWA signs a publish request with the active `auth_pubkey`; a relayer can submit the
 external message without holding the wallet key or the messaging signing key. The signed payload is domain-separated with `VPB1`,
 `deployment_manifest_hash`, the target Vault address, and the publish kind before owner, nonce, max charge, and payload.
-The TON value that CapsuleHub actually sends back in an ACK or bounce is credited to the user's internal Vault TON
+The GRAM value that CapsuleHub actually sends back in an ACK or bounce is credited to the user's internal Vault GRAM
 balance, capped by the tracked pending publish refund amount. If the Vault balance or chain access is not available, the
 PWA fails closed and must not expose publish actions.
 
@@ -74,31 +74,31 @@ Because `auth_pubkey` authorizes Vault-balance spending, compromising the local 
 Vault publish, payment-check, username, or avatar actions. A messaging signing-key compromise can still affect message-level
 identity signatures, so key replacement revokes the old public receive key record for future inbound encryption checks.
 
-PWA message pricing is per capsule. With current reserves and no ATH discount, exact canonical examples are 1 KiB public entries from `0.0337 TON` and `hybrid-v1` 1 KiB private
-capsules from `0.0347 TON`; larger public or private size classes cost more by canonical class. This includes the full
-Platho protocol fee of `0.01 TON`, CapsuleHub compact-index storage endowment, Vault local execution reserve, and the
+PWA message pricing is per capsule. With current reserves and no ATH discount, exact canonical examples are 1 KiB public entries from `0.0337 GRAM` and `hybrid-v1` 1 KiB private
+capsules from `0.0347 GRAM`; larger public or private size classes cost more by canonical class. This includes the full
+Platho protocol fee of `0.01 GRAM`, CapsuleHub compact-index storage endowment, Vault local execution reserve, and the
 expected ACK refund. Separately, if the PWA's conservative fee estimate is higher than the included network-fee
-allowance of `0.005 TON`, it adds
+allowance of `0.005 GRAM`, it adds
 the rounded overage as a surcharge. Contract calls still start from their canonical
 required values: Vault publishes send `maxCharge = canonical_max_charge + surcharge`. CapsuleHub has no direct user
 publish ABI in final v1; every publish is Vault -> CapsuleHub. ATH discounts apply only after the Vault activity airdrop
-has distributed 15,000,000 ATH; before that gate, message protocol fees use the full `0.01 TON` fee. The PWA must show the final
+has distributed 15,000,000 ATH; before that gate, message protocol fees use the full `0.01 GRAM` fee. The PWA must show the final
 hold and net cost for the selected content size before signing.
 
 The surcharge is a signed network/storage safety margin, not a refundable fee bucket. CapsuleHub accepts Vault publishes
 when the attached value is at least the canonical required value, but a successful publish ACK returns only the fixed
-publish ACK reserve of `30,000,000` nanotons (`0.030 TON`). After Vault processes that ACK, the user is credited roughly
-`25,800,000` nanotons in internal Vault TON balance. Any signed surcharge above the canonical required value remains in
+publish ACK reserve of `30,000,000` nanotons (`0.030 GRAM`). After Vault processes that ACK, the user is credited roughly
+`25,800,000` nanotons in internal Vault GRAM balance. Any signed surcharge above the canonical required value remains in
 CapsuleHub as network/storage reserve overage; it is not returned to Vault and is not counted as
 `accrued_plato_fee_ton`.
 
-CapsuleHub protects raw TON reserve equal to `accrued_plato_fee_ton + max(100 TON, 1.25 * live_index_1y_storage_reserve)`.
+CapsuleHub protects raw GRAM reserve equal to `accrued_plato_fee_ton + max(100 GRAM, 1.25 * live_index_1y_storage_reserve)`.
 The live reserve uses unpruned private/public entry counters rather than historical `latest_id` counters. A separate
 permissionless `SweepExcessReserve` call can move only surplus above that protected amount to FeeAccumulator as
 `DepositProtocolFee`, where it follows the normal treasury/buyback split. Ordinary message sending does not perform this
 sweep. If that sweep deposit bounces, the returned amount is intentionally reclassified as backed
 `accrued_plato_fee_ton` so it can be retried through the normal fee flush path.
-Normal partial `FlushFees` calls must be at least the current public protocol fee (`0.010 TON`); a smaller amount is
+Normal partial `FlushFees` calls must be at least the current public protocol fee (`0.010 GRAM`); a smaller amount is
 valid only when it is the entire remaining accrued bucket, so discounted dust can still be finalized.
 
 CapsuleHub records `created_at = now()` for every private and public entry. The PWA uses that contract timestamp for ordering and for bounded transaction-history lookup; client header timestamps remain authenticated payload metadata, not discovery authority. Compact entry metadata can be pruned permissionlessly after the configured one-year retention window, while body availability depends on the chosen TON provider's message-history coverage and the user's local encrypted cache.
@@ -107,14 +107,14 @@ Vault ATH balance is credited through explicit notify-flow accounting, not by sc
 The supported deposit path is the user's ATHWallet `ATHTransferRequestWithNotify` into Vault. Manual ordinary ATH
 transfer to the official Vault ATHWallet is unsupported and must not be displayed as a deposit address or treated as a
 Vault ledger credit. ATH withdrawal from Vault is a signed external Vault command. Its downstream ATHWallet
-deploy/transfer/ACK reserve is paid from the user's internal Vault TON balance, and Vault credits back only
+deploy/transfer/ACK reserve is paid from the user's internal Vault GRAM balance, and Vault credits back only
 authenticated ACK/fail/bounce value it receives, minus local refund reserve and capped by the reserved internal value.
 
 Public posts and comments are a separate open profile, not private capsules without encryption. They store a compact
 `PPH1` public header cell plus a raw public body cell. Public body text and public image/avatar bytes use the same
 1, 2, 4, 8, 16, or 32 KiB public capsule size classes as the user-visible body budget. Header metadata never reduces
-that body budget. Public posts have no postquantum option; public copy uses the `from 0.0337 TON` product label,
-while the current exact public base example is `0.0337 TON` plus the same
+that body budget. Public posts have no postquantum option; public copy uses the `from 0.0337 GRAM` product label,
+while the current exact public base example is `0.0337 GRAM` plus the same
 network-fee surcharge rule. `kind = 1` is a public post; post `flags` bit 0 closes comments for that post. `kind = 2` is
 a one-level public comment with `parent_entry_id:uint64` and `parent_body_hash:uint256` in the header. `kind = 3` is a
 public image post, `kind = 4` is a public image comment, and `kind = 5` is public wallet avatar media. Public headers also carry `stream_id:uint128`,
@@ -304,7 +304,7 @@ pending state or create refund due. A deployed item becomes an authoritative use
 the matching name record through a valid late ACK or `ResendDeployedAck`. Clients and indexers must ignore item-only
 ownership claims and must not use the registry record owner as the current owner after transfers.
 
-The 24-word TON recovery phrase is the single user secret. The PWA deterministically derives the TON wallet key and the messaging encryption/signing keys from that phrase. The profile export/import flow therefore handles only the recovery phrase; there is no separate messaging-key backup.
+The 24-word GRAM recovery phrase is the single user secret. The PWA deterministically derives the GRAM wallet key and the messaging encryption/signing keys from that phrase. The profile export/import flow therefore handles only the recovery phrase; there is no separate messaging-key backup.
 
 ## Replay and expiry policy
 
@@ -390,4 +390,4 @@ The header is bound as AES-GCM additional authenticated data. Changing thread id
 
 ## Production status
 
-The mainnet release path uses embedded TON wallet derivation, Vault-anchored messaging keys, signed bundle validation, fail-closed Vault chain binding, private capsule cell hashing, sender signatures, durable replay storage, encrypted local message history, and recovery phrase export/import. Production deployment must keep the PWA configuration pinned to the verified mainnet manifest and approved TON RPC providers; independent crypto review remains recommended for long-term assurance.
+The mainnet release path uses embedded GRAM wallet derivation, Vault-anchored messaging keys, signed bundle validation, fail-closed Vault chain binding, private capsule cell hashing, sender signatures, durable replay storage, encrypted local message history, and recovery phrase export/import. Production deployment must keep the PWA configuration pinned to the verified mainnet manifest and approved TON RPC providers; independent crypto review remains recommended for long-term assurance.

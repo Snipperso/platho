@@ -27,7 +27,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=14';
+} from './platho-wallet.mjs?v=15';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -152,7 +152,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v434';
+const PLATHO_APP_RUNTIME_VERSION = 'v435';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1186,8 +1186,8 @@ function createWalletReceiveQrNode(address) {
   wrapper.className = 'wallet-receive-card';
   const image = document.createElement('img');
   image.className = 'wallet-receive-qr';
-  image.alt = 'TON wallet QR';
-  image.src = createQrSvgDataUrl(walletTonTransferUri(address), { title: 'TON wallet receive address' });
+  image.alt = 'GRAM wallet QR';
+  image.src = createQrSvgDataUrl(walletTonTransferUri(address), { title: 'GRAM wallet receive address' });
   const addressBox = document.createElement('div');
   addressBox.className = 'wallet-receive-address';
   addressBox.textContent = address;
@@ -7701,7 +7701,7 @@ function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
 }
 
 function plathoAccountActivationFeeLabel(user = currentVaultUserSource()) {
-  return `${formatTonNanotons(plathoAccountActivationFeeNanotons(user))} TON`;
+  return `${formatTonNanotons(plathoAccountActivationFeeNanotons(user))} GRAM`;
 }
 
 function clearNavVaultBalanceRetryTimer() {
@@ -7770,7 +7770,7 @@ function markNavVaultBalanceRetryNeeded(reason = 'retrying') {
 
 function walletTonBalanceLabel() {
   const balance = vaultPocketState.wallet?.ton_balance;
-  return balance === null || balance === undefined ? '-' : `${formatTonNanotons(balance)} TON`;
+  return balance === null || balance === undefined ? '-' : `${formatTonNanotons(balance)} GRAM`;
 }
 
 function refreshWalletTonProfileStatus() {
@@ -7847,7 +7847,7 @@ function assertNetworkFeeSurchargeWithinCap() {
   if (!networkFeeSurchargeExceedsMax(estimate, pricingOptions)) return;
   const rawSurcharge = currentRawNetworkFeeSurchargeNanotons();
   const maxSurcharge = maxNetworkFeeSurchargeNanotons(pricingOptions);
-  throw new Error(`Network surcharge ${formatTonNanotons(rawSurcharge)} TON exceeds the production cap ${formatTonNanotons(maxSurcharge)} TON. Try another RPC/network estimate before sending.`);
+  throw new Error(`Network surcharge ${formatTonNanotons(rawSurcharge)} GRAM exceeds the production cap ${formatTonNanotons(maxSurcharge)} GRAM. Try another RPC/network estimate before sending.`);
 }
 
 function shortUiErrorText(error, fallback = 'Blocked') {
@@ -7877,7 +7877,7 @@ function privateSendBlockedStatusText(error) {
 function vaultActionBlockedStatusText(error, fallback = 'move blocked') {
   const message = shortUiErrorText(error, fallback);
   if (/unlock and activate your platho account before moving ton from vault/i.test(message)) {
-    return 'Activate Platho account before moving TON from Vault';
+    return 'Activate Platho account before moving GRAM from Vault';
   }
   if (/local vault auth key is not ready/i.test(message)) {
     return 'Unlock and activate Platho account before Vault actions';
@@ -7900,7 +7900,7 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
     return 'Unlock and activate Platho account before sending';
   }
   if (options.includeVaultShortfall !== false && privateComposerKnownVaultTonShortfall()) {
-    return 'Vault TON hold required';
+    return 'Vault GRAM hold required';
   }
   return null;
 }
@@ -8010,9 +8010,9 @@ function formatAthDiscountLabel() {
   }
   const bps = athDiscountBps();
   if (bps >= 10_000n) {
-    return 'ATH protocol-fee discount 100% - Platho fee 0 TON';
+    return 'ATH protocol-fee discount 100% - Platho fee 0 GRAM';
   }
-  return `ATH protocol-fee discount ${formatDiscountPercent(bps)} - max reduction 0.010 TON`;
+  return `ATH protocol-fee discount ${formatDiscountPercent(bps)} - max reduction 0.010 GRAM`;
 }
 
 function discountedProtocolFeeNanotons(fullFee) {
@@ -8473,10 +8473,10 @@ async function confirmPublishPriceIncrease({ previousHold, finalHold, previousNe
     dismissOnBackdrop: false,
     summary: [
       { label: 'Capsules', value: String(Math.max(1, Number(parts) || 1)) },
-      { label: 'Previous cost', value: `${formatTonNanotons(oldCost)} TON` },
-      { label: 'New cost', value: `${formatTonNanotons(newCost)} TON` },
-      { label: 'Previous hold', value: `${formatTonNanotons(oldHold)} TON` },
-      { label: 'New hold', value: `${formatTonNanotons(newHold)} TON` },
+      { label: 'Previous cost', value: `${formatTonNanotons(oldCost)} GRAM` },
+      { label: 'New cost', value: `${formatTonNanotons(newCost)} GRAM` },
+      { label: 'Previous hold', value: `${formatTonNanotons(oldHold)} GRAM` },
+      { label: 'New hold', value: `${formatTonNanotons(newHold)} GRAM` },
     ],
   });
   return result !== null;
@@ -8499,10 +8499,10 @@ async function confirmHighNetworkFeeSurcharge({ surcharge, finalHold, finalNetCo
     dismissOnBackdrop: false,
     summary: [
       { label: 'Capsules', value: String(capsuleCount) },
-      { label: 'Base cost', value: `${formatTonNanotons(baseNetCost)} TON` },
-      { label: 'Network surcharge', value: `${formatTonNanotons(totalSurcharge)} TON` },
-      { label: 'Expected cost', value: `${formatTonNanotons(netCost)} TON` },
-      { label: 'Hold', value: `${formatTonNanotons(finalHold)} TON` },
+      { label: 'Base cost', value: `${formatTonNanotons(baseNetCost)} GRAM` },
+      { label: 'Network surcharge', value: `${formatTonNanotons(totalSurcharge)} GRAM` },
+      { label: 'Expected cost', value: `${formatTonNanotons(netCost)} GRAM` },
+      { label: 'Hold', value: `${formatTonNanotons(finalHold)} GRAM` },
     ],
   });
   return result !== null;
@@ -8532,7 +8532,7 @@ async function assertVaultHasPrivatePublishHold(suite, plan, options = {}) {
   const hold = composerEstimatedMaxChargeNanotons(privateComposerPublishProfilesForPlan(suite, plan), 1);
   const balance = vaultTonBalanceNanotons(user);
   if (balance < hold) {
-    throw new Error(`Not enough Vault TON: need ${formatTonNanotons(hold)} TON hold, have ${formatTonNanotons(balance)} TON`);
+    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(hold)} GRAM hold, have ${formatTonNanotons(balance)} GRAM`);
   }
   return { user, hold, balance };
 }
@@ -8552,7 +8552,7 @@ function profileAvatarTonFeeLabel(attachment) {
   if (!attachment) return 'estimated after compression';
   const parts = Math.max(1, imageAttachmentPartCount(attachment));
   const capsuleLabel = `${parts} public capsule${parts === 1 ? '' : 's'}`;
-  return `up to ${formatTonNanotons(estimatedProfileAvatarTonFeeNanotons(attachment))} TON (${capsuleLabel} + registry)`;
+  return `up to ${formatTonNanotons(estimatedProfileAvatarTonFeeNanotons(attachment))} GRAM (${capsuleLabel} + registry)`;
 }
 
 function composerCostStatusText(profile, text, maxTextBytes, attachment = null, options = {}) {
@@ -8585,17 +8585,17 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
     ? pricedProfile.length
     : Math.max(1, Number(parts) || 1);
   const surcharge = currentNetworkFeeSurchargeNanotons() * BigInt(surchargeParts);
-  const surchargeText = surcharge > 0n ? ` - Network +${formatTonNanotons(surcharge)} TON` : '';
+  const surchargeText = surcharge > 0n ? ` - Network +${formatTonNanotons(surcharge)} GRAM` : '';
   const user = currentVaultUserSource();
   if (user?.exists === true && vaultTonBalanceNanotons(user) < hold) {
     return {
-      text: `Need ${formatTonNanotons(hold)} TON hold - Vault ${formatTonNanotons(vaultTonBalanceNanotons(user))} TON`,
+      text: `Need ${formatTonNanotons(hold)} GRAM hold - Vault ${formatTonNanotons(vaultTonBalanceNanotons(user))} GRAM`,
       state: 'short',
       parts,
     };
   }
   return {
-    text: `Cost ${formatTonNanotons(price)} TON - Hold ${formatTonNanotons(hold)} TON${surchargeText} - ${formatAthDiscountLabel()}`,
+    text: `Cost ${formatTonNanotons(price)} GRAM - Hold ${formatTonNanotons(hold)} GRAM${surchargeText} - ${formatAthDiscountLabel()}`,
     state: 'ready',
     parts,
   };
@@ -8859,7 +8859,7 @@ async function setImageAttachment(kind, file, modeId) {
       submitLabel: 'Attach image',
       partCounter: kind === 'private' ? privateImageAttachmentPartCount : imageAttachmentPartCount,
       extraRows: [
-        { label: 'TON fee', value: 'depends on capsule count' },
+        { label: 'GRAM fee', value: 'depends on capsule count' },
       ],
     });
     if (!attachment) {
@@ -9321,7 +9321,7 @@ function refreshMessagingControls() {
       ? 'active'
       : activationPending
       ? 'activating'
-      : `${plathoAccountActivationFeeLabel()} TON`);
+      : `${plathoAccountActivationFeeLabel()} GRAM`);
   if (replaceVaultKeysButton) replaceVaultKeysButton.disabled = !plathoWallet || !signedActionsReady;
   if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady;
   if (mintUsernameButton) mintUsernameButton.disabled = false;
@@ -10838,7 +10838,7 @@ function parseDecimalAmount(input, decimals, symbol) {
 }
 
 function parseTonAmountNanotons(input) {
-  return parseDecimalAmount(input, 9, 'TON');
+  return parseDecimalAmount(input, 9, 'GRAM');
 }
 
 function parseAthAmountAtomic(input) {
@@ -11065,7 +11065,7 @@ function requestTonAmountNanotons(title, hint) {
   return requestAmountNanotons({
     title,
     hint,
-    symbol: 'TON',
+    symbol: 'GRAM',
     parser: parseTonAmountNanotons,
   });
 }
@@ -11083,7 +11083,7 @@ async function showReceiveWalletTonDialog() {
   const address = currentWalletReceiveAddress();
   if (!address) throw new Error('Create or import a wallet first');
   const result = await openActionDialog({
-    title: 'Receive TON',
+    title: 'Receive GRAM',
     hint: 'Show this QR or copy the address. Funds arrive in the local Platho wallet, not in Vault.',
     submitLabel: 'Copy address',
     fields: [{
@@ -11105,9 +11105,9 @@ async function requestWalletTonTransferDetails() {
   const wallet = requirePlathoWallet();
   const fromAddress = walletAddressForCopy(wallet);
   const result = await openActionDialog({
-    title: 'Send TON',
-    hint: 'Sends TON directly from the local Platho wallet, not Vault. Vault funds stay separate.',
-    submitLabel: 'Send TON',
+    title: 'Send GRAM',
+    hint: 'Sends GRAM directly from the local Platho wallet, not Vault. Vault funds stay separate.',
+    submitLabel: 'Send GRAM',
     fields: [
       {
         id: 'recipient',
@@ -11147,7 +11147,7 @@ async function requestWalletTonTransferDetails() {
       }
       if (values.amount?.trim()) {
         try {
-          lines.push({ label: 'Amount', value: `${formatTonNanotons(parseTonAmountNanotons(values.amount))} TON` });
+          lines.push({ label: 'Amount', value: `${formatTonNanotons(parseTonAmountNanotons(values.amount))} GRAM` });
         } catch (error) {
           lines.push({ label: 'Amount', value: error.message });
         }
@@ -11164,7 +11164,7 @@ async function requestWalletTonTransferDetails() {
 async function submitWalletTonTransfer() {
   const details = await requestWalletTonTransferDetails();
   if (!details) return null;
-  setVaultStatus('sending TON from wallet');
+  setVaultStatus('sending GRAM from wallet');
   const message = {
     address: details.recipient,
     amount: details.amount.toString(),
@@ -11173,8 +11173,8 @@ async function submitWalletTonTransfer() {
   const transaction = createWalletTransaction(message);
   const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
   globalThis.plathoLastWalletTonTransfer = { details, message, transaction, result };
-  flashWalletIdentityStatus('TON transfer submitted');
-  setVaultStatus('wallet TON transfer submitted');
+  flashWalletIdentityStatus('GRAM transfer submitted');
+  setVaultStatus('wallet GRAM transfer submitted');
   queueVaultPostTransactionRefresh();
   return result;
 }
@@ -11182,7 +11182,7 @@ async function submitWalletTonTransfer() {
 async function requestWalletSeedImport() {
   const result = await openActionDialog({
     title: 'Import wallet',
-    hint: 'Paste the 24-word TON recovery phrase for the wallet that owns your messages.',
+    hint: 'Paste the 24-word GRAM recovery phrase for the wallet that owns your messages.',
     submitLabel: 'Import wallet',
     fields: [{
       id: 'recoveryPhrase',
@@ -11373,7 +11373,7 @@ async function requestUsernameMintName() {
         return [
           { label: 'Display', value: raw.endsWith('.ath') ? raw : `${raw}.ath` },
           { label: 'ATH price', value: usernameMintPricePreview(raw) },
-          { label: 'TON hold', value: `up to ${formatTonNanotons(estimatedUsernameMintTonFeeNanotons())} TON from Vault` },
+          { label: 'GRAM hold', value: `up to ${formatTonNanotons(estimatedUsernameMintTonFeeNanotons())} GRAM from Vault` },
           { label: 'Route', value: 'Vault' },
         ];
       },
@@ -11404,7 +11404,7 @@ async function requestProfileAvatarUploadDetails(file) {
     submitLabel: 'Use avatar',
     extraRows: (attachment) => [
       { label: 'ATH price', value: `${formatAthAtomic(PROFILE_AVATAR_PRICE_ATH)} ATH; 50% goes to burn` },
-      { label: 'TON fee', value: profileAvatarTonFeeLabel(attachment) },
+      { label: 'GRAM fee', value: profileAvatarTonFeeLabel(attachment) },
       { label: 'Visibility', value: 'avatar media is public' },
     ],
   });
@@ -11429,7 +11429,7 @@ async function requestPaymentCheckDetails(initial = null) {
           label: 'Asset',
           type: 'select',
           options: [
-            { value: 'TON', label: 'TON' },
+            { value: 'TON', label: 'GRAM' },
             { value: 'ATH', label: 'ATH' },
           ],
           value: assetValue,
@@ -11444,7 +11444,7 @@ async function requestPaymentCheckDetails(initial = null) {
         },
       ],
       summary: (values) => [
-        { label: 'Asset', value: values.asset || 'TON' },
+        { label: 'Asset', value: values.asset === 'ATH' ? 'ATH' : 'GRAM' },
         { label: 'Amount', value: values.amount?.trim() || 'not set' },
       ],
     });
@@ -11629,16 +11629,16 @@ function formatAtomicAmount(amount, decimals = 9) {
 
 function paymentAssetLabel(asset) {
   const value = typeof asset === 'bigint' ? asset : BigInt(asset ?? 0);
-  if (value === RECEIVE_ASSETS.TON) return 'TON';
+  if (value === RECEIVE_ASSETS.TON) return 'GRAM';
   if (value === RECEIVE_ASSETS.ATH) return 'ATH';
   return `asset ${value.toString()}`;
 }
 
 function parsePaymentAsset(input) {
   const normalized = String(input ?? '').trim().toUpperCase();
-  if (normalized === 'TON') return RECEIVE_ASSETS.TON;
+  if (normalized === 'TON' || normalized === 'GRAM') return RECEIVE_ASSETS.TON;
   if (normalized === 'ATH') return RECEIVE_ASSETS.ATH;
-  throw new Error('Payment asset must be TON or ATH');
+  throw new Error('Payment asset must be GRAM or ATH');
 }
 
 function paymentMessageText(payment) {
@@ -12414,7 +12414,7 @@ async function fetchTonWalletBalance(address) {
       cache: 'no-store',
     });
     if (!response.ok) {
-      const error = new Error(`TON wallet balance HTTP ${response.status}`);
+      const error = new Error(`GRAM wallet balance HTTP ${response.status}`);
       error.status = response.status;
       error.code = response.status === 429 ? 'RATE_LIMITED' : 'HTTP_ERROR';
       if (response.status === 429 && cached) return cached.balance;
@@ -12775,7 +12775,7 @@ async function assertVaultProfileAvatarCanStart(owner, partCount) {
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < totalTonHold) {
-    throw new Error(`Not enough Vault TON: need ${formatTonNanotons(totalTonHold)} TON hold, have ${formatTonNanotons(vaultTon)} TON`);
+    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(totalTonHold)} GRAM hold, have ${formatTonNanotons(vaultTon)} GRAM`);
   }
   if (vaultAth < PROFILE_AVATAR_PRICE_ATH) {
     throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(PROFILE_AVATAR_PRICE_ATH)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
@@ -12798,7 +12798,7 @@ async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS) {
-    throw new Error(`Not enough Vault TON: need ${formatTonNanotons(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS)} TON hold, have ${formatTonNanotons(vaultTon)} TON`);
+    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS)} GRAM hold, have ${formatTonNanotons(vaultTon)} GRAM`);
   }
   if (vaultAth < priceAtomic) {
     throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
@@ -12823,7 +12823,7 @@ async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarE
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS) {
-    throw new Error(`Not enough Vault TON: need ${formatTonNanotons(PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS)} TON hold, have ${formatTonNanotons(vaultTon)} TON`);
+    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(PROFILE_AVATAR_VAULT_TON_CHARGE_NANOTONS)} GRAM hold, have ${formatTonNanotons(vaultTon)} GRAM`);
   }
   if (vaultAth < PROFILE_AVATAR_PRICE_ATH) {
     throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(PROFILE_AVATAR_PRICE_ATH)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
@@ -13293,7 +13293,7 @@ async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   const vaultTon = vaultTonBalanceNanotons(user);
   const vaultAth = nonNegativeBigInt(user.ath_balance ?? user.athBalance ?? 0n);
   if (vaultTon < USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS) {
-    throw new Error(`Not enough Vault TON: need ${formatTonNanotons(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS)} TON hold, have ${formatTonNanotons(vaultTon)} TON`);
+    throw new Error(`Not enough Vault GRAM: need ${formatTonNanotons(USERNAME_MINT_VAULT_TON_CHARGE_NANOTONS)} GRAM hold, have ${formatTonNanotons(vaultTon)} GRAM`);
   }
   if (vaultAth < priceAtomic) {
     throw new Error(`Not enough Vault ATH: need ${formatAthAtomic(priceAtomic)} ATH, have ${formatAthAtomic(vaultAth)} ATH`);
@@ -13514,7 +13514,7 @@ function refreshNavVaultBalance() {
     }
     return;
   }
-  const tonBalance = `${vaultMoveFormattedBalance('vault', 'TON')} TON`;
+  const tonBalance = `${vaultMoveFormattedBalance('vault', 'TON')} GRAM`;
   const athBalance = `${vaultMoveFormattedBalance('vault', 'ATH')} ATH`;
   for (const node of navVaultTonBalances) {
     node.classList.remove('is-loading');
@@ -14268,7 +14268,7 @@ async function submitAthWalletMessage(type, params, options = {}) {
 }
 
 async function submitVaultDepositTon() {
-  const amount = await requestTonAmountNanotons('Move TON to Vault', 'Moves TON from your connected Platho wallet into the Vault pocket.');
+  const amount = await requestTonAmountNanotons('Move GRAM to Vault', 'Moves GRAM from your connected Platho wallet into the Vault pocket.');
   if (amount === null) return null;
   return submitVaultDepositTonAmount(amount);
 }
@@ -14276,7 +14276,7 @@ async function submitVaultDepositTon() {
 async function submitVaultDepositTonAmount(amount) {
   const provider = await resolveVaultChainProvider();
   const user = await readFreshConnectedVaultUser(provider);
-  setVaultStatus('moving TON to Vault');
+  setVaultStatus('moving GRAM to Vault');
   const result = await submitVaultMessage('DepositTon', { amount }, {
     userExists: user.exists === true,
   });
@@ -14285,13 +14285,13 @@ async function submitVaultDepositTonAmount(amount) {
 }
 
 async function submitVaultWithdrawTon() {
-  const amount = await requestTonAmountNanotons('Move TON from Vault', 'Moves TON from the Vault pocket back to your connected Platho wallet.');
+  const amount = await requestTonAmountNanotons('Move GRAM from Vault', 'Moves GRAM from the Vault pocket back to your connected Platho wallet.');
   if (amount === null) return null;
   return submitVaultWithdrawTonAmount(amount);
 }
 
 async function submitVaultWithdrawTonAmount(amount) {
-  setVaultStatus('moving TON from Vault');
+  setVaultStatus('moving GRAM from Vault');
   requireNoPendingServiceWorkerAppShellReload();
   const provider = await resolveVaultChainProvider();
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -14302,11 +14302,11 @@ async function submitVaultWithdrawTonAmount(amount) {
     cacheTtlMs: 0,
   });
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n || BigInt(user.auth_pubkey ?? 0n) === 0n) {
-    throw new Error('Unlock and activate your Platho account before moving TON from Vault');
+    throw new Error('Unlock and activate your Platho account before moving GRAM from Vault');
   }
   const totalDebit = BigInt(amount) + VAULT_RESERVES_NANOTONS.withdrawTonExec;
   if (BigInt(user.ton_balance ?? 0n) < totalDebit) {
-    throw new Error('Vault TON balance is too low for amount plus transfer reserve');
+    throw new Error('Vault GRAM balance is too low for amount plus transfer reserve');
   }
   const result = await submitVaultAuthExternalWithNonceConfirmation({
     provider,
@@ -14375,7 +14375,7 @@ async function submitVaultWithdrawAthAmount(amount) {
     throw new Error('Vault ATH balance is too low');
   }
   if (BigInt(user.ton_balance ?? 0n) < VAULT_RESERVES_NANOTONS.withdrawAthMinValue) {
-    throw new Error('Vault TON balance is too low for ATH transfer reserve');
+    throw new Error('Vault GRAM balance is too low for ATH transfer reserve');
   }
   const result = await submitVaultAuthExternalWithNonceConfirmation({
     provider,
@@ -14868,12 +14868,12 @@ async function attemptPrivatePaymentCheckPublish(context) {
     const athBalance = BigInt(preparedUser.ath_balance ?? preparedUser.athBalance ?? 0n);
     if (asset === RECEIVE_ASSETS.TON) {
       if (tonBalance < amount + createReserve + quotedPublish.totalMaxCharge) {
-        throw new Error('Not enough Vault TON for payment check and private publish hold');
+        throw new Error('Not enough Vault GRAM for payment check and private publish hold');
       }
     } else {
       if (athBalance < amount) throw new Error(`Not enough ${paymentAssetLabel(asset)} in Vault`);
       if (tonBalance < createReserve + quotedPublish.totalMaxCharge) {
-        throw new Error('Not enough Vault TON for payment check private publish hold');
+        throw new Error('Not enough Vault GRAM for payment check private publish hold');
       }
     }
     const storedRecovery = await persistMessageToEncryptedHistory(thread, message);
@@ -15167,7 +15167,7 @@ async function confirmPlathoAccountActivation(user) {
   let feedback = 'Export the encrypted wallet key, then send the account activation transaction.';
   let tone = 'muted';
   if (walletBalance !== null && walletBalance < fee) {
-    feedback = `Wallet TON is below the ${formatTonNanotons(fee)} TON activation transaction value. Receive TON first.`;
+    feedback = `Wallet GRAM is below the ${formatTonNanotons(fee)} GRAM activation transaction value. Receive GRAM first.`;
     tone = 'error';
   }
   const result = await openActionDialog({
@@ -15189,8 +15189,8 @@ async function confirmPlathoAccountActivation(user) {
       },
     ],
     summary: [
-      { label: 'Wallet TON', value: walletBalance === null ? 'unknown' : `${formatTonNanotons(walletBalance)} TON` },
-      { label: 'Activation tx value', value: `${formatTonNanotons(fee)} TON` },
+      { label: 'Wallet GRAM', value: walletBalance === null ? 'unknown' : `${formatTonNanotons(walletBalance)} GRAM` },
+      { label: 'Activation tx value', value: `${formatTonNanotons(fee)} GRAM` },
       { label: 'Backup', value: 'encrypted wallet key JSON, protected by the local password' },
       { label: 'After activation', value: 'private/public messaging, Vault, .ath name and avatar tabs unlock' },
     ],
@@ -15215,7 +15215,7 @@ async function submitVaultReplaceMessagingKeys() {
   const requiredTon = estimateVaultAttachedValueNanotons('ReplaceMessagingKeys', localVaultDraft.message);
   const tonBalance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
   if (tonBalance < requiredTon) {
-    throw new Error(`Vault TON balance is too low for key rotation; need ${formatTonNanotons(requiredTon)} TON`);
+    throw new Error(`Vault GRAM balance is too low for key rotation; need ${formatTonNanotons(requiredTon)} GRAM`);
   }
   setText(vaultRotateStatus, 'signing');
   const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
@@ -16124,7 +16124,7 @@ async function prepareCapsulesThroughVault(capsules, options = {}) {
   }
   const balance = BigInt(user.ton_balance ?? user.tonBalance ?? 0n);
   if (balance < totalMaxCharge) {
-    throw new Error('Vault TON balance is too low for this publish');
+    throw new Error('Vault GRAM balance is too low for this publish');
   }
   const finalNetCost = composerNetCostFromHoldNanotons(totalMaxCharge, normalizedCapsules.length, quotedProfiles);
   if (!(await confirmPublishPriceIncrease({
