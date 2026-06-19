@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v449<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v449'/);
+    expect(html).toMatch(/id="appVersionLabel">v450<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v450'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -4162,11 +4162,14 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v520/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=142/);
+    expect(sw).toMatch(/platho-pwa-prototype-v521/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=143/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=449/);
+    expect(sw).toMatch(/\.\/app\.js\?v=450/);
+    // The self-hosted Telegram Mini App SDK is precached so it is available offline
+    // and on poor networks, same as the rest of the runtime.
+    expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
     expect(sw).toMatch(/\.\/platho-config\.mjs\?v=80/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
@@ -4233,7 +4236,10 @@ describe('PWA runtime config guard', () => {
       expect(text).toMatch(/connect-src/);
       expect(text).toMatch(/object-src 'none'/);
       expect(text).toMatch(/base-uri 'none'/);
-      expect(text).toMatch(/frame-ancestors 'none'/);
+      // frame-ancestors is relaxed from 'none' to the Telegram web origin so the
+      // app can run as a Telegram Mini App (embedded in an iframe on web.telegram.org);
+      // this is the single, tightest origin that permits the embed.
+      expect(text).toMatch(/frame-ancestors https:\/\/web\.telegram\.org/);
       expect(text).toMatch(/X-Content-Type-Options/);
       expect(text).toMatch(/Referrer-Policy/);
       expect(text).toMatch(/Permissions-Policy/);

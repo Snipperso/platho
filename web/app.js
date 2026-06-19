@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v449';
+const PLATHO_APP_RUNTIME_VERSION = 'v450';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -929,6 +929,11 @@ function setInstallSteps(steps = []) {
 }
 
 function refreshInstallButtons() {
+  if (isTelegramEnv()) {
+    // PWA install is meaningless inside Telegram; keep every install affordance hidden.
+    installButtons.forEach((button) => button.toggleAttribute('hidden', true));
+    return;
+  }
   const state = installActionState();
   const canInstall = state !== 'installed';
   installButtons.forEach((button) => {
@@ -1010,6 +1015,7 @@ function markInstallPromptDismissed() {
 }
 
 function openInstallDialogIfUseful() {
+  if (isTelegramEnv()) return;
   if (!installDialog || installPromptDismissed() || isStandaloneApp()) return;
   installDialog.hidden = false;
   refreshInstallButtons();
@@ -1021,10 +1027,361 @@ function closeInstallDialog({ dismissed = true } = {}) {
 }
 
 function syncViewportCssVars() {
+  // Inside Telegram the WebView height is governed by the client (viewportStableHeight),
+  // not window.visualViewport — using the latter alone clips content under Telegram's header.
+  const telegramHeight = telegramViewportHeight();
   const viewport = window.visualViewport;
-  const height = Math.max(320, Math.round(viewport?.height ?? window.innerHeight ?? document.documentElement.clientHeight ?? 0));
-  document.documentElement.style.setProperty('--app-viewport-height', `${height}px`);
+  const visual = Math.round(viewport?.height ?? window.innerHeight ?? document.documentElement.clientHeight ?? 0);
+  let height;
+  if (telegramHeight > 0) {
+    // Prefer Telegram's stable height, but let an on-screen keyboard (which shrinks
+    // visualViewport on Android/Desktop) reduce it so the composer stays above the keyboard.
+    height = visual > 0 ? Math.min(telegramHeight, visual) : telegramHeight;
+  } else {
+    height = visual;
+  }
+  document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, Math.round(height))}px`);
 }
+
+// ---- Telegram Mini App adapter --------------------------------------------
+// Single codebase: when Platho runs inside a Telegram Mini App we load the
+// self-hosted Telegram WebApp SDK (index.html) and turn on a thin adapter —
+// native theme chrome, viewport + safe-area from Telegram, BackButton, closing
+// confirmation, hidden PWA-install UI, and a softer background auto-lock. In an
+// ordinary browser the SDK reports platform 'unknown', isTelegramEnv() is false,
+// and every branch below is inert, so the standalone PWA is unchanged. Every SDK
+// call is version-gated (isVersionAtLeast) and wrapped so an old client can never
+// throw the app down.
+
+function telegramWebApp() {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  return tg && typeof tg === 'object' ? tg : null;
+}
+
+let telegramEnvCache;
+function isTelegramEnv() {
+  if (telegramEnvCache !== undefined) return telegramEnvCache;
+  const tg = telegramWebApp();
+  telegramEnvCache = Boolean(
+    tg && (
+      (typeof tg.initData === 'string' && tg.initData.length > 0)
+      || (typeof tg.platform === 'string' && tg.platform && tg.platform !== 'unknown')
+    ),
+  );
+  return telegramEnvCache;
+}
+
+function telegramSupports(version) {
+  const tg = telegramWebApp();
+  if (!tg || typeof tg.isVersionAtLeast !== 'function') return false;
+  try {
+    return Boolean(tg.isVersionAtLeast(version));
+  } catch {
+    return false;
+  }
+}
+
+function telegramPlatform() {
+  const tg = telegramWebApp();
+  return tg && typeof tg.platform === 'string' ? tg.platform : '';
+}
+
+function isTelegramSuspendingPlatform() {
+  // iOS WKWebView freezes a backgrounded Mini App (timers stop), so a deferred
+  // background-lock timer would never fire there — keep lock-on-suspend on iOS.
+  return telegramPlatform() === 'ios';
+}
+
+function telegramViewportHeight() {
+  if (!isTelegramEnv()) return 0;
+  const tg = telegramWebApp();
+  const stable = Number(tg && tg.viewportStableHeight);
+  if (Number.isFinite(stable) && stable > 0) return stable;
+  const current = Number(tg && tg.viewportHeight);
+  return Number.isFinite(current) && current > 0 ? current : 0;
+}
+
+function applyTelegramSafeArea() {
+  // Telegram exposes safe areas via the SDK (>=8.0); env(safe-area-inset-*) is
+  // unreliable inside the embed. We only override the CSS vars when the SDK can
+  // report them, so older clients keep the env()-based fallback in styles.css.
+  if (!isTelegramEnv() || !telegramSupports('8.0')) return;
+  const tg = telegramWebApp();
+  const root = document.documentElement.style;
+  for (const side of ['top', 'right', 'bottom', 'left']) {
+    const content = Number(tg && tg.contentSafeAreaInset && tg.contentSafeAreaInset[side]) || 0;
+    const device = Number(tg && tg.safeAreaInset && tg.safeAreaInset[side]) || 0;
+    const px = Math.max(0, Math.round(content + device));
+    // Only override when we have a real inset. Setting 0 before the async
+    // safe-area events arrive would clobber the env() fallback and let content
+    // slide under the notch/home-indicator; leave it unset until the SDK reports one.
+    if (px > 0) root.setProperty(`--app-safe-area-${side}`, `${px}px`);
+    else root.removeProperty(`--app-safe-area-${side}`);
+  }
+}
+
+function syncTelegramBackButton() {
+  if (!isTelegramEnv()) return;
+  const tg = telegramWebApp();
+  if (!tg || !tg.BackButton) return;
+  const chatOpen = appShell && appShell.dataset.chatOpen === 'true';
+  try {
+    if (chatOpen) tg.BackButton.show();
+    else tg.BackButton.hide();
+  } catch {}
+}
+
+function observeChatOpenForTelegramBackButton() {
+  if (!isTelegramEnv() || !appShell || typeof MutationObserver !== 'function') return;
+  const observer = new MutationObserver(syncTelegramBackButton);
+  observer.observe(appShell, { attributes: true, attributeFilter: ['data-chat-open'] });
+  syncTelegramBackButton();
+}
+
+function openExternalLinkInTelegram(href) {
+  const tg = telegramWebApp();
+  if (!tg || typeof tg.openLink !== 'function') return false;
+  try {
+    tg.openLink(href);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markTelegramRootAttribute() {
+  try {
+    if (isTelegramEnv()) document.documentElement.dataset.plathoTelegram = 'true';
+  } catch {}
+}
+
+function initTelegramMiniApp() {
+  const tg = telegramWebApp();
+  if (!tg) return;
+  try {
+    tg.ready();
+  } catch {}
+  if (!isTelegramEnv()) return; // SDK present but launched in a normal browser
+  markTelegramRootAttribute();
+  try {
+    tg.expand();
+  } catch {}
+  // Keep the app's own fixed dark brand theme; only match Telegram's chrome to it.
+  const APP_BG = '#0b0d0f';
+  try {
+    if (telegramSupports('6.9')) tg.setHeaderColor(APP_BG);
+    else tg.setHeaderColor('bg_color');
+  } catch {}
+  try {
+    tg.setBackgroundColor(APP_BG);
+  } catch {}
+  try {
+    if (telegramSupports('7.10') && typeof tg.setBottomBarColor === 'function') tg.setBottomBarColor(APP_BG);
+  } catch {}
+  try {
+    if (telegramSupports('6.2')) tg.enableClosingConfirmation();
+  } catch {}
+  try {
+    if (telegramSupports('7.7') && typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+  } catch {}
+  applyTelegramSafeArea();
+  try {
+    tg.onEvent('safeAreaChanged', applyTelegramSafeArea);
+    tg.onEvent('contentSafeAreaChanged', applyTelegramSafeArea);
+  } catch {}
+  syncViewportCssVars();
+  try {
+    tg.onEvent('viewportChanged', syncViewportCssVars);
+  } catch {}
+  try {
+    if (tg.BackButton && typeof tg.BackButton.onClick === 'function') {
+      tg.BackButton.onClick(() => {
+        try {
+          backToChatsButton?.click();
+        } catch {}
+      });
+    }
+  } catch {}
+  observeChatOpenForTelegramBackButton();
+}
+
+// ---- Telegram durability: storage eviction is real on iOS WKWebView ---------
+// localStorage (the only place the encrypted wallet key lives) can be evicted by
+// the Telegram WebView between sessions. Two defenses: (1) force a confirmed
+// 24-word backup right after generation, and (2) mirror the password-encrypted
+// wallet record into Telegram CloudStorage (server-side, per-user) as a recovery
+// channel. CloudStorage holds only ciphertext; without the user password it is
+// useless, so this does not weaken the wallet.
+
+const TELEGRAM_CLOUD_WALLET_KEY = 'platho_wallet_encrypted_v1';
+const TELEGRAM_CLOUD_VALUE_MAX_BYTES = 4096;
+const TELEGRAM_SEED_BACKUP_STORAGE_KEY = 'platho.wallet.telegram.seedbackup.v1';
+
+function telegramCloudStorage() {
+  const tg = telegramWebApp();
+  return isTelegramEnv() && telegramSupports('6.9') && tg && tg.CloudStorage ? tg.CloudStorage : null;
+}
+
+function telegramCloudSet(key, value) {
+  return new Promise((resolve) => {
+    const cs = telegramCloudStorage();
+    if (!cs || typeof cs.setItem !== 'function') {
+      resolve(false);
+      return;
+    }
+    try {
+      cs.setItem(key, value, (error, ok) => resolve(!error && ok !== false));
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+function telegramCloudGet(key) {
+  return new Promise((resolve) => {
+    const cs = telegramCloudStorage();
+    if (!cs || typeof cs.getItem !== 'function') {
+      resolve(null);
+      return;
+    }
+    try {
+      cs.getItem(key, (error, value) => resolve(error ? null : (value || null)));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+function mirrorWalletRecordToTelegramCloud(record) {
+  if (!telegramCloudStorage() || !record || record.kind !== PLATHO_WALLET_STORAGE_KIND) return;
+  let json = '';
+  try {
+    json = JSON.stringify(record);
+  } catch {
+    return;
+  }
+  // Telegram CloudStorage caps each value at 4096 bytes; the encrypted wallet
+  // record (no message history) is well under that. Skip silently if it ever isn't.
+  if (!json || json.length > TELEGRAM_CLOUD_VALUE_MAX_BYTES) return;
+  telegramCloudSet(TELEGRAM_CLOUD_WALLET_KEY, json).catch(() => {});
+}
+
+async function restoreWalletRecordFromTelegramCloud() {
+  if (!telegramCloudStorage()) return false;
+  if (hasStoredPlathoWalletRecord()) return false; // a local copy always wins
+  try {
+    const json = await telegramCloudGet(TELEGRAM_CLOUD_WALLET_KEY);
+    if (!json) return false;
+    const record = JSON.parse(json);
+    if (!record || record.kind !== PLATHO_WALLET_STORAGE_KIND) return false;
+    const storage = localStorageOrNull();
+    if (!storage) return false;
+    storage.setItem(PLATHO_WALLET_STORAGE_KEY, JSON.stringify(record));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readTelegramSeedBackupSet() {
+  try {
+    const raw = localStorageOrNull()?.getItem(TELEGRAM_SEED_BACKUP_STORAGE_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function isTelegramSeedBackupConfirmed(address) {
+  if (!address) return false;
+  return readTelegramSeedBackupSet().some((entry) => sameWalletAddress(entry, address));
+}
+
+function markTelegramSeedBackupConfirmed(address) {
+  // Guard isTelegramEnv() so an ordinary-browser import never writes this key
+  // (keeps non-Telegram localStorage byte-for-byte identical to before).
+  if (!isTelegramEnv() || !address) return;
+  try {
+    const set = readTelegramSeedBackupSet();
+    if (set.some((entry) => sameWalletAddress(entry, address))) return;
+    set.push(String(address));
+    localStorageOrNull()?.setItem(TELEGRAM_SEED_BACKUP_STORAGE_KEY, JSON.stringify(set.slice(-8)));
+  } catch {}
+}
+
+async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
+  if (!isTelegramEnv() || !wallet) return;
+  if (!force && isTelegramSeedBackupConfirmed(wallet.address)) return;
+  let phrase = '';
+  try {
+    phrase = exportPlathoWalletRecoveryPhrase(wallet);
+  } catch {
+    return;
+  }
+  if (!phrase) return;
+  // Hard gate: no ✕, no outside-click dismiss. The user must read the words and
+  // type SAVED. If they keep declining we stop after a few tries and re-gate on the
+  // next unlock (the flag is only set once they confirm). The fallback depends on
+  // neither clipboard nor file download — the words are shown for manual transcription.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await openActionDialog({
+      title: 'Back up your recovery phrase',
+      hint: 'Telegram can clear local storage in this app. Write these 24 words on paper now - they are the ONLY way to recover this wallet and its funds.',
+      tone: 'error',
+      cancellable: false,
+      dismissOnBackdrop: false,
+      submitLabel: 'I wrote it down',
+      fields: [
+        {
+          id: 'recoveryPhrase',
+          label: 'Recovery phrase (write on paper)',
+          type: 'textarea',
+          value: phrase,
+          readOnly: true,
+          required: false,
+        },
+        {
+          id: 'seedBackupConfirm',
+          name: 'confirmText',
+          label: 'Type SAVED to confirm',
+          type: 'text',
+          placeholder: 'SAVED',
+          autocomplete: 'off',
+          autocapitalize: 'characters',
+          spellcheck: false,
+        },
+      ],
+      summary: ['Without this backup, clearing storage permanently loses the wallet.'],
+    });
+    if (String(result?.confirmText ?? '').trim().toUpperCase() === 'SAVED') {
+      markTelegramSeedBackupConfirmed(wallet.address);
+      return;
+    }
+  }
+}
+
+function showTelegramManualExportDialog(filename, content) {
+  openActionDialog({
+    title: 'Copy your wallet backup',
+    hint: 'Saving files is unreliable inside Telegram. Copy this encrypted wallet key and store it somewhere safe - it is protected by your password.',
+    submitLabel: 'Done',
+    fields: [{
+      id: 'walletKeyBackup',
+      label: filename,
+      type: 'textarea',
+      value: content,
+      readOnly: true,
+      required: false,
+    }],
+    summary: ['This is your password-encrypted wallet key, not the recovery phrase.'],
+  }).catch(() => {});
+}
+
+// Mark the root as early as the module runs so the install-UI is hidden by CSS
+// before first paint (the full bootstrap runs later, after handlers are wired).
+markTelegramRootAttribute();
 
 async function promptInstallApp() {
   const state = installActionState();
@@ -1706,6 +2063,7 @@ function markWalletUnlocked() {
   lastWalletUnlockAt = Date.now();
   walletUnlockPromptPending = false;
   clearWalletUnlockPromptTimer();
+  clearTelegramBackgroundLockTimer();
 }
 
 function shouldIgnoreTransientWalletLock() {
@@ -1783,6 +2141,7 @@ function lockPlathoWallet(status = 'Wallet locked', options = {}) {
     return;
   }
   clearWalletAutoLockTimer();
+  clearTelegramBackgroundLockTimer();
   clearVaultAutoRefreshTimer();
   pauseProfileAvatarPublishRecoveryTimers();
   plathoWallet = null;
@@ -1808,7 +2167,43 @@ function lockPlathoWallet(status = 'Wallet locked', options = {}) {
   reloadForPendingServiceWorkerAppShellUpdate();
 }
 
+const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 45_000;
+let telegramBackgroundLockTimer = null;
+
+function clearTelegramBackgroundLockTimer() {
+  if (telegramBackgroundLockTimer) {
+    clearTimeout(telegramBackgroundLockTimer);
+    telegramBackgroundLockTimer = null;
+  }
+}
+
+function scheduleTelegramBackgroundLock() {
+  clearTelegramBackgroundLockTimer();
+  telegramBackgroundLockTimer = setTimeout(() => {
+    telegramBackgroundLockTimer = null;
+    // Lock only if still backgrounded; the hard idle auto-lock still applies.
+    if (!document.hidden || !plathoWallet) return;
+    if (shouldDeferLockForActiveSend()) {
+      // A send still holds the key — don't drop the background lock, re-arm and recheck.
+      // Bounded by SEND_LOCK_MAX_GRACE_MS on the send side, so this cannot loop forever.
+      scheduleTelegramBackgroundLock();
+      return;
+    }
+    lockPlathoWallet('Wallet locked');
+  }, TELEGRAM_BACKGROUND_LOCK_GRACE_MS);
+}
+
 function lockPlathoWalletForBackground() {
+  // Telegram (Desktop/Android) backgrounds the WebView on the smallest interaction
+  // (opening its own UI, the attachment sheet, switching chats). Hard-locking on every
+  // such transition makes the wallet unusable, so defer to a short background-grace
+  // timer there — the page keeps running, so the timer fires and locks if still hidden.
+  // iOS suspends the WebView (timers freeze), so it keeps the immediate lock-on-suspend
+  // below; resume after suspend is keyless by design. closing-confirmation guards true close.
+  if (isTelegramEnv() && !isTelegramSuspendingPlatform() && plathoWallet && !shouldIgnoreTransientWalletLock()) {
+    scheduleTelegramBackgroundLock();
+    return;
+  }
   lockPlathoWallet('Wallet locked', { transient: true });
 }
 
@@ -1836,6 +2231,10 @@ function scheduleWalletUnlockPrompt(delayMs = 180) {
         return;
       }
       await bootCrypto();
+      // Re-gate the seed backup on the AUTO unlock path too (resume / foreground /
+      // startup), not just the explicit unlock button — otherwise a user who once
+      // declined the gate could keep using funds with no durable backup.
+      await enforceTelegramSeedBackupGate(wallet);
       flashWalletIdentityStatus('Wallet unlocked');
     } catch (error) {
       console.error(error);
@@ -2801,6 +3200,12 @@ function appendInlineMarkdown(parent, text) {
         anchor.href = href;
         anchor.target = '_blank';
         anchor.rel = 'noreferrer';
+        if (/^https?:/i.test(href) && isTelegramEnv()) {
+          // target=_blank is unreliable inside the Telegram embed; route through the SDK.
+          anchor.addEventListener('click', (event) => {
+            if (openExternalLinkInTelegram(href)) event.preventDefault();
+          });
+        }
       }
       parent.append(anchor);
     }
@@ -7831,6 +8236,7 @@ async function writeStoredPlathoWallet(wallet, password) {
   } catch {
     // Without persistent storage the current tab still has a working wallet.
   }
+  mirrorWalletRecordToTelegramCloud(record);
 }
 
 async function writeEncryptedPlathoWalletRecord(record) {
@@ -7842,6 +8248,7 @@ async function writeEncryptedPlathoWalletRecord(record) {
   storage.setItem(PLATHO_WALLET_STORAGE_KEY, JSON.stringify(record));
   storage.removeItem(PLATHO_WALLET_LEGACY_STORAGE_KEY);
   await requestPersistentLocalStorage();
+  mirrorWalletRecordToTelegramCloud(record);
 }
 
 async function changeStoredPlathoWalletPassword() {
@@ -9416,7 +9823,14 @@ function enforcePublicComposerByteLimit() {
 }
 
 function downloadJsonFile(filename, value) {
-  const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], { type: 'application/json' });
+  const json = `${JSON.stringify(value, null, 2)}\n`;
+  if (isTelegramEnv()) {
+    // <a download>.click() silently fails in Telegram's in-app WebView, so the
+    // file would never save — surface the content for manual copy instead.
+    showTelegramManualExportDialog(filename, json);
+    return;
+  }
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -10778,6 +11192,9 @@ createWalletButton?.addEventListener('click', async () => {
     if (!password) return;
     createWalletButton.disabled = true;
     await setPlathoWallet(walletDraft, { password });
+    // Inside Telegram, force a confirmed seed backup right after generation: the
+    // WebView can evict localStorage and the seed is the only recovery path.
+    await enforceTelegramSeedBackupGate(walletDraft, { force: true });
     flashWalletIdentityStatus('Wallet ready');
   } catch (error) {
     setText(walletAddressStatus, 'blocked');
@@ -10800,6 +11217,8 @@ importWalletButton?.addEventListener('click', async () => {
     if (!password) return;
     importWalletButton.disabled = true;
     await setPlathoWallet(walletDraft, { password });
+    // The user just typed this phrase, so they demonstrably hold the backup.
+    markTelegramSeedBackupConfirmed(walletDraft.address);
     flashWalletIdentityStatus('Wallet ready');
   } catch (error) {
     setText(walletAddressStatus, 'import blocked');
@@ -10818,6 +11237,7 @@ unlockWalletButton?.addEventListener('click', async () => {
       return;
     }
     await bootCrypto();
+    await enforceTelegramSeedBackupGate(wallet);
     flashWalletIdentityStatus('Wallet unlocked');
   } catch (error) {
     setText(unlockWalletStatus, 'blocked');
@@ -18657,13 +19077,7 @@ async function bootCrypto() {
   }
 }
 
-if (window.Telegram?.WebApp) {
-  const tg = window.Telegram.WebApp;
-  tg.ready();
-  tg.expand();
-  tg.setHeaderColor('#0b0d0f');
-  tg.setBackgroundColor('#0b0d0f');
-}
+initTelegramMiniApp();
 
 if ('serviceWorker' in navigator && window.isSecureContext) {
   let serviceWorkerRefreshing = false;
@@ -18704,6 +19118,7 @@ document.addEventListener('visibilitychange', () => {
     clearVaultAutoRefreshTimer();
     lockPlathoWalletForBackground();
   } else {
+    clearTelegramBackgroundLockTimer();
     scheduleWalletUnlockPrompt();
     if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
     if (isVaultViewActive()) {
@@ -18722,6 +19137,7 @@ window.addEventListener('pagehide', () => {
   lockPlathoWalletForBackground();
 });
 window.addEventListener('pageshow', () => {
+  clearTelegramBackgroundLockTimer();
   resumePendingPrivatePublishConfirmations();
   resumePendingPrivateSendRetries();
   scheduleWalletUnlockPrompt();
@@ -18736,6 +19152,7 @@ window.addEventListener('pageshow', () => {
   }
 });
 window.addEventListener('focus', () => {
+  clearTelegramBackgroundLockTimer();
   resumePendingPrivatePublishConfirmations();
   resumePendingPrivateSendRetries();
   if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
@@ -18781,6 +19198,7 @@ renderConversation();
 refreshMessagingControls();
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
+  .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
   .then(() => setTimeout(() => {
     promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
   }, 250))

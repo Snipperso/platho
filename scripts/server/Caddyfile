@@ -8,9 +8,8 @@
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         Alt-Svc "clear"
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://rpc.platho.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://rpc.platho.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors https://web.telegram.org; form-action 'none'; upgrade-insecure-requests"
         X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
         Referrer-Policy "no-referrer"
         Permissions-Policy "accelerometer=(), bluetooth=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=()"
     }
