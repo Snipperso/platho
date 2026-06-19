@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-18T19:01:49.982Z",
+  "generatedAt": "2026-06-19T10:52:02.287Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 130,
-    "totalBytes": 3261552,
-    "bundleSha256": "5c8bc21b1df62bd33418023453cdbaa976677c845cdb7dcac5068d4319fbe0bd",
+    "fileCount": 131,
+    "totalBytes": 3395000,
+    "bundleSha256": "0be9ba0e850b56deab0dea183306c5bdb8a31666a9335e355730532172725411",
     "files": [
       {
         "path": "app.js",
-        "bytes": 772550,
-        "sha256": "5e559641d89187c58297e8595a291726e45295c9872d4d2e56e31a905f4b0066"
+        "bytes": 788514,
+        "sha256": "bc8610205bb9b49cf868c7dfa9c8d78dbdbf86e57b500903688b997b53c65314"
       },
       {
         "path": "assets/icons/back.svg",
@@ -209,8 +209,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 31616,
-        "sha256": "a210aaf85f3b34f7ce14da0914ef295f6be650a97bad45a6538fd0bae9196e2b"
+        "bytes": 31912,
+        "sha256": "df0e8d5f87368d7670dc3d08deeeddab5daa0b4f76966f63bf90c8aed589a091"
       },
       {
         "path": "manifest.webmanifest",
@@ -269,13 +269,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 57373,
-        "sha256": "a76697eb92b988b46b3a531c3dea77ed73824c5b875263a74ad393c2215cac64"
+        "bytes": 58182,
+        "sha256": "0ca9ad13b2a0cdf9bdc3a7afbedf02aeccd15afac0e83e28cda75ed8fde837f3"
       },
       {
         "path": "sw.js",
-        "bytes": 6517,
-        "sha256": "08016edaf51154460387ae8977bb80a69eb5dc54692722f027cb2c6e6aa03725"
+        "bytes": 6555,
+        "sha256": "709c57bdae223a9a316659a876110fb4da9f31fb1a57f02478b614cc489ef3ad"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -656,6 +656,11 @@
         "path": "vendor/@noble/post-quantum/utils.js",
         "bytes": 15329,
         "sha256": "d4bf73f56c164e88957bb298d48b49f5979daf73af211f243e4b396efcda9c50"
+      },
+      {
+        "path": "vendor/telegram-web-app.js",
+        "bytes": 116341,
+        "sha256": "bcc5e1ca219fbea9498e826e0f5648603582c7988ec8c3ce0b85c86a9eb6299c"
       },
       {
         "path": "webp-encoder.mjs",

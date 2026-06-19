@@ -426,7 +426,7 @@ Verify:
 - service worker precaches the runtime noble vendor modules used by wallet and message crypto;
 - production hosting uses the checked-in Caddy/Nginx security headers, including strict CSP, `nosniff`, `no-referrer`, and camera/microphone/geolocation denial;
 - CSP `connect-src` names only same-origin and the approved production TON RPC hosts;
-- CSP `script-src` contains the hash for the inline import map in `web/index.html`; if the import map changes, recompute and update the header before deploy;
+- CSP `script-src` is hash-free: the bundle ships no inline scripts and no inline import map (vendor modules use relative imports, and the Telegram WebApp SDK is self-hosted under `web/vendor/`), so there is no content hash to recompute before deploy;
 - `/` and `/index.html` both serve the same PWA entry;
 - docs viewer opens:
   - About Platho;
