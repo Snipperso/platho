@@ -153,7 +153,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v450';
+const PLATHO_APP_RUNTIME_VERSION = 'v451';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -190,14 +190,19 @@ function startRuntimeDiagnostics() {
     const gap = now - runtimeDiagLastBeatAt;
     runtimeDiagLastBeatAt = now;
     const stall = gap - RUNTIME_DIAG_HEARTBEAT_MS;
-    if (stall < RUNTIME_DIAG_STALL_THRESHOLD_MS) return;
-    runtimeDiagnostics.stallCount += 1;
-    runtimeDiagnostics.lastStallMs = stall;
-    if (stall > runtimeDiagnostics.worstStallMs) {
-      runtimeDiagnostics.worstStallMs = stall;
-      runtimeDiagnostics.worstStallOp = runtimeDiagnostics.currentOp;
-      runtimeDiagnostics.worstStallAt = new Date(now).toISOString();
+    if (stall >= RUNTIME_DIAG_STALL_THRESHOLD_MS) {
+      runtimeDiagnostics.stallCount += 1;
+      runtimeDiagnostics.lastStallMs = stall;
+      if (stall > runtimeDiagnostics.worstStallMs) {
+        runtimeDiagnostics.worstStallMs = stall;
+        runtimeDiagnostics.worstStallOp = runtimeDiagnostics.currentOp;
+        runtimeDiagnostics.worstStallAt = new Date(now).toISOString();
+      }
     }
+    // Live-refresh the on-page diagnostics panel (~1/s) so the freeze can be
+    // watched in real time on the Public landing page. Cheap textContent set;
+    // self-guards when the panel is absent.
+    refreshProfileDiagnostics();
   }, RUNTIME_DIAG_HEARTBEAT_MS);
 }
 startRuntimeDiagnostics();
@@ -10066,7 +10071,7 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
-  if (view === 'profile') refreshProfileDiagnostics();
+  if (view === 'public') refreshProfileDiagnostics();
   if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
     beginMessageSyncUi();
     syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).then((result) => {

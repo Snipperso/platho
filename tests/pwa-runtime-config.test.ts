@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v450<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v450'/);
+    expect(html).toMatch(/id="appVersionLabel">v451<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v451'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1658,14 +1658,19 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/markRuntimeOp\('sync-decap'\)/);
     expect(app).toMatch(/if \(entryMs > runtimeDiagnostics\.worstEntryMs\) runtimeDiagnostics\.worstEntryMs = entryMs/);
     expect(app).toMatch(/diag op=\$\{diag\.currentOp\}/);
-    // v448: the diagnostics panel + copy button are mirrored into the Profile tab, so a freeze can be
-    // captured on a device that has not opened a private dialog yet (the in-chat panel needs an open thread).
+    // v451: the diagnostics panel + copy button are pinned at the TOP of the Public page (the default
+    // landing tab), inside the pane header, so a freeze is visible immediately without any navigation.
     const html = readFileSync('web/index.html', 'utf8');
     expect(html).toMatch(/id="profileDiagnosticsLog"/);
     expect(html).toMatch(/id="copyProfileDiagnosticsButton"/);
+    // the diagnostics wrapper lives in the public pane (between the public header actions and </header>).
+    expect(html).toMatch(/id="publicDiagnostics"/);
+    expect(html).toMatch(/<div class="public-diagnostics" id="publicDiagnostics">[\s\S]*id="profileDiagnosticsLog"[\s\S]*<\/header>/);
     expect(app).toMatch(/function runtimeDiagnosticsText\(\)/);
     expect(app).toMatch(/function refreshProfileDiagnostics\(\)/);
-    expect(app).toMatch(/if \(view === 'profile'\) refreshProfileDiagnostics\(\)/);
+    // refreshed on entering the Public tab AND live every heartbeat (~1/s) so the freeze can be watched.
+    expect(app).toMatch(/if \(view === 'public'\) refreshProfileDiagnostics\(\)/);
+    expect(app).toMatch(/refreshProfileDiagnostics\(\);\n {2}\}, RUNTIME_DIAG_HEARTBEAT_MS\)/);
     expect(app).toMatch(/copyProfileDiagnosticsButton\?\.addEventListener\('click'/);
   });
 
@@ -4162,11 +4167,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v521/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=143/);
+    expect(sw).toMatch(/platho-pwa-prototype-v522/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=144/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=450/);
+    expect(sw).toMatch(/\.\/app\.js\?v=451/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
