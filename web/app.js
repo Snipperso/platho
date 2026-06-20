@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v460';
+const PLATHO_APP_RUNTIME_VERSION = 'v461';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -343,6 +343,9 @@ const copyPrivateDebugButton = document.querySelector('#copyPrivateDebugButton')
 const profileDiagnosticsLog = document.querySelector('#profileDiagnosticsLog');
 const copyProfileDiagnosticsButton = document.querySelector('#copyProfileDiagnosticsButton');
 const copyProfileDiagnosticsStatus = document.querySelector('#copyProfileDiagnosticsStatus');
+const vaultDiagnosticsLog = document.querySelector('#vaultDiagnosticsLog');
+const copyVaultDiagnosticsButton = document.querySelector('#copyVaultDiagnosticsButton');
+const copyVaultDiagnosticsStatus = document.querySelector('#copyVaultDiagnosticsStatus');
 const backToChatsButton = document.querySelector('#backToChatsButton');
 const identityMenuButton = document.querySelector('#identityMenuButton');
 const search = document.querySelector('#threadSearch');
@@ -3094,9 +3097,15 @@ function runtimeDiagnosticsText() {
 }
 
 function refreshProfileDiagnostics() {
-  if (!profileDiagnosticsLog) return;
-  profileDiagnosticsLog.textContent = runtimeDiagnosticsText();
+  // The same diagnostics snapshot feeds the Public landing panel AND the Vault panel
+  // (the freeze triggers on the Public->Vault switch, so the panel must be readable
+  // on Vault too without switching back). Cheap textContent set; self-guards per node.
+  if (!profileDiagnosticsLog && !vaultDiagnosticsLog) return;
+  const text = runtimeDiagnosticsText();
+  if (profileDiagnosticsLog) profileDiagnosticsLog.textContent = text;
+  if (vaultDiagnosticsLog) vaultDiagnosticsLog.textContent = text;
   if (copyProfileDiagnosticsButton) copyProfileDiagnosticsButton.disabled = false;
+  if (copyVaultDiagnosticsButton) copyVaultDiagnosticsButton.disabled = false;
 }
 
 let privateDebugCopyStatusTimer = null;
@@ -10582,7 +10591,7 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
-  if (view === 'public') refreshProfileDiagnostics();
+  if (view === 'public' || view === 'vault') refreshProfileDiagnostics();
   if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
     beginMessageSyncUi();
     syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).then((result) => {
@@ -11914,6 +11923,17 @@ copyProfileDiagnosticsButton?.addEventListener('click', async () => {
     setText(copyProfileDiagnosticsStatus, 'copied');
   } catch (error) {
     setText(copyProfileDiagnosticsStatus, 'copy blocked');
+    console.error(error);
+  }
+});
+
+copyVaultDiagnosticsButton?.addEventListener('click', async () => {
+  refreshProfileDiagnostics();
+  try {
+    await copyTextToClipboard(vaultDiagnosticsLog?.textContent ?? '');
+    setText(copyVaultDiagnosticsStatus, 'copied');
+  } catch (error) {
+    setText(copyVaultDiagnosticsStatus, 'copy blocked');
     console.error(error);
   }
 });
