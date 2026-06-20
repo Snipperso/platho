@@ -8,7 +8,7 @@ export const DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET = 'UQDU48m_nYC12oqHJnKG9nBE4lj
 export const DEFAULT_PUBLIC_CHANNELS = Object.freeze([
   Object.freeze({
     id: DEFAULT_PUBLIC_CHANNEL_ID,
-    name: 'platho.app',
+    name: 'platho.ath',
     avatar: 'P',
     subtitle: 'official read-only channel',
     authorWallet: DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,
@@ -352,11 +352,17 @@ export function publicChannelThreadsToFeedItems(threads) {
   for (const thread of threads ?? []) {
     const messages = thread.messages ?? [];
     if (messages.length === 0) {
+      // Render the "waiting for posts" placeholder like a real post (avatar + author name once + body),
+      // not a labelled syncing card — so the hardcoded official-channel message is visually
+      // indistinguishable from an ordinary public post.
       items.push({
         id: thread.id,
         channelId: thread.publicChannelId,
-        meta: [thread.name, thread.state, thread.time].filter(Boolean),
-        title: thread.name,
+        authorWallet: thread.publicChannelAuthorWallet,
+        avatarImageUrl: thread.avatarImageUrl,
+        author: thread.name,
+        meta: [thread.name].filter(Boolean),
+        title: null,
         text: thread.preview,
         comments: [],
         compact: true,
