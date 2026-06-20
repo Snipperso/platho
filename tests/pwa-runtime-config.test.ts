@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v454<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v454'/);
+    expect(html).toMatch(/id="appVersionLabel">v455<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v455'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -348,6 +348,25 @@ describe('PWA runtime config guard', () => {
     // Channels list column width matches the Private dialog-list column (one shared variable).
     expect(css).toMatch(/--public-list-col:\s*clamp\(280px, 32vw, 392px\)/);
     expect(css).toMatch(/data-public-mode="channels"\]\s*\{[\s\S]*grid-template-columns:\s*minmax\(280px, var\(--public-list-col\)\)/);
+  });
+
+  it('PWA-CONFIG-01I: opening a private chat reuses the existing dialog, and the comments toggle reads its state', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // "Private chat" from a Public wallet channel must land in the SAME dialog opened earlier under a
+    // different identity (e.g. an .ath name) or address format, instead of creating a duplicate. Match
+    // by exact id, then shared identity variant, then the same counterparty wallet compared as raw.
+    expect(app).toMatch(/function findExistingRecipientThread\(newThread\)/);
+    expect(app).toMatch(/const existing = findExistingRecipientThread\(result\.thread\)/);
+    expect(app).toMatch(/findThreadByIdentityVariants\(threads, threadIdentityVariants\(newThread\)\)/);
+    expect(app).toMatch(/sameWalletAddress\(wallet, newWallet\)/);
+
+    // Comments toggle is unambiguous: ON = accent (no slash); OFF = muted with a diagonal slash.
+    expect(css).toMatch(/\.composer-post-option::after\s*{[\s\S]*?transform: translate\(-50%, -50%\) rotate\(-45deg\);/);
+    expect(css).toMatch(/\.composer-post-option:has\(input:checked\)::after\s*{\s*opacity: 0;/);
+    expect(app).toMatch(/function updatePublicCommentsToggleUi\(\)/);
+    expect(app).toMatch(/'Comments on - tap to turn off' : 'Comments off - tap to turn on'/);
   });
 
   it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
@@ -4208,11 +4227,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v525/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=147/);
+    expect(sw).toMatch(/platho-pwa-prototype-v526/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=148/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=454/);
+    expect(sw).toMatch(/\.\/app\.js\?v=455/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
