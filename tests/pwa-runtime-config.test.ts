@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v458<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v458'/);
+    expect(html).toMatch(/id="appVersionLabel">v459<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v459'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1748,6 +1748,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(view === 'public'\) refreshProfileDiagnostics\(\)/);
     expect(app).toMatch(/refreshProfileDiagnostics\(\);\n {2}\}, RUNTIME_DIAG_HEARTBEAT_MS\)/);
     expect(app).toMatch(/copyProfileDiagnosticsButton\?\.addEventListener\('click'/);
+    // v459: heartbeat-liveness indicator (beat counter + live age) so even a STATIC freeze screenshot
+    // disambiguates a CPU block (beat frozen) from a UI-event lock (beat keeps climbing). The freeze
+    // reproduces in iOS Safari + PWA + Telegram Mini App (all WebKit), never on Android/Windows, so it is
+    // NOT Telegram-specific. markRuntimeOp now also brackets the synchronous boot block + the public render
+    // so a transient main-thread block on the no-wallet Public path is attributed (worstStallOp).
+    expect(app).toMatch(/runtimeDiagnostics\.beats \+= 1/);
+    expect(app).toMatch(/beat=\$\{d\.beats\} age=\$\{Math\.round\(\(Date\.now\(\) - d\.startedAtMs\) \/ 1000\)\}s/);
+    expect(app).toMatch(/markRuntimeOp\('boot'\)/);
+    expect(app).toMatch(/markRuntimeOp\('public-render'\)/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4243,11 +4252,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v529/);
+    expect(sw).toMatch(/platho-pwa-prototype-v530/);
     expect(sw).toMatch(/\.\/styles\.css\?v=150/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=458/);
+    expect(sw).toMatch(/\.\/app\.js\?v=459/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
