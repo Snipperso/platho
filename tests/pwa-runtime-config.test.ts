@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v451<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v451'/);
+    expect(html).toMatch(/id="appVersionLabel">v452<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v452'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -308,10 +308,41 @@ describe('PWA runtime config guard', () => {
     // the "Display as" menu — not only threads created via New Chat's local-label field.
     expect(app).toMatch(/async function promptThreadLocalLabel\(thread\)/);
     expect(app).toMatch(/thread\.localLabel = next;\s*thread\.displayIdentity = null/);
-    expect(app).toMatch(/thread\.localLabel \? 'Edit local name' : 'Set local name'/);
+    expect(app).toMatch(/localLabelExists \? 'Edit local name' : 'Set local name'/);
     expect(app).toMatch(/identity-variant-action/);
     expect(app).toMatch(/promptThreadLocalLabel\(thread\)\.catch/);
     expect(app).toMatch(/identityMenuButton\.hidden = identityDisplayOptions\(thread\)\.length < 1/);
+  });
+
+  it('PWA-CONFIG-01H: Public wallet channels share the Private "Display as" name + avatar per counterparty', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // Shared, counterparty-keyed display preference store (distinct from the self-presentation store).
+    expect(app).toMatch(/CONTACT_DISPLAY_PREFERENCE_STORAGE_PREFIX = 'platho\.contact\.displayPreference\.v1'/);
+    expect(app).toMatch(/function readContactDisplayPreference\(counterpartyWallet\)/);
+    expect(app).toMatch(/function writeContactDisplayPreference\(counterpartyWallet, preference\)/);
+    expect(app).toMatch(/function resolveContactDisplay\(counterpartyWallet\)/);
+
+    // Private -> Public and Public -> Private halves of the sync.
+    expect(app).toMatch(/function syncThreadDisplayToContactStore\(thread\)/);
+    expect(app).toMatch(/function applyContactDisplaySelection\(counterpartyWallet/);
+    expect(app).toMatch(/function hydrateThreadDisplayFromContactStore\(thread\)/);
+    expect(app).toMatch(/threads\.forEach\(hydrateThreadDisplayFromContactStore\)/);
+
+    // Public "Display as" menu reuses the same option builder + popover as Private.
+    expect(app).toMatch(/function showPublicChannelDisplayPopover\(channel, anchor\)/);
+    expect(app).toMatch(/options: identityDisplayOptions\(context\)/);
+    expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName \}\)/);
+
+    // Registry name overlay + per-wallet avatar resolution so feed, channels list and detail all show it.
+    expect(app).toMatch(/\.map\(applyContactDisplayToRegistryChannel\)/);
+    expect(app).toMatch(/function publicAvatarUrlForWallet\(walletAddress\)/);
+    expect(app).toMatch(/latestPost\?\.avatarImageUrl \?\? publicAvatarUrlForWallet\(channel\.authorWallet\)/);
+
+    // Channels list column width matches the Private dialog-list column (one shared variable).
+    expect(css).toMatch(/--public-list-col:\s*clamp\(280px, 32vw, 392px\)/);
+    expect(css).toMatch(/data-public-mode="channels"\]\s*\{[\s\S]*grid-template-columns:\s*minmax\(280px, var\(--public-list-col\)\)/);
   });
 
   it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
@@ -4167,11 +4198,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v522/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=144/);
+    expect(sw).toMatch(/platho-pwa-prototype-v523/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=145/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=451/);
+    expect(sw).toMatch(/\.\/app\.js\?v=452/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
