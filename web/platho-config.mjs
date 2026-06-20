@@ -183,7 +183,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   publicChannels: [
     {
       id: 'platho.app',
-      name: 'platho.ath',
+      name: 'platho',
       avatar: 'P',
       subtitle: 'official read-only channel',
       authorWallet: 'UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH',
