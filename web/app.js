@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v454';
+const PLATHO_APP_RUNTIME_VERSION = 'v455';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -3676,10 +3676,31 @@ function activeThread() {
   return threads.find((item) => item.id === activeThreadId) ?? threads[0] ?? null;
 }
 
+// Find an already-open dialog for the same person as `newThread`, even when they were reached by a
+// different identity (e.g. an existing chat started via an .ath name vs. opening "Private chat" from a
+// Public wallet channel) or the same wallet in a different address format. Order: exact thread id ->
+// any shared identity variant -> same counterparty wallet (compared as raw, so friendly/raw forms
+// match). Prevents the duplicate empty dialog reported from the Public tab.
+function findExistingRecipientThread(newThread) {
+  const byId = threads.find((thread) => thread.id === newThread.id);
+  if (byId) return byId;
+  const byVariant = findThreadByIdentityVariants(threads, threadIdentityVariants(newThread));
+  if (byVariant) return byVariant;
+  const newWallet = ownerWalletFromThread(newThread);
+  if (newWallet) {
+    const byWallet = threads.find((thread) => {
+      const wallet = ownerWalletFromThread(thread);
+      return wallet && sameWalletAddress(wallet, newWallet);
+    });
+    if (byWallet) return byWallet;
+  }
+  return null;
+}
+
 function selectOrCreateRecipientThread(input, options = {}) {
   const result = createRecipientThread(input, options);
   if (!result.ok) return result;
-  const existing = threads.find((thread) => thread.id === result.thread.id);
+  const existing = findExistingRecipientThread(result.thread);
   if (existing) {
     if (result.thread.localLabel) {
       existing.localLabel = result.thread.localLabel;
@@ -4445,6 +4466,7 @@ function setPublicCommentTarget(item = null) {
     }
     if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.checked = readPublicCommentsDefault() !== 'disabled';
   }
+  updatePublicCommentsToggleUi();
   refreshComposerPublishPolicy();
   refreshComposerCostStatus();
 }
@@ -9812,6 +9834,17 @@ function updatePublicCommentsDefaultUi() {
   const value = readPublicCommentsDefault();
   if (publicCommentsDefaultSelect) publicCommentsDefaultSelect.value = value;
   if (!publicCommentTarget && publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.checked = value !== 'disabled';
+  updatePublicCommentsToggleUi();
+}
+
+// Keep the comments toggle's title/aria-label reflecting its state (the visual is the accent-vs-muted
+// + slash styling; this makes the state explicit for hover and screen readers too).
+function updatePublicCommentsToggleUi() {
+  if (!publicPostCommentsToggle) return;
+  const on = publicComposerCommentsCheckbox?.checked !== false;
+  const label = on ? 'Comments on - tap to turn off' : 'Comments off - tap to turn on';
+  publicPostCommentsToggle.setAttribute('aria-label', label);
+  publicPostCommentsToggle.title = label;
 }
 
 function publicSyncWindowLabel(value = readPublicSyncWindow()) {
@@ -11234,6 +11267,7 @@ publicCancelCommentButton?.addEventListener('click', () => {
 });
 
 publicComposerCommentsCheckbox?.addEventListener('change', () => {
+  updatePublicCommentsToggleUi();
   setPublicStatus(publicComposerCommentsCheckbox.checked
     ? 'next post allows comments'
     : 'next post closes comments');

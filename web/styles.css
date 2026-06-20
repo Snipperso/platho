@@ -1076,6 +1076,7 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .composer-post-option {
+  position: relative;
   justify-self: stretch;
   display: inline-flex;
   align-items: center;
@@ -1088,6 +1089,27 @@ html[data-platho-telegram="true"] .install-header-button {
   color: var(--muted);
   font-size: 13px;
   cursor: pointer;
+}
+
+/* Comments toggle reads its state at a glance: ON = accent green, no slash (see
+   :has(input:checked) below); OFF = muted with a diagonal slash across the chat icon,
+   like the eye/eye-off send-privacy button. */
+.composer-post-option::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  box-shadow: 0 0 0 2px var(--panel-3);
+  transform: translate(-50%, -50%) rotate(-45deg);
+  pointer-events: none;
+}
+
+.composer-post-option:has(input:checked)::after {
+  opacity: 0;
 }
 
 .composer-post-option[hidden] {
@@ -1103,8 +1125,8 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .composer-post-option:has(input:checked) {
-  border-color: rgba(48, 213, 176, 0.32);
-  background: rgba(48, 213, 176, 0.12);
+  border-color: rgba(48, 213, 176, 0.5);
+  background: rgba(48, 213, 176, 0.18);
   color: var(--accent);
 }
 
@@ -1178,16 +1200,14 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .composer .composer-add-button,
-.composer .private-anonymous-button,
-.composer-post-option {
+.composer .private-anonymous-button {
   background: rgba(48, 213, 176, 0.06);
   border-color: rgba(48, 213, 176, 0.26);
   color: var(--accent);
 }
 
 .composer .composer-add-button:hover,
-.composer .private-anonymous-button:hover,
-.composer-post-option:hover {
+.composer .private-anonymous-button:hover {
   border-color: rgba(48, 213, 176, 0.42);
   background: rgba(48, 213, 176, 0.1);
 }
