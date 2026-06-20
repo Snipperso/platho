@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v455<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v455'/);
+    expect(html).toMatch(/id="appVersionLabel">v456<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v456'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -367,6 +367,22 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.composer-post-option:has\(input:checked\)::after\s*{\s*opacity: 0;/);
     expect(app).toMatch(/function updatePublicCommentsToggleUi\(\)/);
     expect(app).toMatch(/'Comments on - tap to turn off' : 'Comments off - tap to turn on'/);
+
+    // Feed-mode posts fill the column width (consistent with the compact cards), not capped to image width.
+    expect(css).toMatch(/\.public-feed\[data-public-mode="feed"\] > \.feed-item:not\(\.compact\)\s*{[\s\S]*?width: 100%;/);
+
+    const mjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    // (1) A wallet post shows its author/channel name ONCE: dropped from message.meta, and no title
+    // fallback to the channel name (the live name comes from thread.name in the feed item).
+    expect(mjs).toMatch(/meta: \[post\.publishStatus, shortTime\(post\.createdAt\)/);
+    expect(mjs).toMatch(/title: message\.publicPostTitle \?\? null/);
+    // (2) Posts are marked read when actually viewed (Public tab active; channel detail visible).
+    expect(app).toMatch(/isPublicViewActive\(\) && markVisiblePublicFeedRead\(items\)/);
+    expect(app).toMatch(/getComputedStyle\(publicChannelDetail\)\.display !== 'none'[\s\S]*?markVisiblePublicFeedRead\(items\)/);
+    // (3) Mobile Channels mode: tapping a channel opens its detail full-width with a back button.
+    expect(app).toMatch(/let publicChannelDetailOpen = false/);
+    expect(app).toMatch(/public-channel-detail-back-button/);
+    expect(css).toMatch(/\[data-channel-detail-open="true"\][\s\S]*?\.public-channel-detail\s*{[\s\S]*?display: grid;/);
   });
 
   it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
@@ -788,7 +804,7 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.message \{[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;/);
     expect(css).toMatch(/\.bubble \{[\s\S]*width:\s*fit-content;[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
     expect(css).toMatch(/\.message-image,[\s\S]*\.feed-image \{[\s\S]*max-width:\s*var\(--message-media-width\)/);
-    expect(css).toMatch(/\.public-feed\[data-public-mode="feed"\] > \.feed-item:not\(\.compact\) \{[\s\S]*width:\s*min\(100%, calc\(var\(--message-media-width\) \+ 36px\)\)/);
+    expect(css).toMatch(/\.public-feed\[data-public-mode="feed"\] > \.feed-item:not\(\.compact\) \{[\s\S]*width: 100%;/);
     expect(app).toMatch(/navVaultTonBalances/);
     expect(app).toMatch(/let navVaultBalanceState = \{/);
     expect(app).toMatch(/function markNavVaultBalancePending/);
@@ -4227,11 +4243,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v526/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=148/);
+    expect(sw).toMatch(/platho-pwa-prototype-v527/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=149/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=455/);
+    expect(sw).toMatch(/\.\/app\.js\?v=456/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -4240,7 +4256,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=31/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=7/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=8/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=29/);
