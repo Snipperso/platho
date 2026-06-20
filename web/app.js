@@ -46,6 +46,7 @@ import {
 } from './vault-ton-rpc-provider.mjs?v=44';
 import {
   DEFAULT_PUBLIC_CHANNELS,
+  DEFAULT_PUBLIC_CHANNEL_ID,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
   PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY,
   normalizePublicChannelRegistry,
@@ -66,6 +67,7 @@ import {
   identityTone,
   identityTypeLabel,
   normalizeIdentityVariants,
+  normalizeRecipientIdentity,
   parseRecipientIdentity,
   preferredInboundIdentity,
   primaryThreadIdentity,
@@ -153,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v451';
+const PLATHO_APP_RUNTIME_VERSION = 'v452';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -479,6 +481,9 @@ let publicChannelRegistry = [];
 let publicChannelThreads = [];
 let publicChannelSubscriptions = null;
 let publicChannelFeedCache = {};
+// Wallet (raw) -> resolved profile-avatar data URL for Public wallet channels, so a channel shows the
+// author's avatar even before/without any cached public post. `null` is a cached "no avatar" miss.
+const publicChannelAvatarUrlByWallet = new Map();
 let publicReadCursors = {};
 let activeThreadId = null;
 let activeDocId = APP_DOCS[0]?.id ?? null;
@@ -498,6 +503,9 @@ let encryptedMessageStore = null;
 let vaultProviderLoadPromise = null;
 let tonDnsProviderLoadPromise = null;
 let identityPopover = null;
+// The button that opened the shared "Display as" popover (Private conversation header OR a Public
+// channel detail header), so its aria-expanded can be reset when the popover closes.
+let identityPopoverAnchor = null;
 let activeActionDialog = null;
 let publicDisplayMode = 'feed';
 let publicChannelSearchQuery = '';
@@ -676,6 +684,11 @@ const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
 const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
 const INSTALL_PROMPT_DISMISSED_STORAGE_KEY = 'platho.installPrompt.dismissed.v1';
 const WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX = 'platho.wallet.displayIdentity.v1';
+// How THIS device chooses to SEE a given counterparty wallet (their Private dialog name AND their
+// Public channel name). Keyed by the counterparty's raw wallet address so a choice made in Private
+// and a choice made in Public stay in sync for the same person. Distinct from
+// WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX above, which is keyed by MY OWN wallet (self-presentation).
+const CONTACT_DISPLAY_PREFERENCE_STORAGE_PREFIX = 'platho.contact.displayPreference.v1';
 const LINKED_PLATHO_USERNAME_STORAGE_PREFIX = 'platho.wallet.linkedPlathoUsername.v1';
 const PRIVATE_SENDER_MODE_STORAGE_PREFIX = 'platho.privateSenderMode.v1';
 const PROFILE_AVATAR_POINTER_STORAGE_PREFIX = 'platho.profile.avatar.v1';
@@ -1658,6 +1671,93 @@ function walletDisplayIdentityStorageKey(owner = plathoWallet?.address) {
   return owner ? `${WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX}:${owner}` : null;
 }
 
+// --- Per-counterparty display preference (shared by Private dialogs and Public wallet channels) ---
+// The stored shape is { displayIdentity: <recipient identity or null>, localLabel: <string or null> },
+// mirroring exactly the two fields a Private thread carries (thread.displayIdentity / thread.localLabel)
+// so the "Display as" choice is identical in both tabs for the same wallet.
+function contactDisplayPreferenceStorageKey(counterpartyWallet) {
+  const raw = rawWalletAddress(counterpartyWallet);
+  return raw ? `${CONTACT_DISPLAY_PREFERENCE_STORAGE_PREFIX}:${raw}` : null;
+}
+
+function normalizeContactDisplayPreference(value) {
+  if (!value || typeof value !== 'object') return null;
+  const displayIdentity = normalizeRecipientIdentity(value.displayIdentity) ?? null;
+  const rawLabel = typeof value.localLabel === 'string' ? value.localLabel.trim() : '';
+  const localLabel = rawLabel.length > 0 ? rawLabel : null;
+  if (!displayIdentity && !localLabel) return null;
+  return { displayIdentity, localLabel };
+}
+
+function readContactDisplayPreference(counterpartyWallet) {
+  const key = contactDisplayPreferenceStorageKey(counterpartyWallet);
+  if (!key) return null;
+  try {
+    return normalizeContactDisplayPreference(JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null'));
+  } catch {
+    return null;
+  }
+}
+
+function writeContactDisplayPreference(counterpartyWallet, preference) {
+  const key = contactDisplayPreferenceStorageKey(counterpartyWallet);
+  if (!key) return;
+  const normalized = normalizeContactDisplayPreference(preference);
+  try {
+    if (!normalized) {
+      localStorageOrNull()?.removeItem(key);
+    } else {
+      localStorageOrNull()?.setItem(key, JSON.stringify({
+        displayIdentity: normalized.displayIdentity,
+        localLabel: normalized.localLabel,
+      }));
+    }
+  } catch {
+    // The cross-tab display preference is cosmetic; a failed write just means no sync this time.
+  }
+}
+
+// Resolve how a counterparty wallet should be shown (name + identity tone) from the shared store.
+// Returns null when the user has not chosen anything for this wallet (callers then keep the default
+// short-address presentation).
+function resolveContactDisplay(counterpartyWallet) {
+  const stored = readContactDisplayPreference(counterpartyWallet);
+  if (!stored) return null;
+  if (stored.displayIdentity) {
+    return {
+      name: displayIdentityLabel(stored.displayIdentity),
+      tone: identityTone(stored.displayIdentity),
+      identity: stored.displayIdentity,
+      localLabel: stored.localLabel ?? null,
+    };
+  }
+  if (stored.localLabel) {
+    return { name: stored.localLabel, tone: null, identity: null, localLabel: stored.localLabel };
+  }
+  return null;
+}
+
+// How a Public wallet channel should be shown: an explicit shared-store choice wins; otherwise mirror
+// the matching Private dialog's CURRENT display (so a chat started via an .ath name shows that name in
+// Public too, even with no explicit choice). Returns null to keep the default short-address name.
+function resolveWalletChannelDisplay(counterpartyWallet) {
+  const explicit = resolveContactDisplay(counterpartyWallet);
+  if (explicit) return explicit;
+  const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
+  if (thread) {
+    const name = threadDisplayLabel(thread);
+    if (name) {
+      return {
+        name,
+        tone: threadDisplayTone(thread),
+        identity: threadSelectedIdentity(thread),
+        localLabel: thread.localLabel ?? null,
+      };
+    }
+  }
+  return null;
+}
+
 function linkedPlathoUsernameStorageKey(owner = plathoWallet?.address) {
   return owner ? `${LINKED_PLATHO_USERNAME_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${owner}` : null;
 }
@@ -2352,6 +2452,97 @@ function persistThreadDisplayPreference(thread) {
     .catch((error) => console.error(error));
 }
 
+// Mirror a Private thread's "Display as" choice into the shared per-counterparty store so the same
+// person's Public wallet channel shows the same name. Cheap: writes localStorage and re-overlays the
+// public registry names (no render — the Public surface re-resolves names from the registry on its
+// next paint / sync).
+function syncThreadDisplayToContactStore(thread) {
+  const wallet = ownerWalletFromThread(thread);
+  if (!wallet) return;
+  writeContactDisplayPreference(wallet, {
+    displayIdentity: thread.displayIdentity ?? null,
+    localLabel: thread.localLabel ?? null,
+  });
+  rebuildPublicChannelRegistry();
+}
+
+// Apply a display choice that originated in the Public tab back to the shared store AND to any live
+// Private thread for the same wallet, then refresh both surfaces. This is the Public -> Private half
+// of the sync (the Private -> Public half is syncThreadDisplayToContactStore above).
+function applyContactDisplaySelection(counterpartyWallet, { displayIdentity = null, localLabel = null } = {}) {
+  writeContactDisplayPreference(counterpartyWallet, { displayIdentity, localLabel });
+  const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
+  if (thread) {
+    thread.displayIdentity = displayIdentity ?? null;
+    if (localLabel) thread.localLabel = localLabel;
+    else delete thread.localLabel;
+    applyThreadDisplayFields(thread);
+    persistThreadDisplayPreference(thread);
+  }
+  // rebuildThreadsFromPublicSubscriptions re-overlays the registry itself, so no separate rebuild here.
+  rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+  renderThreads();
+  renderConversation();
+  renderPublicSurface({ anchorUnread: false });
+}
+
+// Build a thread-shaped object for a wallet that has NO open Private dialog, so the Public "Display as"
+// menu can reuse the exact same option-builder (identityDisplayOptions) the Private menu uses. When a
+// real Private thread exists, callers pass that instead and full parity (incl. a known .ath username)
+// is automatic.
+function contactDisplayContextForWallet(counterpartyWallet) {
+  const existing = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
+  if (existing) return existing;
+  const created = createRecipientThread(counterpartyWallet);
+  const base = created.ok
+    ? created.thread
+    : { id: `wallet:${rawWalletAddress(counterpartyWallet) ?? counterpartyWallet}`, identityVariants: privateWalletIdentityVariants(counterpartyWallet) };
+  const stored = readContactDisplayPreference(counterpartyWallet);
+  if (stored?.displayIdentity) {
+    base.identityVariants = normalizeIdentityVariants([stored.displayIdentity, ...threadIdentityVariants(base)]);
+    base.displayIdentity = stored.displayIdentity;
+  }
+  if (stored?.localLabel) base.localLabel = stored.localLabel;
+  return base;
+}
+
+// Pull a Private thread's display fields into line with the shared per-counterparty store. This is the
+// load-time half of the Public <-> Private sync: a choice made in Public for a wallet whose dialog was
+// not loaded at the time lands on the thread when it next materializes. If the store has nothing yet
+// but the thread already carries a preference (a user who chose a name before this feature shipped), the
+// thread seeds the store so the choice propagates to Public. Returns true when the thread changed.
+//
+// Runs ONCE per thread object (thread.contactDisplaySynced, a runtime-only flag not persisted in the
+// thread snapshot). One-time is correct AND necessary: after the first sync every live edit updates the
+// thread directly (Private via the popover callback, Public via applyContactDisplaySelection), so the
+// store never gets ahead of a loaded thread. Re-running it on every renderThreads would (a) revert a
+// just-made choice when the render happens before the store write, and (b) hammer localStorage on every
+// keystroke-triggered render (slow-device path).
+function hydrateThreadDisplayFromContactStore(thread) {
+  if (!thread || thread.contactDisplaySynced) return false;
+  const wallet = ownerWalletFromThread(thread);
+  if (!wallet) return false; // no wallet yet (unresolved peer): retry once it resolves
+  thread.contactDisplaySynced = true;
+  const stored = readContactDisplayPreference(wallet);
+  if (!stored) {
+    if (thread.displayIdentity || thread.localLabel) {
+      writeContactDisplayPreference(wallet, {
+        displayIdentity: thread.displayIdentity ?? null,
+        localLabel: thread.localLabel ?? null,
+      });
+    }
+    return false;
+  }
+  const sameIdentity = identityKey(stored.displayIdentity) === identityKey(thread.displayIdentity ?? null);
+  const sameLabel = (stored.localLabel ?? null) === (thread.localLabel ?? null);
+  if (sameIdentity && sameLabel) return false;
+  thread.displayIdentity = stored.displayIdentity ?? null;
+  if (stored.localLabel) thread.localLabel = stored.localLabel;
+  else delete thread.localLabel;
+  applyThreadDisplayFields(thread);
+  return true;
+}
+
 function setIdentityLabel(node, thread, baseClass = 'identity-label') {
   const tone = threadDisplayTone(thread);
   node.textContent = threadDisplayLabel(thread);
@@ -2434,6 +2625,11 @@ function ensureIdentityPopover() {
 
 function hideIdentityPopover() {
   if (identityPopover) identityPopover.hidden = true;
+  // Reset whichever button opened the popover (Private header or a Public channel detail button).
+  if (identityPopoverAnchor) {
+    identityPopoverAnchor.setAttribute('aria-expanded', 'false');
+    identityPopoverAnchor = null;
+  }
   identityMenuButton?.setAttribute('aria-expanded', 'false');
 }
 
@@ -2470,15 +2666,44 @@ async function promptThreadLocalLabel(thread) {
     // The cleared label may have been the shown name; applyThreadDisplayFields falls back to the identity.
   }
   applyThreadDisplayFields(thread);
+  syncThreadDisplayToContactStore(thread); // write the store BEFORE rendering (hydrate reads it)
   renderThreads();
   renderConversation();
   persistThreadDisplayPreference(thread);
 }
 
-function showIdentityPopover(thread, anchor) {
-  const options = identityDisplayOptions(thread);
-  if (!thread || !anchor) return;
-  const selectedKey = selectedIdentityDisplayOptionKey(thread);
+// Public-side twin of promptThreadLocalLabel: set/edit the local name for a wallet channel that may
+// have no open Private dialog. Writes the shared store (and the matching live thread, if any).
+async function promptContactLocalLabel(counterpartyWallet) {
+  const stored = readContactDisplayPreference(counterpartyWallet);
+  const current = stored?.localLabel ?? '';
+  const result = await openActionDialog({
+    title: current ? 'Edit local name' : 'Set local name',
+    hint: 'A private label shown only on this device. It is never sent to the other side. Leave empty to clear it.',
+    submitLabel: 'Save',
+    fields: [
+      {
+        id: 'localLabel',
+        label: 'Local name',
+        placeholder: 'Optional, e.g. Anonymous',
+        value: current,
+        required: false,
+        autocomplete: 'off',
+      },
+    ],
+  });
+  if (!result) return;
+  const next = (result.localLabel ?? '').trim();
+  // Setting a local name clears the identity choice (mirrors promptThreadLocalLabel); clearing it falls
+  // back to the wallet/identity default.
+  applyContactDisplaySelection(counterpartyWallet, { displayIdentity: null, localLabel: next || null });
+}
+
+// Generic "Display as" popover used by BOTH the Private conversation header and the Public channel
+// detail header. The caller supplies the option list, the current selection, and what to do when an
+// option / the local-name action is picked.
+function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName }) {
+  if (!anchor) return;
   const popover = ensureIdentityPopover();
   popover.setAttribute('role', 'menu');
   popover.replaceChildren();
@@ -2486,37 +2711,86 @@ function showIdentityPopover(thread, anchor) {
   title.className = 'identity-popover-title';
   title.textContent = 'Display as';
   popover.append(title);
-  for (const option of options) {
+  for (const option of options ?? []) {
     popover.append(identityVariantRow(option, option.key === selectedKey, (selected) => {
-      thread.displayIdentity = selected.identity ?? null;
-      applyThreadDisplayFields(thread);
       hideIdentityPopover();
-      renderThreads();
-      renderConversation();
-      persistThreadDisplayPreference(thread);
+      onSelect(selected);
     }));
   }
-  // Always offer a way to set/edit the private local name — so a thread auto-created from an incoming
-  // message (which never went through New Chat's local-label field) can still be named locally.
   const localNameRow = document.createElement('button');
   localNameRow.type = 'button';
   localNameRow.className = 'identity-variant identity-variant-action';
   localNameRow.setAttribute('role', 'menuitem');
   const localNameLabel = document.createElement('strong');
-  localNameLabel.textContent = thread.localLabel ? 'Edit local name' : 'Set local name';
+  localNameLabel.textContent = localLabelExists ? 'Edit local name' : 'Set local name';
   const localNameType = document.createElement('span');
   localNameType.textContent = 'Only shown on this device';
   localNameRow.append(localNameLabel, localNameType);
   localNameRow.addEventListener('click', () => {
     hideIdentityPopover();
-    promptThreadLocalLabel(thread).catch((error) => console.error(error));
+    onSetLocalName();
   });
   popover.append(localNameRow);
   const rect = anchor.getBoundingClientRect();
   popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
   popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 220)}px`;
   popover.hidden = false;
-  identityMenuButton?.setAttribute('aria-expanded', 'true');
+  // Track the opening button so its aria-expanded reflects the open state and is reset on close
+  // (works for both the Private header button and a Public channel detail button).
+  if (identityPopoverAnchor && identityPopoverAnchor !== anchor) {
+    identityPopoverAnchor.setAttribute('aria-expanded', 'false');
+  }
+  identityPopoverAnchor = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+}
+
+function showIdentityPopover(thread, anchor) {
+  if (!thread || !anchor) return;
+  renderDisplayAsPopover({
+    options: identityDisplayOptions(thread),
+    selectedKey: selectedIdentityDisplayOptionKey(thread),
+    localLabelExists: Boolean(thread.localLabel),
+    anchor,
+    onSelect: (selected) => {
+      thread.displayIdentity = selected.identity ?? null;
+      applyThreadDisplayFields(thread);
+      syncThreadDisplayToContactStore(thread); // write the store BEFORE rendering (hydrate reads it)
+      renderThreads();
+      renderConversation();
+      persistThreadDisplayPreference(thread);
+    },
+    onSetLocalName: () => {
+      promptThreadLocalLabel(thread).catch((error) => console.error(error));
+    },
+  });
+}
+
+// "Display as" for a Public wallet channel — the menu, options, and selection semantics mirror the
+// Private conversation header exactly, and every change flows through the shared store so the matching
+// Private dialog stays in sync.
+function showPublicChannelDisplayPopover(channel, anchor) {
+  const wallet = channel?.authorWallet;
+  if (!wallet || !anchor) return;
+  const context = contactDisplayContextForWallet(wallet);
+  renderDisplayAsPopover({
+    options: identityDisplayOptions(context),
+    selectedKey: selectedIdentityDisplayOptionKey(context),
+    localLabelExists: Boolean(context.localLabel),
+    anchor,
+    onSelect: (selected) => {
+      // Re-read the local label from the store at click time (not the captured context): the user may
+      // have set one via "Set local name" since this popover was built. Selecting an identity must not
+      // wipe it (mirrors Private, where choosing an identity leaves thread.localLabel intact).
+      const currentLocalLabel = readContactDisplayPreference(wallet)?.localLabel ?? null;
+      applyContactDisplaySelection(wallet, {
+        displayIdentity: selected.identity ?? null,
+        localLabel: currentLocalLabel,
+      });
+    },
+    onSetLocalName: () => {
+      promptContactLocalLabel(wallet).catch((error) => console.error(error));
+    },
+  });
 }
 
 function renderConversationIdentity(thread) {
@@ -3422,8 +3696,25 @@ function rebuildPublicChannelRegistry() {
   const baseChannels = normalizePublicChannelRegistry(basePublicChannelRegistry);
   const customChannels = normalizePublicChannelRegistry(customPublicChannels)
     .filter((channel) => !baseChannels.some((base) => publicChannelMatchesAuthorWallet(base, channel.authorWallet)));
-  publicChannelRegistry = normalizePublicChannelRegistry([...baseChannels, ...customChannels]);
+  publicChannelRegistry = normalizePublicChannelRegistry([...baseChannels, ...customChannels])
+    .map(applyContactDisplayToRegistryChannel);
   return publicChannelRegistry;
+}
+
+// Overlay the user's chosen display name (from the shared per-counterparty store) onto a wallet
+// channel so the Public channels list, channel detail header, and feed all show the SAME name the
+// Private dialog shows. name/avatar survive the registry re-normalization in
+// subscribedPublicChannels(); identity tone is re-resolved at render time. The official platho.app
+// channel keeps its brand name.
+function applyContactDisplayToRegistryChannel(channel) {
+  if (!channel?.authorWallet || channel.id === DEFAULT_PUBLIC_CHANNEL_ID) return channel;
+  const display = resolveWalletChannelDisplay(channel.authorWallet);
+  if (!display?.name) return channel;
+  return {
+    ...channel,
+    name: display.name,
+    avatar: publicChannelAvatar(display.name),
+  };
 }
 
 function publicChannelAvatar(label) {
@@ -3785,7 +4076,7 @@ function appendPublicItemComments(article, item) {
     const commentAvatar = document.createElement('div');
     commentAvatar.className = 'avatar feed-avatar';
     commentAvatar.setAttribute('aria-hidden', 'true');
-    setAvatarNode(commentAvatar, String(comment.author ?? 'P').slice(0, 1), comment.avatarImageUrl);
+    setAvatarNode(commentAvatar, String(comment.author ?? 'P').slice(0, 1), comment.avatarImageUrl ?? publicAvatarUrlForWallet(comment.authorWallet));
     const commentMeta = document.createElement('div');
     commentMeta.className = 'feed-meta';
     commentMeta.textContent = [comment.author, comment.createdAt?.slice?.(0, 10)].filter(Boolean).join(' - ');
@@ -3866,7 +4157,7 @@ function renderPublicFeed(items, options = {}) {
     const authorAvatar = document.createElement('div');
     authorAvatar.className = 'avatar feed-avatar';
     authorAvatar.setAttribute('aria-hidden', 'true');
-    setAvatarNode(authorAvatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl);
+    setAvatarNode(authorAvatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
     const meta = document.createElement('div');
     meta.className = 'feed-meta';
     for (const label of [...(item.meta ?? []), unread ? 'unread' : null].filter(Boolean)) {
@@ -3898,7 +4189,7 @@ function appendPublicChannelPost(container, item) {
   const avatar = document.createElement('div');
   avatar.className = 'avatar feed-avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl);
+  setAvatarNode(avatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
   const meta = document.createElement('div');
   meta.className = 'feed-meta';
   for (const label of [...(item.meta ?? []), item.createdAt?.slice?.(0, 10)].filter(Boolean)) {
@@ -3934,21 +4225,47 @@ function renderPublicChannelDetail(channel, items) {
     return;
   }
   const latestPost = items?.[items.length - 1] ?? null;
+  const display = channel.authorWallet ? resolveWalletChannelDisplay(channel.authorWallet) : null;
   const header = document.createElement('header');
   header.className = 'public-channel-detail-header';
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(avatar, channel.avatar, latestPost?.avatarImageUrl);
+  setAvatarNode(avatar, channel.avatar, latestPost?.avatarImageUrl ?? publicAvatarUrlForWallet(channel.authorWallet));
   const titleWrap = document.createElement('div');
   titleWrap.className = 'conversation-title';
   const title = document.createElement('h2');
   title.textContent = channel.name;
+  if (display?.tone) title.className = `identity-title-label identity-label-${display.tone}`;
   const subtitle = document.createElement('p');
   subtitle.textContent = channel.subtitle ?? 'public channel';
   titleWrap.append(title, subtitle);
   const actions = document.createElement('div');
   actions.className = 'public-channel-detail-actions';
+  // Wallet channels get the same "Display as" affordance as a Private conversation header — the choice
+  // is shared per-counterparty, so it stays in sync with that person's Private dialog.
+  const canChooseDisplay = Boolean(channel.authorWallet) && channel.id !== DEFAULT_PUBLIC_CHANNEL_ID;
+  if (canChooseDisplay) {
+    const identityButton = document.createElement('button');
+    identityButton.type = 'button';
+    identityButton.className = 'icon-button';
+    identityButton.setAttribute('aria-haspopup', 'menu');
+    identityButton.setAttribute('aria-expanded', 'false');
+    identityButton.setAttribute('aria-label', `Choose display name for ${channel.name}`);
+    identityButton.title = 'Choose display name';
+    const identityIcon = document.createElement('span');
+    identityIcon.className = 'icon icon-chevron-down';
+    identityButton.append(identityIcon);
+    identityButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (identityPopover && !identityPopover.hidden) {
+        hideIdentityPopover();
+      } else {
+        showPublicChannelDisplayPopover(channel, identityButton);
+      }
+    });
+    actions.append(identityButton);
+  }
   const unfollowButton = document.createElement('button');
   unfollowButton.type = 'button';
   unfollowButton.className = 'mini-action-button';
@@ -4011,13 +4328,14 @@ function renderPublicChannels() {
     const channelAvatar = document.createElement('div');
     channelAvatar.className = 'avatar';
     channelAvatar.setAttribute('aria-hidden', 'true');
-    setAvatarNode(channelAvatar, channel.avatar, latestPost?.avatarImageUrl);
+    setAvatarNode(channelAvatar, channel.avatar, latestPost?.avatarImageUrl ?? publicAvatarUrlForWallet(channel.authorWallet));
     const main = document.createElement('div');
     main.className = 'thread-main';
     const top = document.createElement('div');
     top.className = 'thread-top';
+    const channelDisplay = channel.authorWallet ? resolveWalletChannelDisplay(channel.authorWallet) : null;
     const name = document.createElement('div');
-    name.className = 'thread-name';
+    name.className = `thread-name identity-label${channelDisplay?.tone ? ` identity-label-${channelDisplay.tone}` : ''}`;
     name.textContent = channel.name;
     top.append(name);
     const preview = document.createElement('div');
@@ -4189,12 +4507,15 @@ function rebuildThreadsFromPublicSubscriptions(options = {}) {
     ? threads.filter((thread) => !thread.publicChannelId)
     : clonePreviewThreads();
 
+  threads = nonPublicThreads;
+  // Re-resolve wallet-channel names against the current private threads + shared store so feed-mode
+  // (which bakes channel.name into its items) stays in sync with the Private dialog display.
+  rebuildPublicChannelRegistry();
   publicChannelThreads = publicChannelSubscriptionsToThreads(
     publicChannelSubscriptions,
     publicChannelRegistry,
     publicFeedCacheForCurrentWindow(),
   );
-  threads = nonPublicThreads;
 
   if (preserveActive && previousActive && threads.some((thread) => thread.id === previousActive)) {
     activeThreadId = previousActive;
@@ -5216,6 +5537,7 @@ async function syncPublicChannels() {
       renderThreads();
       renderConversation();
       hydratePublicAvatars().catch((error) => console.error(error));
+      hydratePublicChannelAvatars().catch((error) => console.error(error));
       const unavailableCount = Number(globalThis.plathoLastPublicSync?.historyUnavailableCount ?? 0);
       if (unavailableCount > 0) setPublicStatus(`chain sync: ${unavailableCount} history gap${unavailableCount === 1 ? '' : 's'}`);
       return;
@@ -5263,6 +5585,7 @@ async function syncPublicChannels() {
   renderThreads();
   renderConversation();
   hydratePublicAvatars().catch((error) => console.error(error));
+  hydratePublicChannelAvatars().catch((error) => console.error(error));
 }
 
 function collectPublicAvatarRequests() {
@@ -5304,6 +5627,44 @@ async function hydratePublicAvatars() {
   renderThreads();
   renderConversation();
   return true;
+}
+
+// Resolve the avatar image for a Public wallet channel: the per-wallet profile avatar (loaded by
+// hydratePublicChannelAvatars), falling back to the avatar already loaded for that wallet's open
+// Private dialog. Lets a channel show a face even when it has no cached public posts yet.
+function publicAvatarUrlForWallet(walletAddress) {
+  const raw = rawWalletAddress(walletAddress);
+  if (!raw) return null;
+  const cached = publicChannelAvatarUrlByWallet.get(raw);
+  if (cached) return cached;
+  const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(raw));
+  return thread?.avatarImageUrl ?? null;
+}
+
+// Load profile avatars for subscribed wallet channels straight from the ProfileRegistry (no public
+// post required), keyed by wallet. Only successful loads are cached; a faceless wallet OR a wallet
+// whose provider was momentarily unavailable stays uncached so a later sync retries it (no stuck
+// "no avatar" once the user sets one or the provider recovers).
+async function hydratePublicChannelAvatars() {
+  const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
+    .filter((channel) => channel.authorWallet && channel.id !== DEFAULT_PUBLIC_CHANNEL_ID);
+  let changed = false;
+  for (const channel of channels.slice(0, 24)) {
+    const raw = rawWalletAddress(channel.authorWallet);
+    if (!raw || publicChannelAvatarUrlByWallet.get(raw)) continue;
+    let imageUrl = null;
+    try {
+      imageUrl = await loadProfileAvatarImage(channel.authorWallet);
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) console.error(error);
+      continue; // transient: leave uncached so a later sync retries
+    }
+    if (!imageUrl) continue;
+    publicChannelAvatarUrlByWallet.set(raw, imageUrl);
+    changed = true;
+  }
+  if (changed) renderPublicSurface({ anchorUnread: false });
+  return changed;
 }
 
 function privateKeyIdIndexValue(keyId) {
@@ -7537,6 +7898,10 @@ function applyHistoryThreadSnapshot(thread, snapshot) {
   if (snapshot.avatarImageUrl) thread.avatarImageUrl = snapshot.avatarImageUrl;
   if (snapshot.displayIdentity) thread.displayIdentity = snapshot.displayIdentity;
   if (snapshot.localLabel) thread.localLabel = snapshot.localLabel;
+  // A snapshot may carry a stale display preference (e.g. a Public-tab choice was made while this
+  // dialog was not loaded, so it never reached this thread's persisted snapshot). Re-arm the one-time
+  // contact-store hydration so the next render reconciles against the authoritative shared store.
+  thread.contactDisplaySynced = false;
   return thread;
 }
 
@@ -10114,6 +10479,7 @@ function setView(view) {
 function renderThreads() {
   const q = search.value.trim().toLowerCase();
   threadList.innerHTML = '';
+  threads.forEach(hydrateThreadDisplayFromContactStore);
   threads
     .filter((thread) => {
       if (privateChainSyncPromise && isPendingIdentityResolutionThread(thread)) return false;
