@@ -1428,6 +1428,8 @@ html[data-platho-telegram="true"] .install-header-button {
 .public-pane {
   position: relative;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
+  /* Keep the Channels list column identical to the Private dialog-list column (.workspace). */
+  --public-list-col: clamp(280px, 32vw, 392px);
 }
 
 /* Diagnostics panel pinned at the top of the Public page (inside the header
@@ -1444,7 +1446,7 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .public-pane[data-public-mode="channels"] {
   position: relative;
-  grid-template-columns: minmax(320px, 392px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, var(--public-list-col)) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 14px 0;
   padding: 0;
@@ -1463,13 +1465,13 @@ html[data-platho-telegram="true"] .install-header-button {
 .public-pane[data-public-mode="channels"]::before {
   left: 0;
   z-index: 0;
-  width: 392px;
+  width: var(--public-list-col);
   border-right: 1px solid var(--line-soft);
   background: rgba(17, 20, 23, 0.96);
 }
 
 .public-pane[data-public-mode="channels"]::after {
-  left: 392px;
+  left: var(--public-list-col);
   right: 0;
   z-index: 0;
   background:
