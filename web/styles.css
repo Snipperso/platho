@@ -1643,6 +1643,12 @@ html[data-platho-telegram="true"] .install-header-button {
   min-height: 44px;
 }
 
+/* The detail's back button only exists on mobile, where the detail replaces the channel list. */
+.public-channel-detail-back-button {
+  display: none;
+  flex: 0 0 auto;
+}
+
 .public-channel-detail-actions {
   display: flex;
   justify-content: flex-end;
@@ -1770,7 +1776,9 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .public-feed[data-public-mode="feed"] > .feed-item:not(.compact) {
-  width: min(100%, calc(var(--message-media-width) + 36px));
+  /* Full-width like the compact channel cards (was capped to image width, which left real posts
+     looking narrow/unfinished on desktop). Images inside keep their own --message-media-width cap. */
+  width: 100%;
 }
 
 .feed-item.is-unread {
@@ -3183,6 +3191,27 @@ button.feed-item:hover {
 
   .public-pane[data-public-mode="channels"] .public-channel-detail {
     display: none;
+  }
+
+  /* Tapping a channel opens its detail (posts) full-width, replacing the list + search; a back button
+     in the detail header returns to the list. Desktop keeps both columns and ignores this state. */
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-search-row,
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-feed {
+    display: none;
+  }
+
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 14px;
+    grid-column: 1;
+    grid-row: 2 / 4;
+    min-height: 0;
+    padding: 0 4px 0 0;
+  }
+
+  .public-channel-detail-back-button {
+    display: grid;
   }
 
   .public-pane[data-public-mode="channels"] .public-composer {
