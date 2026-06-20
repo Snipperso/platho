@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v458';
+const PLATHO_APP_RUNTIME_VERSION = 'v459';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -166,6 +166,8 @@ const PLATHO_APP_RUNTIME_VERSION = 'v458';
 // Surfaced in the #privateDebugLog panel (copyable) and on globalThis.plathoRuntimeDiagnostics.
 const runtimeDiagnostics = {
   startedAt: new Date().toISOString(),
+  startedAtMs: Date.now(),
+  beats: 0,
   currentOp: 'idle',
   worstStallMs: 0,
   worstStallOp: null,
@@ -189,6 +191,7 @@ function startRuntimeDiagnostics() {
   runtimeDiagLastBeatAt = Date.now();
   window.setInterval(() => {
     const now = Date.now();
+    runtimeDiagnostics.beats += 1;
     const gap = now - runtimeDiagLastBeatAt;
     runtimeDiagLastBeatAt = now;
     const stall = gap - RUNTIME_DIAG_HEARTBEAT_MS;
@@ -3071,7 +3074,7 @@ function runtimeDiagnosticsText() {
   const mem = (typeof navigator !== 'undefined' && navigator.deviceMemory) || '?';
   const err = messageAutoSyncLastErrorLabel ? ` err=${debugTiny(messageAutoSyncLastErrorLabel, '-')}` : '';
   return [
-    `${PLATHO_APP_RUNTIME_VERSION} op=${d.currentOp} hw=${hw} mem=${mem}`,
+    `${PLATHO_APP_RUNTIME_VERSION} beat=${d.beats} age=${Math.round((Date.now() - d.startedAtMs) / 1000)}s op=${d.currentOp} hw=${hw} mem=${mem}`,
     `stallWorst=${Math.round(d.worstStallMs)}ms@${d.worstStallOp ?? '-'} stalls=${d.stallCount} stallLast=${Math.round(d.lastStallMs)}ms`,
     `entryWorst=${Math.round(d.worstEntryMs)}ms lastSync=${sync ? `${sync.ms}ms/${sync.entries}e imp=${sync.imported} ${sync.mode}` : '-'}`,
     `phase=${messageAutoSyncPhase || 'idle'}${err}`,
@@ -4472,19 +4475,29 @@ function renderPublicChannels() {
 }
 
 function renderPublicSurface(options = {}) {
-  updatePublicModeButtons();
-  if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
-  if (publicDisplayMode === 'channels') {
-    renderPublicChannels();
-    setPublicStatus('channels');
-    updatePublicJumpDownVisibility();
-    return;
+  // Attribute this synchronous render to the diagnostics op (it runs at boot AND
+  // on every public-feed update; a slow-device freeze here would surface as
+  // worstStallOp='public-render'). Restore the previous op so nested calls during
+  // boot don't clobber the 'boot' attribution.
+  const prevOp = runtimeDiagnostics.currentOp;
+  markRuntimeOp('public-render');
+  try {
+    updatePublicModeButtons();
+    if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
+    if (publicDisplayMode === 'channels') {
+      renderPublicChannels();
+      setPublicStatus('channels');
+      updatePublicJumpDownVisibility();
+      return;
+    }
+    const allItems = publicFeedItemsChronological();
+    const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
+    renderPublicFeed(items, options);
+    const unread = allItems.filter(isUnreadPublicItem).length;
+    setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
+  } finally {
+    markRuntimeOp(prevOp);
   }
-  const allItems = publicFeedItemsChronological();
-  const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
-  renderPublicFeed(items, options);
-  const unread = allItems.filter(isUnreadPublicItem).length;
-  setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
 }
 
 function setPublicCommentTarget(item = null) {
@@ -19680,6 +19693,7 @@ window.addEventListener('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passive: true });
 
+markRuntimeOp('boot');
 customPublicChannels = readCustomPublicChannels();
 rebuildPublicChannelRegistry();
 publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
@@ -19706,6 +19720,7 @@ if (activeThreadId) {
 renderThreads();
 renderConversation();
 refreshMessagingControls();
+markRuntimeOp('idle');
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
