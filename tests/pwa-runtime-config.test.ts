@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v459<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v459'/);
+    expect(html).toMatch(/id="appVersionLabel">v460<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v460'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1757,6 +1757,18 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/beat=\$\{d\.beats\} age=\$\{Math\.round\(\(Date\.now\(\) - d\.startedAtMs\) \/ 1000\)\}s/);
     expect(app).toMatch(/markRuntimeOp\('boot'\)/);
     expect(app).toMatch(/markRuntimeOp\('public-render'\)/);
+    // v460: the freeze was narrowed to the Public->Vault switch (only that switch lags; staying on one
+    // tab is fine). The diagnostics panel lives on Public so a Vault freeze is not visible live; so (a)
+    // markRuntimeOp now brackets the Vault load (refreshVaultNow -> 'vault') and the panel switch
+    // (setView -> 'view:<tab>'), and (b) markRuntimeOp writes a localStorage crumb on every op CHANGE so a
+    // HARD freeze (heartbeat dead, can't switch back) still names the op that was active when it died,
+    // surfaced as 'prev=' in the panel after a force-reload.
+    expect(app).toMatch(/markRuntimeOp\(`view:\$\{view\}`\)/);
+    expect(app).toMatch(/markRuntimeOp\('vault'\)/);
+    expect(app).toMatch(/const RUNTIME_DIAG_CRUMB_KEY = 'platho\.diag\.crumb\.v1'/);
+    expect(app).toMatch(/if \(runtimeDiagnostics\.currentOp === op\) return/);
+    expect(app).toMatch(/localStorage\.setItem\(RUNTIME_DIAG_CRUMB_KEY/);
+    expect(app).toMatch(/prev=\$\{d\.prevCrumb \?\? '-'\}/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4252,11 +4264,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v530/);
+    expect(sw).toMatch(/platho-pwa-prototype-v531/);
     expect(sw).toMatch(/\.\/styles\.css\?v=150/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=459/);
+    expect(sw).toMatch(/\.\/app\.js\?v=460/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

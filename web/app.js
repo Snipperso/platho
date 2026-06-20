@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v459';
+const PLATHO_APP_RUNTIME_VERSION = 'v460';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -164,11 +164,17 @@ const PLATHO_APP_RUNTIME_VERSION = 'v459';
 // ML-KEM decapsulate surfaces worstStallOp='sync-decap' with worstStallMs ≈ worstEntryMs, which yielding
 // BETWEEN entries cannot fix (a single synchronous decapsulate can't be split) and would point to a Worker.
 // Surfaced in the #privateDebugLog panel (copyable) and on globalThis.plathoRuntimeDiagnostics.
+const RUNTIME_DIAG_CRUMB_KEY = 'platho.diag.crumb.v1';
 const runtimeDiagnostics = {
   startedAt: new Date().toISOString(),
   startedAtMs: Date.now(),
   beats: 0,
   currentOp: 'idle',
+  // The op the PREVIOUS session was last running (read once at boot, before any
+  // markRuntimeOp overwrites the crumb). If the app froze HARD (heartbeat dead,
+  // tab can't switch back so the live panel can't help) the crumb still names the
+  // op that was active when it died — survives a force-reload.
+  prevCrumb: (() => { try { return localStorage.getItem(RUNTIME_DIAG_CRUMB_KEY); } catch { return null; } })(),
   worstStallMs: 0,
   worstStallOp: null,
   worstStallAt: null,
@@ -179,7 +185,11 @@ const runtimeDiagnostics = {
 };
 globalThis.plathoRuntimeDiagnostics = runtimeDiagnostics;
 function markRuntimeOp(op) {
+  if (runtimeDiagnostics.currentOp === op) return;
   runtimeDiagnostics.currentOp = op;
+  // Persist the op transition synchronously so a permanent freeze leaves a trace
+  // (written BEFORE any blocking work in the new op runs). Bounded: only on change.
+  try { localStorage.setItem(RUNTIME_DIAG_CRUMB_KEY, `${op}@${new Date().toISOString()}`); } catch { /* ignore */ }
 }
 const RUNTIME_DIAG_HEARTBEAT_MS = 1_000;
 const RUNTIME_DIAG_STALL_THRESHOLD_MS = 200;
@@ -3078,6 +3088,7 @@ function runtimeDiagnosticsText() {
     `stallWorst=${Math.round(d.worstStallMs)}ms@${d.worstStallOp ?? '-'} stalls=${d.stallCount} stallLast=${Math.round(d.lastStallMs)}ms`,
     `entryWorst=${Math.round(d.worstEntryMs)}ms lastSync=${sync ? `${sync.ms}ms/${sync.entries}e imp=${sync.imported} ${sync.mode}` : '-'}`,
     `phase=${messageAutoSyncPhase || 'idle'}${err}`,
+    `prev=${d.prevCrumb ?? '-'}`,
     `since=${d.startedAt}`,
   ].join('\n');
 }
@@ -10561,6 +10572,9 @@ function refreshMessagingControls() {
 }
 
 function setView(view) {
+  // Attribute the synchronous panel switch (incl. the WebKit layout/paint of the
+  // freshly-shown pane) so a freeze ON a tab switch is named (e.g. view:vault).
+  markRuntimeOp(`view:${view}`);
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
@@ -15082,6 +15096,11 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
 
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
   if (vaultRefreshPromise) return vaultRefreshPromise;
+  // Attribute the whole Vault load+render (the no-wallet path renders synchronously
+  // here, and the wallet path's critical chain-reads + render also live here) so a
+  // Public->Vault freeze surfaces as worstStallOp='vault' / crumb 'vault'.
+  const prevVaultOp = runtimeDiagnostics.currentOp;
+  markRuntimeOp('vault');
   vaultRefreshPromise = (async () => {
     const results = [];
     const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
@@ -15104,6 +15123,7 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
     return await vaultRefreshPromise;
   } finally {
     vaultRefreshPromise = null;
+    markRuntimeOp(prevVaultOp);
     scheduleVaultAutoRefresh();
   }
 }
