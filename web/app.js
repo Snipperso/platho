@@ -36,7 +36,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=80';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=81';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -58,7 +58,7 @@ import {
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-} from './public-channel-subscriptions.mjs?v=8';
+} from './public-channel-subscriptions.mjs?v=9';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v456';
+const PLATHO_APP_RUNTIME_VERSION = 'v457';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -802,7 +802,9 @@ let navVaultBalanceState = {
   reason: null,
 };
 let vaultProtocolState = {
-  airdrop_remaining_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+  // null = not yet read from chain (renders "-"), NOT "full allocation remaining" — so the airdrop
+  // stat never shows a misleading 0 before a fresh read populates it.
+  airdrop_remaining_ath: null,
   airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   profile_registry_bound: false,
   profile_registry_address: null,
@@ -5750,8 +5752,10 @@ function publicAvatarUrlForWallet(walletAddress) {
 // whose provider was momentarily unavailable stays uncached so a later sync retries it (no stuck
 // "no avatar" once the user sets one or the provider recovers).
 async function hydratePublicChannelAvatars() {
+  // Includes the official channel so its post-style placeholder can show the platho.ath profile
+  // avatar (falls back to the letter tile if that wallet has none).
   const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-    .filter((channel) => channel.authorWallet && channel.id !== DEFAULT_PUBLIC_CHANNEL_ID);
+    .filter((channel) => channel.authorWallet);
   let changed = false;
   for (const channel of channels.slice(0, 24)) {
     const raw = rawWalletAddress(channel.authorWallet);
@@ -14842,7 +14846,7 @@ function refreshVaultMoveWidget() {
 async function refreshVaultDashboard() {
   if (!plathoWallet?.address) {
     vaultProtocolState = {
-      airdrop_remaining_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+      airdrop_remaining_ath: null,
       airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
       profile_registry_bound: false,
       profile_registry_address: null,
@@ -14971,8 +14975,27 @@ async function refreshAthFlushState() {
   }
 }
 
+// Refresh the activity-airdrop "issued" figure from the Vault global (it does NOT live in the
+// ATHMaster jetton data, so the Profile stat was only ever current right after a Vault-tab refresh).
+// Uses the verified->unverified degraded fallback so a flaky/region-blocked gateway still yields a value.
+async function refreshAthAirdropState() {
+  if (!plathoWallet?.address) return;
+  const global = await callWithDegradedTransportReadFallback(
+    () => loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
+    () => loadConnectedVaultGlobal(unverifiedCriticalChainReadOptions()),
+  ).catch(() => null);
+  if (!global) return;
+  vaultProtocolState = {
+    ...vaultProtocolState,
+    airdrop_remaining_ath: global.airdrop_remaining_ath ?? vaultProtocolState.airdrop_remaining_ath ?? null,
+    airdrop_total_allocation_ath: global.airdrop_total_allocation_ath ?? vaultProtocolState.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+  };
+  renderAthProfileStats();
+}
+
 async function refreshAthProtocolStats() {
   renderAthProfileStats();
+  refreshAthAirdropState().catch(() => {});
   try {
     const provider = await resolveAthMasterProvider();
     if (!provider?.getJettonData) {
