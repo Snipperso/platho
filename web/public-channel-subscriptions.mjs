@@ -8,7 +8,7 @@ export const DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET = 'UQDU48m_nYC12oqHJnKG9nBE4lj
 export const DEFAULT_PUBLIC_CHANNELS = Object.freeze([
   Object.freeze({
     id: DEFAULT_PUBLIC_CHANNEL_ID,
-    name: 'platho.ath',
+    name: 'platho',
     avatar: 'P',
     subtitle: 'official read-only channel',
     authorWallet: DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,

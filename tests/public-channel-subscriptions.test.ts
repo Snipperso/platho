@@ -26,7 +26,7 @@ describe('PWA public channel subscriptions', () => {
     expect(threads).toHaveLength(1);
     expect(threads[0]).toMatchObject({
       id: publicChannelThreadId(DEFAULT_PUBLIC_CHANNEL_ID),
-      name: 'platho.ath',
+      name: 'platho',
       readOnly: true,
       state: 'syncing',
     });
@@ -35,10 +35,10 @@ describe('PWA public channel subscriptions', () => {
     // labels), no title, the "waiting" line as the body, and the channel wallet for the avatar.
     const item = publicChannelThreadsToFeedItems(threads)[0];
     expect(item.compact).toBe(true);
-    expect(item.meta).toEqual(['platho.ath']);
+    expect(item.meta).toEqual(['platho']);
     expect(item.title).toBeNull();
     expect(item.text).toBe('Waiting for public feed');
-    expect(item.author).toBe('platho.ath');
+    expect(item.author).toBe('platho');
     expect(item.authorWallet).toBe(DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET);
   });
 
