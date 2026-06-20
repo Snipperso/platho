@@ -787,6 +787,44 @@ html[data-platho-telegram="true"] .install-header-button {
   font-size: 11px;
 }
 
+.identity-variant-localname {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.identity-variant-localname > .identity-variant {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.identity-variant-edit {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.identity-variant-edit:hover {
+  border-color: rgba(48, 213, 176, 0.24);
+  background: rgba(48, 213, 176, 0.08);
+  color: var(--text);
+}
+
+.identity-variant-edit svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
 .conversation-title h2 {
   overflow: hidden;
   text-overflow: ellipsis;
