@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v461';
+const PLATHO_APP_RUNTIME_VERSION = 'v462';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -14710,9 +14710,11 @@ function resetVaultPocketState() {
     wallet: { ton_balance: null, ath_balance: null },
     vault: { ton_balance: null, ath_balance: null },
   };
-  markNavVaultBalanceIdle();
-  refreshWalletTonProfileStatus();
-  refreshVaultMoveWidget();
+  // Inner crumbs so a freeze inside the pocket-reset chain pinpoints the exact leaf (shared fn; harmless
+  // from non-vault callers — the crumb just names the running step).
+  markRuntimeOp('reset:navidle'); markNavVaultBalanceIdle();
+  markRuntimeOp('reset:walletstatus'); refreshWalletTonProfileStatus();
+  markRuntimeOp('reset:movewidget'); refreshVaultMoveWidget();
 }
 
 function applyVaultUserPocketState(user) {
@@ -14900,11 +14902,15 @@ async function refreshVaultDashboard() {
       username_registry_bound: false,
       username_registry_address: null,
     };
-    renderAthProfileStats();
-    renderVaultCards(appConfig.ui?.vaultCards ?? []);
-    resetVaultPocketState();
-    refreshComposerCostStatus();
-    setVaultStatus('wallet required');
+    // Fine-grained crumbs: the Public->Vault freeze is a SYNCHRONOUS block somewhere in this no-wallet
+    // render chain (beat frozen, op stuck at vault). Each marker writes a localStorage crumb BEFORE the
+    // call runs, so a hard freeze leaves prev=<the exact step> after a force-reload.
+    markRuntimeOp('vault:athstats'); renderAthProfileStats();
+    markRuntimeOp('vault:cards'); renderVaultCards(appConfig.ui?.vaultCards ?? []);
+    markRuntimeOp('vault:pocketreset'); resetVaultPocketState();
+    markRuntimeOp('vault:coststatus'); refreshComposerCostStatus();
+    markRuntimeOp('vault:status'); setVaultStatus('wallet required');
+    markRuntimeOp('vault');
     return null;
   }
   let user = null;
