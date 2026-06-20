@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v462';
+const PLATHO_APP_RUNTIME_VERSION = 'v463';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -14942,9 +14942,12 @@ async function refreshVaultDashboard() {
     username_registry_bound: global?.username_registry_bound === true,
     username_registry_address: global?.username_registry_address ?? null,
   };
-  renderAthProfileStats();
-  renderVaultPocketCards(walletBalances, user);
-  refreshComposerCostStatus();
+  // WITH-WALLET crumbs: the freeze is in THIS branch (no-wallet works). Each crumb is written to
+  // localStorage synchronously before its call, so a force-reload after a hard freeze shows prev=<exact step>.
+  markRuntimeOp('vaultw:athstats'); renderAthProfileStats();
+  markRuntimeOp('vaultw:pocketcards'); renderVaultPocketCards(walletBalances, user);
+  markRuntimeOp('vaultw:coststatus'); refreshComposerCostStatus();
+  markRuntimeOp('vault');
   if (user) {
     setVaultStatus(user.exists === true ? 'synced' : 'Vault setup required');
     globalThis.plathoVaultBinding = {
@@ -15047,6 +15050,7 @@ async function refreshAthAirdropState() {
 }
 
 async function refreshAthProtocolStats() {
+  markRuntimeOp('vault:stats');
   renderAthProfileStats();
   refreshAthAirdropState().catch(() => {});
   try {
@@ -19496,18 +19500,24 @@ async function refreshVaultActivationStatus(options = {}) {
       refreshComposerPublishPolicy();
       return null;
     }
+    markRuntimeOp('vact:getkeyrecord');
     const record = await provider.getKeyRecord(user.current_key_id, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
     });
+    markRuntimeOp('vact:assertowner');
     await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
+    // The synchronous ed25519.verify of the signed-bundle binding runs inside here (wallet-only, every
+    // vault open). If the freeze is the crypto, a hard-freeze reload shows prev=vact:verifybinding.
+    markRuntimeOp('vact:verifybinding');
     const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
       ownerWallet: plathoWallet.address,
       currentKeyId: user.current_key_id,
       recordKeyId: user.current_key_id,
     });
+    markRuntimeOp('vact:bound');
     const localAuthPubkey = localVaultAuthKeyPair?.publicKey
       ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey)
       : 0n;
