@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v452<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v452'/);
+    expect(html).toMatch(/id="appVersionLabel">v453<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v453'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -308,7 +308,12 @@ describe('PWA runtime config guard', () => {
     // the "Display as" menu — not only threads created via New Chat's local-label field.
     expect(app).toMatch(/async function promptThreadLocalLabel\(thread\)/);
     expect(app).toMatch(/thread\.localLabel = next;\s*thread\.displayIdentity = null/);
-    expect(app).toMatch(/localLabelExists \? 'Edit local name' : 'Set local name'/);
+    // The local name is edited via a pencil button on its own row (createPencilIcon) instead of a
+    // separate "Edit local name" menu item; a plain "Set local name" action only shows when none exists.
+    expect(app).toMatch(/function createPencilIcon\(\)/);
+    expect(app).toMatch(/className = 'identity-variant-edit'/);
+    expect(app).toMatch(/setAttribute\('aria-label', 'Edit local name'\)/);
+    expect(app).toMatch(/if \(!localLabelExists\) \{[\s\S]*'Set local name'/);
     expect(app).toMatch(/identity-variant-action/);
     expect(app).toMatch(/promptThreadLocalLabel\(thread\)\.catch/);
     expect(app).toMatch(/identityMenuButton\.hidden = identityDisplayOptions\(thread\)\.length < 1/);
@@ -4198,11 +4203,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v523/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=145/);
+    expect(sw).toMatch(/platho-pwa-prototype-v524/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=146/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=452/);
+    expect(sw).toMatch(/\.\/app\.js\?v=453/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

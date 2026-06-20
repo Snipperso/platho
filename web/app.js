@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v452';
+const PLATHO_APP_RUNTIME_VERSION = 'v453';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -2699,6 +2699,24 @@ async function promptContactLocalLabel(counterpartyWallet) {
   applyContactDisplaySelection(counterpartyWallet, { displayIdentity: null, localLabel: next || null });
 }
 
+// Small inline pencil glyph for the local-name edit affordance. Kept inline (createElementNS) so it
+// needs no new asset file / SW-precache entry / bundle-allowlist entry.
+function createPencilIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z');
+  svg.append(path);
+  return svg;
+}
+
 // Generic "Display as" popover used by BOTH the Private conversation header and the Public channel
 // detail header. The caller supplies the option list, the current selection, and what to do when an
 // option / the local-name action is picked.
@@ -2711,26 +2729,53 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
   title.className = 'identity-popover-title';
   title.textContent = 'Display as';
   popover.append(title);
+  const openEdit = () => {
+    hideIdentityPopover();
+    onSetLocalName();
+  };
   for (const option of options ?? []) {
+    if (option.key === 'local-label') {
+      // The local name stays a selectable display option; its edit affordance is now a pencil button
+      // on the row itself instead of a separate "Edit local name" menu item.
+      const row = document.createElement('div');
+      row.className = 'identity-variant-localname';
+      row.setAttribute('role', 'none');
+      const selectRow = identityVariantRow(option, option.key === selectedKey, (selected) => {
+        hideIdentityPopover();
+        onSelect(selected);
+      });
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'identity-variant-edit';
+      editButton.setAttribute('role', 'menuitem');
+      editButton.setAttribute('aria-label', 'Edit local name');
+      editButton.title = 'Edit local name';
+      editButton.append(createPencilIcon());
+      editButton.addEventListener('click', openEdit);
+      row.append(selectRow, editButton);
+      popover.append(row);
+      continue;
+    }
     popover.append(identityVariantRow(option, option.key === selectedKey, (selected) => {
       hideIdentityPopover();
       onSelect(selected);
     }));
   }
-  const localNameRow = document.createElement('button');
-  localNameRow.type = 'button';
-  localNameRow.className = 'identity-variant identity-variant-action';
-  localNameRow.setAttribute('role', 'menuitem');
-  const localNameLabel = document.createElement('strong');
-  localNameLabel.textContent = localLabelExists ? 'Edit local name' : 'Set local name';
-  const localNameType = document.createElement('span');
-  localNameType.textContent = 'Only shown on this device';
-  localNameRow.append(localNameLabel, localNameType);
-  localNameRow.addEventListener('click', () => {
-    hideIdentityPopover();
-    onSetLocalName();
-  });
-  popover.append(localNameRow);
+  // No local name yet — offer a plain action row to set one (there is nothing to edit before a name
+  // exists, so the pencil affordance only appears once one is present).
+  if (!localLabelExists) {
+    const localNameRow = document.createElement('button');
+    localNameRow.type = 'button';
+    localNameRow.className = 'identity-variant identity-variant-action';
+    localNameRow.setAttribute('role', 'menuitem');
+    const localNameLabel = document.createElement('strong');
+    localNameLabel.textContent = 'Set local name';
+    const localNameType = document.createElement('span');
+    localNameType.textContent = 'Only shown on this device';
+    localNameRow.append(localNameLabel, localNameType);
+    localNameRow.addEventListener('click', openEdit);
+    popover.append(localNameRow);
+  }
   const rect = anchor.getBoundingClientRect();
   popover.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
   popover.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 220)}px`;
