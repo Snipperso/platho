@@ -1497,11 +1497,13 @@ html[data-platho-telegram="true"] .install-header-button {
 
 /* Diagnostics panel pinned at the top of the Public page (inside the header
    row, full-width on a wrapped flex line — no change to the pane grid). */
-.public-pane .pane-header {
+.public-pane .pane-header,
+.vault-pane .pane-header {
   flex-wrap: wrap;
 }
 
-.public-diagnostics {
+.public-diagnostics,
+.vault-diagnostics {
   flex: 1 0 100%;
   display: grid;
   gap: 8px;

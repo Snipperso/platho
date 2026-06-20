@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v460<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v460'/);
+    expect(html).toMatch(/id="appVersionLabel">v461<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v461'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1744,8 +1744,8 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/<div class="public-diagnostics" id="publicDiagnostics">[\s\S]*id="profileDiagnosticsLog"[\s\S]*<\/header>/);
     expect(app).toMatch(/function runtimeDiagnosticsText\(\)/);
     expect(app).toMatch(/function refreshProfileDiagnostics\(\)/);
-    // refreshed on entering the Public tab AND live every heartbeat (~1/s) so the freeze can be watched.
-    expect(app).toMatch(/if \(view === 'public'\) refreshProfileDiagnostics\(\)/);
+    // refreshed on entering the Public/Vault tab AND live every heartbeat (~1/s) so the freeze can be watched.
+    expect(app).toMatch(/if \(view === 'public' \|\| view === 'vault'\) refreshProfileDiagnostics\(\)/);
     expect(app).toMatch(/refreshProfileDiagnostics\(\);\n {2}\}, RUNTIME_DIAG_HEARTBEAT_MS\)/);
     expect(app).toMatch(/copyProfileDiagnosticsButton\?\.addEventListener\('click'/);
     // v459: heartbeat-liveness indicator (beat counter + live age) so even a STATIC freeze screenshot
@@ -1769,6 +1769,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(runtimeDiagnostics\.currentOp === op\) return/);
     expect(app).toMatch(/localStorage\.setItem\(RUNTIME_DIAG_CRUMB_KEY/);
     expect(app).toMatch(/prev=\$\{d\.prevCrumb \?\? '-'\}/);
+    // v461: the diagnostics panel is also MIRRORED onto the Vault page (owner request) so the
+    // Public->Vault freeze is readable right there without switching back. Distinct ids (#vaultDiagnostics*
+    // — ids are unique per document); refreshProfileDiagnostics() now fills BOTH panels and setView refreshes
+    // on entering Vault too.
+    expect(html).toMatch(/id="vaultDiagnostics"/);
+    expect(html).toMatch(/<div class="vault-diagnostics" id="vaultDiagnostics">[\s\S]*id="vaultDiagnosticsLog"[\s\S]*<\/header>/);
+    expect(app).toMatch(/const vaultDiagnosticsLog = document\.querySelector\('#vaultDiagnosticsLog'\)/);
+    expect(app).toMatch(/if \(vaultDiagnosticsLog\) vaultDiagnosticsLog\.textContent = text/);
+    expect(app).toMatch(/if \(view === 'public' \|\| view === 'vault'\) refreshProfileDiagnostics\(\)/);
+    expect(app).toMatch(/copyVaultDiagnosticsButton\?\.addEventListener\('click'/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4264,11 +4274,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v531/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=150/);
+    expect(sw).toMatch(/platho-pwa-prototype-v532/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=151/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=460/);
+    expect(sw).toMatch(/\.\/app\.js\?v=461/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
