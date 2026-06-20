@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v461<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v461'/);
+    expect(html).toMatch(/id="appVersionLabel">v462<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v462'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1779,6 +1779,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(vaultDiagnosticsLog\) vaultDiagnosticsLog\.textContent = text/);
     expect(app).toMatch(/if \(view === 'public' \|\| view === 'vault'\) refreshProfileDiagnostics\(\)/);
     expect(app).toMatch(/copyVaultDiagnosticsButton\?\.addEventListener\('click'/);
+    // v462: the Public->Vault freeze is a SYNCHRONOUS block (beat frozen on-device, op stuck at vault, no
+    // wallet, network-independent, iOS-WebKit/slow-device only). Fine-grained crumbs on each step of the
+    // no-wallet refreshVaultDashboard render chain (+ resetVaultPocketState's leaves) so the next force-reload
+    // 'prev=' names the EXACT function that froze.
+    expect(app).toMatch(/markRuntimeOp\('vault:athstats'\); renderAthProfileStats\(\)/);
+    expect(app).toMatch(/markRuntimeOp\('vault:cards'\); renderVaultCards/);
+    expect(app).toMatch(/markRuntimeOp\('vault:pocketreset'\); resetVaultPocketState\(\)/);
+    expect(app).toMatch(/markRuntimeOp\('vault:coststatus'\); refreshComposerCostStatus\(\)/);
+    expect(app).toMatch(/markRuntimeOp\('reset:movewidget'\); refreshVaultMoveWidget\(\)/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4274,11 +4283,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v532/);
+    expect(sw).toMatch(/platho-pwa-prototype-v533/);
     expect(sw).toMatch(/\.\/styles\.css\?v=151/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=461/);
+    expect(sw).toMatch(/\.\/app\.js\?v=462/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
