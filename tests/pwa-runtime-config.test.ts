@@ -252,8 +252,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v453<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v453'/);
+    expect(html).toMatch(/id="appVersionLabel">v454<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v454'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -506,7 +506,12 @@ describe('PWA runtime config guard', () => {
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
     expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: 24px;/);
     expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
-    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;\s*padding: 12px 24px/);
+    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;\s*padding: 12px 14px/);
+    // Public composer is consistent with Private: full-bleed (no right gap) and its two left buttons
+    // are sized exactly like the Private composer buttons at both breakpoints.
+    expect(css).toMatch(/\.public-composer\s*{[\s\S]*?max-width: none;/);
+    expect(css).toMatch(/\.public-composer > \.attachment-button\s*{\s*width: 44px;\s*height: 44px;/);
+    expect(css).toMatch(/\.public-composer > \.composer-post-option,\s*\.public-composer > \.attachment-button\s*{\s*width: 38px;\s*height: 44px;/);
     expect(css).toMatch(/\.vault-move-list\s*{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
     expect(css).toMatch(/\.vault-asset-move-header\s*{\s*grid-template-columns: minmax\(0, 1fr\) auto;/);
     expect(css).toMatch(/\.vault-asset-move-body\s*{\s*grid-template-columns: max-content minmax\(0, 1fr\);/);
@@ -4203,11 +4208,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v524/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=146/);
+    expect(sw).toMatch(/platho-pwa-prototype-v525/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=147/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=453/);
+    expect(sw).toMatch(/\.\/app\.js\?v=454/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

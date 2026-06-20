@@ -1171,7 +1171,8 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .composer .composer-add-button,
-.composer .private-anonymous-button {
+.composer .private-anonymous-button,
+.public-composer > .attachment-button {
   width: 44px;
   height: 44px;
 }
@@ -1421,6 +1422,10 @@ html[data-platho-telegram="true"] .install-header-button {
   align-items: start;
   column-gap: 10px;
   margin: 0 -24px -24px;
+  /* Let the negative margins create a true full-bleed (the base .composer max-width:100% would
+     otherwise cap the width to the padded pane and leave a gap on the right). Private's composer
+     spans its whole pane the same way. */
+  max-width: none;
   padding: 12px 24px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
   border-top: 1px solid var(--line-soft);
   background: rgba(15, 18, 20, 0.96);
@@ -3045,7 +3050,9 @@ button.feed-item:hover {
 
   .composer-add,
   .composer .composer-add-button,
-  .composer .private-anonymous-button {
+  .composer .private-anonymous-button,
+  .public-composer > .composer-post-option,
+  .public-composer > .attachment-button {
     width: 38px;
     height: 44px;
   }
@@ -3060,7 +3067,7 @@ button.feed-item:hover {
 
   .public-composer {
     margin: 0 -24px -24px;
-    padding: 12px 24px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+    padding: 12px 14px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
   }
 
   .balance-grid,
@@ -3162,7 +3169,7 @@ button.feed-item:hover {
     grid-column: 1;
     grid-row: 4;
     margin: 0 -24px -24px;
-    padding: 12px 24px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+    padding: 12px 14px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
   }
 }
 
