@@ -58,7 +58,7 @@ import {
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-} from './public-channel-subscriptions.mjs?v=7';
+} from './public-channel-subscriptions.mjs?v=8';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v455';
+const PLATHO_APP_RUNTIME_VERSION = 'v456';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -508,6 +508,10 @@ let identityPopover = null;
 let identityPopoverAnchor = null;
 let activeActionDialog = null;
 let publicDisplayMode = 'feed';
+// Mobile only: in Channels mode, whether the channel DETAIL (posts) is shown instead of the channel
+// LIST. Desktop always shows both side-by-side; on mobile the detail is hidden until a channel is
+// tapped, then a back button returns to the list.
+let publicChannelDetailOpen = false;
 let publicChannelSearchQuery = '';
 let publicCommentTarget = null;
 let privateImageAttachments = [];
@@ -4044,7 +4048,12 @@ function updatePublicJumpDownVisibility() {
 }
 
 function updatePublicModeButtons() {
-  if (publicPane) publicPane.dataset.publicMode = publicDisplayMode;
+  if (publicDisplayMode !== 'channels') publicChannelDetailOpen = false;
+  if (publicPane) {
+    publicPane.dataset.publicMode = publicDisplayMode;
+    // Drives the mobile "list vs. detail" swap (no effect on desktop, which shows both columns).
+    publicPane.dataset.channelDetailOpen = publicDisplayMode === 'channels' && publicChannelDetailOpen ? 'true' : 'false';
+  }
   publicFeedModeButton?.setAttribute('aria-pressed', publicDisplayMode === 'feed' ? 'true' : 'false');
   publicChannelsModeButton?.setAttribute('aria-pressed', publicDisplayMode === 'channels' ? 'true' : 'false');
   if (publicChannelSearch) publicChannelSearch.placeholder = publicDisplayMode === 'channels' ? 'Search channels' : 'Search public';
@@ -4245,6 +4254,11 @@ function renderPublicFeed(items, options = {}) {
   }
   if (options.anchorUnread) scrollPublicToOldestUnread();
   requestAnimationFrame(updatePublicJumpDownVisibility);
+  // Viewing the feed marks its posts read (only when the Public tab is actually on screen, so a
+  // background sync does not pre-clear unread). Re-render once to drop the unread badges.
+  if (isPublicViewActive() && markVisiblePublicFeedRead(items)) {
+    requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
+  }
 }
 
 function appendPublicChannelPost(container, item) {
@@ -4294,6 +4308,20 @@ function renderPublicChannelDetail(channel, items) {
   const display = channel.authorWallet ? resolveWalletChannelDisplay(channel.authorWallet) : null;
   const header = document.createElement('header');
   header.className = 'public-channel-detail-header';
+  // Mobile-only back affordance: the detail replaces the channel list on narrow screens, so the user
+  // needs a way back. Hidden on desktop via CSS (where list + detail are side by side).
+  const backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.className = 'icon-button public-channel-detail-back-button';
+  backButton.setAttribute('aria-label', 'Back to channels');
+  backButton.title = 'Back to channels';
+  const backIcon = document.createElement('span');
+  backIcon.className = 'icon icon-back';
+  backButton.append(backIcon);
+  backButton.addEventListener('click', () => {
+    publicChannelDetailOpen = false;
+    renderPublicSurface({ anchorUnread: false });
+  });
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
   avatar.setAttribute('aria-hidden', 'true');
@@ -4341,7 +4369,7 @@ function renderPublicChannelDetail(channel, items) {
     setPublicChannelSubscribed(channel.id, false);
   });
   actions.append(unfollowButton);
-  header.append(avatar, titleWrap, actions);
+  header.append(backButton, avatar, titleWrap, actions);
 
   const list = document.createElement('div');
   list.className = 'public-channel-detail-feed';
@@ -4358,6 +4386,14 @@ function renderPublicChannelDetail(channel, items) {
     for (const item of items ?? []) appendPublicChannelPost(list, item);
   }
   publicChannelDetail.append(header, list);
+  // Opening a channel marks its posts read — but only when the detail is actually visible (on mobile it
+  // is hidden until the user taps in; on a background sync the Public tab is off screen).
+  if (isPublicViewActive()
+    && (items ?? []).length > 0
+    && getComputedStyle(publicChannelDetail).display !== 'none'
+    && markVisiblePublicFeedRead(items)) {
+    requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
+  }
 }
 
 function renderPublicChannels() {
@@ -4423,6 +4459,7 @@ function renderPublicChannels() {
         activeChannelId: channel.id,
       };
       writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
+      publicChannelDetailOpen = true; // mobile: reveal the detail (posts); desktop ignores this
       renderPublicSurface({ anchorUnread: false });
     });
     publicFeed.append(card);

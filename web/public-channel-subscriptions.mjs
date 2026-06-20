@@ -306,7 +306,9 @@ export function publicChannelFeedToThread(channel, feed) {
       type: 'in',
       text: post.title ? `${post.title}\n${post.text}` : (feedBlocksPreview(post.blocks) ?? post.text),
       blocks: post.blocks,
-      meta: [post.author ?? normalizedChannel.name, post.publishStatus, shortTime(post.createdAt), post.chainVerified && post.entryUid ? `uid ${post.entryUid.slice(0, 8)}` : null]
+      // The author/channel name is shown once by the feed item (thread.name); keep only status/date/uid
+      // here so a wallet post does not repeat the name.
+      meta: [post.publishStatus, shortTime(post.createdAt), post.chainVerified && post.entryUid ? `uid ${post.entryUid.slice(0, 8)}` : null]
         .filter(Boolean)
         .join(' · '),
       publicPostId: post.id,
@@ -380,7 +382,8 @@ export function publicChannelThreadsToFeedItems(threads) {
           thread.name,
           message.meta,
         ].filter(Boolean),
-        title: message.publicPostTitle ?? thread.name,
+        // Only a real post title; do NOT fall back to the channel name (it is already the meta author).
+        title: message.publicPostTitle ?? null,
         text: feedBlocksPreview(message.publicPostBlocks) ?? message.publicPostText ?? message.text ?? thread.preview,
         blocks: message.publicPostBlocks,
         imageUrl: message.publicPostBlocks?.length ? null : (message.publicPostImageUrl ?? message.attachment?.url),
