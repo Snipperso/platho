@@ -26,10 +26,20 @@ describe('PWA public channel subscriptions', () => {
     expect(threads).toHaveLength(1);
     expect(threads[0]).toMatchObject({
       id: publicChannelThreadId(DEFAULT_PUBLIC_CHANNEL_ID),
-      name: 'platho.app',
+      name: 'platho.ath',
       readOnly: true,
       state: 'syncing',
     });
+
+    // The empty-channel placeholder renders like an ordinary post: author name once (no syncing/public
+    // labels), no title, the "waiting" line as the body, and the channel wallet for the avatar.
+    const item = publicChannelThreadsToFeedItems(threads)[0];
+    expect(item.compact).toBe(true);
+    expect(item.meta).toEqual(['platho.ath']);
+    expect(item.title).toBeNull();
+    expect(item.text).toBe('Waiting for public feed');
+    expect(item.author).toBe('platho.ath');
+    expect(item.authorWallet).toBe(DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET);
   });
 
   it('PUBLIC-SUB-02: config declares chain channel authors, not bundled channel messages', () => {

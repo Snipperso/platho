@@ -2266,7 +2266,11 @@ button.feed-item:hover {
 }
 
 .settings-select-row.compact-select-row {
-  grid-template-columns: minmax(150px, auto) minmax(0, 1fr);
+  grid-template-columns: 108px minmax(0, 1fr);
+}
+
+.settings-select-row.compact-select-row > span {
+  white-space: nowrap;
 }
 
 .settings-select-row strong {
