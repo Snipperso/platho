@@ -1247,6 +1247,57 @@ describe('Vault TON RPC provider', () => {
     })).resolves.toMatchObject({ stack: [num(7n)] });
   });
 
+  it('VAULT-RPC-04I8C: a keyless useUserApiKey toncenter (no key) is NOT a verifier; verify:true self-trusts the lone primary', async () => {
+    // Client-direct keyless model: orbs-keyless-style primary + a user-toncenter that carries the user's
+    // own key at runtime BUT has none yet. Without a key it is just anonymous toncenter (429-prone) — the
+    // same throttled role as the dedicated emergency transport — so it must NOT act as a routine verifier.
+    // The bug: it WAS treated as an eligible verifier, so every verify:true own-vault-action read (publish
+    // charge + nonce) tried it, got 429, and threw RPC_VERIFICATION_UNAVAILABLE — bricking every keyless
+    // send (the message hung at p0:built, never signed). The fix demotes a no-key useUserApiKey transport
+    // to emergency-fallback so the lone primary is self-trusted.
+    const calls: string[] = [];
+    const prevKey = (globalThis as any).plathoToncenterApiKey;
+    (globalThis as any).plathoToncenterApiKey = undefined;
+    try {
+      const transport = createTonRpcTransport({
+        primaryProviderId: 'gateway',
+        fallbackProviderIds: ['user-toncenter'],
+        providers: [
+          { id: 'gateway', kind: 'toncenter-v3', runGetMethodEndpoint: 'https://gateway.example/api/v3/runGetMethod' },
+          {
+            id: 'user-toncenter',
+            kind: 'toncenter-v3',
+            useUserApiKey: true,
+            runGetMethodEndpoint: 'https://usertoncenter.example/api/v3/runGetMethod',
+          },
+        ],
+        requestSpacingMs: 0,
+        rateLimitKey: `user-key-missing-${Math.random()}`,
+        verifyCriticalReads: false,
+        criticalMethods: ['get_user'],
+        fetch: async (url: string) => {
+          const endpoint = String(url);
+          calls.push(endpoint);
+          if (endpoint.includes('usertoncenter.example')) {
+            return { ok: false, status: 429, async json() { return { ok: false }; } };
+          }
+          return { ok: true, status: 200, async json() { return { exit_code: 0, stack: [num(7n)] }; } };
+        },
+      });
+
+      // Only ONE real (non-emergency) read source exists — the no-key user-toncenter does not count — so
+      // verification is structurally degraded (and the app-side no-double-spend guard stays fail-closed).
+      expect(transport?.isVerificationDegraded()).toBe(true);
+      const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
+      // verify:true must SELF-TRUST the lone primary (not fail closed on the broken keyless verifier).
+      await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
+      // The no-key user-toncenter is never consulted as a verifier (its 429 limit never matters).
+      expect(calls.filter((endpoint) => endpoint.includes('usertoncenter.example'))).toHaveLength(0);
+    } finally {
+      (globalThis as any).plathoToncenterApiKey = prevKey;
+    }
+  });
+
   it('VAULT-RPC-04J: falls back on rate-limited reads and sends', async () => {
     const primary = {
       kind: 'primary-rpc',

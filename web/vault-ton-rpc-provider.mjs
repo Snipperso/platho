@@ -2128,7 +2128,22 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     messagesCacheMaxEntries: provider?.messagesCacheMaxEntries ?? defaults.messagesCacheMaxEntries,
     rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? defaults.rateLimitKey,
   });
-  return withRunGetMethodCapabilities(transport, provider, defaults);
+  // A useUserApiKey toncenter transport with NO key available is just anonymous toncenter — the same
+  // throttled, keyless role as the dedicated emergency transport. It must NOT act as a routine cross-read
+  // verifier: it has no key, so it can only 429/anonymous-fail, and being "tried but unable to confirm"
+  // bricks every verify:true own-vault-action read (publish charge + nonce) with RPC_VERIFICATION_UNAVAILABLE
+  // (eligibleVerifierTried=true defeats the lone-primary self-trust). It must also NOT count toward the
+  // verification-degraded gate, so a keyless build honestly reports isVerificationDegraded()===true (one real
+  // read source = Orbs) — exactly the single-source-trust posture verifyCriticalReads:false intends, and the
+  // app-side no-double-spend guard stays fail-closed. Treat it as an emergency fallback while keyless; adding
+  // a real key rebuilds the transport (applyToncenterApiKey) and restores it to a full primary/verifier.
+  const userKeyMissing = (provider?.useUserApiKey ?? defaults.useUserApiKey) === true
+    && !(provider?.apiKey ?? defaults.apiKey)
+    && !globalThis.plathoToncenterApiKey;
+  const effectiveProvider = userKeyMissing
+    ? { ...provider, verifierOnly: true, emergencyFallback: true }
+    : provider;
+  return withRunGetMethodCapabilities(transport, effectiveProvider, defaults);
 }
 
 function orderedTonRpcTransportCandidates(transports, isEligible) {
