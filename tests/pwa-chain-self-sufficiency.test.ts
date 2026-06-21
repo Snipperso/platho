@@ -84,20 +84,43 @@ describe('PWA on-chain self-sufficiency', () => {
     expect(transport).toMatch(/sendBoc/);
     expect(transport).toMatch(/getAccountState/);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.map((provider) => provider.kind)).toEqual([
-      'custom',
+      'ton-access-v2',
       'toncenter-v3',
-      'platho-rpc',
+      'toncenter-v3',
     ]);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('platho-rpc-mainnet');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).not.toContain('toncenter-mainnet');
-    // Keyless TonCenter is NEVER an "on equal footing" routine verifier — it is strictly a
-    // censorship-survival emergency fallback (reads, sends, history) for when the Platho RPC
-    // gateway is wholly unreachable; it is never a normal config-order fallback either.
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.verifierOnly).toBe(true);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.emergencyFallback).toBe(true);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.sendBocEndpoint).toBe('https://toncenter.com/api/v3/message');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.messagesEndpoint).toBe('https://toncenter.com/api/v3/messages');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')?.apiKey).toBeUndefined();
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'platho-rpc-mainnet')?.sendBocEndpoint).toBe('https://rpc.platho.app/api/v3/message');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('user-toncenter');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).not.toContain('orbs-keyless');
+    // Client-direct: keyless Orbs is the per-client decentralized PRIMARY; the user's own toncenter
+    // key carries the message-history indexer; anonymous toncenter is the last-resort emergency only.
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'orbs-keyless')?.kind).toBe('ton-access-v2');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')?.useUserApiKey).toBe(true);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')?.apiKey).toBeUndefined();
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')?.verifierOnly).toBe(true);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')?.emergencyFallback).toBe(true);
+    // No provider routes through the retired rpc.platho.app gateway.
+    expect(JSON.stringify(PLATHO_APP_CONFIG.network.tonRpc)).not.toContain('rpc.platho.app');
+  });
+
+  it('PWA-CHAIN-04: a per-user toncenter key is loaded at boot, re-resolves the transport, and has a settings entry', () => {
+    const app = read('web/app.js');
+    const transport = read('web/vault-ton-rpc-provider.mjs');
+    const html = read('web/index.html');
+
+    // Boot: the saved key is injected into globalThis BEFORE the transport is built (so it is captured).
+    expect(app).toMatch(/globalThis\.plathoToncenterApiKey = savedToncenterKey/);
+    expect(app).toMatch(/'platho\.toncenter\.apiKey\.v1'/);
+    expect(app).toMatch(/globalThis\.plathoTonRpcConfig = rpc/);
+    // Changing the key drops + rebuilds the transport so it takes effect immediately.
+    expect(app).toMatch(/function applyToncenterApiKey/);
+    expect(app).toMatch(/globalThis\.plathoTonRpcTransport = null/);
+    expect(app).toMatch(/createTonRpcTransport\(globalThis\.plathoTonRpcConfig\)/);
+    // The toncenter transport reads the runtime key for the useUserApiKey provider.
+    expect(transport).toMatch(/useUserApiKey/);
+    expect(transport).toMatch(/globalThis\.plathoToncenterApiKey/);
+    // The key is never hardcoded in the config bundle.
+    expect(read('web/platho-config.mjs')).not.toMatch(/apiKey:\s*'/);
+    // Settings entry exists so the user can add/clear the key.
+    expect(html).toMatch(/id="toncenterApiKeyInput"/);
+    expect(html).toMatch(/id="saveToncenterKeyButton"/);
   });
 });

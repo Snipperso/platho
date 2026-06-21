@@ -35,6 +35,16 @@ const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
 // instead of spending the censorship-survival transports re-asking a settled
 // question.
 const TON_GET_METHOD_UNINITIALIZED_EXIT_CODE = -13;
+// Keyless Orbs (TON Access) v2 transport: each client reaches the decentralized network with its
+// own per-client budget (no shared key), used as the primary for non-indexed reads/account/sendBoc.
+const TON_ACCESS_DEFAULT_HOST = 'ton.access.orbs.network';
+const TON_ACCESS_DEFAULT_NETWORK = 'mainnet';
+const TON_ACCESS_DEFAULT_MANAGER_PATH = '/mngr/nodes?npm_version=2.3.0';
+const TON_ACCESS_NODE_TTL_MS = 60_000;
+const TON_ACCESS_REQUEST_SPACING_MS = 250;
+const TON_ACCESS_NODE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+// key `${host}:${network}` -> { expiresAt, nodes, inflight } (single-flight node-manager refresh).
+const tonAccessNodesCache = new Map();
 const TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
   'get_state',
@@ -1309,7 +1319,11 @@ export function createTonCenterV3VaultTransport(options = {}) {
     ?? null;
   const fetchImpl = options.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new VaultTonRpcProviderError('fetch is unavailable');
-  const apiKey = options.apiKey ?? null;
+  // The per-user toncenter key is injected at runtime (no key ever ships in the bundle): a provider
+  // marked useUserApiKey reads the key the app stored from local storage into globalThis. Captured at
+  // build (the app re-resolves the transport when the user adds/changes a key); anonymous until then.
+  const apiKey = options.apiKey
+    ?? (options.useUserApiKey ? (globalThis.plathoToncenterApiKey ?? null) : null);
   const requestSpacingMs = finiteNonNegativeMs(options.requestSpacingMs, TONCENTER_REQUEST_SPACING_MS);
   const rateLimitBackoffMs = finiteNonNegativeMs(options.rateLimitBackoffMs, TONCENTER_RATE_LIMIT_BACKOFF_MS);
   const rateLimitRetries = finiteNonNegativeMs(options.rateLimitRetries, TONCENTER_RATE_LIMIT_RETRIES);
@@ -1538,6 +1552,323 @@ export function createTonCenterV3VaultTransport(options = {}) {
   };
 }
 
+function tonAccessSafeWeight(raw) {
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value < 1) return 1;
+  return Math.min(value, 1_000_000);
+}
+
+function tonAccessWeightedNode(nodes) {
+  const total = nodes.reduce((sum, node) => sum + tonAccessSafeWeight(node?.Weight), 0);
+  let roll = Math.floor(Math.random() * Math.max(1, total));
+  for (const node of nodes) {
+    roll -= tonAccessSafeWeight(node?.Weight);
+    if (roll < 0) return node;
+  }
+  return nodes[0];
+}
+
+function buildTonAccessBaseUrl(host, network, node) {
+  const nodeId = node?.NodeId;
+  if (typeof nodeId !== 'string' || !TON_ACCESS_NODE_ID_RE.test(nodeId)) {
+    throw new VaultTonRpcProviderError('TON Access node id is invalid');
+  }
+  const url = `https://${host}/${nodeId}/1/${network}/toncenter-api-v2`;
+  // Belt-and-suspenders: a node id is regex-confined to the URL path; never let it move the host.
+  if (new URL(url).host !== host) throw new VaultTonRpcProviderError('TON Access node id rejected');
+  return url;
+}
+
+async function resolveTonAccessBase(fetchImpl, { host, network, managerPath, nodeTtlMs, requestTimeoutMs }) {
+  const cacheKey = `${host}:${network}`;
+  let entry = tonAccessNodesCache.get(cacheKey);
+  if (!entry) {
+    entry = { expiresAt: 0, nodes: [], inflight: null };
+    tonAccessNodesCache.set(cacheKey, entry);
+  }
+  const now = Date.now();
+  if (entry.expiresAt > now && entry.nodes.length) {
+    return buildTonAccessBaseUrl(host, network, tonAccessWeightedNode(entry.nodes));
+  }
+  if (!entry.inflight) {
+    entry.inflight = (async () => {
+      const response = await fetchWithTonRpcTimeout(
+        fetchImpl,
+        `https://${host}${managerPath}`,
+        { method: 'GET', headers: { Accept: 'application/json' } },
+        requestTimeoutMs,
+      );
+      if (!response.ok) throw new VaultTonRpcProviderError(`TON Access manager ${response.status}`, { status: response.status });
+      const nodes = await response.json();
+      if (!Array.isArray(nodes)) throw new VaultTonRpcProviderError('TON Access manager returned no node list');
+      const healthKey = `v2-${network}`;
+      const healthy = nodes.filter((node) => (
+        String(node?.Healthy) === '1'
+        && node?.Mngr?.health?.[healthKey] === true
+        && typeof node?.NodeId === 'string'
+        && TON_ACCESS_NODE_ID_RE.test(node.NodeId)
+      ));
+      if (!healthy.length) throw new VaultTonRpcProviderError('TON Access has no healthy v2 node');
+      entry.expiresAt = Date.now() + nodeTtlMs;
+      entry.nodes = healthy;
+      return healthy;
+    })().finally(() => { entry.inflight = null; });
+  }
+  const healthy = await entry.inflight;
+  return buildTonAccessBaseUrl(host, network, tonAccessWeightedNode(healthy));
+}
+
+// v3 stack item {type, value} -> v2 legacy tuple ["num"|"tvm.Slice"|"tvm.Cell", value].
+function tonAccessLegacyStackItem(item) {
+  if (Array.isArray(item)) return item;
+  const type = String(item?.type ?? '').toLowerCase();
+  const value = item?.value ?? item?.boc ?? item?.cell;
+  if (type === 'num' || type === 'int') return ['num', String(value ?? '0')];
+  if (type === 'slice') return ['tvm.Slice', String(value ?? '')];
+  if (type === 'cell') return ['tvm.Cell', String(value ?? '')];
+  throw new VaultTonRpcProviderError(`Unsupported TON stack item type: ${type || 'missing'}`);
+}
+
+// v2 legacy tuple -> v3 stack item, matching the gateway's normalize_run_get_method_response.
+function tonAccessV3StackItem(item) {
+  if (!Array.isArray(item)) return item;
+  const type = String(item[0] ?? '').toLowerCase();
+  const raw = item.length > 1 ? item[1] : null;
+  const value = (raw && typeof raw === 'object') ? (raw.bytes ?? raw.value ?? raw.boc ?? raw.cell) : raw;
+  if (type.includes('num') || type.includes('int')) return { type: 'num', value: String(value ?? '0') };
+  if (type.includes('slice')) return { type: 'slice', value: String(value ?? ''), boc: String(value ?? '') };
+  if (type.includes('cell')) {
+    const cell = String(value ?? '');
+    return { type: 'cell', value: cell, boc: cell, cell };
+  }
+  return { type: type || 'unsupported', value };
+}
+
+function normalizeTonAccessRunGetMethodResponse(upstream) {
+  const source = (upstream && typeof upstream === 'object') ? upstream : {};
+  const result = (source.result && typeof source.result === 'object') ? source.result : {};
+  const stack = (Array.isArray(result.stack) ? result.stack : []).map(tonAccessV3StackItem);
+  // Mirror the toncenter-v3 transport's defensive exit-code extraction (nested + top-level + camelCase).
+  const exitCode = result.exit_code ?? result.exitCode ?? source.exit_code ?? source.exitCode ?? 0;
+  return {
+    ok: source.ok !== false,
+    error: source.error ?? result.error,
+    code: source.code ?? result.code,
+    result: { ...result, stack },
+    exit_code: exitCode,
+    stack,
+  };
+}
+
+// Keyless Orbs (TON Access) v2 transport. Mirrors createTonCenterV3VaultTransport's interface so it
+// plugs into createFallbackTonRpcTransport, but speaks the v2 jsonRPC dialect (normalized to v3) and
+// resolves a fresh weighted node per request. No api key, no message-history indexer.
+export function createTonAccessV2VaultTransport(options = {}) {
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  if (typeof fetchImpl !== 'function') throw new VaultTonRpcProviderError('fetch is unavailable');
+  const host = options.host ?? TON_ACCESS_DEFAULT_HOST;
+  const network = options.network ?? TON_ACCESS_DEFAULT_NETWORK;
+  const managerPath = options.managerPath ?? TON_ACCESS_DEFAULT_MANAGER_PATH;
+  const nodeTtlMs = finitePositiveInteger(options.nodeTtlMs, TON_ACCESS_NODE_TTL_MS);
+  const requestSpacingMs = finiteNonNegativeMs(options.requestSpacingMs, TON_ACCESS_REQUEST_SPACING_MS);
+  const rateLimitBackoffMs = finiteNonNegativeMs(options.rateLimitBackoffMs, TONCENTER_RATE_LIMIT_BACKOFF_MS);
+  const rateLimitRetries = finiteNonNegativeMs(options.rateLimitRetries, TONCENTER_RATE_LIMIT_RETRIES);
+  const runGetMethodCacheMaxEntries = finitePositiveInteger(
+    options.runGetMethodCacheMaxEntries,
+    TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES,
+  );
+  const rateLimitKey = options.rateLimitKey ?? 'ton-access-v2';
+  // Stable identity for request spacing + cache keys (the real fetch URL changes per node).
+  const cacheEndpoint = `ton-access-v2:${host}:${network}`;
+
+  const resolveBase = (requestTimeoutMs) => resolveTonAccessBase(fetchImpl, { host, network, managerPath, nodeTtlMs, requestTimeoutMs });
+
+  return {
+    kind: 'ton-access-v2',
+    supportsMessageHistory: false,
+    supportsSendBoc: true,
+    async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, verify, allowUnverifiedCriticalRead, requestTimeoutMs, timeoutMs, queueTimeoutMs }) {
+      const call = {
+        address: assertString(address, 'TON RPC address'),
+        method: assertString(method, 'TON RPC method'),
+        stack: Array.isArray(stack) ? stack : [],
+      };
+      const cacheKey = toncenterRunGetMethodCacheKey(cacheEndpoint, null, rateLimitKey, call);
+      const resolvedPriority = resolveRunGetMethodPriority(call.method, { priority }, options);
+      const resolvedCacheTtlMs = resolveRunGetMethodCacheTtlMs(call.method, { cacheTtlMs, ttlMs }, options);
+      const bypassCache = resolvedCacheTtlMs === 0;
+      if (!bypassCache) {
+        const cached = readRunGetMethodCache(cacheKey);
+        if (cached) return cached;
+      }
+      const inFlightKey = tonRpcInFlightKey(cacheKey, resolvedCacheTtlMs, {
+        allowUnverifiedCriticalRead,
+        priority: resolvedPriority,
+        queueTimeoutMs,
+        requestTimeoutMs,
+        timeoutMs,
+        verify,
+      });
+      const existing = toncenterRunGetMethodInFlight.get(inFlightKey);
+      if (existing) return existing;
+      const resolvedRequestTimeoutMs = resolveTonRpcRequestTimeoutMs({ cacheTtlMs, ttlMs, priority, requestTimeoutMs, timeoutMs }, options);
+      const body = JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'platho',
+        method: 'runGetMethod',
+        params: { address: call.address, method: call.method, stack: call.stack.map(tonAccessLegacyStackItem) },
+      });
+      const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
+      const promise = (async () => {
+        try {
+          const response = await scheduleToncenterHttpRequest(
+            cacheEndpoint,
+            null,
+            async () => fetchWithTonRpcTimeout(fetchImpl, `${await resolveBase(resolvedRequestTimeoutMs)}/jsonRPC`, {
+              method: 'POST',
+              headers,
+              body,
+            }, resolvedRequestTimeoutMs),
+            {
+              rateLimitKey,
+              requestSpacingMs,
+              rateLimitBackoffMs,
+              rateLimitRetries,
+              skipIfRateLimited: options.skipRateLimitedGetMethods ?? true,
+              priority: resolvedPriority,
+              queueTimeoutMs,
+            },
+          );
+          if (!response.ok) throw toncenterHttpError('TON Access get-method', response);
+          const normalized = normalizeTonAccessRunGetMethodResponse(await response.json());
+          // TON Access (v2) reports app-level errors (e.g. uninitialized account -> code -13) as an
+          // HTTP-200 {ok:false,...} with no result. Treat that as a thrown error (NOT an empty-stack
+          // success) so exit-code semantics — notably the -13 deploy-on-first-transfer signal — survive,
+          // and so the bad shape is never written to the read cache.
+          if (normalized.ok === false) {
+            const failCode = Number(normalized.code ?? normalized.exit_code ?? 0);
+            throw new VaultTonRpcProviderError(
+              `TON Access get-method failed${normalized.error ? `: ${normalized.error}` : ''}`,
+              Number.isFinite(failCode) ? { exitCode: failCode } : {},
+            );
+          }
+          const exitCode = Number(normalized.exit_code ?? 0);
+          if (exitCode !== 0) throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`, { exitCode });
+          writeRunGetMethodCache(cacheKey, normalized, resolvedCacheTtlMs, runGetMethodCacheMaxEntries);
+          return normalized;
+        } finally {
+          toncenterRunGetMethodInFlight.delete(inFlightKey);
+        }
+      })();
+      toncenterRunGetMethodInFlight.set(inFlightKey, promise);
+      return promise;
+    },
+    async sendBoc(input = {}) {
+      const { boc, requestTimeoutMs, timeoutMs, queueTimeoutMs, skipIfRateLimited, priority = 'critical' } = input;
+      const resolvedRequestTimeoutMs = resolveTonRpcRequestTimeoutMs({ priority, requestTimeoutMs, timeoutMs }, options);
+      const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
+      const response = await scheduleToncenterHttpRequest(
+        cacheEndpoint,
+        null,
+        async () => fetchWithTonRpcTimeout(fetchImpl, `${await resolveBase(resolvedRequestTimeoutMs)}/sendBoc`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ boc }),
+        }, resolvedRequestTimeoutMs),
+        {
+          rateLimitKey,
+          requestSpacingMs,
+          rateLimitBackoffMs,
+          rateLimitRetries: finiteNonNegativeMs(options.sendBocRateLimitRetries, Math.max(rateLimitRetries, 1)),
+          skipIfRateLimited: skipIfRateLimited === true,
+          priority,
+          queueTimeoutMs,
+        },
+      );
+      if (!response.ok) throw await toncenterHttpErrorWithBody('TON Access sendBoc', response);
+      const json = await response.json();
+      const ok = json.ok ?? json.result?.ok ?? true;
+      if (ok === false) throw new VaultTonRpcProviderError('TON Access sendBoc rejected message');
+      // A landed external advances seqno / mutates state, so cached reads for this provider go stale.
+      clearToncenterRunGetMethodCache({ endpoint: cacheEndpoint, apiKey: null, rateLimitKey });
+      clearToncenterMessagesCache();
+      return json;
+    },
+    async getAccountState(input, requestOptions = {}) {
+      const address = typeof input === 'string' ? input : input?.address;
+      const resolvedAddress = assertString(address, 'TON account address');
+      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
+      const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
+      const response = await scheduleToncenterHttpRequest(
+        cacheEndpoint,
+        null,
+        async () => fetchWithTonRpcTimeout(
+          fetchImpl,
+          appendQueryParams(`${await resolveBase(requestTimeoutMs)}/getAddressInformation`, { address: resolvedAddress }),
+          { method: 'GET', headers, cache: 'no-store' },
+          requestTimeoutMs,
+        ),
+        {
+          rateLimitKey,
+          requestSpacingMs,
+          rateLimitBackoffMs,
+          rateLimitRetries,
+          skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
+          priority: requestOptions.priority ?? 'wallet',
+          queueTimeoutMs: requestOptions.queueTimeoutMs,
+        },
+      );
+      if (!response.ok) throw toncenterHttpError('TON Access account state', response);
+      return response.json();
+    },
+    async getAccountBalance(address, requestOptions = {}) {
+      const state = await this.getAccountState({ address }, requestOptions);
+      const value = state?.balance
+        ?? state?.result?.balance
+        ?? state?.account?.balance
+        ?? state?.result?.account?.balance;
+      if (value === undefined || value === null) {
+        throw new VaultTonRpcProviderError('TON account state did not include a balance');
+      }
+      return value;
+    },
+    // Package E foundation: keyless body retrieval by scanning an account's transactions (no indexer).
+    async getTransactions(params = {}, requestOptions = {}) {
+      const query = stableQueryObject(params);
+      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
+      const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
+      const response = await scheduleToncenterHttpRequest(
+        cacheEndpoint,
+        null,
+        async () => fetchWithTonRpcTimeout(
+          fetchImpl,
+          appendQueryParams(`${await resolveBase(requestTimeoutMs)}/getTransactions`, query),
+          { method: 'GET', headers },
+          requestTimeoutMs,
+        ),
+        {
+          rateLimitKey,
+          requestSpacingMs,
+          rateLimitBackoffMs,
+          rateLimitRetries,
+          skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
+          priority: requestOptions.priority ?? 'messages',
+          queueTimeoutMs: requestOptions.queueTimeoutMs,
+        },
+      );
+      if (!response.ok) throw toncenterHttpError('TON Access transactions', response);
+      return response.json();
+    },
+    // No getMessages: Orbs has no message-history indexer, and omitting it makes the fallback layer
+    // (transportSupportsReadMethod) route message-history reads to a keyed toncenter transport instead.
+  };
+}
+
+// Test-only: drop the cached Orbs node list so unit tests don't leak healthy-node state between cases.
+export function __clearTonAccessNodesCacheForTests() {
+  tonAccessNodesCache.clear();
+}
+
 function isRetryableTonRpcError(error) {
   const status = Number(error?.status ?? error?.response?.status ?? 0);
   const code = String(error?.code ?? '').toUpperCase();
@@ -1731,6 +2062,28 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   if ((kind === 'custom' || kind === 'user' || kind === 'external') && provider?.globalName) {
     return null;
   }
+  if (kind === 'ton-access-v2' || kind === 'ton-access' || kind === 'orbs') {
+    const transport = createTonAccessV2VaultTransport({
+      host: provider?.tonAccessHost ?? defaults.tonAccessHost,
+      network: provider?.tonAccessNetwork ?? defaults.tonAccessNetwork,
+      managerPath: provider?.tonAccessManagerPath ?? defaults.tonAccessManagerPath,
+      nodeTtlMs: provider?.tonAccessNodeTtlMs ?? defaults.tonAccessNodeTtlMs,
+      headers: provider?.headers ?? defaults.headers,
+      fetch: provider?.fetch ?? defaults.fetch,
+      requestSpacingMs: provider?.requestSpacingMs ?? defaults.requestSpacingMs,
+      rateLimitBackoffMs: provider?.rateLimitBackoffMs ?? defaults.rateLimitBackoffMs,
+      rateLimitRetries: provider?.rateLimitRetries ?? defaults.rateLimitRetries,
+      sendBocRateLimitRetries: provider?.sendBocRateLimitRetries ?? defaults.sendBocRateLimitRetries,
+      requestTimeoutMs: provider?.requestTimeoutMs ?? defaults.requestTimeoutMs,
+      skipRateLimitedGetMethods: provider?.skipRateLimitedGetMethods ?? defaults.skipRateLimitedGetMethods,
+      runGetMethodCacheTtlMs: provider?.runGetMethodCacheTtlMs ?? defaults.runGetMethodCacheTtlMs,
+      runGetMethodCacheMaxEntries: provider?.runGetMethodCacheMaxEntries ?? defaults.runGetMethodCacheMaxEntries,
+      runGetMethodCacheTtls: provider?.runGetMethodCacheTtls ?? defaults.runGetMethodCacheTtls,
+      runGetMethodPriorities: provider?.runGetMethodPriorities ?? defaults.runGetMethodPriorities,
+      rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? 'ton-access-v2',
+    });
+    return withRunGetMethodCapabilities(transport, provider, defaults);
+  }
   const endpoint = provider?.runGetMethodEndpoint
     ?? provider?.endpoint
     ?? defaults.runGetMethodEndpoint
@@ -1745,6 +2098,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     sendBocEndpoint: provider?.sendBocEndpoint ?? defaults.sendBocEndpoint,
     accountEndpoint: provider?.accountEndpoint ?? provider?.walletBalanceEndpoint ?? defaults.accountEndpoint ?? defaults.walletBalanceEndpoint,
     apiKey: provider?.apiKey ?? defaults.apiKey ?? null,
+    useUserApiKey: provider?.useUserApiKey ?? defaults.useUserApiKey,
     headers: provider?.headers ?? defaults.headers,
     fetch: provider?.fetch ?? defaults.fetch,
     requestSpacingMs: provider?.requestSpacingMs ?? defaults.requestSpacingMs,

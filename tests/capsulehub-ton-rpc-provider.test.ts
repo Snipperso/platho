@@ -433,6 +433,127 @@ describe('CapsuleHub TON RPC provider', () => {
     expect(calls[0].stack).toEqual([{ type: 'num', value: '0x7' }]);
   });
 
+  it('CAPHUB-TXSCAN-01: keyless body retrieval scans transactions (no indexer) and hash-verifies the v2 in_msg body', async () => {
+    const privateHeader0 = tonCell.snakeCellFromBytes(new Uint8Array([0x10]), 'private header0');
+    const privateHeader1 = tonCell.snakeCellFromBytes(privateHeader1Bytes(1_700_000_000), 'private header1');
+    const privateBody = tonCell.snakeCellFromBytes(new Uint8Array([0x12]), 'private body');
+    const privateHeader0Hash = await cellHashInt(privateHeader0);
+    const privateHeader1Hash = await cellHashInt(privateHeader1);
+    const privateBodyHash = await cellHashInt(privateBody);
+    const privateMessageBody = cellBoc(tonCell.beginCell()
+      .uint(0xA4F862C0n, 32, 'op')
+      .uint(1n, 64, 'bounce_id')
+      .uint(2n, 160, 'bounce_tag')
+      .uint(0xaaaan, 256, 'publish_id')
+      .uint(1n, 8, 'size_class')
+      .uint(2n, 8, 'crypto_suite')
+      .uint(privateHeader0Hash, 256, 'header_0_hash')
+      .ref(tonCell.beginCell()
+        .uint(privateHeader1Hash, 256, 'header_1_hash')
+        .uint(privateBodyHash, 256, 'body_hash')
+        .ref(privateHeader0, 'header_0')
+        .ref(privateHeader1, 'header_1')
+        .ref(privateBody, 'body')
+        .uint(5_000_000n, 128, 'protocol_fee_paid')
+        .endCell(), 'payload')
+      .endCell());
+
+    let txScanCalls = 0;
+    const transport = {
+      async runGetMethod(call: { method: string }) {
+        if (call.method === 'get_private_entry') {
+          return {
+            stack: [
+              num(-1n), num(7n), num(6n), num(5n), num(0x777n), num(0xaaaan),
+              { type: 'slice', value: encodeTonAddressSliceBoc(AUTHOR) },
+              num(0n), num(7n), num(1_700_000_123n),
+              num(privateHeader0Hash), num(privateHeader1Hash), num(privateBodyHash),
+              { type: 'cell', value: cellBoc(privateHeader0) },
+              { type: 'cell', value: cellBoc(privateHeader1) },
+            ],
+          };
+        }
+        throw new Error(`unexpected method ${call.method}`);
+      },
+      // No getMessages (no indexer): the keyless Orbs transport only scans an account's transactions,
+      // returning the publish body in the toncenter v2 in_msg.msg_data.body shape.
+      async getTransactions() {
+        txScanCalls += 1;
+        return { result: [{ in_msg: { msg_data: { body: privateMessageBody } } }] };
+      },
+    };
+
+    const provider = createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport });
+    const entry = await provider.getPrivateEntry(7n);
+    await expect(provider.resolvePrivateEntryBody(entry, { priority: 'critical', messageCacheTtlMs: 0 }))
+      .resolves.toMatchObject({ body_boc: cellBoc(privateBody) });
+    expect(txScanCalls).toBeGreaterThan(0);
+  });
+
+  it('CAPHUB-TXSCAN-02: keeps paging past a server-clamped short first page (cursor-driven, not length<limit)', async () => {
+    const privateHeader0 = tonCell.snakeCellFromBytes(new Uint8Array([0x10]), 'private header0');
+    const privateHeader1 = tonCell.snakeCellFromBytes(privateHeader1Bytes(1_700_000_000), 'private header1');
+    const privateBody = tonCell.snakeCellFromBytes(new Uint8Array([0x12]), 'private body');
+    const privateHeader0Hash = await cellHashInt(privateHeader0);
+    const privateHeader1Hash = await cellHashInt(privateHeader1);
+    const privateBodyHash = await cellHashInt(privateBody);
+    const privateMessageBody = cellBoc(tonCell.beginCell()
+      .uint(0xA4F862C0n, 32, 'op')
+      .uint(1n, 64, 'bounce_id')
+      .uint(2n, 160, 'bounce_tag')
+      .uint(0xaaaan, 256, 'publish_id')
+      .uint(1n, 8, 'size_class')
+      .uint(2n, 8, 'crypto_suite')
+      .uint(privateHeader0Hash, 256, 'header_0_hash')
+      .ref(tonCell.beginCell()
+        .uint(privateHeader1Hash, 256, 'header_1_hash')
+        .uint(privateBodyHash, 256, 'body_hash')
+        .ref(privateHeader0, 'header_0')
+        .ref(privateHeader1, 'header_1')
+        .ref(privateBody, 'body')
+        .uint(5_000_000n, 128, 'protocol_fee_paid')
+        .endCell(), 'payload')
+      .endCell());
+    // A neighbouring non-publish transaction on the busy CapsuleHub account (skipped by the op check).
+    const decoyBody = cellBoc(tonCell.beginCell().uint(0x12345678n, 32, 'op').endCell());
+
+    const txPages: any[] = [];
+    const transport = {
+      async runGetMethod(call: { method: string }) {
+        if (call.method === 'get_private_entry') {
+          return {
+            stack: [
+              num(-1n), num(7n), num(6n), num(5n), num(0x777n), num(0xaaaan),
+              { type: 'slice', value: encodeTonAddressSliceBoc(AUTHOR) },
+              num(0n), num(7n), num(1_700_000_123n),
+              num(privateHeader0Hash), num(privateHeader1Hash), num(privateBodyHash),
+              { type: 'cell', value: cellBoc(privateHeader0) },
+              { type: 'cell', value: cellBoc(privateHeader1) },
+            ],
+          };
+        }
+        throw new Error(`unexpected method ${call.method}`);
+      },
+      // Page 0 is server-clamped to a single (non-matching) tx — length < requested limit — but the
+      // account has older history; the body is only on page 2, reachable via the (lt,hash) cursor.
+      async getTransactions(params: any) {
+        txPages.push(params);
+        if (!params.lt) {
+          return { result: [{ transaction_id: { lt: '100', hash: 'h0' }, utime: 1_700_000_200, in_msg: { msg_data: { body: decoyBody } } }] };
+        }
+        return { result: [{ transaction_id: { lt: '50', hash: 'h1' }, utime: 1_700_000_123, in_msg: { msg_data: { body: privateMessageBody } } }] };
+      },
+    };
+
+    const provider = createCapsuleHubTonRpcProvider({ capsuleHubAddress: CAPSULE, transport });
+    const entry = await provider.getPrivateEntry(7n);
+    await expect(provider.resolvePrivateEntryBody(entry, { priority: 'critical', messageCacheTtlMs: 0 }))
+      .resolves.toMatchObject({ body_boc: cellBoc(privateBody) });
+    // It did NOT treat the short first page as exhaustion — it followed the cursor to the next page.
+    expect(txPages.length).toBeGreaterThanOrEqual(2);
+    expect(txPages[1]).toMatchObject({ lt: '100', hash: 'h0' });
+  });
+
   it('CAPHUB-RPC-02: falls back to broad history lookup when exact body_hash lookup returns no body', async () => {
     const privateHeader0 = tonCell.snakeCellFromBytes(new Uint8Array([0x10]), 'private header0');
     const privateHeader1 = tonCell.snakeCellFromBytes(privateHeader1Bytes(1_700_000_000), 'private header1');

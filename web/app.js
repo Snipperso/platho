@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=82';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=83';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=44';
+} from './vault-ton-rpc-provider.mjs?v=45';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -135,19 +135,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=3';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=26';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=27';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=40';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=28';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=24';
+} from './capsulehub-ton-rpc-provider.mjs?v=41';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=29';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=25';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=31';
+} from './username-ton-rpc-provider.mjs?v=32';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v463';
+const PLATHO_APP_RUNTIME_VERSION = 'v465';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -257,7 +257,16 @@ function installConfiguredTonRuntime(config = appConfig) {
   if (apiKey && !globalThis.plathoTonRpcApiKey) {
     globalThis.plathoTonRpcApiKey = apiKey;
   }
+  // Client-direct RPC: load the user's own toncenter API key (if saved) BEFORE building the transport,
+  // so the user-toncenter provider (useUserApiKey) captures it; anonymous until the user adds one.
+  if (globalThis.plathoToncenterApiKey === undefined) {
+    try {
+      const savedToncenterKey = globalThis.localStorage?.getItem('platho.toncenter.apiKey.v1');
+      globalThis.plathoToncenterApiKey = savedToncenterKey && savedToncenterKey.trim() ? savedToncenterKey.trim() : null;
+    } catch { globalThis.plathoToncenterApiKey = null; }
+  }
   if (!globalThis.plathoTonRpcTransport && typeof globalThis.fetch === 'function') {
+    globalThis.plathoTonRpcConfig = rpc;
     const transport = createTonRpcTransport(rpc);
     if (transport) globalThis.plathoTonRpcTransport = transport;
   }
@@ -432,6 +441,57 @@ const mintUsernameButton = document.querySelector('#mintUsernameButton');
 const mintUsernameStatus = document.querySelector('#mintUsernameStatus');
 const linkUsernameButton = document.querySelector('#linkUsernameButton');
 const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
+const toncenterApiKeyInput = document.querySelector('#toncenterApiKeyInput');
+const saveToncenterKeyButton = document.querySelector('#saveToncenterKeyButton');
+const saveToncenterKeyStatus = document.querySelector('#saveToncenterKeyStatus');
+const toncenterKeyStatus = document.querySelector('#toncenterKeyStatus');
+const getToncenterKeyButton = document.querySelector('#getToncenterKeyButton');
+
+// Client-direct RPC: the user's own free toncenter API key (10 rps) speeds up reads + the message
+// indexer. Stored locally; injected into the user-toncenter transport at build via
+// globalThis.plathoToncenterApiKey. Keyless (Orbs) keeps working without it.
+const TONCENTER_API_KEY_STORAGE_KEY = 'platho.toncenter.apiKey.v1';
+
+function refreshToncenterKeyUi() {
+  let key = globalThis.plathoToncenterApiKey ?? null;
+  if (key == null) {
+    try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
+  }
+  if (toncenterKeyStatus) toncenterKeyStatus.textContent = key ? 'key active' : 'recommended';
+  if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) {
+    toncenterApiKeyInput.value = key ?? '';
+  }
+}
+
+function applyToncenterApiKey(rawKey) {
+  const key = String(rawKey ?? '').trim();
+  try {
+    if (key) globalThis.localStorage?.setItem(TONCENTER_API_KEY_STORAGE_KEY, key);
+    else globalThis.localStorage?.removeItem(TONCENTER_API_KEY_STORAGE_KEY);
+  } catch { /* ignore storage errors */ }
+  globalThis.plathoToncenterApiKey = key || null;
+  // The RPC transports captured the previous key at build; drop and rebuild so the new key applies now.
+  globalThis.plathoTonRpcTransport = null;
+  globalThis.plathoCapsuleHubRpcTransport = null;
+  globalThis.plathoWalletRpcTransport = null;
+  try {
+    const rebuilt = globalThis.plathoTonRpcConfig ? createTonRpcTransport(globalThis.plathoTonRpcConfig) : null;
+    if (rebuilt) globalThis.plathoTonRpcTransport = rebuilt;
+  } catch { /* best-effort; the next read rebuilds */ }
+  refreshToncenterKeyUi();
+  return Boolean(key);
+}
+
+saveToncenterKeyButton?.addEventListener('click', () => {
+  const saved = applyToncenterApiKey(toncenterApiKeyInput?.value);
+  if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = saved ? 'saved' : 'cleared';
+});
+
+getToncenterKeyButton?.addEventListener('click', () => {
+  try { globalThis.open?.('https://t.me/toncenter', '_blank', 'noopener'); } catch { /* ignore */ }
+});
+
+refreshToncenterKeyUi();
 const burnAthButton = document.querySelector('#burnAthButton');
 const flushAthButton = document.querySelector('#flushAthButton');
 const flushAthStatus = document.querySelector('#flushAthStatus');

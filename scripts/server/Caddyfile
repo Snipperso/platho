@@ -8,7 +8,7 @@
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         Alt-Svc "clear"
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://rpc.platho.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors https://web.telegram.org; form-action 'none'; upgrade-insecure-requests"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://ton.access.orbs.network https://*.orbs.network; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors https://web.telegram.org; form-action 'none'; upgrade-insecure-requests"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "no-referrer"
         Permissions-Policy "accelerometer=(), bluetooth=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=()"
@@ -39,5 +39,21 @@ platho.app {
 rpc.platho.app {
     import security_headers
     encode gzip
-    reverse_proxy 127.0.0.1:8790
+
+    # Cap the request body at the edge (matches the gateway MAX_BODY_BYTES).
+    request_body {
+        max_size 256KiB
+    }
+
+    route {
+        # Only the routes the gateway serves; reject everything else before Python.
+        @badmethods not method GET POST OPTIONS
+        respond @badmethods 405
+
+        # Overwrite X-Forwarded-For with the real client IP so a client-supplied (spoofed)
+        # value can never reach the gateway's rate limiter.
+        reverse_proxy 127.0.0.1:8790 {
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
 }

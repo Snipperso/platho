@@ -10,10 +10,43 @@ EnvironmentFile=/etc/platho/rpc-gateway.env
 ExecStart=/usr/bin/python3 /opt/platho/platho-rpc-gateway.py
 Restart=on-failure
 RestartSec=3
+
+# --- Resource ceilings: cap the DoS classes (dict growth, thread/connection floods) ----------
+MemoryMax=256M
+TasksMax=256
+LimitNOFILE=4096
+
+# --- Sandbox: shrink blast radius if the gateway is ever compromised --------------------------
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# AF_UNIX is required for journald stderr logging and the local resolver socket.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# Empty bounding set => the process holds zero capabilities (CapBnd=0), inherited across any exec.
+CapabilityBoundingSet=
+# NOTE: NoNewPrivileges above is honored on most systemd builds but is NOT enforced for a root
+# service on the prod box (systemd 257 installs the seccomp filter itself, so NNP isn't force-set
+# and the explicit request isn't applied). Blast radius stays minimal regardless: CapabilityBoundingSet=
+# empty (zero caps even across a setuid exec) + the seccomp @system-service filter cover the gap.
+# /etc/platho (incl. the key file) is read-only to the service; ProtectSystem=strict makes the
+# rest of the filesystem read-only too.
+ReadOnlyPaths=/etc/platho
 
 [Install]
 WantedBy=multi-user.target
