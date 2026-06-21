@@ -141,4 +141,14 @@ describe('TON Access (Orbs) v2 transport', () => {
     await expect(camel.runGetMethod({ address: ADDR, method: 'get_global', stack: [], cacheTtlMs: 0 }))
       .rejects.toMatchObject({ exitCode: 7 });
   });
+
+  it('ORBS-11: getTransactions surfaces an HTTP-200 {ok:false} (e.g. v2 limit>100 validation, code:422) as a thrown error, not an empty page', async () => {
+    // A swallowed {ok:false} reads to the keyless body-scan as "account has no matching tx" and the body
+    // recovery gives up forever; it must throw so the scan records a real failure instead of a silent zero.
+    const transport = makeTransport({
+      transactions: { ok: false, error: 'Validation error: limit must be less than or equal to 100', code: 422 },
+    });
+    await expect(transport.getTransactions({ address: ADDR, limit: 1000 }))
+      .rejects.toThrow(/transactions failed/i);
+  });
 });
