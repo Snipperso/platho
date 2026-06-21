@@ -80,46 +80,47 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     chain: 'mainnet',
     label: 'mainnet',
     tonRpc: {
-      primaryProviderId: 'user-custom',
-      fallbackProviderIds: ['platho-rpc-mainnet'],
-      // The rpc.platho.app gateway is itself multi-source (keyed TonCenter + Orbs, with read
-      // fallback + redundant broadcast), so it is the trusted verified source — the PWA does NOT
-      // routinely cross-verify every critical read against a 2nd transport. Routine cross-verify
-      // would either hammer the keyless emergency toncenter (~1 rps) or fail closed on
-      // gateway-vs-gateway hot-state disagreement (the documented 'confirming' freezes). Safety-
-      // critical reads that genuinely need a cross-check pass an explicit per-call verify:true,
-      // which still NEVER consults the keyless emergency transport (see vault-ton-rpc-provider).
+      // CLIENT-DIRECT RPC (no central gateway). Each client carries its OWN per-client budget:
+      //  - orbs-keyless  : keyless decentralized Orbs network, PRIMARY for non-indexed
+      //                    reads/account/sendBoc (per-client budget, censorship-resistant, no key).
+      //  - user-toncenter: the user's OWN free toncenter API key (10 rps), injected at runtime from
+      //                    local storage. Carries the message-history indexer + reads/send.
+      //  - keyless-toncenter: anonymous toncenter, last-resort only (weak/throttled).
+      // verifyCriticalReads stays false: message bodies self-verify against CapsuleHub hashes, so a
+      // single (even untrusted) provider read cannot poison them; routine cross-verify would burn the
+      // per-user budget for no security gain.
+      primaryProviderId: 'orbs-keyless',
+      fallbackProviderIds: ['user-toncenter', 'keyless-toncenter'],
       verifyCriticalReads: false,
       criticalMethods: [...REQUIRED_TON_RPC_CRITICAL_METHODS],
       providers: [
         {
-          id: 'user-custom',
-          kind: 'custom',
-          globalName: 'plathoCustomTonRpcTransport',
+          id: 'orbs-keyless',
+          kind: 'ton-access-v2',
+          // No message-history indexer; getMessages reads route to a keyed toncenter provider.
         },
         {
-          id: 'toncenter-mainnet',
+          id: 'user-toncenter',
+          kind: 'toncenter-v3',
+          // The toncenter API key is the user's own free key, injected at runtime via
+          // globalThis.plathoToncenterApiKey. When absent the transport runs anonymous (degraded).
+          useUserApiKey: true,
+          runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.com/api/v3/message',
+          messagesEndpoint: 'https://toncenter.com/api/v3/messages',
+          walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
+          requestSpacingMs: 100,
+        },
+        {
+          id: 'keyless-toncenter',
           kind: 'toncenter-v3',
           verifierOnly: true,
-          // Censorship survival: if the Platho RPC gateway is blocked or
-          // unreachable, keyless TonCenter (~1 rps) takes over reads, sends,
-          // and message history until the gateway recovers. It is never a
-          // normal read/send fallback while a primary transport is healthy.
           emergencyFallback: true,
           runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
           sendBocEndpoint: 'https://toncenter.com/api/v3/message',
           messagesEndpoint: 'https://toncenter.com/api/v3/messages',
           walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
           requestSpacingMs: 1500,
-        },
-        {
-          id: 'platho-rpc-mainnet',
-          kind: 'platho-rpc',
-          runGetMethodEndpoint: 'https://rpc.platho.app/api/v3/runGetMethod',
-          sendBocEndpoint: 'https://rpc.platho.app/api/v3/message',
-          messagesEndpoint: 'https://rpc.platho.app/api/v3/messages',
-          walletBalanceEndpoint: 'https://rpc.platho.app/api/v2/getAddressInformation',
-          supportedGetMethods: [...PLATHO_RPC_GATEWAY_GET_METHODS],
         },
       ],
       requestSpacingMs: 250,
@@ -135,7 +136,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: 'b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=44',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=45',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -145,7 +146,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=24',
+      moduleUrl: './ton-dns-provider.mjs?v=25',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
@@ -308,20 +309,6 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
           'Production PWA config must include a concrete TON RPC send provider.',
         );
       }
-      for (const rpcProvider of tonRpcProviders) {
-        const isEmergencyFallbackProvider = rpcProvider?.verifierOnly === true && rpcProvider?.emergencyFallback === true;
-        if (
-          /toncenter/i.test(String(rpcProvider?.id ?? rpcProvider?.kind ?? ''))
-          && rpcProvider?.sendBocEndpoint
-          && !isEmergencyFallbackProvider
-        ) {
-          addFinding(
-            findings,
-            'PWA_TONCENTER_DIRECT_SEND_FORBIDDEN',
-            'Production PWA must broadcast through the Platho RPC gateway; direct TonCenter sendBoc is allowed only on a verifier-only emergency fallback provider.',
-          );
-        }
-      }
       const hasEmergencyFallbackProvider = tonRpcProviders.some((rpcProvider) => (
         rpcProvider?.verifierOnly === true
         && rpcProvider?.emergencyFallback === true
@@ -333,24 +320,36 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
         addFinding(
           findings,
           'PWA_TON_RPC_EMERGENCY_FALLBACK_REQUIRED',
-          'Production PWA config must include a verifier-only emergency fallback provider with read, send, and message-history endpoints so the messenger survives a blocked primary gateway.',
+          'Production PWA config must include a verifier-only emergency fallback provider with read, send, and message-history endpoints so the messenger survives when the primary transports are unreachable.',
         );
       }
-      const fallbackIds = new Set((config?.network?.tonRpc?.fallbackProviderIds ?? config?.network?.tonRpc?.fallbackProviders ?? []).map(String));
+      // Client-direct model: each client carries its own per-client RPC budget, so a keyless
+      // decentralized provider (Orbs / TON Access) must exist for the no-key / censored survival path.
+      const hasKeylessDecentralizedProvider = tonRpcProviders.some((rpcProvider) => (
+        ['ton-access-v2', 'ton-access', 'orbs'].includes(String(rpcProvider?.kind ?? '').toLowerCase())
+      ));
+      if (!hasKeylessDecentralizedProvider) {
+        addFinding(
+          findings,
+          'PWA_TON_RPC_KEYLESS_DECENTRALIZED_REQUIRED',
+          'Production PWA config must include a keyless decentralized TON RPC provider (Orbs / TON Access) so reads and sends survive without a per-user API key.',
+        );
+      }
+      // The central rpc.platho.app gateway is retired; no provider may route through it.
       for (const rpcProvider of tonRpcProviders) {
-        const providerId = String(rpcProvider?.id ?? '');
-        if (/toncenter/i.test(String(rpcProvider?.id ?? rpcProvider?.kind ?? '')) && fallbackIds.has(providerId)) {
+        const routedThroughGateway = [
+          rpcProvider?.runGetMethodEndpoint,
+          rpcProvider?.endpoint,
+          rpcProvider?.sendBocEndpoint,
+          rpcProvider?.messagesEndpoint,
+          rpcProvider?.walletBalanceEndpoint,
+          rpcProvider?.accountEndpoint,
+        ].some((value) => typeof value === 'string' && /rpc\.platho\.app/i.test(value));
+        if (routedThroughGateway) {
           addFinding(
             findings,
-            'PWA_TONCENTER_DIRECT_READ_FALLBACK_FORBIDDEN',
-            'Production PWA must not use direct TonCenter as a normal read fallback; keep it verifier-only.',
-          );
-        }
-        if (/toncenter/i.test(String(rpcProvider?.id ?? rpcProvider?.kind ?? '')) && rpcProvider?.runGetMethodEndpoint && rpcProvider?.verifierOnly !== true) {
-          addFinding(
-            findings,
-            'PWA_TONCENTER_DIRECT_READ_VERIFIER_ONLY_REQUIRED',
-            'Production direct TonCenter read provider must be marked verifierOnly.',
+            'PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN',
+            'Production PWA must not route through the retired rpc.platho.app gateway; clients talk to TON directly (Orbs + the user key).',
           );
         }
       }

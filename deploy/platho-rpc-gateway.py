@@ -1,18 +1,43 @@
 #!/usr/bin/env python3
+"""Platho read-only/broadcast TON RPC gateway.
+
+Security posture (see deploy/platho-rpc-gateway.env.example for the knobs):
+  * The gateway is an UNAUTHENTICATED public endpoint (a static-PWA backend cannot
+    ship a secret). CORS is a browser-only convenience header and is NOT treated as
+    access control. The real defenses are: a real client-IP rate limit (keyed on the
+    Caddy-appended hop, never the client-supplied X-Forwarded-For), a dedicated
+    stricter broadcast limit, an optional global keyed-upstream ceiling, a bounded
+    request-concurrency gate, request/socket timeouts, and structural validation of
+    every relayed external.
+  * The paid TonCenter key is read from a root-only file and only ever attached to
+    TonCenter requests (never Orbs). It is never returned to clients or logged.
+"""
+import base64
 import json
 import os
 import random
 import re
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
+
+def env_flag(name, default):
+    return os.getenv(name, default).strip().lower() not in ("0", "false", "off", "no")
+
+
+# Production allowlist is set via PLATHO_RPC_ALLOWED_ORIGINS. The default is
+# prod-only (platho.app); localhost dev origins are added back ONLY when
+# PLATHO_RPC_DEV=1 so an unset env var fails closed in production.
 DEFAULT_ALLOWED_ORIGINS = [
     "https://platho.app",
     "https://www.platho.app",
+]
+DEV_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8787",
     "http://localhost:8787",
 ]
@@ -77,7 +102,17 @@ MESSAGE_QUERY_ALLOWED_KEYS = {
     "offset",
 }
 
+# Only `address` may reach the keyed v2 account read; the raw client query is never
+# forwarded verbatim (it used to be — an unmetered arbitrary-account read primitive).
+ACCOUNT_QUERY_ALLOWED_KEYS = {"address"}
+
 BOC_BASE64_RE = re.compile(r"^[A-Za-z0-9+/=_-]+$")
+# Permissive-but-bounded: blocks query injection / oversized values without pinning a
+# single address form (raw `wc:hex`, base64, base64url all pass). Account BALANCE reads
+# are inherently for arbitrary user wallets, so we validate shape, not identity.
+TON_ADDRESS_RE = re.compile(r"^[-0-9A-Za-z_:/+=]{1,256}$")
+
+BOC_MAGIC = b"\xb5\xee\x9c\x72"
 
 
 def split_list(value, fallback):
@@ -110,12 +145,49 @@ TONCENTER_V2_BASE = os.getenv("PLATHO_RPC_TONCENTER_V2_BASE", "https://toncenter
 TONCENTER_API_KEY = os.getenv("PLATHO_RPC_TONCENTER_API_KEY", "").strip()
 TONCENTER_API_KEY_FILE = os.getenv("PLATHO_RPC_TONCENTER_API_KEY_FILE", "").strip()
 TONCENTER_AUTH_RETRY_MS = int(os.getenv("PLATHO_RPC_TONCENTER_AUTH_RETRY_MS", "60000"))
+# A single transient upstream 401/403 (often a Cloudflare/WAF challenge attributed to the
+# request, not the key) must NOT silently flip the whole process keyless. Only after this
+# many CONSECUTIVE 401s do we disable the key process-wide; 403 only degrades that one
+# request. Any keyed 2xx resets the counter.
+TONCENTER_AUTH_FAIL_THRESHOLD = int(os.getenv("PLATHO_RPC_TONCENTER_AUTH_FAIL_THRESHOLD", "3"))
 MAX_BODY_BYTES = int(os.getenv("PLATHO_RPC_MAX_BODY_BYTES", "262144"))
+# A valid single TON external is capped at 65535 bytes (config-43); its base64 is ~87380
+# chars. Cap the /message boc well under MAX_BODY_BYTES so a 256KB padding blob can never be
+# relayed (and so the redundant double-broadcast can't be used as a bandwidth amplifier).
+MESSAGE_MAX_BOC_CHARS = int(os.getenv("PLATHO_RPC_MESSAGE_MAX_BOC_CHARS", "90000"))
 UPSTREAM_TIMEOUT_SECONDS = float(os.getenv("PLATHO_RPC_UPSTREAM_TIMEOUT_MS", "15000")) / 1000.0
+# Inbound socket timeout caps slowloris / dribbled bodies (BaseHTTPRequestHandler.timeout
+# defaults to None = never).
+HANDLER_TIMEOUT_SECONDS = float(os.getenv("PLATHO_RPC_HANDLER_TIMEOUT_MS", "15000")) / 1000.0
 UPSTREAM_USER_AGENT = os.getenv("PLATHO_RPC_UPSTREAM_USER_AGENT", "PlathoRpcGateway/1.0 (+https://platho.app)").strip()
 RATE_LIMIT_PER_MINUTE = int(os.getenv("PLATHO_RPC_RATE_LIMIT_PER_MINUTE", "240"))
-MESSAGE_MAX_OFFSET = int(os.getenv("PLATHO_RPC_MESSAGES_MAX_OFFSET", "8000"))
-ALLOWED_ORIGINS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_ORIGINS"), DEFAULT_ALLOWED_ORIGINS))
+# A much tighter dedicated limit for the state-changing broadcast route.
+BROADCAST_RATE_LIMIT_PER_MINUTE = int(os.getenv("PLATHO_RPC_BROADCAST_RATE_LIMIT_PER_MINUTE", "30"))
+# Optional global circuit breaker on key-bearing upstream calls (0 = off). Bounds total
+# paid-key spend even under distributed abuse; set after observing real traffic.
+GLOBAL_UPSTREAM_PER_MINUTE = int(os.getenv("PLATHO_RPC_GLOBAL_UPSTREAM_PER_MINUTE", "0"))
+# Bounded request concurrency: caps simultaneously in-flight handlers so thread-per-connection
+# floods / slow-upstream pile-ups can't exhaust threads+FDs. Excess requests get a fast 503.
+MAX_CONCURRENT_REQUESTS = int(os.getenv("PLATHO_RPC_MAX_CONCURRENT_REQUESTS", "64"))
+# Hard ceiling on distinct rate-limit buckets (defense-in-depth against dict-growth DoS).
+MAX_RATE_LIMIT_BUCKETS = int(os.getenv("PLATHO_RPC_MAX_RATE_LIMIT_BUCKETS", "50000"))
+# Number of trusted reverse-proxy hops in front of the gateway (Caddy = 1). The real client
+# IP is the Nth-from-last X-Forwarded-For token; client-supplied leftmost tokens are ignored.
+# 0 = ignore X-Forwarded-For entirely and use the TCP peer.
+FORWARDED_FOR_TRUSTED_HOPS = int(os.getenv("PLATHO_RPC_FORWARDED_FOR_TRUSTED_HOPS", "1"))
+# Reject the state-changing broadcast when no Origin is present (cheap brake on no-Origin curl
+# abuse; Origin is spoofable so this is only one layer).
+REQUIRE_ORIGIN_FOR_BROADCAST = env_flag("PLATHO_RPC_REQUIRE_ORIGIN_FOR_BROADCAST", "1")
+# Structurally validate every relayed external (well-formed single ext-in message with a
+# standard internal destination). Rejects garbage/non-external blobs. Our builders always
+# produce valid externals, so this never rejects a legitimate send.
+VALIDATE_BROADCAST_STRUCTURE = env_flag("PLATHO_RPC_VALIDATE_BROADCAST_STRUCTURE", "1")
+# Never echo raw upstream error bodies to clients (upstream recon + future-key-reflection
+# risk). Server logs still keep the full detail.
+EXPOSE_UPSTREAM_ERRORS = env_flag("PLATHO_RPC_EXPOSE_UPSTREAM_ERRORS", "0")
+
+_dev_origins = DEV_ALLOWED_ORIGINS if env_flag("PLATHO_RPC_DEV", "0") else []
+ALLOWED_ORIGINS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_ORIGINS"), DEFAULT_ALLOWED_ORIGINS + _dev_origins))
 ALLOWED_GET_METHODS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_GET_METHODS"), DEFAULT_ALLOWED_GET_METHODS))
 ALLOWED_MESSAGE_DESTINATIONS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_MESSAGE_DESTINATIONS"), []))
 ALLOWED_MESSAGE_SOURCES = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_MESSAGE_SOURCES"), []))
@@ -123,11 +195,28 @@ ALLOWED_MESSAGE_OPCODES = {
     item.lower()
     for item in split_list(os.getenv("PLATHO_RPC_ALLOWED_MESSAGE_OPCODES"), DEFAULT_ALLOWED_MESSAGE_OPCODES)
 }
+# Optional destination allowlist specifically for the BROADCAST route (empty = structural
+# validation only). Leave empty unless EVERY broadcast target is known — wallet
+# activation/transfer externals are addressed to the user's own wallet, so a hard allowlist
+# here would break onboarding.
+ALLOWED_BROADCAST_DESTINATIONS = set(split_list(os.getenv("PLATHO_RPC_ALLOWED_BROADCAST_DESTINATIONS"), []))
+MESSAGE_MAX_OFFSET = int(os.getenv("PLATHO_RPC_MESSAGES_MAX_OFFSET", "8000"))
+NODE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 ton_access_nodes_cache = {"expires_at": 0, "nodes": []}
 toncenter_api_key_cache = {"path": None, "mtime": None, "value": None}
-toncenter_auth_state = {"disabled_until": 0}
+toncenter_auth_state = {"disabled_until": 0, "consecutive_failures": 0}
 rate_limit_buckets = {}
+global_upstream_bucket = {"count": 0, "reset_at": 0}
+key_fail_open_logged = {"at": 0}
+
+# Guards the small read-modify-write sections on the shared dicts above. Held only for
+# microscopic critical sections, never across network I/O.
+_state_lock = threading.Lock()
+# Single-flight for the Orbs node-manager refresh so a cache miss doesn't thunder.
+_nodes_lock = threading.Lock()
+# Bounds concurrent in-flight handlers.
+request_semaphore = threading.BoundedSemaphore(max(1, MAX_CONCURRENT_REQUESTS))
 
 
 def json_response(handler, status, payload, extra_headers=None):
@@ -198,6 +287,11 @@ def log_upstream_fallback(kind, reason):
     print(f"upstream_fallback route={kind} upstream=ton-access-v2 reason={reason}", file=sys.stderr, flush=True)
 
 
+def log_security(event, detail=""):
+    safe_detail = f" {detail}" if detail else ""
+    print(f"security_event {event}{safe_detail}", file=sys.stderr, flush=True)
+
+
 def read_fallback_reason(error):
     # Only connectivity-level upstream trouble is fallback-worthy. Client
     # errors (4xx other than 429) describe the request, not the upstream,
@@ -213,11 +307,23 @@ def read_fallback_reason(error):
     return None
 
 
+def safe_weight(raw):
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 1
+    if value < 1:
+        return 1
+    if value > 1_000_000:
+        return 1_000_000
+    return value
+
+
 def weighted_node(nodes):
-    total = sum(max(1, int(node.get("Weight") or 1)) for node in nodes)
+    total = sum(safe_weight(node.get("Weight")) for node in nodes)
     roll = random.randrange(max(1, total))
     for node in nodes:
-        roll -= max(1, int(node.get("Weight") or 1))
+        roll -= safe_weight(node.get("Weight"))
         if roll < 0:
             return node
     return nodes[0]
@@ -230,25 +336,68 @@ def toncenter_api_key():
         return ""
     try:
         stat = os.stat(TONCENTER_API_KEY_FILE)
-        if (
-            toncenter_api_key_cache["path"] == TONCENTER_API_KEY_FILE
-            and toncenter_api_key_cache["mtime"] == stat.st_mtime
-            and toncenter_api_key_cache["value"] is not None
-        ):
-            return toncenter_api_key_cache["value"]
+        with _state_lock:
+            cached = (
+                toncenter_api_key_cache["path"] == TONCENTER_API_KEY_FILE
+                and toncenter_api_key_cache["mtime"] == stat.st_mtime
+                and toncenter_api_key_cache["value"] is not None
+            )
+            if cached:
+                return toncenter_api_key_cache["value"]
         with open(TONCENTER_API_KEY_FILE, "r", encoding="utf-8") as handle:
             value = handle.read().strip()
-        toncenter_api_key_cache.update({"path": TONCENTER_API_KEY_FILE, "mtime": stat.st_mtime, "value": value})
+        with _state_lock:
+            toncenter_api_key_cache.update({"path": TONCENTER_API_KEY_FILE, "mtime": stat.st_mtime, "value": value})
+        if not value:
+            note_key_fail_open("key file is empty")
         return value
     except OSError:
+        note_key_fail_open("key file is configured but unreadable")
         return ""
+
+
+def note_key_fail_open(reason):
+    # A configured-but-unusable key must be LOUD, not a silent keyless downgrade.
+    now = int(time.time() * 1000)
+    with _state_lock:
+        if now - key_fail_open_logged["at"] < 60000:
+            return
+        key_fail_open_logged["at"] = now
+    log_security("key_fail_open", reason)
 
 
 def toncenter_headers():
     api_key = toncenter_api_key()
-    if int(time.time() * 1000) < toncenter_auth_state["disabled_until"]:
+    with _state_lock:
+        disabled = int(time.time() * 1000) < toncenter_auth_state["disabled_until"]
+    if disabled:
         return {}
     return {"X-API-Key": api_key} if api_key else {}
+
+
+def register_auth_failure(code):
+    # 401 = the key is genuinely rejected -> count toward the global-disable threshold.
+    # 403 = usually a per-request WAF/geo block attributed to the request, NOT the key ->
+    # retry THIS call keyless without poisoning global state for everyone.
+    if code != 401:
+        return
+    now = int(time.time() * 1000)
+    with _state_lock:
+        toncenter_auth_state["consecutive_failures"] += 1
+        fails = toncenter_auth_state["consecutive_failures"]
+        if fails >= TONCENTER_AUTH_FAIL_THRESHOLD:
+            toncenter_auth_state["disabled_until"] = now + TONCENTER_AUTH_RETRY_MS
+            crossed = True
+        else:
+            crossed = False
+    if crossed:
+        log_security("toncenter_key_disabled", f"consecutive_401={fails} retry_ms={TONCENTER_AUTH_RETRY_MS}")
+
+
+def register_auth_success():
+    with _state_lock:
+        if toncenter_auth_state["consecutive_failures"]:
+            toncenter_auth_state["consecutive_failures"] = 0
 
 
 def fetch_toncenter_json(url, method="GET", body=None):
@@ -256,35 +405,67 @@ def fetch_toncenter_json(url, method="GET", body=None):
     if not headers:
         return fetch_json(url, method=method, body=body)
     try:
-        return fetch_json(url, method=method, body=body, extra_headers=headers)
+        result = fetch_json(url, method=method, body=body, extra_headers=headers)
+        register_auth_success()
+        return result
     except HTTPError as error:
         if error.code not in (401, 403):
             raise
-        toncenter_auth_state["disabled_until"] = int(time.time() * 1000) + TONCENTER_AUTH_RETRY_MS
+        register_auth_failure(error.code)
         return fetch_json(url, method=method, body=body)
+
+
+def global_upstream_allowed():
+    if GLOBAL_UPSTREAM_PER_MINUTE <= 0:
+        return True
+    now = int(time.time() * 1000)
+    with _state_lock:
+        if global_upstream_bucket["reset_at"] <= now:
+            global_upstream_bucket["count"] = 1
+            global_upstream_bucket["reset_at"] = now + 60000
+            return True
+        global_upstream_bucket["count"] += 1
+        return global_upstream_bucket["count"] <= GLOBAL_UPSTREAM_PER_MINUTE
 
 
 def ton_access_base():
     now = int(time.time() * 1000)
-    if ton_access_nodes_cache["expires_at"] > now and ton_access_nodes_cache["nodes"]:
-        node = weighted_node(ton_access_nodes_cache["nodes"])
-        return f"https://{TON_ACCESS_HOST}/{node['NodeId']}/1/{TON_ACCESS_NETWORK}/toncenter-api-v2"
+    with _state_lock:
+        if ton_access_nodes_cache["expires_at"] > now and ton_access_nodes_cache["nodes"]:
+            node = weighted_node(ton_access_nodes_cache["nodes"])
+            return f"https://{TON_ACCESS_HOST}/{node['NodeId']}/1/{TON_ACCESS_NETWORK}/toncenter-api-v2"
 
-    status, nodes = fetch_json(f"https://{TON_ACCESS_HOST}{TON_ACCESS_MANAGER_PATH}")
-    if status < 200 or status >= 300 or not isinstance(nodes, list):
-        raise RuntimeError(f"TON_ACCESS_MANAGER_{status}")
-    health_key = f"v2-{TON_ACCESS_NETWORK}"
-    healthy = [
-        node
-        for node in nodes
-        if str(node.get("Healthy")) == "1" and node.get("Mngr", {}).get("health", {}).get(health_key) is True
-    ]
-    if not healthy:
-        raise RuntimeError("TON_ACCESS_NO_HEALTHY_V2_NODE")
-    ton_access_nodes_cache["expires_at"] = now + TON_ACCESS_NODE_TTL_MS
-    ton_access_nodes_cache["nodes"] = healthy
-    node = weighted_node(healthy)
-    return f"https://{TON_ACCESS_HOST}/{node['NodeId']}/1/{TON_ACCESS_NETWORK}/toncenter-api-v2"
+    # Single-flight the manager refresh so a cache miss under load doesn't thunder.
+    with _nodes_lock:
+        now = int(time.time() * 1000)
+        with _state_lock:
+            if ton_access_nodes_cache["expires_at"] > now and ton_access_nodes_cache["nodes"]:
+                node = weighted_node(ton_access_nodes_cache["nodes"])
+                return f"https://{TON_ACCESS_HOST}/{node['NodeId']}/1/{TON_ACCESS_NETWORK}/toncenter-api-v2"
+
+        status, nodes = fetch_json(f"https://{TON_ACCESS_HOST}{TON_ACCESS_MANAGER_PATH}")
+        if status < 200 or status >= 300 or not isinstance(nodes, list):
+            raise RuntimeError(f"TON_ACCESS_MANAGER_{status}")
+        health_key = f"v2-{TON_ACCESS_NETWORK}"
+        healthy = [
+            node
+            for node in nodes
+            if str(node.get("Healthy")) == "1"
+            and node.get("Mngr", {}).get("health", {}).get(health_key) is True
+            and isinstance(node.get("NodeId"), str)
+            and NODE_ID_RE.fullmatch(node.get("NodeId"))
+        ]
+        if not healthy:
+            raise RuntimeError("TON_ACCESS_NO_HEALTHY_V2_NODE")
+        with _state_lock:
+            ton_access_nodes_cache["expires_at"] = now + TON_ACCESS_NODE_TTL_MS
+            ton_access_nodes_cache["nodes"] = healthy
+        node = weighted_node(healthy)
+        url = f"https://{TON_ACCESS_HOST}/{node['NodeId']}/1/{TON_ACCESS_NETWORK}/toncenter-api-v2"
+        # Belt-and-suspenders: NodeId is regex-confined to the path, but never let it move the host.
+        if urlparse(url).netloc != TON_ACCESS_HOST:
+            raise RuntimeError("TON_ACCESS_NODE_ID_REJECTED")
+        return url
 
 
 def to_legacy_stack_item(item):
@@ -327,6 +508,12 @@ def load_run_get_method_payload(body_bytes):
     method = str(payload.get("method") or "")
     if method not in ALLOWED_GET_METHODS:
         raise PermissionError(f"GET_METHOD_NOT_ALLOWED:{method or 'missing'}")
+    address = str(payload.get("address") or "")
+    if not TON_ADDRESS_RE.fullmatch(address):
+        raise PermissionError("GET_METHOD_ADDRESS_INVALID")
+    stack = payload.get("stack") or []
+    if not isinstance(stack, list) or len(stack) > 16:
+        raise PermissionError("GET_METHOD_STACK_INVALID")
     return payload
 
 
@@ -358,10 +545,22 @@ def normalize_run_get_method_response(upstream_json):
     }
 
 
-def append_original_query(endpoint, path):
-    upstream = urlparse(endpoint)
-    incoming = urlparse(path)
-    return urlunparse((upstream.scheme, upstream.netloc, upstream.path, "", incoming.query, ""))
+def validated_account_target(path, base):
+    parsed = urlparse(path)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    extra_keys = set(params) - ACCOUNT_QUERY_ALLOWED_KEYS
+    if extra_keys:
+        raise PermissionError(f"ACCOUNT_QUERY_NOT_ALLOWED:{sorted(extra_keys)[0]}")
+    values = params.get("address")
+    if not values:
+        raise PermissionError("ACCOUNT_QUERY_MISSING:address")
+    if len(values) != 1:
+        raise PermissionError("ACCOUNT_QUERY_REPEATED:address")
+    address = values[0]
+    if not TON_ADDRESS_RE.fullmatch(address):
+        raise PermissionError("ACCOUNT_ADDRESS_INVALID")
+    upstream = urlparse(base)
+    return urlunparse((upstream.scheme, upstream.netloc, upstream.path, "", urlencode({"address": address}), ""))
 
 
 def single_query_value(params, key, required=False):
@@ -436,6 +635,120 @@ def validated_messages_query(path):
     return urlunparse((upstream.scheme, upstream.netloc, upstream.path, "", urlencode(cleaned), ""))
 
 
+# --- BoC structural validation (ported from web/pwa-contract-transactions.mjs parseBocBase64
+# + crypto/platho-crypto.mjs; matches the externals our builders serialize) -----------------
+
+def _boc_read_uint(data, offset, length, name):
+    if offset + length > len(data):
+        raise ValueError(f"{name}_truncated")
+    out = 0
+    for i in range(length):
+        out = (out << 8) | data[offset + i]
+    return out, offset + length
+
+
+def parse_boc_root_cell(raw):
+    if len(raw) < 10 or raw[0:4] != BOC_MAGIC:
+        raise ValueError("boc_magic")
+    offset = 4
+    flags = raw[offset]; offset += 1
+    has_index = bool(flags & 0x80)
+    has_crc32 = bool(flags & 0x40)
+    has_cache_bits = bool(flags & 0x20)
+    boc_flags = (flags >> 3) & 0x03
+    size_bytes = flags & 0x07
+    off_bytes = raw[offset]; offset += 1
+    if has_cache_bits or boc_flags != 0:
+        raise ValueError("boc_flags")
+    if not (1 <= size_bytes <= 4) or not (1 <= off_bytes <= 4):
+        raise ValueError("boc_counter_width")
+    cells_count, offset = _boc_read_uint(raw, offset, size_bytes, "cells_count")
+    roots_count, offset = _boc_read_uint(raw, offset, size_bytes, "roots_count")
+    absent_count, offset = _boc_read_uint(raw, offset, size_bytes, "absent_count")
+    total_cells_size, offset = _boc_read_uint(raw, offset, off_bytes, "total_cells_size")
+    if roots_count != 1 or absent_count != 0:
+        raise ValueError("boc_root_count")
+    if cells_count < 1 or cells_count > 4096:
+        raise ValueError("boc_cells_count")
+    root_index, offset = _boc_read_uint(raw, offset, size_bytes, "root_index")
+    if has_index:
+        index_bytes = cells_count * off_bytes
+        if offset + index_bytes > len(raw):
+            raise ValueError("boc_index_truncated")
+        offset += index_bytes
+    cells_end = offset + total_cells_size
+    trailer = 4 if has_crc32 else 0
+    if cells_end + trailer > len(raw):
+        raise ValueError("boc_data_truncated")
+    parsed = []
+    for _ in range(cells_count):
+        if offset + 2 > len(raw):
+            raise ValueError("boc_descriptor_truncated")
+        d1 = raw[offset]; d2 = raw[offset + 1]; offset += 2
+        refs_count = d1 & 0x07
+        if (d1 & 0xf8) != 0:
+            raise ValueError("boc_exotic_cell")
+        data_length = (d2 + 1) // 2
+        if offset + data_length > len(raw):
+            raise ValueError("boc_cell_data_truncated")
+        data = bytearray(raw[offset:offset + data_length]); offset += data_length
+        bit_length = data_length * 8
+        if d2 % 2 != 0:
+            terminator = -1
+            for bit in range(bit_length - 1, -1, -1):
+                if (data[bit >> 3] >> (7 - (bit & 7))) & 1:
+                    terminator = bit
+                    break
+            if terminator < 0:
+                raise ValueError("boc_missing_terminator")
+            data[terminator >> 3] &= ~(1 << (7 - (terminator & 7)))
+            bit_length = terminator
+            data = data[: (bit_length + 7) // 8]
+        for _ref in range(refs_count):
+            _, offset = _boc_read_uint(raw, offset, size_bytes, "ref_index")
+        parsed.append((bytes(data), bit_length))
+    if offset != cells_end:
+        raise ValueError("boc_size_mismatch")
+    if root_index >= len(parsed):
+        raise ValueError("boc_root_index")
+    return parsed[root_index]
+
+
+def _read_bits(data, bit_length, cursor, count):
+    if cursor + count > bit_length:
+        raise ValueError("bits_truncated")
+    value = 0
+    for i in range(count):
+        bit = cursor + i
+        value = (value << 1) | ((data[bit >> 3] >> (7 - (bit & 7))) & 1)
+    return value, cursor + count
+
+
+def extract_external_destination(boc_b64):
+    normalized = boc_b64.replace("-", "+").replace("_", "/")
+    normalized += "=" * ((-len(normalized)) % 4)
+    raw = base64.b64decode(normalized)
+    data, bit_length = parse_boc_root_cell(raw)
+    cursor = 0
+    tag, cursor = _read_bits(data, bit_length, cursor, 2)
+    if tag != 0b10:
+        raise ValueError("not_ext_in")
+    src, cursor = _read_bits(data, bit_length, cursor, 2)
+    if src != 0b00:
+        raise ValueError("ext_src_not_none")
+    addr_tag, cursor = _read_bits(data, bit_length, cursor, 2)
+    if addr_tag != 0b10:
+        raise ValueError("dest_not_addr_std")
+    anycast, cursor = _read_bits(data, bit_length, cursor, 1)
+    if anycast != 0:
+        raise ValueError("dest_anycast_unsupported")
+    workchain, cursor = _read_bits(data, bit_length, cursor, 8)
+    if workchain >= 128:
+        workchain -= 256
+    address, cursor = _read_bits(data, bit_length, cursor, 256)
+    return "%d:%064x" % (workchain, address)
+
+
 def validated_send_message_payload(body_bytes):
     payload = json.loads(body_bytes.decode("utf-8") if body_bytes else "{}")
     if not isinstance(payload, dict):
@@ -446,33 +759,68 @@ def validated_send_message_payload(body_bytes):
     boc = str(payload.get("boc") or "").strip()
     if not boc:
         raise PermissionError("MESSAGE_BOC_MISSING")
-    if len(boc) > MAX_BODY_BYTES:
+    if len(boc) > MAX_BODY_BYTES or (MESSAGE_MAX_BOC_CHARS and len(boc) > MESSAGE_MAX_BOC_CHARS):
         raise PermissionError("MESSAGE_BOC_TOO_LARGE")
     if not BOC_BASE64_RE.fullmatch(boc):
         raise PermissionError("MESSAGE_BOC_INVALID")
+    if VALIDATE_BROADCAST_STRUCTURE:
+        try:
+            destination = extract_external_destination(boc)
+        except Exception:
+            # Not a well-formed single ext-in external — every legitimate Platho send is one,
+            # so this is garbage / relay-abuse. Fail closed.
+            raise PermissionError("MESSAGE_BOC_NOT_EXTERNAL")
+        if ALLOWED_BROADCAST_DESTINATIONS and destination not in ALLOWED_BROADCAST_DESTINATIONS:
+            raise PermissionError("MESSAGE_DESTINATION_NOT_ALLOWED")
     return {"boc": boc}
 
 
 def client_ip(handler):
-    forwarded = handler.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    return forwarded or handler.client_address[0] or "unknown"
+    # The rate-limit key MUST come from a hop the attacker cannot forge. Caddy appends the
+    # real peer as the LAST X-Forwarded-For token, so we take the Nth-from-last
+    # (FORWARDED_FOR_TRUSTED_HOPS), never the client-supplied leftmost value.
+    if FORWARDED_FOR_TRUSTED_HOPS > 0:
+        parts = [item.strip() for item in handler.headers.get("X-Forwarded-For", "").split(",") if item.strip()]
+        if len(parts) >= FORWARDED_FOR_TRUSTED_HOPS:
+            candidate = parts[-FORWARDED_FOR_TRUSTED_HOPS]
+            if candidate:
+                return candidate
+    return handler.client_address[0] or "unknown"
 
 
-def check_rate_limit(handler):
-    if RATE_LIMIT_PER_MINUTE <= 0:
+def _sweep_and_cap_buckets(now):
+    # Called under _state_lock. Drop expired buckets; if still over the hard cap, evict the
+    # entries closest to expiry. Keeps the dict bounded regardless of client-IP cardinality.
+    expired = [key for key, bucket in rate_limit_buckets.items() if bucket["reset_at"] <= now]
+    for key in expired:
+        del rate_limit_buckets[key]
+    overflow = len(rate_limit_buckets) - MAX_RATE_LIMIT_BUCKETS
+    if overflow > 0:
+        victims = sorted(rate_limit_buckets, key=lambda key: rate_limit_buckets[key]["reset_at"])[:overflow]
+        for key in victims:
+            del rate_limit_buckets[key]
+
+
+def check_rate_limit(handler, limit, scope):
+    if limit <= 0:
         return True
-    key = client_ip(handler)
+    key = f"{scope}|{client_ip(handler)}"
     now = int(time.time() * 1000)
-    bucket = rate_limit_buckets.get(key)
-    if not bucket or bucket["reset_at"] <= now:
-        rate_limit_buckets[key] = {"count": 1, "reset_at": now + 60000}
-        return True
-    bucket["count"] += 1
-    return bucket["count"] <= RATE_LIMIT_PER_MINUTE
+    with _state_lock:
+        bucket = rate_limit_buckets.get(key)
+        if not bucket or bucket["reset_at"] <= now:
+            if len(rate_limit_buckets) >= MAX_RATE_LIMIT_BUCKETS:
+                _sweep_and_cap_buckets(now)
+            rate_limit_buckets[key] = {"count": 1, "reset_at": now + 60000}
+            return True
+        bucket["count"] += 1
+        return bucket["count"] <= limit
 
 
 class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
     server_version = "PlathoRpcGateway"
+    # Cap slowloris / dribbled-body connections (default None = never times out).
+    timeout = HANDLER_TIMEOUT_SECONDS if HANDLER_TIMEOUT_SECONDS > 0 else None
 
     def log_message(self, fmt, *args):
         return
@@ -498,9 +846,13 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
         json_response(self, status, payload, headers)
 
     def read_body(self):
+        # The gateway speaks HTTP/1.0 and does NOT decode chunked transfer-encoding; reject it
+        # rather than silently mis-reading a 0-length body.
+        if self.headers.get("Transfer-Encoding"):
+            raise ValueError("TRANSFER_ENCODING_UNSUPPORTED")
         length = int(self.headers.get("Content-Length") or "0")
-        if length > MAX_BODY_BYTES:
-            raise ValueError("REQUEST_TOO_LARGE")
+        if length < 0 or length > MAX_BODY_BYTES:
+            raise ValueError("REQUEST_TOO_LARGE" if length > MAX_BODY_BYTES else "REQUEST_INVALID")
         return self.rfile.read(length)
 
     def do_OPTIONS(self):
@@ -520,20 +872,38 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
         self.handle_route()
 
     def handle_route(self):
+        # Bound concurrent in-flight handlers; a flood gets a fast 503 instead of piling threads.
+        if not request_semaphore.acquire(blocking=False):
+            self.send_json(503, {"ok": False, "error": "gateway busy"})
+            return
+        try:
+            self._handle_route()
+        finally:
+            request_semaphore.release()
+
+    def _handle_route(self):
         parsed = urlparse(self.path)
         if self.command == "GET" and parsed.path == "/healthz":
-            self.send_json(200, {"ok": True, "service": "platho-rpc-gateway"})
-            return
-        if not check_rate_limit(self):
-            self.send_json(429, {"ok": False, "error": "rate limit exceeded"})
+            with _state_lock:
+                key_disabled = int(time.time() * 1000) < toncenter_auth_state["disabled_until"]
+            self.send_json(200, {"ok": True, "service": "platho-rpc-gateway", "key_disabled": key_disabled})
             return
         kind = ROUTES.get((self.command, parsed.path))
         if not kind:
             self.send_json(404, {"ok": False, "error": "route is not allowed"})
             return
+        if not check_rate_limit(self, RATE_LIMIT_PER_MINUTE, "all"):
+            self.send_json(429, {"ok": False, "error": "rate limit exceeded"})
+            return
+        if kind == "message" and not check_rate_limit(self, BROADCAST_RATE_LIMIT_PER_MINUTE, "broadcast"):
+            self.send_json(429, {"ok": False, "error": "rate limit exceeded"})
+            return
         try:
             if UPSTREAM_KIND not in ("ton-access-v2", "toncenter-v3"):
                 self.send_json(503, {"ok": False, "error": "unsupported upstream kind"})
+                return
+            if not global_upstream_allowed():
+                self.send_json(503, {"ok": False, "error": "gateway upstream ceiling reached"})
                 return
             if kind == "run_get_method":
                 body = self.read_body()
@@ -562,6 +932,9 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
             if kind == "message":
                 if UPSTREAM_KIND != "toncenter-v3":
                     self.send_json(503, {"ok": False, "error": "message broadcast is not supported by this upstream"})
+                    return
+                if REQUIRE_ORIGIN_FOR_BROADCAST and not self.headers.get("Origin"):
+                    self.send_json(403, {"ok": False, "error": "origin is required"})
                     return
                 request = validated_send_message_payload(self.read_body())
                 status, upstream, primary_error = None, None, None
@@ -610,7 +983,7 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
                     payload = {"ok": True, "delivery": "unconfirmed"}
                     if primary_status is not None:
                         payload["upstream_status"] = primary_status
-                    if detail:
+                    if detail and EXPOSE_UPSTREAM_ERRORS:
                         payload["upstream_error"] = detail
                     self.send_json(202, payload)
                     return
@@ -626,7 +999,7 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
                 return
             if kind == "account":
                 if UPSTREAM_KIND == "toncenter-v3":
-                    target = append_original_query(f"{TONCENTER_V2_BASE}/getAddressInformation", self.path)
+                    target = validated_account_target(self.path, f"{TONCENTER_V2_BASE}/getAddressInformation")
                     try:
                         status, upstream = fetch_toncenter_json(target)
                     except (HTTPError, URLError, TimeoutError) as error:
@@ -634,10 +1007,10 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
                         if not TON_ACCESS_READ_FALLBACK or reason is None:
                             raise
                         log_upstream_fallback(kind, reason)
-                        fallback_target = append_original_query(f"{ton_access_base()}/getAddressInformation", self.path)
+                        fallback_target = validated_account_target(self.path, f"{ton_access_base()}/getAddressInformation")
                         status, upstream = fetch_json(fallback_target)
                 else:
-                    target = append_original_query(f"{ton_access_base()}/getAddressInformation", self.path)
+                    target = validated_account_target(self.path, f"{ton_access_base()}/getAddressInformation")
                     status, upstream = fetch_json(target)
                 self.send_json(status, upstream)
                 return
@@ -651,7 +1024,7 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
             detail = http_error_detail(error)
             log_upstream_error(kind, error, detail)
             payload = {"ok": False, "error": "upstream request failed", "upstream_status": error.code}
-            if detail:
+            if detail and EXPOSE_UPSTREAM_ERRORS:
                 payload["upstream_error"] = detail
             self.send_json(error.code, payload)
         except (URLError, TimeoutError) as error:
@@ -662,6 +1035,8 @@ class PlathoRpcGatewayHandler(BaseHTTPRequestHandler):
 
 def main():
     server = ThreadingHTTPServer((HOST, PORT), PlathoRpcGatewayHandler)
+    server.daemon_threads = True
+    log_security("startup", f"origins={sorted(ALLOWED_ORIGINS)} upstream={UPSTREAM_KIND}")
     print(f"platho-rpc-gateway listening on http://{HOST}:{PORT}", flush=True)
     server.serve_forever()
 

@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=44';
+import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=45';
 import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=29';
 
 const CAPSULEHUB_OPS = Object.freeze({
@@ -20,6 +20,9 @@ const KIND_PUBLIC_BYTE = 2n;
 const CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS = 3600;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT = 1000;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_MAX_PAGES = 8;
+// Keyless tx-scan: stop paging once transactions are this many seconds older than the entry's
+// publish time (we have walked past where the body would be).
+const CAPSULEHUB_TX_SCAN_BACKSTOP_SEC = 120;
 const CAPSULEHUB_BODY_HISTORY_UNAVAILABLE = 'BODY_HISTORY_UNAVAILABLE';
 
 export class CapsuleHubTonRpcProviderError extends Error {
@@ -136,6 +139,36 @@ function messageHistoryTransports(transport) {
     if (resolved?.getMessages && !out.includes(resolved)) out.push(resolved);
   }
   return out;
+}
+
+// Keyless body retrieval: transports that can scan an account's transactions directly (no message
+// indexer). The keyless Orbs (ton-access-v2) transport provides getTransactions; toncenter-v3 does not.
+function transactionHistoryTransports(transport) {
+  const transports = Array.isArray(transport?.transports) && transport.transports.length > 0
+    ? transport.transports
+    : [transport];
+  const out = [];
+  for (const item of transports) {
+    const resolved = item?.transport ?? item;
+    if (isTonRpcTransportDead(resolved)) continue;
+    if (resolved?.getTransactions && !out.includes(resolved)) out.push(resolved);
+  }
+  return out;
+}
+
+function transactionRecordsFromResponse(response) {
+  const records = response?.transactions
+    ?? response?.result?.transactions
+    ?? response?.result
+    ?? [];
+  return Array.isArray(records) ? records : [];
+}
+
+function transactionPagingCursor(record) {
+  const id = record?.transaction_id ?? record?.transactionId ?? record?.id ?? null;
+  const lt = id?.lt ?? record?.lt ?? null;
+  const hash = id?.hash ?? record?.hash ?? null;
+  return (lt !== null && lt !== undefined && hash) ? { lt: String(lt), hash: String(hash) } : null;
 }
 
 function resolveCapsuleHubAddress(configured, callOptions) {
@@ -447,6 +480,9 @@ function messageBodyBocFromRecord(record) {
     ?? record?.body
     ?? record?.in_msg?.message_content?.body
     ?? record?.inMsg?.messageContent?.body
+    // toncenter v2 getTransactions shape (keyless Orbs tx-scan): in_msg.msg_data.body.
+    ?? record?.in_msg?.msg_data?.body
+    ?? record?.inMsg?.msgData?.body
     ?? null;
 }
 
@@ -813,11 +849,10 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
     let parsed = publishBodyCache.get(key);
     if (!parsed) {
       const transport = resolveTransport(options);
-      if (!transport?.getMessages) {
-        throw new CapsuleHubTonRpcProviderError('TON RPC transport cannot read CapsuleHub message history');
-      }
       const historyTransports = messageHistoryTransports(transport);
-      if (historyTransports.length === 0) {
+      // Either an indexer (getMessages) OR a keyless transaction-scanner (getTransactions, e.g. Orbs)
+      // can recover the body, so require at least one of the two — not getMessages specifically.
+      if (historyTransports.length === 0 && transactionHistoryTransports(transport).length === 0) {
         throw new CapsuleHubTonRpcProviderError('TON RPC transport cannot read CapsuleHub message history');
       }
       const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
@@ -872,6 +907,62 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
           if (parsed) break;
         }
         if (parsed) break;
+      }
+      // Keyless fallback (no indexer): when no getMessages transport found the body — only the keyless
+      // Orbs transport is available, or the toncenter indexer is unreachable — scan the CapsuleHub
+      // account's transactions directly and run each candidate through the SAME hash-verifying pipeline
+      // (cachePublishMessages + takeValidParsed), so a malicious/incorrect provider body is never served
+      // (it fails the entry's body_hash).
+      if (!parsed) {
+        for (const txTransport of transactionHistoryTransports(transport)) {
+          if (isTonRpcTransportDead(txTransport)) continue;
+          let cursor = null;
+          let prevLt = null;
+          // The entry's publish tx sits at ~entry.created_at; once the scan pages clearly older than
+          // that we have passed where the body would be, so stop (cost bound; mirrors the getMessages
+          // start_utime window). entry.created_at is in seconds.
+          const txScanStopBeforeSec = (entry?.created_at && entry.created_at !== 0n)
+            ? Number(entry.created_at) - CAPSULEHUB_TX_SCAN_BACKSTOP_SEC
+            : null;
+          try {
+            for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+              const txParams = { address, limit: CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT };
+              if (cursor) { txParams.lt = cursor.lt; txParams.hash = cursor.hash; }
+              const response = await txTransport.getTransactions(txParams, {
+                priority: callOptions.priority ?? 'messages',
+                cacheTtlMs: callOptions.messageCacheTtlMs ?? options.messageCacheTtlMs,
+              });
+              const txRecords = transactionRecordsFromResponse(response);
+              await cachePublishMessages(kind, txRecords, expectedSourceRaw);
+              parsed = await takeValidParsed();
+              if (parsed) break;
+              if (txRecords.length === 0) break;
+              // Paged strictly older than the entry's publish time -> the body is not here.
+              const oldestSec = messageCreatedAtSecFromRecord(txRecords[txRecords.length - 1]);
+              if (txScanStopBeforeSec !== null && oldestSec !== null && Number(oldestSec) < txScanStopBeforeSec) break;
+              // v2 /getTransactions clamps `limit` server-side, so DON'T infer exhaustion from page
+              // length; advance by the (lt,hash) cursor and stop only when lt no longer strictly
+              // decreases (handles the inclusive boundary returning the same page).
+              const nextCursor = transactionPagingCursor(txRecords[txRecords.length - 1]);
+              let nextLt = null;
+              try { nextLt = nextCursor ? BigInt(nextCursor.lt) : null; } catch { nextLt = null; }
+              if (!nextCursor || nextLt === null || (prevLt !== null && nextLt >= prevLt)) {
+                historyScanIncomplete = true;
+                break;
+              }
+              cursor = nextCursor;
+              prevLt = nextLt;
+              if (pageIndex === maxPages - 1) historyScanIncomplete = true;
+            }
+          } catch (error) {
+            lastHistoryError = error;
+            historyScanIncomplete = true;
+            if (Number(error?.status ?? 0) === 429 || String(error?.code ?? '').toUpperCase() === 'RATE_LIMITED') {
+              noteTonRpcReadTransportRateLimited(txTransport, error);
+            }
+          }
+          if (parsed) break;
+        }
       }
       if (!parsed) throw bodyHistoryUnavailable(kind, entry, { historyScanIncomplete, cause: lastHistoryError });
     }
