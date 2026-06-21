@@ -1,16 +1,16 @@
 # Platho Static Web Deploy Prep
 
-Status: PRODUCTION_STATIC_PACKAGE_READY
-Mode: production
+Status: PREVIEW_STATIC_PACKAGE_READY
+Mode: preview
 Domain: platho.app
-Output: C:\platho\artifacts\platho-web-static-production
+Output: C:\platho\artifacts\platho-web-static-preview
 
 ## Runtime
 
 ```text
 fileCount=131
-totalBytes=3456595
-bundleSha256=0a16a46d1c81291a3ac5aa3fe93d744df9d8b58fada70de05764bcbda6820156
+totalBytes=3459939
+bundleSha256=43acfaff4838f1b6b9de5d40da492ce4b14e68fc3877de0ea15ab8ba0ce5cc72
 noBackendRuntime=true
 ```
 
@@ -29,7 +29,7 @@ None
 
 ## Warnings
 
-None
+- STATIC_PACKAGE_IS_NON_PRODUCTION
 
 ## Production Findings
 
