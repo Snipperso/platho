@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
+import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config.mjs';
 
 function read(path: string): string {
   return readFileSync(path, 'utf8');
@@ -97,8 +97,10 @@ describe('PWA on-chain self-sufficiency', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')?.apiKey).toBeUndefined();
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')?.verifierOnly).toBe(true);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')?.emergencyFallback).toBe(true);
-    // No provider routes through the retired rpc.platho.app gateway.
-    expect(JSON.stringify(PLATHO_APP_CONFIG.network.tonRpc)).not.toContain('rpc.platho.app');
+    // Every provider endpoint is a canonical decentralized/public TON host (Orbs or toncenter.com) — no
+    // provider routes through a central proxy/gateway.
+    expect(validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => finding.id))
+      .not.toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
   });
 
   it('PWA-CHAIN-04: a per-user toncenter key is loaded at boot, re-resolves the transport, and has a settings entry', () => {
