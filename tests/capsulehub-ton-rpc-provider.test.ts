@@ -459,6 +459,7 @@ describe('CapsuleHub TON RPC provider', () => {
       .endCell());
 
     let txScanCalls = 0;
+    let txScanLimit: number | null = null;
     const transport = {
       async runGetMethod(call: { method: string }) {
         if (call.method === 'get_private_entry') {
@@ -477,8 +478,9 @@ describe('CapsuleHub TON RPC provider', () => {
       },
       // No getMessages (no indexer): the keyless Orbs transport only scans an account's transactions,
       // returning the publish body in the toncenter v2 in_msg.msg_data.body shape.
-      async getTransactions() {
+      async getTransactions(params: any) {
         txScanCalls += 1;
+        txScanLimit = params?.limit ?? null;
         return { result: [{ in_msg: { msg_data: { body: privateMessageBody } } }] };
       },
     };
@@ -488,6 +490,10 @@ describe('CapsuleHub TON RPC provider', () => {
     await expect(provider.resolvePrivateEntryBody(entry, { priority: 'critical', messageCacheTtlMs: 0 }))
       .resolves.toMatchObject({ body_boc: cellBoc(privateBody) });
     expect(txScanCalls).toBeGreaterThan(0);
+    // E1: toncenter v2 /getTransactions rejects limit > 100 with an HTTP-200 {ok:false,code:422} body
+    // (the keyless Orbs proxy forwards it verbatim). The tx-scan must request the v2 max, NOT the 1000
+    // used for the v3 getMessages indexer — sending 1000 made every keyless body scan come back empty.
+    expect(txScanLimit).toBe(100);
   });
 
   it('CAPHUB-TXSCAN-02: keeps paging past a server-clamped short first page (cursor-driven, not length<limit)', async () => {

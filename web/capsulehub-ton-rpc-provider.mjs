@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=45';
+import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=46';
 import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=29';
 
 const CAPSULEHUB_OPS = Object.freeze({
@@ -20,6 +20,12 @@ const KIND_PUBLIC_BYTE = 2n;
 const CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS = 3600;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT = 1000;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_MAX_PAGES = 8;
+// toncenter v2 /getTransactions rejects limit > 100 with an HTTP-200 {ok:false,code:422} body, and the
+// keyless Orbs (ton-access-v2) proxy forwards that verbatim. Sending the 1000 above made every keyless
+// body tx-scan come back empty (no rows) -> bodies never recovered -> the cursor never advanced -> an
+// infinite re-walk that kept the RPC limiter hot and starved sends. Cap the tx-scan page to the v2 max.
+// (The v3 getMessages indexer used elsewhere still accepts the 1000.)
+const CAPSULEHUB_TX_SCAN_PAGE_LIMIT = 100;
 // Keyless tx-scan: stop paging once transactions are this many seconds older than the entry's
 // publish time (we have walked past where the body would be).
 const CAPSULEHUB_TX_SCAN_BACKSTOP_SEC = 120;
@@ -926,7 +932,7 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
             : null;
           try {
             for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
-              const txParams = { address, limit: CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT };
+              const txParams = { address, limit: CAPSULEHUB_TX_SCAN_PAGE_LIMIT };
               if (cursor) { txParams.lt = cursor.lt; txParams.hash = cursor.hash; }
               const response = await txTransport.getTransactions(txParams, {
                 priority: callOptions.priority ?? 'messages',
