@@ -17,22 +17,6 @@
   }
 }
 
-(platho_rpc_headers) {
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    Alt-Svc "clear"
-    # rpc serves JSON only — lock it all the way down.
-    Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
-    X-Frame-Options "DENY"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "no-referrer"
-    Permissions-Policy "camera=(), microphone=(), geolocation=()"
-    Cross-Origin-Opener-Policy "same-origin"
-    Cross-Origin-Resource-Policy "same-origin"
-    -Server
-  }
-}
-
 platho.app {
   import platho_security_headers
 
@@ -72,34 +56,4 @@ platho.app {
 
 www.platho.app {
   redir https://platho.app{uri} permanent
-}
-
-rpc.platho.app {
-  import platho_rpc_headers
-
-  encode zstd gzip
-
-  # Cap the request body at the edge (matches the gateway MAX_BODY_BYTES).
-  request_body {
-    max_size 256KiB
-  }
-
-  route {
-    # Only the routes the gateway serves; reject everything else before it reaches Python.
-    @badmethods not method GET POST OPTIONS
-    respond @badmethods 405
-
-    # Overwrite X-Forwarded-For with the real client IP so a client-supplied (spoofed) value
-    # can never reach the gateway's rate limiter. Clients connect directly to Caddy, so the
-    # immediate peer IS the real client.
-    reverse_proxy 127.0.0.1:8790 {
-      header_up X-Forwarded-For {remote_host}
-    }
-  }
-
-  # OPTIONAL but recommended: an edge rate limit independent of the gateway's in-process one.
-  # Requires the caddy-ratelimit module (github.com/mholt/caddy-ratelimit). Example:
-  #   rate_limit {
-  #     zone rpc { key {remote_host}; events 600; window 1m }
-  #   }
 }
