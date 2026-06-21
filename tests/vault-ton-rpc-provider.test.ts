@@ -885,12 +885,11 @@ describe('Vault TON RPC provider', () => {
       },
     });
 
-    // A critical read with explicit verify:true is NEVER cross-verified against the keyless
-    // emergency transport (it is not an "on equal footing" verifier). With no other (gateway)
-    // verifier alive, cross-verification is STRUCTURALLY impossible, so the lone gateway read —
-    // rpc.platho.app is itself a trusted multi-source endpoint — is SELF-TRUSTED and returned (the
-    // "1 live gateway → trust the gateway, stay alive" degrade). The keyless host is consulted for
-    // nothing; only the gateway primary call is issued.
+    // A critical read with explicit verify:true is NEVER cross-verified against the keyless emergency
+    // transport (it is not an "on equal footing" verifier). With no other non-emergency verifier alive,
+    // cross-verification is STRUCTURALLY impossible, so the lone live primary read — itself a trusted
+    // multi-source endpoint — is SELF-TRUSTED and returned (the "1 live source → trust it, stay alive"
+    // degrade). The keyless host is consulted for nothing; only the primary call is issued.
     await expect(transport?.runGetMethod({
       address: VAULT,
       method: 'get_user',
@@ -1086,8 +1085,7 @@ describe('Vault TON RPC provider', () => {
     const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
     // The keyless emergency transport is the only other read transport, but it is NEVER used as a
     // verifier — so a verify:true read finds no eligible verifier and, rather than failing closed,
-    // SELF-TRUSTS the lone gateway (rpc.platho.app, itself multi-source) and returns its result
-    // every time.
+    // SELF-TRUSTS the lone live primary (itself multi-source) and returns its result every time.
     await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
     await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
     await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });

@@ -2258,14 +2258,14 @@ export function createFallbackTonRpcTransport(options = {}) {
       }
     }
     if (mustVerify && !verified) {
-      // No eligible verifier was even tried → cross-read verification is STRUCTURALLY impossible:
-      // the gateway is the sole live read transport (the keyless emergency host is never a routine
-      // verifier, and no second gateway is reachable). The gateway (rpc.platho.app) is itself a
-      // trusted multi-source endpoint — keyed TonCenter + Orbs with internal read-fallback — so a
-      // single gateway read IS the verified result. Self-trust it and return, rather than failing
-      // closed and bricking the reads that hardcode verify:true (Vault balance/activation). This is
-      // exactly the "1 live gateway → trust the gateway, stay alive" degrade the censorship policy
-      // requires, and it consults the keyless host for nothing. The app-side double-spend guard
+      // No eligible verifier was even tried → cross-read verification is STRUCTURALLY impossible: the
+      // primary is the sole live read transport (the keyless emergency host is never a routine verifier,
+      // and no second non-emergency transport is reachable). In the client-direct model that primary is
+      // the decentralized Orbs (TON Access) network — itself multi-node with internal failover — so a
+      // single primary read IS the trusted result. Self-trust it and return, rather than failing closed
+      // and bricking the reads that hardcode verify:true (Vault balance/activation, publish charge/nonce).
+      // This is exactly the "1 live source → trust it, stay alive" degrade the censorship policy requires,
+      // and it consults the keyless emergency host for nothing. The app-side double-spend guard
       // independently observes isVerificationDegraded()===true and stays fail-closed, so self-
       // trusting reads here does NOT weaken the no-double-publish invariant. We fail closed ONLY
       // when an eligible (gateway) verifier WAS tried but could not confirm — a genuinely

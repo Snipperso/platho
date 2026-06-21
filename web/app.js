@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=86';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=87';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=47';
+} from './vault-ton-rpc-provider.mjs?v=48';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -135,19 +135,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=3';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=29';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=30';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=43';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=31';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=27';
+} from './capsulehub-ton-rpc-provider.mjs?v=44';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=32';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=28';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=34';
+} from './username-ton-rpc-provider.mjs?v=35';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v468';
+const PLATHO_APP_RUNTIME_VERSION = 'v469';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
