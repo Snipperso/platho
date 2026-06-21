@@ -19,27 +19,28 @@ const productionConfig = {
     chain: 'mainnet',
     label: 'mainnet',
     tonRpc: {
-      primaryProviderId: 'custom',
-      fallbackProviderIds: ['platho-rpc'],
+      primaryProviderId: 'orbs',
+      fallbackProviderIds: ['user-toncenter', 'keyless-toncenter'],
       verifyCriticalReads: true,
       criticalMethods: [...PLATHO_APP_CONFIG.network.tonRpc.criticalMethods],
       providers: [
-        { id: 'custom', kind: 'custom', globalName: 'plathoCustomTonRpcTransport' },
+        { id: 'orbs', kind: 'ton-access-v2' },
         {
-          id: 'platho-rpc',
-          kind: 'platho-rpc',
-          runGetMethodEndpoint: 'https://rpc.example/api/v3/runGetMethod',
-          sendBocEndpoint: 'https://rpc.example/api/v3/message',
-          messagesEndpoint: 'https://rpc.example/api/v3/messages',
+          id: 'user-toncenter',
+          kind: 'toncenter-v3',
+          useUserApiKey: true,
+          runGetMethodEndpoint: 'https://toncenter-a.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter-a.example/api/v3/message',
+          messagesEndpoint: 'https://toncenter-a.example/api/v3/messages',
         },
         {
-          id: 'toncenter',
+          id: 'keyless-toncenter',
           kind: 'toncenter-v3',
           verifierOnly: true,
           emergencyFallback: true,
-          runGetMethodEndpoint: 'https://toncenter-2.example/api/v3/runGetMethod',
-          sendBocEndpoint: 'https://toncenter-2.example/api/v3/message',
-          messagesEndpoint: 'https://toncenter-2.example/api/v3/messages',
+          runGetMethodEndpoint: 'https://toncenter-b.example/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter-b.example/api/v3/message',
+          messagesEndpoint: 'https://toncenter-b.example/api/v3/messages',
         },
       ],
       requestTimeoutMs: 15000,
@@ -138,29 +139,33 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.runGetMethodCacheTtlMs).toBe(15000);
     expect(PLATHO_APP_CONFIG.network.tonRpc.runGetMethodCacheMaxEntries).toBe(512);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.map((provider) => provider.id)).toEqual([
-      'user-custom',
-      'toncenter-mainnet',
-      'platho-rpc-mainnet',
+      'orbs-keyless',
+      'user-toncenter',
+      'keyless-toncenter',
     ]);
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toEqual([
-      'platho-rpc-mainnet',
+      'user-toncenter',
+      'keyless-toncenter',
     ]);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'platho-rpc-mainnet')).toMatchObject({
-      runGetMethodEndpoint: 'https://rpc.platho.app/api/v3/runGetMethod',
-      sendBocEndpoint: 'https://rpc.platho.app/api/v3/message',
-      messagesEndpoint: 'https://rpc.platho.app/api/v3/messages',
-      walletBalanceEndpoint: 'https://rpc.platho.app/api/v2/getAddressInformation',
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'orbs-keyless')).toMatchObject({
+      kind: 'ton-access-v2',
     });
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'toncenter-mainnet')).toMatchObject({
-      verifierOnly: true,
-      emergencyFallback: true,
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')).toMatchObject({
+      useUserApiKey: true,
       runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
       sendBocEndpoint: 'https://toncenter.com/api/v3/message',
       messagesEndpoint: 'https://toncenter.com/api/v3/messages',
       walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
+    });
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')).toMatchObject({
+      verifierOnly: true,
+      emergencyFallback: true,
+      runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
       requestSpacingMs: 1500,
     });
-    expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('user-custom');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('orbs-keyless');
+    // No provider routes through the retired rpc.platho.app gateway.
+    expect(JSON.stringify(PLATHO_APP_CONFIG.network.tonRpc)).not.toContain('rpc.platho.app');
     // The rpc.platho.app gateway is itself multi-source (keyed TonCenter + Orbs); it is the trusted
     // verified source, so the PWA does NOT routinely cross-verify every critical read against a 2nd
     // transport (which would hammer the keyless emergency toncenter or freeze on gateway-vs-gateway
@@ -196,7 +201,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=24/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=25/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -252,8 +257,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v463<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v463'/);
+    expect(html).toMatch(/id="appVersionLabel">v465<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v465'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3702,7 +3707,7 @@ describe('PWA runtime config guard', () => {
     expect(readAvatarPartsSource).toMatch(/for \(let entryId = start; entryId <= start \+ maxExtra; entryId \+= 1n\)/);
   });
 
-  it('PWA-CONFIG-04AD: production config forbids direct TonCenter sendBoc fallback', () => {
+  it('PWA-CONFIG-04AD: production config forbids routing through the retired rpc.platho.app gateway', () => {
     const report = validatePlathoAppConfig({
       ...productionConfig,
       network: {
@@ -3712,11 +3717,11 @@ describe('PWA runtime config guard', () => {
           providers: [
             ...productionConfig.network.tonRpc.providers,
             {
-              id: 'toncenter-direct-send',
+              id: 'platho-rpc',
               kind: 'toncenter-v3',
-              runGetMethodEndpoint: 'https://toncenter.example/api/v3/runGetMethod',
-              sendBocEndpoint: 'https://toncenter.example/api/v3/message',
-              messagesEndpoint: 'https://toncenter.example/api/v3/messages',
+              runGetMethodEndpoint: 'https://rpc.platho.app/api/v3/runGetMethod',
+              sendBocEndpoint: 'https://rpc.platho.app/api/v3/message',
+              messagesEndpoint: 'https://rpc.platho.app/api/v3/messages',
             },
           ],
         },
@@ -3724,39 +3729,24 @@ describe('PWA runtime config guard', () => {
     });
 
     expect(report.ok).toBe(false);
-    expect(report.findings.map((finding) => finding.id)).toContain('PWA_TONCENTER_DIRECT_SEND_FORBIDDEN');
+    expect(report.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
   });
 
-  it('PWA-CONFIG-04AE: production config keeps direct TonCenter read access verifier-only', () => {
-    const normalFallbackReport = validatePlathoAppConfig({
+  it('PWA-CONFIG-04AE: production config requires a keyless decentralized (Orbs) provider', () => {
+    const withoutOrbs = validatePlathoAppConfig({
       ...productionConfig,
       network: {
         ...productionConfig.network,
         tonRpc: {
           ...productionConfig.network.tonRpc,
-          fallbackProviderIds: ['platho-rpc', 'toncenter'],
+          providers: productionConfig.network.tonRpc.providers.filter(
+            (provider) => provider.kind !== 'ton-access-v2',
+          ),
         },
       },
     });
-    expect(normalFallbackReport.ok).toBe(false);
-    expect(normalFallbackReport.findings.map((finding) => finding.id)).toContain('PWA_TONCENTER_DIRECT_READ_FALLBACK_FORBIDDEN');
-
-    const missingVerifierFlagReport = validatePlathoAppConfig({
-      ...productionConfig,
-      network: {
-        ...productionConfig.network,
-        tonRpc: {
-          ...productionConfig.network.tonRpc,
-          providers: productionConfig.network.tonRpc.providers.map((provider) => (
-            provider.id === 'toncenter'
-              ? { ...provider, verifierOnly: false }
-              : provider
-          )),
-        },
-      },
-    });
-    expect(missingVerifierFlagReport.ok).toBe(false);
-    expect(missingVerifierFlagReport.findings.map((finding) => finding.id)).toContain('PWA_TONCENTER_DIRECT_READ_VERIFIER_ONLY_REQUIRED');
+    expect(withoutOrbs.ok).toBe(false);
+    expect(withoutOrbs.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_KEYLESS_DECENTRALIZED_REQUIRED');
   });
 
   it('PWA-CONFIG-04AF: production config requires a full-capability emergency fallback provider', () => {
@@ -3767,7 +3757,7 @@ describe('PWA runtime config guard', () => {
         tonRpc: {
           ...productionConfig.network.tonRpc,
           providers: productionConfig.network.tonRpc.providers.map((provider) => {
-            if (provider.id !== 'toncenter') return provider;
+            if (provider.id !== 'keyless-toncenter') return provider;
             const { emergencyFallback, ...rest } = provider as Record<string, unknown>;
             return rest;
           }),
@@ -3776,9 +3766,6 @@ describe('PWA runtime config guard', () => {
     });
     expect(withoutEmergencyFlag.ok).toBe(false);
     expect(withoutEmergencyFlag.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_EMERGENCY_FALLBACK_REQUIRED');
-    // A toncenter sendBoc endpoint without the explicit emergency-fallback
-    // marker also stays forbidden as a direct send route.
-    expect(withoutEmergencyFlag.findings.map((finding) => finding.id)).toContain('PWA_TONCENTER_DIRECT_SEND_FORBIDDEN');
 
     const withoutSendEndpoint = validatePlathoAppConfig({
       ...productionConfig,
@@ -3787,7 +3774,7 @@ describe('PWA runtime config guard', () => {
         tonRpc: {
           ...productionConfig.network.tonRpc,
           providers: productionConfig.network.tonRpc.providers.map((provider) => (
-            provider.id === 'toncenter'
+            provider.id === 'keyless-toncenter'
               ? { ...provider, sendBocEndpoint: false, messagesEndpoint: false }
               : provider
           )),
@@ -4292,29 +4279,29 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v534/);
+    expect(sw).toMatch(/platho-pwa-prototype-v536/);
     expect(sw).toMatch(/\.\/styles\.css\?v=151/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=463/);
+    expect(sw).toMatch(/\.\/app\.js\?v=465/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=82/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=31/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=83/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=32/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=44/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=28/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=26/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=24/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=31/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=45/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=29/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=27/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=25/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=32/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=7/);

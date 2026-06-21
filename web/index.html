@@ -26,7 +26,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel">network</span>
-              <span class="app-version-label" id="appVersionLabel">v463</span>
+              <span class="app-version-label" id="appVersionLabel">v465</span>
             </div>
           </div>
         </div>
@@ -424,6 +424,15 @@
               </div>
             </section>
 
+            <section class="profile-section" aria-label="RPC access">
+              <h2>RPC access</h2>
+              <div class="settings-list">
+                <button id="getToncenterKeyButton" type="button"><span>Get a free RPC key</span><strong id="toncenterKeyStatus">recommended</strong></button>
+                <label class="settings-select-row" for="toncenterApiKeyInput"><span>toncenter key</span><input id="toncenterApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="paste to speed up reads"></label>
+                <button id="saveToncenterKeyButton" type="button"><span>Save</span><strong id="saveToncenterKeyStatus"></strong></button>
+              </div>
+            </section>
+
             <section class="profile-section" aria-label="ATH">
               <h2>ATH</h2>
               <div class="profile-stat-list">
@@ -552,6 +561,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=463" type="module"></script>
+    <script src="./app.js?v=465" type="module"></script>
   </body>
 </html>
