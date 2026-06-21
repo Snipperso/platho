@@ -29,18 +29,18 @@ const productionConfig = {
           id: 'user-toncenter',
           kind: 'toncenter-v3',
           useUserApiKey: true,
-          runGetMethodEndpoint: 'https://toncenter-a.example/api/v3/runGetMethod',
-          sendBocEndpoint: 'https://toncenter-a.example/api/v3/message',
-          messagesEndpoint: 'https://toncenter-a.example/api/v3/messages',
+          runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.com/api/v3/message',
+          messagesEndpoint: 'https://toncenter.com/api/v3/messages',
         },
         {
           id: 'keyless-toncenter',
           kind: 'toncenter-v3',
           verifierOnly: true,
           emergencyFallback: true,
-          runGetMethodEndpoint: 'https://toncenter-b.example/api/v3/runGetMethod',
-          sendBocEndpoint: 'https://toncenter-b.example/api/v3/message',
-          messagesEndpoint: 'https://toncenter-b.example/api/v3/messages',
+          runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
+          sendBocEndpoint: 'https://toncenter.com/api/v3/message',
+          messagesEndpoint: 'https://toncenter.com/api/v3/messages',
         },
       ],
       requestTimeoutMs: 15000,
@@ -164,13 +164,14 @@ describe('PWA runtime config guard', () => {
       requestSpacingMs: 1500,
     });
     expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('orbs-keyless');
-    // No provider routes through the retired rpc.platho.app gateway.
-    expect(JSON.stringify(PLATHO_APP_CONFIG.network.tonRpc)).not.toContain('rpc.platho.app');
-    // The rpc.platho.app gateway is itself multi-source (keyed TonCenter + Orbs); it is the trusted
-    // verified source, so the PWA does NOT routinely cross-verify every critical read against a 2nd
-    // transport (which would hammer the keyless emergency toncenter or freeze on gateway-vs-gateway
-    // hot-state disagreement). Keyless toncenter stays strictly an emergency primary/send/history
-    // fallback, never an "on equal footing" verifier.
+    // Every provider endpoint is a canonical decentralized/public TON host (Orbs or toncenter.com), so the
+    // validator raises no central-proxy/gateway finding — there is no single host to block or DoS.
+    expect(validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => finding.id))
+      .not.toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
+    // verifyCriticalReads stays false: message bodies self-verify against CapsuleHub hashes, so a single
+    // (even untrusted) provider read cannot poison them, and routine cross-verification would only burn the
+    // per-user budget. Keyless toncenter stays strictly an emergency primary/send/history fallback, never
+    // an "on equal footing" verifier.
     expect(PLATHO_APP_CONFIG.network.tonRpc.verifyCriticalReads).toBe(false);
     for (const method of [
       'get_state',
@@ -201,7 +202,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=27/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=28/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -257,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v468<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v468'/);
+    expect(html).toMatch(/id="appVersionLabel">v469<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v469'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -3728,7 +3729,12 @@ describe('PWA runtime config guard', () => {
     expect(readAvatarPartsSource).toMatch(/for \(let entryId = start; entryId <= start \+ maxExtra; entryId \+= 1n\)/);
   });
 
-  it('PWA-CONFIG-04AD: production config forbids routing through the retired rpc.platho.app gateway', () => {
+  it('PWA-CONFIG-04AD: production config forbids routing through ANY central RPC proxy/gateway (canonical hosts only)', () => {
+    // The real config (Orbs + toncenter.com only) routes through no central proxy, so it is not flagged.
+    expect(validatePlathoAppConfig(productionConfig).findings.map((finding) => finding.id))
+      .not.toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
+    // But ANY provider on a non-canonical (self-hosted central proxy) host is rejected by principle — not
+    // a blacklist of one retired hostname.
     const report = validatePlathoAppConfig({
       ...productionConfig,
       network: {
@@ -3738,11 +3744,11 @@ describe('PWA runtime config guard', () => {
           providers: [
             ...productionConfig.network.tonRpc.providers,
             {
-              id: 'platho-rpc',
+              id: 'central-proxy',
               kind: 'toncenter-v3',
-              runGetMethodEndpoint: 'https://rpc.platho.app/api/v3/runGetMethod',
-              sendBocEndpoint: 'https://rpc.platho.app/api/v3/message',
-              messagesEndpoint: 'https://rpc.platho.app/api/v3/messages',
+              runGetMethodEndpoint: 'https://rpc.central-proxy.example/api/v3/runGetMethod',
+              sendBocEndpoint: 'https://rpc.central-proxy.example/api/v3/message',
+              messagesEndpoint: 'https://rpc.central-proxy.example/api/v3/messages',
             },
           ],
         },
@@ -4300,29 +4306,29 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v539/);
+    expect(sw).toMatch(/platho-pwa-prototype-v540/);
     expect(sw).toMatch(/\.\/styles\.css\?v=151/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=468/);
+    expect(sw).toMatch(/\.\/app\.js\?v=469/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=86/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=43/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=34/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=87/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=44/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=35/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=47/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=31/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=43/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=27/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=34/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=48/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=32/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=44/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=30/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=28/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=35/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=7/);

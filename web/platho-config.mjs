@@ -102,7 +102,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: 'b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=47',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=48',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -112,7 +112,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=27',
+      moduleUrl: './ton-dns-provider.mjs?v=28',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
@@ -220,6 +220,40 @@ function hasConcreteTonRpcSendProvider(provider) {
   return Boolean(provider?.sendBocEndpoint);
 }
 
+// Client-direct architecture guard. Clients talk to TON only through CANONICAL decentralized / public
+// endpoints — Orbs (TON Access) for the keyless decentralized path and toncenter.com for the per-user-key
+// indexer. ANY other RPC host is a central proxy/gateway: a single point to block or DoS, which the
+// client-direct model exists to remove. Enforced as a host ALLOW-LIST (the principle) rather than a
+// blacklist of one retired hostname, so it also catches any future central proxy.
+function tonRpcEndpointHost(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    const host = raw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split('/')[0].split(':')[0].toLowerCase();
+    return host || null;
+  }
+}
+
+function isCanonicalTonRpcHost(host) {
+  const h = String(host ?? '').toLowerCase();
+  return h === 'ton.access.orbs.network' || h.endsWith('.orbs.network')
+    || h === 'toncenter.com' || h.endsWith('.toncenter.com');
+}
+
+function tonRpcProviderEndpointHosts(provider) {
+  return [
+    provider?.runGetMethodEndpoint,
+    provider?.endpoint,
+    provider?.sendBocEndpoint,
+    provider?.messagesEndpoint,
+    provider?.walletBalanceEndpoint,
+    provider?.accountEndpoint,
+    provider?.tonAccessHost,
+  ].map(tonRpcEndpointHost).filter((host) => host !== null);
+}
+
 export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
   const findings = [];
   const mode = config?.mode;
@@ -301,21 +335,18 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
           'Production PWA config must include a keyless decentralized TON RPC provider (Orbs / TON Access) so reads and sends survive without a per-user API key.',
         );
       }
-      // The central rpc.platho.app gateway is retired; no provider may route through it.
+      // No provider may route through a central RPC proxy/gateway: every explicit endpoint host must be a
+      // canonical decentralized/public TON host (Orbs or toncenter.com), so there is no single host to
+      // block or DoS. Principle-based (host allow-list) — supersedes and generalizes the retired central
+      // gateway ban.
       for (const rpcProvider of tonRpcProviders) {
-        const routedThroughGateway = [
-          rpcProvider?.runGetMethodEndpoint,
-          rpcProvider?.endpoint,
-          rpcProvider?.sendBocEndpoint,
-          rpcProvider?.messagesEndpoint,
-          rpcProvider?.walletBalanceEndpoint,
-          rpcProvider?.accountEndpoint,
-        ].some((value) => typeof value === 'string' && /rpc\.platho\.app/i.test(value));
-        if (routedThroughGateway) {
+        const routesThroughCentralProxy = tonRpcProviderEndpointHosts(rpcProvider)
+          .some((host) => !isCanonicalTonRpcHost(host));
+        if (routesThroughCentralProxy) {
           addFinding(
             findings,
             'PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN',
-            'Production PWA must not route through the retired rpc.platho.app gateway; clients talk to TON directly (Orbs + the user key).',
+            'Production PWA must not route through a central RPC proxy/gateway; every provider endpoint must be a canonical decentralized/public TON host (Orbs ton.access.orbs.network or toncenter.com), so clients talk to TON directly with no central host to block or DoS.',
           );
         }
       }
