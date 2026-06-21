@@ -35,25 +35,3 @@ platho.app {
 		file_server
 	}
 }
-
-rpc.platho.app {
-    import security_headers
-    encode gzip
-
-    # Cap the request body at the edge (matches the gateway MAX_BODY_BYTES).
-    request_body {
-        max_size 256KiB
-    }
-
-    route {
-        # Only the routes the gateway serves; reject everything else before Python.
-        @badmethods not method GET POST OPTIONS
-        respond @badmethods 405
-
-        # Overwrite X-Forwarded-For with the real client IP so a client-supplied (spoofed)
-        # value can never reach the gateway's rate limiter.
-        reverse_proxy 127.0.0.1:8790 {
-            header_up X-Forwarded-For {remote_host}
-        }
-    }
-}

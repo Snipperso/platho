@@ -70,35 +70,9 @@ sudo systemctl reload caddy
 
 Point DNS `A` and `AAAA` records for `platho.app` at the server before expecting HTTPS issuance to work.
 
-## Platho RPC gateway
+## Platho RPC gateway (RETIRED)
 
-The production PWA uses `https://rpc.platho.app` as the first concrete TON RPC provider after any user-supplied custom transport. This host must not expose a full public TON API. The preferred production mode is `toncenter-v3` with a server-side TonCenter API key stored outside the repo. The gateway only exposes the PWA routes: allowlisted `runGetMethod`, wallet `getAddressInformation`, restricted `/api/v3/messages` history routes for CapsuleHub publish body recovery plus CapsuleHub-to-Vault publish ACK confirmation, and restricted `/api/v3/message` BOC broadcast with only a JSON `{ "boc": "..." }` body.
-
-DNS:
-
-```text
-A     rpc.platho.app     <server IPv4>
-AAAA  rpc.platho.app     <server IPv6>
-```
-
-Install outline:
-
-```sh
-sudo mkdir -p /etc/platho
-sudo mkdir -p /opt/platho
-sudo cp deploy/platho-rpc-gateway.py /opt/platho/platho-rpc-gateway.py
-sudo cp deploy/platho-rpc-gateway.env.example /etc/platho/rpc-gateway.env
-sudoedit /etc/platho/rpc-gateway.env
-sudo install -m 600 -o root -g root /path/to/toncenter-mainnet.key /etc/platho/toncenter-mainnet.key
-sudo cp deploy/platho-rpc-gateway.service /etc/systemd/system/platho-rpc-gateway.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now platho-rpc-gateway
-sudo systemctl status platho-rpc-gateway
-```
-
-Keep the key out of the PWA bundle and out of git. Prefer `PLATHO_RPC_TONCENTER_API_KEY_FILE=/etc/platho/toncenter-mainnet.key` over putting the key directly in the environment. The file should be root-owned and mode `600`. Keep a non-empty `PLATHO_RPC_UPSTREAM_USER_AGENT`; TonCenter's edge can reject default Python urllib traffic before the request reaches the API.
-
-The gateway allowlists the PWA routes, applies CORS for `platho.app`, limits get-method names, restricts message history by destination/source/opcode, validates BOC broadcast bodies, and rate-limits clients. It is a production guardrail, not a full node. If you need an anonymous fallback, set `PLATHO_RPC_UPSTREAM_KIND=ton-access-v2`; that mode disables `/api/v3/messages` and `/api/v3/message` and uses Orbs TON Access for read verification.
+`rpc.platho.app` has been decommissioned. The PWA is **client-direct**: each client talks to TON itself via the keyless Orbs (TON Access) network plus the user's own optional free TonCenter API key, so there is no central gateway to block or DoS. The former gateway code (`deploy/platho-rpc-gateway.*`) and its tests have been removed, and `validatePlathoAppConfig` now actively forbids any provider routing through `rpc.platho.app`.
 
 ## Nginx fallback
 

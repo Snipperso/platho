@@ -36,7 +36,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=85';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=86';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v467';
+const PLATHO_APP_RUNTIME_VERSION = 'v468';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
