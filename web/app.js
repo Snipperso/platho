@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=83';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=84';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=45';
+} from './vault-ton-rpc-provider.mjs?v=46';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -135,19 +135,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=3';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=27';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=28';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=41';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=29';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=25';
+} from './capsulehub-ton-rpc-provider.mjs?v=42';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=30';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=26';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=32';
+} from './username-ton-rpc-provider.mjs?v=33';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v465';
+const PLATHO_APP_RUNTIME_VERSION = 'v466';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -7941,7 +7941,15 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
         // Fast follow-up only while the catch-up actually makes progress;
         // a stalled walk (same state every pass) backs off exponentially so
         // it cannot melt the RPC budget with a 2-second resync loop.
-        const progressed = privateSyncImported(result) || Number(result?.skipped ?? 0) > 0;
+        // A cycle whose ONLY delta is body-gap skips (keyless cannot fetch those bodies) is NOT real
+        // progress: counting it as progress pins the fast 8s cadence and re-walks the same unfetchable
+        // bodies every cycle, keeping the RPC limiter perpetually hot (and starving sends). Treat a
+        // body-gap-only cycle as a stall so the backoff ramps toward 60s; genuine imports or any
+        // non-body-gap skip still fast-follow.
+        const onlyBodyGapSkips = !privateSyncImported(result)
+          && result?.reason === 'body_history_unavailable';
+        const progressed = privateSyncImported(result)
+          || (Number(result?.skipped ?? 0) > 0 && !onlyBodyGapSkips);
         messageAutoSyncStallStreak = progressed ? 0 : messageAutoSyncStallStreak + 1;
         // Floor the fast follow-up at 8s. The old 2s minimum re-fired a fresh sync pass (dozens of
         // synchronous ML-KEM decapsulates) every 2 seconds while a catch-up progressed — fine on a fast
@@ -19147,7 +19155,15 @@ async function settlePrivateComposerSendError(context, error) {
 async function runPrivateSendRetry(context) {
   const { thread, message } = context;
   if (!thread?.messages?.includes(message)) return;
-  if (tonRpcLimited()) {
+  // The shared tonRpcLimited() gate is armed by ANY rate-limit — including the background body-sync
+  // hammering the keyless toncenter indexer (~1 rps), which on a keyless build keeps it perpetually hot.
+  // Don't let that READ-throttle starve a user's FIRST broadcast: a message that has never been
+  // signed/sent (every part still BUILT, privateMessageHasPublishAttempt === false) broadcasts via Orbs
+  // sendBoc — a different endpoint/budget than the throttled indexer that armed the limiter — so let it
+  // through and rely on the send transport's own skipIfRateLimited/backoff. A message that HAS an attempt
+  // (some part SENT/SUBMITTED/UNKNOWN, possibly in-flight) keeps the bail, so the key-gated no-double-spend
+  // re-sign path is NEVER entered while the limiter is hot.
+  if (tonRpcLimited() && privateMessageHasPublishAttempt(message)) {
     schedulePrivateSendRetry(context, { message: TON_RPC_CONNECTING_STATUS, code: 'RATE_LIMITED' });
     return;
   }

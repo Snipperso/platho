@@ -1857,7 +1857,20 @@ export function createTonAccessV2VaultTransport(options = {}) {
         },
       );
       if (!response.ok) throw toncenterHttpError('TON Access transactions', response);
-      return response.json();
+      const payload = await response.json();
+      // toncenter v2 reports param/validation failures (e.g. limit > 100) as an HTTP-200 {ok:false,code}
+      // body. Surface that as a real error instead of silently returning a body with no transactions —
+      // a swallowed {ok:false} reads to the caller as "no matching tx" and the body scan gives up. Mirror
+      // runGetMethod's HTTP-200 {ok:false} handling above. Not a 429/RATE_LIMITED, so the body-scan catch
+      // classifies it as a generic (non-rate-limit) history failure, not a backoff trigger.
+      if (payload && payload.ok === false) {
+        const failCode = Number(payload.code ?? 0);
+        throw new VaultTonRpcProviderError(
+          `TON Access transactions failed${payload.error ? `: ${String(payload.error).slice(0, 80)}` : ''}`,
+          Number.isFinite(failCode) && failCode > 0 ? { status: failCode } : {},
+        );
+      }
+      return payload;
     },
     // No getMessages: Orbs has no message-history indexer, and omitting it makes the fallback layer
     // (transportSupportsReadMethod) route message-history reads to a keyed toncenter transport instead.
