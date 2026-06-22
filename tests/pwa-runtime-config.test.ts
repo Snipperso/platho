@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v474<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v474'/);
+    expect(html).toMatch(/id="appVersionLabel">v475<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v475'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1964,10 +1964,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/fetch\('https:\/\/toncenter\.com\/api\/v3\/masterchainInfo', \{\s*headers: \{ 'X-API-Key': key \}/);
     expect(app).toMatch(/if \(response\.ok\) return \{ ok: true \}/);
     expect(app).toMatch(/response\.status === 401 \|\| response\.status === 403\) return \{ ok: false, reason: 'invalid' \}/);
-    // Settings save: a definitively invalid key is NOT saved; offline/unverified still saves (keyless fallback).
-    expect(app).toMatch(/const result = await validateToncenterApiKey\(trimmed\);\s*if \(result\.reason === 'invalid'\)/);
-    expect(app).toMatch(/saveToncenterKeyStatus\.textContent = 'invalid key - not saved'/);
-    expect(app).toMatch(/result\.ok \? 'saved \(valid\)' : 'saved \(could not verify\)'/);
+    // No Save button: the settings field validates + saves on change (blur / Enter). A definitively
+    // invalid key is rejected and NOT stored; an unverified one is kept (keyless Orbs fallback).
+    expect(app).toMatch(/async function commitToncenterKeyFromInput\(\)/);
+    expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('change'/);
+    expect(app).toMatch(/if \(result\.reason === 'invalid'\) \{[\s\S]*toncenterKeyStatus\.textContent = 'invalid key'[\s\S]*setAttribute\('data-state', 'error'\)[\s\S]*return;\s*\}\s*applyToncenterApiKey\(trimmed\);/);
+    // The row itself doubles as the Get button (opens the @toncenter bot), except a click on the field.
+    expect(app).toMatch(/rpcKeyRow\?\.addEventListener\('click'[\s\S]*event\.target === toncenterApiKeyInput[\s\S]*openToncenterBotLink\(\)/);
+    // The Save button is gone.
+    expect(app).not.toMatch(/saveToncenterKeyButton/);
     // Quick-start step 2 validates too: an invalid key surfaces a message and does NOT advance the stepper.
     expect(app).toMatch(/if \(result\.reason === 'invalid'\) return 'That key was rejected by TON Center\. Check it and retry, or Skip\.'/);
     // The stepper handler renders a string run() result as a non-advancing failure message.
@@ -4421,11 +4426,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v545/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=153/);
+    expect(sw).toMatch(/platho-pwa-prototype-v546/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=154/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=474/);
+    expect(sw).toMatch(/\.\/app\.js\?v=475/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -121,8 +121,8 @@ describe('PWA on-chain self-sufficiency', () => {
     expect(transport).toMatch(/globalThis\.plathoToncenterApiKey/);
     // The key is never hardcoded in the config bundle.
     expect(read('web/platho-config.mjs')).not.toMatch(/apiKey:\s*'/);
-    // Settings entry exists so the user can add/clear the key.
+    // Settings entry exists so the user can add/clear the key (auto-saved on change — no Save button).
     expect(html).toMatch(/id="toncenterApiKeyInput"/);
-    expect(html).toMatch(/id="saveToncenterKeyButton"/);
+    expect(html).toMatch(/id="rpcKeyRow"/);
   });
 });
