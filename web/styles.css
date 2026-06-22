@@ -2322,6 +2322,141 @@ button.feed-item:hover {
   box-shadow: 0 18px 50px var(--shadow);
 }
 
+/* Quick-start onboarding */
+.quick-start-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(460px, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 50px var(--shadow);
+}
+
+.quick-start-dialog header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-start-view {
+  display: grid;
+  gap: 14px;
+}
+
+.quick-start-view[hidden] {
+  display: none;
+}
+
+.quick-start-pitch,
+.quick-start-step-why {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text);
+  opacity: 0.82;
+}
+
+.quick-start-highlights {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+}
+
+.quick-start-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.quick-start-step-actions {
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+}
+
+.quick-start-foot {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.quick-start-progress {
+  display: flex;
+  gap: 6px;
+}
+
+.quick-start-progress-dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.quick-start-progress-dot.is-done {
+  background: var(--accent);
+}
+
+.quick-start-progress-dot.is-current {
+  background: var(--accent-2);
+}
+
+.quick-start-step-head {
+  display: grid;
+  gap: 4px;
+}
+
+.quick-start-step-counter {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+.quick-start-step-head h3 {
+  margin: 0;
+}
+
+.quick-start-step-body {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-start-step-body:empty {
+  display: none;
+}
+
+.quick-start-step-body input[type="text"],
+.quick-start-step-body input:not([type]) {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.quick-start-step-address {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.quick-start-status {
+  margin: 0;
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
 .docs-dialog {
   grid-template-rows: auto minmax(0, 1fr);
   width: min(980px, 100%);
