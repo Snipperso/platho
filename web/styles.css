@@ -2308,6 +2308,16 @@ button.feed-item:hover {
   display: none;
 }
 
+/* Quick-start steps open the shared #actionDialog (password prompts, the Telegram
+   seed-backup hard gate, the manual wallet-key copy dialog) WHILE the #quickStartDialog
+   overlay is still visible. Both are .modal-backdrop at z-index:40 and #quickStartDialog
+   is later in the DOM, so without this override it paints over the action dialog and
+   pointer-blocks it — burying those prompts and freezing onboarding (worst in the
+   Telegram WebView, where the seed gate is non-dismissible). Keep it below the lightbox (70). */
+#actionDialog {
+  z-index: 60;
+}
+
 .recipient-dialog,
 .action-dialog,
 .docs-dialog,
@@ -2327,6 +2337,8 @@ button.feed-item:hover {
   display: grid;
   gap: 16px;
   width: min(460px, 100%);
+  max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
+  overflow-y: auto;
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 8px;
