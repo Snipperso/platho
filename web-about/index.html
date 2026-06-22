@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0d0f">
+    <meta name="color-scheme" content="dark">
+    <title>Platho — Decentralized Messenger on TON | Own Your Keys</title>
+    <meta name="description" content="Platho is a decentralized messenger on the TON blockchain — no backend, no central server, no platform permission. Own your username NFT, your built-in wallet and your keys. Post-quantum encrypted, live on TON mainnet.">
+    <link rel="canonical" href="https://about.platho.app/">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+
+    <link rel="icon" href="./assets/platho-icon.svg" type="image/svg+xml">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Platho">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="Platho — Decentralized Messenger on TON">
+    <meta property="og:description" content="Own your messages, your name and your keys. A decentralized messenger on TON — no backend, no platform permission, post-quantum encrypted. Live on TON mainnet.">
+    <meta property="og:url" content="https://about.platho.app/">
+    <meta property="og:image" content="https://about.platho.app/assets/og.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Platho — own your messages, your name, your keys. Decentralized messenger on TON.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Platho — Decentralized Messenger on TON">
+    <meta name="twitter:description" content="Own your messages, your name and your keys. A decentralized, post-quantum messenger on TON. No backend. No platform permission.">
+    <meta name="twitter:image" content="https://about.platho.app/assets/og.png">
+    <meta name="twitter:image:alt" content="Platho — own your messages, your name, your keys. Decentralized messenger on TON.">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://about.platho.app/#org",
+          "name": "Platho",
+          "url": "https://platho.app",
+          "logo": "https://about.platho.app/assets/og.png",
+          "description": "Platho is a decentralized, self-sovereign messenger built on the TON blockchain."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://about.platho.app/#website",
+          "url": "https://about.platho.app/",
+          "name": "Platho",
+          "description": "A decentralized messenger on the TON blockchain. No backend, no platform permission, post-quantum encrypted.",
+          "publisher": { "@id": "https://about.platho.app/#org" },
+          "inLanguage": "en"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Platho",
+          "applicationCategory": "CommunicationApplication",
+          "operatingSystem": "Web, Progressive Web App, Telegram Mini App",
+          "url": "https://platho.app",
+          "description": "A decentralized messenger on TON: end-to-end post-quantum encrypted private messages, public channels as on-chain state, .ath username NFTs and a built-in TON wallet — no backend and no central server.",
+          "featureList": [
+            "End-to-end post-quantum encrypted private messaging",
+            "Public channels as verifiable on-chain state",
+            ".ath username NFTs you own on-chain",
+            "Built-in TON wallet from a single recovery phrase",
+            "No backend, no central server, censorship-resistant"
+          ],
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+          "publisher": { "@id": "https://about.platho.app/#org" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://about.platho.app/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What does Platho cost?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Operations cost small amounts of GRAM or ATH — a short message starts around 0.0337 GRAM. There is no subscription and no ads. You pay the network, not a platform." }
+            },
+            {
+              "@type": "Question",
+              "name": "Can Platho be shut down?",
+              "acceptedAnswer": { "@type": "Answer", "text": "There is no central server to seize. The client is static and hostable anywhere, and the state lives in open TON contracts. Blocking one host or provider does not stop the protocol." }
+            },
+            {
+              "@type": "Question",
+              "name": "What if I lose my recovery phrase?",
+              "acceptedAnswer": { "@type": "Answer", "text": "It is gone. There is no support line that can restore it — that is the real cost of holding your own keys. Back up your 24 words and keep them safe." }
+            },
+            {
+              "@type": "Question",
+              "name": "Are my messages really private?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Private messages are encrypted client-side with a hybrid post-quantum scheme (X25519 + ML-KEM-768 with AES-256-GCM). The transport and the contracts only ever see ciphertext and hashes — never your plaintext or keys." }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need an external wallet?",
+              "acceptedAnswer": { "@type": "Answer", "text": "No. Platho has a built-in TON wallet derived from your recovery phrase — no separate connector or browser extension required." }
+            },
+            {
+              "@type": "Question",
+              "name": "Is Platho live?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes — Platho is deployed and running on TON mainnet today." }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="./styles.css?v=7">
+    <script src="./main.js?v=7" defer></script>
+  </head>
+  <body>
+    <canvas id="signal" class="bg-signal" aria-hidden="true"></canvas>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <a class="skip-link" href="#hero">Skip to content</a>
+
+    <!-- ============ NAV ============ -->
+    <header class="nav" id="nav">
+      <a class="brand" href="#hero" aria-label="Platho">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 512 512" role="img" aria-label="Platho">
+            <defs>
+              <linearGradient id="pmark" x1="118" y1="430" x2="430" y2="82" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#2be6ad"/>
+                <stop offset="0.55" stop-color="#30d5b0"/>
+                <stop offset="1" stop-color="#25c99b"/>
+              </linearGradient>
+            </defs>
+            <rect width="512" height="512" rx="108" fill="#0b0d0f"/>
+            <g transform="translate(0 512) scale(1 -1)">
+              <path fill="url(#pmark)" fill-rule="evenodd" d="M167.5 432.1 L330.5 432.1 L346.5 429.9 L364.5 424.8 L380.5 417.7 L393.5 409.6 L404.5 401.0 L416.0 389.5 L425.8 376.5 L435.9 358.5 L441.7 343.5 L445.9 325.5 L446.9 296.5 L445.8 285.5 L442.8 271.5 L435.7 251.5 L425.9 233.5 L416.9 221.5 L402.5 207.1 L387.5 196.1 L362.5 184.1 L348.5 180.1 L334.5 178.0 L221.5 177.2 L220.5 79.2 L137.5 79.4 L137.2 139.5 L166.5 140.2 L166.8 174.5 L136.5 175.1 L135.6 174.5 L135.7 163.5 L134.5 162.8 L104.1 163.5 L104.5 192.7 L134.5 192.9 L135.5 193.5 L135.4 220.5 L136.2 221.5 L166.8 222.5 L166.5 253.0 L135.5 253.3 L134.5 235.2 L105.5 235.1 L104.1 236.5 L104.3 264.5 L134.5 265.3 L135.5 292.5 L197.5 292.7 L198.4 293.5 L198.0 323.5 L166.8 324.5 L167.3 364.5 L198.4 365.5 L198.3 394.5 L166.9 395.5 L166.7 430.5 L167.5 432.1 Z M104.5 407.6 L134.9 407.5 L134.5 377.7 L104.5 377.9 L104.5 407.6 Z M221.5 372.3 L221.5 237.2 L322.5 237.1 L329.5 238.1 L342.5 242.1 L352.5 247.4 L359.5 252.8 L369.6 263.5 L377.0 275.5 L381.5 288.5 L383.1 298.5 L382.7 316.5 L379.7 327.5 L374.8 338.5 L368.9 347.5 L358.5 357.9 L344.5 366.7 L332.5 370.8 L322.5 372.4 L221.5 372.3 Z M65.5 324.3 L93.5 324.3 L93.9 294.5 L64.9 294.5 L64.6 322.5 L65.5 324.3 Z"/>
+            </g>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name" translate="no">Platho</span>
+          <span class="brand-sub">about</span>
+        </span>
+      </a>
+
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#philosophy">Philosophy</a>
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#security">Security</a>
+        <a href="#token">Token</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+
+      <a class="btn btn-accent nav-cta" href="https://platho.app">Open Messenger <span aria-hidden="true">→</span></a>
+    </header>
+
+    <main>
+      <!-- ============ HERO ============ -->
+      <section class="hero" id="hero">
+        <div class="hero-inner">
+          <div class="status-badge">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>LIVE ON TON MAINNET</span>
+          </div>
+
+          <h1 class="hero-title" data-scramble>Own your messages.<br>Own your name.<br>Own your keys.</h1>
+
+          <p class="hero-sub">
+            Platho is a decentralized messenger on the TON blockchain. No backend,
+            no platform permission, no central server to switch off. Encrypted today
+            — post-quantum for tomorrow.
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn btn-accent btn-lg" href="https://platho.app">Open Messenger <span aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
+          </div>
+
+          <p class="hero-terminal"><span class="prompt">&gt;</span> establishing self-sovereign channel<span class="cursor" aria-hidden="true"></span></p>
+        </div>
+      </section>
+
+      <!-- ============ PHILOSOPHY ============ -->
+      <section class="section" id="philosophy" data-reveal>
+        <div class="section-head">
+          <span class="kicker">philosophy</span>
+          <h2>You're a tenant, not an owner.</h2>
+        </div>
+        <div class="prose">
+          <p>
+            The ordinary internet is built too comfortably for the people who control it.
+            An account can be closed. Access can be limited. History can be deleted. Rules can be
+            changed after you have already moved part of your life into a platform. The user is not
+            an owner there — the user is a tenant who exists for as long as the platform allows it.
+          </p>
+          <blockquote>Platho rejects that model.</blockquote>
+          <p>
+            Core actions are anchored by your wallet and executed through open smart contracts.
+            The wallet stays the root of control; routine activity runs through the Vault and signed
+            commands instead of exposing the wallet every time. That doesn't make the system perfect —
+            it removes the central defect of ordinary platforms: the hidden ability to rewrite the
+            rules, cut off access, or seize what should belong to the user.
+          </p>
+          <p>
+            Platho is not trying to be a comfortable cage. It is a tool where control over basic digital
+            things returns to the person using it — not to whoever controls the server, the database, or
+            the access rules.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ HOW IT WORKS ============ -->
+      <section class="section" id="how" data-reveal>
+        <div class="section-head">
+          <span class="kicker">architecture</span>
+          <h2>No server to trust. No database to edit.</h2>
+          <p class="section-lead">Platho removes the structural incentive to centralize. Here is how.</p>
+        </div>
+
+        <div class="grid grid-2">
+          <article class="card">
+            <h3><span class="card-num">01</span> No backend</h3>
+            <p>
+              The app is a static client that runs entirely in your browser. There is no Platho server
+              to log in to, deliver messages, or hold state — so it can be hosted anywhere: a server,
+              IPFS, or inside Telegram.
+            </p>
+          </article>
+          <article class="card">
+            <h3><span class="card-num">02</span> On-chain, not a database</h3>
+            <p>
+              Public messages, profiles and names live as verifiable smart-contract state on TON
+              (the Vault and CapsuleHub contracts) instead of a closed database an operator can
+              quietly rewrite.
+            </p>
+          </article>
+          <article class="card">
+            <h3><span class="card-num">03</span> Client-direct</h3>
+            <p>
+              Each client talks to the TON network directly through its own RPC, with a keyless
+              fallback when a provider is blocked. There is no central gateway that can become a
+              single point of failure or censorship.
+            </p>
+          </article>
+          <article class="card">
+            <h3><span class="card-num">04</span> Wallet at the root</h3>
+            <p>
+              A single 24-word recovery phrase derives every key you need. The Vault sits between
+              your wallet and the public network, so routine app activity never exposes the wallet
+              directly on-chain.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ FEATURES ============ -->
+      <section class="section" id="features" data-reveal>
+        <div class="section-head">
+          <span class="kicker">capabilities</span>
+          <h2>Everything a messenger does — owned, not rented.</h2>
+        </div>
+
+        <div class="grid grid-feat">
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H9l-5 4v-4a3 3 0 0 1-2-3V5Zm3-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2.7L2 17.6V13a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1Z"/></svg>
+            </span>
+            <h3>Private messaging</h3>
+            <p>End-to-end encrypted private capsules, anchored on-chain and readable only by you and the recipient.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h4l8 5V4L8 9H4Zm2 2h2.6l5.4-3.4v8.8L8.6 13H6v-2Zm13.6-4.4 1.4-1.4a9.5 9.5 0 0 1 0 13.4l-1.4-1.4a7.5 7.5 0 0 0 0-10.6Zm-2.8 2.8 1.4-1.4a5.5 5.5 0 0 1 0 7.8l-1.4-1.4a3.5 3.5 0 0 0 0-5Z"/></svg>
+            </span>
+            <h3>Public channels</h3>
+            <p>Public posts and channels as verifiable contract state — no operator policy deciding what survives.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm9 10H3v-2a7 7 0 0 1 14 0v2Zm-15-2h12a5 5 0 0 0-12 0Z"/></svg>
+            </span>
+            <h3>.ath username NFTs</h3>
+            <p>Your username is an NFT you actually own on-chain — 4 to 16 characters, yours to keep or move.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H5Zm7 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm5 1h2v2h-2v-2Z"/></svg>
+            </span>
+            <h3>The Vault</h3>
+            <p>A protective balance layer between your wallet and the public network — limits what's exposed to routine activity.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.2 7.2A6.8 6.8 0 0 1 18.8 12h2a8.8 8.8 0 0 0-15-6.2L3.7 3.7v5.8h5.8L7.2 7.2Zm9.6 9.6A6.8 6.8 0 0 1 5.2 12h-2a8.8 8.8 0 0 0 15 6.2l2.1 2.1v-5.8h-5.8l2.3 2.3Z"/></svg>
+            </span>
+            <h3>Embedded wallet</h3>
+            <p>A built-in TON wallet — no external connector or extension. One recovery phrase is your entire backup.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5 5 4.5v5c0 4.4 3 8.5 7 9.5 4-1 7-5.1 7-9.5v-5l-7-3Zm0 2.2 5 2.1V9.5c0 3.3-2.1 6.4-5 7.4-2.9-1-5-4.1-5-7.4V5.8l5-2.1ZM11 8h2v3h-2V8Zm0 4h2v2h-2v-2Z"/></svg>
+            </span>
+            <h3>Post-quantum encryption</h3>
+            <p>Hybrid X25519 + ML-KEM-768 with AES-256-GCM on every private message — safe now, safe later.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Zm-5 10 4-5-.6 4H16l-3.7 4.8.5-3.8H8Z"/></svg>
+            </span>
+            <h3>Activity rewards</h3>
+            <p>Earn ATH simply by using the network — distribution tied to real usage, not a closed allocation.</p>
+          </article>
+
+          <article class="feat">
+            <span class="feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5 5 4.5v5c0 4.4 3 8.5 7 9.5 4-1 7-5.1 7-9.5v-5l-7-3Zm0 2.2 5 2.1V9.5c0 3.3-2.1 6.4-5 7.4-2.9-1-5-4.1-5-7.4V5.8l5-2.1Zm-1.3 3.6L9.3 12l3.9-3.2-1 2.7H14l-3.3 3.5.6-2.7h-1.6Z"/></svg>
+            </span>
+            <h3>Censorship-survival</h3>
+            <p>If a provider is blocked, the app falls back to an emergency route and keeps working.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ SECURITY ============ -->
+      <section class="section section-alt" id="security" data-reveal>
+        <div class="section-head">
+          <span class="kicker">security</span>
+          <h2>Encrypted today. Secure against tomorrow.</h2>
+        </div>
+
+        <div class="grid grid-2">
+          <article class="card card-sec">
+            <h3>Client-side encryption</h3>
+            <p>
+              Private messages are encrypted in your browser before they touch any transport.
+              No server ever sees plaintext, and your keys never leave your device.
+            </p>
+          </article>
+          <article class="card card-sec">
+            <h3>Post-quantum by design</h3>
+            <p>
+              ML-KEM-768 protects today's messages against tomorrow's quantum computers, combined
+              with classical X25519 in a hybrid scheme — so it's safe against both today's and
+              future attackers.
+            </p>
+          </article>
+          <article class="card card-sec">
+            <h3>No hidden admin switch</h3>
+            <p>
+              The contracts give no one an arbitrary switch to seize balances, rewrite state, or
+              change the rules. V1 keeps a few narrow, documented launch authorities — and says so
+              openly rather than hiding them.
+            </p>
+          </article>
+          <article class="card card-sec">
+            <h3>Your keys, your responsibility</h3>
+            <p>
+              A lost seed phrase cannot be restored through support. The blockchain is public and
+              operations cost money. The trade-off for real ownership is stated honestly, not buried.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ TOKEN ============ -->
+      <section class="section" id="token" data-reveal>
+        <div class="section-head">
+          <span class="kicker">economics</span>
+          <h2>GRAM pays. ATH participates.</h2>
+        </div>
+
+        <div class="grid grid-3">
+          <article class="card">
+            <h3>GRAM</h3>
+            <p>
+              The network currency. It pays for operations — publishing, names, avatars. Messaging
+              starts at a fraction of a GRAM. You pay the network, not a platform.
+            </p>
+          </article>
+          <article class="card">
+            <h3>ATH</h3>
+            <p>
+              The protocol utility token: usernames, avatar updates, and post-airdrop fee discounts.
+              A fixed supply of 100,000,000 — no quiet inflation.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Earned, not allocated</h3>
+            <p>
+              A meaningful share is distributed through real activity — 10 ATH per successful message —
+              rather than a closed allocation to early addresses.
+            </p>
+          </article>
+        </div>
+        <p class="fine-print">Informational only. Not financial advice.</p>
+      </section>
+
+      <!-- ============ PLATFORMS ============ -->
+      <section class="section section-alt" id="platforms" data-reveal>
+        <div class="section-head">
+          <span class="kicker">platforms</span>
+          <h2>Runs where you do.</h2>
+        </div>
+        <div class="grid grid-3">
+          <article class="card">
+            <h3>Progressive Web App</h3>
+            <p>Installable, works offline, no app-store gatekeeper between you and your messages.</p>
+          </article>
+          <article class="card">
+            <h3>Telegram Mini App</h3>
+            <p>The same Platho, running inside Telegram — same keys, same ownership.</p>
+          </article>
+          <article class="card">
+            <h3>One codebase</h3>
+            <p>Same contracts, same wallet, same self-sovereign model everywhere it runs.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ FAQ ============ -->
+      <section class="section" id="faq" data-reveal>
+        <div class="section-head">
+          <span class="kicker">faq</span>
+          <h2>Straight answers.</h2>
+        </div>
+
+        <div class="faq" data-accordion>
+          <details class="faq-item">
+            <summary>What does it cost?</summary>
+            <div class="faq-body"><p>Operations cost small amounts of GRAM or ATH — a short message starts around 0.0337 GRAM. There's no subscription and no ads. You pay the network, not a platform.</p></div>
+          </details>
+          <details class="faq-item">
+            <summary>Can Platho be shut down?</summary>
+            <div class="faq-body"><p>There's no central server to seize. The client is static and hostable anywhere, and the state lives in open TON contracts. Blocking one host or provider doesn't stop the protocol.</p></div>
+          </details>
+          <details class="faq-item">
+            <summary>What if I lose my recovery phrase?</summary>
+            <div class="faq-body"><p>It's gone. There is no support line that can restore it — that's the real cost of holding your own keys. Back up your 24 words and keep them safe.</p></div>
+          </details>
+          <details class="faq-item">
+            <summary>Are my messages really private?</summary>
+            <div class="faq-body"><p>Private messages are encrypted client-side with a hybrid post-quantum scheme. The transport and the contracts only ever see ciphertext and hashes — never your plaintext or keys.</p></div>
+          </details>
+          <details class="faq-item">
+            <summary>Do I need an external wallet?</summary>
+            <div class="faq-body"><p>No. Platho has a built-in TON wallet derived from your recovery phrase — no separate connector or browser extension required.</p></div>
+          </details>
+          <details class="faq-item">
+            <summary>Is it live?</summary>
+            <div class="faq-body"><p>Yes — Platho is deployed and running on TON mainnet today.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <!-- ============ FINAL CTA ============ -->
+      <section class="cta-final" id="get-started" data-reveal>
+        <div class="cta-inner">
+          <span class="kicker">access</span>
+          <h2>Stop asking permission.</h2>
+          <p>Your wallet is your identity. Your keys are your backup. The network is the platform.</p>
+          <a class="btn btn-accent btn-lg" href="https://platho.app">Open Messenger <span aria-hidden="true">→</span></a>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="brand-mark brand-mark-sm" aria-hidden="true">
+            <svg viewBox="0 0 512 512" role="img" aria-label="Platho">
+              <rect width="512" height="512" rx="108" fill="#0b0d0f"/>
+              <g transform="translate(0 512) scale(1 -1)">
+                <path fill="#30d5b0" fill-rule="evenodd" d="M167.5 432.1 L330.5 432.1 L346.5 429.9 L364.5 424.8 L380.5 417.7 L393.5 409.6 L404.5 401.0 L416.0 389.5 L425.8 376.5 L435.9 358.5 L441.7 343.5 L445.9 325.5 L446.9 296.5 L445.8 285.5 L442.8 271.5 L435.7 251.5 L425.9 233.5 L416.9 221.5 L402.5 207.1 L387.5 196.1 L362.5 184.1 L348.5 180.1 L334.5 178.0 L221.5 177.2 L220.5 79.2 L137.5 79.4 L137.2 139.5 L166.5 140.2 L166.8 174.5 L136.5 175.1 L135.6 174.5 L135.7 163.5 L134.5 162.8 L104.1 163.5 L104.5 192.7 L134.5 192.9 L135.5 193.5 L135.4 220.5 L136.2 221.5 L166.8 222.5 L166.5 253.0 L135.5 253.3 L134.5 235.2 L105.5 235.1 L104.1 236.5 L104.3 264.5 L134.5 265.3 L135.5 292.5 L197.5 292.7 L198.4 293.5 L198.0 323.5 L166.8 324.5 L167.3 364.5 L198.4 365.5 L198.3 394.5 L166.9 395.5 L166.7 430.5 L167.5 432.1 Z M104.5 407.6 L134.9 407.5 L134.5 377.7 L104.5 377.9 L104.5 407.6 Z M221.5 372.3 L221.5 237.2 L322.5 237.1 L329.5 238.1 L342.5 242.1 L352.5 247.4 L359.5 252.8 L369.6 263.5 L377.0 275.5 L381.5 288.5 L383.1 298.5 L382.7 316.5 L379.7 327.5 L374.8 338.5 L368.9 347.5 L358.5 357.9 L344.5 366.7 L332.5 370.8 L322.5 372.4 L221.5 372.3 Z M65.5 324.3 L93.5 324.3 L93.9 294.5 L64.9 294.5 L64.6 322.5 L65.5 324.3 Z"/>
+              </g>
+            </svg>
+          </span>
+          <span>Platho — control returns to the person using it.</span>
+        </div>
+        <div class="footer-meta">
+          <span class="footer-sig">PLTH://ABOUT</span>
+          <span class="footer-tags">Built on TON · No backend · Post-quantum</span>
+          <a class="footer-link" href="https://platho.app">platho.app →</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
