@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-22T11:25:01.210Z",
-  "mode": "preview",
+  "generatedAt": "2026-06-22T12:14:31.553Z",
+  "mode": "production",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
-  "status": "PREVIEW_STATIC_PACKAGE_READY",
-  "productionReady": false,
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
+  "status": "PRODUCTION_STATIC_PACKAGE_READY",
+  "productionReady": true,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 131,
-    "totalBytes": 3489740,
-    "bundleSha256": "1be48e9d3ab9b3b800e0e5e79856c0d9eab2121583748a8fdbb6a9c6cf246b56",
+    "totalBytes": 3499836,
+    "bundleSha256": "e51a06342eb909e31a67df968eeb037255265f73162a9304d77688dddfa623ff",
     "files": [
       {
         "path": "app.js",
-        "bytes": 843891,
-        "sha256": "35bb585b8f677c25f743e63d381ef5945db12c510c9cdf56801bd067ef74dd65"
+        "bytes": 853391,
+        "sha256": "c6e4fe04bda81ee582fcc71cf9baa4dd79210637584f0a8c162ae13211f5a13c"
       },
       {
         "path": "assets/icons/back.svg",
@@ -209,8 +209,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 35751,
-        "sha256": "d0bc5120e16e320e198abacb89c513c5d14b4b5fe22a5c8979c0681eb2301616"
+        "bytes": 35923,
+        "sha256": "629fad230eea30ac112fadc88d4fe3d58de83b7a4883f6f091ae7d20843092e8"
       },
       {
         "path": "manifest.webmanifest",
@@ -269,13 +269,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 65801,
-        "sha256": "5e834b83b8282c62fbc68c2c02e5b234b684cf9d522ee1a9be3d0553187802c7"
+        "bytes": 66225,
+        "sha256": "3a541668095d5f92b1bba75bc5707a8967558b796f244a358a99af280c0930cd"
       },
       {
         "path": "sw.js",
         "bytes": 6556,
-        "sha256": "6ac0391aa3c361bfabff0c75b6d2c42eb62200b4ad3e744fa02f41a4e6538a67"
+        "sha256": "4a2d8758bf316076c80b389e21e631cc5430bec0e91cd9e2a66cfa5fbec7a02e"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -925,8 +925,6 @@
     "productionMarkersCleared": true
   },
   "blockers": [],
-  "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION"
-  ],
+  "warnings": [],
   "productionFindings": []
 }

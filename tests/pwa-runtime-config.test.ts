@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v475<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v475'/);
+    expect(html).toMatch(/id="appVersionLabel">v477<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v477'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1803,6 +1803,19 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/markRuntimeOp\('vaultw:coststatus'\); refreshComposerCostStatus\(\)/);
     expect(app).toMatch(/markRuntimeOp\('vact:verifybinding'\)/);
     expect(app).toMatch(/markRuntimeOp\('vault:stats'\)/);
+    // v476 FIX: the with-wallet capture (op=vault stuck ~148s, heartbeat ALIVE, renders not reached =>
+    // crumb 'vault') proved the freeze is the ASYNC Vault-open read burst hanging (degraded RPC: keyless
+    // toncenter fallback + verify cross-check + backoff -> minutes), NOT a CPU loop. refreshVaultDashboard
+    // now bounds the read burst with a hard VAULT_OPEN_READ_DEADLINE_MS; on timeout it renders with cached
+    // state + 'RPC busy, retrying' instead of awaiting forever, so the Vault tab can never hang open.
+    expect(app).toMatch(/const VAULT_OPEN_READ_DEADLINE_MS = 12_000/);
+    expect(app).toMatch(/Promise\.race\(\[\s*vaultReadsPromise,\s*delay\(VAULT_OPEN_READ_DEADLINE_MS\)\.then\(\(\) => vaultReadsTimedOut\)/);
+    expect(app).toMatch(/if \(settledVaultReads === vaultReadsTimedOut\) \{/);
+    // And an overall backstop on refreshVaultNow so the activation/stats jobs (same verify:true reads) can't
+    // keep op='vault' + the single-flight lock held for minutes either.
+    expect(app).toMatch(/const VAULT_REFRESH_DEADLINE_MS = 16_000/);
+    expect(app).toMatch(/Promise\.race\(\[\s*vaultWork,\s*delay\(VAULT_REFRESH_DEADLINE_MS\)\.then\(\(\) => vaultRefreshTimedOut\)/);
+    expect(app).toMatch(/vaultWork\.catch\(\(\) => \{\}\)/);
   });
 
   it('PWA-KEYLESS-SEND-01: a keyless body-gap flood does not starve a first send (E3) nor pin the fast sync cadence (E4)', () => {
@@ -1871,7 +1884,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="quickStartImportButton"/);
     // First-run controller: shown only with no wallet and not yet dismissed.
     expect(app).toMatch(/function maybeShowQuickStartOnFirstRun\(\)/);
-    expect(app).toMatch(/if \(hasStoredPlathoWalletRecord\(\)\) return;\s*if \(quickStartDismissedForever\(\)\) return;\s*openQuickStart\(\)/);
+    expect(app).toMatch(/if \(!hasStoredPlathoWalletRecord\(\)\) \{\s*if \(quickStartDismissedForever\(\)\) return false;\s*openQuickStart\(\);\s*return true;/);
     // The five guided steps reuse the existing flows; create + back-up are mandatory (optional:false).
     expect(app).toMatch(/const QUICK_START_STEPS = \[/);
     expect(app).toMatch(/run: \(\) => runQuickStartCreateWallet\(\)/);
@@ -1977,6 +1990,37 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(result\.reason === 'invalid'\) return 'That key was rejected by TON Center\. Check it and retry, or Skip\.'/);
     // The stepper handler renders a string run() result as a non-advancing failure message.
     expect(app).toMatch(/if \(typeof ok === 'string'\) \{[\s\S]*setText\(quickStartStepStatus, ok\)/);
+  });
+
+  it('PWA-WALLET-KEY-BACKUP-SAFETY-01: an un-exported wallet key keeps re-surfacing the backup until done', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // A durable per-address "key never exported" flag, mirrored to Telegram CloudStorage (survives iOS eviction).
+    expect(app).toMatch(/const WALLET_KEY_BACKUP_PENDING_KEY = 'platho\.wallet\.keybackup\.pending\.v1'/);
+    expect(app).toMatch(/function markWalletKeyBackupPending\(address\)/);
+    expect(app).toMatch(/function markWalletKeyBackupDone\(address\)/);
+    expect(app).toMatch(/function walletKeyBackupPendingForStoredWallet\(\)/);
+    expect(app).toMatch(/telegramCloudSet\(WALLET_KEY_BACKUP_PENDING_CLOUD_KEY/);
+    expect(app).toMatch(/async function restoreWalletKeyBackupPendingFromTelegramCloud\(\)/);
+    // Set pending on EVERY new-wallet creation (manual + quick-start); cleared when the key is actually exported.
+    expect(app).toMatch(/await setPlathoWallet\(walletDraft, \{ password \}\);\s*markWalletKeyBackupPending\(walletDraft\.address\)/);
+    expect(app).toMatch(/await downloadJsonFile\([\s\S]*markWalletKeyBackupDone\(storedWalletAddressForCopy\(record\)/);
+    // Re-surface: a wallet that exists but is unbacked-up re-opens the quick-start jumped to the export step.
+    expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*openQuickStartAtBackup\(\);\s*return true;/);
+    expect(app).toMatch(/function openQuickStartAtBackup\(\)[\s\S]*quickStartStepIndexByKey\('export'\)/);
+    // The export step is keyed so the lookup is robust to reordering.
+    expect(app).toMatch(/key: 'export',\s*title: 'Back up your wallet key'/);
+    // Closing the backup re-prompt must NOT permanently dismiss onboarding (the backup is still pending).
+    expect(app).toMatch(/let quickStartBackupMode = false/);
+    expect(app).toMatch(/if \(!quickStartBackupMode\) \{[\s\S]*QUICK_START_DISMISSED_KEY/);
+    // Boot restores the flag from cloud and skips the startup unlock prompt while driving the backup (no double password).
+    expect(app).toMatch(/restoreWalletKeyBackupPendingFromTelegramCloud\(\)\.catch/);
+    expect(app).toMatch(/const drivingBackup = walletKeyBackupPendingForStoredWallet\(\);[\s\S]*if \(!drivingBackup\) \{\s*promptStoredWalletUnlockOnStartup/);
+    // A visible Profile warning row, shown only while pending; tapping it exports.
+    expect(html).toMatch(/id="walletBackupWarning"/);
+    expect(app).toMatch(/function refreshWalletBackupWarning\(\)[\s\S]*walletBackupWarning\.hidden = !walletKeyBackupPendingForStoredWallet\(\)/);
+    expect(css).toMatch(/\.wallet-backup-warning/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4426,11 +4470,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v546/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=154/);
+    expect(sw).toMatch(/platho-pwa-prototype-v548/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=155/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=475/);
+    expect(sw).toMatch(/\.\/app\.js\?v=477/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
