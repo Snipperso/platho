@@ -202,7 +202,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=28/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=29/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v469<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v469'/);
+    expect(html).toMatch(/id="appVersionLabel">v470<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v470'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1824,6 +1824,32 @@ describe('PWA runtime config guard', () => {
     // keeping the limiter perpetually hot.
     expect(app).toMatch(/const onlyBodyGapSkips = !privateSyncImported\(result\)\s*&& result\?\.reason === 'body_history_unavailable'/);
     expect(app).toMatch(/const progressed = privateSyncImported\(result\)\s*\|\| \(Number\(result\?\.skipped \?\? 0\) > 0 && !onlyBodyGapSkips\)/);
+  });
+
+  it('PWA-KEYLESS-EFFICIENCY-01: body-gap terminal cap + early-skip + on-5xx retry + dead-publish confirm-skip', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const vault = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
+    // The body-history store gains a cross-session strike cap (mirrors the unknown-error stuck store).
+    expect(app).toMatch(/const PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP = 6/);
+    expect(app).toMatch(/const strikes = \(Number\(prior\?\.strikes \?\? 0\) \|\| 0\) \+ 1/);
+    // Capped body gaps are filtered out of the auto-retry replay (stops the heavy tx-scan) but stay
+    // re-attemptable under the manual force path (keyless-tolerable).
+    expect(app).toMatch(/if \(!force && \(Number\(record\.strikes \?\? 0\) \|\| 0\) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP\) continue/);
+    expect(app).toMatch(/function privateBodyHistorySurfacedCount\(address\)/);
+    expect(app).toMatch(/function privateBodyHistoryEntryCapped\(address, entryId\)/);
+    // The per-cycle index walk early-skips the heavy body tx-scan for a terminally-capped entry.
+    expect(app).toMatch(/if \(source !== 'history-retry' && privateBodyHistoryEntryCapped\(address, entryId\)\) \{/);
+    // The body-gap branch only PINS the cursor while BELOW the cap; a terminal gap leaves bodyHistoryError
+    // null so the cursor/head-repair can advance past it.
+    expect(app).toMatch(/const bodyStrikes = rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
+    expect(app).toMatch(/if \(bodyStrikes < PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP\) \{/);
+    // Honest 'Synced': a surfaced (capped) body gap folds into undeliveredCount -> 'private_entry_undelivered'.
+    expect(app).toMatch(/const undeliveredCount = privateStuckEntrySurfacedCount\(address\) \+ privateBodyHistorySurfacedCount\(address\)/);
+    // The per-cycle confirm sweep skips terminally-stopped (dead) publishes (CPU-only elision).
+    expect(app).toMatch(/if \(message\.privatePublishConfirmStopped === true \|\| message\.privateSendRetryStopped === true\) continue/);
+    // Orbs getTransactions retries once on a 5xx with a fresh node (read-only; sendBoc untouched).
+    expect(vault).toMatch(/for \(let attempt = 0; attempt <= 1; attempt \+= 1\) \{/);
+    expect(vault).toMatch(/if \(!response \|\| response\.ok \|\| Number\(response\.status\) < 500 \|\| attempt >= 1\) break/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4306,29 +4332,29 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v540/);
+    expect(sw).toMatch(/platho-pwa-prototype-v541/);
     expect(sw).toMatch(/\.\/styles\.css\?v=151/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=469/);
+    expect(sw).toMatch(/\.\/app\.js\?v=470/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=87/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=44/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=88/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=45/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=16/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=48/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=32/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=44/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=30/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=28/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=49/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=33/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=45/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=31/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=29/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=36/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=7/);

@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=87';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=88';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=48';
+} from './vault-ton-rpc-provider.mjs?v=49';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -135,19 +135,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=3';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=30';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=31';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=44';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=32';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=28';
+} from './capsulehub-ton-rpc-provider.mjs?v=45';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=33';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=29';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=35';
+} from './username-ton-rpc-provider.mjs?v=36';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v469';
+const PLATHO_APP_RUNTIME_VERSION = 'v470';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -749,6 +749,11 @@ const PRIVATE_CHAIN_STUCK_ENTRY_LIMIT = 200;
 const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_AUTO_LIMIT = 2;
 const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_MANUAL_LIMIT = 16;
 const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8;
+// A keyless body gap (no indexer; the Orbs tx-scan can't reach an old/unrecoverable body) is more
+// deterministically permanent than a generic unknown error, and each retry pays a heavy 8-page CapsuleHub
+// tx-scan, so cap it sooner: after this many cross-session strikes the entry is surfaced 'undelivered' and
+// stops being re-fetched (its heavy body tx-scan is skipped, the 500 source).
+const PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP = 6;
 const PRIVATE_CHAIN_HEAD_REPAIR_STORAGE_PREFIX = 'platho.private.chain.head.repair.v1';
 const PRIVATE_CHAIN_HEAD_REPAIR_SCAN_LIMIT = 8;
 const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.public.chain.history.unavailable.v1';
@@ -5960,6 +5965,8 @@ function normalizePrivateBodyHistoryUnavailableRecord(record) {
     entryId: String(entryId),
     bodyHash: /^0x[0-9a-fA-F]{64}$/.test(String(record?.bodyHash ?? '')) ? String(record.bodyHash).toLowerCase() : null,
     createdAt: record?.createdAt ? String(record.createdAt) : null,
+    strikes: Math.max(0, Math.floor(Number(record?.strikes ?? 0)) || 0),
+    firstSeenAt: record?.firstSeenAt ? String(record.firstSeenAt) : (record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString()),
     lastSeenAt: record?.lastSeenAt ? String(record.lastSeenAt) : new Date().toISOString(),
   };
 }
@@ -6091,17 +6098,21 @@ function publicBodyHistoryRetryEntryIds(address, latest, minEntryId) {
 
 function rememberPrivateBodyHistoryUnavailable(address, entry, entryId) {
   const id = String(entryId ?? privateEntryIdText(entry) ?? '');
-  if (!/^[0-9]+$/.test(id)) return [];
-  const existing = readPrivateBodyHistoryUnavailable(address)
-    .filter((record) => record.entryId !== id);
+  if (!/^[0-9]+$/.test(id)) return 0;
+  const records = readPrivateBodyHistoryUnavailable(address);
+  const prior = records.find((record) => record.entryId === id);
+  const strikes = (Number(prior?.strikes ?? 0) || 0) + 1;
+  const existing = records.filter((record) => record.entryId !== id);
   existing.push({
     entryId: id,
     bodyHash: entryBodyHashHex(entry),
     createdAt: entry?.created_at !== undefined && entry?.created_at !== null ? String(entry.created_at) : null,
+    strikes,
+    firstSeenAt: prior?.firstSeenAt ?? new Date().toISOString(),
     lastSeenAt: new Date().toISOString(),
   });
   writePrivateBodyHistoryUnavailable(address, existing);
-  return existing;
+  return strikes;
 }
 
 function clearPrivateBodyHistoryUnavailable(address, entryId) {
@@ -6119,6 +6130,10 @@ function privateBodyHistoryRetryEntryIds(address, options = {}) {
   const retryLimit = force ? PRIVATE_CHAIN_HISTORY_RETRY_MANUAL_LIMIT : PRIVATE_CHAIN_HISTORY_RETRY_AUTO_LIMIT;
   const now = Date.now();
   for (const record of records) {
+    // Terminally-capped body gaps (surfaced 'undelivered') stop consuming the auto-retry budget —
+    // filtered BEFORE the cooldown, exactly like the stuck-entry store. The manual "Sync messages"
+    // (force) path still re-attempts them so a no-key owner can retry without losing the option.
+    if (!force && (Number(record.strikes ?? 0) || 0) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP) continue;
     if (!force) {
       const lastSeenMs = Date.parse(record.lastSeenAt ?? '');
       if (Number.isFinite(lastSeenMs) && now - lastSeenMs < PRIVATE_CHAIN_HISTORY_RETRY_COOLDOWN_MS) continue;
@@ -6133,6 +6148,23 @@ function privateBodyHistoryRetryEntryIds(address, options = {}) {
     if (ids.length >= retryLimit) break;
   }
   return ids;
+}
+
+// Count body gaps promoted past the cross-session cap — a surfaced "undelivered" body, fed into the
+// sync's undeliveredCount so "Synced" stays honest after the cursor/early-skip stops re-fetching them.
+function privateBodyHistorySurfacedCount(address) {
+  return readPrivateBodyHistoryUnavailable(address)
+    .filter((record) => (Number(record.strikes ?? 0) || 0) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP)
+    .length;
+}
+
+// Is this entry's body terminally unrecoverable (capped)? Used to SKIP the heavy/500-prone body tx-scan
+// on the per-cycle index walk while still reading the cheap entry metadata the walk needs.
+function privateBodyHistoryEntryCapped(address, entryId) {
+  const id = String(entryId ?? '');
+  if (!/^[0-9]+$/.test(id)) return false;
+  return readPrivateBodyHistoryUnavailable(address)
+    .some((record) => record.entryId === id && (Number(record.strikes ?? 0) || 0) >= PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP);
 }
 
 // Cross-session "stuck entry" store (#9): a private index entry that the per-session
@@ -7371,6 +7403,15 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     let entry = null;
     try {
       entry = await readPrivateEntryCached(entryId);
+      // Terminally-capped body gap (surfaced 'undelivered'): the body is unrecoverable keyless, so SKIP
+      // the heavy, 500-prone open+body tx-scan and keep only the cheap entry-metadata read the walk needs
+      // for the previousLink. The manual "Sync messages" (source 'history-retry') path still re-attempts.
+      if (source !== 'history-retry' && privateBodyHistoryEntryCapped(address, entryId)) {
+        scannedPrivateEntryIds.add(entryIdKey);
+        rememberPrivateScanLog(entryId, 'body-undelivered');
+        skipped += 1;
+        return { ok: true, entry };
+      }
       if (entry.exists !== true) {
         scannedPrivateEntryIds.add(entryIdKey);
         rememberPrivateScanLog(entryId, 'empty');
@@ -7428,14 +7469,22 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         return { ok: false, entry };
       } else if (isBodyHistoryUnavailableError(error)) {
         scannedPrivateEntryIds.add(entryIdKey);
-        rememberPrivateScanLog(entryId, 'body-gap');
-        bodyHistoryError = error;
-        blockedEntryId = entryId;
-        historyUnavailableEntries.push({
-          entryId: entryId.toString(),
-          bodyHash: entryBodyHashHex(entry),
-        });
-        rememberPrivateBodyHistoryUnavailable(address, entry, entryId);
+        const bodyStrikes = rememberPrivateBodyHistoryUnavailable(address, entry, entryId);
+        if (bodyStrikes < PRIVATE_CHAIN_BODY_HISTORY_CROSS_SESSION_CAP) {
+          // Still retrying: pin the cursor (the gap may be transient/recoverable) so it re-walks next cycle.
+          rememberPrivateScanLog(entryId, 'body-gap');
+          bodyHistoryError = error;
+          blockedEntryId = entryId;
+          historyUnavailableEntries.push({
+            entryId: entryId.toString(),
+            bodyHash: entryBodyHashHex(entry),
+          });
+        } else {
+          // Terminal: surfaced 'undelivered' (folded into undeliveredCount). Do NOT set bodyHistoryError,
+          // so it stops vetoing cursor/head-repair persistence; the next cycle the entry is early-skipped
+          // (no heavy body tx-scan, the 500 source).
+          rememberPrivateScanLog(entryId, 'body-undelivered');
+        }
         skipped += 1;
         return { ok: true, entry };
       } else if (isTonRpcVerificationSoftReadError(error) || isTonRpcTransientError(error)) {
@@ -7701,7 +7750,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   // "undelivered" gap. Read from the STORE (not the per-run skipped counter) so it
   // survives reload, when skipped resets to 0 while the cursor sits past the entry —
   // exactly the false "Synced" this guards against.
-  const undeliveredCount = privateStuckEntrySurfacedCount(address);
+  const undeliveredCount = privateStuckEntrySurfacedCount(address) + privateBodyHistorySurfacedCount(address);
   const reason = bodyHistoryError
     ? 'body_history_unavailable'
     : privateKeyOpenError
@@ -16951,6 +17000,10 @@ async function confirmPendingPrivatePublishMessagesFromEntries(entries, confirme
     for (const message of thread.messages ?? []) {
       const publishState = message?.publishState;
       if (!publishState?.parts?.length || publishState?.status === CAPSULEHUB_PUBLISH_STATUS_CONFIRMED) continue;
+      // A publish whose send/confirm retries are terminally stopped (durable red 'not sent'/'not confirmed')
+      // never flips to sealed via this in-memory re-match, so skip it — stops the per-cycle sweep re-deriving
+      // match work for permanently-dead messages. Read/CPU-only; no send/re-sign path is touched.
+      if (message.privatePublishConfirmStopped === true || message.privateSendRetryStopped === true) continue;
       let messageChanged = false;
       for (const part of publishState.parts ?? []) {
         if (publishPartKind(part) !== 'private') continue;
