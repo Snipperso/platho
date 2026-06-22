@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v470<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v470'/);
+    expect(html).toMatch(/id="appVersionLabel">v471<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v471'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1850,6 +1850,11 @@ describe('PWA runtime config guard', () => {
     // Orbs getTransactions retries once on a 5xx with a fresh node (read-only; sendBoc untouched).
     expect(vault).toMatch(/for \(let attempt = 0; attempt <= 1; attempt \+= 1\) \{/);
     expect(vault).toMatch(/if \(!response \|\| response\.ok \|\| Number\(response\.status\) < 500 \|\| attempt >= 1\) break/);
+    // B1: keyless (verify:false + allowUnverifiedCriticalRead) reads now PERSIST the index cursor so the
+    // sync stops re-walking head->frozen-cursor (~15 getPrivateEntry reads) every cycle. Safe because the
+    // index is an append-only backward-linked list (no fabricated future head; cursor advances only after a
+    // complete walk; a lagging head self-corrects; head-repair re-covers recent entries).
+    expect(app).toMatch(/if \(readOptions\.allowUnverifiedCriticalRead === true\) return 'keyless_unverified'/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4332,11 +4337,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v541/);
+    expect(sw).toMatch(/platho-pwa-prototype-v542/);
     expect(sw).toMatch(/\.\/styles\.css\?v=151/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=470/);
+    expect(sw).toMatch(/\.\/app\.js\?v=471/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
