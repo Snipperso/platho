@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v473<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v473'/);
+    expect(html).toMatch(/id="appVersionLabel">v474<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v474'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1876,7 +1876,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const QUICK_START_STEPS = \[/);
     expect(app).toMatch(/run: \(\) => runQuickStartCreateWallet\(\)/);
     expect(app).toMatch(/run: \(\) => exportEncryptedWalletKeyFile\(\)/);
-    expect(app).toMatch(/run: \(\) => applyToncenterApiKey\(quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value\)/);
+    // Step 2 (TON Center key) reads the input and applies the key (after validating it — see PWA-TONCENTER-KEY-VALIDATE-01).
+    expect(app).toMatch(/const value = quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value;[\s\S]*applyToncenterApiKey\(trimmed\)/);
     // Wired into the boot chain, defensively, after the wallet state is known.
     expect(app).toMatch(/try \{ maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
   });
@@ -1933,7 +1934,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // Axis A: defer the background auto-lock while a send actively holds the key, bounded by a max grace,
     // set ONCE (never re-armed by later background events) so a wedged send can't pin the wallet unlocked.
-    expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 150 \* 1000/);
+    expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 600 \* 1000/);
     expect(app).toMatch(/function vaultSendNeedsKeyNow\(\)[\s\S]*vaultPublishSendWaiters > 0 \|\| privateOutboundWorkActive\(\)/);
     expect(app).toMatch(/if \(!needsKey\) vaultSendInFlightUntil = 0/);
     expect(app).toMatch(/if \(vaultSendInFlightUntil === 0\) vaultSendInFlightUntil = now \+ SEND_LOCK_MAX_GRACE_MS/);
@@ -1944,6 +1945,33 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const owner = options\.owner \?\? resolvePublishOwner\(publishState\);\s*if \(!owner\) return 0/);
     expect(app).toMatch(/owner = resolvePublishOwner\(publishState\);\s*if \(!owner\) return \{ resigned: 0, confirmed: 0 \}/);
     expect(app).toMatch(/confirmCapsuleHubPublishEntries\(message\.publishState, \{ \.\.\.confirmOptions, owner: resolvePublishOwner\(message\.publishState\) \}\)/);
+  });
+
+  it('PWA-WALLET-LOCK-TIMING-01: wallet auto-lock timers relaxed per owner (idle 30min, TG background 5min, send grace 10min)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Owner-chosen values (2026-06-22): the wallet was auto-locking too eagerly and interrupting slow sends.
+    expect(app).toMatch(/const WALLET_AUTO_LOCK_MS = 30 \* 60 \* 1000/);
+    expect(app).toMatch(/const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 300_000/);
+    expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 600 \* 1000/);
+    // The hard idle lock still exists (this is a relaxation, not a removal).
+    expect(app).toMatch(/walletAutoLockTimer = setTimeout\(\(\) => \{\s*lockPlathoWallet\('Wallet locked'\);\s*\}, WALLET_AUTO_LOCK_MS\)/);
+  });
+
+  it('PWA-TONCENTER-KEY-VALIDATE-01: a user-entered TON Center key is validated before it is saved', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // validateToncenterApiKey makes one authenticated call: 200 = ok, 401/403 = invalid, anything else = unverified.
+    expect(app).toMatch(/async function validateToncenterApiKey\(rawKey\)/);
+    expect(app).toMatch(/fetch\('https:\/\/toncenter\.com\/api\/v3\/masterchainInfo', \{\s*headers: \{ 'X-API-Key': key \}/);
+    expect(app).toMatch(/if \(response\.ok\) return \{ ok: true \}/);
+    expect(app).toMatch(/response\.status === 401 \|\| response\.status === 403\) return \{ ok: false, reason: 'invalid' \}/);
+    // Settings save: a definitively invalid key is NOT saved; offline/unverified still saves (keyless fallback).
+    expect(app).toMatch(/const result = await validateToncenterApiKey\(trimmed\);\s*if \(result\.reason === 'invalid'\)/);
+    expect(app).toMatch(/saveToncenterKeyStatus\.textContent = 'invalid key - not saved'/);
+    expect(app).toMatch(/result\.ok \? 'saved \(valid\)' : 'saved \(could not verify\)'/);
+    // Quick-start step 2 validates too: an invalid key surfaces a message and does NOT advance the stepper.
+    expect(app).toMatch(/if \(result\.reason === 'invalid'\) return 'That key was rejected by TON Center\. Check it and retry, or Skip\.'/);
+    // The stepper handler renders a string run() result as a non-advancing failure message.
+    expect(app).toMatch(/if \(typeof ok === 'string'\) \{[\s\S]*setText\(quickStartStepStatus, ok\)/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4393,11 +4421,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v544/);
+    expect(sw).toMatch(/platho-pwa-prototype-v545/);
     expect(sw).toMatch(/\.\/styles\.css\?v=153/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=473/);
+    expect(sw).toMatch(/\.\/app\.js\?v=474/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

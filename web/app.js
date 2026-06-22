@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v473';
+const PLATHO_APP_RUNTIME_VERSION = 'v474';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -482,9 +482,52 @@ function applyToncenterApiKey(rawKey) {
   return Boolean(key);
 }
 
-saveToncenterKeyButton?.addEventListener('click', () => {
-  const saved = applyToncenterApiKey(toncenterApiKeyInput?.value);
-  if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = saved ? 'saved' : 'cleared';
+// Validate a TON Center API key with one lightweight authenticated call. toncenter returns 401
+// "API key does not exist" for a bad key and 200 for a good one (verified against the live API). A
+// network error / rate-limit is inconclusive — we report 'unverified' so the caller can still save
+// (offline or throttled must not block the user; a wrong key just falls back to the keyless Orbs path).
+async function validateToncenterApiKey(rawKey) {
+  const key = String(rawKey ?? '').trim();
+  if (!key) return { ok: false, reason: 'empty' };
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
+  try {
+    const response = await fetch('https://toncenter.com/api/v3/masterchainInfo', {
+      headers: { 'X-API-Key': key },
+      signal: controller?.signal,
+    });
+    if (response.ok) return { ok: true };
+    if (response.status === 401 || response.status === 403) return { ok: false, reason: 'invalid' };
+    return { ok: false, reason: 'unverified' };
+  } catch {
+    return { ok: false, reason: 'unverified' };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+saveToncenterKeyButton?.addEventListener('click', async () => {
+  const trimmed = String(toncenterApiKeyInput?.value ?? '').trim();
+  if (!trimmed) {
+    applyToncenterApiKey('');
+    if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = 'cleared';
+    return;
+  }
+  if (saveToncenterKeyButton) saveToncenterKeyButton.disabled = true;
+  if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = 'checking...';
+  try {
+    const result = await validateToncenterApiKey(trimmed);
+    if (result.reason === 'invalid') {
+      if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = 'invalid key - not saved';
+      return;
+    }
+    applyToncenterApiKey(trimmed);
+    if (saveToncenterKeyStatus) {
+      saveToncenterKeyStatus.textContent = result.ok ? 'saved (valid)' : 'saved (could not verify)';
+    }
+  } finally {
+    if (saveToncenterKeyButton) saveToncenterKeyButton.disabled = false;
+  }
 });
 
 getToncenterKeyButton?.addEventListener('click', () => {
@@ -669,12 +712,12 @@ const PLATHO_WALLET_CIPHER_NAME = 'AES-GCM-256';
 const PLATHO_WALLET_KDF_ITERATIONS = 350_000;
 const PLATHO_WALLET_PASSWORD_MIN_LENGTH = 10;
 const PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH = 20;
-const WALLET_AUTO_LOCK_MS = 10 * 60 * 1000;
-// Max time a background auto-lock may be deferred while a send actively needs the key. Covers the worst
-// legitimate multi-external send: one inter-batch nonce-confirm wait (90s) + the final broadcast + the
-// ~10s stale-read floor reconciliation. Far tighter (4x) than the 10min idle backstop, and only engages
-// during an active send (idle background still locks immediately).
-const SEND_LOCK_MAX_GRACE_MS = 150 * 1000;
+const WALLET_AUTO_LOCK_MS = 30 * 60 * 1000;
+// Max time a background auto-lock may be deferred while a send actively needs the key. Covers a slow
+// multi-external send on a degraded/keyless path (inter-batch nonce-confirm waits + the final broadcast +
+// the stale-read floor reconciliation) that can run several minutes. Still bounded below the 30min idle
+// backstop, and only engages during an active send (idle background still locks immediately).
+const SEND_LOCK_MAX_GRACE_MS = 600 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
@@ -2378,7 +2421,7 @@ function lockPlathoWallet(status = 'Wallet locked', options = {}) {
   reloadForPendingServiceWorkerAppShellUpdate();
 }
 
-const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 45_000;
+const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 300_000;
 let telegramBackgroundLockTimer = null;
 
 function clearTelegramBackgroundLockTimer() {
@@ -20019,7 +20062,15 @@ const QUICK_START_STEPS = [
       wrap.append(getKey, input);
       return wrap;
     },
-    run: () => applyToncenterApiKey(quickStartStepBody?.querySelector('#quickStartKeyInput')?.value),
+    run: async () => {
+      const value = quickStartStepBody?.querySelector('#quickStartKeyInput')?.value;
+      const trimmed = String(value ?? '').trim();
+      if (!trimmed) return false;
+      const result = await validateToncenterApiKey(trimmed);
+      if (result.reason === 'invalid') return 'That key was rejected by TON Center. Check it and retry, or Skip.';
+      applyToncenterApiKey(trimmed);
+      return true;
+    },
   },
   {
     title: 'Back up your wallet key',
@@ -20143,7 +20194,10 @@ quickStartActionButton?.addEventListener('click', async () => {
   setText(quickStartStepStatus, 'Working...');
   try {
     const ok = await step.run();
-    if (ok === false) {
+    if (typeof ok === 'string') {
+      // The step supplied its own failure message (e.g. an invalid key) — show it, do not advance.
+      setText(quickStartStepStatus, ok);
+    } else if (ok === false) {
       setText(quickStartStepStatus, step.optional ? 'Nothing entered - paste a key or Skip.' : 'Not completed - try again.');
     } else {
       setText(quickStartStepStatus, 'Done');
