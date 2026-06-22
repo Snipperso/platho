@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v472';
+const PLATHO_APP_RUNTIME_VERSION = 'v473';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -488,7 +488,7 @@ saveToncenterKeyButton?.addEventListener('click', () => {
 });
 
 getToncenterKeyButton?.addEventListener('click', () => {
-  try { globalThis.open?.('https://t.me/toncenter', '_blank', 'noopener'); } catch { /* ignore */ }
+  openToncenterBotLink();
 });
 
 refreshToncenterKeyUi();
@@ -1254,6 +1254,25 @@ function openExternalLinkInTelegram(href) {
   }
 }
 
+function openTelegramDeepLink(href) {
+  const tg = telegramWebApp();
+  if (tg && typeof tg.openTelegramLink === 'function') {
+    try {
+      tg.openTelegramLink(href);
+      return true;
+    } catch { /* fall through to openLink */ }
+  }
+  return openExternalLinkInTelegram(href);
+}
+
+// A bare window.open of a t.me/ link is a no-op inside the Telegram in-app WebView,
+// so route the @toncenter bot link through the SDK first and fall back to a new tab
+// (normal browser / SDK missing).
+function openToncenterBotLink() {
+  if (openTelegramDeepLink('https://t.me/toncenter')) return;
+  try { globalThis.open?.('https://t.me/toncenter', '_blank', 'noopener'); } catch { /* ignore */ }
+}
+
 function markTelegramRootAttribute() {
   try {
     if (isTelegramEnv()) document.documentElement.dataset.plathoTelegram = 'true';
@@ -1468,7 +1487,7 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
 }
 
 function showTelegramManualExportDialog(filename, content) {
-  openActionDialog({
+  return openActionDialog({
     title: 'Copy your wallet backup',
     hint: 'Saving files is unreliable inside Telegram. Copy this encrypted wallet key and store it somewhere safe - it is protected by your password.',
     submitLabel: 'Done',
@@ -10471,12 +10490,13 @@ function enforcePublicComposerByteLimit() {
   return;
 }
 
-function downloadJsonFile(filename, value) {
+async function downloadJsonFile(filename, value) {
   const json = `${JSON.stringify(value, null, 2)}\n`;
   if (isTelegramEnv()) {
     // <a download>.click() silently fails in Telegram's in-app WebView, so the
-    // file would never save — surface the content for manual copy instead.
-    showTelegramManualExportDialog(filename, json);
+    // file would never save — surface the content for manual copy instead. Await
+    // the copy dialog so a mandatory export step only completes once acknowledged.
+    await showTelegramManualExportDialog(filename, json);
     return;
   }
   const blob = new Blob([json], { type: 'application/json' });
@@ -10519,9 +10539,9 @@ function walletKeyBackupFromRecord(record) {
   };
 }
 
-function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWalletRecord()) {
+async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWalletRecord()) {
   if (!record) throw new Error('No encrypted wallet key is stored on this device');
-  downloadJsonFile(safeWalletKeyFilename(record), walletKeyBackupFromRecord(record));
+  await downloadJsonFile(safeWalletKeyFilename(record), walletKeyBackupFromRecord(record));
 }
 
 async function offerEncryptedWalletKeyBackup(reason = 'Save this encrypted wallet key file before adding funds.') {
@@ -10541,7 +10561,7 @@ async function offerEncryptedWalletKeyBackup(reason = 'Save this encrypted walle
     ],
   });
   if (!result) return false;
-  downloadEncryptedWalletKeyBackup(record);
+  await downloadEncryptedWalletKeyBackup(record);
   return true;
 }
 
@@ -12682,7 +12702,7 @@ async function exportEncryptedWalletKeyFile() {
     submitLabel: 'Export wallet key',
   });
   if (!unlocked) return false;
-  downloadEncryptedWalletKeyBackup(record);
+  await downloadEncryptedWalletKeyBackup(record);
   return true;
 }
 
@@ -19932,9 +19952,23 @@ const quickStartStepWhy = document.querySelector('#quickStartStepWhy');
 const quickStartStepBody = document.querySelector('#quickStartStepBody');
 const quickStartStepStatus = document.querySelector('#quickStartStepStatus');
 const QUICK_START_DISMISSED_KEY = 'platho.quickstart.dismissed.v1';
+const QUICK_START_DISMISSED_CLOUD_KEY = 'platho_quickstart_dismissed_v1';
 
 function quickStartDismissedForever() {
   try { return globalThis.localStorage?.getItem(QUICK_START_DISMISSED_KEY) === '1'; } catch { return false; }
+}
+
+// iOS Telegram can evict localStorage between sessions, so a wallet-less user who
+// dismissed the welcome would re-see it every launch. Mirror the dismissal into
+// Telegram CloudStorage (no-op outside Telegram) and restore it on boot.
+async function restoreQuickStartDismissalFromTelegramCloud() {
+  if (!telegramCloudStorage()) return;
+  if (quickStartDismissedForever()) return;
+  try {
+    if ((await telegramCloudGet(QUICK_START_DISMISSED_CLOUD_KEY)) === '1') {
+      try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
 }
 
 async function runQuickStartCreateWallet() {
@@ -19974,7 +20008,7 @@ const QUICK_START_STEPS = [
       getKey.type = 'button';
       getKey.className = 'secondary-button';
       getKey.textContent = 'Get a free key (@toncenter)';
-      getKey.addEventListener('click', () => { try { globalThis.open?.('https://t.me/toncenter', '_blank', 'noopener'); } catch { /* ignore */ } });
+      getKey.addEventListener('click', () => { openToncenterBotLink(); });
       const input = document.createElement('input');
       input.type = 'text';
       input.id = 'quickStartKeyInput';
@@ -20069,6 +20103,7 @@ function quickStartAdvance() {
 function closeQuickStart() {
   if (quickStartDialog) quickStartDialog.hidden = true;
   try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+  try { telegramCloudSet(QUICK_START_DISMISSED_CLOUD_KEY, '1').catch(() => {}); } catch { /* ignore */ }
 }
 
 function finishQuickStart() {
@@ -20145,6 +20180,7 @@ markRuntimeOp('idle');
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
+  .then(() => restoreQuickStartDismissalFromTelegramCloud().catch(() => {}))
   .then(() => setTimeout(() => {
     promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
     try { maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
