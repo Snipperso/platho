@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v471';
+const PLATHO_APP_RUNTIME_VERSION = 'v472';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -10500,12 +10500,22 @@ function walletKeyBackupFromRecord(record) {
   if (!record || record.kind !== PLATHO_WALLET_STORAGE_KIND) {
     throw new Error('Encrypted wallet key is missing');
   }
+  // Client-direct RPC: each user has their OWN free toncenter API key. Bundle it into the wallet-key
+  // backup so restoring the key on another device brings the RPC key too — not just the wallet. It is
+  // low-sensitivity (free, rate-limited, regenerable), so it travels in plaintext alongside the
+  // (password-encrypted) wallet rather than under the wallet password. Backward-compat: v1 backups had no
+  // key, and the importer reads it conditionally, so old/new files interoperate.
+  let toncenterApiKey = globalThis.plathoToncenterApiKey ?? null;
+  if (toncenterApiKey == null) {
+    try { toncenterApiKey = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { toncenterApiKey = null; }
+  }
   return {
     kind: PLATHO_WALLET_KEY_BACKUP_KIND,
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     walletAddress: storedWalletAddressForCopy(record),
     encryptedWallet: record,
+    ...(toncenterApiKey ? { toncenterApiKey } : {}),
   };
 }
 
@@ -12701,7 +12711,14 @@ async function importEncryptedWalletKeyFile(file) {
   });
   if (!wallet) return false;
   if (!(await confirmWalletReplacement('Import wallet key'))) return false;
-  return activateImportedEncryptedWalletRecord(wallet, record);
+  const restored = await activateImportedEncryptedWalletRecord(wallet, record);
+  // v2+ backups also carry the user's own toncenter API key — restore it so importing the wallet key on a
+  // new device brings the RPC key too. v1 backups (no key) skip this. Keyless Orbs works either way.
+  if (restored && parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND
+    && typeof parsed.toncenterApiKey === 'string' && parsed.toncenterApiKey.trim()) {
+    applyToncenterApiKey(parsed.toncenterApiKey);
+  }
+  return restored;
 }
 
 async function requestWalletDisplayIdentity(mode) {
@@ -19898,6 +19915,215 @@ publicReadCursors = readPublicReadCursors();
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
 renderDocsNav();
+// ── Quick-start onboarding (shown on first run when there is no wallet yet) ──────────────
+const quickStartDialog = document.querySelector('#quickStartDialog');
+const quickStartWelcomeView = document.querySelector('#quickStartWelcomeView');
+const quickStartStepsView = document.querySelector('#quickStartStepsView');
+const quickStartBeginButton = document.querySelector('#quickStartBeginButton');
+const quickStartImportButtonEl = document.querySelector('#quickStartImportButton');
+const quickStartCloseButton = document.querySelector('#quickStartCloseButton');
+const quickStartBackButton = document.querySelector('#quickStartBackButton');
+const quickStartSkipButton = document.querySelector('#quickStartSkipButton');
+const quickStartActionButton = document.querySelector('#quickStartActionButton');
+const quickStartProgress = document.querySelector('#quickStartProgress');
+const quickStartStepCounter = document.querySelector('#quickStartStepCounter');
+const quickStartStepTitle = document.querySelector('#quickStartStepTitle');
+const quickStartStepWhy = document.querySelector('#quickStartStepWhy');
+const quickStartStepBody = document.querySelector('#quickStartStepBody');
+const quickStartStepStatus = document.querySelector('#quickStartStepStatus');
+const QUICK_START_DISMISSED_KEY = 'platho.quickstart.dismissed.v1';
+
+function quickStartDismissedForever() {
+  try { return globalThis.localStorage?.getItem(QUICK_START_DISMISSED_KEY) === '1'; } catch { return false; }
+}
+
+async function runQuickStartCreateWallet() {
+  if (hasStoredPlathoWalletRecord()) return true;
+  const walletDraft = await createPlathoWallet(plathoWalletNetworkOptions());
+  const password = await requestNewWalletStoragePassword('Encrypt new wallet', {
+    passwordManagerUsername: walletDraft.address,
+    passwordManagerNetworkGlobalId: walletDraft.networkGlobalId,
+  });
+  if (!password) return false;
+  await setPlathoWallet(walletDraft, { password });
+  await enforceTelegramSeedBackupGate(walletDraft, { force: true });
+  flashWalletIdentityStatus('Wallet ready');
+  refreshMessagingControls();
+  return true;
+}
+
+const QUICK_START_STEPS = [
+  {
+    title: 'Create your wallet',
+    action: 'Create wallet',
+    optional: false,
+    why: 'Your wallet is your identity and key in Platho. It is generated on this device and encrypted with a password you choose - no server ever holds it. Everything below builds on it.',
+    autoDone: () => hasStoredPlathoWalletRecord(),
+    body: () => null,
+    run: () => runQuickStartCreateWallet(),
+  },
+  {
+    title: 'Add a TON Center key',
+    action: 'Save key',
+    optional: true,
+    why: 'Your own free TON Center API key (10 requests/sec + the message indexer) makes Platho faster and avoids shared rate limits. Optional - without it Platho runs on the keyless Orbs network, just slower. Get one in ~10 seconds from the @toncenter Telegram bot, then paste it here.',
+    autoDone: () => false,
+    body: () => {
+      const wrap = document.createElement('div');
+      const getKey = document.createElement('button');
+      getKey.type = 'button';
+      getKey.className = 'secondary-button';
+      getKey.textContent = 'Get a free key (@toncenter)';
+      getKey.addEventListener('click', () => { try { globalThis.open?.('https://t.me/toncenter', '_blank', 'noopener'); } catch { /* ignore */ } });
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'quickStartKeyInput';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.placeholder = 'Paste your TON Center API key';
+      if (globalThis.plathoToncenterApiKey) input.value = globalThis.plathoToncenterApiKey;
+      wrap.append(getKey, input);
+      return wrap;
+    },
+    run: () => applyToncenterApiKey(quickStartStepBody?.querySelector('#quickStartKeyInput')?.value),
+  },
+  {
+    title: 'Back up your wallet key',
+    action: 'Save wallet key',
+    optional: false,
+    why: 'Browser storage can be cleared - especially on iPhone Safari - which would wipe your wallet from this device. Save the encrypted wallet-key file now; it is protected by your password and also carries your TON Center key, so you can restore everything on any device.',
+    autoDone: () => false,
+    body: () => null,
+    run: () => exportEncryptedWalletKeyFile(),
+  },
+  {
+    title: 'Top up your wallet',
+    action: 'Copy address',
+    optional: true,
+    why: 'A small amount of GRAM covers network fees and account activation. Send GRAM to the address below from any TON wallet or exchange - you can do this later.',
+    autoDone: () => false,
+    body: () => {
+      const div = document.createElement('div');
+      div.className = 'quick-start-step-address';
+      div.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || 'Create a wallet first';
+      return div;
+    },
+    run: async () => {
+      const address = currentWalletReceiveAddress() || storedWalletAddressForCopy() || '';
+      if (!address) return false;
+      await copyTextToClipboard(address);
+      return true;
+    },
+  },
+  {
+    title: 'Activate your Platho account',
+    action: 'Activate account',
+    optional: true,
+    why: 'Activation registers your messaging keys on-chain (a one-time fee from your wallet). After it you can send and receive private messages. It needs a funded wallet - do it now, or later from the Profile tab.',
+    autoDone: () => hasActivePlathoAccount(),
+    body: () => null,
+    run: async () => { await submitVaultRegisterMessagingKeys(); return true; },
+  },
+];
+
+let quickStartStepIndex = 0;
+
+function renderQuickStartProgress() {
+  if (!quickStartProgress) return;
+  quickStartProgress.innerHTML = '';
+  QUICK_START_STEPS.forEach((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'quick-start-progress-dot';
+    if (i < quickStartStepIndex) dot.classList.add('is-done');
+    else if (i === quickStartStepIndex) dot.classList.add('is-current');
+    quickStartProgress.appendChild(dot);
+  });
+}
+
+function renderQuickStartStep() {
+  const step = QUICK_START_STEPS[quickStartStepIndex];
+  if (!step) { finishQuickStart(); return; }
+  // A mandatory step that is already satisfied (e.g. a wallet already exists) is auto-skipped.
+  if (!step.optional && step.autoDone()) { quickStartAdvance(); return; }
+  renderQuickStartProgress();
+  setText(quickStartStepCounter, `Step ${quickStartStepIndex + 1} of ${QUICK_START_STEPS.length}`);
+  setText(quickStartStepTitle, step.title);
+  setText(quickStartStepWhy, step.why);
+  setText(quickStartStepStatus, '');
+  if (quickStartStepBody) {
+    quickStartStepBody.innerHTML = '';
+    const body = step.body();
+    if (body) quickStartStepBody.appendChild(body);
+  }
+  if (quickStartActionButton) quickStartActionButton.textContent = step.action;
+  if (quickStartBackButton) quickStartBackButton.hidden = quickStartStepIndex === 0;
+  if (quickStartSkipButton) quickStartSkipButton.hidden = !step.optional;
+}
+
+function quickStartAdvance() {
+  if (quickStartStepIndex >= QUICK_START_STEPS.length - 1) { finishQuickStart(); return; }
+  quickStartStepIndex += 1;
+  renderQuickStartStep();
+}
+
+function closeQuickStart() {
+  if (quickStartDialog) quickStartDialog.hidden = true;
+  try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+}
+
+function finishQuickStart() {
+  closeQuickStart();
+  flashWalletIdentityStatus('Setup complete');
+}
+
+function openQuickStart() {
+  if (!quickStartDialog) return;
+  quickStartStepIndex = 0;
+  if (quickStartWelcomeView) quickStartWelcomeView.hidden = false;
+  if (quickStartStepsView) quickStartStepsView.hidden = true;
+  quickStartDialog.hidden = false;
+}
+
+function maybeShowQuickStartOnFirstRun() {
+  if (!quickStartDialog) return;
+  if (hasStoredPlathoWalletRecord()) return;
+  if (quickStartDismissedForever()) return;
+  openQuickStart();
+}
+
+quickStartBeginButton?.addEventListener('click', () => {
+  quickStartStepIndex = 0;
+  if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
+  if (quickStartStepsView) quickStartStepsView.hidden = false;
+  renderQuickStartStep();
+});
+quickStartCloseButton?.addEventListener('click', () => closeQuickStart());
+quickStartImportButtonEl?.addEventListener('click', () => { closeQuickStart(); walletKeyBackupInput?.click(); });
+quickStartBackButton?.addEventListener('click', () => { if (quickStartStepIndex > 0) { quickStartStepIndex -= 1; renderQuickStartStep(); } });
+quickStartSkipButton?.addEventListener('click', () => quickStartAdvance());
+quickStartActionButton?.addEventListener('click', async () => {
+  const step = QUICK_START_STEPS[quickStartStepIndex];
+  if (!step || !quickStartActionButton) return;
+  quickStartActionButton.disabled = true;
+  setText(quickStartStepStatus, 'Working...');
+  try {
+    const ok = await step.run();
+    if (ok === false) {
+      setText(quickStartStepStatus, step.optional ? 'Nothing entered - paste a key or Skip.' : 'Not completed - try again.');
+    } else {
+      setText(quickStartStepStatus, 'Done');
+      quickStartAdvance();
+    }
+  } catch (error) {
+    console.error(error);
+    setText(quickStartStepStatus, step.optional
+      ? 'Could not complete - you can Skip and do this later.'
+      : `Could not complete: ${error?.message ?? 'try again'}`);
+  } finally {
+    quickStartActionButton.disabled = false;
+  }
+});
+
 renderAthProfileStats();
 updatePublicSyncWindowUi();
 updatePublicCommentsDefaultUi();
@@ -19921,5 +20147,6 @@ bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
   .then(() => setTimeout(() => {
     promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
+    try { maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
   }, 250))
   .catch((error) => console.error(error));

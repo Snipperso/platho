@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v471<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v471'/);
+    expect(html).toMatch(/id="appVersionLabel">v472<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v472'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1857,6 +1857,30 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(readOptions\.allowUnverifiedCriticalRead === true\) return 'keyless_unverified'/);
   });
 
+  it('PWA-QUICKSTART-01: first-run quick-start onboarding + wallet-key carries the toncenter key', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // Wallet-key backup now bundles the user's own toncenter key (v2) so restoring the key on a new device
+    // brings the RPC key too; the importer restores it, backward-compatible with v1 (no-key) backups.
+    expect(app).toMatch(/kind: PLATHO_WALLET_KEY_BACKUP_KIND,\s*version: 2/);
+    expect(app).toMatch(/\.\.\.\(toncenterApiKey \? \{ toncenterApiKey \} : \{\}\)/);
+    expect(app).toMatch(/parsed\?\.kind === PLATHO_WALLET_KEY_BACKUP_KIND[\s\S]*applyToncenterApiKey\(parsed\.toncenterApiKey\)/);
+    // Quick-start overlay markup (welcome + import buttons + the close affordance).
+    expect(html).toMatch(/id="quickStartDialog"/);
+    expect(html).toMatch(/id="quickStartBeginButton"/);
+    expect(html).toMatch(/id="quickStartImportButton"/);
+    // First-run controller: shown only with no wallet and not yet dismissed.
+    expect(app).toMatch(/function maybeShowQuickStartOnFirstRun\(\)/);
+    expect(app).toMatch(/if \(hasStoredPlathoWalletRecord\(\)\) return;\s*if \(quickStartDismissedForever\(\)\) return;\s*openQuickStart\(\)/);
+    // The five guided steps reuse the existing flows; create + back-up are mandatory (optional:false).
+    expect(app).toMatch(/const QUICK_START_STEPS = \[/);
+    expect(app).toMatch(/run: \(\) => runQuickStartCreateWallet\(\)/);
+    expect(app).toMatch(/run: \(\) => exportEncryptedWalletKeyFile\(\)/);
+    expect(app).toMatch(/run: \(\) => applyToncenterApiKey\(quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value\)/);
+    // Wired into the boot chain, defensively, after the wallet state is known.
+    expect(app).toMatch(/try \{ maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
+  });
+
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // openActionDialog decouples the close (✕) button (cancellable) from outside-click/Escape (dismissOnBackdrop).
@@ -2145,7 +2169,10 @@ describe('PWA runtime config guard', () => {
 
     expect(prepareIndex).toBeGreaterThanOrEqual(0);
     expect(assignIndex).toBeGreaterThan(prepareIndex);
-    expect(importSource).toMatch(/return activateImportedEncryptedWalletRecord\(wallet, record\)/);
+    // v472: the call is captured (const restored = await ...) so the bundled toncenter key can be restored
+    // AFTER the wallet activates; the wallet-switch still goes through activateImportedEncryptedWalletRecord.
+    expect(importSource).toMatch(/const restored = await activateImportedEncryptedWalletRecord\(wallet, record\)/);
+    expect(importSource).toMatch(/applyToncenterApiKey\(parsed\.toncenterApiKey\)/);
     expect(importSource).not.toMatch(/plathoWallet = wallet/);
   });
 
@@ -4337,11 +4364,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v542/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=151/);
+    expect(sw).toMatch(/platho-pwa-prototype-v543/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=152/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=471/);
+    expect(sw).toMatch(/\.\/app\.js\?v=472/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
