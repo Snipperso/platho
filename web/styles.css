@@ -2292,6 +2292,77 @@ button.feed-item:hover {
   font: inherit;
 }
 
+/* RPC key: one row — label, an inline (frameless) field, a status, and a Get button. The whole row
+   (except the field) is clickable and opens the @toncenter bot, like a settings-list button. */
+.settings-rpc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  cursor: pointer;
+}
+
+.settings-rpc-row .rpc-key-label {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.settings-rpc-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: text;
+}
+
+.settings-rpc-row input:focus {
+  outline: none;
+}
+
+.settings-rpc-row input::placeholder {
+  color: var(--muted-2);
+}
+
+.rpc-key-status {
+  flex: 0 0 auto;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.rpc-key-status[data-state="error"] {
+  color: var(--danger);
+}
+
+.rpc-key-status[data-state="ok"] {
+  color: var(--green);
+}
+
+/* Higher specificity than the generic `.settings-list button` rule so this compact inline
+   button wins over the full-height settings-row button styling. */
+.settings-rpc-row .rpc-key-get {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-rpc-row .rpc-key-get:hover {
+  border-color: rgba(48, 213, 176, 0.42);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

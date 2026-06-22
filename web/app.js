@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v474';
+const PLATHO_APP_RUNTIME_VERSION = 'v475';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -442,10 +442,8 @@ const mintUsernameStatus = document.querySelector('#mintUsernameStatus');
 const linkUsernameButton = document.querySelector('#linkUsernameButton');
 const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
 const toncenterApiKeyInput = document.querySelector('#toncenterApiKeyInput');
-const saveToncenterKeyButton = document.querySelector('#saveToncenterKeyButton');
-const saveToncenterKeyStatus = document.querySelector('#saveToncenterKeyStatus');
 const toncenterKeyStatus = document.querySelector('#toncenterKeyStatus');
-const getToncenterKeyButton = document.querySelector('#getToncenterKeyButton');
+const rpcKeyRow = document.querySelector('#rpcKeyRow');
 
 // Client-direct RPC: the user's own free toncenter API key (10 rps) speeds up reads + the message
 // indexer. Stored locally; injected into the user-toncenter transport at build via
@@ -457,7 +455,10 @@ function refreshToncenterKeyUi() {
   if (key == null) {
     try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
   }
-  if (toncenterKeyStatus) toncenterKeyStatus.textContent = key ? 'key active' : 'recommended';
+  if (toncenterKeyStatus) {
+    toncenterKeyStatus.textContent = key ? 'key active' : 'recommended';
+    toncenterKeyStatus.removeAttribute('data-state');
+  }
   if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) {
     toncenterApiKeyInput.value = key ?? '';
   }
@@ -506,31 +507,54 @@ async function validateToncenterApiKey(rawKey) {
   }
 }
 
-saveToncenterKeyButton?.addEventListener('click', async () => {
-  const trimmed = String(toncenterApiKeyInput?.value ?? '').trim();
+// No Save button: validate + save when the field loses focus after an edit (or on Enter). A
+// definitively invalid key (toncenter 401/403) is rejected and NOT stored; an unverifiable one
+// (offline / rate-limited) is kept so the user is never blocked — a wrong key just falls back to the
+// keyless Orbs path. On success refreshToncenterKeyUi() shows 'key active'.
+async function commitToncenterKeyFromInput() {
+  if (!toncenterApiKeyInput) return;
+  const trimmed = String(toncenterApiKeyInput.value ?? '').trim();
   if (!trimmed) {
     applyToncenterApiKey('');
-    if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = 'cleared';
     return;
   }
-  if (saveToncenterKeyButton) saveToncenterKeyButton.disabled = true;
-  if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = 'checking...';
-  try {
-    const result = await validateToncenterApiKey(trimmed);
-    if (result.reason === 'invalid') {
-      if (saveToncenterKeyStatus) saveToncenterKeyStatus.textContent = 'invalid key - not saved';
-      return;
+  if (trimmed === (globalThis.plathoToncenterApiKey ?? null)) {
+    refreshToncenterKeyUi();
+    return;
+  }
+  if (toncenterKeyStatus) {
+    toncenterKeyStatus.textContent = 'checking...';
+    toncenterKeyStatus.removeAttribute('data-state');
+  }
+  const result = await validateToncenterApiKey(trimmed);
+  if (result.reason === 'invalid') {
+    if (toncenterKeyStatus) {
+      toncenterKeyStatus.textContent = 'invalid key';
+      toncenterKeyStatus.setAttribute('data-state', 'error');
     }
-    applyToncenterApiKey(trimmed);
-    if (saveToncenterKeyStatus) {
-      saveToncenterKeyStatus.textContent = result.ok ? 'saved (valid)' : 'saved (could not verify)';
-    }
-  } finally {
-    if (saveToncenterKeyButton) saveToncenterKeyButton.disabled = false;
+    return;
+  }
+  applyToncenterApiKey(trimmed);
+}
+
+toncenterApiKeyInput?.addEventListener('change', () => {
+  commitToncenterKeyFromInput().catch((error) => console.error(error));
+});
+toncenterApiKeyInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    toncenterApiKeyInput.blur();
   }
 });
 
-getToncenterKeyButton?.addEventListener('click', () => {
+// The whole RPC-key row doubles as the "Get a key" button (opens the @toncenter bot), EXCEPT when the
+// click lands on the text field itself (tapping the field just focuses it). The explicit Get button
+// bubbles up to this same handler.
+rpcKeyRow?.addEventListener('click', (event) => {
+  if (toncenterApiKeyInput
+    && (event.target === toncenterApiKeyInput || toncenterApiKeyInput.contains(event.target))) {
+    return;
+  }
   openToncenterBotLink();
 });
 
