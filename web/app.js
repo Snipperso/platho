@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v470';
+const PLATHO_APP_RUNTIME_VERSION = 'v471';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -7217,6 +7217,16 @@ function privateIndexSyncReadLimit(options = {}) {
 
 function privateIndexCursorPersistenceMode(readOptions = {}) {
   if (readOptions.verify === true && readOptions.allowUnverifiedCriticalRead !== true) return 'verified';
+  // Client-direct keyless model: verify:false single-source (Orbs) reads are the trusted norm
+  // (verifyCriticalReads:false; the gateway the 'verified' mode required is decommissioned). The private
+  // index is an APPEND-ONLY backward-linked list, so a node cannot fabricate a future head; the cursor
+  // advances only AFTER a complete walk (every entry head->stopLink processed), a lagging head simply
+  // self-corrects next cycle (the cursor stays below the real head, so the next walk catches up), and the
+  // head-repair window re-scans the recent entries every cycle. So persisting the keyless cursor is safe,
+  // and it stops the per-cycle full re-walk (head->frozen-cursor, ~15 getPrivateEntry reads) that burned
+  // the keyless RPC budget. The conservative non-persist mode stays for any read that opts OUT of the
+  // unverified path (no allowUnverifiedCriticalRead).
+  if (readOptions.allowUnverifiedCriticalRead === true) return 'keyless_unverified';
   return 'disabled_unverified';
 }
 
