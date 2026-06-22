@@ -1837,25 +1837,35 @@ export function createTonAccessV2VaultTransport(options = {}) {
       const query = stableQueryObject(params);
       const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
       const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
-      const response = await scheduleToncenterHttpRequest(
-        cacheEndpoint,
-        null,
-        async () => fetchWithTonRpcTimeout(
-          fetchImpl,
-          appendQueryParams(`${await resolveBase(requestTimeoutMs)}/getTransactions`, query),
-          { method: 'GET', headers },
-          requestTimeoutMs,
-        ),
-        {
-          rateLimitKey,
-          requestSpacingMs,
-          rateLimitBackoffMs,
-          rateLimitRetries,
-          skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
-          priority: requestOptions.priority ?? 'messages',
-          queueTimeoutMs: requestOptions.queueTimeoutMs,
-        },
-      );
+      // A 5xx from one Orbs node is per-node transient: resolveBase() (called fresh inside the fetch thunk
+      // each attempt) re-rolls a weighted-random node, so a single retry almost always lands on a healthy
+      // node. A 5xx on this heavy CapsuleHub tx-scan otherwise aborts the whole body lookup and keeps the
+      // entry's gap alive another cycle. Retry ONCE on a fresh node. Read-only — NEVER applied to sendBoc
+      // (a double-broadcast hazard). 429 stays handled by scheduleToncenterHttpRequest's own loop; 4xx
+      // (incl. the HTTP-200 {ok:false} validation case below) is a real error and is not retried.
+      let response = null;
+      for (let attempt = 0; attempt <= 1; attempt += 1) {
+        response = await scheduleToncenterHttpRequest(
+          cacheEndpoint,
+          null,
+          async () => fetchWithTonRpcTimeout(
+            fetchImpl,
+            appendQueryParams(`${await resolveBase(requestTimeoutMs)}/getTransactions`, query),
+            { method: 'GET', headers },
+            requestTimeoutMs,
+          ),
+          {
+            rateLimitKey,
+            requestSpacingMs,
+            rateLimitBackoffMs,
+            rateLimitRetries,
+            skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
+            priority: requestOptions.priority ?? 'messages',
+            queueTimeoutMs: requestOptions.queueTimeoutMs,
+          },
+        );
+        if (!response || response.ok || Number(response.status) < 500 || attempt >= 1) break;
+      }
       if (!response.ok) throw toncenterHttpError('TON Access transactions', response);
       const payload = await response.json();
       // toncenter v2 reports param/validation failures (e.g. limit > 100) as an HTTP-200 {ok:false,code}
