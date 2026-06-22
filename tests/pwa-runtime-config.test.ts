@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v472<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v472'/);
+    expect(html).toMatch(/id="appVersionLabel">v473<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v473'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1879,6 +1879,35 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/run: \(\) => applyToncenterApiKey\(quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value\)/);
     // Wired into the boot chain, defensively, after the wallet state is known.
     expect(app).toMatch(/try \{ maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
+  });
+
+  it('PWA-QUICKSTART-TMA-01: quick-start works inside the Telegram Mini App (modal stacking, awaitable export, TG link, cloud dismissal)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // BLOCKER fix: quick-start steps open the shared #actionDialog (password / TG seed-backup hard gate /
+    // manual wallet-key copy) while #quickStartDialog is still visible; both are .modal-backdrop z-index:40 and
+    // quick-start is later in the DOM, so it painted on top and buried those prompts. Raise #actionDialog above
+    // the quick-start overlay (40) but below the image lightbox (70).
+    expect(css).toMatch(/#actionDialog \{\s*z-index: 60;\s*\}/);
+    // MEDIUM fix: in Telegram the export is a manual-copy dialog (no file download). Make the whole chain
+    // awaitable so the MANDATORY export step only completes once the user acknowledges the copy dialog.
+    expect(app).toMatch(/function showTelegramManualExportDialog\(filename, content\) \{\s*return openActionDialog\(/);
+    expect(app).toMatch(/async function downloadJsonFile\(filename, value\)[\s\S]*await showTelegramManualExportDialog\(filename, json\)/);
+    expect(app).toMatch(/async function downloadEncryptedWalletKeyBackup\([\s\S]*await downloadJsonFile\(/);
+    expect(app).toMatch(/if \(!unlocked\) return false;\s*await downloadEncryptedWalletKeyBackup\(record\);/);
+    // MEDIUM fix: a bare window.open of a t.me/ link is a no-op in the TG WebView; route the @toncenter bot
+    // link through the SDK (openTelegramLink) first, fall back to a new tab only outside Telegram.
+    expect(app).toMatch(/function openTelegramDeepLink\(href\)[\s\S]*tg\.openTelegramLink\(href\)/);
+    expect(app).toMatch(/function openToncenterBotLink\(\) \{\s*if \(openTelegramDeepLink\('https:\/\/t\.me\/toncenter'\)\) return;/);
+    expect(app).toMatch(/getKey\.addEventListener\('click', \(\) => \{ openToncenterBotLink\(\); \}\)/);
+    // the quick-start step-2 link no longer calls a bare window.open directly in its handler.
+    expect(app).not.toMatch(/getKey\.addEventListener\('click', \(\) => \{ try \{ globalThis\.open/);
+    // LOW fix: mirror the dismissal into Telegram CloudStorage (iOS evicts localStorage) and restore on boot.
+    expect(app).toMatch(/telegramCloudSet\(QUICK_START_DISMISSED_CLOUD_KEY, '1'\)/);
+    expect(app).toMatch(/async function restoreQuickStartDismissalFromTelegramCloud\(\)/);
+    expect(app).toMatch(/restoreQuickStartDismissalFromTelegramCloud\(\)\.catch\(\(\) => \{\}\)/);
+    // LOW fix: the dialog scrolls inside a viewport-bounded box (keyboard-shrunk TG viewport) instead of clipping.
+    expect(css).toMatch(/\.quick-start-dialog \{[\s\S]*?max-height: calc\(var\(--app-viewport-height[\s\S]*?overflow-y: auto;[\s\S]*?\}/);
   });
 
   it('PWA-UNLOCK-MODAL-01: the unlock-wallet dialog closes ONLY via the close button (no click-outside / Escape)', () => {
@@ -4364,11 +4393,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v543/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=152/);
+    expect(sw).toMatch(/platho-pwa-prototype-v544/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=153/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=472/);
+    expect(sw).toMatch(/\.\/app\.js\?v=473/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
