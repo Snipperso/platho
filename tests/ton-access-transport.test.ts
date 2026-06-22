@@ -151,4 +151,52 @@ describe('TON Access (Orbs) v2 transport', () => {
     await expect(transport.getTransactions({ address: ADDR, limit: 1000 }))
       .rejects.toThrow(/transactions failed/i);
   });
+
+  it('ORBS-12: getTransactions retries once on a per-node 5xx (fresh node) and then succeeds', async () => {
+    const calls: any[] = [];
+    let txCalls = 0;
+    const fetchImpl = async (url: unknown) => {
+      const u = String(url);
+      calls.push(u);
+      if (u.includes('/mngr/nodes')) {
+        return jsonResponse([
+          { Healthy: '1', NodeId: 'node1abc', Weight: 1, Mngr: { health: { 'v2-testnet': true } } },
+          { Healthy: '1', NodeId: 'node2def', Weight: 1, Mngr: { health: { 'v2-testnet': true } } },
+        ]);
+      }
+      if (u.includes('/getTransactions')) {
+        txCalls += 1;
+        // First node 500s; the retry resolves a fresh node and gets a 200.
+        if (txCalls === 1) return jsonResponse({ ok: false }, false, 500);
+        return jsonResponse({ ok: true, transactions: [{ x: 1 }] });
+      }
+      return jsonResponse({ error: `unexpected ${u}` }, false, 404);
+    };
+    const transport = createTonAccessV2VaultTransport({
+      fetch: fetchImpl, host: 'orbs.test', network: 'testnet', requestSpacingMs: 0, rateLimitRetries: 0,
+    });
+    const out = await transport.getTransactions({ address: ADDR, limit: 5 });
+    expect(out.transactions).toEqual([{ x: 1 }]);
+    // Exactly two getTransactions fetches: the 500, then the fresh-node retry that succeeded.
+    expect(calls.filter((u) => u.includes('/getTransactions'))).toHaveLength(2);
+  });
+
+  it('ORBS-13: a persistent 5xx on getTransactions is bounded to 2 attempts then throws', async () => {
+    const calls: any[] = [];
+    const fetchImpl = async (url: unknown) => {
+      const u = String(url);
+      calls.push(u);
+      if (u.includes('/mngr/nodes')) {
+        return jsonResponse([{ Healthy: '1', NodeId: 'node1abc', Weight: 1, Mngr: { health: { 'v2-testnet': true } } }]);
+      }
+      if (u.includes('/getTransactions')) return jsonResponse({ ok: false }, false, 503);
+      return jsonResponse({ error: `unexpected ${u}` }, false, 404);
+    };
+    const transport = createTonAccessV2VaultTransport({
+      fetch: fetchImpl, host: 'orbs.test', network: 'testnet', requestSpacingMs: 0, rateLimitRetries: 0,
+    });
+    await expect(transport.getTransactions({ address: ADDR, limit: 5 })).rejects.toThrow();
+    // Bounded: at most one retry (2 total attempts), never an unbounded storm on the heavy CapsuleHub query.
+    expect(calls.filter((u) => u.includes('/getTransactions'))).toHaveLength(2);
+  });
 });
