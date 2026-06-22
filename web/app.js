@@ -155,7 +155,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v475';
+const PLATHO_APP_RUNTIME_VERSION = 'v477';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -419,6 +419,7 @@ const sendWalletTonStatus = document.querySelector('#sendWalletTonStatus');
 const walletTonBalanceButton = document.querySelector('#walletTonBalanceButton');
 const walletTonBalanceStatus = document.querySelector('#walletTonBalanceStatus');
 const exportWalletKeyButton = document.querySelector('#exportWalletKeyButton');
+const walletBackupWarning = document.querySelector('#walletBackupWarning');
 const exportWalletKeyStatus = document.querySelector('#exportWalletKeyStatus');
 const importWalletKeyButton = document.querySelector('#importWalletKeyButton');
 const importWalletKeyStatus = document.querySelector('#importWalletKeyStatus');
@@ -1501,6 +1502,75 @@ function markTelegramSeedBackupConfirmed(address) {
   } catch {}
 }
 
+// ---- Wallet-key backup safety net ------------------------------------------
+// A newly-created wallet is stored on-device immediately, but exporting the encrypted KEY-FILE backup is a
+// separate step. If the user is interrupted (screen off, reload, accidental close) before exporting it, the
+// wallet can sit on the device with NO backup, and the quick-start would not re-appear (a wallet already
+// exists). So we durably flag "this wallet's key was never exported" — mirrored to Telegram CloudStorage to
+// survive iOS localStorage eviction — and keep re-surfacing the backup step until it is done. The flag is
+// cleared on export; a wallet created by IMPORT is never flagged (the user already holds the seed / file).
+const WALLET_KEY_BACKUP_PENDING_KEY = 'platho.wallet.keybackup.pending.v1';
+const WALLET_KEY_BACKUP_PENDING_CLOUD_KEY = 'platho_wallet_keybackup_pending_v1';
+
+function readWalletKeyBackupPendingSet() {
+  try {
+    const raw = localStorageOrNull()?.getItem(WALLET_KEY_BACKUP_PENDING_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeWalletKeyBackupPendingSet(list) {
+  const trimmed = Array.from(new Set(list.map(String))).slice(-8);
+  try { localStorageOrNull()?.setItem(WALLET_KEY_BACKUP_PENDING_KEY, JSON.stringify(trimmed)); } catch { /* ignore */ }
+  try { telegramCloudSet(WALLET_KEY_BACKUP_PENDING_CLOUD_KEY, JSON.stringify(trimmed)).catch(() => {}); } catch { /* ignore */ }
+}
+
+function isWalletKeyBackupPending(address) {
+  if (!address) return false;
+  return readWalletKeyBackupPendingSet().some((entry) => sameWalletAddress(entry, address));
+}
+
+function markWalletKeyBackupPending(address) {
+  if (!address) return;
+  const set = readWalletKeyBackupPendingSet();
+  if (set.some((entry) => sameWalletAddress(entry, address))) return;
+  set.push(String(address));
+  writeWalletKeyBackupPendingSet(set);
+  try { refreshWalletBackupWarning(); } catch { /* UI not ready */ }
+}
+
+function markWalletKeyBackupDone(address) {
+  if (!address) return;
+  const set = readWalletKeyBackupPendingSet();
+  const next = set.filter((entry) => !sameWalletAddress(entry, address));
+  if (next.length !== set.length) writeWalletKeyBackupPendingSet(next);
+  try { refreshWalletBackupWarning(); } catch { /* UI not ready */ }
+}
+
+function walletKeyBackupPendingForStoredWallet() {
+  if (!hasStoredPlathoWalletRecord()) return false;
+  const record = readEncryptedPlathoWalletRecord();
+  const address = record ? (storedWalletAddressForCopy(record) || record.address) : null;
+  return Boolean(address && isWalletKeyBackupPending(address));
+}
+
+async function restoreWalletKeyBackupPendingFromTelegramCloud() {
+  if (!telegramCloudStorage()) return;
+  try {
+    const json = await telegramCloudGet(WALLET_KEY_BACKUP_PENDING_CLOUD_KEY);
+    if (!json) return;
+    const cloud = JSON.parse(json);
+    if (!Array.isArray(cloud)) return;
+    // Union with local, erring toward "still pending": after iOS localStorage eviction the local set is
+    // empty, so the cloud copy is what keeps the backup nudge alive until the key is actually exported.
+    const merged = Array.from(new Set([...readWalletKeyBackupPendingSet(), ...cloud.map(String)]));
+    writeWalletKeyBackupPendingSet(merged);
+  } catch { /* ignore */ }
+}
+
 async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
   if (!isTelegramEnv() || !wallet) return;
   if (!force && isTelegramSeedBackupConfirmed(wallet.address)) return;
@@ -2241,6 +2311,7 @@ function walletDisplaySubtitle(wallet = plathoWallet) {
 }
 
 function renderWalletIdentity(status = null) {
+  try { refreshWalletBackupWarning(); } catch { /* UI not ready */ }
   if (!plathoWallet) {
     const storedRecord = storedPlathoWalletRecord();
     const hasStored = Boolean(storedRecord);
@@ -10609,6 +10680,8 @@ function walletKeyBackupFromRecord(record) {
 async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWalletRecord()) {
   if (!record) throw new Error('No encrypted wallet key is stored on this device');
   await downloadJsonFile(safeWalletKeyFilename(record), walletKeyBackupFromRecord(record));
+  // The key file (or the Telegram manual-copy dialog) is now saved/acknowledged — clear the backup nudge.
+  markWalletKeyBackupDone(storedWalletAddressForCopy(record) || record?.address || null);
 }
 
 async function offerEncryptedWalletKeyBackup(reason = 'Save this encrypted wallet key file before adding funds.') {
@@ -11943,6 +12016,7 @@ createWalletButton?.addEventListener('click', async () => {
     if (!password) return;
     createWalletButton.disabled = true;
     await setPlathoWallet(walletDraft, { password });
+    markWalletKeyBackupPending(walletDraft.address);
     // Inside Telegram, force a confirmed seed backup right after generation: the
     // WebView can evict localStorage and the seed is the only recovery path.
     await enforceTelegramSeedBackupGate(walletDraft, { force: true });
@@ -12062,6 +12136,26 @@ exportWalletKeyButton?.addEventListener('click', async () => {
     setText(exportWalletKeyStatus, 'blocked');
     console.error(error);
   } finally {
+    refreshMessagingControls();
+  }
+});
+
+// Profile indicator: a noticeable warning row shown only while the on-device wallet's key has never been
+// exported. Tapping it runs the same export flow; downloadEncryptedWalletKeyBackup clears the flag on success.
+function refreshWalletBackupWarning() {
+  if (!walletBackupWarning) return;
+  walletBackupWarning.hidden = !walletKeyBackupPendingForStoredWallet();
+}
+
+walletBackupWarning?.addEventListener('click', async () => {
+  try {
+    walletBackupWarning.disabled = true;
+    if (await exportEncryptedWalletKeyFile()) flashWalletIdentityStatus('Wallet key exported');
+  } catch (error) {
+    console.error(error);
+  } finally {
+    walletBackupWarning.disabled = false;
+    refreshWalletBackupWarning();
     refreshMessagingControls();
   }
 });
@@ -13811,6 +13905,20 @@ async function loadConnectedVaultGlobal(options = {}) {
 // never bites normal reads.
 const CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS = 8_000;
 
+// Hard ceiling for the WHOLE Vault-open read burst (wallet balances + vault user + global). Under degraded
+// RPC (gateway slow/unreachable -> keyless toncenter fallback: serial ~1 rps + 60s backoff + verify:true
+// cross-check + retries) the burst can accumulate to MINUTES, which left refreshVaultNow awaiting forever
+// (observed on iOS: op=vault stuck ~148s, heartbeat alive, the Vault tab dead). Past this deadline the Vault
+// renders with whatever is cached, shows "RPC busy, retrying", and lets the background reads update later —
+// so the tab can NEVER hang open.
+const VAULT_OPEN_READ_DEADLINE_MS = 12_000;
+// Overall backstop for the WHOLE refreshVaultNow (dashboard + activation + stats jobs). The dashboard read
+// deadline above un-freezes the balance render, but the activation/stats jobs do the same verify:true reads
+// and would otherwise keep op='vault' + the single-flight lock held for minutes under degraded RPC. Past
+// this the caller-visible refresh returns (op -> idle, lock released, auto-refresh resumes); any still-slow
+// inner read finishes in the background and renders late.
+const VAULT_REFRESH_DEADLINE_MS = 16_000;
+
 function unverifiedCriticalChainReadOptions() {
   return {
     verify: false,
@@ -15147,11 +15255,32 @@ async function refreshVaultDashboard() {
   let user = null;
   let global = null;
   let userError = null;
-  const [walletBalancesResult, userResult, globalResult] = await Promise.allSettled([
+  const vaultReadsPromise = Promise.allSettled([
     loadConnectedWalletBalances(),
-    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
-    loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
+    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
+    loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
   ]);
+  // Hard deadline: never await the read burst forever. Under degraded RPC it can take minutes
+  // (keyless toncenter fallback + verify cross-check + backoff), which hung the Vault tab (op=vault ~148s,
+  // heartbeat alive, tab dead). On timeout, render with cached state + a retry instead of hanging.
+  const vaultReadsTimedOut = Symbol('vault-open-reads-timeout');
+  const settledVaultReads = await Promise.race([
+    vaultReadsPromise,
+    delay(VAULT_OPEN_READ_DEADLINE_MS).then(() => vaultReadsTimedOut),
+  ]);
+  if (settledVaultReads === vaultReadsTimedOut) {
+    markRuntimeOp('vaultw:slow');
+    renderAthProfileStats();
+    refreshComposerCostStatus();
+    setVaultStatus('RPC busy, retrying');
+    markNavVaultBalancePending('RPC busy', { retry: true });
+    refreshComposerPublishPolicy();
+    // Apply the slow reads when they finally settle (best-effort, only if still on the Vault tab).
+    vaultReadsPromise.then(() => { if (isVaultViewActive()) scheduleVaultAutoRefresh(1_000); }).catch(() => {});
+    markRuntimeOp('vault');
+    return null;
+  }
+  const [walletBalancesResult, userResult, globalResult] = settledVaultReads;
   const walletBalances = walletBalancesResult.status === 'fulfilled'
     ? walletBalancesResult.value
     : { ton_balance: null, ath_balance: null };
@@ -15362,7 +15491,7 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
   // Public->Vault freeze surfaces as worstStallOp='vault' / crumb 'vault'.
   const prevVaultOp = runtimeDiagnostics.currentOp;
   markRuntimeOp('vault');
-  vaultRefreshPromise = (async () => {
+  const vaultWork = (async () => {
     const results = [];
     const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
     results.push(...dashboardResult);
@@ -15380,8 +15509,21 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
     const rejected = results.find((result) => result.status === 'rejected');
     if (rejected) throw rejected.reason;
   })();
+  vaultWork.catch(() => {});
+  vaultRefreshPromise = vaultWork;
+  const vaultRefreshTimedOut = Symbol('vault-refresh-deadline');
   try {
-    return await vaultRefreshPromise;
+    const outcome = await Promise.race([
+      vaultWork,
+      delay(VAULT_REFRESH_DEADLINE_MS).then(() => vaultRefreshTimedOut),
+    ]);
+    if (outcome === vaultRefreshTimedOut) {
+      // Degraded RPC: the inner read/render work blew past the deadline. Stop blocking the caller and the
+      // single-flight lock; surface a retry. The inner work keeps running and renders late if it settles.
+      setVaultStatus('RPC busy, retrying');
+      return null;
+    }
+    return outcome;
   } finally {
     vaultRefreshPromise = null;
     markRuntimeOp(prevVaultOp);
@@ -20047,6 +20189,7 @@ async function runQuickStartCreateWallet() {
   });
   if (!password) return false;
   await setPlathoWallet(walletDraft, { password });
+  markWalletKeyBackupPending(walletDraft.address);
   await enforceTelegramSeedBackupGate(walletDraft, { force: true });
   flashWalletIdentityStatus('Wallet ready');
   refreshMessagingControls();
@@ -20097,6 +20240,7 @@ const QUICK_START_STEPS = [
     },
   },
   {
+    key: 'export',
     title: 'Back up your wallet key',
     action: 'Save wallet key',
     optional: false,
@@ -20175,10 +20319,18 @@ function quickStartAdvance() {
   renderQuickStartStep();
 }
 
+// When the quick-start is re-opened ONLY to finish the mandatory wallet-key backup (a wallet already
+// exists), closing it must NOT permanently dismiss onboarding — the backup is still pending and should
+// re-surface next launch. quickStartBackupMode tracks that so closeQuickStart skips the dismissed-forever flag.
+let quickStartBackupMode = false;
+
 function closeQuickStart() {
   if (quickStartDialog) quickStartDialog.hidden = true;
-  try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
-  try { telegramCloudSet(QUICK_START_DISMISSED_CLOUD_KEY, '1').catch(() => {}); } catch { /* ignore */ }
+  if (!quickStartBackupMode) {
+    try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+    try { telegramCloudSet(QUICK_START_DISMISSED_CLOUD_KEY, '1').catch(() => {}); } catch { /* ignore */ }
+  }
+  quickStartBackupMode = false;
 }
 
 function finishQuickStart() {
@@ -20188,17 +20340,44 @@ function finishQuickStart() {
 
 function openQuickStart() {
   if (!quickStartDialog) return;
+  quickStartBackupMode = false;
   quickStartStepIndex = 0;
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = false;
   if (quickStartStepsView) quickStartStepsView.hidden = true;
   quickStartDialog.hidden = false;
 }
 
-function maybeShowQuickStartOnFirstRun() {
+function quickStartStepIndexByKey(key) {
+  const i = QUICK_START_STEPS.findIndex((step) => step.key === key);
+  return i >= 0 ? i : 0;
+}
+
+// Re-open the quick-start jumped straight to the mandatory wallet-key backup step (used when a wallet exists
+// but its key was never exported). The export step itself prompts for the password, so the wallet does not
+// need to be unlocked first.
+function openQuickStartAtBackup() {
   if (!quickStartDialog) return;
-  if (hasStoredPlathoWalletRecord()) return;
-  if (quickStartDismissedForever()) return;
-  openQuickStart();
+  quickStartBackupMode = true;
+  quickStartStepIndex = quickStartStepIndexByKey('export');
+  if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
+  if (quickStartStepsView) quickStartStepsView.hidden = false;
+  quickStartDialog.hidden = false;
+  renderQuickStartStep();
+}
+
+function maybeShowQuickStartOnFirstRun() {
+  if (!quickStartDialog) return false;
+  if (!hasStoredPlathoWalletRecord()) {
+    if (quickStartDismissedForever()) return false;
+    openQuickStart();
+    return true;
+  }
+  // A wallet exists but its encrypted key was never exported — keep nudging the backup until it is done.
+  if (walletKeyBackupPendingForStoredWallet()) {
+    openQuickStartAtBackup();
+    return true;
+  }
+  return false;
 }
 
 quickStartBeginButton?.addEventListener('click', () => {
@@ -20259,8 +20438,16 @@ document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))
   .then(() => restoreQuickStartDismissalFromTelegramCloud().catch(() => {}))
+  .then(() => restoreWalletKeyBackupPendingFromTelegramCloud().catch(() => {}))
   .then(() => setTimeout(() => {
-    promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
+    try { refreshWalletBackupWarning(); } catch (error) { console.error(error); }
+    // If we are driving the user through the mandatory wallet-key backup (a wallet exists but its key was
+    // never exported), the backup step does its own unlock — don't also pop the startup unlock prompt
+    // (avoids a confusing double password). Otherwise unlock as usual.
+    const drivingBackup = walletKeyBackupPendingForStoredWallet();
     try { maybeShowQuickStartOnFirstRun(); } catch (error) { console.error(error); }
+    if (!drivingBackup) {
+      promptStoredWalletUnlockOnStartup().catch((error) => console.error(error));
+    }
   }, 250))
   .catch((error) => console.error(error));

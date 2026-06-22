@@ -2363,6 +2363,17 @@ button.feed-item:hover {
   border-color: rgba(48, 213, 176, 0.42);
 }
 
+/* Persistent "your wallet key is not backed up" warning row in the Profile (higher specificity than the
+   generic .settings-list button so the danger styling wins). Shown only while the backup is pending. */
+.settings-list button.wallet-backup-warning {
+  border-color: var(--danger);
+}
+
+.settings-list button.wallet-backup-warning > span,
+.settings-list button.wallet-backup-warning > strong {
+  color: var(--danger);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
