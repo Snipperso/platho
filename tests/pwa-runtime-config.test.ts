@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v481<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v481'/);
+    expect(html).toMatch(/id="appVersionLabel">v482<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v482'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1992,6 +1992,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function commitToncenterKeyFromInput\(\)/);
     expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('change'/);
     expect(app).toMatch(/if \(result\.reason === 'invalid'\) \{[\s\S]*toncenterKeyStatus\.textContent = 'invalid key'[\s\S]*setAttribute\('data-state', 'error'\)[\s\S]*return;\s*\}\s*applyToncenterApiKey\(trimmed\);/);
+    // "recommended" lives in the section heading, not the row, so it never crowds the key input on a narrow
+    // phone; the in-row status is empty when there is no key (validation states like 'invalid key' still show).
+    expect(app).toMatch(/toncenterKeyStatus\.textContent = key \? 'key active' : ''/);
+    expect(readFileSync('web/index.html', 'utf8')).toMatch(/<h2>RPC access \(recommended\)<\/h2>/);
     // The row itself doubles as the Get button (opens the @toncenter bot), except a click on the field.
     expect(app).toMatch(/rpcKeyRow\?\.addEventListener\('click'[\s\S]*event\.target === toncenterApiKeyInput[\s\S]*openToncenterBotLink\(\)/);
     // The Save button is gone.
@@ -4488,11 +4492,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v552/);
+    expect(sw).toMatch(/platho-pwa-prototype-v553/);
     expect(sw).toMatch(/\.\/styles\.css\?v=157/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=481/);
+    expect(sw).toMatch(/\.\/app\.js\?v=482/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v481';
+const PLATHO_APP_RUNTIME_VERSION = 'v482';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -458,7 +458,7 @@ function refreshToncenterKeyUi() {
     try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
   }
   if (toncenterKeyStatus) {
-    toncenterKeyStatus.textContent = key ? 'key active' : 'recommended';
+    toncenterKeyStatus.textContent = key ? 'key active' : '';
     toncenterKeyStatus.removeAttribute('data-state');
   }
   if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) {
