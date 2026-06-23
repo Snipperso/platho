@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v478<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v478'/);
+    expect(html).toMatch(/id="appVersionLabel">v479<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v479'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -2006,6 +2006,10 @@ describe('PWA runtime config guard', () => {
     // Set pending on EVERY new-wallet creation (manual + quick-start); cleared when the key is actually exported.
     expect(app).toMatch(/await setPlathoWallet\(walletDraft, \{ password \}\);\s*markWalletKeyBackupPending\(walletDraft\.address\)/);
     expect(app).toMatch(/await downloadJsonFile\([\s\S]*markWalletKeyBackupDone\(storedWalletAddressForCopy\(record\)/);
+    // Importing an encrypted wallet-key backup proves the key is already exported (the file IS the export), so the
+    // import path clears the pending flag (incl. the cloud mirror) for the imported address -- IMPORT is never a
+    // pending state. Regression guard: re-importing a wallet wrongly showed the Profile "back up your key" warning.
+    expect(app).toMatch(/async function activateImportedEncryptedWalletRecord\([\s\S]*?markWalletKeyBackupDone\(wallet\.address\)/);
     // Re-surface: a wallet that exists but is unbacked-up re-opens the quick-start jumped to the export step.
     expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*openQuickStartAtBackup\(\);\s*return true;/);
     expect(app).toMatch(/function openQuickStartAtBackup\(\)[\s\S]*quickStartStepIndexByKey\('export'\)/);
@@ -2021,6 +2025,10 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="walletBackupWarning"/);
     expect(app).toMatch(/function refreshWalletBackupWarning\(\)[\s\S]*walletBackupWarning\.hidden = !walletKeyBackupPendingForStoredWallet\(\)/);
     expect(css).toMatch(/\.wallet-backup-warning/);
+    // The warning is a .settings-list <button>, and `.settings-list button { display: flex }` (specificity
+    // 0,1,1) outranks the UA `[hidden] { display: none }` (0,1,0) -- without an explicit guard the row can
+    // never hide via its `hidden` attribute. Regression: it kept showing "Save now" after a successful export.
+    expect(css).toMatch(/\.settings-list button\[hidden\][\s\S]*?display:\s*none/);
   });
 
   it('PWA-REGISTRY-CRITICAL-01: identity, avatar, and username registry reads use fresh verified options', () => {
@@ -4470,11 +4478,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v549/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=155/);
+    expect(sw).toMatch(/platho-pwa-prototype-v550/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=156/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=478/);
+    expect(sw).toMatch(/\.\/app\.js\?v=479/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

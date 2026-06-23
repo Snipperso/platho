@@ -2098,6 +2098,14 @@ button.feed-item:hover {
   border-color: var(--line);
 }
 
+/* The `display: flex` above (specificity 0,1,1) outranks the UA `[hidden] { display: none }`
+   (0,1,0), so a settings/action button with the `hidden` attribute would stay visible. Restore
+   native hiding for these buttons -- e.g. #walletBackupWarning, which toggles via `.hidden`. */
+.action-grid button[hidden],
+.settings-list button[hidden] {
+  display: none;
+}
+
 .ledger-row {
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr) auto;
