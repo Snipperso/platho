@@ -98,11 +98,11 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     },
   },
   vault: {
-    address: 'UQB-EaCRXSL_HyRXhp7YMSuQxKcSYPEvRtq-hEwsfzepfFJT',
-    deploymentManifestHash: 'b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae',
+    address: 'UQC0dTjgbUpyNlSoUJoQE1UHlh12PUrBv1Ui7bQ8izv4uB27',
+    deploymentManifestHash: '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=49',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=50',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -112,27 +112,27 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=29',
+      moduleUrl: './ton-dns-provider.mjs?v=30',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
     },
   },
   capsuleHub: {
-    address: 'UQAYwXnGFHz0yZLDKRNGofomS9yWrzxMnyPO-A-Di5ZQB90G',
+    address: 'UQAjYAjfEB33-QIifsf02U3sZmAvvwJgoCZPNjGh2FmmPZRx',
     publicReadLimit: 128,
   },
   feeAccumulator: {
-    address: 'UQBHCfa5_Kn0JHCniQxrUfVAIg67L2ZvwkLOhBUaQzNP2zM-',
+    address: 'UQBg4NGArbbjGCFR-2lZ68XCQibO5OYTA7JfVKSdViXDrY6p',
   },
   ath: {
-    masterAddress: 'UQBbeKdVpDbcgalNLVEsCrtG3rTmw87vtzuRUM4B3X7IAFFt',
+    masterAddress: 'UQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oRbF',
   },
   usernameRegistry: {
-    address: 'UQAInh5yk_bApmczqRiPKNSgta-ty_VOsDqs5QrGZgCyONIj',
+    address: 'UQC-TQBTQolXC-feDjb78omYJ40B1w4qq8P4nV2JhHxLFb2u',
   },
   profileRegistry: {
-    address: 'UQBEVx3u0fNLfEQFBoE3jKcvojt7FQf68pckqsaXunnsJrIn',
+    address: 'UQCKAB4WWVRhFdlVPfaSs8NEE1GzOwWa6WHf5R-bAZHay8gf',
   },
   crypto: {
     signedBundlePurpose: 'pwa-production',

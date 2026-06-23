@@ -187,13 +187,13 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_avatar_version');
     expect(PLATHO_APP_CONFIG.network.tonRpc.criticalMethods).toContain('get_username_item_address');
     expect(PLATHO_APP_CONFIG.capsuleHub.publicReadLimit).toBe(128);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQB-EaCRXSL_HyRXhp7YMSuQxKcSYPEvRtq-hEwsfzepfFJT');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQC0dTjgbUpyNlSoUJoQE1UHlh12PUrBv1Ui7bQ8izv4uB27');
     expect(PLATHO_APP_CONFIG.vault.deploymentManifestHash).toBe(
-      'b29aa2598542aa320df5065cc5dbce5d29047e7a44140fd68a49439316dee5ae',
+      '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
     );
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQAYwXnGFHz0yZLDKRNGofomS9yWrzxMnyPO-A-Di5ZQB90G');
-    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQBHCfa5_Kn0JHCniQxrUfVAIg67L2ZvwkLOhBUaQzNP2zM-');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQBbeKdVpDbcgalNLVEsCrtG3rTmw87vtzuRUM4B3X7IAFFt');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQAjYAjfEB33-QIifsf02U3sZmAvvwJgoCZPNjGh2FmmPZRx');
+    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQBg4NGArbbjGCFR-2lZ68XCQibO5OYTA7JfVKSdViXDrY6p');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oRbF');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
@@ -202,7 +202,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=29/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=30/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v477<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v477'/);
+    expect(html).toMatch(/id="appVersionLabel">v478<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v478'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -570,9 +570,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQB-EaCRXSL_HyRXhp7YMSuQxKcSYPEvRtq-hEwsfzepfFJT');
-    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQAYwXnGFHz0yZLDKRNGofomS9yWrzxMnyPO-A-Di5ZQB90G');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQBbeKdVpDbcgalNLVEsCrtG3rTmw87vtzuRUM4B3X7IAFFt');
+    expect(PLATHO_APP_CONFIG.vault.address).toBe('UQC0dTjgbUpyNlSoUJoQE1UHlh12PUrBv1Ui7bQ8izv4uB27');
+    expect(PLATHO_APP_CONFIG.capsuleHub.address).toBe('UQAjYAjfEB33-QIifsf02U3sZmAvvwJgoCZPNjGh2FmmPZRx');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQA1Xa56qP5Ebe3yprAEQWf4Rg_cc39xhwIP1802Jql2oRbF');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).toMatch(/fetchTonWalletBalance\(address\)/);
@@ -3742,7 +3742,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function clearPublicBodyHistoryUnavailable/);
     expect(app).toMatch(/function publicBodyHistoryRetryEntryIds/);
     expect(syncPublicSource).toMatch(/const retryEntryIds = publicBodyHistoryRetryEntryIds\(address, latestId, BigInt\(minEntryId\)\)/);
-    expect(syncPublicSource).toMatch(/entryIdsToScan\.push\(\.\.\.retryEntryIds\)/);
+    expect(syncPublicSource).toMatch(/for \(const id of retryEntryIds\) pushScanId\(id\)/);
     expect(syncPublicSource).toMatch(/rememberPublicBodyHistoryUnavailable\(address, entry, entryIdValue\)/);
     expect(syncPublicSource).toMatch(/clearPublicBodyHistoryUnavailable\(address, entryIdValue\)/);
     expect(syncPublicSource).toMatch(/unavailableEntries\.push/);
@@ -4470,32 +4470,32 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v548/);
+    expect(sw).toMatch(/platho-pwa-prototype-v549/);
     expect(sw).toMatch(/\.\/styles\.css\?v=155/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=477/);
+    expect(sw).toMatch(/\.\/app\.js\?v=478/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
-    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=3/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=88/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=45/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=36/);
-    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=12/);
+    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=4/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=89/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=46/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
-    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=16/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=49/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=45/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=31/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=29/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=36/);
+    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=50/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=34/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=46/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=32/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=30/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=37/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
-    expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=7/);
+    expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/ed25519\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/abstract\/edwards\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/hashes\/sha2\.js/);

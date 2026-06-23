@@ -1,6 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=49';
-import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=29';
+import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=50';
+import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=30';
 
 const CAPSULEHUB_OPS = Object.freeze({
   // VPB2 batch ingest (the live redeploy path): ONE Vault->Hub message carries N part bodies.
@@ -396,6 +396,7 @@ export function parseCapsuleHubBatchMessageBody(bodyBoc) {
     } else {
       const sizeClass = part.readUint(8, 'size_class');
       part.readUint(8, 'reserved');
+      const parentLink = part.readUint(64, 'parent_link');
       const headerHash = part.readUint(256, 'header_hash');
       const bodyHash = part.readUint(256, 'body_hash');
       const header = part.readRef('header');
@@ -407,6 +408,7 @@ export function parseCapsuleHubBatchMessageBody(bodyBoc) {
         part_index: partIndex,
         author_wallet: authorWallet,
         size_class: sizeClass,
+        parent_link: parentLink,
         header_hash: headerHash,
         body_hash: bodyHash,
         header_cell: header,
@@ -740,10 +742,10 @@ export function decodePrivateCapsuleKeyIndexStack(result) {
 
 export function decodePublicCapsuleEntryStack(result) {
   const stack = extractStack(result);
-  if (stack.length !== 11) {
+  if (stack.length !== 13) {
     throw new CapsuleHubTonRpcProviderError('CapsuleHub public entry ABI mismatch: current entry view required');
   }
-  const headerBoc = readStackCellBoc(stack, 10, 'public header cell');
+  const headerBoc = readStackCellBoc(stack, 12, 'public header cell');
   return {
     exists: readStackBool(stack, 0, 'public entry exists'),
     entry_id: readStackInt(stack, 1, 'public entry id'),
@@ -755,8 +757,27 @@ export function decodePublicCapsuleEntryStack(result) {
     created_at: readStackInt(stack, 7, 'public created at'),
     header_hash: readStackInt(stack, 8, 'public header hash'),
     body_hash: readStackInt(stack, 9, 'public body hash'),
+    // parent_link == 0 -> top-level post; else parentEntryId+1 -> comment. prev_link chains the entry's index.
+    parent_link: readStackInt(stack, 10, 'public parent link'),
+    prev_link: readStackInt(stack, 11, 'public prev link'),
     header_boc: headerBoc,
     body_boc: null,
+  };
+}
+
+// Public author/parent index views share the private key-index shape (exists, key_id, latest_entry_id,
+// latest_entry_link, entry_count).
+export function decodePublicCapsuleKeyIndexStack(result) {
+  const stack = extractStack(result);
+  if (stack.length !== 5) {
+    throw new CapsuleHubTonRpcProviderError('CapsuleHub public key index ABI mismatch: current key-index view required');
+  }
+  return {
+    exists: readStackBool(stack, 0, 'public key index exists'),
+    key_id: readStackInt(stack, 1, 'public key index key id'),
+    latest_entry_id: readStackInt(stack, 2, 'public key index latest entry id'),
+    latest_entry_link: readStackInt(stack, 3, 'public key index latest entry link'),
+    entry_count: readStackInt(stack, 4, 'public key index entry count'),
   };
 }
 
@@ -1035,6 +1056,28 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
         address,
         method: 'get_public_entry',
         stack: [stackNumber(entryId)],
+        ...runGetCallOptions(callOptions),
+      }));
+    },
+    // Public author index head: keyId = beginCell().storeAddress(author).endCell().hash() (publicAuthorKeyId).
+    async getPublicAuthorIndex(keyId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
+      return decodePublicCapsuleKeyIndexStack(await transport.runGetMethod({
+        address,
+        method: 'get_public_author_index',
+        stack: [stackNumber(keyId)],
+        ...runGetCallOptions(callOptions),
+      }));
+    },
+    // Public parent (comment-thread) index head, keyed by the parent post's entry id.
+    async getPublicParentIndex(parentEntryId, callOptions = {}) {
+      const transport = resolveTransport(options);
+      const address = resolveCapsuleHubAddress(options.capsuleHubAddress, callOptions);
+      return decodePublicCapsuleKeyIndexStack(await transport.runGetMethod({
+        address,
+        method: 'get_public_parent_index',
+        stack: [stackNumber(parentEntryId)],
         ...runGetCallOptions(callOptions),
       }));
     },

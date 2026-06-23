@@ -2354,7 +2354,7 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, slice, slice, int, 
 ((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell), int) $Vault$_fun_batchStorageReserve((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell) $self, int $kind) impure inline_ref {
     var (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)) = $self;
     if (($kind == 2)) {
-        var $fresh$ret_221 = 8400000;
+        var $fresh$ret_221 = 10400000;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_221);
     }
     var $fresh$ret_222 = 4300000;
@@ -2364,10 +2364,10 @@ builder $Vault$_store(builder build_0, (slice, slice, slice, slice, slice, int, 
 ((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell), int) $Vault$_fun_batchHubPartGas((slice, slice, slice, slice, slice, int, int, int, int, cell, cell, cell, cell, cell, cell, cell, cell, int, int, int, int, int, int, cell) $self, int $kind) impure inline_ref {
     var (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)) = $self;
     if (($kind == 2)) {
-        var $fresh$ret_223 = 75000;
+        var $fresh$ret_223 = 180000;
         return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_223);
     }
-    var $fresh$ret_224 = 75000;
+    var $fresh$ret_224 = 170000;
     return (($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext), $fresh$ret_224);
 }
 
@@ -3344,9 +3344,6 @@ _ %get_global() method_id(126899) {
         }
         throw_unless(16562, ($global_now() >= ($pending'created_at + 86400)));
         int $tombstoneExpiresAt = ($global_now() + 86400);
-        if (($tombstoneExpiresAt > 4294967295)) {
-            $tombstoneExpiresAt = 4294967295;
-        }
         var ($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce, $user'receipts) = ($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)~$Vault$_fun_updateReceipt(($self'vault_ath_wallet_address, $self'ath_master_address, $self'capsule_hub_address, $self'profile_registry_address, $self'username_registry_address, $self'binding_flags, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'users, $self'key_records, $self'receive_intents, $self'processed_ath_deposits, $self'pending_ath_withdrawals, $self'pending_batch_publishes, $self'pending_profile_avatar_payments, $self'pending_username_mint_payments, $self'user_count, $self'key_record_count, $self'receive_intent_count, $self'processed_ath_deposit_count, $self'pending_ath_withdrawal_count, $self'pending_publish_count, $self'genesis_ext)~$Vault$_fun_getUserOrEmpty($pending'owner_wallet), $pending'nonce, 3, 18446744073709551615);
         $self'users~__tact_dict_set_slice_cell(267, $pending'owner_wallet, $UserState$_store_cell(($user'ton_balance, $user'ath_balance, $user'current_key_id, $user'auth_pubkey, $user'publish_nonce, $user'receipts), begin_cell()));
         $self'pending_batch_publishes~__tact_dict_set_int_cell(257, $bounceId, $PendingBatchPublish$_store_cell($PendingBatchPublish$_constructor_owner_wallet_tombstone_refund_to_vault_nonce_publish_kind_part_count_publish_id_refundable_amount_created_at($pending'owner_wallet, true, $pending'refund_to_vault, $pending'nonce, $pending'publish_kind, $pending'part_count, $pending'publish_id, $pending'refundable_amount, $tombstoneExpiresAt), begin_cell()));
@@ -3959,12 +3956,13 @@ _ %get_global() method_id(126899) {
                 ifnot ($isLast) {
                     $wantRefs = 3;
                 }
-                ifnot (( (($Slice$_fun_bits($part) == 528)) ? (($Slice$_fun_refs($part) == $wantRefs)) : (false) )) {
+                ifnot (( (($Slice$_fun_bits($part) == 592)) ? (($Slice$_fun_refs($part) == $wantRefs)) : (false) )) {
                     $rejectCode = 17;
                     $failIdx = $i;
                 } else {
                     int $sizeClass = $part~load_uint(8);
                     int $reserved = $part~load_uint(8);
+                    $part~$Slice$_fun_skipBits(64);
                     $h0 = $part~load_uint(256);
                     $bh = $part~load_uint(256);
                     cell $header = $part~$Slice$_fun_loadRef();

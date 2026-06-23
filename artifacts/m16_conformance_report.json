@@ -50,8 +50,8 @@
     },
     {
       "contract": "CapsuleHub.tact",
-      "non_comment_lines": 888,
-      "receive_handlers": 8,
+      "non_comment_lines": 1054,
+      "receive_handlers": 7,
       "bounced_handlers": 1,
       "forbidden_hits": [],
       "empty_fallback_rejects": true,
@@ -104,7 +104,7 @@
     },
     {
       "contract": "Vault.tact",
-      "non_comment_lines": 2482,
+      "non_comment_lines": 2480,
       "receive_handlers": 16,
       "bounced_handlers": 4,
       "forbidden_hits": [],
@@ -139,8 +139,8 @@
       "match": true
     },
     "CAPSULEHUB_CODE_HASH": {
-      "built": "f72823a4c01afd938143201dddff03f5193143e116366ce35a69e46662607791",
-      "pinned": "f72823a4c01afd938143201dddff03f5193143e116366ce35a69e46662607791",
+      "built": "b7ec6e2dfa9426ebab383883c85fe47a0d126c940b41ee614ef9b2c30f84d21a",
+      "pinned": "b7ec6e2dfa9426ebab383883c85fe47a0d126c940b41ee614ef9b2c30f84d21a",
       "match": true
     },
     "FEEACCUMULATOR_CODE_HASH": {
@@ -164,8 +164,8 @@
       "match": true
     },
     "VAULT_CODE_HASH": {
-      "built": "2cde6f6839b062374600628689008fc68d7d7757622a691287638829adbf08eb",
-      "pinned": "2cde6f6839b062374600628689008fc68d7d7757622a691287638829adbf08eb",
+      "built": "41d0e25a72d0505c4ef16503eb5d1d1dfed92bdc622fd6edc6b202166b998e87",
+      "pinned": "41d0e25a72d0505c4ef16503eb5d1d1dfed92bdc622fd6edc6b202166b998e87",
       "match": true
     }
   },
@@ -173,7 +173,7 @@
     "profile": "PLATHO.V1.DEPLOYMENT_MANIFEST_IMPLEMENTED_SUBSET_M15",
     "version": 15,
     "status": "IMPLEMENTED_SUBSET_NOT_FINAL_GENESIS",
-    "manifest_hash_hex": "c7810ecc1f34b442d8e190e9dcd7c6409f81dd1dccb2a0858ec6773c79ea80c9",
+    "manifest_hash_hex": "2bc9869de35239ef7f259456544fba14a22986fd1d0bab3731cee8b172bab7a0",
     "blockers_before_final_genesis": [
       "ATH_TREASURY_SUPPLY_MUST_BE_DEPLOYED_WITH_ONE_SHOT_GENESIS_CREDIT",
       "FINAL_DEPLOYMENT_MANIFEST_MUST_REPLACE_FIXTURE_ADDRESSES_WITH_MAINNET_STATEINIT_ADDRESSES",

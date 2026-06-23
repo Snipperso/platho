@@ -35,6 +35,26 @@ async function ingestGas(kind: bigint, n: number, size: bigint = SIZE_1K): Promi
   return Number((tx!.description as any).computePhase.gasUsed);
 }
 
+// Measures Hub ingest gas of an n-part batch that ALSO auto-evicts n entries: seed n at T0, advance past the
+// 1-year retention window, then send a second n-part batch (which adds n AND evicts the n now-expired seeds).
+const EVICT_RETENTION = 31536000;
+const EVICT_T0 = 1_700_000_000;
+async function ingestGasWithEviction(kind: bigint, n: number, size: bigint = SIZE_1K): Promise<number> {
+  const { hub, vault, blockchain } = (await setupHub()) as any;
+  const send = (pid: bigint, bid: bigint) => hub.send(vault.getSender(), { value: toNano('5') }, {
+    $$type: 'PublishBatchToHub',
+    bounce_id: bid, bounce_tag: bid + 1000n, publish_id: pid, publish_kind: kind,
+    part_count: BigInt(n), protocol_fee_total: 0n, author_wallet: vault.address,
+    parts: partsList(kind, n, size), marketing: kind === KIND_PUBLIC ? marketingCell() : null,
+  } as any);
+  blockchain.now = EVICT_T0;
+  await send(0x1111n, 1n);
+  blockchain.now = EVICT_T0 + EVICT_RETENTION + 60;
+  const res = await send(0x2222n, 2n);
+  const tx = res.transactions.find((t: any) => t.inMessage?.info?.dest?.toString() === hub.address.toString());
+  return Number((tx!.description as any).computePhase.gasUsed);
+}
+
 async function vaultBatchGas(n: number, size: bigint = SIZE_1K): Promise<number> {
   const { blockchain, vault, user } = await setupVault({ balance: toNano('10') });
   await registerHybrid(vault, user);
@@ -92,6 +112,22 @@ describe('VPB2 gas harness: CapsuleHub batch ingest', () => {
     // eslint-disable-next-line no-console
     console.log(`GAS-GATE  1x32K vaultGas=${one32k} (hard limit 1000000)`);
     expect(one32k).toBeLessThan(1_000_000);
+  });
+
+  it('GAS-GATE-EVICT: a publish that auto-evicts part_count entries stays within the funded HUB_PART_GAS provision', async () => {
+    // Worst case: an 8-part batch (largest that fits the 65,535-byte external as 8x4K) that ALSO auto-evicts 8
+    // now-expired entries. The Hub's value gate funds getComputeFee(HUB_BATCH_BASE_GAS + part_count*HUB_PART_GAS_*);
+    // the actual add+evict compute MUST stay under that provision, or the publish would value-shortfall once the
+    // contract is >1yr old. Mirrors contracts/CapsuleHub.tact HUB_BATCH_BASE_GAS=14000, HUB_PART_GAS_PUBLIC=180000,
+    // HUB_PART_GAS_PRIVATE=170000.
+    const HUB_BATCH_BASE_GAS = 14000;
+    for (const [label, kind, perPart] of [['PUBLIC ', KIND_PUBLIC, 180000], ['PRIVATE', KIND_PRIVATE, 170000]] as const) {
+      const gas = await ingestGasWithEviction(kind, 8, 4n);
+      const provisioned = HUB_BATCH_BASE_GAS + 8 * perPart;
+      // eslint-disable-next-line no-console
+      console.log(`GAS-GATE-EVICT ${label} 8x4K add+evict gasUsed=${gas} provisioned=${provisioned} headroom=${provisioned - gas} perPartUsed≈${Math.round((gas - HUB_BATCH_BASE_GAS) / 8)}/${perPart}`);
+      expect(gas).toBeLessThan(provisioned);
+    }
   });
 
   it('GAS-BY-SIZE: per-capsule gas + capacity at each private size class (1 part each)', async () => {

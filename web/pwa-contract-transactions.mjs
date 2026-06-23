@@ -697,6 +697,17 @@ export async function computeVaultMessagingKeyId(params = {}) {
   return bytesToBigInt(hash);
 }
 
+// Public author-index key id: hash of the FULL standard-address serialization of the author wallet, byte-for-byte
+// matching CapsuleHub.publicAuthorKeyId = beginCell().storeAddress(author).endCell().hash(). The builder's
+// .address() serializes identically to Tact storeAddress (tag 2 + anycast 0 + workchain byte + 32 hash bytes).
+// MUST be used for getPublicAuthorIndex — do NOT use basechainAddressHashValue (the bare 256-bit account hash, a
+// DIFFERENT value): a mismatch would make the author index resolve to "no posts" for every author.
+export async function computePublicAuthorKeyId(authorWallet) {
+  const cell = beginCell().address(authorWallet, 'author_wallet').endCell();
+  const { hash } = await computeCellHashAndDepth(cell);
+  return bytesToBigInt(hash);
+}
+
 function privateVaultBalancePublishSignedDataCell(params) {
   const publish = assertObject(params.publish ?? params, 'publish');
   const payload = beginCell()
@@ -1176,12 +1187,24 @@ export function buildBatchPublishPartCell(part) {
   const builder = beginCell()
     .uint(normalizePublicSizeClass(part.size_class ?? part.sizeClass, 'part.size_class'), 8, 'size_class')
     .uint(0n, 8, 'reserved')
+    .uint(publishPublicParentLink(part), 64, 'parent_link')
     .uint(publishHashValue(part.header_hash ?? part.headerHash ?? part.header_0_hash, 'part.header_hash'), 256, 'header_hash')
     .uint(publishHashValue(part.body_hash ?? part.bodyHash, 'part.body_hash'), 256, 'body_hash')
     .ref(header, 'header')
     .ref(body, 'body');
   if (next) builder.ref(next, 'next_part');
   return builder.endCell();
+}
+
+// parent_link wire field (entryLink convention): 0 -> top-level post (indexed by author on-chain);
+// parentEntryId+1 -> comment (indexed by parent). Mirrors CapsuleHub's parentLink/entryIdFromLink.
+function publishPublicParentLink(part) {
+  const explicit = part.parent_link ?? part.parentLink;
+  if (explicit !== undefined && explicit !== null) return BigInt(explicit);
+  const pid = part.parent_entry_id ?? part.parentEntryId;
+  if (pid === undefined || pid === null) return 0n;
+  const value = BigInt(pid);
+  return value < 0n ? 0n : value + 1n;
 }
 
 // Link 1..MAX_BATCH_PARTS parts into the singly-linked list and return its head (part 0). Built tail-first so
@@ -1839,6 +1862,12 @@ export async function createPublicPostPayload(input, options = {}) {
     body_boc: bodyBoc,
     header_cell: { hash: headerHash, boc: headerBoc, bytes: headerBytes.length },
     body_cell: { hash: bodyHash, boc: bodyBoc, bytes: bodyBytes.length },
+    // Surface the comment parent so the part builder sets parent_link (0 for posts) → the contract indexes a
+    // comment under its parent, not as a top-level post. Sourced from the parsed header (undefined for posts).
+    parentEntryId: parsed.parentEntryId,
+    parent_entry_id: parsed.parent_entry_id,
+    parentHash: parsed.parentHash,
+    parent_hash: parsed.parent_hash,
   };
 }
 

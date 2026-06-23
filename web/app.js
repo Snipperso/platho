@@ -27,7 +27,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=16';
+} from './platho-wallet.mjs?v=17';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -35,15 +35,15 @@ import {
 } from './encrypted-message-store.mjs?v=5';
 import {
   VaultChainProviderUnavailableError,
-} from './vault-chain-provider.mjs?v=7';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=88';
+} from './vault-chain-provider.mjs?v=8';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=89';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=49';
+} from './vault-ton-rpc-provider.mjs?v=50';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -97,7 +97,7 @@ import {
   networkFeeSurchargeNanotons,
   rawNetworkFeeSurchargeNanotons,
   resolveNetworkFeeEstimateNanotons,
-} from './message-pricing-policy.mjs?v=12';
+} from './message-pricing-policy.mjs?v=13';
 import {
   createProfileRegistryMessage,
   createAthWalletMessage,
@@ -110,6 +110,7 @@ import {
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
   buildVaultUsernameMintExternalBoc,
+  computePublicAuthorKeyId,
   computeVaultMessagingKeyId,
   computeVaultReceiveIntentId,
   createVaultWalletMessage,
@@ -129,25 +130,25 @@ import {
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
   VAULT_SIZE_CLASS,
-} from './pwa-contract-transactions.mjs?v=29';
+} from './pwa-contract-transactions.mjs?v=30';
 import {
   groupPublishItemsIntoBatches,
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
-} from './publish-batch-orchestration.mjs?v=3';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=31';
+} from './publish-batch-orchestration.mjs?v=4';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=32';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=45';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=33';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=29';
+} from './capsulehub-ton-rpc-provider.mjs?v=46';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=34';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=30';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=36';
+} from './username-ton-rpc-provider.mjs?v=37';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -155,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v477';
+const PLATHO_APP_RUNTIME_VERSION = 'v478';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -829,6 +830,10 @@ const PUBLIC_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 400;
 const LEGACY_MESSAGE_HISTORY_DB_NAME = 'platho-local-message-history-v1';
 const LEGACY_REPLAY_DB_NAME = 'platho-local-security-v1';
 const PUBLIC_CHAIN_READ_LIMIT = 128;
+// 'Long' history sync walks the full retained per-author chain the UI promises ("up to 1 year"), bounded by this
+// generous safety cap so a pathological high-volume author cannot wedge the client; past it the feed honestly
+// reports itself incomplete (symmetric to the private walk's catch-up signal).
+const PUBLIC_CHAIN_LONG_READ_LIMIT = 4096;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
 const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48;
 const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
@@ -5607,7 +5612,10 @@ function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
   rebuildPublicChannelRegistry();
 
   const subscribedById = new Map((publicChannelSubscriptions?.channels ?? []).map((item) => [item.id, item]));
-  subscribedById.set(id, { id, subscribed: true });
+  // Only an EXPLICIT user action (options.activate) subscribes. A channel merely DISCOVERED while syncing
+  // (a post author, or the author of a comment on a subscribed post) is registered for display but left
+  // unsubscribed — otherwise a fresh user's feed fills with everyone, the original public-feed bug.
+  subscribedById.set(id, { id, subscribed: subscribedById.get(id)?.subscribed === true || options.activate === true });
   publicChannelSubscriptions = {
     version: publicChannelSubscriptions?.version ?? 1,
     activeChannelId: options.activate ? id : (publicChannelSubscriptions?.activeChannelId ?? id),
@@ -5637,11 +5645,75 @@ async function syncPublicChannelFromChain() {
   const minEntryId = syncWindow === 'long' ? 0 : Math.max(0, latest - readLimit);
   const retryEntryIds = publicBodyHistoryRetryEntryIds(address, latestId, BigInt(minEntryId));
   const retryEntryIdSet = new Set(retryEntryIds.map((id) => id.toString()));
+  // Per-subscribed-author walk (replaces the old global scan): fetch only posts by channels the user is
+  // subscribed to, plus the comments on those posts, via the on-chain author/parent indexes. Cost scales with
+  // the user's subscriptions, NOT the global feed size — the scalability fix. The walk caches each fetched
+  // entry so the body-resolution loop below does not re-fetch it.
   const entryIdsToScan = [];
-  for (let entryId = latest - 1; entryId >= minEntryId; entryId -= 1) {
-    entryIdsToScan.push(BigInt(entryId));
+  const scanSet = new Set();
+  const walkedEntries = new Map();
+  const pushScanId = (id) => { const k = id.toString(); if (!scanSet.has(k)) { scanSet.add(k); entryIdsToScan.push(id); } };
+  // Walk a backward-linked index chain (an author's posts, or a post's comments). Returns the walked entry ids
+  // plus whether the cap truncated the walk (the chain still had older entries) — the honest-incomplete signal,
+  // symmetric to the private walk's catch-up. The chain ends naturally at link==0 (entryLink == id+1, 0 = none);
+  // a missing/evicted entry (exists!==true) terminates gracefully without counting it.
+  const walkPublicChainIds = async (latestLink, max) => {
+    const ids = [];
+    let link = BigInt(latestLink ?? 0n);
+    let truncated = false;
+    for (let n = 0; link > 0n; n += 1) {
+      if (n >= max) { truncated = true; break; }
+      const entryId = link - 1n;
+      const entry = await provider.getPublicEntry(entryId, readOptions);
+      walkedEntries.set(entryId.toString(), entry);
+      if (entry.exists !== true) break;
+      ids.push(entryId);
+      pushScanId(entryId);
+      const prev = BigInt(entry.prev_link ?? 0n);
+      if (prev === link) break; // defensive: never spin on a self-referential link
+      link = prev;
+    }
+    return { ids, truncated };
+  };
+  // 'short' = newest readLimit per author (cheap default). 'long' = the full retained per-author history the UI
+  // promises ("up to 1 year"), bounded by a generous safety cap. entry_count (kept exact by the contract's
+  // tail-first FIFO eviction) is the false-positive-free truncation detector.
+  const allTime = syncWindow === 'long';
+  const authorWalkMax = allTime ? PUBLIC_CHAIN_LONG_READ_LIMIT : readLimit;
+  const incompleteChannels = [];
+  for (const channel of subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)) {
+    const channelAuthor = channel.authorWallet;
+    if (!channelAuthor) continue;
+    let authorIndex;
+    try {
+      authorIndex = await provider.getPublicAuthorIndex(await computePublicAuthorKeyId(channelAuthor), readOptions);
+    } catch (error) {
+      console.warn('Skipping public author index read', channel.id, error);
+      continue;
+    }
+    if (authorIndex.exists !== true) continue;
+    const liveCount = Number(authorIndex.entry_count ?? 0n) || 0;
+    const { ids: postIds, truncated: postsTruncated } = await walkPublicChainIds(authorIndex.latest_entry_link, authorWalkMax);
+    let commentsTruncated = false;
+    for (const postId of postIds) {
+      let parentIndex;
+      try {
+        parentIndex = await provider.getPublicParentIndex(postId, readOptions);
+      } catch {
+        continue;
+      }
+      if (parentIndex.exists === true) {
+        const { truncated: ct } = await walkPublicChainIds(parentIndex.latest_entry_link, authorWalkMax);
+        if (ct) commentsTruncated = true;
+      }
+    }
+    // Honest incomplete: more live posts on-chain than were surfaced (cap-truncated, or walked < the contract's
+    // exact live count), or some post's comment chain was truncated.
+    if (postsTruncated || commentsTruncated || (liveCount > 0 && postIds.length < liveCount)) {
+      incompleteChannels.push(channel.id);
+    }
   }
-  entryIdsToScan.push(...retryEntryIds);
+  for (const id of retryEntryIds) pushScanId(id);
   const cutoffMs = publicSyncCutoffMs();
   const postParts = [];
   const commentParts = [];
@@ -5651,7 +5723,7 @@ async function syncPublicChannelFromChain() {
   for (const entryIdValue of entryIdsToScan) {
     const retryOnly = retryEntryIdSet.has(entryIdValue.toString());
     scanned += 1;
-    const entry = await provider.getPublicEntry(entryIdValue, readOptions);
+    const entry = walkedEntries.get(entryIdValue.toString()) ?? await provider.getPublicEntry(entryIdValue, readOptions);
     if (entry.exists !== true) {
       if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
       continue;
@@ -5856,6 +5928,8 @@ async function syncPublicChannelFromChain() {
     retryEntryCount: retryEntryIds.length,
     historyUnavailableCount: unavailableEntries.length,
     unavailableEntries,
+    incompleteChannelCount: incompleteChannels.length,
+    incompleteChannels,
   };
   return true;
 }
@@ -5900,7 +5974,17 @@ async function syncPublicChannels() {
       hydratePublicAvatars().catch((error) => console.error(error));
       hydratePublicChannelAvatars().catch((error) => console.error(error));
       const unavailableCount = Number(globalThis.plathoLastPublicSync?.historyUnavailableCount ?? 0);
-      if (unavailableCount > 0) setPublicStatus(`chain sync: ${unavailableCount} history gap${unavailableCount === 1 ? '' : 's'}`);
+      const incompleteCount = Number(globalThis.plathoLastPublicSync?.incompleteChannelCount ?? 0);
+      if (unavailableCount > 0) {
+        setPublicStatus(`chain sync: ${unavailableCount} history gap${unavailableCount === 1 ? '' : 's'}`);
+      } else if (incompleteCount > 0) {
+        // Honest incomplete signal (symmetric to the private 'sync incomplete'): a subscribed channel has more
+        // retained posts on-chain than were surfaced. 'short' shows only the newest 128 — point the user at the
+        // Long window; 'long' already loads full retained history, so only a past-cap extreme reports here.
+        setPublicStatus(globalThis.plathoLastPublicSync?.allTime
+          ? `feed incomplete: ${incompleteCount} channel${incompleteCount === 1 ? '' : 's'}`
+          : 'older posts available — set History sync to Long');
+      }
       return;
     }
   } catch (error) {
@@ -19662,6 +19746,9 @@ function publicPublishDraftFromPayload(payload) {
     body_hash: payload.bodyHash,
     header_0_cell: payload.header_cell,
     body_cell: payload.body_cell,
+    // Carry the comment parent to the part so buildBatchPublishPartCell sets parent_link (0 for posts) and the
+    // contract indexes a comment under its parent. Undefined for posts.
+    parent_entry_id: payload.parent_entry_id ?? payload.parentEntryId,
   };
 }
 

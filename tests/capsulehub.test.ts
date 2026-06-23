@@ -7,7 +7,6 @@ import {
   CapsuleHub,
   DepositProtocolFee,
   FlushFees,
-  PruneCapsuleEntry,
   SweepExcessReserve,
   storeDepositProtocolFee,
 } from '../build/CapsuleHub/CapsuleHub_CapsuleHub';
@@ -58,8 +57,7 @@ const FEEACCUMULATOR_FLUSH_EXEC_RESERVE = 5_000_000n;
 const CAPSULEHUB_INDEX_RETENTION_SECONDS = 31_536_000;
 const CAPSULEHUB_MIN_PROTECTED_RESERVE = 100_000_000_000n;
 const CAPSULEHUB_PRIVATE_INDEX_1Y = 4_300_000n;   // keepalive(1M) + private endowment(3.3M)
-const CAPSULEHUB_PUBLIC_INDEX_1Y = 8_400_000n;    // keepalive(1M) + public endowment(7.4M)
-const CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE = 2_000_000n;
+const CAPSULEHUB_PUBLIC_INDEX_1Y = 10_400_000n;    // keepalive(1M) + public endowment(9.4M, author/parent index)
 const OP_DEPOSIT_PROTOCOL_FEE = 0xff775609;
 
 const START_NOW = 1_700_000_000;
@@ -439,28 +437,6 @@ describe('CapsuleHub v1 milestone 1 (VPB2 batch path)', () => {
     expect(firstEntry.recipient_prev_link).toBe(0n);
     expect(secondEntry.sender_prev_link).toBe(1n);
     expect(secondEntry.recipient_prev_link).toBe(1n);
-
-    // Prune entry id 1 (the second batch) after retention -> index latest falls back to entry 0.
-    blockchain.now = START_NOW + CAPSULEHUB_INDEX_RETENTION_SECONDS;
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 1n,
-      entry_id: 1n,
-      publish_id: computeEntryPublishId(secondId, 0),
-    } as PruneCapsuleEntry);
-
-    expect((await hub.getGetPrivateSenderIndex(senderKeyId))).toMatchObject({
-      exists: true,
-      latest_entry_id: 0n,
-      latest_entry_link: 1n,
-      entry_count: 1n,
-    });
-    expect((await hub.getGetPrivateRecipientIndex(recipientKeyId))).toMatchObject({
-      exists: true,
-      latest_entry_id: 0n,
-      latest_entry_link: 1n,
-      entry_count: 1n,
-    });
   });
 
   it('CAPSULE-VAULT-BACKING-01: Vault publish retains protocol fee backing instead of returning it as ACK excess', async () => {
@@ -605,117 +581,7 @@ describe('CapsuleHub v1 milestone 1 (VPB2 batch path)', () => {
     expect(await contractBalance(blockchain, hub.address)).toBeGreaterThanOrEqual(after.protected_reserve_ton);
   });
 
-  it('CAPSULE-RETENTION-01: compact private/public entries can be pruned only after retention window', async () => {
-    const { blockchain, hub, vault, operator } = await setupHubFee({ feeAccumulatorDeployed: true });
-
-    const privateId = hash256('retention-01-private');
-    const publicId = hash256('retention-01-public');
-    await seedAccruedFee(hub, vault, { feeTotal: PLATO_PRIVATE_HYBRID_FEE, publishId: privateId, kind: KIND_PRIVATE });
-    await seedAccruedFee(hub, vault, { feeTotal: PLATO_PUBLIC_FEE, publishId: publicId, kind: KIND_PUBLIC });
-
-    const privateEntryPublishId = computeEntryPublishId(privateId, 0);
-    const publicEntryPublishId = computeEntryPublishId(publicId, 0);
-
-    // Before the retention window: prune is rejected (13502), entry survives.
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 1n,
-      entry_id: 0n,
-      publish_id: privateEntryPublishId,
-    } as PruneCapsuleEntry);
-    expect((await hub.getGetPrivateEntry(0n)).exists).toBe(true);
-
-    blockchain.now = START_NOW + CAPSULEHUB_INDEX_RETENTION_SECONDS;
-
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 1n,
-      entry_id: 0n,
-      publish_id: privateEntryPublishId,
-    } as PruneCapsuleEntry);
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 2n,
-      entry_id: 0n,
-      publish_id: publicEntryPublishId,
-    } as PruneCapsuleEntry);
-
-    expect((await hub.getGetPrivateEntry(0n)).exists).toBe(false);
-    expect((await hub.getGetPublicEntry(0n)).exists).toBe(false);
-    const state = await hub.getGetState();
-    expect(state.private_latest_id).toBe(1n);
-    expect(state.public_latest_id).toBe(1n);
-    expect(state.private_live_count).toBe(0n);
-    expect(state.public_live_count).toBe(0n);
-    expect((await hub.getGetPrivatePage(0n))).toMatchObject({
-      exists: true,
-      first_entry_id: 0n,
-      next_entry_id: 1n,
-      entry_count: 1n,
-      opened_at: 0n,
-      updated_at: 0n,
-    });
-  });
-
-  it('CAPSULE-RETENTION-01B: underfunded prune cannot delete retained entries', async () => {
-    const { blockchain, hub, vault, operator } = await setupHubFee({ feeAccumulatorDeployed: true });
-
-    const privateId = hash256('retention-01b-private');
-    const publicId = hash256('retention-01b-public');
-    await seedAccruedFee(hub, vault, { feeTotal: PLATO_PRIVATE_HYBRID_FEE, publishId: privateId, kind: KIND_PRIVATE });
-    await seedAccruedFee(hub, vault, { feeTotal: PLATO_PUBLIC_FEE, publishId: publicId, kind: KIND_PUBLIC });
-
-    const privateEntryPublishId = computeEntryPublishId(privateId, 0);
-    const publicEntryPublishId = computeEntryPublishId(publicId, 0);
-
-    // Underfunded prune (below the exec reserve) -> 13530 bounce, entry survives even before the window.
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE - 1n }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 1n,
-      entry_id: 0n,
-      publish_id: privateEntryPublishId,
-    } as PruneCapsuleEntry);
-    expect((await hub.getGetPrivateEntry(0n)).exists).toBe(true);
-    expect((await hub.getGetState()).private_live_count).toBe(1n);
-
-    blockchain.now = START_NOW + CAPSULEHUB_INDEX_RETENTION_SECONDS;
-
-    // Still underfunded after the window -> still rejected; both kinds survive.
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE - 1n }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 1n,
-      entry_id: 0n,
-      publish_id: privateEntryPublishId,
-    } as PruneCapsuleEntry);
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE - 1n }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 2n,
-      entry_id: 0n,
-      publish_id: publicEntryPublishId,
-    } as PruneCapsuleEntry);
-
-    expect((await hub.getGetPrivateEntry(0n)).exists).toBe(true);
-    expect((await hub.getGetPublicEntry(0n)).exists).toBe(true);
-    const state = await hub.getGetState();
-    expect(state.private_live_count).toBe(1n);
-    expect(state.public_live_count).toBe(1n);
-  });
-
-  it('CAPSULE-RETENTION-02: prune authenticates publish id before deleting an entry', async () => {
-    const { blockchain, hub, vault, operator } = await setupHubFee({ feeAccumulatorDeployed: true });
-
-    const privateId = hash256('retention-02-private');
-    await seedAccruedFee(hub, vault, { feeTotal: PLATO_PRIVATE_HYBRID_FEE, publishId: privateId, kind: KIND_PRIVATE });
-    blockchain.now = START_NOW + CAPSULEHUB_INDEX_RETENTION_SECONDS;
-
-    // A wrong publish_id fails the per-entry authentication (13501) even after the window -> entry survives.
-    await hub.send(operator.getSender(), { value: CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE }, {
-      $$type: 'PruneCapsuleEntry',
-      kind: 1n,
-      entry_id: 0n,
-      publish_id: hash256('wrong-publish-id'),
-    } as PruneCapsuleEntry);
-
-    expect((await hub.getGetPrivateEntry(0n)).exists).toBe(true);
-  });
+  // Retention / eviction is now FIFO auto-eviction folded into the publish path (no standalone PruneCapsuleEntry
+  // op). Its coverage — retention gate, FIFO order, index un-push, entry_count exactness, state bounding, both
+  // kinds — lives in tests/capsulehub-eviction.test.ts.
 });

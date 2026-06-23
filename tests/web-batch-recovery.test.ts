@@ -70,7 +70,7 @@ function walkParts(kind: bigint, head: Cell, count: number): Array<{ bodyHash: b
       out.push({ bodyHash, bodyCell });
       cursor = isLast ? head : s.loadRef();
     } else {
-      s.loadUint(8); s.loadUint(8); s.loadUintBig(256);
+      s.loadUint(8); s.loadUint(8); s.loadUint(64); s.loadUintBig(256); // size, reserved, parent_link, header_hash
       const bodyHash = s.loadUintBig(256);
       s.loadRef();
       const bodyCell = s.loadRef();

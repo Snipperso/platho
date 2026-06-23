@@ -125,9 +125,9 @@ describe('VPB2 publish-batch orchestration: grouping + batch-external build', ()
     // from each item's kind+size — NOT the sum of the per-item maxCharge fields (the stale model). Item
     // maxCharge is ignored by the orchestrator now, so the result is identical regardless of those values.
     const SHARED_BASE = 127_800_000n;
-    const PRIV_1K = 28_700_000n; // private size-1 per-part marginal (message-pricing-policy.mjs)
+    const PRIV_1K = 34_800_000n; // private size-1 per-part marginal (message-pricing-policy.mjs)
     const twoPriv1k = [privateItem(0, 0, 1n), privateItem(1, 1, toNano('1'))];
-    const expectedHold = SHARED_BASE + 2n * PRIV_1K; // 185.2M
+    const expectedHold = SHARED_BASE + 2n * PRIV_1K; // 197.4M
     expect(batchMaxChargeForItems(twoPriv1k)).toBe(expectedHold);
     // The amortized hold comfortably exceeds the affine pre-accept floor for this small shape.
     expect(batchMaxChargeForItems(twoPriv1k)).toBeGreaterThan(batchChargeFloor(2));

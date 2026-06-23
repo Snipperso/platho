@@ -294,7 +294,7 @@ describe('Vault milestone 6: Vault-balance batch publish orchestration (VPB2)', 
     const expectedBodyHash = (() => {
       // Reconstruct the body hash the helper used (publicPart fillBase 0 at SIZE_32K).
       const s = partsRoot.beginParse();
-      s.loadUint(8); s.loadUint(8); s.loadUintBig(256);
+      s.loadUint(8); s.loadUint(8); s.loadUint(64); s.loadUintBig(256); // size, reserved, parent_link, header_hash
       return s.loadUintBig(256); // body hash field
     })();
 

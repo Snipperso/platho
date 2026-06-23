@@ -356,7 +356,7 @@ const BATCH_FLOOR_BASE_PIN: Int = 92700000;    // import hold (89.63M, rounded u
 const BATCH_FLOOR_PER_PART_PIN: Int = 6200000; // per-part walk compute (getComputeFee(90000)≈6.0M, rounded up)
 const PROTOCOL_FEE_TON_BATCH: Int = 10000000; // 0.01 TON per part
 const STORAGE_RESERVE_PRIVATE: Int = 4300000; // 1M keepalive + 3.3M endowment
-const STORAGE_RESERVE_PUBLIC: Int = 8400000;  // 1M keepalive + 7.4M endowment
+const STORAGE_RESERVE_PUBLIC: Int = 10400000;  // 1M keepalive + 9.4M endowment (raised for the author/parent index slot)
 // Structural GAS constants (runtime-priced via getComputeFee). CALIBRATED 2026-06-13 from sandbox worst-case:
 // per-part is the 32K measurement (Vault ~81,452 / Hub ~69,289) + margin; bases from the count-sweep intercept.
 // MAX_BATCH_PARTS=8 keeps the worst sendable batch (8x4K ~471k) under 50% of the 1M tx limit (gate GAS-GATE-G8).
@@ -364,8 +364,8 @@ const VAULT_BATCH_BASE_GAS: Int = 50000;
 const VAULT_PART_GAS_PRIVATE: Int = 90000;
 const VAULT_PART_GAS_PUBLIC: Int = 90000;
 const HUB_BATCH_BASE_GAS: Int = 14000;
-const HUB_PART_GAS_PRIVATE: Int = 75000;
-const HUB_PART_GAS_PUBLIC: Int = 75000;
+const HUB_PART_GAS_PRIVATE: Int = 170000; // mirror CapsuleHub: private add (2 index pushes) + auto-evict one (2 index un-pushes)
+const HUB_PART_GAS_PUBLIC: Int = 180000; // mirror CapsuleHub: public add (index push + author-key hash) + auto-evict one
 const WALK_GAS_PER_PART_MAX: Int = 90000;
 const REJECT_BASE_GAS: Int = 10000;
 const ACK_GAS: Int = 9000;
@@ -2178,11 +2178,12 @@ contract Vault {
             } else {
                 let wantRefs: Int = 2;
                 if (!isLast) { wantRefs = 3; }
-                if (!((part.bits() == 528) && (part.refs() == wantRefs))) {
+                if (!((part.bits() == 592) && (part.refs() == wantRefs))) {
                     rejectCode = RJ_PART_SHAPE; failIdx = i;
                 } else {
                     let sizeClass: Int = part.loadUint(8);
                     let reserved: Int = part.loadUint(8);
+                    part.skipBits(64); // parent_link: validated + indexed authoritatively by CapsuleHub; the Vault forwards partsRoot whole
                     h0 = part.loadUint(256);
                     bh = part.loadUint(256);
                     let header: Cell = part.loadRef();
@@ -2621,10 +2622,9 @@ contract Vault {
             return;
         }
         throwUnless(16562, now() >= pending.created_at + VAULT_PENDING_PUBLISH_STALE_TTL);
+        // created_at is uint64, so now()+TTL never overflows — no clamp (a UINT32_MAX clamp would collapse the
+        // late-settlement grace post-2106 by making the tombstone delete-gate immediately true).
         let tombstoneExpiresAt: Int = now() + VAULT_PRUNED_PUBLISH_TOMBSTONE_TTL;
-        if (tombstoneExpiresAt > UINT32_MAX) {
-            tombstoneExpiresAt = UINT32_MAX;
-        }
         let user: UserState = self.updateReceipt(self.getUserOrEmpty(pending.owner_wallet), pending.nonce, RES_TOMBSTONED, AUX_BATCH_LEVEL);
         self.users.set(pending.owner_wallet, user);
         self.pending_batch_publishes.set(bounceId, PendingBatchPublish {
