@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v479';
+const PLATHO_APP_RUNTIME_VERSION = 'v480';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -17001,8 +17001,12 @@ async function submitVaultRegisterMessagingKeys() {
     vaultDraftStatus.textContent = 'active';
     return null;
   }
-  if (!(await confirmPlathoAccountActivation(user))) return null;
-  downloadEncryptedWalletKeyBackup();
+  const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
+  if (!(await confirmPlathoAccountActivation(user, { needsKeyBackup }))) return null;
+  // Only force the key export when this wallet key has never been backed up (a freshly created wallet). An
+  // imported or already-exported wallet is provably backed up (markWalletKeyBackupDone cleared the flag), so
+  // don't make the user re-download it just to activate.
+  if (needsKeyBackup) await downloadEncryptedWalletKeyBackup();
   vaultDraftStatus.textContent = 'signing';
   const result = await submitVaultMessage('RegisterMessagingKeys', localVaultDraft.message, {
     userExists: user.exists === true,
@@ -17013,41 +17017,49 @@ async function submitVaultRegisterMessagingKeys() {
   return result;
 }
 
-async function confirmPlathoAccountActivation(user) {
+async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = {}) {
   const fee = plathoAccountActivationFeeNanotons(user);
   const walletBalance = await refreshWalletTonBalanceForProfile().catch(() => null);
-  let feedback = 'Export the encrypted wallet key, then send the account activation transaction.';
+  let feedback = needsKeyBackup
+    ? 'Export the encrypted wallet key, then send the account activation transaction.'
+    : 'Your wallet key is already backed up. Send the account activation transaction.';
   let tone = 'muted';
   if (walletBalance !== null && walletBalance < fee) {
     feedback = `Wallet GRAM is below the ${formatTonNanotons(fee)} GRAM activation transaction value. Receive GRAM first.`;
     tone = 'error';
   }
+  // The forced key-export step (and its acknowledgement checkbox) only appears when the key has not been
+  // backed up yet. An imported / already-exported wallet skips it and just confirms the on-chain activation.
+  const fields = [];
+  if (needsKeyBackup) {
+    fields.push({
+      id: 'backupConfirmed',
+      type: 'checkbox',
+      label: 'I understand this will download my encrypted wallet key backup before activation.',
+    });
+  }
+  fields.push({
+    id: 'activationConfirmed',
+    type: 'checkbox',
+    label: 'I understand activation sends an on-chain Vault transaction and publishes the public keys needed for Platho messaging.',
+  });
   const result = await openActionDialog({
     title: 'Activate Platho account',
     hint: feedback,
     tone,
-    submitLabel: 'Export key and activate',
+    submitLabel: needsKeyBackup ? 'Export key and activate' : 'Activate account',
     dismissOnBackdrop: false,
-    fields: [
-      {
-        id: 'backupConfirmed',
-        type: 'checkbox',
-        label: 'I understand this will download my encrypted wallet key backup before activation.',
-      },
-      {
-        id: 'activationConfirmed',
-        type: 'checkbox',
-        label: 'I understand activation sends an on-chain Vault transaction and publishes the public keys needed for Platho messaging.',
-      },
-    ],
+    fields,
     summary: [
       { label: 'Wallet GRAM', value: walletBalance === null ? 'unknown' : `${formatTonNanotons(walletBalance)} GRAM` },
       { label: 'Activation tx value', value: `${formatTonNanotons(fee)} GRAM` },
-      { label: 'Backup', value: 'encrypted wallet key JSON, protected by the local password' },
+      { label: 'Backup', value: needsKeyBackup ? 'encrypted wallet key JSON, protected by the local password' : 'already saved' },
       { label: 'After activation', value: 'private/public messaging, Vault, .ath name and avatar tabs unlock' },
     ],
   });
-  return result?.backupConfirmed === true && result?.activationConfirmed === true;
+  if (!result) return false;
+  if (needsKeyBackup && result.backupConfirmed !== true) return false;
+  return result.activationConfirmed === true;
 }
 
 async function submitVaultReplaceMessagingKeys() {

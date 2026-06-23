@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v479<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v479'/);
+    expect(html).toMatch(/id="appVersionLabel">v480<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v480'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -653,6 +653,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/backupConfirmed/);
     expect(app).toMatch(/activationConfirmed/);
     expect(app).toMatch(/downloadEncryptedWalletKeyBackup\(\)/);
+    // Activation forces the key export ONLY when the key is not yet backed up; an imported / already-exported
+    // wallet (markWalletKeyBackupDone cleared the pending flag) skips the download + the backup checkbox and
+    // just confirms the on-chain activation.
+    expect(app).toMatch(/const needsKeyBackup = walletKeyBackupPendingForStoredWallet\(\)/);
+    expect(app).toMatch(/if \(needsKeyBackup\) await downloadEncryptedWalletKeyBackup\(\)/);
+    expect(app).toMatch(/submitLabel: needsKeyBackup \? 'Export key and activate' : 'Activate account'/);
     expect(app).toMatch(/VAULT_RECEIVE_CRYPTO_SUITE = CRYPTO_SUITES\.HYBRID_V1/);
     expect(app).toMatch(/loadMessagingIdentityFromWallet\(VAULT_RECEIVE_CRYPTO_SUITE\)/);
     expect(app).not.toMatch(/postquantum only/);
@@ -4478,11 +4484,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v550/);
+    expect(sw).toMatch(/platho-pwa-prototype-v551/);
     expect(sw).toMatch(/\.\/styles\.css\?v=156/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=479/);
+    expect(sw).toMatch(/\.\/app\.js\?v=480/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
