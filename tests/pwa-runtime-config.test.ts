@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v485<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v485'/);
+    expect(html).toMatch(/id="appVersionLabel">v486<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v486'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1998,6 +1998,10 @@ describe('PWA runtime config guard', () => {
     // invalid key is rejected and NOT stored; an unverified one is kept (keyless Orbs fallback).
     expect(app).toMatch(/async function commitToncenterKeyFromInput\(\)/);
     expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('change'/);
+    // Validate on paste/input (debounced), not only on blur, so pasting a key shows feedback right away;
+    // and keep "checking..." visible for a perceptible beat even when validation returns fast.
+    expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('input', scheduleToncenterKeyCheck\)/);
+    expect(app).toMatch(/const minCheckingVisible = new Promise[\s\S]*?setTimeout\(resolve, 450\)[\s\S]*?await validateToncenterApiKey\(trimmed\);\s*await minCheckingVisible;/);
     expect(app).toMatch(/if \(result\.reason === 'invalid'\) \{[\s\S]*toncenterKeyStatus\.textContent = 'invalid key'[\s\S]*setAttribute\('data-state', 'error'\)[\s\S]*return;\s*\}\s*applyToncenterApiKey\(trimmed\);/);
     // "recommended" lives in the section heading, not the row, so it never crowds the key input on a narrow
     // phone; the in-row status is empty when there is no key (validation states like 'invalid key' still show).
@@ -4501,11 +4505,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v556/);
+    expect(sw).toMatch(/platho-pwa-prototype-v557/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=485/);
+    expect(sw).toMatch(/\.\/app\.js\?v=486/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

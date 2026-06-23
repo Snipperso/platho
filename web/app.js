@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v485';
+const PLATHO_APP_RUNTIME_VERSION = 'v486';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -528,7 +528,11 @@ async function commitToncenterKeyFromInput() {
     toncenterKeyStatus.textContent = 'checking...';
     toncenterKeyStatus.removeAttribute('data-state');
   }
+  // Keep "checking..." on screen for a perceptible beat even when the network validation returns fast,
+  // so the user actually sees the key being verified before it flips to "key active" / "invalid key".
+  const minCheckingVisible = new Promise((resolve) => setTimeout(resolve, 450));
   const result = await validateToncenterApiKey(trimmed);
+  await minCheckingVisible;
   if (result.reason === 'invalid') {
     if (toncenterKeyStatus) {
       toncenterKeyStatus.textContent = 'invalid key';
@@ -539,7 +543,19 @@ async function commitToncenterKeyFromInput() {
   applyToncenterApiKey(trimmed);
 }
 
+// Validate shortly after the key is pasted/edited (debounced), so the user sees "checking..." -> result
+// right after pasting WITHOUT having to click away first; blur/Enter still validate immediately.
+let toncenterKeyCheckTimer = null;
+function scheduleToncenterKeyCheck() {
+  if (toncenterKeyCheckTimer) clearTimeout(toncenterKeyCheckTimer);
+  toncenterKeyCheckTimer = setTimeout(() => {
+    toncenterKeyCheckTimer = null;
+    commitToncenterKeyFromInput().catch((error) => console.error(error));
+  }, 600);
+}
+toncenterApiKeyInput?.addEventListener('input', scheduleToncenterKeyCheck);
 toncenterApiKeyInput?.addEventListener('change', () => {
+  if (toncenterKeyCheckTimer) { clearTimeout(toncenterKeyCheckTimer); toncenterKeyCheckTimer = null; }
   commitToncenterKeyFromInput().catch((error) => console.error(error));
 });
 toncenterApiKeyInput?.addEventListener('keydown', (event) => {
