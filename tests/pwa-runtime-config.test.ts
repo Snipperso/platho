@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v483<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v483'/);
+    expect(html).toMatch(/id="appVersionLabel">v484<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v484'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -540,6 +540,9 @@ describe('PWA runtime config guard', () => {
     // row's label + input placeholder + "recommended" + Get) sizes the implicit auto column past a narrow
     // phone viewport and stretches every Profile row off the right edge.
     expect(css).toMatch(/\.settings-list\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\);\s*\}/);
+    // A settings/select-row label that wraps to two lines must stay flush-left (buttons default to
+    // text-align:center, which would center the wrapped label and look inconsistent with single-line rows).
+    expect(css).toMatch(/\.settings-list button > span,\s*\.settings-select-row > span\s*\{\s*text-align: left/);
     expect(css).toMatch(/\.chat-pane\s*{[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;/);
     expect(css).toMatch(/\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: 64px minmax\(0, 1fr\) max-content;[\s\S]*overflow: hidden;/);
     expect(css).toMatch(/\.composer\s*{[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;/);
@@ -4494,11 +4497,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v554/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=158/);
+    expect(sw).toMatch(/platho-pwa-prototype-v555/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=483/);
+    expect(sw).toMatch(/\.\/app\.js\?v=484/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
