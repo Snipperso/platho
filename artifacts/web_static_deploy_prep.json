@@ -1,21 +1,21 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-23T12:30:03.203Z",
-  "mode": "production",
+  "generatedAt": "2026-06-23T16:12:59.428Z",
+  "mode": "preview",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
-  "status": "PRODUCTION_STATIC_PACKAGE_READY",
-  "productionReady": true,
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
+  "status": "PREVIEW_STATIC_PACKAGE_READY",
+  "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 131,
-    "totalBytes": 3514191,
-    "bundleSha256": "6fb7510f4a638580a470b2e72f9f283f53fef4dee39dad48f8993c3124d45c28",
+    "totalBytes": 3515455,
+    "bundleSha256": "2aef7cfe5018e5aeb78e408b1b5ab0f51d4edc0f6d1f022aaddd8426c0e6df66",
     "files": [
       {
         "path": "app.js",
         "bytes": 861205,
-        "sha256": "113d5356ad4f796e70abdfcf500b65153da054e7d512f08d67427318a1946b85"
+        "sha256": "6a69916a83e32b35c4e38f3d22d85cc8fef2c56933d09ee881478a72feb8c1bd"
       },
       {
         "path": "assets/icons/back.svg",
@@ -160,7 +160,7 @@
       {
         "path": "ath-ton-rpc-provider.mjs",
         "bytes": 6598,
-        "sha256": "0c14419102e02fc46823e8f421c71e7f85876c92dd5d5a9ef07a6fa64b1439be"
+        "sha256": "81a174bc7c2945c1e5e1d8eeba5e870971ffe716a2fa94634b710b23fbc29029"
       },
       {
         "path": "boot-guard.js",
@@ -175,7 +175,7 @@
       {
         "path": "capsulehub-ton-rpc-provider.mjs",
         "bytes": 50480,
-        "sha256": "fc8612bf24328880b0277385e9fcc2f821e94f5a335cc885ecaf78a83d940abe"
+        "sha256": "b370044cd321740978707b9b1d667f624e0d040dee84e1f7b70d60592e3de21e"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -210,7 +210,7 @@
       {
         "path": "index.html",
         "bytes": 35926,
-        "sha256": "4c10ac6c6e9dc4842168de0b2ad619a6f612419d0e14a1448a2dbc01262bf310"
+        "sha256": "1484658d0b70c591d12a612424587a661f00b48beff1a89142af4a51d2c218be"
       },
       {
         "path": "manifest.webmanifest",
@@ -225,7 +225,7 @@
       {
         "path": "platho-config.mjs",
         "bytes": 16655,
-        "sha256": "0b7c7905b48a467a46c9b57bdd4654824776139a3003a681b23d91f8f5cf00ed"
+        "sha256": "50933ce5a27d26cb62ce90d605a554261781b53acb4c545dc5916409ebe5d1ed"
       },
       {
         "path": "platho-wallet.mjs",
@@ -235,7 +235,7 @@
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
         "bytes": 8261,
-        "sha256": "4da865a207f3f3cbe63a706ba29f4e332549c9192061c7ef632d7062fdaa2dca"
+        "sha256": "efa46ffc834cb9382445be90f4b37ed01c19d53335eebdeb705221f8868e6434"
       },
       {
         "path": "public-channel-subscriptions.mjs",
@@ -275,12 +275,12 @@
       {
         "path": "sw.js",
         "bytes": 6556,
-        "sha256": "dd7dd3fd490df420d3b65c75186f221b3540de0905a6a25403b7321b54eba87e"
+        "sha256": "6b20395bc3a8462b218fa1c8ca4302de1e43c53bcfb3a550ac651dfe36150d61"
       },
       {
         "path": "ton-dns-provider.mjs",
         "bytes": 11673,
-        "sha256": "ba9c1e17b79cd1381e2eb36e83b16affa7116db1fa3b69bec8681e029b1724e3"
+        "sha256": "890cb3df8550d140a890a16196b4db3f5b0c2d739e6684ce2a3af213ae45c2ab"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",
@@ -290,7 +290,7 @@
       {
         "path": "username-ton-rpc-provider.mjs",
         "bytes": 17434,
-        "sha256": "a810cba75022c9a2a954d8eb5f51005956d0947319de59de2bd0d06c286b03af"
+        "sha256": "eded32d017b4bd37883de16ce3c1a27053c68c54cb8a5c428d4ebb272ed69374"
       },
       {
         "path": "vault-chain-provider.mjs",
@@ -299,8 +299,8 @@
       },
       {
         "path": "vault-ton-rpc-provider.mjs",
-        "bytes": 112389,
-        "sha256": "0ed8fe3cb2e18a51865aa69e27c15b81f14ee6822e9ade9285314b9095b5d0fc"
+        "bytes": 113653,
+        "sha256": "cc7de94c17dfe6b01eb5ed4f1fe8fb67225170725a48dea7a6d2d1178f70ee49"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
@@ -925,6 +925,8 @@
     "productionMarkersCleared": true
   },
   "blockers": [],
-  "warnings": [],
+  "warnings": [
+    "STATIC_PACKAGE_IS_NON_PRODUCTION"
+  ],
   "productionFindings": []
 }

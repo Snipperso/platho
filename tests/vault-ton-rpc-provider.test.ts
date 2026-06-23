@@ -1534,7 +1534,13 @@ describe('Vault TON RPC provider', () => {
     });
   });
 
-  it('RT-PWA-VLT-001: get_user critical verification compares balances and publish nonce', async () => {
+  it('RT-PWA-VLT-001: get_user critical verification tolerates volatile counter lag (balance/nonce), resolving to the primary', async () => {
+    // ton_balance[1], ath_balance[2] and publish_nonce[5] mutate on every credit/withdraw/publish, so two
+    // HONEST replicas observed at different block heights legitimately disagree on them during the hot
+    // send/confirm window. Cross-verifying them turned every keyed (verify:true) hot read into a spurious
+    // RPC_DISAGREEMENT -> the [8,20,45,60]s private-send retry ladder (the dominant send-latency bottleneck).
+    // They are excluded from the compare (mirror of get_global); the read resolves to the primary value.
+    // Key-identity fields stay cross-verified -> see VAULT-RPC-04K4.
     const baseUserStack = [
       num(-1n),
       num(100n),
@@ -1573,10 +1579,7 @@ describe('Vault TON RPC provider', () => {
         address: VAULT,
         method: 'get_user',
         stack: [],
-      }), label).rejects.toMatchObject({
-        name: 'VaultTonRpcProviderError',
-        code: 'RPC_DISAGREEMENT',
-      });
+      }), label).resolves.toMatchObject({ stack: baseUserStack });
     }
   });
 
@@ -1711,7 +1714,7 @@ describe('Vault TON RPC provider', () => {
     });
   });
 
-  it('VAULT-RPC-04K3: rejects get_user balance and nonce lag for critical verification', async () => {
+  it('VAULT-RPC-04K3: tolerates get_user balance and nonce lag, resolving to the primary (mutable counters not cross-verified)', async () => {
     const first = {
       kind: 'fresh-rpc',
       async runGetMethod() {
@@ -1750,54 +1753,62 @@ describe('Vault TON RPC provider', () => {
       criticalMethods: ['get_user'],
     });
 
-    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] })).rejects.toMatchObject({
-      code: 'RPC_DISAGREEMENT',
+    // exists/current_key_id/auth_pubkey agree on both replicas; only the mutable ton_balance/ath_balance/
+    // publish_nonce lag. The read must NOT fail closed on that lag (mirror of VAULT-RPC-04K5 for get_global)
+    // and resolves to the primary (fresh) value.
+    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] })).resolves.toMatchObject({
+      stack: [
+        num(-1n),
+        num(120_000_000n),
+        num(50_000_000_000n),
+        num(777n),
+        num(888n),
+        num(12n),
+      ],
     });
   });
 
-  it('VAULT-RPC-04K4: still rejects get_user when verified key fields disagree', async () => {
-    const first = {
-      kind: 'fresh-rpc',
-      async runGetMethod() {
-        return {
-          exit_code: 0,
-          stack: [
-            num(-1n),
-            num(120_000_000n),
-            num(50_000_000_000n),
-            num(777n),
-            num(888n),
-            num(12n),
-          ],
-        };
-      },
-    };
-    const second = {
-      kind: 'wrong-key-rpc',
-      async runGetMethod() {
-        return {
-          exit_code: 0,
-          stack: [
-            num(-1n),
-            num(120_000_000n),
-            num(50_000_000_000n),
-            num(778n),
-            num(888n),
-            num(12n),
-          ],
-        };
-      },
-    };
-    const transport = createFallbackTonRpcTransport({
-      transports: [first, second],
-      verifyCriticalReads: true,
-      criticalMethods: ['get_user'],
-    });
+  it('VAULT-RPC-04K4: still rejects get_user when a verified key-identity field (current_key_id or auth_pubkey) disagrees', async () => {
+    // The signing-key identity a lying RPC must NOT be able to fake stays cross-verified even though the
+    // volatile counters were relaxed: current_key_id[3] and auth_pubkey[4]. Each, differing alone (with the
+    // mutable counters identical), must still throw RPC_DISAGREEMENT.
+    for (const [label, keyIndex, wrongValue] of [
+      ['current_key_id', 3, 778n],
+      ['auth_pubkey', 4, 889n],
+    ] as const) {
+      const baseStack = [
+        num(-1n),
+        num(120_000_000n),
+        num(50_000_000_000n),
+        num(777n),
+        num(888n),
+        num(12n),
+      ];
+      const first = {
+        kind: 'fresh-rpc',
+        async runGetMethod() {
+          return { exit_code: 0, stack: baseStack };
+        },
+      };
+      const second = {
+        kind: `wrong-${label}-rpc`,
+        async runGetMethod() {
+          const stack = [...baseStack];
+          stack[keyIndex] = num(wrongValue);
+          return { exit_code: 0, stack };
+        },
+      };
+      const transport = createFallbackTonRpcTransport({
+        transports: [first, second],
+        verifyCriticalReads: true,
+        criticalMethods: ['get_user'],
+      });
 
-    await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] })).rejects.toMatchObject({
-      name: 'VaultTonRpcProviderError',
-      code: 'RPC_DISAGREEMENT',
-    });
+      await expect(transport?.runGetMethod({ address: VAULT, method: 'get_user', stack: [] }), label).rejects.toMatchObject({
+        name: 'VaultTonRpcProviderError',
+        code: 'RPC_DISAGREEMENT',
+      });
+    }
   });
 
   it('VAULT-RPC-04K5: verifies get_global static route fields without rejecting mutable counter lag', async () => {

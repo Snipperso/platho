@@ -1990,13 +1990,24 @@ function normalizeTonRpcResultForCompare(result, method = null) {
   if (Array.isArray(stack)) {
     const methodName = String(method);
     if (methodName === 'get_user') {
+      // Cross-verify ONLY the stable, security-relevant fields of the user view. The per-user
+      // counters are inherently volatile: ton_balance[1] / ath_balance[2] change on every
+      // credit/withdraw/publish and publish_nonce[5] increments on every publish, so two HONEST
+      // RPC replicas observed at different block heights legitimately disagree on them during the
+      // hot send/confirm window. Including them here turned every keyed (verify:true) hot read into
+      // a spurious RPC_DISAGREEMENT, dropping the private send into the [8,20,45,60]s retry ladder
+      // (the dominant send-latency bottleneck — and WORSE with a key, since a key supplies the
+      // second non-emergency verifier that makes the dual-read fire at all). We therefore compare
+      // only exists[0], current_key_id[3] and auth_pubkey[4] — the signing-key identity that a lying
+      // RPC must NOT be able to fake. This mirrors the get_global treatment just below, which already
+      // excludes its own volatile counters. No-double-spend is unaffected: the returned nonce/balance
+      // are still the primary (Orbs) values, guarded by the monotonic publish-nonce floor +
+      // verified-absence-before-resign, and the contract independently enforces nonce-equality
+      // (throwUnless 16xxx) and balance sufficiency on-chain.
       return stableJsonString([
         stack[0] ?? null,
-        stack[1] ?? null,
-        stack[2] ?? null,
         stack[3] ?? null,
         stack[4] ?? null,
-        stack[5] ?? null,
       ]);
     }
     if (methodName === 'get_global') {
