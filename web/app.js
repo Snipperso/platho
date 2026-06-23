@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v484';
+const PLATHO_APP_RUNTIME_VERSION = 'v485';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -15304,9 +15304,11 @@ function refreshVaultMoveWidget() {
     setText(card.fromLabel, sourceLabel);
     setText(card.toLabel, targetLabel);
     if (card.submitButton) {
+      // card.asset is the internal key ('TON'/'ATH'); show the user-facing coin label (TON -> GRAM rebrand).
+      const assetLabel = card.asset === 'ATH' ? 'ATH' : 'GRAM';
       card.submitButton.textContent = direction === 'to-vault'
-        ? `Move ${card.asset} to Vault`
-        : `Move ${card.asset} to Wallet`;
+        ? `Move ${assetLabel} to Vault`
+        : `Move ${assetLabel} to Wallet`;
       card.submitButton.disabled = !plathoWallet;
     }
     if (card.form) {
