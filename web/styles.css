@@ -1610,6 +1610,14 @@ html[data-platho-telegram="true"] .install-header-button {
   gap: 10px;
 }
 
+/* Cap the implicit grid column at the container width. Without this, the single auto column sizes to the
+   widest child's max-content (e.g. the RPC-key row: label + input placeholder + "recommended" + Get), which on
+   a narrow phone exceeds the viewport and stretches every settings row past the right edge. minmax(0,1fr) forces
+   rows to the container width so flexible children (the RPC input, min-width:0) shrink instead of overflowing. */
+.settings-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .public-feed {
   overflow: auto;
   padding-right: 4px;
