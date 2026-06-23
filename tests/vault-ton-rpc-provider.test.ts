@@ -341,6 +341,38 @@ describe('Vault TON RPC provider', () => {
     });
   });
 
+  it('VAULT-RPC-04C2: a 429 without Retry-After carries the CONFIGURED backoff, not a hardcoded 60s', async () => {
+    // Regression: toncenterHttpError used to hardcode retryAfterMs=60000 on a header-less 429. That value
+    // propagated up to the app-level limiter + the higher retry loops, making them sleep a full minute per
+    // 429 — a keyless image send idled ~10 min issuing almost no requests. It must now carry the transport's
+    // configured rateLimitBackoffMs so the loops retry at the intended ~7s cadence.
+    const transport = createTonCenterV3VaultTransport({
+      endpoint: 'https://toncenter.example/api/v3/runGetMethod',
+      requestSpacingMs: 0,
+      rateLimitBackoffMs: 7000,
+      rateLimitRetries: 0,
+      rateLimitKey: `test-${Math.random()}`,
+      fetch: async () => ({
+        ok: false,
+        status: 429,
+        headers: { get: () => null }, // no Retry-After header
+        async json() {
+          return {};
+        },
+      }),
+    });
+
+    await expect(transport.runGetMethod({
+      address: VAULT,
+      method: 'get_user',
+      stack: [],
+    })).rejects.toMatchObject({
+      status: 429,
+      code: 'RATE_LIMITED',
+      retryAfterMs: 7000,
+    });
+  });
+
   it('VAULT-RPC-04D: retries TON Center 429 once before surfacing success', async () => {
     const requests: any[] = [];
     const transport = createTonCenterV3VaultTransport({
