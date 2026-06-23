@@ -258,8 +258,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v487<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v487'/);
+    expect(html).toMatch(/id="appVersionLabel">v488<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v488'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -4310,8 +4310,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/let messageAutoSyncPhase = 'idle'/);
     expect(app).toMatch(/const MESSAGE_SYNC_LOADING_FRAMES = Object\.freeze/);
     expect(app).toMatch(/function messageAutoSyncCountdownText/);
-    expect(app).toMatch(/return `next sync in \$\{seconds\}s`/);
-    expect(app).toMatch(/✓ Synced - \$\{next\}/);
+    // State-only sync label: the "next sync in Ns" countdown was removed (owner: drop the next-sync timer).
+    expect(app).not.toMatch(/next sync in \$\{seconds\}s/);
+    expect(app).toMatch(/if \(messageAutoSyncPhase === 'synced'\) return '✓ Synced'/);
+    expect(app).toMatch(/if \(messageAutoSyncPhase === 'delayed'\) return messageAutoSyncLastErrorLabel/);
     expect(app).toMatch(/function beginMessageSyncUi/);
     expect(app).toMatch(/function completeMessageSyncUi/);
     expect(app).toMatch(/function failMessageSyncUi/);
@@ -4505,11 +4507,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v558/);
+    expect(sw).toMatch(/platho-pwa-prototype-v559/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=487/);
+    expect(sw).toMatch(/\.\/app\.js\?v=488/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
