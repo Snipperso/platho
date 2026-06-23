@@ -2008,8 +2008,8 @@ describe('Vault TON RPC provider', () => {
     // VPB2: getCanonicalPublishCharge is now a pure client computation (SHARED_BASE + per-part marginal == a
     // 1-part batch canonical_total) — the per-message contract getter get_canonical_publish_charge was removed
     // with the batch redeploy, so this makes NO RPC call and is absent from the calls list below.
-    await expect(provider.getCanonicalPublishCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(156_500_000n);
-    await expect(provider.getCanonicalPublishCharge(OWNER, 2n, 1n, 0n)).resolves.toBe(161_000_000n);
+    await expect(provider.getCanonicalPublishCharge(OWNER, 1n, 1n, 2n)).resolves.toBe(162_600_000n);
+    await expect(provider.getCanonicalPublishCharge(OWNER, 2n, 1n, 0n)).resolves.toBe(169_800_000n);
     await expect(provider.getGlobal()).resolves.toMatchObject({
       sealed: true,
       capsule_hub_bound: true,

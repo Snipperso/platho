@@ -90,6 +90,8 @@ describe('CapsuleHub TON RPC provider', () => {
               num(0n),
               num(0n),
               num(0n),
+              num(0n), // parent_link
+              num(0n), // prev_link
               { type: 'cell', value: cellBoc(tonCell.beginCell().endCell()) },
             ],
           };
@@ -266,6 +268,8 @@ describe('CapsuleHub TON RPC provider', () => {
               num(1_700_000_456n),
               num(publicHeaderHash),
               num(publicBodyHash),
+              num(0n), // parent_link
+              num(0n), // prev_link
               { type: 'cell', value: cellBoc(publicHeader) },
             ],
           };

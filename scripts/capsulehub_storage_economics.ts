@@ -24,11 +24,11 @@ const PUBLIC_FEE = 10_000_000n;
 // required value is INDEPENDENT of the body size class (it validates payload cells by declared hash and
 // stores only compact index entries), so this reserve is flat across 1K..32K. Empirical floor for the
 // 1-part batch is ~5.94M nanotons; 7M leaves headroom that the Hub returns to the Vault via mode-128.
-const BATCH_EXEC_RESERVE = 7_000_000n;
+const BATCH_EXEC_RESERVE = 14_000_000n; // raised to cover HUB_PART_GAS_* up to 180k (getComputeFee ~12.0M) + base, after auto-eviction
 const SIZE_CLASSES = [1n, 2n, 4n, 8n, 16n, 32n] as const;
 const KEEPALIVE = 1_000_000n;
 const PRIVATE_ENTRY_STORAGE = 3_300_000n;
-const PUBLIC_ENTRY_STORAGE = 7_400_000n;
+const PUBLIC_ENTRY_STORAGE = 9_400_000n; // mirrors CapsuleHub CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT (author/parent index)
 const PAGE_STORAGE = 0n;
 const ACK_RESERVE = 30_000_000n;
 // The Hub keeps storage with the 1.25 protectedReserve buffer (batchStorageReserveWithBuffer); the inbound

@@ -18,7 +18,7 @@ const CAPSULEHUB_INDEX_RETENTION_SECONDS: Int = 31536000;
 const CAPSULEHUB_PAGE_SIZE: Int = 256;
 const CAPSULEHUB_STORAGE_KEEPALIVE_RESERVE: Int = 1000000;
 const CAPSULEHUB_PRIVATE_ENTRY_STORAGE_ENDOWMENT: Int = 3300000;
-const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 7400000;
+const CAPSULEHUB_PUBLIC_ENTRY_STORAGE_ENDOWMENT: Int = 9400000; // 7.4M header/entry + ~2M author/parent index slot
 const CAPSULEHUB_ACK_FORWARD_RESERVE: Int = 30000000;
 const CAPSULEHUB_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const CAPSULEHUB_FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE: Int = 2000000;
@@ -28,7 +28,10 @@ const CAPSULEHUB_STORAGE_RESERVE_BUFFER_NUMERATOR: Int = 125;
 const CAPSULEHUB_STORAGE_RESERVE_BUFFER_DENOMINATOR: Int = 100;
 const CAPSULEHUB_SWEEP_LOCAL_EXEC_RESERVE: Int = 2000000;
 const CAPSULEHUB_MIN_RESERVE_SWEEP_TON: Int = PLATO_PUBLIC_POST_FEE_TON;
-const CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE: Int = 2000000;
+// Eviction is folded into the publish path (FIFO oldest-first) — there is no standalone prune op. Each batch
+// evicts up to part_count entries of its own kind that are past CAPSULEHUB_INDEX_RETENTION_SECONDS, bounding
+// live state by construction. CAPSULEHUB_EVICT_PER_PART_GAS is the per-evicted-entry compute folded into the
+// publisher's HUB_PART_GAS_* hold (see HUB_PART_GAS_PUBLIC/PRIVATE below).
 const CAPSULEHUB_PRIVATE_HEADER0_BITS: Int = 1120; // 140 bytes
 const CAPSULEHUB_PRIVATE_HEADER1_BITS: Int = 240; // 30 bytes
 const CAPSULEHUB_PRIVATE_HEADER0_CELLS: Int = 2;
@@ -50,8 +53,8 @@ const CAPSULEHUB_ENTRY_KIND_PUBLIC: Int = 2;
 // the Session-5 generator pins both sides from one source) ---
 const MAX_BATCH_PARTS: Int = 8;
 const HUB_BATCH_BASE_GAS: Int = 14000;
-const HUB_PART_GAS_PRIVATE: Int = 75000;
-const HUB_PART_GAS_PUBLIC: Int = 75000;
+const HUB_PART_GAS_PRIVATE: Int = 170000; // add (2 index pushes + payload validation) + auto-evict one (2 index un-pushes + header parse + del); provisional, measured-tightened
+const HUB_PART_GAS_PUBLIC: Int = 180000;  // add (1 index push + author-key hash) + auto-evict one (1 index un-push + del); provisional, measured-tightened
 const HUB_MIN_PER_PART_VALUE: Int = 1000000; // loose O(1) Phase-A lower bound (gross-underfunding early bounce)
 const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN: Int = 0x45504931; // "EPI1" per-entry publish_id derivation
 const PLATHO_PUBLIC_MARKETING_NOTE_ASCII: Int = 0x73656e742076696120506c6174686f2e417070; // "sent via Platho.App"
@@ -77,12 +80,6 @@ message(0x53575052) SweepExcessReserve {
 
 message(0xFF775609) DepositProtocolFee {
     amount: Int as uint128;
-}
-
-message(0x4350524E) PruneCapsuleEntry {
-    kind: Int as uint8;
-    entry_id: Int as uint64;
-    publish_id: Int as uint256;
 }
 
 // VPB2: the Vault forwards one signed batch (1..MAX_BATCH_PARTS parts) under this op. Wire format mirrors the
@@ -157,6 +154,12 @@ struct PublicCapsuleEntry {
     created_at: Int as uint64;
     author_wallet: Address;
     body_hash: Int as uint256;
+    // parent_link == 0 -> top-level post (indexed by author); else == parentEntryId+1 -> comment
+    // (indexed by parent). Reuses the entryLink convention so entry 0 is unambiguous.
+    parent_link: Int as uint64;
+    // Backward link in whichever public index this entry lives in (author chain for posts,
+    // parent chain for comments). Mirrors PrivateCapsuleEntry.recipient_prev_link.
+    prev_link: Int as uint64;
     header: Cell;
 }
 
@@ -202,7 +205,22 @@ struct PublicCapsuleEntryView {
     created_at: Int;
     header_hash: Int;
     body_hash: Int;
+    parent_link: Int;
+    prev_link: Int;
     header: Cell;
+}
+
+struct PublicCapsuleKeyIndex {
+    latest_entry_link: Int as uint64;
+    entry_count: Int as uint64;
+}
+
+struct PublicCapsuleKeyIndexView {
+    exists: Bool;
+    key_id: Int;
+    latest_entry_id: Int;
+    latest_entry_link: Int;
+    entry_count: Int;
 }
 
 contract CapsuleHub {
@@ -221,6 +239,16 @@ contract CapsuleHub {
     public_entries: map<Int as uint64, PublicCapsuleEntry>;
     private_sender_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
     private_recipient_index: map<Int as uint256, PrivateCapsuleKeyIndex>;
+    // Public read-side indexes (symmetric with the private sender/recipient indexes): posts indexed by
+    // hashed author wallet, comments indexed by parent entry id. Each lets a client walk only the entries
+    // it cares about (a subscribed author's posts, or one post's comments) without a global scan.
+    public_author_index: map<Int as uint256, PublicCapsuleKeyIndex>;
+    public_parent_index: map<Int as uint64, PublicCapsuleKeyIndex>;
+    // FIFO eviction low-water marks: the lowest entry id NOT yet evicted (everything below is gone). Auto-eviction
+    // in the publish path advances these, deleting oldest-first past the retention window. Strict FIFO = we only
+    // ever delete a chain TAIL, so backward walks never hit a hole and entry_count stays exact.
+    public_oldest_live_id: Int as uint64;
+    private_oldest_live_id: Int as uint64;
 
     init(fee_accumulator_address: Address, vault_address: Address, vault_bound: Bool, sealed: Bool, deployment_manifest_hash: Int, genesis_controller_address: Address) {
         self.fee_accumulator_address = fee_accumulator_address;
@@ -238,6 +266,10 @@ contract CapsuleHub {
         self.public_entries = emptyMap();
         self.private_sender_index = emptyMap();
         self.private_recipient_index = emptyMap();
+        self.public_author_index = emptyMap();
+        self.public_parent_index = emptyMap();
+        self.public_oldest_live_id = 0;
+        self.private_oldest_live_id = 0;
     }
 
     fun requireSealed() {
@@ -516,6 +548,144 @@ contract CapsuleHub {
         }
     }
 
+    // Public author key id: hash of the standard-address serialization of the author wallet. The client
+    // derives the identical key with beginCell().storeAddress(addr).endCell().hash(). Workchain-agnostic.
+    fun publicAuthorKeyId(authorWallet: Address): Int {
+        return beginCell().storeAddress(authorWallet).endCell().hash();
+    }
+
+    // Mirror of pushPrivateRecipientIndex for the public author index (posts).
+    fun pushPublicAuthorIndex(keyId: Int, entryLink: Int): Int {
+        let indexOpt: PublicCapsuleKeyIndex? = self.public_author_index.get(keyId);
+        let prevLink: Int = 0;
+        let count: Int = 0;
+        if (indexOpt != null) {
+            let index: PublicCapsuleKeyIndex = indexOpt!!;
+            prevLink = index.latest_entry_link;
+            count = index.entry_count;
+        }
+        self.public_author_index.set(keyId, PublicCapsuleKeyIndex {
+            latest_entry_link: entryLink,
+            entry_count: count + 1
+        });
+        return prevLink;
+    }
+
+    // Mirror of pushPrivateRecipientIndex for the public parent index (comments), keyed by parent entry id.
+    fun pushPublicParentIndex(parentEntryId: Int, entryLink: Int): Int {
+        let indexOpt: PublicCapsuleKeyIndex? = self.public_parent_index.get(parentEntryId);
+        let prevLink: Int = 0;
+        let count: Int = 0;
+        if (indexOpt != null) {
+            let index: PublicCapsuleKeyIndex = indexOpt!!;
+            prevLink = index.latest_entry_link;
+            count = index.entry_count;
+        }
+        self.public_parent_index.set(parentEntryId, PublicCapsuleKeyIndex {
+            latest_entry_link: entryLink,
+            entry_count: count + 1
+        });
+        return prevLink;
+    }
+
+    // Mirror of prunePrivateRecipientIndex; same retained-history contract (middle links are not rewired).
+    fun prunePublicAuthorIndex(keyId: Int, entryLink: Int, prevLink: Int) {
+        let indexOpt: PublicCapsuleKeyIndex? = self.public_author_index.get(keyId);
+        if (indexOpt != null) {
+            let index: PublicCapsuleKeyIndex = indexOpt!!;
+            if (index.latest_entry_link == entryLink) {
+                index.latest_entry_link = prevLink;
+            }
+            if (index.entry_count > 0) {
+                index.entry_count -= 1;
+            }
+            if (index.entry_count == 0) {
+                self.public_author_index.del(keyId);
+            } else {
+                self.public_author_index.set(keyId, index);
+            }
+        }
+    }
+
+    fun prunePublicParentIndex(parentEntryId: Int, entryLink: Int, prevLink: Int) {
+        let indexOpt: PublicCapsuleKeyIndex? = self.public_parent_index.get(parentEntryId);
+        if (indexOpt != null) {
+            let index: PublicCapsuleKeyIndex = indexOpt!!;
+            if (index.latest_entry_link == entryLink) {
+                index.latest_entry_link = prevLink;
+            }
+            if (index.entry_count > 0) {
+                index.entry_count -= 1;
+            }
+            if (index.entry_count == 0) {
+                self.public_parent_index.del(parentEntryId);
+            } else {
+                self.public_parent_index.set(parentEntryId, index);
+            }
+        }
+    }
+
+    // Auto-eviction (public): delete up to maxEvict oldest entries that are past the retention window, advancing
+    // the low-water mark. Strict FIFO by entry id (== creation order, since created_at is monotone with id), so
+    // each deleted entry is the TAIL of its author/parent chain — no middle-prune, no truncation, entry_count exact.
+    // Stops at the first non-expired entry (nothing older can be expired). O(maxEvict), funded by the publisher.
+    fun evictExpiredPublic(maxEvict: Int) {
+        let oid: Int = self.public_oldest_live_id;
+        let evicted: Int = 0;
+        let stop: Bool = false;
+        while ((!stop) && (evicted < maxEvict) && (oid < self.public_latest_id)) {
+            let entryOpt: PublicCapsuleEntry? = self.public_entries.get(oid);
+            if (entryOpt == null) {
+                oid += 1; // defensive: FIFO never leaves a live gap, but skip a missing id rather than spin
+            } else {
+                let entry: PublicCapsuleEntry = entryOpt!!;
+                if (now() < entry.created_at + CAPSULEHUB_INDEX_RETENTION_SECONDS) {
+                    stop = true;
+                } else {
+                    let entryLink: Int = self.entryLink(oid);
+                    if (entry.parent_link == 0) {
+                        self.prunePublicAuthorIndex(self.publicAuthorKeyId(entry.author_wallet), entryLink, entry.prev_link);
+                    } else {
+                        self.prunePublicParentIndex(self.entryIdFromLink(entry.parent_link), entryLink, entry.prev_link);
+                    }
+                    self.public_entries.del(oid);
+                    self.public_live_count -= 1;
+                    oid += 1;
+                    evicted += 1;
+                }
+            }
+        }
+        self.public_oldest_live_id = oid;
+    }
+
+    // Auto-eviction (private): mirror of the public path; un-pushes BOTH the sender and recipient index of each
+    // evicted entry (key ids parsed from header_0, exactly as the old prune path did).
+    fun evictExpiredPrivate(maxEvict: Int) {
+        let oid: Int = self.private_oldest_live_id;
+        let evicted: Int = 0;
+        let stop: Bool = false;
+        while ((!stop) && (evicted < maxEvict) && (oid < self.private_latest_id)) {
+            let entryOpt: PrivateCapsuleEntry? = self.private_entries.get(oid);
+            if (entryOpt == null) {
+                oid += 1;
+            } else {
+                let entry: PrivateCapsuleEntry = entryOpt!!;
+                if (now() < entry.created_at + CAPSULEHUB_INDEX_RETENTION_SECONDS) {
+                    stop = true;
+                } else {
+                    let entryLink: Int = self.entryLink(oid);
+                    self.prunePrivateSenderIndex(self.privateHeaderSenderKeyId(entry.header_0), entryLink, entry.sender_prev_link);
+                    self.prunePrivateRecipientIndex(self.privateHeaderRecipientKeyId(entry.header_0), entryLink, entry.recipient_prev_link);
+                    self.private_entries.del(oid);
+                    self.private_live_count -= 1;
+                    oid += 1;
+                    evicted += 1;
+                }
+            }
+        }
+        self.private_oldest_live_id = oid;
+    }
+
     fun computeVaultPrivateEntryUid(entryId: Int, publishId: Int, header0: Int, header1: Int, bodyHash: Int): Int {
         let hashFields: Cell = beginCell()
             .storeUint(header0, 256)
@@ -672,9 +842,10 @@ contract CapsuleHub {
             } else {
                 let wantRefs: Int = 2;
                 if (!isLast) { wantRefs = 3; }
-                throwUnless(13520, (part.bits() == 528) && (part.refs() == wantRefs));
+                throwUnless(13520, (part.bits() == 592) && (part.refs() == wantRefs));
                 let sizeClass: Int = part.loadUint(8);
                 let reserved: Int = part.loadUint(8);
+                let parentLink: Int = part.loadUint(64);
                 let h0: Int = part.loadUint(256);
                 let bh: Int = part.loadUint(256);
                 let header: Cell = part.loadRef();
@@ -683,14 +854,27 @@ contract CapsuleHub {
                 throwUnless(13521, reserved == 0);
                 throwUnless(13522, self.isAllowedPublicSizeClass(sizeClass));
                 throwUnless(13523, (h0 != 0) && (bh != 0));
+                // parentLink == 0 -> post; else parentLink == parentEntryId+1 and the parent must strictly precede.
+                // The parent is NOT required to still exist (it may have been evicted) nor to be a top-level post
+                // (a comment may reply to a comment) — intentional: each entry is independently funded and the
+                // thread is reassembled client-side. The only guard is that the parent id precedes this entry.
+                throwUnless(13528, (parentLink == 0) || (parentLink <= entryId));
                 self.requirePublicHeaderCell(header, h0, 13524, 13525);
                 self.requirePublicPayloadCell(body, bh, sizeClass, 13526, 13527);
                 let uid: Int = self.computeVaultPublicEntryUid(entryId, entryPublishId, msg.author_wallet, h0, bh);
+                let publicPrevLink: Int = 0;
+                if (parentLink == 0) {
+                    publicPrevLink = self.pushPublicAuthorIndex(self.publicAuthorKeyId(msg.author_wallet), self.entryLink(entryId));
+                } else {
+                    publicPrevLink = self.pushPublicParentIndex(self.entryIdFromLink(parentLink), self.entryLink(entryId));
+                }
                 self.public_entries.set(entryId, PublicCapsuleEntry {
                     publish_id: entryPublishId,
                     created_at: now(),
                     author_wallet: msg.author_wallet,
                     body_hash: bh,
+                    parent_link: parentLink,
+                    prev_link: publicPrevLink,
                     header: header
                 });
                 self.public_live_count += 1;
@@ -709,6 +893,15 @@ contract CapsuleHub {
             self.public_latest_id += msg.part_count;
         }
         self.accrued_plato_fee_ton += msg.protocol_fee_total;
+
+        // Auto-eviction (FIFO, funded via HUB_PART_GAS_*): each batch evicts up to part_count oldest expired
+        // entries of its own kind, bounding live state by construction. Just-added entries are created at now()
+        // so they are never expired; the loop stops at the first non-expired entry.
+        if (isPrivate) {
+            self.evictExpiredPrivate(msg.part_count);
+        } else {
+            self.evictExpiredPublic(msg.part_count);
+        }
 
         // ACK (spec 5.3): keep fee + entry storage (+1.25 buffer), protect pre-existing balance, return the rest
         // (import over-hold + ack float) to the Vault via mode 128. The Vault credits it back to the user ledger.
@@ -779,37 +972,6 @@ contract CapsuleHub {
             mode: SendPayFwdFeesSeparately,
             body: DepositProtocolFee { amount: msg.amount }.toCell()
         });
-    }
-
-    receive(msg: PruneCapsuleEntry) {
-        self.requireSealed();
-        throwUnless(13530, context().value >= CAPSULEHUB_PRUNE_ENTRY_EXEC_RESERVE);
-        if (msg.kind == CAPSULEHUB_ENTRY_KIND_PRIVATE) {
-            let entryOpt: PrivateCapsuleEntry? = self.private_entries.get(msg.entry_id);
-            throwUnless(13500, entryOpt != null);
-            let entry: PrivateCapsuleEntry = entryOpt!!;
-            throwUnless(13501, entry.publish_id == msg.publish_id);
-            throwUnless(13502, now() >= entry.created_at + CAPSULEHUB_INDEX_RETENTION_SECONDS);
-            let entryLink: Int = self.entryLink(msg.entry_id);
-            let senderKeyId: Int = self.privateHeaderSenderKeyId(entry.header_0);
-            let recipientKeyId: Int = self.privateHeaderRecipientKeyId(entry.header_0);
-            self.prunePrivateSenderIndex(senderKeyId, entryLink, entry.sender_prev_link);
-            self.prunePrivateRecipientIndex(recipientKeyId, entryLink, entry.recipient_prev_link);
-            self.private_entries.del(msg.entry_id);
-            self.private_live_count -= 1;
-        } else {
-            if (msg.kind == CAPSULEHUB_ENTRY_KIND_PUBLIC) {
-                let entryOpt: PublicCapsuleEntry? = self.public_entries.get(msg.entry_id);
-                throwUnless(13510, entryOpt != null);
-                let entry: PublicCapsuleEntry = entryOpt!!;
-                throwUnless(13511, entry.publish_id == msg.publish_id);
-                throwUnless(13512, now() >= entry.created_at + CAPSULEHUB_INDEX_RETENTION_SECONDS);
-                self.public_entries.del(msg.entry_id);
-                self.public_live_count -= 1;
-            } else {
-                throw(13520);
-            }
-        }
     }
 
     get fun get_private_entry(entryId: Int): PrivateCapsuleEntryView {
@@ -897,6 +1059,48 @@ contract CapsuleHub {
         };
     }
 
+    get fun get_public_author_index(keyId: Int): PublicCapsuleKeyIndexView {
+        let indexOpt: PublicCapsuleKeyIndex? = self.public_author_index.get(keyId);
+        if (indexOpt == null) {
+            return PublicCapsuleKeyIndexView {
+                exists: false,
+                key_id: keyId,
+                latest_entry_id: 0,
+                latest_entry_link: 0,
+                entry_count: 0
+            };
+        }
+        let index: PublicCapsuleKeyIndex = indexOpt!!;
+        return PublicCapsuleKeyIndexView {
+            exists: true,
+            key_id: keyId,
+            latest_entry_id: self.entryIdFromLink(index.latest_entry_link),
+            latest_entry_link: index.latest_entry_link,
+            entry_count: index.entry_count
+        };
+    }
+
+    get fun get_public_parent_index(parentEntryId: Int): PublicCapsuleKeyIndexView {
+        let indexOpt: PublicCapsuleKeyIndex? = self.public_parent_index.get(parentEntryId);
+        if (indexOpt == null) {
+            return PublicCapsuleKeyIndexView {
+                exists: false,
+                key_id: parentEntryId,
+                latest_entry_id: 0,
+                latest_entry_link: 0,
+                entry_count: 0
+            };
+        }
+        let index: PublicCapsuleKeyIndex = indexOpt!!;
+        return PublicCapsuleKeyIndexView {
+            exists: true,
+            key_id: parentEntryId,
+            latest_entry_id: self.entryIdFromLink(index.latest_entry_link),
+            latest_entry_link: index.latest_entry_link,
+            entry_count: index.entry_count
+        };
+    }
+
     get fun get_public_entry(entryId: Int): PublicCapsuleEntryView {
         let entryOpt: PublicCapsuleEntry? = self.public_entries.get(entryId);
         if (entryOpt == null) {
@@ -911,6 +1115,8 @@ contract CapsuleHub {
                 created_at: 0,
                 header_hash: 0,
                 body_hash: 0,
+                parent_link: 0,
+                prev_link: 0,
                 header: emptyCell()
             };
         }
@@ -927,6 +1133,8 @@ contract CapsuleHub {
             created_at: entry.created_at,
             header_hash: headerHash,
             body_hash: entry.body_hash,
+            parent_link: entry.parent_link,
+            prev_link: entry.prev_link,
             header: entry.header
         };
     }

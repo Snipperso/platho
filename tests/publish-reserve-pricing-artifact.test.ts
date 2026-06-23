@@ -54,8 +54,8 @@ describe('Publish reserve pricing artifacts', () => {
     expect(report.fee_config_snapshot.config_25_cell_price).toBe('436906667');
     expect(report.current_constants_nanotons.privateHybridFee).toBe('10000000');
     expect(report.current_constants_nanotons.publicFee).toBe('10000000');
-    expect(report.cases.find((item: any) => item.id === 'public_1k')?.user_net_debit_nanotons).toBe('34700000');
-    expect(report.cases.find((item: any) => item.id === 'private_hybrid_1k')?.user_net_debit_nanotons).toBe('32300000');
+    expect(report.cases.find((item: any) => item.id === 'public_1k')?.user_net_debit_nanotons).toBe('39000000');
+    expect(report.cases.find((item: any) => item.id === 'private_hybrid_1k')?.user_net_debit_nanotons).toBe('33900000');
     expect(report.cases.map((item: any) => item.id)).toEqual([
       'public_1k',
       'public_2k',

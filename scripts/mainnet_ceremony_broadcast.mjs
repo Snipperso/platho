@@ -26,12 +26,16 @@
  *   send:  node scripts/mainnet_ceremony_broadcast.mjs --phase deploy --broadcast
  *   phases: deploy | treasury-supply | bind | fund | seal
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { Address, Cell, beginCell, contractAddress, internal, loadStateInit, storeMessage, SendMode, toNano, fromNano } from '@ton/core';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import { WalletContractV5R1, WalletContractV4, WalletContractV3R2 } from '@ton/ton';
 
 const GATEWAY = (process.env.PLATHO_GATEWAY || 'https://rpc.platho.app').replace(/\/+$/, '');
+// The keyed gateway (rpc.platho.app) was decommissioned; keyless toncenter throttles at ~1 rps and would
+// 429-abort the ceremony mid-flight. Read the toncenter API key (env or artifacts/local/center.txt) and add it
+// to toncenter calls via the rate-limit-tolerant tcFetch wrapper below. Transport only — signing is untouched.
+const TONCENTER_KEY = (process.env.TONCENTER_API_KEY || (existsSync('artifacts/local/center.txt') ? readFileSync('artifacts/local/center.txt', 'utf8') : '')).trim();
 const PACKET = arg('--packet', 'artifacts/local/mainnet_tx_dry_run_packet.json');
 const PHASE = arg('--phase');
 const DO_BROADCAST = process.argv.includes('--broadcast');
@@ -56,19 +60,35 @@ const fmt = (n) => (Number(n) / 1e9).toFixed(4);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function collectHashes(cell, set) { set.add(cell.hash().toString('hex')); for (const r of cell.refs) collectHashes(r, set); }
 
-async function gwState(addr) { const r = await fetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } }); const j = await r.json().catch(() => ({})); return j && j.ok ? j.result : null; }
+// Keyed, rate-limit-tolerant fetch: adds X-API-Key on toncenter calls and retries 429/5xx with exponential
+// backoff so a transient throttle never reads as a missing/uninit wallet (which would abort the ceremony).
+async function tcFetch(url, opts = {}, tries = 8) {
+  const headers = { ...(opts.headers || {}) };
+  if (TONCENTER_KEY && /toncenter\.com/.test(url)) headers['X-API-Key'] = TONCENTER_KEY;
+  let delay = 600;
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      const r = await fetch(url, { ...opts, headers });
+      if (r.status === 429 || r.status >= 500) { await sleep(delay); delay = Math.min(delay * 2, 8000); continue; }
+      return r;
+    } catch { await sleep(delay); delay = Math.min(delay * 2, 8000); }
+  }
+  return fetch(url, { ...opts, headers });
+}
+
+async function gwState(addr) { const r = await tcFetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } }); const j = await r.json().catch(() => ({})); return j && j.ok ? j.result : null; }
 async function gwSeqno(addr) {
   // toncenter v2 FIRST (gateway runGetMethod can return a load-balanced stale seqno).
-  try { const r = await fetch('https://toncenter.com/api/v2/runGetMethod', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method: 'seqno', stack: [] }) }); const j = await r.json(); const v = j?.result?.stack?.[0]?.[1]; if (typeof v === 'string') return Number(BigInt(v)); } catch {}
-  try { const r = await fetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method: 'seqno', stack: [] }) }); const j = await r.json(); const v = j?.stack?.[0]?.value; if (typeof v === 'string') return Number(BigInt(v)); } catch {}
+  try { const r = await tcFetch('https://toncenter.com/api/v2/runGetMethod', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method: 'seqno', stack: [] }) }); const j = await r.json(); const v = j?.result?.stack?.[0]?.[1]; if (typeof v === 'string') return Number(BigInt(v)); } catch {}
+  try { const r = await tcFetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method: 'seqno', stack: [] }) }); const j = await r.json(); const v = j?.stack?.[0]?.value; if (typeof v === 'string') return Number(BigInt(v)); } catch {}
   return 0;
 }
 async function gwSend(bocB64) {
   // Redundant broadcast: the gateway has ACKed (200) without delivering, so also push to
   // toncenter v2 /sendBoc (keyless). Actual delivery is confirmed by the seqno-advance poll.
   const out = []; let anyOk = false;
-  try { const r = await fetch('https://toncenter.com/api/v2/sendBoc', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); out.push(`toncenter ${r.status}`); if (r.ok) anyOk = true; } catch (e) { out.push('toncenter ERR'); }
-  try { const r = await fetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); out.push(`gateway ${r.status}`); if (r.ok) anyOk = true; } catch (e) { out.push('gateway ERR'); }
+  try { const r = await tcFetch('https://toncenter.com/api/v2/sendBoc', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); out.push(`toncenter ${r.status}`); if (r.ok) anyOk = true; } catch (e) { out.push('toncenter ERR'); }
+  try { const r = await tcFetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); out.push(`gateway ${r.status}`); if (r.ok) anyOk = true; } catch (e) { out.push('gateway ERR'); }
   return { ok: anyOk, status: 'multi', body: out.join(' | ') };
 }
 

@@ -141,13 +141,14 @@ export function privatePart(opts: { size?: bigint; fillBase?: number; next?: Cel
   return b.endCell();
 }
 
-export function publicPart(opts: { size?: bigint; fillBase?: number; next?: Cell | null } = {}): Cell {
+export function publicPart(opts: { size?: bigint; fillBase?: number; parentLink?: bigint; next?: Cell | null } = {}): Cell {
   const size = opts.size ?? SIZE_1K;
   const f = opts.fillBase ?? 0;
   const header = finalPublicHeaderCell(0x50, 8);
   const body = finalPublicBodyCell(0x40 + f, Number(size) * 1024);
   const b = beginCell()
     .storeUint(size, 8).storeUint(0, 8)
+    .storeUint(opts.parentLink ?? 0n, 64)
     .storeUint(cellHash(header), 256).storeUint(cellHash(body), 256)
     .storeRef(header).storeRef(body);
   if (opts.next) b.storeRef(opts.next);
@@ -201,7 +202,7 @@ export function privatePartCustom(opts: {
 
 // Fully-overridable public part frame (size(8) reserved(8) h(256) bh(256) + ref header,body[,next]).
 export function publicPartCustom(opts: {
-  sizeClass?: bigint; reserved?: bigint;
+  sizeClass?: bigint; reserved?: bigint; parentLink?: bigint;
   hHash?: bigint; bodyHash?: bigint;
   hCell?: Cell; bodyCell?: Cell;
   next?: Cell | null;
@@ -211,6 +212,7 @@ export function publicPartCustom(opts: {
   const body = opts.bodyCell ?? finalPublicBodyCell(0x40, Number(size) * 1024);
   const b = beginCell()
     .storeUint(size, 8).storeUint(opts.reserved ?? 0n, 8)
+    .storeUint(opts.parentLink ?? 0n, 64)
     .storeUint(opts.hHash ?? cellHash(header), 256)
     .storeUint(opts.bodyHash ?? cellHash(body), 256)
     .storeRef(header).storeRef(body);

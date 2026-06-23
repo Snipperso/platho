@@ -34,21 +34,27 @@ export const SUCCESSFUL_PUBLISH_ACK_REFUND_NANOTONS = 25_800_000n;
 export const BATCH_SHARED_BASE_HOLD_NANOTONS = 127_800_000n;
 
 // Per-part marginal hold by size class (the amount each additional capsule adds to canonical_total).
+// Recalibrated 2026-06-22 (b): FIFO auto-eviction folded into the publish path raised HUB_PART_GAS_* (private
+// 75k->170k, public 90k->180k) to fund add+evict per part. Per-part holds re-derived from a sandbox binary-search
+// of the new canonical_total (x8 constraint binds for sizes 1/2/4; 1-part for the rest), monotone + ~1M margin.
 export const PRIVATE_CAPSULE_PER_PART_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze({
-  1: 28_700_000n,
-  2: 29_400_000n,
-  4: 30_600_000n,
-  8: 33_100_000n,
-  16: 38_000_000n,
-  32: 47_900_000n,
+  1: 34_800_000n,
+  2: 35_400_000n,
+  4: 35_800_000n,
+  8: 36_200_000n,
+  16: 40_500_000n,
+  32: 50_000_000n,
 });
+// Recalibrated 2026-06-22 (b): public author/parent index (+storage) AND FIFO auto-eviction (HUB_PART_GAS_PUBLIC
+// 75k->180k to fund add+evict). Per-part holds re-derived from a sandbox binary-search of the new canonical_total
+// (x8 constraint binds for sizes 1/2/4), monotone + margin.
 export const PUBLIC_CAPSULE_PER_PART_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze({
-  1: 33_200_000n,
-  2: 33_800_000n,
-  4: 35_000_000n,
-  8: 37_500_000n,
-  16: 42_400_000n,
-  32: 52_300_000n,
+  1: 42_000_000n,
+  2: 43_000_000n,
+  4: 44_000_000n,
+  8: 45_000_000n,
+  16: 48_000_000n,
+  32: 57_500_000n,
 });
 
 // SINGLE-capsule total hold = SHARED_BASE + perPartHold(size). This is the canonical_total (and thus the
@@ -72,20 +78,20 @@ export const PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS = Object.freeze(Object.f
 // capsule. Sandbox-measured at the current build (1-part batch, ample max_charge), rounded up to 0.0001 TON.
 // This is what the user actually pays — NOT the hold (which is reserved then mostly returned).
 export const PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS = Object.freeze({
-  1: 32_300_000n,
-  2: 33_600_000n,
-  4: 36_100_000n,
-  8: 41_100_000n,
-  16: 51_200_000n,
-  32: 71_200_000n,
+  1: 33_900_000n,
+  2: 35_200_000n,
+  4: 37_700_000n,
+  8: 42_700_000n,
+  16: 52_700_000n,
+  32: 72_800_000n,
 });
 export const PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS = Object.freeze({
-  1: 34_700_000n,
-  2: 36_000_000n,
-  4: 38_500_000n,
-  8: 43_500_000n,
-  16: 53_600_000n,
-  32: 73_600_000n,
+  1: 39_000_000n,
+  2: 40_200_000n,
+  4: 42_700_000n,
+  8: 47_800_000n,
+  16: 57_800_000n,
+  32: 77_900_000n,
 });
 
 export const MESSAGE_PRICE_SUITES = Object.freeze({

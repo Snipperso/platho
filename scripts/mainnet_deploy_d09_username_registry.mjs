@@ -23,7 +23,7 @@
  *   dry run:    node scripts/mainnet_deploy_d09_username_registry.mjs --mnemonic-file artifacts/local/deployer.secret
  *   broadcast:  node scripts/mainnet_deploy_d09_username_registry.mjs --mnemonic-file artifacts/local/deployer.secret --broadcast
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { Address, Cell, beginCell, contractAddress, internal, loadStateInit, storeMessage, SendMode } from '@ton/core';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import * as TonLib from '@ton/ton';
@@ -32,6 +32,8 @@ const PACKET_PATH = 'artifacts/local/mainnet_tx_dry_run_packet.json';
 const STEP_ID = 'D09';
 const EXPECTED_CONTRACT = 'UsernameRegistry';
 const GATEWAY = (process.env.PLATHO_GATEWAY || 'https://rpc.platho.app').replace(/\/+$/, '');
+// Decommissioned gateway carried the toncenter key server-side; pass it as the api_key query param now.
+const KEY = (process.env.TONCENTER_API_KEY || (existsSync('artifacts/local/center.txt') ? readFileSync('artifacts/local/center.txt', 'utf8') : '')).trim();
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -44,13 +46,13 @@ const fmtTon = (n) => (Number(n) / 1e9).toFixed(4);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function gwGetState(addr) {
-  const r = await fetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } });
+  const r = await fetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}&api_key=${KEY}`, { headers: { accept: 'application/json' } });
   const j = await r.json().catch(() => ({}));
   if (!j || j.ok !== true) throw new Error(`getAddressInformation(${addr}): ${j && j.error ? j.error : 'HTTP ' + r.status}`);
   return j.result;
 }
 async function gwSendBoc(bocB64) {
-  const r = await fetch(`${GATEWAY}/api/v3/message`, {
+  const r = await fetch(`${GATEWAY}/api/v3/message?api_key=${KEY}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ boc: bocB64 }),
@@ -105,7 +107,7 @@ async function main() {
   let seqno = 0;
   if (!notDeployed) {
     try {
-      const r = await fetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: wallet.address.toString(), method: 'seqno', stack: [] }) });
+      const r = await fetch(`${GATEWAY}/api/v3/runGetMethod?api_key=${KEY}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: wallet.address.toString(), method: 'seqno', stack: [] }) });
       const j = await r.json();
       const raw = j?.stack?.[0]?.value ?? j?.result?.stack?.[0]?.[1] ?? '0';
       seqno = Number(BigInt(raw));

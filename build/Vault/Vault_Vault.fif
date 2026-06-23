@@ -2742,16 +2742,16 @@ PROGRAM{
   $Vault$_fun_batchStorageReserve PROCREF:<{
     2 EQINT
     IFJMP:<{
-      8400000 PUSHINT
+      10400000 PUSHINT
     }>
     4300000 PUSHINT
   }>
   $Vault$_fun_batchHubPartGas PROCREF:<{
     2 EQINT
     IFJMP:<{
-      75000 PUSHINT
+      180000 PUSHINT
     }>
-    75000 PUSHINT
+    170000 PUSHINT
   }>
   $Vault$_fun_batchVaultPartGas PROCREF:<{
     2 EQINT
@@ -6921,13 +6921,6 @@ PROGRAM{
           NOW
       86400 PUSHINT
       ADD
-      DUP
-      32 PUSHPOW2DEC
-      GREATER
-      IF:<{
-        DROP
-        32 PUSHPOW2DEC
-      }>
       31 s() PUSH
       31 s() PUSH
       31 s() PUSH
@@ -10434,7 +10427,7 @@ PROGRAM{
           }>
           s5 PUSH
               SBITS
-          528 PUSHINT
+          592 PUSHINT
           EQUAL
           IF:<{
             s5 PUSH
@@ -10451,6 +10444,8 @@ PROGRAM{
             s0 s2 XCHG
             8 LDU
             8 LDU
+            64 PUSHINT
+                SDSKIPFIRST
             256 LDU
             256 LDU
                 LDREF

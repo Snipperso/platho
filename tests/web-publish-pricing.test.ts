@@ -55,18 +55,18 @@ const PART_COUNTS = [1, 8] as const;
 // private 4K (over the packer's conservative budget). Their delivery + pricing are covered by the matching
 // 1-part entries (the split yields single-part externals on the proven 1-part path) and by WPP-AMORTIZE.
 const MEASURED_CANONICAL_TOTAL: Record<string, bigint> = {
-  'private|1|1': 151_886_475n, 'private|1|8': 346_856_548n,
-  'private|2|1': 152_485_942n, 'private|2|8': 351_652_282n,
-  'private|4|1': 153_684_875n,
-  'private|8|1': 156_082_742n,
-  'private|16|1': 160_885_142n,
-  'private|32|1': 170_483_276n,
-  'public|1|1': 156_209_342n, 'public|1|8': 381_245_348n,
-  'public|2|1': 156_808_808n, 'public|2|8': 386_041_082n,
-  'public|4|1': 158_007_742n, 'public|4|8': 395_632_549n,
-  'public|8|1': 160_405_609n,
-  'public|16|1': 165_208_009n,
-  'public|32|1': 174_806_143n,
+  'private|1|1': 158_220_000n, 'private|1|8': 397_524_000n,
+  'private|2|1': 158_820_000n, 'private|2|8': 402_319_000n,
+  'private|4|1': 160_019_000n,
+  'private|8|1': 162_417_000n,
+  'private|16|1': 167_219_000n,
+  'private|32|1': 176_817_000n,
+  'public|1|1': 165_714_000n, 'public|1|8': 457_280_000n,
+  'public|2|1': 166_314_000n, 'public|2|8': 462_076_000n,
+  'public|4|1': 167_513_000n, 'public|4|8': 471_667_000n,
+  'public|8|1': 169_910_000n,
+  'public|16|1': 174_713_000n,
+  'public|32|1': 184_311_000n,
 };
 
 function cellPayload(cell: Cell) {
