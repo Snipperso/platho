@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v478';
+const PLATHO_APP_RUNTIME_VERSION = 'v479';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -12955,6 +12955,11 @@ async function activateImportedEncryptedWalletRecord(wallet, record) {
   prepareWalletScopedRuntimeForWallet(wallet, 'wallet key imported');
   await writeEncryptedPlathoWalletRecord(record);
   plathoWallet = wallet;
+  // Importing an encrypted wallet-key backup proves the key is already backed up (the file IS the export), so
+  // clear any "key never exported" pending flag for this address -- in localStorage AND its Telegram CloudStorage
+  // mirror, which survives a local-data wipe and would otherwise re-flag a freshly imported wallet on next boot.
+  // IMPORT is never a backup-pending state.
+  markWalletKeyBackupDone(wallet.address);
   localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
   markWalletUnlocked();
   scheduleWalletAutoLock();
