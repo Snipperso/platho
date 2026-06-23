@@ -2215,6 +2215,14 @@ button.feed-item:hover {
   padding: 0 16px;
 }
 
+/* Buttons default to text-align:center, so a label that wraps to two lines centers -- inconsistent with the
+   left-aligned single-line labels. Left-align the label so wrapped lines stay flush-left (the value <strong>
+   keeps its own right alignment). */
+.settings-list button > span,
+.settings-select-row > span {
+  text-align: left;
+}
+
 .profile-stat-list {
   display: grid;
   gap: 8px;
