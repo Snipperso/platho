@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=89';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=90';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=50';
+} from './vault-ton-rpc-provider.mjs?v=51';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -136,19 +136,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=4';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=32';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=33';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=46';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=34';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=30';
+} from './capsulehub-ton-rpc-provider.mjs?v=47';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=35';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=31';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=37';
+} from './username-ton-rpc-provider.mjs?v=38';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v486';
+const PLATHO_APP_RUNTIME_VERSION = 'v487';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -13916,15 +13916,19 @@ function isTonRpcRateLimitError(error) {
 }
 
 function tonRpcLimitBackoffMs(error = null) {
+  // The configured keyless backoff (~7s) is the CEILING for the app-level limiter park (composer
+  // backpressure + send bail). Honor a SMALLER server-supplied retry-after, but never let a large (or a
+  // stale-hardcoded) error.retryAfterMs re-introduce a multi-minute idle here — the transport's own
+  // state.backoffUntil still honors a real Retry-After for actual request pacing.
+  const configured = Number(appConfig.network?.tonRpc?.rateLimitBackoffMs);
+  const ceiling = Number.isFinite(configured) && configured > 0
+    ? Math.floor(configured)
+    : TON_RPC_LIMIT_FALLBACK_BACKOFF_MS;
   const retryAfterMs = Number(error?.retryAfterMs);
   if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
-    return Math.max(TON_RPC_LIMIT_MIN_BACKOFF_MS, Math.floor(retryAfterMs));
+    return Math.max(TON_RPC_LIMIT_MIN_BACKOFF_MS, Math.min(Math.floor(retryAfterMs), ceiling));
   }
-  const configured = Number(appConfig.network?.tonRpc?.rateLimitBackoffMs);
-  if (Number.isFinite(configured) && configured > 0) {
-    return Math.max(TON_RPC_LIMIT_MIN_BACKOFF_MS, Math.floor(configured));
-  }
-  return TON_RPC_LIMIT_FALLBACK_BACKOFF_MS;
+  return Math.max(TON_RPC_LIMIT_MIN_BACKOFF_MS, ceiling);
 }
 
 function tonRpcLimited() {

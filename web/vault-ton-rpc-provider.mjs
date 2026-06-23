@@ -686,8 +686,12 @@ function toncenterBackoffError(retryAfterMs) {
   });
 }
 
-function toncenterHttpError(label, response) {
-  const retryMs = response?.status === 429 ? retryAfterMs(response) ?? TONCENTER_RATE_LIMIT_BACKOFF_MS : undefined;
+function toncenterHttpError(label, response, fallbackBackoffMs = TONCENTER_RATE_LIMIT_BACKOFF_MS) {
+  // A 429 WITHOUT a Retry-After header should carry the transport's CONFIGURED rate-limit backoff (the
+  // keyless ~7s), not a hardcoded 60s. The error's retryAfterMs propagates up to the app-level limiter and
+  // the higher retry loops; the old hardcode made them sleep a full minute per 429, so a keyless send idled
+  // for ~10 min issuing almost no requests. A real Retry-After header still wins.
+  const retryMs = response?.status === 429 ? retryAfterMs(response) ?? fallbackBackoffMs : undefined;
   return new VaultTonRpcProviderError(`${label} HTTP ${response.status}`, {
     status: response.status,
     code: response.status === 429 ? 'RATE_LIMITED' : 'HTTP_ERROR',
@@ -717,8 +721,8 @@ function toncenterHttpErrorDetail(text) {
   return raw.slice(0, 1000);
 }
 
-async function toncenterHttpErrorWithBody(label, response) {
-  const error = toncenterHttpError(label, response);
+async function toncenterHttpErrorWithBody(label, response, fallbackBackoffMs = TONCENTER_RATE_LIMIT_BACKOFF_MS) {
+  const error = toncenterHttpError(label, response, fallbackBackoffMs);
   try {
     const body = typeof response?.clone === 'function' ? await response.clone().text() : await response.text();
     const detail = toncenterHttpErrorDetail(body);
@@ -1393,7 +1397,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
             },
           );
           if (!response.ok) {
-            throw toncenterHttpError('TON RPC get-method', response);
+            throw toncenterHttpError('TON RPC get-method', response, rateLimitBackoffMs);
           }
           const json = await response.json();
           const exitCode = json.exit_code ?? json.exitCode ?? json.result?.exit_code ?? json.result?.exitCode ?? 0;
@@ -1447,7 +1451,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
         },
       );
       if (!response.ok) {
-        throw await toncenterHttpErrorWithBody('TON RPC sendBoc', response);
+        throw await toncenterHttpErrorWithBody('TON RPC sendBoc', response, rateLimitBackoffMs);
       }
       const json = await response.json();
       const ok = json.ok ?? json.result?.ok ?? true;
@@ -1484,7 +1488,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
         },
       );
       if (!response.ok) {
-        throw toncenterHttpError('TON RPC account state', response);
+        throw toncenterHttpError('TON RPC account state', response, rateLimitBackoffMs);
       }
       return response.json();
     },
@@ -1537,7 +1541,7 @@ export function createTonCenterV3VaultTransport(options = {}) {
             },
           );
           if (!response.ok) {
-            throw toncenterHttpError('TON RPC messages', response);
+            throw toncenterHttpError('TON RPC messages', response, rateLimitBackoffMs);
           }
           const json = await response.json();
           writeMessagesCache(cacheKey, json, resolvedCacheTtlMs, messagesCacheMaxEntries);
@@ -1739,7 +1743,7 @@ export function createTonAccessV2VaultTransport(options = {}) {
               queueTimeoutMs,
             },
           );
-          if (!response.ok) throw toncenterHttpError('TON Access get-method', response);
+          if (!response.ok) throw toncenterHttpError('TON Access get-method', response, rateLimitBackoffMs);
           const normalized = normalizeTonAccessRunGetMethodResponse(await response.json());
           // TON Access (v2) reports app-level errors (e.g. uninitialized account -> code -13) as an
           // HTTP-200 {ok:false,...} with no result. Treat that as a thrown error (NOT an empty-stack
@@ -1785,7 +1789,7 @@ export function createTonAccessV2VaultTransport(options = {}) {
           queueTimeoutMs,
         },
       );
-      if (!response.ok) throw await toncenterHttpErrorWithBody('TON Access sendBoc', response);
+      if (!response.ok) throw await toncenterHttpErrorWithBody('TON Access sendBoc', response, rateLimitBackoffMs);
       const json = await response.json();
       const ok = json.ok ?? json.result?.ok ?? true;
       if (ok === false) throw new VaultTonRpcProviderError('TON Access sendBoc rejected message');
@@ -1818,7 +1822,7 @@ export function createTonAccessV2VaultTransport(options = {}) {
           queueTimeoutMs: requestOptions.queueTimeoutMs,
         },
       );
-      if (!response.ok) throw toncenterHttpError('TON Access account state', response);
+      if (!response.ok) throw toncenterHttpError('TON Access account state', response, rateLimitBackoffMs);
       return response.json();
     },
     async getAccountBalance(address, requestOptions = {}) {
@@ -1866,7 +1870,7 @@ export function createTonAccessV2VaultTransport(options = {}) {
         );
         if (!response || response.ok || Number(response.status) < 500 || attempt >= 1) break;
       }
-      if (!response.ok) throw toncenterHttpError('TON Access transactions', response);
+      if (!response.ok) throw toncenterHttpError('TON Access transactions', response, rateLimitBackoffMs);
       const payload = await response.json();
       // toncenter v2 reports param/validation failures (e.g. limit > 100) as an HTTP-200 {ok:false,code}
       // body. Surface that as a real error instead of silently returning a body with no transactions —
