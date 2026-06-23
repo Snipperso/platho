@@ -17,13 +17,20 @@
  *   upload:    ... --broadcast
  *   + seal:    ... --broadcast --seal
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { Address, beginCell, Cell, internal, storeMessage, SendMode, toNano } from '@ton/core';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import * as TonLib from '@ton/ton';
 import { storeUploadArt, storeSealArt } from '../build/UsernameRegistry/UsernameRegistry_UsernameRegistry';
 
-const GATEWAY = (process.env.PLATHO_GATEWAY || 'https://rpc.platho.app').replace(/\/+$/, '');
+// The rpc.platho.app gateway was decommissioned (PWA v468); route through keyed toncenter directly.
+// Key from env or artifacts/local/center.txt (gitignored) — required so 56 externals + the seqno/art-count
+// polling don't drown in keyless 429s. The key is appended as api_key= on every toncenter call.
+const GATEWAY = (process.env.PLATHO_GATEWAY || 'https://toncenter.com').replace(/\/+$/, '');
+const TONCENTER_KEY = (process.env.TONCENTER_API_KEY
+  || (existsSync('artifacts/local/center.txt') ? readFileSync('artifacts/local/center.txt', 'utf8') : '')).trim();
+const KEY_Q = TONCENTER_KEY ? `api_key=${encodeURIComponent(TONCENTER_KEY)}` : '';
+const withKey = (url: string) => (KEY_Q ? `${url}${url.includes('?') ? '&' : '?'}${KEY_Q}` : url);
 const PAYLOAD_PATH = 'artifacts/username_art_v2/art_payload.json';
 // per UploadArt: each part carries its share of the registry's PERMANENT storage reserve.
 // 56 x 0.17 = 9.52 TON accumulates in the registry (it retains UploadArt value) -> covers the
@@ -53,21 +60,21 @@ function plainSnake(s: string): Cell {
   return next!;
 }
 async function gwGetState(addr: string) {
-  const r = await fetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } });
+  const r = await fetch(withKey(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`), { headers: { accept: 'application/json' } });
   const j: any = await r.json().catch(() => ({}));
   if (!j || j.ok !== true) throw new Error(`getAddressInformation(${addr}): ${j?.error ?? 'HTTP ' + r.status}`);
   return j.result;
 }
 async function gwRunGet(addr: string, method: string): Promise<string> {
   // toncenter v2 FIRST: the gateway runGetMethod returns stale/0 for hot registry state.
-  try { const r = await fetch('https://toncenter.com/api/v2/runGetMethod', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); const v = j?.result?.stack?.[0]?.[1]; if (typeof v === 'string') return v; } catch {}
-  try { const r = await fetch(`${GATEWAY}/api/v3/runGetMethod`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); return j?.stack?.[0]?.value ?? j?.result?.stack?.[0]?.[1] ?? '0'; } catch { return '0'; }
+  try { const r = await fetch(withKey('https://toncenter.com/api/v2/runGetMethod'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); const v = j?.result?.stack?.[0]?.[1]; if (typeof v === 'string') return v; } catch {}
+  try { const r = await fetch(withKey(`${GATEWAY}/api/v3/runGetMethod`), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method, stack: [] }) }); const j: any = await r.json(); return j?.stack?.[0]?.value ?? j?.result?.stack?.[0]?.[1] ?? '0'; } catch { return '0'; }
 }
 async function gwSendBoc(bocB64: string) {
   // Redundant: gateway intermittently ACKs without delivering; also push to toncenter v2.
   const parts: string[] = []; let anyOk = false;
-  try { const r = await fetch('https://toncenter.com/api/v2/sendBoc', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`toncenter ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('toncenter ERR'); }
-  try { const r = await fetch(`${GATEWAY}/api/v3/message`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`gateway ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('gateway ERR'); }
+  try { const r = await fetch(withKey('https://toncenter.com/api/v2/sendBoc'), { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`toncenter-v2 ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('toncenter-v2 ERR'); }
+  try { const r = await fetch(withKey(`${GATEWAY}/api/v3/message`), { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ boc: bocB64 }) }); parts.push(`toncenter-v3 ${r.status}`); if (r.ok) anyOk = true; } catch { parts.push('toncenter-v3 ERR'); }
   return { httpStatus: 0, ok: anyOk, body: parts.join(' | ') };
 }
 
