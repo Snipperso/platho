@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v487';
+const PLATHO_APP_RUNTIME_VERSION = 'v488';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -3128,24 +3128,15 @@ function renderConversationIdentity(thread) {
 
 const MESSAGE_SYNC_LOADING_FRAMES = Object.freeze(['Syncing', 'Syncing.', 'Syncing..', 'Syncing...']);
 
-function messageAutoSyncNextText() {
-  if (messageAutoSyncAt <= 0) return null;
-  const seconds = Math.max(1, Math.ceil((messageAutoSyncAt - Date.now()) / 1000));
-  return `next sync in ${seconds}s`;
-}
-
 function messageAutoSyncCountdownText() {
   if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair) return null;
+  // State-only sync status — auto-sync runs in the background, so there is no "next sync in Ns" countdown.
   if (messageAutoSyncPhase === 'syncing') {
     return MESSAGE_SYNC_LOADING_FRAMES[messageAutoSyncLoadingFrame % MESSAGE_SYNC_LOADING_FRAMES.length];
   }
-  const next = messageAutoSyncNextText();
-  if (messageAutoSyncPhase === 'synced') return next ? `✓ Synced - ${next}` : '✓ Synced';
-  if (messageAutoSyncPhase === 'delayed') {
-    const label = messageAutoSyncLastErrorLabel ?? 'Sync delayed';
-    return next ? `${label} - ${next}` : label;
-  }
-  return next ? `Next sync in ${next.replace('next sync in ', '')}` : null;
+  if (messageAutoSyncPhase === 'synced') return '✓ Synced';
+  if (messageAutoSyncPhase === 'delayed') return messageAutoSyncLastErrorLabel ?? 'Sync delayed';
+  return null;
 }
 
 function conversationSubtitleText(thread) {
@@ -3393,20 +3384,13 @@ function scheduleMessageAutoSyncCountdownUi() {
   clearMessageAutoSyncCountdownTimer();
   refreshConversationSubtitle();
   if (!isChatsViewActive() || document.hidden) return;
+  // Only re-tick to animate the "Syncing…" frames; there is no longer a "next sync in Ns" countdown to update.
   if (messageAutoSyncPhase === 'syncing') {
     messageAutoSyncCountdownTimer = window.setTimeout(() => {
       messageAutoSyncLoadingFrame = (messageAutoSyncLoadingFrame + 1) % MESSAGE_SYNC_LOADING_FRAMES.length;
       scheduleMessageAutoSyncCountdownUi();
     }, 420);
-    return;
   }
-  if (messageAutoSyncAt <= 0) return;
-  const remainingMs = messageAutoSyncAt - Date.now();
-  if (remainingMs <= 0) return;
-  messageAutoSyncCountdownTimer = window.setTimeout(
-    scheduleMessageAutoSyncCountdownUi,
-    Math.min(MESSAGE_SYNC_COUNTDOWN_TICK_MS, remainingMs),
-  );
 }
 
 function beginMessageSyncUi() {
