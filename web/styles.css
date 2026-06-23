@@ -2331,8 +2331,11 @@ button.feed-item:hover {
   flex: 1 1 auto;
   min-width: 0;
   height: 34px;
-  border: none;
-  background: transparent;
+  /* A distinct dark field box (like the select controls) so it reads as an input against the lighter row. */
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--panel);
   color: var(--text);
   font: inherit;
   cursor: text;
@@ -2340,6 +2343,7 @@ button.feed-item:hover {
 
 .settings-rpc-row input:focus {
   outline: none;
+  border-color: var(--accent);
 }
 
 .settings-rpc-row input::placeholder {
