@@ -35,6 +35,9 @@ const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
 // instead of spending the censorship-survival transports re-asking a settled
 // question.
 const TON_GET_METHOD_UNINITIALIZED_EXIT_CODE = -13;
+// Anonymous (no-key) toncenter is ~1 rps. A keyed user-toncenter is spaced for 10 rps (100ms); when it runs
+// WITHOUT a key it must drop to this keyless spacing or it 429-storms toncenter.com into a perpetual "RPC busy".
+const TONCENTER_KEYLESS_REQUEST_SPACING_MS = 1500;
 const TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
   'get_state',
@@ -1758,6 +1761,17 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   if (!['toncenter-v3', 'toncenter', 'platho-rpc', 'json-rpc-compatible'].includes(kind)) {
     throw new VaultTonRpcProviderError(`Unsupported TON RPC provider kind: ${kind}`);
   }
+  // A no-key user-toncenter MUST use the keyless ~1 rps spacing, NOT the keyed 100ms (10 rps): anonymous
+  // toncenter.com rate-limits at ~1 rps, so 100ms would 429-storm it into a perpetual "RPC busy" /
+  // private_index_read_failed. It STILL stays a non-emergency primary (no demotion — see below); when a key
+  // is later added, applyToncenterApiKey rebuilds the transport with the full keyed spacing.
+  const userKeyMissing = (provider?.useUserApiKey ?? defaults.useUserApiKey) === true
+    && !(provider?.apiKey ?? defaults.apiKey)
+    && !globalThis.plathoToncenterApiKey;
+  const configuredSpacingMs = provider?.requestSpacingMs ?? defaults.requestSpacingMs;
+  const effectiveRequestSpacingMs = userKeyMissing
+    ? Math.max(Number(configuredSpacingMs ?? 0) || 0, TONCENTER_KEYLESS_REQUEST_SPACING_MS)
+    : configuredSpacingMs;
   const transport = createTonCenterV3VaultTransport({
     endpoint,
     messagesEndpoint: provider?.messagesEndpoint ?? defaults.messagesEndpoint,
@@ -1767,7 +1781,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     useUserApiKey: provider?.useUserApiKey ?? defaults.useUserApiKey,
     headers: provider?.headers ?? defaults.headers,
     fetch: provider?.fetch ?? defaults.fetch,
-    requestSpacingMs: provider?.requestSpacingMs ?? defaults.requestSpacingMs,
+    requestSpacingMs: effectiveRequestSpacingMs,
     rateLimitBackoffMs: provider?.rateLimitBackoffMs ?? defaults.rateLimitBackoffMs,
     rateLimitRetries: provider?.rateLimitRetries ?? defaults.rateLimitRetries,
     sendBocRateLimitRetries: provider?.sendBocRateLimitRetries ?? defaults.sendBocRateLimitRetries,
