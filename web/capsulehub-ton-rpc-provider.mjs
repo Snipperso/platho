@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
-import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=52';
+import { decodeTonAddressSliceBoc, isTonRpcTransportDead, noteTonRpcReadTransportRateLimited } from './vault-ton-rpc-provider.mjs?v=53';
 import { tonCell, computeEntryPublishId } from './pwa-contract-transactions.mjs?v=30';
 
 const CAPSULEHUB_OPS = Object.freeze({
@@ -20,11 +20,10 @@ const KIND_PUBLIC_BYTE = 2n;
 const CAPSULEHUB_MESSAGE_BODY_BUCKET_SECONDS = 3600;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_LIMIT = 1000;
 const CAPSULEHUB_MESSAGE_BODY_LOOKUP_MAX_PAGES = 8;
-// toncenter v2 /getTransactions rejects limit > 100 with an HTTP-200 {ok:false,code:422} body, and the
-// keyless Orbs (ton-access-v2) proxy forwards that verbatim. Sending the 1000 above made every keyless
-// body tx-scan come back empty (no rows) -> bodies never recovered -> the cursor never advanced -> an
-// infinite re-walk that kept the RPC limiter hot and starved sends. Cap the tx-scan page to the v2 max.
-// (The v3 getMessages indexer used elsewhere still accepts the 1000.)
+// toncenter /getTransactions (v2) rejects limit > 100 with an HTTP-200 {ok:false,code:422} body. Sending
+// the 1000 above made every keyless body tx-scan come back empty (no rows) -> bodies never recovered ->
+// the cursor never advanced -> an infinite re-walk that kept the RPC limiter hot and starved sends. Cap
+// the tx-scan page to the v2 max. (The v3 getMessages indexer used elsewhere still accepts the 1000.)
 const CAPSULEHUB_TX_SCAN_PAGE_LIMIT = 100;
 // Keyless tx-scan: stop paging once transactions are this many seconds older than the entry's
 // publish time (we have walked past where the body would be).
@@ -148,7 +147,7 @@ function messageHistoryTransports(transport) {
 }
 
 // Keyless body retrieval: transports that can scan an account's transactions directly (no message
-// indexer). The keyless Orbs (ton-access-v2) transport provides getTransactions; toncenter-v3 does not.
+// indexer). The toncenter transport provides getTransactions (toncenter v2 /getTransactions).
 function transactionHistoryTransports(transport) {
   const transports = Array.isArray(transport?.transports) && transport.transports.length > 0
     ? transport.transports
@@ -877,8 +876,10 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
     if (!parsed) {
       const transport = resolveTransport(options);
       const historyTransports = messageHistoryTransports(transport);
-      // Either an indexer (getMessages) OR a keyless transaction-scanner (getTransactions, e.g. Orbs)
-      // can recover the body, so require at least one of the two — not getMessages specifically.
+      // Either an indexer (getMessages) OR a transaction-scanner (getTransactions) can recover the body,
+      // so require at least one of the two — not getMessages specifically. (Toncenter-only: every transport
+      // exposes the getMessages indexer, so the getTransactions tx-scan branch below is currently inert —
+      // it is kept as a structural fallback should a non-indexer transport ever be reintroduced.)
       if (historyTransports.length === 0 && transactionHistoryTransports(transport).length === 0) {
         throw new CapsuleHubTonRpcProviderError('TON RPC transport cannot read CapsuleHub message history');
       }
@@ -935,8 +936,8 @@ export function createCapsuleHubTonRpcProvider(options = {}) {
         }
         if (parsed) break;
       }
-      // Keyless fallback (no indexer): when no getMessages transport found the body — only the keyless
-      // Orbs transport is available, or the toncenter indexer is unreachable — scan the CapsuleHub
+      // Transaction-scan fallback (no indexer hit): when no getMessages transport found the body (the
+      // toncenter indexer is unreachable, or only a non-indexer transport is available) scan the CapsuleHub
       // account's transactions directly and run each candidate through the SAME hash-verifying pipeline
       // (cachePublishMessages + takeValidParsed), so a malicious/incorrect provider body is never served
       // (it fails the entry's body_hash).

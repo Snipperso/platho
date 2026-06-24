@@ -46,30 +46,32 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     chain: 'mainnet',
     label: 'mainnet',
     tonRpc: {
-      // CLIENT-DIRECT RPC (no central gateway). Each client carries its OWN per-client budget:
-      //  - orbs-keyless  : keyless decentralized Orbs network, PRIMARY for non-indexed
-      //                    reads/account/sendBoc (per-client budget, censorship-resistant, no key).
-      //  - user-toncenter: the user's OWN free toncenter API key (10 rps), injected at runtime from
-      //                    local storage. Carries the message-history indexer + reads/send.
-      //  - keyless-toncenter: anonymous toncenter, last-resort only (weak/throttled).
-      // verifyCriticalReads stays false: message bodies self-verify against CapsuleHub hashes, so a
-      // single (even untrusted) provider read cannot poison them; routine cross-verify would burn the
-      // per-user budget for no security gain.
-      primaryProviderId: 'orbs-keyless',
-      fallbackProviderIds: ['user-toncenter', 'keyless-toncenter'],
+      // CLIENT-DIRECT RPC, TONCENTER-ONLY (no central gateway, no Orbs). Each client carries its OWN
+      // per-client budget:
+      //  - user-toncenter   : the user's OWN free toncenter v3 key (10 rps), injected at runtime via
+      //                       globalThis.plathoToncenterApiKey. PRIMARY for ALL reads/account/sendBoc +
+      //                       the message-history indexer. When the key is absent the transport runs
+      //                       anonymous (~1 rps, 429-prone) but STAYS a non-emergency primary — it is
+      //                       NOT demoted to verifierOnly (see vault-ton-rpc-provider.mjs userKeyMissing);
+      //                       demoting it would leave zero live primaries once Orbs is gone -> perpetual
+      //                       "syncing". Onboarding nudges the user to add a key.
+      //  - keyless-toncenter: anonymous toncenter, EMERGENCY/last-resort only (weak/throttled, ~1 rps).
+      // Orbs (ton-access-v2) was removed: it is stuck on toncenter API v2 (no v3 indexer / normalized
+      // hash to confirm a just-sent message) and lags the post-2026-04 sub-second chain, so as the
+      // primary read it stalled confirmations. Both transports are now the same toncenter.com backend
+      // (keyed vs anonymous), so there is NO independent second source: verifyCriticalReads stays false
+      // and the hot path self-trusts the lone non-emergency primary (message bodies still self-verify
+      // against CapsuleHub hashes, so a single provider read cannot poison them). This is a weaker
+      // censorship posture than the old decentralized-Orbs fallback — an explicit, owner-approved trade
+      // for usability (toncenter.com reachable; if it is ever blocked there is no decentralized fallback).
+      primaryProviderId: 'user-toncenter',
+      fallbackProviderIds: ['keyless-toncenter'],
       verifyCriticalReads: false,
       criticalMethods: [...REQUIRED_TON_RPC_CRITICAL_METHODS],
       providers: [
         {
-          id: 'orbs-keyless',
-          kind: 'ton-access-v2',
-          // No message-history indexer; getMessages reads route to a keyed toncenter provider.
-        },
-        {
           id: 'user-toncenter',
           kind: 'toncenter-v3',
-          // The toncenter API key is the user's own free key, injected at runtime via
-          // globalThis.plathoToncenterApiKey. When absent the transport runs anonymous (degraded).
           useUserApiKey: true,
           runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
           sendBocEndpoint: 'https://toncenter.com/api/v3/message',
@@ -80,6 +82,9 @@ export const PLATHO_APP_CONFIG = deepFreeze({
         {
           id: 'keyless-toncenter',
           kind: 'toncenter-v3',
+          // verifierOnly + emergencyFallback are LOAD-BEARING: they keep this same-backend anonymous
+          // source out of the routine verifier role (it would otherwise self-compare against the keyed
+          // primary and fail closed). Do NOT drop these flags.
           verifierOnly: true,
           emergencyFallback: true,
           runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
@@ -102,7 +107,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=52',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=53',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -112,7 +117,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=32',
+      moduleUrl: './ton-dns-provider.mjs?v=33',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
@@ -220,11 +225,10 @@ function hasConcreteTonRpcSendProvider(provider) {
   return Boolean(provider?.sendBocEndpoint);
 }
 
-// Client-direct architecture guard. Clients talk to TON only through CANONICAL decentralized / public
-// endpoints — Orbs (TON Access) for the keyless decentralized path and toncenter.com for the per-user-key
-// indexer. ANY other RPC host is a central proxy/gateway: a single point to block or DoS, which the
-// client-direct model exists to remove. Enforced as a host ALLOW-LIST (the principle) rather than a
-// blacklist of one retired hostname, so it also catches any future central proxy.
+// Client-direct architecture guard. Clients talk to TON only through the canonical public toncenter.com
+// host (per-user key + anonymous fallback). ANY other RPC host is a central proxy/gateway: a single point
+// to block or DoS, which the client-direct model exists to remove. Enforced as a host ALLOW-LIST (the
+// principle) rather than a blacklist of one retired hostname, so it also catches any future central proxy.
 function tonRpcEndpointHost(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -238,8 +242,7 @@ function tonRpcEndpointHost(value) {
 
 function isCanonicalTonRpcHost(host) {
   const h = String(host ?? '').toLowerCase();
-  return h === 'ton.access.orbs.network' || h.endsWith('.orbs.network')
-    || h === 'toncenter.com' || h.endsWith('.toncenter.com');
+  return h === 'toncenter.com' || h.endsWith('.toncenter.com');
 }
 
 function tonRpcProviderEndpointHosts(provider) {
@@ -250,7 +253,6 @@ function tonRpcProviderEndpointHosts(provider) {
     provider?.messagesEndpoint,
     provider?.walletBalanceEndpoint,
     provider?.accountEndpoint,
-    provider?.tonAccessHost,
   ].map(tonRpcEndpointHost).filter((host) => host !== null);
 }
 
@@ -323,22 +325,11 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
           'Production PWA config must include a verifier-only emergency fallback provider with read, send, and message-history endpoints so the messenger survives when the primary transports are unreachable.',
         );
       }
-      // Client-direct model: each client carries its own per-client RPC budget, so a keyless
-      // decentralized provider (Orbs / TON Access) must exist for the no-key / censored survival path.
-      const hasKeylessDecentralizedProvider = tonRpcProviders.some((rpcProvider) => (
-        ['ton-access-v2', 'ton-access', 'orbs'].includes(String(rpcProvider?.kind ?? '').toLowerCase())
-      ));
-      if (!hasKeylessDecentralizedProvider) {
-        addFinding(
-          findings,
-          'PWA_TON_RPC_KEYLESS_DECENTRALIZED_REQUIRED',
-          'Production PWA config must include a keyless decentralized TON RPC provider (Orbs / TON Access) so reads and sends survive without a per-user API key.',
-        );
-      }
-      // No provider may route through a central RPC proxy/gateway: every explicit endpoint host must be a
-      // canonical decentralized/public TON host (Orbs or toncenter.com), so there is no single host to
-      // block or DoS. Principle-based (host allow-list) — supersedes and generalizes the retired central
-      // gateway ban.
+      // No provider may route through a central RPC proxy/gateway: every explicit endpoint host must be
+      // the canonical public toncenter.com host, so there is no single bespoke host to block or DoS.
+      // Principle-based (host allow-list) — supersedes and generalizes the retired central gateway ban.
+      // (The old "must have a keyless decentralized Orbs provider" guard was removed with the toncenter-only
+      // switch; the emergency-fallback rule above still guarantees a keyless survival transport.)
       for (const rpcProvider of tonRpcProviders) {
         const routesThroughCentralProxy = tonRpcProviderEndpointHosts(rpcProvider)
           .some((host) => !isCanonicalTonRpcHost(host));
@@ -346,7 +337,7 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
           addFinding(
             findings,
             'PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN',
-            'Production PWA must not route through a central RPC proxy/gateway; every provider endpoint must be a canonical decentralized/public TON host (Orbs ton.access.orbs.network or toncenter.com), so clients talk to TON directly with no central host to block or DoS.',
+            'Production PWA must not route through a central RPC proxy/gateway; every provider endpoint must be the canonical public TON host (toncenter.com), so clients talk to TON directly with no central host to block or DoS.',
           );
         }
       }

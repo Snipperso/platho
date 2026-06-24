@@ -84,21 +84,20 @@ describe('PWA on-chain self-sufficiency', () => {
     expect(transport).toMatch(/sendBoc/);
     expect(transport).toMatch(/getAccountState/);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.map((provider) => provider.kind)).toEqual([
-      'ton-access-v2',
       'toncenter-v3',
       'toncenter-v3',
     ]);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toContain('user-toncenter');
-    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).not.toContain('orbs-keyless');
-    // Client-direct: keyless Orbs is the per-client decentralized PRIMARY; the user's own toncenter
-    // key carries the message-history indexer; anonymous toncenter is the last-resort emergency only.
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'orbs-keyless')?.kind).toBe('ton-access-v2');
+    // TONCENTER-ONLY: the user's own keyed toncenter is the PRIMARY (reads/send/history); anonymous toncenter
+    // is the last-resort emergency fallback. No Orbs / ton-access provider remains.
+    expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('user-toncenter');
+    expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toEqual(['keyless-toncenter']);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.some((provider) => String(provider.kind) === 'ton-access-v2')).toBe(false);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')?.useUserApiKey).toBe(true);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')?.apiKey).toBeUndefined();
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')?.verifierOnly).toBe(true);
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')?.emergencyFallback).toBe(true);
-    // Every provider endpoint is a canonical decentralized/public TON host (Orbs or toncenter.com) — no
-    // provider routes through a central proxy/gateway.
+    // Every provider endpoint is the canonical public toncenter.com host — no provider routes through a
+    // central proxy/gateway.
     expect(validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => finding.id))
       .not.toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
   });

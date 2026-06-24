@@ -138,18 +138,14 @@ describe('PWA runtime config guard', () => {
     expect(PLATHO_APP_CONFIG.network.tonRpc.requestTimeoutMs).toBe(15000);
     expect(PLATHO_APP_CONFIG.network.tonRpc.runGetMethodCacheTtlMs).toBe(15000);
     expect(PLATHO_APP_CONFIG.network.tonRpc.runGetMethodCacheMaxEntries).toBe(512);
+    // TONCENTER-ONLY (Orbs removed): keyed user-toncenter is the primary, keyless-toncenter the emergency fallback.
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.map((provider) => provider.id)).toEqual([
-      'orbs-keyless',
       'user-toncenter',
       'keyless-toncenter',
     ]);
     expect(PLATHO_APP_CONFIG.network.tonRpc.fallbackProviderIds).toEqual([
-      'user-toncenter',
       'keyless-toncenter',
     ]);
-    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'orbs-keyless')).toMatchObject({
-      kind: 'ton-access-v2',
-    });
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'user-toncenter')).toMatchObject({
       useUserApiKey: true,
       runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
@@ -163,9 +159,11 @@ describe('PWA runtime config guard', () => {
       runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
       requestSpacingMs: 1500,
     });
-    expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('orbs-keyless');
-    // Every provider endpoint is a canonical decentralized/public TON host (Orbs or toncenter.com), so the
-    // validator raises no central-proxy/gateway finding — there is no single host to block or DoS.
+    // No Orbs / ton-access provider remains.
+    expect(PLATHO_APP_CONFIG.network.tonRpc.providers.some((provider) => String(provider.kind) === 'ton-access-v2')).toBe(false);
+    expect(PLATHO_APP_CONFIG.network.tonRpc.primaryProviderId).toBe('user-toncenter');
+    // Every provider endpoint is the canonical public toncenter.com host, so the validator raises no
+    // central-proxy/gateway finding — there is no single bespoke host to block or DoS.
     expect(validatePlathoAppConfig(PLATHO_APP_CONFIG).findings.map((finding) => finding.id))
       .not.toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
     // verifyCriticalReads stays false: message bodies self-verify against CapsuleHub hashes, so a single
@@ -202,7 +200,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=32/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=33/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -258,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v489<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v489'/);
+    expect(html).toMatch(/id="appVersionLabel">v490<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v490'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1297,23 +1295,25 @@ describe('PWA runtime config guard', () => {
     expect(maxSource).toMatch(/balance - VAULT_RESERVES_NANOTONS\.withdrawTonExec/);
   });
 
-  it('PWA-SEND-02: prepared Vault send waits for nonce between multi-part BOCs and preserves partial state', () => {
+  it('PWA-SEND-02: prepared Vault send streams multi-part BOCs back-to-back (non-blocking nonce barrier) and preserves partial state', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const sendSource = app.slice(
       app.indexOf('async function sendPreparedCapsulesThroughVault'),
       app.indexOf('async function publishCapsulesThroughVault'),
     );
-    const nonceReadIndex = sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true');
+    const firstBatchGateIndex = sendSource.indexOf('if (batchIndex === 0) {');
+    const nonceReadIndex = sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true');
+    const floorNonceIndex = sendSource.indexOf('clientNonce = nonceFloor;');
     const buildIndex = sendSource.indexOf('batchExternal = await buildBatchExternalFromPublishItems(batch');
     const sendIndex = sendSource.indexOf('lastResult = await sendVaultExternalBoc(batchExternal)');
     const sentStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_SENT');
     const confirmNonceIndex = sendSource.indexOf('shouldConfirmVaultPublishNonceAfterSend(batchIndex, batches.length, options)');
-    const middleNonceIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, nonceWaitOptions)');
+    const barrierWaitIndex = sendSource.indexOf('await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions)');
     const submittedStatusIndex = sendSource.indexOf('PUBLISH_PART_STATUS_VAULT_SUBMITTED');
     const finalBarrierIndex = sendSource.indexOf('installVaultPublishNonceBarrier');
     const partialIndex = sendSource.indexOf('vaultPublishPartialError');
     const clientNonceSource = sendSource.slice(
-      sendSource.indexOf('let clientNonce = options.allowOwnVaultActionReadFallback === true'),
+      sendSource.indexOf('clientNonce = options.allowOwnVaultActionReadFallback === true'),
       sendSource.indexOf('if (clientNonce === null)'),
     );
     const nonceWaitSource = app.slice(
@@ -1325,16 +1325,24 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function readVaultPublishNonceForBroadcastRetry'),
     );
 
-    expect(nonceReadIndex).toBeGreaterThanOrEqual(0);
+    expect(firstBatchGateIndex).toBeGreaterThanOrEqual(0);
+    expect(nonceReadIndex).toBeGreaterThan(firstBatchGateIndex);
+    // Batch 0 reads the chain nonce; later batches derive it from the monotonic floor (NO chain read ->
+    // no re-block on the just-installed barrier) so all batches sign + broadcast back-to-back.
+    expect(floorNonceIndex).toBeGreaterThan(nonceReadIndex);
+    expect(sendSource).toMatch(/if \(batchIndex === 0\) \{[\s\S]*?readVaultPublishNonce\(provider, owner\)[\s\S]*?\} else \{\s*clientNonce = nonceFloor;\s*\}/);
     expect(buildIndex).toBeGreaterThan(nonceReadIndex);
     expect(sendIndex).toBeGreaterThan(buildIndex);
     expect(sentStatusIndex).toBeGreaterThan(sendIndex);
     expect(confirmNonceIndex).toBeGreaterThan(sentStatusIndex);
-    expect(middleNonceIndex).toBeGreaterThan(confirmNonceIndex);
-    expect(submittedStatusIndex).toBeGreaterThan(middleNonceIndex);
-    expect(finalBarrierIndex).toBeGreaterThan(submittedStatusIndex);
-    // Back-to-back signed actions serialize on the publish nonce barrier
-    // instead of blocking the final part's CapsuleHub confirmation.
+    // NON-BLOCKING: EVERY batch installs the background nonce barrier; there is NO blocking inter-batch
+    // wait. The barrier's nonce poll (on expectedNonce) runs inside the installed task, after the install.
+    expect(finalBarrierIndex).toBeGreaterThan(confirmNonceIndex);
+    expect(barrierWaitIndex).toBeGreaterThan(finalBarrierIndex);
+    expect(submittedStatusIndex).toBeGreaterThan(finalBarrierIndex);
+    // The OLD blocking middle-batch nonce wait (await directly in the loop on clientNonce + 1n) is gone.
+    expect(sendSource).not.toMatch(/await waitForVaultPublishNonce\(provider, owner, clientNonce \+ 1n, nonceWaitOptions\)/);
+    // A FOLLOWING signed vault action still serializes on the publish nonce barrier.
     expect(sendSource).toMatch(/await awaitVaultPublishNonceBarrier\(\)/);
     // Monotonic per-owner nonce floor: a lagging replica must never make the
     // client sign below an observed/consumed nonce (burst-send race), and a
@@ -1856,7 +1864,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const progressed = privateSyncImported\(result\)\s*\|\| \(Number\(result\?\.skipped \?\? 0\) > 0 && !onlyBodyGapSkips\)/);
   });
 
-  it('PWA-KEYLESS-EFFICIENCY-01: body-gap terminal cap + early-skip + on-5xx retry + dead-publish confirm-skip', () => {
+  it('PWA-KEYLESS-EFFICIENCY-01: body-gap terminal cap + early-skip + dead-publish confirm-skip + keyless cursor persist', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const vault = readFileSync('web/vault-ton-rpc-provider.mjs', 'utf8');
     // The body-history store gains a cross-session strike cap (mirrors the unknown-error stuck store).
@@ -1877,9 +1885,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const undeliveredCount = privateStuckEntrySurfacedCount\(address\) \+ privateBodyHistorySurfacedCount\(address\)/);
     // The per-cycle confirm sweep skips terminally-stopped (dead) publishes (CPU-only elision).
     expect(app).toMatch(/if \(message\.privatePublishConfirmStopped === true \|\| message\.privateSendRetryStopped === true\) continue/);
-    // Orbs getTransactions retries once on a 5xx with a fresh node (read-only; sendBoc untouched).
-    expect(vault).toMatch(/for \(let attempt = 0; attempt <= 1; attempt \+= 1\) \{/);
-    expect(vault).toMatch(/if \(!response \|\| response\.ok \|\| Number\(response\.status\) < 500 \|\| attempt >= 1\) break/);
+    // The Orbs (ton-access-v2) transport + its getTransactions on-5xx fresh-node retry were removed with the
+    // toncenter-only switch; keyless body recovery now uses the toncenter getMessages indexer (every transport
+    // exposes it), so no ton-access transport remains in the provider.
+    expect(vault).not.toMatch(/ton-access-v2|createTonAccessV2VaultTransport/);
     // B1: keyless (verify:false + allowUnverifiedCriticalRead) reads now PERSIST the index cursor so the
     // sync stops re-walking head->frozen-cursor (~15 getPrivateEntry reads) every cycle. Safe because the
     // index is an append-only backward-linked list (no fabricated future head; cursor advances only after a
@@ -3958,23 +3967,6 @@ describe('PWA runtime config guard', () => {
     expect(report.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN');
   });
 
-  it('PWA-CONFIG-04AE: production config requires a keyless decentralized (Orbs) provider', () => {
-    const withoutOrbs = validatePlathoAppConfig({
-      ...productionConfig,
-      network: {
-        ...productionConfig.network,
-        tonRpc: {
-          ...productionConfig.network.tonRpc,
-          providers: productionConfig.network.tonRpc.providers.filter(
-            (provider) => provider.kind !== 'ton-access-v2',
-          ),
-        },
-      },
-    });
-    expect(withoutOrbs.ok).toBe(false);
-    expect(withoutOrbs.findings.map((finding) => finding.id)).toContain('PWA_TON_RPC_KEYLESS_DECENTRALIZED_REQUIRED');
-  });
-
   it('PWA-CONFIG-04AF: production config requires a full-capability emergency fallback provider', () => {
     const withoutEmergencyFlag = validatePlathoAppConfig({
       ...productionConfig,
@@ -4507,29 +4499,29 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v560/);
+    expect(sw).toMatch(/platho-pwa-prototype-v561/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=489/);
+    expect(sw).toMatch(/\.\/app\.js\?v=490/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=91/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=48/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=39/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=92/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=49/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=52/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=36/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=48/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=34/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=32/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=39/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=53/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=49/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=33/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);

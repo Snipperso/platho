@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=91';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=92';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=52';
+} from './vault-ton-rpc-provider.mjs?v=53';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -136,19 +136,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=4';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=34';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=35';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=48';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=36';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=32';
+} from './capsulehub-ton-rpc-provider.mjs?v=49';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=37';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=33';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=39';
+} from './username-ton-rpc-provider.mjs?v=40';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v489';
+const PLATHO_APP_RUNTIME_VERSION = 'v490';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -449,7 +449,7 @@ const rpcKeyRow = document.querySelector('#rpcKeyRow');
 
 // Client-direct RPC: the user's own free toncenter API key (10 rps) speeds up reads + the message
 // indexer. Stored locally; injected into the user-toncenter transport at build via
-// globalThis.plathoToncenterApiKey. Keyless (Orbs) keeps working without it.
+// globalThis.plathoToncenterApiKey. Keyless toncenter keeps working without it.
 const TONCENTER_API_KEY_STORAGE_KEY = 'platho.toncenter.apiKey.v1';
 
 function refreshToncenterKeyUi() {
@@ -488,7 +488,7 @@ function applyToncenterApiKey(rawKey) {
 // Validate a TON Center API key with one lightweight authenticated call. toncenter returns 401
 // "API key does not exist" for a bad key and 200 for a good one (verified against the live API). A
 // network error / rate-limit is inconclusive — we report 'unverified' so the caller can still save
-// (offline or throttled must not block the user; a wrong key just falls back to the keyless Orbs path).
+// (offline or throttled must not block the user; a wrong key just falls back to the keyless toncenter path).
 async function validateToncenterApiKey(rawKey) {
   const key = String(rawKey ?? '').trim();
   if (!key) return { ok: false, reason: 'empty' };
@@ -512,7 +512,7 @@ async function validateToncenterApiKey(rawKey) {
 // No Save button: validate + save when the field loses focus after an edit (or on Enter). A
 // definitively invalid key (toncenter 401/403) is rejected and NOT stored; an unverifiable one
 // (offline / rate-limited) is kept so the user is never blocked — a wrong key just falls back to the
-// keyless Orbs path. On success refreshToncenterKeyUi() shows 'key active'.
+// keyless toncenter path. On success refreshToncenterKeyUi() shows 'key active'.
 async function commitToncenterKeyFromInput() {
   if (!toncenterApiKeyInput) return;
   const trimmed = String(toncenterApiKeyInput.value ?? '').trim();
@@ -834,7 +834,7 @@ const PRIVATE_CHAIN_STUCK_ENTRY_LIMIT = 200;
 const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_AUTO_LIMIT = 2;
 const PRIVATE_CHAIN_STUCK_ENTRY_RETRY_MANUAL_LIMIT = 16;
 const PRIVATE_SCAN_UNKNOWN_ERROR_CROSS_SESSION_CAP = 8;
-// A keyless body gap (no indexer; the Orbs tx-scan can't reach an old/unrecoverable body) is more
+// A keyless body gap (no indexer; the keyless toncenter tx-scan can't reach an old/unrecoverable body) is more
 // deterministically permanent than a generic unknown error, and each retry pays a heavy 8-page CapsuleHub
 // tx-scan, so cap it sooner: after this many cross-session strikes the entry is surfaced 'undelivered' and
 // stops being re-fetched (its heavy body tx-scan is skipped, the 500 source).
@@ -7458,7 +7458,7 @@ function privateIndexSyncReadLimit(options = {}) {
 
 function privateIndexCursorPersistenceMode(readOptions = {}) {
   if (readOptions.verify === true && readOptions.allowUnverifiedCriticalRead !== true) return 'verified';
-  // Client-direct keyless model: verify:false single-source (Orbs) reads are the trusted norm
+  // Client-direct keyless model: verify:false single-source (toncenter) reads are the trusted norm
   // (verifyCriticalReads:false; the gateway the 'verified' mode required is decommissioned). The private
   // index is an APPEND-ONLY backward-linked list, so a node cannot fabricate a future head; the cursor
   // advances only AFTER a complete walk (every entry head->stopLink processed), a lagging head simply
@@ -12983,7 +12983,7 @@ async function importEncryptedWalletKeyFile(file) {
   if (!(await confirmWalletReplacement('Import wallet key'))) return false;
   const restored = await activateImportedEncryptedWalletRecord(wallet, record);
   // v2+ backups also carry the user's own toncenter API key — restore it so importing the wallet key on a
-  // new device brings the RPC key too. v1 backups (no key) skip this. Keyless Orbs works either way.
+  // new device brings the RPC key too. v1 backups (no key) skip this. Keyless toncenter works either way.
   if (restored && parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND
     && typeof parsed.toncenterApiKey === 'string' && parsed.toncenterApiKey.trim()) {
     applyToncenterApiKey(parsed.toncenterApiKey);
@@ -18084,11 +18084,26 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
       }
       let batchExternal = null;
       try {
-        let clientNonce = options.allowOwnVaultActionReadFallback === true
-          ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
-          : await readVaultPublishNonce(provider, owner);
-        if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
+        // Batch 0 reads the chain nonce; subsequent batches derive the nonce from the monotonic floor
+        // (raised right after the previous batch's broadcast at :raiseVaultPublishNonceFloor) WITHOUT a
+        // chain read. The chain has not yet reflected the prior external, and readVaultPublishNonce would
+        // re-block on the just-installed background nonce barrier (awaitVaultPublishNonceBarrier) — that
+        // inter-batch block is exactly the multi-minute image latency. Signing N batches under N
+        // consecutive nonces and broadcasting them back-to-back is how a wallet streams seqno: the contract
+        // enforces strict sequential nonce on-chain (throwUnless == publish_nonce, pre-accept) and bounces
+        // any out-of-order arrival with NO charge, so back-to-back broadcast cannot double-spend or land
+        // out of order; a bounced (reordered) batch is healed by the idempotent same-nonce re-broadcast in
+        // the confirmation-retry path.
         const nonceFloor = vaultPublishNonceFloor(owner);
+        let clientNonce;
+        if (batchIndex === 0) {
+          clientNonce = options.allowOwnVaultActionReadFallback === true
+            ? await readVaultPublishNonceForOwnVaultAction(provider, owner)
+            : await readVaultPublishNonce(provider, owner);
+          if (clientNonce === null) throw new Error('Vault publish nonce could not be read before signing');
+        } else {
+          clientNonce = nonceFloor;
+        }
         if (clientNonce < nonceFloor) {
           // A lagging replica returned a nonce we already observed consumed
           // (or consumed ourselves by broadcasting). Re-read briefly, then
@@ -18160,35 +18175,31 @@ async function sendPreparedCapsulesThroughVault(prepared, options = {}) {
             requestTimeoutMs: options.requestTimeoutMs,
             queueTimeoutMs: options.queueTimeoutMs,
           };
-          if (batchIndex < batches.length - 1) {
-            // Middle batches: the contract consumes one strictly sequential
-            // nonce per accepted batch, so the next batch cannot be signed
-            // until this one is reflected on-chain.
-            await waitForVaultPublishNonce(provider, owner, clientNonce + 1n, nonceWaitOptions);
-            for (const item of batch.items) {
-              notifyPublishState(options, publishState, setPublishPartStatus(publishState, item.partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
-            }
-          } else {
-            // Final batch: do not block CapsuleHub confirmation on the nonce
-            // poll. Track it in the background; the barrier serializes any
-            // following signed vault action instead of this await.
-            const finalPartIndexes = batch.items.map((item) => item.partIndex);
-            const expectedNonce = clientNonce + 1n;
-            installVaultPublishNonceBarrier((async () => {
-              try {
-                await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions);
-                for (const partIndex of finalPartIndexes) {
-                  const part = publishState.parts?.[partIndex];
-                  if (part && part.status === PUBLISH_PART_STATUS_SENT) {
-                    notifyPublishState(options, publishState, setPublishPartStatus(publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
-                  }
+          // NON-BLOCKING for EVERY batch (middle and final): never await the chain nonce advance inside
+          // the send loop. Each batch tracks its own nonce confirmation in the background barrier and the
+          // loop proceeds straight to the next batch, which signs at the freshly-raised floor -> all batches
+          // broadcast back-to-back instead of one-land-at-a-time (this is what collapses the multi-minute
+          // image to near-text latency). installVaultPublishNonceBarrier REPLACES the pending barrier, so a
+          // subsequent UNRELATED signed vault action awaits the last (highest-nonce) wait — and since the
+          // contract only reaches the highest nonce after every lower one landed, that still serializes a
+          // following action behind the whole burst. The per-batch background task still runs to flip that
+          // batch's parts SENT -> VAULT_SUBMITTED when its nonce lands.
+          const batchPartIndexes = batch.items.map((item) => item.partIndex);
+          const expectedNonce = clientNonce + 1n;
+          installVaultPublishNonceBarrier((async () => {
+            try {
+              await waitForVaultPublishNonce(provider, owner, expectedNonce, nonceWaitOptions);
+              for (const partIndex of batchPartIndexes) {
+                const part = publishState.parts?.[partIndex];
+                if (part && part.status === PUBLISH_PART_STATUS_SENT) {
+                  notifyPublishState(options, publishState, setPublishPartStatus(publishState, partIndex, PUBLISH_PART_STATUS_VAULT_SUBMITTED));
                 }
-              } catch {
-                // Confirmation retries re-broadcast and re-check this batch;
-                // a failed background nonce poll must not surface here.
               }
-            })());
-          }
+            } catch {
+              // Confirmation retries re-broadcast and re-check this batch;
+              // a failed background nonce poll must not surface here.
+            }
+          })());
         }
       } catch (error) {
         const sentBeforeFailure = Boolean(batch.result);
@@ -19574,11 +19585,12 @@ async function runPrivateSendRetry(context) {
   // The shared tonRpcLimited() gate is armed by ANY rate-limit — including the background body-sync
   // hammering the keyless toncenter indexer (~1 rps), which on a keyless build keeps it perpetually hot.
   // Don't let that READ-throttle starve a user's FIRST broadcast: a message that has never been
-  // signed/sent (every part still BUILT, privateMessageHasPublishAttempt === false) broadcasts via Orbs
-  // sendBoc — a different endpoint/budget than the throttled indexer that armed the limiter — so let it
-  // through and rely on the send transport's own skipIfRateLimited/backoff. A message that HAS an attempt
-  // (some part SENT/SUBMITTED/UNKNOWN, possibly in-flight) keeps the bail, so the key-gated no-double-spend
-  // re-sign path is NEVER entered while the limiter is hot.
+  // signed/sent (every part still BUILT, privateMessageHasPublishAttempt === false) is allowed through even
+  // while the read-limiter is hot, relying on the send transport's own skipIfRateLimited/backoff.
+  // (Toncenter-only: with no key, send /api/v3/message and reads /api/v3/messages share ONE ~1 rps
+  // anonymous quota, so this is best-effort rather than a separate budget; with a key they share the 10 rps
+  // key.) A message that HAS an attempt (some part SENT/SUBMITTED/UNKNOWN, possibly in-flight) keeps the
+  // bail, so the key-gated no-double-spend re-sign path is NEVER entered while the limiter is hot.
   if (tonRpcLimited() && privateMessageHasPublishAttempt(message)) {
     schedulePrivateSendRetry(context, { message: TON_RPC_CONNECTING_STATUS, code: 'RATE_LIMITED' });
     return;
@@ -20320,7 +20332,7 @@ const QUICK_START_STEPS = [
     title: 'Add a TON Center key',
     action: 'Save key',
     optional: true,
-    why: 'Your own free TON Center API key (10 requests/sec + the message indexer) makes Platho faster and avoids shared rate limits. Optional - without it Platho runs on the keyless Orbs network, just slower. Get one in ~10 seconds from the @toncenter Telegram bot, then paste it here.',
+    why: 'Your own free TON Center API key (10 requests/sec + the message indexer) makes Platho faster and avoids shared rate limits. Optional - without it Platho runs on the keyless toncenter path, just slower. Get one in ~10 seconds from the @toncenter Telegram bot, then paste it here.',
     autoDone: () => false,
     body: () => {
       const wrap = document.createElement('div');

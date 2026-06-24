@@ -35,16 +35,6 @@ const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
 // instead of spending the censorship-survival transports re-asking a settled
 // question.
 const TON_GET_METHOD_UNINITIALIZED_EXIT_CODE = -13;
-// Keyless Orbs (TON Access) v2 transport: each client reaches the decentralized network with its
-// own per-client budget (no shared key), used as the primary for non-indexed reads/account/sendBoc.
-const TON_ACCESS_DEFAULT_HOST = 'ton.access.orbs.network';
-const TON_ACCESS_DEFAULT_NETWORK = 'mainnet';
-const TON_ACCESS_DEFAULT_MANAGER_PATH = '/mngr/nodes?npm_version=2.3.0';
-const TON_ACCESS_NODE_TTL_MS = 60_000;
-const TON_ACCESS_REQUEST_SPACING_MS = 250;
-const TON_ACCESS_NODE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
-// key `${host}:${network}` -> { expiresAt, nodes, inflight } (single-flight node-manager refresh).
-const tonAccessNodesCache = new Map();
 const TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
   'get_state',
@@ -1556,346 +1546,6 @@ export function createTonCenterV3VaultTransport(options = {}) {
   };
 }
 
-function tonAccessSafeWeight(raw) {
-  const value = Number.parseInt(raw, 10);
-  if (!Number.isFinite(value) || value < 1) return 1;
-  return Math.min(value, 1_000_000);
-}
-
-function tonAccessWeightedNode(nodes) {
-  const total = nodes.reduce((sum, node) => sum + tonAccessSafeWeight(node?.Weight), 0);
-  let roll = Math.floor(Math.random() * Math.max(1, total));
-  for (const node of nodes) {
-    roll -= tonAccessSafeWeight(node?.Weight);
-    if (roll < 0) return node;
-  }
-  return nodes[0];
-}
-
-function buildTonAccessBaseUrl(host, network, node) {
-  const nodeId = node?.NodeId;
-  if (typeof nodeId !== 'string' || !TON_ACCESS_NODE_ID_RE.test(nodeId)) {
-    throw new VaultTonRpcProviderError('TON Access node id is invalid');
-  }
-  const url = `https://${host}/${nodeId}/1/${network}/toncenter-api-v2`;
-  // Belt-and-suspenders: a node id is regex-confined to the URL path; never let it move the host.
-  if (new URL(url).host !== host) throw new VaultTonRpcProviderError('TON Access node id rejected');
-  return url;
-}
-
-async function resolveTonAccessBase(fetchImpl, { host, network, managerPath, nodeTtlMs, requestTimeoutMs }) {
-  const cacheKey = `${host}:${network}`;
-  let entry = tonAccessNodesCache.get(cacheKey);
-  if (!entry) {
-    entry = { expiresAt: 0, nodes: [], inflight: null };
-    tonAccessNodesCache.set(cacheKey, entry);
-  }
-  const now = Date.now();
-  if (entry.expiresAt > now && entry.nodes.length) {
-    return buildTonAccessBaseUrl(host, network, tonAccessWeightedNode(entry.nodes));
-  }
-  if (!entry.inflight) {
-    entry.inflight = (async () => {
-      const response = await fetchWithTonRpcTimeout(
-        fetchImpl,
-        `https://${host}${managerPath}`,
-        { method: 'GET', headers: { Accept: 'application/json' } },
-        requestTimeoutMs,
-      );
-      if (!response.ok) throw new VaultTonRpcProviderError(`TON Access manager ${response.status}`, { status: response.status });
-      const nodes = await response.json();
-      if (!Array.isArray(nodes)) throw new VaultTonRpcProviderError('TON Access manager returned no node list');
-      const healthKey = `v2-${network}`;
-      const healthy = nodes.filter((node) => (
-        String(node?.Healthy) === '1'
-        && node?.Mngr?.health?.[healthKey] === true
-        && typeof node?.NodeId === 'string'
-        && TON_ACCESS_NODE_ID_RE.test(node.NodeId)
-      ));
-      if (!healthy.length) throw new VaultTonRpcProviderError('TON Access has no healthy v2 node');
-      entry.expiresAt = Date.now() + nodeTtlMs;
-      entry.nodes = healthy;
-      return healthy;
-    })().finally(() => { entry.inflight = null; });
-  }
-  const healthy = await entry.inflight;
-  return buildTonAccessBaseUrl(host, network, tonAccessWeightedNode(healthy));
-}
-
-// v3 stack item {type, value} -> v2 legacy tuple ["num"|"tvm.Slice"|"tvm.Cell", value].
-function tonAccessLegacyStackItem(item) {
-  if (Array.isArray(item)) return item;
-  const type = String(item?.type ?? '').toLowerCase();
-  const value = item?.value ?? item?.boc ?? item?.cell;
-  if (type === 'num' || type === 'int') return ['num', String(value ?? '0')];
-  if (type === 'slice') return ['tvm.Slice', String(value ?? '')];
-  if (type === 'cell') return ['tvm.Cell', String(value ?? '')];
-  throw new VaultTonRpcProviderError(`Unsupported TON stack item type: ${type || 'missing'}`);
-}
-
-// v2 legacy tuple -> v3 stack item, matching the gateway's normalize_run_get_method_response.
-function tonAccessV3StackItem(item) {
-  if (!Array.isArray(item)) return item;
-  const type = String(item[0] ?? '').toLowerCase();
-  const raw = item.length > 1 ? item[1] : null;
-  const value = (raw && typeof raw === 'object') ? (raw.bytes ?? raw.value ?? raw.boc ?? raw.cell) : raw;
-  if (type.includes('num') || type.includes('int')) return { type: 'num', value: String(value ?? '0') };
-  if (type.includes('slice')) return { type: 'slice', value: String(value ?? ''), boc: String(value ?? '') };
-  if (type.includes('cell')) {
-    const cell = String(value ?? '');
-    return { type: 'cell', value: cell, boc: cell, cell };
-  }
-  return { type: type || 'unsupported', value };
-}
-
-function normalizeTonAccessRunGetMethodResponse(upstream) {
-  const source = (upstream && typeof upstream === 'object') ? upstream : {};
-  const result = (source.result && typeof source.result === 'object') ? source.result : {};
-  const stack = (Array.isArray(result.stack) ? result.stack : []).map(tonAccessV3StackItem);
-  // Mirror the toncenter-v3 transport's defensive exit-code extraction (nested + top-level + camelCase).
-  const exitCode = result.exit_code ?? result.exitCode ?? source.exit_code ?? source.exitCode ?? 0;
-  return {
-    ok: source.ok !== false,
-    error: source.error ?? result.error,
-    code: source.code ?? result.code,
-    result: { ...result, stack },
-    exit_code: exitCode,
-    stack,
-  };
-}
-
-// Keyless Orbs (TON Access) v2 transport. Mirrors createTonCenterV3VaultTransport's interface so it
-// plugs into createFallbackTonRpcTransport, but speaks the v2 jsonRPC dialect (normalized to v3) and
-// resolves a fresh weighted node per request. No api key, no message-history indexer.
-export function createTonAccessV2VaultTransport(options = {}) {
-  const fetchImpl = options.fetch ?? globalThis.fetch;
-  if (typeof fetchImpl !== 'function') throw new VaultTonRpcProviderError('fetch is unavailable');
-  const host = options.host ?? TON_ACCESS_DEFAULT_HOST;
-  const network = options.network ?? TON_ACCESS_DEFAULT_NETWORK;
-  const managerPath = options.managerPath ?? TON_ACCESS_DEFAULT_MANAGER_PATH;
-  const nodeTtlMs = finitePositiveInteger(options.nodeTtlMs, TON_ACCESS_NODE_TTL_MS);
-  const requestSpacingMs = finiteNonNegativeMs(options.requestSpacingMs, TON_ACCESS_REQUEST_SPACING_MS);
-  const rateLimitBackoffMs = finiteNonNegativeMs(options.rateLimitBackoffMs, TONCENTER_RATE_LIMIT_BACKOFF_MS);
-  const rateLimitRetries = finiteNonNegativeMs(options.rateLimitRetries, TONCENTER_RATE_LIMIT_RETRIES);
-  const runGetMethodCacheMaxEntries = finitePositiveInteger(
-    options.runGetMethodCacheMaxEntries,
-    TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES,
-  );
-  const rateLimitKey = options.rateLimitKey ?? 'ton-access-v2';
-  // Stable identity for request spacing + cache keys (the real fetch URL changes per node).
-  const cacheEndpoint = `ton-access-v2:${host}:${network}`;
-
-  const resolveBase = (requestTimeoutMs) => resolveTonAccessBase(fetchImpl, { host, network, managerPath, nodeTtlMs, requestTimeoutMs });
-
-  return {
-    kind: 'ton-access-v2',
-    supportsMessageHistory: false,
-    supportsSendBoc: true,
-    async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, verify, allowUnverifiedCriticalRead, requestTimeoutMs, timeoutMs, queueTimeoutMs }) {
-      const call = {
-        address: assertString(address, 'TON RPC address'),
-        method: assertString(method, 'TON RPC method'),
-        stack: Array.isArray(stack) ? stack : [],
-      };
-      const cacheKey = toncenterRunGetMethodCacheKey(cacheEndpoint, null, rateLimitKey, call);
-      const resolvedPriority = resolveRunGetMethodPriority(call.method, { priority }, options);
-      const resolvedCacheTtlMs = resolveRunGetMethodCacheTtlMs(call.method, { cacheTtlMs, ttlMs }, options);
-      const bypassCache = resolvedCacheTtlMs === 0;
-      if (!bypassCache) {
-        const cached = readRunGetMethodCache(cacheKey);
-        if (cached) return cached;
-      }
-      const inFlightKey = tonRpcInFlightKey(cacheKey, resolvedCacheTtlMs, {
-        allowUnverifiedCriticalRead,
-        priority: resolvedPriority,
-        queueTimeoutMs,
-        requestTimeoutMs,
-        timeoutMs,
-        verify,
-      });
-      const existing = toncenterRunGetMethodInFlight.get(inFlightKey);
-      if (existing) return existing;
-      const resolvedRequestTimeoutMs = resolveTonRpcRequestTimeoutMs({ cacheTtlMs, ttlMs, priority, requestTimeoutMs, timeoutMs }, options);
-      const body = JSON.stringify({
-        jsonrpc: '2.0',
-        id: 'platho',
-        method: 'runGetMethod',
-        params: { address: call.address, method: call.method, stack: call.stack.map(tonAccessLegacyStackItem) },
-      });
-      const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
-      const promise = (async () => {
-        try {
-          const response = await scheduleToncenterHttpRequest(
-            cacheEndpoint,
-            null,
-            async () => fetchWithTonRpcTimeout(fetchImpl, `${await resolveBase(resolvedRequestTimeoutMs)}/jsonRPC`, {
-              method: 'POST',
-              headers,
-              body,
-            }, resolvedRequestTimeoutMs),
-            {
-              rateLimitKey,
-              requestSpacingMs,
-              rateLimitBackoffMs,
-              rateLimitRetries,
-              skipIfRateLimited: options.skipRateLimitedGetMethods ?? true,
-              priority: resolvedPriority,
-              queueTimeoutMs,
-            },
-          );
-          if (!response.ok) throw toncenterHttpError('TON Access get-method', response, rateLimitBackoffMs);
-          const normalized = normalizeTonAccessRunGetMethodResponse(await response.json());
-          // TON Access (v2) reports app-level errors (e.g. uninitialized account -> code -13) as an
-          // HTTP-200 {ok:false,...} with no result. Treat that as a thrown error (NOT an empty-stack
-          // success) so exit-code semantics — notably the -13 deploy-on-first-transfer signal — survive,
-          // and so the bad shape is never written to the read cache.
-          if (normalized.ok === false) {
-            const failCode = Number(normalized.code ?? normalized.exit_code ?? 0);
-            throw new VaultTonRpcProviderError(
-              `TON Access get-method failed${normalized.error ? `: ${normalized.error}` : ''}`,
-              Number.isFinite(failCode) ? { exitCode: failCode } : {},
-            );
-          }
-          const exitCode = Number(normalized.exit_code ?? 0);
-          if (exitCode !== 0) throw new VaultTonRpcProviderError(`TON RPC get-method exit code ${exitCode}`, { exitCode });
-          writeRunGetMethodCache(cacheKey, normalized, resolvedCacheTtlMs, runGetMethodCacheMaxEntries);
-          return normalized;
-        } finally {
-          toncenterRunGetMethodInFlight.delete(inFlightKey);
-        }
-      })();
-      toncenterRunGetMethodInFlight.set(inFlightKey, promise);
-      return promise;
-    },
-    async sendBoc(input = {}) {
-      const { boc, requestTimeoutMs, timeoutMs, queueTimeoutMs, skipIfRateLimited, priority = 'critical' } = input;
-      const resolvedRequestTimeoutMs = resolveTonRpcRequestTimeoutMs({ priority, requestTimeoutMs, timeoutMs }, options);
-      const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
-      const response = await scheduleToncenterHttpRequest(
-        cacheEndpoint,
-        null,
-        async () => fetchWithTonRpcTimeout(fetchImpl, `${await resolveBase(resolvedRequestTimeoutMs)}/sendBoc`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ boc }),
-        }, resolvedRequestTimeoutMs),
-        {
-          rateLimitKey,
-          requestSpacingMs,
-          rateLimitBackoffMs,
-          rateLimitRetries: finiteNonNegativeMs(options.sendBocRateLimitRetries, Math.max(rateLimitRetries, 1)),
-          skipIfRateLimited: skipIfRateLimited === true,
-          priority,
-          queueTimeoutMs,
-        },
-      );
-      if (!response.ok) throw await toncenterHttpErrorWithBody('TON Access sendBoc', response, rateLimitBackoffMs);
-      const json = await response.json();
-      const ok = json.ok ?? json.result?.ok ?? true;
-      if (ok === false) throw new VaultTonRpcProviderError('TON Access sendBoc rejected message');
-      // A landed external advances seqno / mutates state, so cached reads for this provider go stale.
-      clearToncenterRunGetMethodCache({ endpoint: cacheEndpoint, apiKey: null, rateLimitKey });
-      clearToncenterMessagesCache();
-      return json;
-    },
-    async getAccountState(input, requestOptions = {}) {
-      const address = typeof input === 'string' ? input : input?.address;
-      const resolvedAddress = assertString(address, 'TON account address');
-      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
-      const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
-      const response = await scheduleToncenterHttpRequest(
-        cacheEndpoint,
-        null,
-        async () => fetchWithTonRpcTimeout(
-          fetchImpl,
-          appendQueryParams(`${await resolveBase(requestTimeoutMs)}/getAddressInformation`, { address: resolvedAddress }),
-          { method: 'GET', headers, cache: 'no-store' },
-          requestTimeoutMs,
-        ),
-        {
-          rateLimitKey,
-          requestSpacingMs,
-          rateLimitBackoffMs,
-          rateLimitRetries,
-          skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
-          priority: requestOptions.priority ?? 'wallet',
-          queueTimeoutMs: requestOptions.queueTimeoutMs,
-        },
-      );
-      if (!response.ok) throw toncenterHttpError('TON Access account state', response, rateLimitBackoffMs);
-      return response.json();
-    },
-    async getAccountBalance(address, requestOptions = {}) {
-      const state = await this.getAccountState({ address }, requestOptions);
-      const value = state?.balance
-        ?? state?.result?.balance
-        ?? state?.account?.balance
-        ?? state?.result?.account?.balance;
-      if (value === undefined || value === null) {
-        throw new VaultTonRpcProviderError('TON account state did not include a balance');
-      }
-      return value;
-    },
-    // Package E foundation: keyless body retrieval by scanning an account's transactions (no indexer).
-    async getTransactions(params = {}, requestOptions = {}) {
-      const query = stableQueryObject(params);
-      const requestTimeoutMs = resolveTonRpcRequestTimeoutMs(requestOptions, options);
-      const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
-      // A 5xx from one Orbs node is per-node transient: resolveBase() (called fresh inside the fetch thunk
-      // each attempt) re-rolls a weighted-random node, so a single retry almost always lands on a healthy
-      // node. A 5xx on this heavy CapsuleHub tx-scan otherwise aborts the whole body lookup and keeps the
-      // entry's gap alive another cycle. Retry ONCE on a fresh node. Read-only — NEVER applied to sendBoc
-      // (a double-broadcast hazard). 429 stays handled by scheduleToncenterHttpRequest's own loop; 4xx
-      // (incl. the HTTP-200 {ok:false} validation case below) is a real error and is not retried.
-      let response = null;
-      for (let attempt = 0; attempt <= 1; attempt += 1) {
-        response = await scheduleToncenterHttpRequest(
-          cacheEndpoint,
-          null,
-          async () => fetchWithTonRpcTimeout(
-            fetchImpl,
-            appendQueryParams(`${await resolveBase(requestTimeoutMs)}/getTransactions`, query),
-            { method: 'GET', headers },
-            requestTimeoutMs,
-          ),
-          {
-            rateLimitKey,
-            requestSpacingMs,
-            rateLimitBackoffMs,
-            rateLimitRetries,
-            skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
-            priority: requestOptions.priority ?? 'messages',
-            queueTimeoutMs: requestOptions.queueTimeoutMs,
-          },
-        );
-        if (!response || response.ok || Number(response.status) < 500 || attempt >= 1) break;
-      }
-      if (!response.ok) throw toncenterHttpError('TON Access transactions', response, rateLimitBackoffMs);
-      const payload = await response.json();
-      // toncenter v2 reports param/validation failures (e.g. limit > 100) as an HTTP-200 {ok:false,code}
-      // body. Surface that as a real error instead of silently returning a body with no transactions —
-      // a swallowed {ok:false} reads to the caller as "no matching tx" and the body scan gives up. Mirror
-      // runGetMethod's HTTP-200 {ok:false} handling above. Not a 429/RATE_LIMITED, so the body-scan catch
-      // classifies it as a generic (non-rate-limit) history failure, not a backoff trigger.
-      if (payload && payload.ok === false) {
-        const failCode = Number(payload.code ?? 0);
-        throw new VaultTonRpcProviderError(
-          `TON Access transactions failed${payload.error ? `: ${String(payload.error).slice(0, 80)}` : ''}`,
-          Number.isFinite(failCode) && failCode > 0 ? { status: failCode } : {},
-        );
-      }
-      return payload;
-    },
-    // No getMessages: Orbs has no message-history indexer, and omitting it makes the fallback layer
-    // (transportSupportsReadMethod) route message-history reads to a keyed toncenter transport instead.
-  };
-}
-
-// Test-only: drop the cached Orbs node list so unit tests don't leak healthy-node state between cases.
-export function __clearTonAccessNodesCacheForTests() {
-  tonAccessNodesCache.clear();
-}
-
 function isRetryableTonRpcError(error) {
   const status = Number(error?.status ?? error?.response?.status ?? 0);
   const code = String(error?.code ?? '').toUpperCase();
@@ -2001,7 +1651,7 @@ function normalizeTonRpcResultForCompare(result, method = null) {
       // only exists[0], current_key_id[3] and auth_pubkey[4] — the signing-key identity that a lying
       // RPC must NOT be able to fake. This mirrors the get_global treatment just below, which already
       // excludes its own volatile counters. No-double-spend is unaffected: the returned nonce/balance
-      // are still the primary (Orbs) values, guarded by the monotonic publish-nonce floor +
+      // are still the primary (toncenter) values, guarded by the monotonic publish-nonce floor +
       // verified-absence-before-resign, and the contract independently enforces nonce-equality
       // (throwUnless 16xxx) and balance sufficiency on-chain.
       return stableJsonString([
@@ -2100,28 +1750,6 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   if ((kind === 'custom' || kind === 'user' || kind === 'external') && provider?.globalName) {
     return null;
   }
-  if (kind === 'ton-access-v2' || kind === 'ton-access' || kind === 'orbs') {
-    const transport = createTonAccessV2VaultTransport({
-      host: provider?.tonAccessHost ?? defaults.tonAccessHost,
-      network: provider?.tonAccessNetwork ?? defaults.tonAccessNetwork,
-      managerPath: provider?.tonAccessManagerPath ?? defaults.tonAccessManagerPath,
-      nodeTtlMs: provider?.tonAccessNodeTtlMs ?? defaults.tonAccessNodeTtlMs,
-      headers: provider?.headers ?? defaults.headers,
-      fetch: provider?.fetch ?? defaults.fetch,
-      requestSpacingMs: provider?.requestSpacingMs ?? defaults.requestSpacingMs,
-      rateLimitBackoffMs: provider?.rateLimitBackoffMs ?? defaults.rateLimitBackoffMs,
-      rateLimitRetries: provider?.rateLimitRetries ?? defaults.rateLimitRetries,
-      sendBocRateLimitRetries: provider?.sendBocRateLimitRetries ?? defaults.sendBocRateLimitRetries,
-      requestTimeoutMs: provider?.requestTimeoutMs ?? defaults.requestTimeoutMs,
-      skipRateLimitedGetMethods: provider?.skipRateLimitedGetMethods ?? defaults.skipRateLimitedGetMethods,
-      runGetMethodCacheTtlMs: provider?.runGetMethodCacheTtlMs ?? defaults.runGetMethodCacheTtlMs,
-      runGetMethodCacheMaxEntries: provider?.runGetMethodCacheMaxEntries ?? defaults.runGetMethodCacheMaxEntries,
-      runGetMethodCacheTtls: provider?.runGetMethodCacheTtls ?? defaults.runGetMethodCacheTtls,
-      runGetMethodPriorities: provider?.runGetMethodPriorities ?? defaults.runGetMethodPriorities,
-      rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? 'ton-access-v2',
-    });
-    return withRunGetMethodCapabilities(transport, provider, defaults);
-  }
   const endpoint = provider?.runGetMethodEndpoint
     ?? provider?.endpoint
     ?? defaults.runGetMethodEndpoint
@@ -2153,22 +1781,19 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     messagesCacheMaxEntries: provider?.messagesCacheMaxEntries ?? defaults.messagesCacheMaxEntries,
     rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? defaults.rateLimitKey,
   });
-  // A useUserApiKey toncenter transport with NO key available is just anonymous toncenter — the same
-  // throttled, keyless role as the dedicated emergency transport. It must NOT act as a routine cross-read
-  // verifier: it has no key, so it can only 429/anonymous-fail, and being "tried but unable to confirm"
-  // bricks every verify:true own-vault-action read (publish charge + nonce) with RPC_VERIFICATION_UNAVAILABLE
-  // (eligibleVerifierTried=true defeats the lone-primary self-trust). It must also NOT count toward the
-  // verification-degraded gate, so a keyless build honestly reports isVerificationDegraded()===true (one real
-  // read source = Orbs) — exactly the single-source-trust posture verifyCriticalReads:false intends, and the
-  // app-side no-double-spend guard stays fail-closed. Treat it as an emergency fallback while keyless; adding
-  // a real key rebuilds the transport (applyToncenterApiKey) and restores it to a full primary/verifier.
-  const userKeyMissing = (provider?.useUserApiKey ?? defaults.useUserApiKey) === true
-    && !(provider?.apiKey ?? defaults.apiKey)
-    && !globalThis.plathoToncenterApiKey;
-  const effectiveProvider = userKeyMissing
-    ? { ...provider, verifierOnly: true, emergencyFallback: true }
-    : provider;
-  return withRunGetMethodCapabilities(transport, effectiveProvider, defaults);
+  // TONCENTER-ONLY topology (Orbs removed): user-toncenter is the sole primary read/send/history source.
+  // When the user has NO key it runs anonymous (~1 rps, 429-prone) but MUST stay a non-emergency primary
+  // and is NOT demoted to verifierOnly/emergencyFallback. Demoting it (the old Orbs-present behaviour, when
+  // Orbs was the real primary and a keyless user-toncenter was a redundant second source) would now leave
+  // keyless-toncenter as the only emergency transport and ZERO live primaries -> orderedTonRpcTransportCandidates
+  // has no alivePrimary -> the first 429 parks everything -> perpetual "syncing". It also never fail-closes as
+  // a verifier: the only other transport (keyless-toncenter) is emergencyFallback and is skipped by the
+  // verifier loop, so a verify:true read finds no eligible verifier and self-trusts the lone primary
+  // (isVerificationDegraded()===true is the intended steady state — both transports are the same toncenter.com
+  // backend, so there is no independent source to cross-verify against, and the app-side no-double-spend guard
+  // stays fail-closed on that degraded signal). Adding a key rebuilds the transport (applyToncenterApiKey) and
+  // restores the full 10 rps budget.
+  return withRunGetMethodCapabilities(transport, provider, defaults);
 }
 
 function orderedTonRpcTransportCandidates(transports, isEligible) {
@@ -2285,15 +1910,16 @@ export function createFallbackTonRpcTransport(options = {}) {
     if (mustVerify && !verified) {
       // No eligible verifier was even tried → cross-read verification is STRUCTURALLY impossible: the
       // primary is the sole live read transport (the keyless emergency host is never a routine verifier,
-      // and no second non-emergency transport is reachable). In the client-direct model that primary is
-      // the decentralized Orbs (TON Access) network — itself multi-node with internal failover — so a
-      // single primary read IS the trusted result. Self-trust it and return, rather than failing closed
-      // and bricking the reads that hardcode verify:true (Vault balance/activation, publish charge/nonce).
-      // This is exactly the "1 live source → trust it, stay alive" degrade the censorship policy requires,
-      // and it consults the keyless emergency host for nothing. The app-side double-spend guard
-      // independently observes isVerificationDegraded()===true and stays fail-closed, so self-
-      // trusting reads here does NOT weaken the no-double-publish invariant. We fail closed ONLY
-      // when an eligible (gateway) verifier WAS tried but could not confirm — a genuinely
+      // and no second non-emergency transport exists). In the TONCENTER-ONLY model that primary is the
+      // user's keyed toncenter v3 (or the anonymous toncenter when no key) — a single host by design, and
+      // both transports share the same toncenter.com backend so there is no independent source to
+      // cross-verify against anyway. A single primary read IS the trusted result: self-trust it and return,
+      // rather than failing closed and bricking the reads that hardcode verify:true (Vault balance/activation,
+      // publish charge/nonce). Message bodies still self-verify against CapsuleHub hashes, so a single read
+      // cannot poison them. This is the "1 live source → trust it, stay alive" degrade verifyCriticalReads:false
+      // intends; the app-side double-spend guard independently observes isVerificationDegraded()===true (now the
+      // steady state) and stays fail-closed, so self-trusting reads here does NOT weaken the no-double-publish
+      // invariant. We fail closed ONLY when an eligible verifier WAS tried but could not confirm — a genuinely
       // inconclusive cross-read.
       if (!eligibleVerifierTried) return primaryResult;
       throw new VaultTonRpcProviderError(`TON RPC verification unavailable for ${method}`, {
@@ -2326,15 +1952,15 @@ export function createFallbackTonRpcTransport(options = {}) {
         lastError = error;
         if (methodName === 'sendBoc' && isSendBocTransportUnavailableError(error)) continue;
         noteTonRpcTransportFailure(transport, error, transportDeadRetryMs);
-        // A PRIMARY (non-emergency) gateway that answered with an HTTP 5xx is
-        // reachable and has ALREADY run its own server-side redundant broadcast
-        // (Orbs /sendBoc). Falling through to the keyless emergency toncenter here
-        // only re-broadcasts the same external — burning its ~1 rps quota (which
-        // the confirmation reads need) and producing a second 500. The external is
-        // idempotent and may already be on-chain, so stop and let the caller
-        // confirm via a nonce read instead of dual-broadcasting. Connectivity death
-        // (a blocked gateway: no HTTP status) is NOT caught here and still falls
-        // through to the emergency send path — the censorship-survival invariant.
+        // A PRIMARY (non-emergency) toncenter that answered with an HTTP 5xx is
+        // reachable and has accepted the external into its pipeline. Falling through
+        // to the keyless emergency toncenter here only re-broadcasts the same external
+        // to the SAME backend — burning its ~1 rps quota (which the confirmation reads
+        // need) and producing a second 500. The external is idempotent (fixed nonce)
+        // and may already be on-chain, so stop and let the caller confirm via a nonce
+        // read instead of dual-broadcasting. Connectivity death (a blocked host: no
+        // HTTP status) is NOT caught here and still falls through to the emergency send
+        // path — the survival invariant.
         if (
           methodName === 'sendBoc'
           && !isEmergencyFallbackTransport(transport)
