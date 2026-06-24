@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v492';
+const PLATHO_APP_RUNTIME_VERSION = 'v493';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -8229,7 +8229,15 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
     messageAutoSyncTimer = null;
     messageAutoSyncAt = 0;
     let nextSyncDelayMs = MESSAGE_AUTO_SYNC_MS;
-    if (privateOutboundWorkActive()) {
+    // Pause background sync while an outbound send OR its publish-confirmation is in flight. The broadcast
+    // is covered by privateOutboundWorkActive(), but the CONFIRM phase (runPrivatePublishConfirmationRetry:
+    // nonce poll + CapsuleHub receipt read + the retry ladder, tens of seconds) is intentionally keyless and
+    // NOT counted there — so without this the index-walk sync resumes ~5s after broadcast and competes with
+    // the confirm reads for the keyless ~1 rps budget, tipping over the toncenter per-IP limit -> 429 storm
+    // and a stalled image (the owner's "image sent during sync" case). Yielding the budget to the in-flight
+    // confirm lets it settle fast; sync resumes once privatePublishConfirmJobs drains. (Wallet-lock logic is
+    // untouched: confirmation stays keyless / not key-holding — this only gates the background read pump.)
+    if (privateOutboundWorkActive() || privatePublishConfirmJobs.size > 0) {
       scheduleMessageAutoSync(PRIVATE_OUTBOUND_SYNC_PAUSE_MS);
       return;
     }
