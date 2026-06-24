@@ -143,7 +143,15 @@ function messageHistoryTransports(transport) {
     if (isTonRpcTransportDead(resolved)) continue;
     if (resolved?.getMessages && !out.includes(resolved)) out.push(resolved);
   }
-  return out;
+  // TONCENTER-ONLY: the keyless EMERGENCY transport is the SAME toncenter.com backend + client IP as the
+  // keyed primary, so a body the primary indexer can't find yet is NOT findable on it either — falling
+  // through fires a redundant, un-spaced getMessages at the same per-IP rate limit and 429-storms
+  // /api/v3/messages (worst right after a send, when the indexer lags). Drop emergency-fallback transports
+  // (verifierOnly) from routine body-lookup whenever a non-emergency one is alive; genuinely DISTINCT-backend
+  // providers are never emergency, so multi-provider body recovery is preserved. Emergency stays only when it
+  // is the sole alive transport (primary dead → survival path). Lagging bodies recover on a later sync cycle.
+  const nonEmergency = out.filter((resolved) => resolved?.verifierOnly !== true);
+  return nonEmergency.length > 0 ? nonEmergency : out;
 }
 
 // Keyless body retrieval: transports that can scan an account's transactions directly (no message
@@ -158,7 +166,10 @@ function transactionHistoryTransports(transport) {
     if (isTonRpcTransportDead(resolved)) continue;
     if (resolved?.getTransactions && !out.includes(resolved)) out.push(resolved);
   }
-  return out;
+  // Drop the same-backend keyless emergency transport when a non-emergency one is alive (see
+  // messageHistoryTransports); distinct-backend providers are never emergency and are preserved.
+  const nonEmergency = out.filter((resolved) => resolved?.verifierOnly !== true);
+  return nonEmergency.length > 0 ? nonEmergency : out;
 }
 
 function transactionRecordsFromResponse(response) {
