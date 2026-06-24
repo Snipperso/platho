@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v496';
+const PLATHO_APP_RUNTIME_VERSION = 'v497';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -793,6 +793,12 @@ const PRIVATE_PENDING_PUBLISH_CONFIRMATION_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 // manual Retry button. This makes a genuinely-undelivered message recoverable in minutes and, for an
 // already-old stuck message, surfaces Retry immediately on resume instead of after 24 fresh attempts.
 const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 * 60 * 1000;
+// Surface the actionable "RPC broadcast unavailable, retry" terminal EARLY (long before the ~9-min
+// no-progress deadline) when the broadcast is provably erroring: nothing landed AND every in-flight
+// external is failing to relay (e.g. toncenter's keyless broadcaster is shedding/5xx-ing). A send whose
+// broadcast SUCCEEDED but is just slow to confirm keeps the patient full-deadline path — its parts carry
+// no error, so publishStateBroadcastIsFailing() returns false and this early stop never fires.
+const PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT = 10;
 const PRIVATE_PUBLISH_CONFIRM_BACKGROUND_RETRY_MS = 30 * 1000;
 const PRIVATE_PUBLISH_CONFIRM_HOT_AGE_MS = 5 * 60 * 1000;
 // Publish + CapsuleHub ACK realistically spans 2-3 basechain blocks; the hot
@@ -18423,6 +18429,28 @@ function publishPartBroadcastRetryCount(part) {
   return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 }
 
+// The broadcast is provably FAILING (not merely slow-to-confirm) when there is at least one in-flight
+// external still awaiting broadcast AND every such part currently carries a broadcast error. part.error is
+// set when a (re-)broadcast throws/5xx-es and is cleared to null the moment a (re-)broadcast SUCCEEDS
+// (setPublishPartStatus -> SENT), so a part whose external actually relayed never counts as failing — this
+// is what keeps a broadcasting-fine-but-slow send on the patient confirm path instead of the early terminal.
+function publishStateBroadcastIsFailing(publishState) {
+  const pending = (publishState?.parts ?? []).filter((part) => publishPartNeedsBroadcastRetry(part));
+  return pending.length > 0 && pending.every((part) => Boolean(part.error));
+}
+
+// On an explicit user Retry of a broadcast-unacknowledged publish, clear the per-part re-broadcast budget
+// (count + cooldown) so the already-signed, fixed-nonce external is re-sent immediately. Idempotent and
+// double-spend-safe: a re-used nonce is contract-rejected, and retryUnconfirmedVaultPublishBroadcasts reads
+// the chain nonce FIRST (a landed external is detected and marked VAULT_SUBMITTED, never re-sent).
+function resetPublishBroadcastBudgetForManualRetry(publishState) {
+  for (const part of publishState?.parts ?? []) {
+    if (!publishPartNeedsBroadcastRetry(part)) continue;
+    part.broadcastRetryCount = 0;
+    part.lastBroadcastAt = null;
+  }
+}
+
 function publishPartLastBroadcastAgeMs(part) {
   const parsed = Date.parse(part?.lastBroadcastAt ?? '');
   return Number.isFinite(parsed) ? Math.max(0, Date.now() - parsed) : Infinity;
@@ -18945,7 +18973,8 @@ function ensurePendingPrivateSendRetry(thread, message, error = { message: 'resu
 
 function privatePublishConfirmStoppedStatusText(error = null) {
   if (error?.code === 'STALE_PRIVATE_PUBLISH') return 'not confirmed: chain lookup expired';
-  if (error?.code === 'CONFIRM_RETRY_EXHAUSTED') return 'not confirmed: send timed out';
+  if (error?.code === 'BROADCAST_REJECTED') return 'not confirmed: RPC broadcast unavailable';
+  if (error?.code === 'CONFIRM_RETRY_EXHAUSTED') return 'not confirmed: chain confirmation timed out';
   if (error?.code === 'PARTIAL_PRIVATE_PUBLISH_RETRY_EXPIRED') {
     return /limit/i.test(String(error?.message ?? ''))
       ? 'not confirmed: partial publish retry limit reached'
@@ -18966,12 +18995,16 @@ function stopPrivatePublishConfirmationRetry(context, error = null) {
   message.privatePublishConfirmStopped = true;
   message.privatePublishConfirmStoppedAt = new Date().toISOString();
   message.meta = privatePublishConfirmStoppedStatusText(error);
-  // A confirm-exhausted message is submitted-but-unconfirmable with no retryable send parts: a Retry
-  // would only re-broadcast nonce-dead externals (it cannot re-send) and the no-double-spend guard
-  // refuses to auto-re-sign, so no manual action is useful here. Show JUST the durable red terminal
-  // status — no Retry/Dismiss buttons.
-  message.privateManualRetryAvailable = false;
-  message.privateCancelAvailable = false;
+  // A broadcast-unacknowledged / confirm-exhausted publish was never seen on-chain (confirmedCount stays 0
+  // -> the nonce was never consumed). Offer a manual Retry: it re-broadcasts the SAME already-signed,
+  // fixed-nonce external (idempotent — the contract rejects a re-used nonce, and if it secretly landed the
+  // confirm read picks it up), which is exactly what unsticks the send once the RPC broadcaster recovers.
+  // Local Cancel stays unavailable while a publish attempt exists (the nonce slot is committed; discarding
+  // the message would orphan it) — privateMessageCanLocalCancel enforces that, so it resolves to false here.
+  // Other stop reasons (stale chain lookup, etc.) keep the no-action durable terminal.
+  const broadcastRetryable = error?.code === 'BROADCAST_REJECTED' || error?.code === 'CONFIRM_RETRY_EXHAUSTED';
+  message.privateManualRetryAvailable = broadcastRetryable;
+  message.privateCancelAvailable = broadcastRetryable && privateMessageCanLocalCancel(message);
   message.privateSendLastError = shortUiErrorText(error, 'confirmation stopped');
   thread.state = 'blocked';
   refreshThreadAfterMessageChange(thread);
@@ -19030,6 +19063,18 @@ function schedulePrivatePublishConfirmationRetry(context, error = null) {
   // per-resume scheduleImmediate reset means the attempt-based >=ACTIVE_LIMIT*4 backstop is otherwise never
   // reached for a partial). The fast attempt>=ACTIVE_LIMIT stop stays gated on confirmedCount===0 (nothing
   // landed -> fail fast); the *4 backstop is the attempt-based catch-all.
+  // Early actionable terminal: nothing landed (confirmed AND vault-submitted both 0) and the broadcast is
+  // provably erroring on every in-flight external. Surface "RPC broadcast unavailable" + a safe Retry in
+  // ~minutes instead of spinning to the full ~9-min no-progress deadline. Gated on publishStateBroadcastIsFailing
+  // so a broadcasting-fine-but-slow send is never killed early.
+  if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
+    && Number(message.publishState?.confirmedCount ?? 0) === 0
+    && Number(message.publishState?.submittedCount ?? 0) === 0
+    && attempt >= PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT
+    && publishStateBroadcastIsFailing(message.publishState)) {
+    stopPrivatePublishConfirmationRetry(context, { message: 'RPC broadcast unavailable', code: 'BROADCAST_REJECTED' });
+    return;
+  }
   if (message.publishState?.status !== CAPSULEHUB_PUBLISH_STATUS_CONFIRMED
     && ((Number(message.publishState?.confirmedCount ?? 0) === 0
         && attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT)
@@ -19404,6 +19449,9 @@ async function retryPrivateMessageFromUi(thread, message) {
   const context = privateSendRetryContextForMessage(thread, message);
   try {
     if (privateMessageHasPublishAttempt(message) && !publishStateHasRetryableSendParts(message.publishState)) {
+      // Re-arm the idempotent same-nonce re-broadcast immediately (clear the per-part budget/cooldown) so a
+      // user Retry after a broadcast-unavailable terminal re-sends the already-signed external right away.
+      resetPublishBroadcastBudgetForManualRetry(message.publishState);
       await runPrivatePublishConfirmationRetry(context);
       return;
     }
