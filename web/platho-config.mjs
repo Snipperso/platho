@@ -92,8 +92,9 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
           sendBocEndpoint: 'https://toncenter.com/api/v3/message',
           messagesEndpoint: 'https://toncenter.com/api/v3/messages',
-          walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
-          requestSpacingMs: 1500,
+          // 1100ms = ~0.91 rps, the "forsazh" anonymous pacing (shares the #F per-IP budget with a no-key
+          // user-toncenter; see TONCENTER_KEYLESS_REQUEST_SPACING_MS). Was 1500ms/0.67 rps.
+          requestSpacingMs: 1100,
         },
       ],
       requestSpacingMs: 250,
@@ -109,7 +110,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=55',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=56',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,
@@ -119,7 +120,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=35',
+      moduleUrl: './ton-dns-provider.mjs?v=36',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
