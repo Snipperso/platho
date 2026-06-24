@@ -200,7 +200,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=34/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=35/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v493<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v493'/);
+    expect(html).toMatch(/id="appVersionLabel">v494<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v494'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -2870,6 +2870,10 @@ describe('PWA runtime config guard', () => {
       expect(source).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
       expect(source).toMatch(/finally \{[\s\S]*endPrivateOutboundWork\(\);[\s\S]*\}/);
     }
+    // A send also YIELDS to an in-flight sync pass (privateChainSyncPromise), capped, so the two never fight
+    // the keyless ~1 rps budget. No-op when no sync is running; bounded so a stuck sync can't block sends.
+    expect(publishSource).toMatch(/if \(privateChainSyncPromise\) \{[\s\S]*Promise\.race\(\[[\s\S]*privateChainSyncPromise[\s\S]*PRIVATE_SEND_SYNC_WAIT_CAP_MS/);
+    expect(app).toMatch(/const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 6 \* 1000/);
   });
 
   it('PWA-MSG-01: default public sync window covers the maximum public multipart image', () => {
@@ -4506,29 +4510,29 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v564/);
+    expect(sw).toMatch(/platho-pwa-prototype-v565/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=493/);
+    expect(sw).toMatch(/\.\/app\.js\?v=494/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=94/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=51/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=95/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=52/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=42/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=54/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=38/);
-    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=51/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=36/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=34/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=41/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=55/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=39/);
+    expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=52/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=37/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=35/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=42/);
     expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
     expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
     expect(sw).toMatch(/\.\/vault-chain-provider\.mjs\?v=8/);

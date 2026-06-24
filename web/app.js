@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=94';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=95';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=54';
+} from './vault-ton-rpc-provider.mjs?v=55';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -136,19 +136,19 @@ import {
   buildBatchExternalFromPublishItems,
   batchMaxChargeForItems,
 } from './publish-batch-orchestration.mjs?v=4';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=36';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=37';
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=51';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=38';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=34';
+} from './capsulehub-ton-rpc-provider.mjs?v=52';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=39';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=35';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=41';
+} from './username-ton-rpc-provider.mjs?v=42';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v493';
+const PLATHO_APP_RUNTIME_VERSION = 'v494';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -812,6 +812,9 @@ const PRIVATE_PUBLISH_DROPPED_RECOVERY_SCAN_LIMIT = 48;
 const PRIVATE_PUBLISH_DROPPED_RECOVERY_MAX_RESIGNS = 3;
 const PRIVATE_PUBLISH_DROPPED_RECOVERY_BROADCAST_MARGIN_S = 180;
 const PRIVATE_OUTBOUND_SYNC_PAUSE_MS = 5 * 1000;
+// A send yields to an in-flight sync pass for at most this long (so the two never fight the keyless ~1 rps
+// budget) — capped so a long/stuck sync can never block a send.
+const PRIVATE_SEND_SYNC_WAIT_CAP_MS = 6 * 1000;
 const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho.private.chain.index.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_STORAGE_PREFIX = 'platho.private.chain.history.unavailable.v1';
 const PRIVATE_CHAIN_HISTORY_UNAVAILABLE_LIMIT = 200;
@@ -19434,6 +19437,17 @@ function cancelPrivateMessageFromUi(thread, message) {
 async function attemptPrivateComposerMessagePublish(context) {
   const endPrivateOutboundWork = beginPrivateOutboundWork();
   try {
+  // Yield to an in-flight sync pass before sending. beginPrivateOutboundWork above already blocks the NEXT
+  // auto-sync cycle; here we also wait out the CURRENT pass (privateChainSyncPromise) so the send's
+  // broadcast + confirm reads do not interleave with the index walk on the scarce keyless ~1 rps budget
+  // (the #F shared per-IP budget keeps that safe from 429s, but interleaving still slows the confirm). Capped
+  // by PRIVATE_SEND_SYNC_WAIT_CAP_MS so a long/stuck sync can never block a send. No-op when no sync is running.
+  if (privateChainSyncPromise) {
+    await Promise.race([
+      Promise.resolve(privateChainSyncPromise).catch(() => {}),
+      delay(PRIVATE_SEND_SYNC_WAIT_CAP_MS),
+    ]);
+  }
   const { thread, message, text, attachments, attachment, selectedSuite, senderOptions, payment } = context;
   clearPrivateMessageManualRecovery(message);
   let capsules = Array.isArray(message.capsules) && message.capsules.length > 0
