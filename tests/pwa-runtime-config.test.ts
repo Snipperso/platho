@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v495<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v495'/);
+    expect(html).toMatch(/id="appVersionLabel">v496<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v496'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1254,6 +1254,11 @@ describe('PWA runtime config guard', () => {
     expect(helperSource).toMatch(/Activate Platho account before sending/);
     expect(helperSource).toMatch(/network surcharge .* exceeds the production cap/i);
     expect(helperSource).toMatch(/RPC verification pending/);
+    // Insufficient Vault balance is a DETERMINISTIC failure: it must show a clear actionable status AND be
+    // classified FATAL so the send stops retrying (terminal manual-recovery) instead of furiously re-trying.
+    expect(helperSource).toMatch(/Insufficient Vault GRAM — top up in Vault, then retry/);
+    expect(helperSource).toMatch(/Insufficient Vault ATH — top up in Vault, then retry/);
+    expect(app).toMatch(/function isFatalPrivateSendError\(error\)[\s\S]*vault \(\?:ton\|gram\|ath\) balance is too low/);
     expect(messageIndex).toBeGreaterThanOrEqual(0);
     expect(insertIndex).toBeGreaterThan(messageIndex);
     expect(preflightIndex).toBeGreaterThan(insertIndex);
@@ -4510,11 +4515,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v566/);
+    expect(sw).toMatch(/platho-pwa-prototype-v567/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=495/);
+    expect(sw).toMatch(/\.\/app\.js\?v=496/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
