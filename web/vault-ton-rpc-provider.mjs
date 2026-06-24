@@ -35,9 +35,12 @@ const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
 // instead of spending the censorship-survival transports re-asking a settled
 // question.
 const TON_GET_METHOD_UNINITIALIZED_EXIT_CODE = -13;
-// Anonymous (no-key) toncenter is ~1 rps. A keyed user-toncenter is spaced for 10 rps (100ms); when it runs
-// WITHOUT a key it must drop to this keyless spacing or it 429-storms toncenter.com into a perpetual "RPC busy".
-const TONCENTER_KEYLESS_REQUEST_SPACING_MS = 1500;
+// Anonymous (no-key) toncenter is a HARD ~1 rps per-IP limit with NO burst grace. The shared anonymous budget
+// (#F: all 'toncenter.com|public' traffic) is paced at this spacing; a keyed user-toncenter uses its own 125ms
+// (8 rps) bucket. 1100ms = ~0.91 rps leaves ~100ms headroom for RTT jitter under the 1 rps ceiling (tuned up
+// from the original conservative 1500ms/0.67 rps "forsazh" experiment). If 429s reappear on no-key bursts,
+// raise this back toward 1250-1500ms; the ceiling is empirical per-network (client spacing + RTT jitter).
+const TONCENTER_KEYLESS_REQUEST_SPACING_MS = 1100;
 const TON_RPC_CRITICAL_METHODS = Object.freeze([
   'get_global',
   'get_state',
