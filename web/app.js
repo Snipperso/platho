@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v495';
+const PLATHO_APP_RUNTIME_VERSION = 'v496';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -9444,6 +9444,11 @@ function privateSendPreflightStatusText(error) {
     return 'Payment check recovery could not be saved; reload Platho and try again';
   }
   if (/activate platho account before publishing/i.test(message)) return 'Activate Platho account before sending';
+  // Insufficient Vault balance is DETERMINISTIC — retrying never helps (the balance won't appear). Surface a
+  // clear, actionable terminal status (the message is stopped + manual-retry-available via isFatalPrivateSendError);
+  // the user tops up the Vault, then retries.
+  if (/ath balance is too low/i.test(message)) return 'Insufficient Vault ATH — top up in Vault, then retry';
+  if (/gram balance is too low/i.test(message)) return 'Insufficient Vault GRAM — top up in Vault, then retry';
   if (/network surcharge .* exceeds the production cap/i.test(message)) return message;
   if (isTonRpcVerificationSoftReadError(error)) return 'RPC verification pending';
   if (/Vault chain provider|TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
@@ -9514,7 +9519,7 @@ function isFatalPrivateSendError(error) {
   const message = String(error?.message ?? error ?? '');
   return isPublishPriceChangeCancelled(error)
     || isVaultPublishPartialError(error)
-    || /not enough vault ton|vault ton balance is too low|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|network surcharge .*exceeds the production cap|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
+    || /not enough vault ton|vault (?:ton|gram|ath) balance is too low|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|network surcharge .*exceeds the production cap|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
 }
 
 function isRecoverablePrivateSendError(error) {
