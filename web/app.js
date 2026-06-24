@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v497';
+const PLATHO_APP_RUNTIME_VERSION = 'v499';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -577,7 +577,6 @@ rpcKeyRow?.addEventListener('click', (event) => {
 });
 
 refreshToncenterKeyUi();
-const burnAthButton = document.querySelector('#burnAthButton');
 const flushAthButton = document.querySelector('#flushAthButton');
 const flushAthStatus = document.querySelector('#flushAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
@@ -766,7 +765,17 @@ const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
 const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000, 90_000, 180_000];
 const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
-// Survival mode: with the primary RPC gateway parked the keyless fallback has
+// Foreground IDLE fast tier. There is no push in a no-backend messenger — the recipient must poll to
+// receive. A fully-synced ("nothing new") pass costs only 2 toncenter index reads (recipient+sender),
+// both of which early-exit to ZERO entry reads when the cursor already equals the head, so it is cheap
+// enough to run far more often than the 60s steady cap. At the keyless 1100ms spacing a 2-read pass every
+// 12s is only ~0.17 rps — well under the ~0.91 rps per-IP budget, leaving ample room for the send/confirm/
+// Vault reads that share it (and sends still pause sync, so a fast idle poll never collides with a send).
+// This is the "if the app is idle, why not sync?" tier: it cuts worst-case receive latency from ~60s to
+// ~12s while foregrounded. It is NOT applied during catch-up (its own 8-60s ladder), when the transport is
+// degraded (the 180s floor below still wins), on a 429 (its own backoff), or in the background (paused).
+const MESSAGE_AUTO_SYNC_IDLE_MS = 12 * 1000;
+// Survival mode: with the primary RPC transport dead the keyless fallback has
 // a ~1 rps budget, so background sync slows down to protect the send path.
 const MESSAGE_AUTO_SYNC_DEGRADED_MS = 180 * 1000;
 const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
@@ -8275,7 +8284,11 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
         // catch-up still drains, just paced.
         nextSyncDelayMs = Math.max(8_000, Math.min(2_000 * 2 ** Math.min(messageAutoSyncStallStreak, 5), MESSAGE_AUTO_SYNC_MS));
       } else {
+        // Fully synced ("nothing new"): poll again on the fast foreground-idle tier instead of the 60s cap,
+        // so a freshly-arrived message is picked up in ~12s. The pass is cheap (2 cursor-at-head reads) and
+        // the degraded floor + send-pause + 429-backoff below still override this when they apply.
         messageAutoSyncStallStreak = 0;
+        nextSyncDelayMs = MESSAGE_AUTO_SYNC_IDLE_MS;
       }
       if (privateSyncImported(result)) {
         setText(messageSyncStatus, 'new messages');
@@ -10912,7 +10925,12 @@ function refreshMessagingControls() {
   setText(createWalletStatus, hasKnownWallet ? 'replace' : 'recommended');
   if (importWalletButton) importWalletButton.disabled = false;
   setText(importWalletStatus, hasKnownWallet ? 'replace' : '24 words');
-  if (unlockWalletButton) unlockWalletButton.disabled = Boolean(plathoWallet) || !hasStoredWallet;
+  if (unlockWalletButton) {
+    unlockWalletButton.disabled = Boolean(plathoWallet) || !hasStoredWallet;
+    // Only show the Unlock row when it is actionable (a stored wallet that is currently locked). Hide the
+    // dead "unlocked" / "not stored" states rather than showing a disabled row that just takes up space.
+    unlockWalletButton.hidden = !(hasStoredWallet && !plathoWallet);
+  }
   setText(unlockWalletStatus, storedWalletLockStatus());
   if (changeWalletPasswordButton) changeWalletPasswordButton.disabled = !hasStoredWallet;
   setText(changeWalletPasswordStatus, hasStoredWallet ? 'change' : 'not stored');
@@ -10938,7 +10956,14 @@ function refreshMessagingControls() {
   // poll horizon elapses; a wallet change resets it.
   if (accountActive) plathoAccountActivationPending = false;
   const activationPending = plathoAccountActivationPending && !accountActive && Boolean(plathoWallet) && !appShellReloadPending;
-  if (registerVaultKeysButton) registerVaultKeysButton.disabled = !plathoWallet || accountActive || appShellReloadPending || activationPending;
+  if (registerVaultKeysButton) {
+    registerVaultKeysButton.disabled = !plathoWallet || accountActive || appShellReloadPending || activationPending;
+    // Only show the Activate row while activation is actionable or in progress (wallet unlocked AND the
+    // account is not yet active). Hide the dead "active" state (and the no-wallet / reload-app states)
+    // instead of a disabled row. The "activating" progress state stays visible (plathoWallet && !accountActive),
+    // preserving the deliberate in-flight feedback at lines ~10946-10952.
+    registerVaultKeysButton.hidden = !(Boolean(plathoWallet) && !accountActive && !appShellReloadPending);
+  }
   setText(vaultDraftStatus, !plathoWallet
     ? 'wallet required'
     : appShellReloadPending
@@ -10967,7 +10992,6 @@ function refreshMessagingControls() {
   if (publicMessageInput) publicMessageInput.disabled = !plathoWallet || !signedActionsReady;
   if (publicComposerCommentsCheckbox) publicComposerCommentsCheckbox.disabled = !plathoWallet || !signedActionsReady;
   refreshPublicSendButtonState();
-  if (burnAthButton) burnAthButton.disabled = !plathoWallet || !signedActionsReady;
   renderAthFlushStatus();
   for (const button of actionGrid?.querySelectorAll('button[data-action]') ?? []) {
     button.disabled = !plathoWallet || !signedActionsReady;
@@ -11594,18 +11618,6 @@ linkUsernameButton?.addEventListener('click', async () => {
   }
 });
 
-burnAthButton?.addEventListener('click', async () => {
-  try {
-    burnAthButton.disabled = true;
-    await submitAthWalletBurn();
-  } catch (error) {
-    flashWalletIdentityStatus('ATH burn blocked');
-    console.error(error);
-  } finally {
-    burnAthButton.disabled = false;
-  }
-});
-
 flushAthButton?.addEventListener('click', async () => {
   try {
     flushAthButton.disabled = true;
@@ -12080,6 +12092,11 @@ composer?.addEventListener('submit', async (event) => {
   privatePaymentCheckDraft = null;
   updateImageAttachmentUi('private');
   autoResizeComposerTextarea(messageInput);
+  // Return focus to the composer so the user can keep typing without re-tapping the field. Clicking the
+  // send button moved focus to the button (and on mobile would drop the keyboard); refocus synchronously
+  // within the submit gesture so the keyboard stays up. messageInput is the static shell element (not
+  // rebuilt by the renders below), so the focus survives renderThreads()/renderConversation().
+  messageInput?.focus();
   refreshComposerCostStatus();
   if (sendButton) sendButton.disabled = true;
   renderThreads();
@@ -16292,21 +16309,6 @@ async function submitUsernameMint() {
   return result;
 }
 
-async function submitAthWalletBurn() {
-  const amount = await requestAthAmountAtomic('Burn ATH', 'Burns ATH from your external ATH wallet.');
-  if (amount === null) return null;
-  const owner = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
-  setText(identitySubtitle, 'ATH burn signing');
-  const result = await submitAthWalletMessage('ATHBurn', {
-    query_id: nextQueryId(),
-    amount,
-    response_destination: owner,
-  });
-  queueAthProtocolStatsRefresh();
-  flashWalletIdentityStatus('ATH burn submitted');
-  return result;
-}
-
 async function submitAthDueFlush() {
   requireNoPendingServiceWorkerAppShellReload();
   requirePlathoWallet();
@@ -20017,7 +20019,6 @@ globalThis.plathoVaultTransactions = {
   submitVaultWithdrawAth,
   submitUsernameMint,
   submitVaultUsernameMint,
-  submitAthWalletBurn,
   submitAthDueFlush,
   submitProfileAvatarUpdate,
   submitCreatePaymentCheck,
