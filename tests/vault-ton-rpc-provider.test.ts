@@ -1277,28 +1277,32 @@ describe('Vault TON RPC provider', () => {
     })).resolves.toMatchObject({ stack: [num(7n)] });
   });
 
-  it('VAULT-RPC-04I8C: a keyless useUserApiKey toncenter (no key) is NOT a verifier; verify:true self-trusts the lone primary', async () => {
-    // Client-direct keyless model: orbs-keyless-style primary + a user-toncenter that carries the user's
-    // own key at runtime BUT has none yet. Without a key it is just anonymous toncenter (429-prone) — the
-    // same throttled role as the dedicated emergency transport — so it must NOT act as a routine verifier.
-    // The bug: it WAS treated as an eligible verifier, so every verify:true own-vault-action read (publish
-    // charge + nonce) tried it, got 429, and threw RPC_VERIFICATION_UNAVAILABLE — bricking every keyless
-    // send (the message hung at p0:built, never signed). The fix demotes a no-key useUserApiKey transport
-    // to emergency-fallback so the lone primary is self-trusted.
+  it('VAULT-RPC-04I8C: toncenter-only — a no-key user-toncenter stays the non-emergency PRIMARY; verify:true self-trusts (the emergency keyless is never a verifier)', async () => {
+    // Toncenter-only model: user-toncenter carries the user's own key at runtime but has none yet, so it runs
+    // anonymous (429-prone). It is NOT demoted to emergency (with Orbs gone that would leave zero live primaries
+    // -> perpetual syncing). The only other transport is the emergency keyless-toncenter, which is never a
+    // routine verifier, so a verify:true read finds no eligible verifier and SELF-TRUSTS the lone (anonymous)
+    // primary instead of failing closed (which previously bricked keyless sends at p0:built).
     const calls: string[] = [];
     const prevKey = (globalThis as any).plathoToncenterApiKey;
     (globalThis as any).plathoToncenterApiKey = undefined;
     try {
       const transport = createTonRpcTransport({
-        primaryProviderId: 'gateway',
-        fallbackProviderIds: ['user-toncenter'],
+        primaryProviderId: 'user-toncenter',
+        fallbackProviderIds: ['keyless-toncenter'],
         providers: [
-          { id: 'gateway', kind: 'toncenter-v3', runGetMethodEndpoint: 'https://gateway.example/api/v3/runGetMethod' },
           {
             id: 'user-toncenter',
             kind: 'toncenter-v3',
             useUserApiKey: true,
             runGetMethodEndpoint: 'https://usertoncenter.example/api/v3/runGetMethod',
+          },
+          {
+            id: 'keyless-toncenter',
+            kind: 'toncenter-v3',
+            verifierOnly: true,
+            emergencyFallback: true,
+            runGetMethodEndpoint: 'https://keyless.example/api/v3/runGetMethod',
           },
         ],
         requestSpacingMs: 0,
@@ -1309,20 +1313,21 @@ describe('Vault TON RPC provider', () => {
           const endpoint = String(url);
           calls.push(endpoint);
           if (endpoint.includes('usertoncenter.example')) {
-            return { ok: false, status: 429, async json() { return { ok: false }; } };
+            return { ok: true, status: 200, async json() { return { exit_code: 0, stack: [num(7n)] }; } };
           }
-          return { ok: true, status: 200, async json() { return { exit_code: 0, stack: [num(7n)] }; } };
+          // The emergency keyless must never be consulted as a verifier; 429 it so any consultation surfaces.
+          return { ok: false, status: 429, async json() { return { ok: false }; } };
         },
       });
 
-      // Only ONE real (non-emergency) read source exists — the no-key user-toncenter does not count — so
-      // verification is structurally degraded (and the app-side no-double-spend guard stays fail-closed).
+      // Only ONE non-emergency read source exists (the anonymous primary); the emergency keyless does not
+      // count, so verification is structurally degraded (and the app-side no-double-spend guard stays fail-closed).
       expect(transport?.isVerificationDegraded()).toBe(true);
       const call = { address: VAULT, method: 'get_user', stack: [], cacheTtlMs: 0, verify: true };
-      // verify:true must SELF-TRUST the lone primary (not fail closed on the broken keyless verifier).
+      // verify:true must SELF-TRUST the lone (anonymous) primary, not fail closed.
       await expect(transport?.runGetMethod(call)).resolves.toMatchObject({ stack: [num(7n)] });
-      // The no-key user-toncenter is never consulted as a verifier (its 429 limit never matters).
-      expect(calls.filter((endpoint) => endpoint.includes('usertoncenter.example'))).toHaveLength(0);
+      // The emergency keyless is never consulted as a verifier.
+      expect(calls.filter((endpoint) => endpoint.includes('keyless.example'))).toHaveLength(0);
     } finally {
       (globalThis as any).plathoToncenterApiKey = prevKey;
     }
