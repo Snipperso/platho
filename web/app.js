@@ -52,13 +52,14 @@ import {
   normalizePublicChannelRegistry,
   normalizePublicChannelFeed,
   publicChannelSubscriptionsToThreads,
+  publicChannelsToThreads,
   publicChannelThreadsToFeedItems,
   readPublicChannelFeedCache,
   readPublicChannelSubscriptions,
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-} from './public-channel-subscriptions.mjs?v=10';
+} from './public-channel-subscriptions.mjs?v=11';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -156,7 +157,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v500';
+const PLATHO_APP_RUNTIME_VERSION = 'v501';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -2046,6 +2047,21 @@ function resolveContactDisplay(counterpartyWallet) {
 function resolveWalletChannelDisplay(counterpartyWallet) {
   const explicit = resolveContactDisplay(counterpartyWallet);
   if (explicit) return explicit;
+  // Own wallet: show the user's OWN .ath in their own public channel (feed name + channels list), parity with
+  // the Profile header. The own username is known locally (readLinkedPlathoUsername, verified at mint) — no
+  // chain read, no verification needed. An explicit manual choice above still wins.
+  if (plathoWallet?.address && sameWalletAddress(counterpartyWallet, plathoWallet.address)) {
+    const ownLabel = readLinkedPlathoUsername(plathoWallet.address)?.label;
+    const ownIdentity = ownLabel ? plathoUsernameIdentity(ownLabel) : null;
+    if (ownIdentity) {
+      return {
+        name: displayIdentityLabel(ownIdentity),
+        tone: identityTone(ownIdentity),
+        identity: ownIdentity,
+        localLabel: null,
+      };
+    }
+  }
   const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
   if (thread) {
     const name = threadDisplayLabel(thread);
@@ -4507,19 +4523,48 @@ function appendPublicItemActions(article, item) {
   });
   actions.append(commentButton);
 
-  const privateButton = document.createElement('button');
-  privateButton.type = 'button';
-  privateButton.textContent = 'Private chat';
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
-  privateButton.disabled = !authorWallet;
-  privateButton.title = authorWallet
-    ? 'Open this author in Private'
-    : 'Author wallet is not available for this public item';
-  privateButton.addEventListener('click', () => {
-    if (!authorWallet) return;
-    openPrivateThreadForWallet(authorWallet);
-  });
-  actions.append(privateButton);
+  const isOwnPost = Boolean(authorWallet && plathoWallet?.address && sameWalletAddress(authorWallet, plathoWallet.address));
+
+  // "Display as" parity with Private: let the user relabel another author (their .ath / a local name). The
+  // choice is shared per-counterparty and stays in sync with that person's Private dialog. Reuses the same
+  // popover the channel-detail header uses. Not shown on your OWN post or the official platho.app channel.
+  if (authorWallet && !isOwnPost && item.channelId !== DEFAULT_PUBLIC_CHANNEL_ID) {
+    const identityButton = document.createElement('button');
+    identityButton.type = 'button';
+    identityButton.className = 'icon-button';
+    identityButton.setAttribute('aria-haspopup', 'menu');
+    identityButton.setAttribute('aria-expanded', 'false');
+    identityButton.title = 'Choose display name';
+    const identityIcon = document.createElement('span');
+    identityIcon.className = 'icon icon-chevron-down';
+    identityButton.append(identityIcon);
+    identityButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (identityPopover && !identityPopover.hidden) {
+        hideIdentityPopover();
+      } else {
+        showPublicChannelDisplayPopover({ authorWallet }, identityButton);
+      }
+    });
+    actions.append(identityButton);
+  }
+
+  // "Private chat" — open the author in Private. HIDDEN on your own post: a dialog with yourself is meaningless.
+  if (!isOwnPost) {
+    const privateButton = document.createElement('button');
+    privateButton.type = 'button';
+    privateButton.textContent = 'Private chat';
+    privateButton.disabled = !authorWallet;
+    privateButton.title = authorWallet
+      ? 'Open this author in Private'
+      : 'Author wallet is not available for this public item';
+    privateButton.addEventListener('click', () => {
+      if (!authorWallet) return;
+      openPrivateThreadForWallet(authorWallet);
+    });
+    actions.append(privateButton);
+  }
   article.append(actions);
 }
 
@@ -4938,9 +4983,10 @@ function rebuildThreadsFromPublicSubscriptions(options = {}) {
   // Re-resolve wallet-channel names against the current private threads + shared store so feed-mode
   // (which bakes channel.name into its items) stays in sync with the Private dialog display.
   rebuildPublicChannelRegistry();
-  publicChannelThreads = publicChannelSubscriptionsToThreads(
-    publicChannelSubscriptions,
-    publicChannelRegistry,
+  // Feed source = subscribed channels UNIONED with the user's own wallet channel (so own posts always show
+  // without auto-subscribing). The channels LIST stays subscription-driven (see the channels render).
+  publicChannelThreads = publicChannelsToThreads(
+    feedSourcePublicChannels(),
     publicFeedCacheForCurrentWindow(),
   );
 
@@ -5632,6 +5678,26 @@ function publicChannelIdForAuthorWallet(authorWallet) {
     ?? ensurePublicChannelForAuthorWallet(wallet);
 }
 
+// The user's OWN wallet channel, if it already exists in the registry (created at publish time). FIND-only:
+// no side effects (does NOT create/subscribe) so it is safe to call on every render/sync.
+function ownPublicChannel() {
+  const wallet = rawWalletAddress(plathoWallet?.address);
+  if (!wallet) return null;
+  return publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet)) ?? null;
+}
+
+// The set of channels that feed the Public FEED: everything the user is subscribed to, PLUS their own wallet
+// channel — so a user always sees their OWN posts without auto-subscribing (auto-subscribe was killed in
+// clean-10). The own channel is included as an implicit feed source only; the persisted subscription store is
+// never mutated, so the channels LIST stays driven by real subscriptions and the per-author scalability bound
+// is preserved (cost adds at most ONE author index — the user's own).
+function feedSourcePublicChannels() {
+  const subscribed = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry);
+  const own = ownPublicChannel();
+  if (!own || subscribed.some((channel) => channel.id === own.id)) return subscribed;
+  return [...subscribed, own];
+}
+
 function publicAuthorLabel(authorWallet) {
   const wallet = rawWalletAddress(authorWallet) ?? String(authorWallet ?? '').trim();
   return publicChannelRegistry.find((channel) => publicChannelMatchesAuthorWallet(channel, wallet))?.name
@@ -5742,7 +5808,9 @@ async function syncPublicChannelFromChain() {
   const allTime = syncWindow === 'long';
   const authorWalkMax = allTime ? PUBLIC_CHAIN_LONG_READ_LIMIT : readLimit;
   const incompleteChannels = [];
-  for (const channel of subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)) {
+  // Walk the FEED source (subscribed + own) so the user's own confirmed posts are fetched from chain, not just
+  // the subscribed authors. Adds at most one author index (the user's own).
+  for (const channel of feedSourcePublicChannels()) {
     const channelAuthor = channel.authorWallet;
     if (!channelAuthor) continue;
     let authorIndex;
@@ -5899,7 +5967,9 @@ async function syncPublicChannelFromChain() {
         }
       }
       const documentBlocks = documentBytes
-        ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes))
+        // Public decode is forward-compat tolerant: a post carrying a new block type (e.g. the author-.ath
+        // tag added in a later phase) still decodes here instead of throwing. Private decode stays strict.
+        ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true }))
         : [];
       const readEntryId = ordered.reduce((max, item) => {
         const value = publicEntryIdBigInt(item.entryId) ?? -1n;
@@ -11058,6 +11128,12 @@ function setView(view) {
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
     clearMessageAutoSyncTimer();
+  } else {
+    // Restore the open conversation when returning to the private tab. On mobile, data-chat-open is the only
+    // thing the CSS uses to choose the conversation pane vs the thread list; switching away cleared it, so
+    // without this the list shows instead of the chat the user was in. Gate on activeThreadId (the explicit
+    // selection), NOT activeThread() which falls back to threads[0] — matches the boot-time logic.
+    appShell.dataset.chatOpen = activeThreadId ? 'true' : 'false';
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
@@ -13621,7 +13697,14 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
   ]);
 }
 
-function decodeMessageDocumentBlocks(bytesLike) {
+function decodeMessageDocumentBlocks(bytesLike, options = {}) {
+  // tolerateUnknownBlocks: forward-compat reader tolerance. The block frame is [type, flags, uint32 len,
+  // content] and `offset` is advanced past `content` BEFORE the type dispatch, so an unrecognized block can
+  // be SKIPPED while keeping the offset aligned (the trailing-bytes invariant below still holds). PUBLIC
+  // decode opts in so a future post that carries a new block type (e.g. an author-username tag added in a
+  // later phase) still decodes on this client instead of throwing. PRIVATE decode stays STRICT (default
+  // false) — no behavior change for the funds-/correctness-sensitive private path.
+  const tolerateUnknownBlocks = options.tolerateUnknownBlocks === true;
   const bytes = bytesLike instanceof Uint8Array ? bytesLike : new Uint8Array(bytesLike ?? []);
   if (bytes.length < PLATHO_DOCUMENT_HEADER_BYTES) throw new Error('Document message is truncated');
   for (let index = 0; index < PLATHO_DOCUMENT_MAGIC.length; index += 1) {
@@ -13653,6 +13736,9 @@ function decodeMessageDocumentBlocks(bytesLike) {
       });
     } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.PAYMENT) {
       blocks.push({ type: 'payment', payment: paymentFromDocumentContent(content) });
+    } else if (tolerateUnknownBlocks) {
+      // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
+      continue;
     } else {
       throw new Error('Unsupported document block type');
     }

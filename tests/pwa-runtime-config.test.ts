@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v500<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v500'/);
+    expect(html).toMatch(/id="appVersionLabel">v501<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v501'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -4557,14 +4557,52 @@ describe('PWA runtime config guard', () => {
     expect(syncSource).toMatch(/isBodyHistoryUnavailableError\(error\)[\s\S]*rememberPrivateBodyHistoryUnavailable\(address, entry, entryId\)/);
   });
 
+  it('PWA-PUBLIC-PRIVATE-UI-01: public/private UI fixes — tab-restore, info-button, feed overflow/uid, self-post, self-dialog, display-as', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const pubMjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    // 1. Returning to the private tab restores the open conversation (data-chat-open) on mobile.
+    expect(app).toMatch(/appShell\.dataset\.chatOpen = activeThreadId \? 'true' : 'false'/);
+    // 2. Public header actions grow to flush-right when wrapped (mobile info button no longer jumps).
+    expect(css).toMatch(/\.public-header-actions \{[\s\S]*?flex-grow: 1;/);
+    // 3a. Feed grid column is capped so a long token cannot stretch the card off-screen.
+    expect(css).toMatch(/\.public-feed \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/);
+    // 3b. Plain feed post bodies wrap long tokens.
+    expect(css).toMatch(/\.feed-item p \{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/);
+    // 3c. The technical entry uid is dropped from the feed header meta.
+    expect(pubMjs).toMatch(/meta: \[post\.publishStatus, shortTime\(post\.createdAt\)\]/);
+    expect(pubMjs).not.toMatch(/uid \$\{post\.entryUid/);
+    // 4. Own posts show in the feed without auto-subscribing (feed source = subscribed + own).
+    expect(app).toMatch(/function feedSourcePublicChannels\(\)/);
+    expect(app).toMatch(/function ownPublicChannel\(\)/);
+    expect(app).toMatch(/publicChannelThreads = publicChannelsToThreads\(\s*feedSourcePublicChannels\(\)/);
+    expect(app).toMatch(/for \(const channel of feedSourcePublicChannels\(\)\)/);
+    expect(pubMjs).toMatch(/export function publicChannelsToThreads\(channels, feedCache = \{\}\)/);
+    // 5. "Private chat" is hidden on your own public post (no self-dialog).
+    expect(app).toMatch(/const isOwnPost = Boolean\(authorWallet && plathoWallet\?\.address && sameWalletAddress\(authorWallet, plathoWallet\.address\)\)/);
+    expect(app).toMatch(/if \(!isOwnPost\) \{[\s\S]*?textContent = 'Private chat'/);
+    // 6A. Feed items get the "Display as" affordance (reuses the channel-detail popover).
+    expect(app).toMatch(/showPublicChannelDisplayPopover\(\{ authorWallet \}, identityButton\)/);
+    // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read).
+    expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)\)[\s\S]*?readLinkedPlathoUsername\(plathoWallet\.address\)\?\.label/);
+    // 6B phase-1: PUBLIC document decode is forward-compat tolerant (skips unknown blocks) so a later phase can
+    // embed an author-.ath block without breaking already-updated clients; PRIVATE decode stays STRICT.
+    expect(app).toMatch(/function decodeMessageDocumentBlocks\(bytesLike, options = \{\}\)/);
+    expect(app).toMatch(/const tolerateUnknownBlocks = options\.tolerateUnknownBlocks === true/);
+    expect(app).toMatch(/\} else if \(tolerateUnknownBlocks\) \{[\s\S]*?continue;/);
+    expect(app).toMatch(/decodeMessageDocumentBlocks\(documentBytes, \{ tolerateUnknownBlocks: true \}\)/);
+    // Private capsule decode stays strict (no tolerate option) — funds-/correctness-sensitive path unchanged.
+    expect(app).toMatch(/decodeMessageDocumentBlocks\(opened\.payload\.bytes\)\)/);
+  });
+
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v571/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=161/);
+    expect(sw).toMatch(/platho-pwa-prototype-v572/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=162/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=500/);
+    expect(sw).toMatch(/\.\/app\.js\?v=501/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -4573,7 +4611,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=10/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=11/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
