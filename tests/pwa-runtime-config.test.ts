@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v496<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v496'/);
+    expect(html).toMatch(/id="appVersionLabel">v497<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v497'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -1162,7 +1162,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/attempt >= PRIVATE_PUBLISH_CONFIRM_ACTIVE_ATTEMPT_LIMIT/);
     expect(app).toMatch(/Number\(message\.publishState\?\.confirmedCount \?\? 0\) === 0/);
     expect(app).toMatch(/code: 'CONFIRM_RETRY_EXHAUSTED'/);
-    expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: send timed out'/);
+    expect(app).toMatch(/error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'\) return 'not confirmed: chain confirmation timed out'/);
+    // Early actionable terminal when the broadcast is provably erroring (nothing landed): "RPC broadcast
+    // unavailable" surfaces in ~minutes (PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT) instead of spinning to
+    // the full ~9-min deadline, gated by publishStateBroadcastIsFailing so a fine-but-slow send is never killed.
+    expect(app).toMatch(/const PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT = 10/);
+    expect(app).toMatch(/function publishStateBroadcastIsFailing\(publishState\)/);
+    expect(app).toMatch(/attempt >= PRIVATE_PUBLISH_BROADCAST_FAIL_ATTEMPT_LIMIT[\s\S]*publishStateBroadcastIsFailing\(message\.publishState\)/);
+    expect(app).toMatch(/code: 'BROADCAST_REJECTED'/);
+    expect(app).toMatch(/error\?\.code === 'BROADCAST_REJECTED'\) return 'not confirmed: RPC broadcast unavailable'/);
     // STABLE-age trigger: a long-stuck no-progress message surfaces Retry without restarting the
     // per-session attempt budget (the age is anchored on message creation, not publishState.updatedAt).
     expect(app).toMatch(/const PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS = 10 \* 60 \* 1000/);
@@ -1182,11 +1190,17 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function stopPartialPrivatePublishRecovery'),
     );
     expect(stopSource).toMatch(/message\.privatePublishConfirmStopped = true/);
-    // Confirm-exhausted shows JUST a durable red terminal status — NO manual-action buttons. A Retry
-    // would only re-broadcast nonce-dead externals (it cannot re-send) and the no-double-spend guard
-    // refuses to auto-re-sign, so neither Retry nor Dismiss is useful for this terminal state.
-    expect(stopSource).toMatch(/message\.privateManualRetryAvailable = false/);
-    expect(stopSource).toMatch(/message\.privateCancelAvailable = false/);
+    // Broadcast-unacknowledged / confirm-exhausted now offers a SAFE manual Retry: it re-broadcasts the same
+    // already-signed fixed-nonce external (idempotent — a re-used nonce is contract-rejected, and a secretly
+    // landed external is detected by the confirm read), which unsticks the send once the RPC broadcaster
+    // recovers. Local Cancel stays gated by privateMessageCanLocalCancel (false while a publish attempt
+    // exists — the nonce slot is committed, so discarding would orphan it).
+    expect(stopSource).toMatch(/const broadcastRetryable = error\?\.code === 'BROADCAST_REJECTED' \|\| error\?\.code === 'CONFIRM_RETRY_EXHAUSTED'/);
+    expect(stopSource).toMatch(/message\.privateManualRetryAvailable = broadcastRetryable/);
+    expect(stopSource).toMatch(/message\.privateCancelAvailable = broadcastRetryable && privateMessageCanLocalCancel\(message\)/);
+    // The Retry path clears the per-part re-broadcast budget so the same-nonce external re-sends at once.
+    expect(app).toMatch(/function resetPublishBroadcastBudgetForManualRetry\(publishState\)/);
+    expect(app).toMatch(/resetPublishBroadcastBudgetForManualRetry\(message\.publishState\)/);
     // 'not confirmed: ...' resolves to a 'failed' status key — the durable red terminal status.
     expect(app).toMatch(/text\.includes\('not confirmed'\)/);
   });
@@ -4515,11 +4529,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v567/);
+    expect(sw).toMatch(/platho-pwa-prototype-v568/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=496/);
+    expect(sw).toMatch(/\.\/app\.js\?v=497/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
