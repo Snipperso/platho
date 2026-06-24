@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v492<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v492'/);
+    expect(html).toMatch(/id="appVersionLabel">v493<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v493'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -2861,7 +2861,10 @@ describe('PWA runtime config guard', () => {
 
     expect(app).toMatch(/let privateOutboundWorkDepth = 0/);
     expect(app).toMatch(/function beginPrivateOutboundWork\(\)/);
-    expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\)\) \{/);
+    // Sync pauses for BOTH an in-flight broadcast (privateOutboundWorkActive) AND the full publish-confirm
+    // lifecycle (privatePublishConfirmJobs.size > 0) — the confirm phase's reads otherwise compete with the
+    // index walk for the keyless ~1 rps budget and 429-storm an image sent during sync.
+    expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\) \|\| privatePublishConfirmJobs\.size > 0\) \{/);
     expect(autoSyncSource).toMatch(/scheduleMessageAutoSync\(PRIVATE_OUTBOUND_SYNC_PAUSE_MS\)/);
     for (const source of [paymentSource, publishSource, confirmSource]) {
       expect(source).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
@@ -4503,11 +4506,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v563/);
+    expect(sw).toMatch(/platho-pwa-prototype-v564/);
     expect(sw).toMatch(/\.\/styles\.css\?v=159/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=492/);
+    expect(sw).toMatch(/\.\/app\.js\?v=493/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
