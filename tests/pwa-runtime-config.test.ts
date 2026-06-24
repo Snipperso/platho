@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v497<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v497'/);
+    expect(html).toMatch(/id="appVersionLabel">v499<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v499'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -524,6 +524,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/syncViewportCssVars/);
     expect(app).toMatch(/visualViewport/);
     expect(css).toMatch(/--app-viewport-height/);
+    // The on-screen keyboard must RESIZE the layout viewport (so 100dvh/--app-viewport-height shrink and the
+    // header stays put), not scroll the full-height layout viewport and push the header off the top.
+    expect(html).toMatch(/name="viewport"[^>]*interactive-widget=resizes-content/);
     expect(html).toMatch(/class="profile-scroll-content"/);
     expect(html).toMatch(/class="vault-scroll-content"/);
     expect(css).toMatch(/\.profile-scroll-content/);
@@ -754,7 +757,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/nativeCanvasWebpEncodeSupported = false/);
     expect(app).toMatch(/Image encoder did not produce WebP bytes/);
     expect(app).toMatch(/avatar media is public/);
-    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athSupplyStatus"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="burnAthButton"[\s\S]*id="flushAthButton"[\s\S]*id="flushAthStatus"/);
+    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athSupplyStatus"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="flushAthButton"[\s\S]*id="flushAthStatus"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
     expect(html).toMatch(/id="syncMessagesButton"/);
     expect(html).not.toMatch(/id="keySuiteStatus"/);
@@ -803,7 +806,11 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toMatch(/Claim failed mint refund/);
     expect(html).not.toMatch(/Claim username refund/);
     expect(html).not.toMatch(/id="transferAthButton"/);
-    expect(html).toMatch(/id="burnAthButton"/);
+    // Burn ATH row removed: it burned the external ATH wallet (normally ~0; user ATH lives in the Vault),
+    // had no balance validation, and vault-ATH burn is infeasible (burn is wallet->ATHMaster only). The
+    // protocol burn-due flush + buyback/burn remain the real supply-reduction path.
+    expect(html).not.toMatch(/id="burnAthButton"/);
+    expect(html).not.toMatch(/>Burn ATH</);
     expect(html).toMatch(/Flush ATH/);
     expect(html).toMatch(/Wallet and Vault are separate for security/);
     expect(html).toMatch(/data-nav-vault-balance/);
@@ -1278,6 +1285,9 @@ describe('PWA runtime config guard', () => {
     expect(preflightIndex).toBeGreaterThan(insertIndex);
     expect(submitSource).toMatch(/privateDraft:\s*\{/);
     expect(submitSource).toMatch(/messageInput\.value = ''/);
+    // After sending, focus returns to the composer so the user can keep typing without re-tapping the field
+    // (clicking the send button moved focus to the button / would drop the mobile keyboard).
+    expect(submitSource).toMatch(/messageInput\?\.focus\(\)/);
     expect(submitSource).toMatch(/await settlePrivateComposerSendError\(sendContext, error\)/);
     expect(submitSource).not.toMatch(/restorePrivateDraftAfterUnsentMessage/);
     expect(settleSource).toMatch(/privateSendPreflightStatusText\(error\)/);
@@ -2442,6 +2452,11 @@ describe('PWA runtime config guard', () => {
     expect(controls).toMatch(/const activationPending = plathoAccountActivationPending && !accountActive/);
     expect(controls).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending \|\| activationPending/);
     expect(controls).toMatch(/activationPending\s*\?\s*'activating'/);
+    // Hide the dead rows instead of showing disabled placeholders: Unlock only when a stored wallet is
+    // locked (actionable); Activate only while activation is actionable or in progress (wallet unlocked AND
+    // not yet active) — so the "active"/"unlocked"/"not stored" dead states disappear from the profile.
+    expect(controls).toMatch(/unlockWalletButton\.hidden = !\(hasStoredWallet && !plathoWallet\)/);
+    expect(controls).toMatch(/registerVaultKeysButton\.hidden = !\(Boolean\(plathoWallet\) && !accountActive && !appShellReloadPending\)/);
     // Safety release so a dropped/failed activation never strands the row spinning.
     expect(postTx).toMatch(/if \(pollActivation\) \{[\s\S]*plathoAccountActivationPending = false;[\s\S]*refreshMessagingControls\(\)/);
     // A wallet switch clears any pending lock left from the previous wallet.
@@ -4110,7 +4125,7 @@ describe('PWA runtime config guard', () => {
     );
     const submitSource = app.slice(
       app.indexOf('async function submitUsernameMint'),
-      app.indexOf('async function submitAthWalletBurn'),
+      app.indexOf('async function submitAthDueFlush'),
     );
     const priceIndex = submitSource.indexOf('readUsernameMintPriceForOwnVaultAction(provider, registry, username)');
     const availabilityIndex = submitSource.indexOf('readUsernameMintAvailabilityForOwnVaultAction(provider, registry, username)');
@@ -4164,7 +4179,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const submitSource = app.slice(
       app.indexOf('async function submitUsernameMint'),
-      app.indexOf('async function submitAthWalletBurn'),
+      app.indexOf('async function submitAthDueFlush'),
     );
     const waitSource = app.slice(
       app.indexOf('async function waitForPlathoUsernameOwnership'),
@@ -4191,7 +4206,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const source = app.slice(
       app.indexOf('async function submitUsernameMint'),
-      app.indexOf('async function submitAthWalletBurn'),
+      app.indexOf('async function submitAthDueFlush'),
     );
     const helper = app.slice(
       app.indexOf('async function readUsernameMintPriceForOwnVaultAction'),
@@ -4279,10 +4294,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function setView(view)'),
       app.indexOf('function renderThreads'),
     );
-    const burnSource = app.slice(
-      app.indexOf('async function submitAthWalletBurn'),
-      app.indexOf('async function submitProfileAvatarUpdate'),
-    );
     const flushSource = app.slice(
       app.indexOf('async function readAthBurnFlushState'),
       app.indexOf('async function submitProfileAvatarUpdate'),
@@ -4297,8 +4308,9 @@ describe('PWA runtime config guard', () => {
     expect(refreshSource).toMatch(/total_supply:\s*data\?\.total_supply === null \|\| data\?\.total_supply === undefined\s*\?\s*null\s*:\s*nonNegativeBigInt\(data\.total_supply\)/);
     expect(refreshSource).not.toMatch(/ATH_TOTAL_SUPPLY_ATOMIC/);
     expect(viewSource).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\) \{[\s\S]*refreshAthProtocolStats\(\)\.catch/);
-    expect(burnSource).toMatch(/submitAthWalletMessage\('ATHBurn'/);
-    expect(burnSource).toMatch(/queueAthProtocolStatsRefresh\(\)/);
+    // Burn ATH user row removed (see the index.html assertions). The ATHBurn message primitive itself stays
+    // for the protocol buyback/burn-due path; there is no longer a user-facing wallet-burn handler to assert.
+    expect(app).not.toMatch(/async function submitAthWalletBurn/);
     expect(app).toMatch(/flushAthButton\?\.addEventListener\('click'/);
     expect(app).toMatch(/const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = \[5_000, 15_000, 45_000, 90_000, 180_000\]/);
     expect(flushSource).toMatch(/function queueAthFlushPostTransactionRefresh\(\)/);
@@ -4325,6 +4337,13 @@ describe('PWA runtime config guard', () => {
     );
 
     expect(app).toMatch(/const MESSAGE_AUTO_SYNC_MS = 60 \* 1000/);
+    // Foreground IDLE fast tier: a fully-synced ("nothing new") pass re-arms at ~12s (a cheap 2-read pass)
+    // instead of the 60s cap, so a no-push recipient picks up a waiting message in ~12s. The degraded floor,
+    // send-pause and 429-backoff still override it when they apply.
+    expect(app).toMatch(/const MESSAGE_AUTO_SYNC_IDLE_MS = 12 \* 1000/);
+    expect(app).toMatch(/nextSyncDelayMs = MESSAGE_AUTO_SYNC_IDLE_MS/);
+    // The degraded-transport floor still wins over the fast idle tier (primary RPC dead -> back off to 180s).
+    expect(app).toMatch(/const effectiveDelayMs = degradedTransport \? Math\.max\(requestedDelayMs, MESSAGE_AUTO_SYNC_DEGRADED_MS\) : requestedDelayMs/);
     expect(app).toMatch(/const PRIVATE_CHAIN_INDEX_STORAGE_PREFIX = 'platho\.private\.chain\.index\.v1'/);
     expect(app).toMatch(/const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120/);
     expect(app).toMatch(/const PRIVATE_CHAIN_AUTO_INDEX_READ_LIMIT = 48/);
@@ -4529,11 +4548,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v568/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=159/);
+    expect(sw).toMatch(/platho-pwa-prototype-v570/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=160/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=497/);
+    expect(sw).toMatch(/\.\/app\.js\?v=499/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
