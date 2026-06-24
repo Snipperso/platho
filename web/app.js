@@ -36,7 +36,7 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=93';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=94';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -140,7 +140,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import {
   createCapsuleHubTonRpcProvider,
   isCapsuleHubBodyHistoryUnavailable,
-} from './capsulehub-ton-rpc-provider.mjs?v=50';
+} from './capsulehub-ton-rpc-provider.mjs?v=51';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=38';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=34';
 import {
@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v491';
+const PLATHO_APP_RUNTIME_VERSION = 'v492';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -14005,6 +14005,14 @@ const CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS = 8_000;
 // renders with whatever is cached, shows "RPC busy, retrying", and lets the background reads update later —
 // so the tab can NEVER hang open.
 const VAULT_OPEN_READ_DEADLINE_MS = 12_000;
+// Short TTL for BACKGROUND/display Vault reads (get_user/get_global for the dashboard + airdrop). With Orbs
+// gone, ALL reads share one toncenter budget, and these reads were cacheTtlMs:0 (cache-bypass) so the SAME
+// get_user/get_global fetched by the dashboard, the airdrop refresh and the nav-balance path each hit the
+// network separately within one second -> a slow Vault open + extra 429s. A small TTL lets the transport's
+// runGetMethod cache collapse those duplicate reads. Funds-critical reads (pre-sign nonce/charge, post-tx
+// confirm) KEEP cacheTtlMs:0 at their own sites; and sendBoc clears the read cache, so a balance change
+// after one of our own actions still shows fresh (this only dedups the steady/display refresh path).
+const VAULT_DISPLAY_READ_CACHE_TTL_MS = 8_000;
 // Overall backstop for the WHOLE refreshVaultNow (dashboard + activation + stats jobs). The dashboard read
 // deadline above un-freezes the balance render, but the activation/stats jobs do the same verify:true reads
 // and would otherwise keep op='vault' + the single-flight lock held for minutes under degraded RPC. Past
@@ -15182,7 +15190,7 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
   markNavVaultBalancePending(options.fromRetry ? 'retrying' : 'refreshing');
   navVaultBalanceRefreshPromise = (async () => {
     try {
-      const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: 0 });
+      const user = await loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS });
       applyVaultUserPocketState(user);
       return user;
     } catch (error) {
@@ -15352,8 +15360,8 @@ async function refreshVaultDashboard() {
   let userError = null;
   const vaultReadsPromise = Promise.allSettled([
     loadConnectedWalletBalances(),
-    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
-    loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
+    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
+    loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
   ]);
   // Hard deadline: never await the read burst forever. Under degraded RPC it can take minutes
   // (keyless toncenter fallback + verify cross-check + backoff), which hung the Vault tab (op=vault ~148s,
@@ -15492,7 +15500,7 @@ async function refreshAthFlushState() {
 async function refreshAthAirdropState() {
   if (!plathoWallet?.address) return;
   const global = await callWithDegradedTransportReadFallback(
-    () => loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: 0 }),
+    () => loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS }),
     () => loadConnectedVaultGlobal(unverifiedCriticalChainReadOptions()),
   ).catch(() => null);
   if (!global) return;
@@ -15833,6 +15841,9 @@ async function resolveTonDnsProvider() {
   });
 }
 
+// The owner's ATH jetton-wallet address is a deterministic function of (owner, ATHMaster) — it never
+// changes — so it was wasteful to re-read get_wallet_address on every Vault refresh cycle (one of the ~5
+// reads in the Vault-open burst). Cache it in memory after the first resolve.
 async function loadConnectedAthWalletAddress() {
   const owner = requirePlathoWalletAddress();
   requireBasechainAddress(owner, 'Connected wallet');

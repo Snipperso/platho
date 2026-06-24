@@ -77,7 +77,9 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           sendBocEndpoint: 'https://toncenter.com/api/v3/message',
           messagesEndpoint: 'https://toncenter.com/api/v3/messages',
           walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
-          requestSpacingMs: 100,
+          // 125ms = 8 rps, a 20% margin under the 10 rps free-key cap. toncenter rate-limits per-second with
+          // NO burst grace, so a flat 100ms (=10 rps, zero margin) sporadically tips to 11/sec on jitter -> 429.
+          requestSpacingMs: 125,
         },
         {
           id: 'keyless-toncenter',
