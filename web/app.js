@@ -156,7 +156,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v499';
+const PLATHO_APP_RUNTIME_VERSION = 'v500';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -565,15 +565,15 @@ toncenterApiKeyInput?.addEventListener('keydown', (event) => {
   }
 });
 
-// The whole RPC-key row doubles as the "Get a key" button (opens the @toncenter bot), EXCEPT when the
-// click lands on the text field itself (tapping the field just focuses it). The explicit Get button
-// bubbles up to this same handler.
+// The whole RPC-key row doubles as the "Get a key" button (opens the help modal that explains how to get a
+// key and links to the @toncenter bot), EXCEPT when the click lands on the text field itself (tapping the
+// field just focuses it). The explicit Get button bubbles up to this same handler.
 rpcKeyRow?.addEventListener('click', (event) => {
   if (toncenterApiKeyInput
     && (event.target === toncenterApiKeyInput || toncenterApiKeyInput.contains(event.target))) {
     return;
   }
-  openToncenterBotLink();
+  openRpcKeyHelpDialog();
 });
 
 refreshToncenterKeyUi();
@@ -1378,6 +1378,27 @@ function openTelegramDeepLink(href) {
 function openToncenterBotLink() {
   if (openTelegramDeepLink('https://t.me/toncenter')) return;
   try { globalThis.open?.('https://t.me/toncenter', '_blank', 'noopener'); } catch { /* ignore */ }
+}
+
+// "Get" no longer dumps the user straight into the @toncenter bot. It opens an explanatory modal first
+// (what an RPC key is for + the exact steps), and the bot link is the modal's primary action. Dismissing
+// the modal (✕ / outside-click) does nothing; only the CTA opens the bot.
+async function openRpcKeyHelpDialog() {
+  const proceed = await openActionDialog({
+    title: 'Get an RPC key',
+    hint: 'A free TON Center API key speeds up reads. It is optional — Platho also works without one. To get a key from the @toncenter bot:',
+    fields: [{
+      type: 'note',
+      steps: [
+        'Open the @toncenter bot and send /start.',
+        'Choose to create an API key — you can enter any name.',
+        'When asked for the network, select mainnet.',
+        'Copy the key the bot sends you, then paste it into the RPC Key field here.',
+      ],
+    }],
+    submitLabel: 'Open @toncenter bot',
+  });
+  if (proceed) openToncenterBotLink();
 }
 
 function markTelegramRootAttribute() {
@@ -3563,6 +3584,28 @@ function createActionField(field) {
     card.append(image, meta);
     wrapper.append(label, card);
     return wrapper;
+  }
+  if (field.type === 'note') {
+    // Purely informational block (no label, no [name] — not collected as a value): an intro line and/or a
+    // numbered steps list, used by explanatory dialogs like the "Get an RPC key" help modal.
+    const note = document.createElement('div');
+    note.className = 'action-note';
+    if (field.text) {
+      const para = document.createElement('p');
+      para.textContent = field.text;
+      note.append(para);
+    }
+    if (Array.isArray(field.steps) && field.steps.length > 0) {
+      const list = document.createElement('ol');
+      list.className = 'action-note-steps';
+      for (const step of field.steps) {
+        const item = document.createElement('li');
+        item.textContent = step;
+        list.append(item);
+      }
+      note.append(list);
+    }
+    return note;
   }
   let input;
   if (field.type === 'textarea') {

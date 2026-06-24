@@ -2709,6 +2709,31 @@ button.feed-item:hover {
   text-transform: uppercase;
 }
 
+/* Informational block inside an action dialog (e.g. the "Get an RPC key" help modal): a muted intro line
+   and a numbered steps list — no input. */
+.action-note {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.action-note p {
+  margin: 0;
+}
+
+.action-note-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.action-note-steps li {
+  padding-left: 2px;
+}
+
 .action-custom-field {
   display: grid;
   gap: 10px;

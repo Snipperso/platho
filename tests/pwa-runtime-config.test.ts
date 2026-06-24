@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v499<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v499'/);
+    expect(html).toMatch(/id="appVersionLabel">v500<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v500'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -2051,8 +2051,20 @@ describe('PWA runtime config guard', () => {
     expect(readFileSync('web/index.html', 'utf8')).toMatch(/<h2>RPC access \(recommended\)<\/h2>/);
     // The key input is a distinct dark field box (not frameless/transparent) so it reads as a text input on the row.
     expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.settings-rpc-row input\s*\{[\s\S]*?background:\s*var\(--panel\)/);
-    // The row itself doubles as the Get button (opens the @toncenter bot), except a click on the field.
-    expect(app).toMatch(/rpcKeyRow\?\.addEventListener\('click'[\s\S]*event\.target === toncenterApiKeyInput[\s\S]*openToncenterBotLink\(\)/);
+    // The row itself doubles as the Get button (except a click on the field). "Get" no longer dumps the user
+    // straight into the bot: it opens an explanatory help modal whose primary action opens the @toncenter bot.
+    expect(app).toMatch(/rpcKeyRow\?\.addEventListener\('click'[\s\S]*event\.target === toncenterApiKeyInput[\s\S]*openRpcKeyHelpDialog\(\)/);
+    expect(app).toMatch(/async function openRpcKeyHelpDialog\(\)/);
+    // The help modal: title + the "any name" and "mainnet" guidance + a bot-link CTA, and it opens the bot
+    // ONLY when the user confirms via the CTA (proceed), not on dismiss.
+    expect(app).toMatch(/title: 'Get an RPC key'/);
+    expect(app).toMatch(/you can enter any name/);
+    expect(app).toMatch(/select mainnet/);
+    expect(app).toMatch(/submitLabel: 'Open @toncenter bot'/);
+    expect(app).toMatch(/if \(proceed\) openToncenterBotLink\(\)/);
+    // The 'note' field type renders the informational steps block (no input, not collected as a value).
+    expect(app).toMatch(/if \(field\.type === 'note'\)/);
+    expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.action-note-steps/);
     // The Save button is gone.
     expect(app).not.toMatch(/saveToncenterKeyButton/);
     // Quick-start step 2 validates too: an invalid key surfaces a message and does NOT advance the stepper.
@@ -4548,11 +4560,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v570/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=160/);
+    expect(sw).toMatch(/platho-pwa-prototype-v571/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=161/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=499/);
+    expect(sw).toMatch(/\.\/app\.js\?v=500/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
