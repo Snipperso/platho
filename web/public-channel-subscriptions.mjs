@@ -306,9 +306,10 @@ export function publicChannelFeedToThread(channel, feed) {
       type: 'in',
       text: post.title ? `${post.title}\n${post.text}` : (feedBlocksPreview(post.blocks) ?? post.text),
       blocks: post.blocks,
-      // The author/channel name is shown once by the feed item (thread.name); keep only status/date/uid
-      // here so a wallet post does not repeat the name.
-      meta: [post.publishStatus, shortTime(post.createdAt), post.chainVerified && post.entryUid ? `uid ${post.entryUid.slice(0, 8)}` : null]
+      // The author/channel name is shown once by the feed item (thread.name); keep only status + date here so
+      // a wallet post does not repeat the name. The technical entry uid was dropped — it is internal noise in
+      // the always-visible header (the author name + status + date already identify the post).
+      meta: [post.publishStatus, shortTime(post.createdAt)]
         .filter(Boolean)
         .join(' · '),
       publicPostId: post.id,
@@ -334,8 +335,10 @@ export function publicChannelFeedToThread(channel, feed) {
   };
 }
 
-export function publicChannelSubscriptionsToThreads(subscriptions, registry = DEFAULT_PUBLIC_CHANNELS, feedCache = {}) {
-  return subscribedPublicChannels(subscriptions, registry).map((channel) => {
+// Build feed threads from an EXPLICIT channel list (the feed source may be the subscribed set UNIONED with
+// the user's own wallet channel, so own posts show without auto-subscribing — see feedSourcePublicChannels).
+export function publicChannelsToThreads(channels, feedCache = {}) {
+  return (channels ?? []).map((channel) => {
     let feed = null;
     try {
       const cached = feedCache?.[channel.id]?.feed ?? feedCache?.[channel.id] ?? null;
@@ -345,6 +348,10 @@ export function publicChannelSubscriptionsToThreads(subscriptions, registry = DE
     }
     return publicChannelFeedToThread(channel, feed);
   });
+}
+
+export function publicChannelSubscriptionsToThreads(subscriptions, registry = DEFAULT_PUBLIC_CHANNELS, feedCache = {}) {
+  return publicChannelsToThreads(subscribedPublicChannels(subscriptions, registry), feedCache);
 }
 
 export function publicChannelThreadsToFeedItems(threads) {

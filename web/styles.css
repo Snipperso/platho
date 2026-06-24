@@ -1619,6 +1619,10 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .public-feed {
+  /* Cap the implicit grid column at the container width (same fix as .settings-list above): without it the
+     single auto column sizes to its widest child's max-content, so a feed card with a long unbroken token
+     (URL / wallet / id) stretches EVERY .feed-item past the right edge on a phone. */
+  grid-template-columns: minmax(0, 1fr);
   overflow: auto;
   padding-right: 4px;
 }
@@ -1824,6 +1828,10 @@ button.feed-item:hover {
 
 .feed-item p {
   line-height: 1.45;
+  /* Break long unbroken tokens (URLs / wallet addresses / ids) so a plain post body cannot exceed the
+     viewport (matches .feed-block-text). The grid-column cap above only helps if children can shrink. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .comment-list {
@@ -3319,6 +3327,10 @@ button.feed-item:hover {
 
   .public-header-actions {
     min-width: var(--header-actions-width);
+    /* The public pane-header is flex-wrap:wrap; when the actions wrap to their own line, grow to fill it so
+       the base justify-content:flex-end keeps the info button flush right (consistent with the other tabs)
+       instead of left-aligning at the wrapped line's start. */
+    flex-grow: 1;
   }
 
   .segmented-control {
