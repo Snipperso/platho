@@ -1793,7 +1793,16 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
     runGetMethodCacheTtls: provider?.runGetMethodCacheTtls ?? defaults.runGetMethodCacheTtls,
     runGetMethodPriorities: provider?.runGetMethodPriorities ?? defaults.runGetMethodPriorities,
     messagesCacheMaxEntries: provider?.messagesCacheMaxEntries ?? defaults.messagesCacheMaxEntries,
-    rateLimitKey: provider?.rateLimitKey ?? provider?.id ?? defaults.rateLimitKey,
+    // #F shared per-IP budget: do NOT default the limiter key to provider.id. With provider.id, the keyed
+    // user-toncenter and the anonymous keyless-toncenter sat in SEPARATE client queues even though they hit
+    // the SAME toncenter.com from ONE IP — on a no-key wallet (both anonymous, 1500ms each) their two queues
+    // together exceeded toncenter's per-IP ~1 rps limit during concurrent sync+send -> 429 bursts. Falling
+    // through to toncenterLimiterKey's origin|key-mode keying merges all ANONYMOUS toncenter traffic into one
+    // 'toncenter.com|public' budget (single nextAt/backoff, paced at the keyless spacing) while keyed traffic
+    // keeps its own 'toncenter.com|api-key' budget — toncenter rate-limits keyed per-key and anonymous
+    // per-IP, i.e. different buckets, so only the anonymous side must share. An explicit provider.rateLimitKey
+    // still wins if a config ever needs to force-separate.
+    rateLimitKey: provider?.rateLimitKey ?? defaults.rateLimitKey,
   });
   // TONCENTER-ONLY topology (Orbs removed): user-toncenter is the sole primary read/send/history source.
   // When the user has NO key it runs anonymous (~1 rps, 429-prone) but MUST stay a non-emergency primary
