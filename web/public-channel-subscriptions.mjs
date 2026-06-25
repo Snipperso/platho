@@ -141,10 +141,21 @@ export function readPublicChannelFeedCache(storage) {
   }
 }
 
+// Heavy base64 media (post/avatar image data URLs + image-block urls) must NEVER be persisted to localStorage.
+// On iOS WebKit a large localStorage store makes EVERY synchronous setItem re-serialize the WHOLE store, so a
+// feed cache bloated with image data URLs turned the Vault tab's handful of crumb/state setItems into a
+// multi-second main-thread freeze — engine/storage-bound, so it froze even on an iPhone 16 Pro Max and only
+// on WebKit (Blink/V8 do not re-serialize the whole store per write). The media re-derives from the chain on
+// the next sync; only the light text/metadata is cached. (Private message history is in IndexedDB, unaffected.)
+function omitHeavyFeedMediaForPersist(key, value) {
+  if (key === 'imageUrl' || key === 'avatarImageUrl' || key === 'url') return undefined;
+  return value;
+}
+
 export function writePublicChannelFeedCache(storage, cache) {
   if (!storage?.setItem) return false;
   try {
-    storage.setItem(PUBLIC_CHANNEL_FEED_CACHE_KEY, JSON.stringify(isObject(cache) ? cache : {}));
+    storage.setItem(PUBLIC_CHANNEL_FEED_CACHE_KEY, JSON.stringify(isObject(cache) ? cache : {}, omitHeavyFeedMediaForPersist));
     return true;
   } catch {
     return false;

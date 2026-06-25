@@ -231,6 +231,31 @@ describe('PWA public channel subscriptions', () => {
     expect(post.comments[0].chainVerified).toBe(false);
   });
 
+  it('PUBLIC-SUB-MEDIA-STRIP: heavy base64 media is NOT persisted to localStorage (iOS Vault-freeze root fix)', () => {
+    const store = new Map();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) };
+    const big = (c: string) => `data:image/webp;base64,${c.repeat(5000)}`;
+    const cached = {
+      'wallet:abc': { feed: { posts: [{
+        id: 'p1', entryId: '1', text: 'hi',
+        imageUrl: big('A'), avatarImageUrl: big('B'),
+        blocks: [{ type: 'image', url: big('C') }, { type: 'text', text: 'kept' }],
+        comments: [{ id: 'c1', text: 'c', imageUrl: big('D'), avatarImageUrl: big('E') }],
+      }] } },
+    };
+    writePublicChannelFeedCache(storage, cached);
+    const raw = store.get(PUBLIC_CHANNEL_FEED_CACHE_KEY) ?? '';
+    // A localStorage feed cache bloated with base64 media made every synchronous setItem re-serialize the
+    // whole store on iOS WebKit -> a multi-second Vault-tab freeze (even on iPhone 16 Pro Max). The persisted
+    // copy must carry NO base64 media; the light text/metadata stays (images re-derive from chain on sync).
+    expect(raw).not.toMatch(/data:image/);
+    expect(raw).not.toContain('"imageUrl"');
+    expect(raw).not.toContain('"avatarImageUrl"');
+    expect(raw).not.toContain('"url"');
+    expect(raw).toContain('"text":"hi"');
+    expect(raw).toContain('"text":"kept"');
+  });
+
   it('PUBLIC-SUB-04: stored unsubscribe is preserved and not re-seeded on every reload', () => {
     const state = normalizePublicChannelSubscriptions({
       version: 1,
