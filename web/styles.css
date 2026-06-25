@@ -1892,6 +1892,16 @@ button.feed-item:hover {
   border-color: var(--line-soft);
 }
 
+/* The "Display as" chevron is an .icon-button in the text-button row. The row's `padding: 0 13px` shrinks its
+   content box below the 20px icon, so place-items:center can't center it (the chevron drifts sideways). Drop
+   the text padding and make it a clean square matching the row height so the chevron sits dead-centre. */
+.feed-actions .icon-button {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
 .balance-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));

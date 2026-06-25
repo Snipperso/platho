@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v501<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v501'/);
+    expect(html).toMatch(/id="appVersionLabel">v502<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v502'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -4583,6 +4583,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(!isOwnPost\) \{[\s\S]*?textContent = 'Private chat'/);
     // 6A. Feed items get the "Display as" affordance (reuses the channel-detail popover).
     expect(app).toMatch(/showPublicChannelDisplayPopover\(\{ authorWallet \}, identityButton\)/);
+    // 6A styling: the chevron icon-button in the feed-actions row drops the row's text padding and is a clean
+    // square so the icon sits centred (the row's `padding: 0 13px` otherwise pushes the chevron sideways).
+    expect(css).toMatch(/\.feed-actions \.icon-button \{[\s\S]*?padding: 0;/);
     // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read).
     expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)\)[\s\S]*?readLinkedPlathoUsername\(plathoWallet\.address\)\?\.label/);
     // 6B phase-1: PUBLIC document decode is forward-compat tolerant (skips unknown blocks) so a later phase can
@@ -4598,11 +4601,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v572/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=162/);
+    expect(sw).toMatch(/platho-pwa-prototype-v573/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=163/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=501/);
+    expect(sw).toMatch(/\.\/app\.js\?v=502/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
