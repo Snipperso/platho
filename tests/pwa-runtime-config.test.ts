@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v502<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v502'/);
+    expect(html).toMatch(/id="appVersionLabel">v503<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v503'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(html).toMatch(/id="copyPrivateDebugButton"/);
     expect(html).toMatch(/aria-label="Copy debug text"/);
@@ -4581,11 +4581,14 @@ describe('PWA runtime config guard', () => {
     // 5. "Private chat" is hidden on your own public post (no self-dialog).
     expect(app).toMatch(/const isOwnPost = Boolean\(authorWallet && plathoWallet\?\.address && sameWalletAddress\(authorWallet, plathoWallet\.address\)\)/);
     expect(app).toMatch(/if \(!isOwnPost\) \{[\s\S]*?textContent = 'Private chat'/);
-    // 6A. Feed items get the "Display as" affordance (reuses the channel-detail popover).
+    // 6A. Feed posts get the "Display as" chevron in the AUTHOR ROW (top-right), FEED mode only — channels mode
+    // omits it on post cards (the channel-detail header already carries it). Reuses the shared popover.
+    expect(app).toMatch(/function publicItemIdentityButton\(item\)/);
     expect(app).toMatch(/showPublicChannelDisplayPopover\(\{ authorWallet \}, identityButton\)/);
-    // 6A styling: the chevron icon-button in the feed-actions row drops the row's text padding and is a clean
-    // square so the icon sits centred (the row's `padding: 0 13px` otherwise pushes the chevron sideways).
-    expect(css).toMatch(/\.feed-actions \.icon-button \{[\s\S]*?padding: 0;/);
+    expect(app).toMatch(/const feedIdentityButton = publicItemIdentityButton\(item\);[\s\S]*?authorRow\.append\(feedIdentityButton\)/);
+    // It is pinned right in the compact author row (margin-left:auto, clean square so the chevron centres).
+    expect(css).toMatch(/\.feed-author-identity \{[\s\S]*?margin-left: auto;[\s\S]*?padding: 0;/);
+    expect(css).not.toMatch(/\.feed-actions \.icon-button/);
     // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read).
     expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)\)[\s\S]*?readLinkedPlathoUsername\(plathoWallet\.address\)\?\.label/);
     // 6B phase-1: PUBLIC document decode is forward-compat tolerant (skips unknown blocks) so a later phase can
@@ -4601,11 +4604,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v573/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=163/);
+    expect(sw).toMatch(/platho-pwa-prototype-v574/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=164/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=502/);
+    expect(sw).toMatch(/\.\/app\.js\?v=503/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
