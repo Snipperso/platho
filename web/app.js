@@ -29,6 +29,7 @@ import {
   sendPlathoWalletTransaction,
 } from './platho-wallet.mjs?v=17';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
+import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
@@ -157,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v511';
+const PLATHO_APP_RUNTIME_VERSION = 'v513';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -956,6 +957,21 @@ function scopedStorageKey(baseKey) {
 
 function scopedIndexedDbName(baseName) {
   return `${baseName}.${deploymentStorageSuffix()}`;
+}
+
+// Profile-avatar media now lives in IndexedDB (per-record writes, large quota) instead of localStorage —
+// whose iOS whole-store re-serialization on every write was the Vault-freeze root. Deployment-scoped (NOT
+// wallet-scoped): avatars are content-addressed (sha256) and the public feed needs them before unlock.
+// A single lazy DB open, cached as a promise; null if IndexedDB is unavailable (reads/writes then no-op).
+const profileAvatarMediaStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-profile-avatar-media-v1') }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+function profileAvatarMediaStore() {
+  return profileAvatarMediaStorePromise;
 }
 
 function walletIndexedDbSuffix(walletAddress = plathoWallet?.address) {
@@ -1811,11 +1827,11 @@ function currentProfilePointerFields() {
   };
 }
 
-function profileAvatarMediaCacheKey(avatarHash) {
+function profileAvatarMediaHashKey(avatarHash) {
   try {
     const normalized = normalizeAvatarHashHex(avatarHash);
     if (normalized === zeroAvatarHashHex()) return null;
-    return `${PROFILE_AVATAR_MEDIA_CACHE_PREFIX}:${normalized}`;
+    return normalized;
   } catch {
     return null;
   }
@@ -1835,75 +1851,85 @@ function webpDataUrlToBytes(dataUrl) {
 }
 
 async function readProfileAvatarMediaCache(avatarHash) {
-  const key = profileAvatarMediaCacheKey(avatarHash);
-  if (!key) return null;
+  const hash = profileAvatarMediaHashKey(avatarHash);
+  if (!hash) return null;
   try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null');
-    if (!parsed || parsed.hash !== normalizeAvatarHashHex(avatarHash)) return null;
-    const bytes = webpDataUrlToBytes(parsed.url);
+    const store = await profileAvatarMediaStore();
+    const url = (await store?.get(hash))?.url;
+    if (typeof url !== 'string') return null;
+    const bytes = webpDataUrlToBytes(url);
     if (!bytes) return null;
     const computedHash = await sha256Hex(bytes);
-    if (computedHash.toLowerCase() !== normalizeAvatarHashHex(avatarHash).toLowerCase()) {
-      localStorageOrNull()?.removeItem(key);
+    if (computedHash.toLowerCase() !== hash.toLowerCase()) {
+      await store?.delete(hash);
       return null;
     }
-    return parsed.url;
+    return url;
   } catch {
     return null;
   }
 }
 
-function writeProfileAvatarMediaCache(avatarHash, dataUrl) {
-  const key = profileAvatarMediaCacheKey(avatarHash);
-  if (!key || typeof dataUrl !== 'string') return;
+async function writeProfileAvatarMediaCache(avatarHash, dataUrl) {
+  const hash = profileAvatarMediaHashKey(avatarHash);
+  if (!hash || typeof dataUrl !== 'string') return;
   try {
-    localStorageOrNull()?.setItem(key, JSON.stringify({
-      hash: normalizeAvatarHashHex(avatarHash),
-      url: dataUrl,
-      cachedAt: new Date().toISOString(),
-    }));
+    const store = await profileAvatarMediaStore();
+    await store?.put(hash, dataUrl);
   } catch {
-    // Avatar media is reconstructable from chain; local cache is best effort.
+    // Avatar media is reconstructable from chain; the local cache is best effort.
   }
 }
 
-// Synchronous read-through of the persisted, content-addressed avatar media cache. readProfileAvatarMediaCache
-// is async (it re-verifies sha256); for a first-render warm-up we trust the stored bytes (they were verified on
-// write, and the key + parsed.hash both bind to avatarHash), so the FIRST paint shows the face with no flash.
-function readProfileAvatarMediaCacheSync(avatarHash) {
-  const key = profileAvatarMediaCacheKey(avatarHash);
-  if (!key) return null;
-  try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null');
-    if (!parsed || parsed.hash !== normalizeAvatarHashHex(avatarHash)) return null;
-    return typeof parsed.url === 'string' ? parsed.url : null;
-  } catch {
-    return null;
-  }
-}
-
-// Warm the in-memory per-wallet public-avatar map from the persisted media cache BEFORE the first render.
-// The v504 feed-cache media strip drops avatarImageUrl from the persisted feed (to avoid the iOS localStorage
-// freeze), but avatarHash survives and the avatar BYTES are persisted separately + untouched — so a reload
-// resolves faces locally instead of showing letter-tile placeholders and re-reading every avatar from chain.
-function warmPublicAvatarFromCachedPost(post) {
+// Warm the in-memory per-wallet public-avatar map from the IndexedDB media store BEFORE the first render, so a
+// reloaded public feed shows faces immediately (no letter-tile placeholder + chain-refetch flash). The v504
+// feed-cache media strip drops avatarImageUrl from the persisted feed, but avatarHash survives and the avatar
+// bytes live in the media store. One batch read; no sha256 re-verify (the bytes were verified on write).
+function collectCachedAvatarPointers(post, byWallet) {
   if (!post) return;
   const raw = rawWalletAddress(post.authorWallet ?? post.author_wallet);
-  if (raw && !publicChannelAvatarUrlByWallet.has(raw)) {
-    const url = readProfileAvatarMediaCacheSync(post.avatarHash ?? post.avatar_hash);
-    if (url) publicChannelAvatarUrlByWallet.set(raw, url);
-  }
-  for (const comment of Array.isArray(post.comments) ? post.comments : []) warmPublicAvatarFromCachedPost(comment);
+  const hash = profileAvatarMediaHashKey(post.avatarHash ?? post.avatar_hash);
+  if (raw && hash && !publicChannelAvatarUrlByWallet.has(raw) && !byWallet.has(raw)) byWallet.set(raw, hash);
+  for (const comment of Array.isArray(post.comments) ? post.comments : []) collectCachedAvatarPointers(comment, byWallet);
 }
-function warmPublicChannelAvatarsFromCache() {
+async function warmPublicChannelAvatarsFromCache() {
   try {
+    const byWallet = new Map(); // raw wallet -> avatarHash, for authors not already in the in-memory map
     for (const record of Object.values(publicChannelFeedCache ?? {})) {
       const feed = record?.feed ?? record;
       if (!Array.isArray(feed)) continue;
-      for (const post of feed) warmPublicAvatarFromCachedPost(post);
+      for (const post of feed) collectCachedAvatarPointers(post, byWallet);
+    }
+    if (byWallet.size === 0) return;
+    const store = await profileAvatarMediaStore();
+    if (!store) return;
+    const urls = await store.getMany([...byWallet.values()]);
+    for (const [raw, hash] of byWallet) {
+      const url = urls.get(hash);
+      if (url && !publicChannelAvatarUrlByWallet.has(raw)) publicChannelAvatarUrlByWallet.set(raw, url);
     }
   } catch {
-    // Best effort: a wallet whose avatar is not in the media cache just hydrates from chain as before.
+    // Best effort: a wallet whose avatar is not cached just hydrates from chain as before.
+  }
+}
+
+// One-time migration of any avatars left in the OLD localStorage cache (platho.profile.avatar.media.v1:*) into
+// IndexedDB, then delete them from localStorage — freeing the localStorage bloat the iOS freeze came from.
+async function migrateLegacyAvatarMediaCacheToIndexedDb() {
+  const ls = localStorageOrNull();
+  if (!ls) return;
+  let keys = [];
+  try { keys = Object.keys(ls).filter((key) => key.startsWith(`${PROFILE_AVATAR_MEDIA_CACHE_PREFIX}:`)); } catch { return; }
+  if (keys.length === 0) return;
+  const store = await profileAvatarMediaStore().catch(() => null);
+  for (const key of keys) {
+    try {
+      const parsed = JSON.parse(ls.getItem(key) ?? 'null');
+      if (store && parsed?.hash && typeof parsed.url === 'string') await store.put(parsed.hash, parsed.url);
+      ls.removeItem(key);
+    } catch {
+      // Skip a corrupt entry; it is reconstructable from chain.
+    }
   }
 }
 
@@ -5278,7 +5304,7 @@ async function cacheAssembledAvatarParts(parts, pointer) {
   const hash = await sha256Hex(bytes);
   if (hash.toLowerCase() !== pointer.avatarHash.toLowerCase()) return null;
   const url = bytesToImageDataUrl(bytes, 'image/webp');
-  writeProfileAvatarMediaCache(pointer.avatarHash, url);
+  await writeProfileAvatarMediaCache(pointer.avatarHash, url);
   return url;
 }
 
@@ -8203,7 +8229,7 @@ function beginPrivateOutboundWork() {
   privateOutboundWorkDepth += 1;
   return () => {
     privateOutboundWorkDepth = Math.max(0, privateOutboundWorkDepth - 1);
-    if (privateOutboundWorkDepth === 0 && isChatsViewActive() && !messageAutoSyncTimer) {
+    if (privateOutboundWorkDepth === 0 && !messageAutoSyncTimer) {
       scheduleMessageAutoSync(PRIVATE_OUTBOUND_SYNC_PAUSE_MS);
     }
   };
@@ -8258,9 +8284,17 @@ function raiseVaultPublishNonceFloor(owner, nonce) {
   if (nonce > current) vaultPublishNonceFloorByOwner.set(key, nonce);
 }
 
+// The public feed shares the unified background sync loop but at a gentler cadence than the private fast-idle
+// tier (it is less time-sensitive, and keyless reads share one toncenter budget).
+const PUBLIC_BACKGROUND_SYNC_MS = 30_000;
+let lastPublicBackgroundSyncAt = 0;
+// Unified background sync loop. Runs on EVERY in-app tab — only document.hidden (the whole app backgrounded)
+// suspends it — ticking the public feed + (with a wallet) private messages, so switching tabs is instant:
+// the data is already fresh, setView no longer re-triggers a sync. The loop yields the toncenter budget to an
+// in-flight send/confirm. The funds-critical send/confirm/nonce loops are SEPARATE and untouched.
 function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   clearMessageAutoSyncTimer();
-  if (!isChatsViewActive() || !plathoWallet || !localRecipientKeyPair || document.hidden) return;
+  if (document.hidden) return;
   const transport = globalThis.plathoTonRpcTransport;
   const degradedTransport = typeof transport?.isDegraded === 'function' && transport.isDegraded();
   const requestedDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
@@ -8282,6 +8316,17 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
     // untouched: confirmation stays keyless / not key-holding — this only gates the background read pump.)
     if (privateOutboundWorkActive() || privatePublishConfirmJobs.size > 0) {
       scheduleMessageAutoSync(PRIVATE_OUTBOUND_SYNC_PAUSE_MS);
+      return;
+    }
+    // PUBLIC feed — synced in the background (every ~30s) regardless of the active tab AND regardless of
+    // wallet, so switching to Public is instant. Cheap cursor read; best effort.
+    if (Date.now() - lastPublicBackgroundSyncAt >= PUBLIC_BACKGROUND_SYNC_MS) {
+      lastPublicBackgroundSyncAt = Date.now();
+      try { await syncPublicChannels(); } catch (error) { noteTonRpcRateLimit(error); }
+    }
+    // PRIVATE — only with a wallet + messaging keys; otherwise keep the loop alive for the public sync above.
+    if (!plathoWallet || !localRecipientKeyPair) {
+      scheduleMessageAutoSync(nextSyncDelayMs);
       return;
     }
     beginMessageSyncUi();
@@ -11036,7 +11081,6 @@ function setView(view) {
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
-    clearMessageAutoSyncTimer();
   } else {
     // Restore the open conversation when returning to the private tab. On mobile, data-chat-open is the only
     // thing the CSS uses to choose the conversation pane vs the thread list; switching away cleared it, so
@@ -11046,26 +11090,10 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
-  if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
-    beginMessageSyncUi();
-    syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).then((result) => {
-      completeMessageSyncUi(result);
-      setText(messageSyncStatus, privateSyncStatusText(result));
-      scheduleMessageAutoSync();
-    }).catch((error) => {
-      const rateLimited = noteTonRpcRateLimit(error);
-      failMessageSyncUi(rateLimited ? 'Sync delayed' : 'Sync failed');
-      setText(messageSyncStatus, rateLimited ? 'sync delayed' : 'sync failed');
-      if (!rateLimited) console.error(error);
-      scheduleMessageAutoSync();
-    });
-  }
+  // Switching tabs no longer re-triggers a sync — the unified background loop (scheduleMessageAutoSync) keeps
+  // BOTH private messages and the public feed fresh on every tab, so switch-in is instant. setView only renders.
   if (view === 'public') {
     renderPublicSurface({ anchorUnread: true });
-    syncPublicChannels().catch((error) => {
-      if (noteTonRpcRateLimit(error)) setPublicStatus('sync delayed');
-      else console.error(error);
-    });
   }
   if (view === 'vault') {
     refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
@@ -16418,7 +16446,7 @@ async function submitProfileAvatarUpdate(avatar) {
   setProfileAvatarStatus('checking current avatar');
   const currentPointer = await readCurrentProfileAvatarPointerFromChain(owner, { required: true });
   if (currentPointer?.avatarHash?.toLowerCase?.() === normalizeAvatarHashHex(avatarHash).toLowerCase()) {
-    writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
+    await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
     const cachedImage = await readProfileAvatarMediaCache(avatarHash);
     if (cachedImage) setAvatarNode(profileAvatar, 'P', cachedImage);
     setProfileAvatarStatus('avatar active', '');
@@ -16493,7 +16521,7 @@ async function submitProfileAvatarUpdate(avatar) {
     throw error;
   }
 
-  writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
+  await writeProfileAvatarMediaCache(avatarHash, bytesToImageDataUrl(avatar.bytes, 'image/webp'));
   const pendingPointer = {
     profileVersion: nextVersion,
     avatarHash,
@@ -20225,30 +20253,27 @@ async function bootCrypto() {
         setText(encryptionStatus, 'review');
         setText(capsulePolicyStatus, 'review');
       });
-    if (appShell?.dataset?.view === 'chats') {
-      beginMessageSyncUi();
-      const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {
-        refreshMessagingControls();
-        if (noteTonRpcRateLimit(error)) {
-          failMessageSyncUi('Sync delayed');
-          setText(messageSyncStatus, 'sync delayed');
-        } else {
-          failMessageSyncUi('Sync failed');
-          console.error(error);
-        }
-        return null;
-      });
-      if (syncResult) {
-        completeMessageSyncUi(syncResult);
-        setText(messageSyncStatus, privateSyncStatusText(syncResult));
-      } else if (messageSyncStatus?.textContent !== 'sync delayed') {
-        setText(messageSyncStatus, 'sync failed');
+    // After unlock, sync private messages immediately + arm the unified background loop — regardless of the
+    // active tab, so messages are there the moment you open chats (the loop keeps running on every tab).
+    beginMessageSyncUi();
+    const syncResult = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).catch((error) => {
+      refreshMessagingControls();
+      if (noteTonRpcRateLimit(error)) {
+        failMessageSyncUi('Sync delayed');
+        setText(messageSyncStatus, 'sync delayed');
+      } else {
+        failMessageSyncUi('Sync failed');
+        console.error(error);
       }
-      scheduleMessageAutoSync();
-    } else {
-      setText(messageSyncStatus, 'ready');
-      clearMessageAutoSyncTimer();
+      return null;
+    });
+    if (syncResult) {
+      completeMessageSyncUi(syncResult);
+      setText(messageSyncStatus, privateSyncStatusText(syncResult));
+    } else if (messageSyncStatus?.textContent !== 'sync delayed') {
+      setText(messageSyncStatus, 'sync failed');
     }
+    scheduleMessageAutoSync();
     if (isVaultViewActive()) {
       await refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
         if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
@@ -20313,7 +20338,7 @@ document.addEventListener('visibilitychange', () => {
   } else {
     clearTelegramBackgroundLockTimer();
     scheduleWalletUnlockPrompt();
-    if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
+    scheduleMessageAutoSync(2_000);
     if (isVaultViewActive()) {
       refreshVaultNow({ includeActivation: true }).catch((error) => {
         if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
@@ -20334,7 +20359,7 @@ window.addEventListener('pageshow', () => {
   resumePendingPrivatePublishConfirmations();
   resumePendingPrivateSendRetries();
   scheduleWalletUnlockPrompt();
-  if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
+  scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
     refreshVaultNow({ includeActivation: true }).catch((error) => {
       if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
@@ -20348,7 +20373,7 @@ window.addEventListener('focus', () => {
   clearTelegramBackgroundLockTimer();
   resumePendingPrivatePublishConfirmations();
   resumePendingPrivateSendRetries();
-  if (isChatsViewActive()) scheduleMessageAutoSync(2_000);
+  scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
     refreshVaultNow({ includeActivation: true }).catch((error) => {
       if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
@@ -20368,9 +20393,12 @@ rebuildPublicChannelRegistry();
 publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
 writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
-// Warm per-wallet avatars from the persisted media cache BEFORE the first render so reloaded public feeds
-// show faces immediately (no letter-tile placeholder + chain-refetch flash). Synchronous + local-only.
-warmPublicChannelAvatarsFromCache();
+// Warm per-wallet avatars from the IndexedDB media store BEFORE the first render so reloaded public feeds show
+// faces immediately (no letter-tile placeholder + chain-refetch flash). Top-level await (app.js is a module),
+// bounded by a short deadline so a slow/unavailable IndexedDB can never hang boot — past it the remaining
+// avatars just hydrate from chain. Then migrate any legacy localStorage avatar cache off-thread.
+await Promise.race([warmPublicChannelAvatarsFromCache(), delay(400)]);
+setTimeout(() => { void migrateLegacyAvatarMediaCacheToIndexedDb(); }, 0);
 // One-time cleanup: an EXISTING device cache (written before the strip below) may still hold megabytes of
 // base64 media in localStorage — the root of the iOS Vault freeze. Re-persist it through the now-stripping
 // writer so the on-disk store shrinks to light metadata. Deferred (setTimeout 0) so the single heavy
@@ -20671,6 +20699,10 @@ installNavBackHandling();
 renderThreads();
 renderConversation();
 refreshMessagingControls();
+// Start the unified background sync loop regardless of the initial tab or wallet state: it ticks the public
+// feed immediately and picks up private messages once a wallet/keys are present. It self-suspends on
+// document.hidden and re-arms on visibility/focus/pageshow.
+scheduleMessageAutoSync(2_000);
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))

@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-06-25T16:46:16.565Z",
+  "generatedAt": "2026-06-25T17:49:01.430Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,14 +8,14 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 131,
-    "totalBytes": 3515529,
-    "bundleSha256": "2f1a9613f9627760ca2c0733709f1ee5e89ef33ecafdb61edfca5ba37f643150",
+    "fileCount": 132,
+    "totalBytes": 3522487,
+    "bundleSha256": "2827c91d543701d894459c3d2e0c20d6ba2213193d003833dfa4cdc682ec7064",
     "files": [
       {
         "path": "app.js",
-        "bytes": 874755,
-        "sha256": "69bf4ea29c5101f14e1c6131cd993eb42fc5c30e693b5f1e85c5bd3803e053a1"
+        "bytes": 877306,
+        "sha256": "952bda6e5d794df08c08e2b1dda891fdc60fc3358cd22ab6cdb5aa12d4da3959"
       },
       {
         "path": "assets/icons/back.svg",
@@ -210,7 +210,7 @@
       {
         "path": "index.html",
         "bytes": 34705,
-        "sha256": "a0a0e349b172890bdcec65fa21f296e785bc7964d68815923737041e83d17a65"
+        "sha256": "1ad6efcf8c200f0e71abb09abf62c08cbf34eab4bca8df49b3d37045c44663f9"
       },
       {
         "path": "manifest.webmanifest",
@@ -231,6 +231,11 @@
         "path": "platho-wallet.mjs",
         "bytes": 24222,
         "sha256": "2a31b395115d6a75fe72e30cccabf2d977256cc727c3c012399fae3380208d28"
+      },
+      {
+        "path": "profile-avatar-media-store.mjs",
+        "bytes": 4365,
+        "sha256": "34f0dff12a64f338b1f3fe6be50effca7a31683763590acf1f0f9b1053a61b6c"
       },
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
@@ -274,8 +279,8 @@
       },
       {
         "path": "sw.js",
-        "bytes": 6556,
-        "sha256": "56dd37e19e857dd32cb621d29eb98c84c635522d91dd35a2b931ca65fbdeda36"
+        "bytes": 6598,
+        "sha256": "4ebbe7aa558e391a80fc0e989f4648c453f9cef1cd120e346da8fe42d7ab4b2e"
       },
       {
         "path": "ton-dns-provider.mjs",
