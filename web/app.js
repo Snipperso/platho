@@ -157,7 +157,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v504';
+const PLATHO_APP_RUNTIME_VERSION = 'v505';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -15534,6 +15534,7 @@ async function refreshVaultDashboard() {
   let user = null;
   let global = null;
   let userError = null;
+  markRuntimeOp('vaultw:reads-kick');
   const vaultReadsPromise = Promise.allSettled([
     loadConnectedWalletBalances(),
     loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
@@ -15586,7 +15587,7 @@ async function refreshVaultDashboard() {
   markRuntimeOp('vaultw:athstats'); renderAthProfileStats();
   markRuntimeOp('vaultw:pocketcards'); renderVaultPocketCards(walletBalances, user);
   markRuntimeOp('vaultw:coststatus'); refreshComposerCostStatus();
-  markRuntimeOp('vault');
+  markRuntimeOp('vaultw:postrender');
   if (user) {
     setVaultStatus(user.exists === true ? 'synced' : 'Vault setup required');
     globalThis.plathoVaultBinding = {
@@ -20195,6 +20196,7 @@ async function refreshVaultActivationStatus(options = {}) {
     return null;
   }
   try {
+    markRuntimeOp('vact:enter');
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
     const user = options.user ?? await provider.getUser(plathoWallet.address, {
@@ -20220,15 +20222,20 @@ async function refreshVaultActivationStatus(options = {}) {
       renderAthProfileStats();
     }
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
+      // Fine crumbs: a NON-activated account (current_key_id===0) runs these RENDER calls while crumb='vault'
+      // (no sub-crumb), so a hard freeze here leaves prev=<the exact render> after a force-reload. (Diagnosing
+      // the iOS Vault freeze that hangs even on a 16 Pro Max with an empty localStorage -> NOT the feed cache.)
+      markRuntimeOp('vact:notactivated');
       globalThis.plathoVaultBinding = {
         walletAddress: plathoWallet.address,
         user,
         keyRecord: null,
       };
       setText(vaultRecordStatus, 'account activation required');
-      refreshMessageActionStatuses();
-      refreshMessagingControls();
-      refreshComposerPublishPolicy();
+      markRuntimeOp('vact:msgactions'); refreshMessageActionStatuses();
+      markRuntimeOp('vact:msgcontrols'); refreshMessagingControls();
+      markRuntimeOp('vact:pubpolicy'); refreshComposerPublishPolicy();
+      markRuntimeOp('vact:notactivated-done');
       return null;
     }
     markRuntimeOp('vact:getkeyrecord');
