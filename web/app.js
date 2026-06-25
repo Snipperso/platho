@@ -36,14 +36,14 @@ import {
 import {
   VaultChainProviderUnavailableError,
 } from './vault-chain-provider.mjs?v=8';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=96';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=97';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   readBatchPublishReceipt,
   interpretBatchPublishReceipt,
   BATCH_PUBLISH_RECEIPT_STATUS,
-} from './vault-ton-rpc-provider.mjs?v=56';
+} from './vault-ton-rpc-provider.mjs?v=58';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -157,72 +157,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v505';
-
-// Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
-// console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
-// next beat is ~N ms late, so (gap - interval) is the stall. runtimeDiagnostics.currentOp records what was
-// running (set around heavy ops via markRuntimeOp), so a stall is ATTRIBUTED — e.g. a single multi-second
-// ML-KEM decapsulate surfaces worstStallOp='sync-decap' with worstStallMs ≈ worstEntryMs, which yielding
-// BETWEEN entries cannot fix (a single synchronous decapsulate can't be split) and would point to a Worker.
-// Surfaced in the #privateDebugLog panel (copyable) and on globalThis.plathoRuntimeDiagnostics.
-const RUNTIME_DIAG_CRUMB_KEY = 'platho.diag.crumb.v1';
-const runtimeDiagnostics = {
-  startedAt: new Date().toISOString(),
-  startedAtMs: Date.now(),
-  beats: 0,
-  currentOp: 'idle',
-  // The op the PREVIOUS session was last running (read once at boot, before any
-  // markRuntimeOp overwrites the crumb). If the app froze HARD (heartbeat dead,
-  // tab can't switch back so the live panel can't help) the crumb still names the
-  // op that was active when it died — survives a force-reload.
-  prevCrumb: (() => { try { return localStorage.getItem(RUNTIME_DIAG_CRUMB_KEY); } catch { return null; } })(),
-  worstStallMs: 0,
-  worstStallOp: null,
-  worstStallAt: null,
-  lastStallMs: 0,
-  stallCount: 0,
-  worstEntryMs: 0,
-  lastSync: null,
-};
-globalThis.plathoRuntimeDiagnostics = runtimeDiagnostics;
-function markRuntimeOp(op) {
-  if (runtimeDiagnostics.currentOp === op) return;
-  runtimeDiagnostics.currentOp = op;
-  // Persist the op transition synchronously so a permanent freeze leaves a trace
-  // (written BEFORE any blocking work in the new op runs). Bounded: only on change.
-  try { localStorage.setItem(RUNTIME_DIAG_CRUMB_KEY, `${op}@${new Date().toISOString()}`); } catch { /* ignore */ }
-}
-const RUNTIME_DIAG_HEARTBEAT_MS = 1_000;
-const RUNTIME_DIAG_STALL_THRESHOLD_MS = 200;
-let runtimeDiagLastBeatAt = 0;
-let runtimeDiagStarted = false;
-function startRuntimeDiagnostics() {
-  if (runtimeDiagStarted || typeof window === 'undefined' || typeof window.setInterval !== 'function') return;
-  runtimeDiagStarted = true;
-  runtimeDiagLastBeatAt = Date.now();
-  window.setInterval(() => {
-    const now = Date.now();
-    runtimeDiagnostics.beats += 1;
-    const gap = now - runtimeDiagLastBeatAt;
-    runtimeDiagLastBeatAt = now;
-    const stall = gap - RUNTIME_DIAG_HEARTBEAT_MS;
-    if (stall >= RUNTIME_DIAG_STALL_THRESHOLD_MS) {
-      runtimeDiagnostics.stallCount += 1;
-      runtimeDiagnostics.lastStallMs = stall;
-      if (stall > runtimeDiagnostics.worstStallMs) {
-        runtimeDiagnostics.worstStallMs = stall;
-        runtimeDiagnostics.worstStallOp = runtimeDiagnostics.currentOp;
-        runtimeDiagnostics.worstStallAt = new Date(now).toISOString();
-      }
-    }
-    // Live-refresh the on-page diagnostics panel (~1/s) so the freeze can be
-    // watched in real time on the Public landing page. Cheap textContent set;
-    // self-guards when the panel is absent.
-    refreshProfileDiagnostics();
-  }, RUNTIME_DIAG_HEARTBEAT_MS);
-}
-startRuntimeDiagnostics();
+const PLATHO_APP_RUNTIME_VERSION = 'v511';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -349,14 +284,6 @@ const messageStrip = document.querySelector('#messageStrip');
 const activeAvatar = document.querySelector('#activeAvatar');
 const activeTitle = document.querySelector('#activeTitle');
 const activeSubtitle = document.querySelector('#activeSubtitle');
-const privateDebugLog = document.querySelector('#privateDebugLog');
-const copyPrivateDebugButton = document.querySelector('#copyPrivateDebugButton');
-const profileDiagnosticsLog = document.querySelector('#profileDiagnosticsLog');
-const copyProfileDiagnosticsButton = document.querySelector('#copyProfileDiagnosticsButton');
-const copyProfileDiagnosticsStatus = document.querySelector('#copyProfileDiagnosticsStatus');
-const vaultDiagnosticsLog = document.querySelector('#vaultDiagnosticsLog');
-const copyVaultDiagnosticsButton = document.querySelector('#copyVaultDiagnosticsButton');
-const copyVaultDiagnosticsStatus = document.querySelector('#copyVaultDiagnosticsStatus');
 const backToChatsButton = document.querySelector('#backToChatsButton');
 const identityMenuButton = document.querySelector('#identityMenuButton');
 const search = document.querySelector('#threadSearch');
@@ -1333,22 +1260,73 @@ function applyTelegramSafeArea() {
   }
 }
 
-function syncTelegramBackButton() {
-  if (!isTelegramEnv()) return;
-  const tg = telegramWebApp();
-  if (!tg || !tg.BackButton) return;
-  const chatOpen = appShell && appShell.dataset.chatOpen === 'true';
-  try {
-    if (chatOpen) tg.BackButton.show();
-    else tg.BackButton.hide();
-  } catch {}
+// Back-navigation. The hardware/gesture Back (Android) — and the Telegram in-app BackButton — should return
+// to the LIST when an overlay is open (a private conversation OR a public channel branch), and only exit the
+// app from the list. Telegram env: drive the native BackButton (its click maps to Android Back). Non-Telegram
+// (PWA/browser): keep exactly ONE history sentinel while an overlay is open, so a popstate (Android Back)
+// closes the overlay instead of unloading the app.
+function navOverlayIsOpen() {
+  return appShell?.dataset?.chatOpen === 'true' || publicChannelDetailOpen === true;
 }
 
-function observeChatOpenForTelegramBackButton() {
-  if (!isTelegramEnv() || !appShell || typeof MutationObserver !== 'function') return;
-  const observer = new MutationObserver(syncTelegramBackButton);
-  observer.observe(appShell, { attributes: true, attributeFilter: ['data-chat-open'] });
-  syncTelegramBackButton();
+let navHistorySentinel = false;
+function syncNavBackAffordance() {
+  const open = navOverlayIsOpen();
+  if (isTelegramEnv()) {
+    const tg = telegramWebApp();
+    if (tg && tg.BackButton) { try { open ? tg.BackButton.show() : tg.BackButton.hide(); } catch {} }
+    return;
+  }
+  if (open && !navHistorySentinel) {
+    try { history.pushState({ plathoOverlay: 1 }, ''); navHistorySentinel = true; } catch {}
+  }
+}
+
+function closeNavOverlay() {
+  // Public channel branch (channels mode) -> back to the channel list.
+  if (publicChannelDetailOpen === true) {
+    publicChannelDetailOpen = false;
+    renderPublicSurface({ anchorUnread: false });
+    syncNavBackAffordance();
+    return true;
+  }
+  // Private conversation -> back to the dialog list. Clear activeThreadId so a later tab-return restores the
+  // LIST, not this dialog: setView restores chatOpen from activeThreadId, and leaving it set re-opened the
+  // dialog even when the user had backed out to the list.
+  if (appShell?.dataset?.chatOpen === 'true') {
+    appShell.dataset.chatOpen = 'false';
+    activeThreadId = null;
+    renderThreads();
+    hideIdentityPopover();
+    syncNavBackAffordance();
+    return true;
+  }
+  return false;
+}
+
+function requestNavBack() {
+  // Non-Telegram: pop the history sentinel so the stack stays consistent; popstate runs closeNavOverlay.
+  if (!isTelegramEnv() && navHistorySentinel) {
+    navHistorySentinel = false;
+    try { history.back(); return; } catch { /* fall through to a direct close */ }
+  }
+  closeNavOverlay();
+}
+
+function installNavBackHandling() {
+  if (!appShell) return;
+  if (typeof MutationObserver === 'function') {
+    const observer = new MutationObserver(syncNavBackAffordance);
+    observer.observe(appShell, { attributes: true, attributeFilter: ['data-chat-open'] });
+    if (publicPane) observer.observe(publicPane, { attributes: true, attributeFilter: ['data-channel-detail-open'] });
+  }
+  if (typeof window !== 'undefined' && !isTelegramEnv()) {
+    window.addEventListener('popstate', () => {
+      navHistorySentinel = false;
+      closeNavOverlay();
+    });
+  }
+  syncNavBackAffordance();
 }
 
 function openExternalLinkInTelegram(href) {
@@ -1450,12 +1428,11 @@ function initTelegramMiniApp() {
     if (tg.BackButton && typeof tg.BackButton.onClick === 'function') {
       tg.BackButton.onClick(() => {
         try {
-          backToChatsButton?.click();
+          requestNavBack();
         } catch {}
       });
     }
   } catch {}
-  observeChatOpenForTelegramBackButton();
 }
 
 // ---- Telegram durability: storage eviction is real on iOS WKWebView ---------
@@ -1887,6 +1864,46 @@ function writeProfileAvatarMediaCache(avatarHash, dataUrl) {
     }));
   } catch {
     // Avatar media is reconstructable from chain; local cache is best effort.
+  }
+}
+
+// Synchronous read-through of the persisted, content-addressed avatar media cache. readProfileAvatarMediaCache
+// is async (it re-verifies sha256); for a first-render warm-up we trust the stored bytes (they were verified on
+// write, and the key + parsed.hash both bind to avatarHash), so the FIRST paint shows the face with no flash.
+function readProfileAvatarMediaCacheSync(avatarHash) {
+  const key = profileAvatarMediaCacheKey(avatarHash);
+  if (!key) return null;
+  try {
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null');
+    if (!parsed || parsed.hash !== normalizeAvatarHashHex(avatarHash)) return null;
+    return typeof parsed.url === 'string' ? parsed.url : null;
+  } catch {
+    return null;
+  }
+}
+
+// Warm the in-memory per-wallet public-avatar map from the persisted media cache BEFORE the first render.
+// The v504 feed-cache media strip drops avatarImageUrl from the persisted feed (to avoid the iOS localStorage
+// freeze), but avatarHash survives and the avatar BYTES are persisted separately + untouched — so a reload
+// resolves faces locally instead of showing letter-tile placeholders and re-reading every avatar from chain.
+function warmPublicAvatarFromCachedPost(post) {
+  if (!post) return;
+  const raw = rawWalletAddress(post.authorWallet ?? post.author_wallet);
+  if (raw && !publicChannelAvatarUrlByWallet.has(raw)) {
+    const url = readProfileAvatarMediaCacheSync(post.avatarHash ?? post.avatar_hash);
+    if (url) publicChannelAvatarUrlByWallet.set(raw, url);
+  }
+  for (const comment of Array.isArray(post.comments) ? post.comments : []) warmPublicAvatarFromCachedPost(comment);
+}
+function warmPublicChannelAvatarsFromCache() {
+  try {
+    for (const record of Object.values(publicChannelFeedCache ?? {})) {
+      const feed = record?.feed ?? record;
+      if (!Array.isArray(feed)) continue;
+      for (const post of feed) warmPublicAvatarFromCachedPost(post);
+    }
+  } catch {
+    // Best effort: a wallet whose avatar is not in the media cache just hydrates from chain as before.
   }
 }
 
@@ -3332,16 +3349,8 @@ function privateDebugLines(thread = activeThread()) {
   const senderCursor = sync.senderCursor ?? {};
   const indexError = sync.indexReadError ? ` idxErr=${debugTiny(sync.indexReadError, '-')}` : '';
   const indexFallback = sync.indexReadFallback ? ` idxFallback=${debugTiny(sync.indexReadFallback, '-')}` : '';
-  const diag = runtimeDiagnostics;
-  const diagSync = diag.lastSync
-    ? `${diag.lastSync.ms}ms/${diag.lastSync.entries}e imp=${diag.lastSync.imported} ${diag.lastSync.mode}`
-    : '-';
-  const diagHw = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || '?';
-  const diagMem = (typeof navigator !== 'undefined' && navigator.deviceMemory) || '?';
   return [
     `${PLATHO_APP_RUNTIME_VERSION} key=${shortKeyId(localRecipientKeyPair?.keyId)} phase=${phase}${error}`,
-    `diag op=${diag.currentOp} stallWorst=${Math.round(diag.worstStallMs)}ms@${diag.worstStallOp ?? '-'} stalls=${diag.stallCount} stallLast=${Math.round(diag.lastStallMs)}ms`,
-    `diag entryWorst=${Math.round(diag.worstEntryMs)}ms lastSync=${diagSync} hw=${diagHw} mem=${diagMem}`,
     `idx=${sync.indexKeyId ?? '-'} rh=${sync.recipientHead ?? '-'} sh=${sync.senderHead ?? '-'} mode=${sync.mode ?? '-'}`,
     `rc=${recipientCursor.processedHeadLink ?? '-'}:${recipientCursor.resumeLink ?? '-'} sc=${senderCursor.processedHeadLink ?? '-'}:${senderCursor.resumeLink ?? '-'}`,
     `imp=${sync.imported ?? 0} skip=${sync.skipped ?? 0} inc=${sync.incompletePrivateStreamCount ?? 0} catch=${sync.catchUpRemaining ?? 0}`,
@@ -3352,81 +3361,10 @@ function privateDebugLines(thread = activeThread()) {
   ];
 }
 
-function refreshPrivateDebugLog() {
-  if (!privateDebugLog) return;
-  const thread = activeThread();
-  if (!thread || !isChatsViewActive()) {
-    privateDebugLog.hidden = true;
-    privateDebugLog.textContent = '';
-    if (copyPrivateDebugButton) copyPrivateDebugButton.disabled = true;
-    return;
-  }
-  privateDebugLog.hidden = false;
-  privateDebugLog.textContent = privateDebugLines(thread).join('\n');
-  if (copyPrivateDebugButton) copyPrivateDebugButton.disabled = privateDebugLog.textContent.trim().length === 0;
-}
-
-// Self-contained runtime diagnostics text (no thread/dialog needed) for the Profile panel — so a freeze can
-// be captured on a device that hasn't opened a private chat yet. Surfaces the main-thread stall detector +
-// per-entry decapsulate timing + device specs.
-function runtimeDiagnosticsText() {
-  const d = runtimeDiagnostics;
-  const sync = d.lastSync;
-  const hw = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || '?';
-  const mem = (typeof navigator !== 'undefined' && navigator.deviceMemory) || '?';
-  const err = messageAutoSyncLastErrorLabel ? ` err=${debugTiny(messageAutoSyncLastErrorLabel, '-')}` : '';
-  return [
-    `${PLATHO_APP_RUNTIME_VERSION} beat=${d.beats} age=${Math.round((Date.now() - d.startedAtMs) / 1000)}s op=${d.currentOp} hw=${hw} mem=${mem}`,
-    `stallWorst=${Math.round(d.worstStallMs)}ms@${d.worstStallOp ?? '-'} stalls=${d.stallCount} stallLast=${Math.round(d.lastStallMs)}ms`,
-    `entryWorst=${Math.round(d.worstEntryMs)}ms lastSync=${sync ? `${sync.ms}ms/${sync.entries}e imp=${sync.imported} ${sync.mode}` : '-'}`,
-    `phase=${messageAutoSyncPhase || 'idle'}${err}`,
-    `prev=${d.prevCrumb ?? '-'}`,
-    `since=${d.startedAt}`,
-  ].join('\n');
-}
-
-function refreshProfileDiagnostics() {
-  // The same diagnostics snapshot feeds the Public landing panel AND the Vault panel
-  // (the freeze triggers on the Public->Vault switch, so the panel must be readable
-  // on Vault too without switching back). Cheap textContent set; self-guards per node.
-  if (!profileDiagnosticsLog && !vaultDiagnosticsLog) return;
-  const text = runtimeDiagnosticsText();
-  if (profileDiagnosticsLog) profileDiagnosticsLog.textContent = text;
-  if (vaultDiagnosticsLog) vaultDiagnosticsLog.textContent = text;
-  if (copyProfileDiagnosticsButton) copyProfileDiagnosticsButton.disabled = false;
-  if (copyVaultDiagnosticsButton) copyVaultDiagnosticsButton.disabled = false;
-}
-
-let privateDebugCopyStatusTimer = null;
-
-function setPrivateDebugCopyButtonStatus(label, durationMs = 1400) {
-  if (!copyPrivateDebugButton) return;
-  if (privateDebugCopyStatusTimer) {
-    window.clearTimeout(privateDebugCopyStatusTimer);
-    privateDebugCopyStatusTimer = null;
-  }
-  copyPrivateDebugButton.setAttribute('aria-label', label);
-  copyPrivateDebugButton.title = label;
-  privateDebugCopyStatusTimer = window.setTimeout(() => {
-    privateDebugCopyStatusTimer = null;
-    copyPrivateDebugButton.setAttribute('aria-label', 'Copy debug text');
-    copyPrivateDebugButton.title = 'Copy debug text';
-  }, durationMs);
-}
-
-async function copyPrivateDebugText() {
-  refreshPrivateDebugLog();
-  const text = privateDebugLog?.textContent?.trim() ?? '';
-  if (!text) throw new Error('No debug text to copy');
-  await copyTextToClipboard(text);
-  setPrivateDebugCopyButtonStatus('Debug copied');
-}
-
 function refreshConversationSubtitle() {
   const thread = activeThread();
   if (!thread || !activeSubtitle) return;
   activeSubtitle.textContent = conversationSubtitleText(thread);
-  refreshPrivateDebugLog();
 }
 
 function clearMessageAutoSyncCountdownTimer() {
@@ -3455,7 +3393,6 @@ function beginMessageSyncUi() {
   messageAutoSyncLoadingFrame = 0;
   setText(messageSyncStatus, 'syncing');
   scheduleMessageAutoSyncCountdownUi();
-  refreshPrivateDebugLog();
 }
 
 function completeMessageSyncUi(result) {
@@ -3473,14 +3410,12 @@ function completeMessageSyncUi(result) {
   messageAutoSyncPhase = complete ? 'synced' : 'delayed';
   messageAutoSyncLastErrorLabel = complete ? null : status;
   refreshConversationSubtitle();
-  refreshPrivateDebugLog();
 }
 
 function failMessageSyncUi(label) {
   messageAutoSyncPhase = 'delayed';
   messageAutoSyncLastErrorLabel = label || 'Sync delayed';
   refreshConversationSubtitle();
-  refreshPrivateDebugLog();
 }
 
 function openNewChatDialog() {
@@ -4685,8 +4620,7 @@ function renderPublicChannelDetail(channel, items) {
   backIcon.className = 'icon icon-back';
   backButton.append(backIcon);
   backButton.addEventListener('click', () => {
-    publicChannelDetailOpen = false;
-    renderPublicSurface({ anchorUnread: false });
+    requestNavBack();
   });
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
@@ -4836,29 +4770,19 @@ function renderPublicChannels() {
 }
 
 function renderPublicSurface(options = {}) {
-  // Attribute this synchronous render to the diagnostics op (it runs at boot AND
-  // on every public-feed update; a slow-device freeze here would surface as
-  // worstStallOp='public-render'). Restore the previous op so nested calls during
-  // boot don't clobber the 'boot' attribution.
-  const prevOp = runtimeDiagnostics.currentOp;
-  markRuntimeOp('public-render');
-  try {
-    updatePublicModeButtons();
-    if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
-    if (publicDisplayMode === 'channels') {
-      renderPublicChannels();
-      setPublicStatus('channels');
-      updatePublicJumpDownVisibility();
-      return;
-    }
-    const allItems = publicFeedItemsChronological();
-    const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
-    renderPublicFeed(items, options);
-    const unread = allItems.filter(isUnreadPublicItem).length;
-    setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
-  } finally {
-    markRuntimeOp(prevOp);
+  updatePublicModeButtons();
+  if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
+  if (publicDisplayMode === 'channels') {
+    renderPublicChannels();
+    setPublicStatus('channels');
+    updatePublicJumpDownVisibility();
+    return;
   }
+  const allItems = publicFeedItemsChronological();
+  const items = allItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
+  renderPublicFeed(items, options);
+  const unread = allItems.filter(isUnreadPublicItem).length;
+  setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
 }
 
 function setPublicCommentTarget(item = null) {
@@ -7674,7 +7598,6 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       mode: options.mode === 'auto' || options.fast === true ? 'auto' : 'recovery',
       scanLog: ['index-unavailable'],
     };
-    refreshPrivateDebugLog();
     return result;
   }
   const quickSync = options.mode === 'auto' || options.fast === true;
@@ -7719,7 +7642,6 @@ async function syncPrivateCapsulesFromChain(options = {}) {
       rpcDelayed,
       scanLog: ['index-read-error'],
     };
-    refreshPrivateDebugLog();
     if (rpcDelayed) return result;
     throw error;
   };
@@ -7973,11 +7895,7 @@ async function syncPrivateCapsulesFromChain(options = {}) {
         nextLink = 0n;
         break;
       }
-      markRuntimeOp('sync-decap');
-      const entryStartedAt = Date.now();
       const result = await scanPrivateEntryId(entryId, { source: role });
-      const entryMs = Date.now() - entryStartedAt;
-      if (entryMs > runtimeDiagnostics.worstEntryMs) runtimeDiagnostics.worstEntryMs = entryMs;
       if (!result.ok) {
         scanComplete = false;
         return;
@@ -8212,20 +8130,17 @@ async function syncPrivateCapsulesFromChain(options = {}) {
     refreshMessagingControls();
     renderThreads();
     renderConversation();
-    refreshPrivateDebugLog();
     resumePendingPrivatePublishConfirmations();
     resumePendingPrivateSendRetries();
     return result;
   }
   if (!scanComplete) {
     refreshMessagingControls();
-    refreshPrivateDebugLog();
     resumePendingPrivateSendRetries();
     if (rateLimitError) throw rateLimitError;
     return result;
   }
   refreshMessagingControls();
-  refreshPrivateDebugLog();
   resumePendingPrivatePublishConfirmations();
   resumePendingPrivateSendRetries();
   return result;
@@ -8233,22 +8148,11 @@ async function syncPrivateCapsulesFromChain(options = {}) {
 
 async function syncPrivateCapsulesFromChainOnce(options = {}) {
   if (privateChainSyncPromise) return privateChainSyncPromise;
-  const syncStartedAt = Date.now();
-  markRuntimeOp('sync');
   privateChainSyncPromise = syncPrivateCapsulesFromChain(options);
   try {
-    const result = await privateChainSyncPromise;
-    runtimeDiagnostics.lastSync = {
-      ms: Date.now() - syncStartedAt,
-      entries: Number(result?.indexEntriesScanned ?? 0) + Number(result?.headRepairScanned ?? 0) + Number(result?.historyRetryScanned ?? 0),
-      imported: Number(result?.imported ?? 0),
-      mode: result?.mode ?? options?.mode ?? '-',
-      at: new Date().toISOString(),
-    };
-    return result;
+    return await privateChainSyncPromise;
   } finally {
     privateChainSyncPromise = null;
-    markRuntimeOp('idle');
   }
 }
 
@@ -11129,9 +11033,6 @@ function refreshMessagingControls() {
 }
 
 function setView(view) {
-  // Attribute the synchronous panel switch (incl. the WebKit layout/paint of the
-  // freshly-shown pane) so a freeze ON a tab switch is named (e.g. view:vault).
-  markRuntimeOp(`view:${view}`);
   appShell.dataset.view = view;
   if (view !== 'chats') {
     appShell.dataset.chatOpen = 'false';
@@ -11145,7 +11046,6 @@ function setView(view) {
   }
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
-  if (view === 'public' || view === 'vault') refreshProfileDiagnostics();
   if (view === 'chats' && plathoWallet && localRecipientKeyPair) {
     beginMessageSyncUi();
     syncPrivateCapsulesFromChainOnce({ mode: 'auto' }).then((result) => {
@@ -11248,7 +11148,6 @@ function renderConversation() {
     setAvatarNode(activeAvatar, 'P', null);
     activeTitle.textContent = 'No private chat';
     activeSubtitle.textContent = 'Create or choose a chat';
-    refreshPrivateDebugLog();
     messageStrip.innerHTML = '';
     if (identityMenuButton) {
       identityMenuButton.hidden = true;
@@ -11275,7 +11174,6 @@ function renderConversation() {
   }
   renderConversationIdentity(thread);
   activeSubtitle.textContent = conversationSubtitleText(thread);
-  refreshPrivateDebugLog();
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
@@ -11517,8 +11415,7 @@ docsNav?.addEventListener('click', (event) => {
 search.addEventListener('input', renderThreads);
 
 backToChatsButton?.addEventListener('click', () => {
-  appShell.dataset.chatOpen = 'false';
-  hideIdentityPopover();
+  requestNavBack();
 });
 
 identityMenuButton?.addEventListener('click', (event) => {
@@ -12468,40 +12365,6 @@ copyWalletAddressButton?.addEventListener('click', async () => {
     flashWalletIdentityStatus('Wallet address copied');
   } catch (error) {
     flashWalletIdentityStatus('copy blocked');
-    console.error(error);
-  }
-});
-
-copyPrivateDebugButton?.addEventListener('click', async () => {
-  try {
-    copyPrivateDebugButton.disabled = true;
-    await copyPrivateDebugText();
-  } catch (error) {
-    setPrivateDebugCopyButtonStatus('Debug copy blocked');
-    console.error(error);
-  } finally {
-    refreshPrivateDebugLog();
-  }
-});
-
-copyProfileDiagnosticsButton?.addEventListener('click', async () => {
-  refreshProfileDiagnostics();
-  try {
-    await copyTextToClipboard(profileDiagnosticsLog?.textContent ?? '');
-    setText(copyProfileDiagnosticsStatus, 'copied');
-  } catch (error) {
-    setText(copyProfileDiagnosticsStatus, 'copy blocked');
-    console.error(error);
-  }
-});
-
-copyVaultDiagnosticsButton?.addEventListener('click', async () => {
-  refreshProfileDiagnostics();
-  try {
-    await copyTextToClipboard(vaultDiagnosticsLog?.textContent ?? '');
-    setText(copyVaultDiagnosticsStatus, 'copied');
-  } catch (error) {
-    setText(copyVaultDiagnosticsStatus, 'copy blocked');
     console.error(error);
   }
 });
@@ -15265,19 +15128,6 @@ async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   return submission;
 }
 
-async function loadConnectedWalletBalances() {
-  const [tonResult, athResult] = await Promise.allSettled([
-    loadConnectedTonWalletBalance(),
-    loadConnectedAthWalletBalance(),
-  ]);
-  if (tonResult.status === 'rejected') noteTonRpcRateLimit(tonResult.reason);
-  if (athResult.status === 'rejected') noteTonRpcRateLimit(athResult.reason);
-  return {
-    ton_balance: tonResult.status === 'fulfilled' ? tonResult.value : null,
-    ath_balance: athResult.status === 'fulfilled' ? athResult.value : null,
-  };
-}
-
 async function refreshWalletTonBalanceForProfile() {
   if (!plathoWallet?.address) {
     vaultPocketState = {
@@ -15326,11 +15176,9 @@ function resetVaultPocketState() {
     wallet: { ton_balance: null, ath_balance: null },
     vault: { ton_balance: null, ath_balance: null },
   };
-  // Inner crumbs so a freeze inside the pocket-reset chain pinpoints the exact leaf (shared fn; harmless
-  // from non-vault callers — the crumb just names the running step).
-  markRuntimeOp('reset:navidle'); markNavVaultBalanceIdle();
-  markRuntimeOp('reset:walletstatus'); refreshWalletTonProfileStatus();
-  markRuntimeOp('reset:movewidget'); refreshVaultMoveWidget();
+  markNavVaultBalanceIdle();
+  refreshWalletTonProfileStatus();
+  refreshVaultMoveWidget();
 }
 
 function applyVaultUserPocketState(user) {
@@ -15520,74 +15368,54 @@ async function refreshVaultDashboard() {
       username_registry_bound: false,
       username_registry_address: null,
     };
-    // Fine-grained crumbs: the Public->Vault freeze is a SYNCHRONOUS block somewhere in this no-wallet
-    // render chain (beat frozen, op stuck at vault). Each marker writes a localStorage crumb BEFORE the
-    // call runs, so a hard freeze leaves prev=<the exact step> after a force-reload.
-    markRuntimeOp('vault:athstats'); renderAthProfileStats();
-    markRuntimeOp('vault:cards'); renderVaultCards(appConfig.ui?.vaultCards ?? []);
-    markRuntimeOp('vault:pocketreset'); resetVaultPocketState();
-    markRuntimeOp('vault:coststatus'); refreshComposerCostStatus();
-    markRuntimeOp('vault:status'); setVaultStatus('wallet required');
-    markRuntimeOp('vault');
+    renderAthProfileStats();
+    renderVaultCards(appConfig.ui?.vaultCards ?? []);
+    resetVaultPocketState();
+    refreshComposerCostStatus();
+    setVaultStatus('wallet required');
     return null;
   }
   let user = null;
-  let global = null;
   let userError = null;
-  markRuntimeOp('vaultw:reads-kick');
-  const vaultReadsPromise = Promise.allSettled([
-    loadConnectedWalletBalances(),
-    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
-    loadConnectedVaultGlobal({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
+  // v509 — the Apple-only Vault freeze is the CONCURRENT read burst itself, not any single read. v508 removed
+  // the external balances from the burst, which only MOVED the freeze onto get_global (the new last read of
+  // the concurrent get_user+get_global burst -> prev=vaultr:protocol-armed). The WORKING nav-corner balance
+  // (refreshVaultNavBalanceInBackground) reads get_user ALONE and NEVER freezes. So on iOS WebKit a single
+  // read is fine but 2+ concurrent reads stall the run loop. FIX: the critical path reads get_user ALONE
+  // (== the proven nav read) and renders immediately; get_global (stats/registry) + the external GRAM/ATH
+  // balances load deferred and STRICTLY SEQUENTIALLY (one read at a time), off the render path.
+  const vaultUserTimedOut = Symbol('vault-open-user-timeout');
+  const settledUser = await Promise.race([
+    loadConnectedVaultUser({ verify: true, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS })
+      .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason })),
+    delay(VAULT_OPEN_READ_DEADLINE_MS).then(() => vaultUserTimedOut),
   ]);
-  // Hard deadline: never await the read burst forever. Under degraded RPC it can take minutes
-  // (keyless toncenter fallback + verify cross-check + backoff), which hung the Vault tab (op=vault ~148s,
-  // heartbeat alive, tab dead). On timeout, render with cached state + a retry instead of hanging.
-  const vaultReadsTimedOut = Symbol('vault-open-reads-timeout');
-  const settledVaultReads = await Promise.race([
-    vaultReadsPromise,
-    delay(VAULT_OPEN_READ_DEADLINE_MS).then(() => vaultReadsTimedOut),
-  ]);
-  if (settledVaultReads === vaultReadsTimedOut) {
-    markRuntimeOp('vaultw:slow');
+  if (settledUser === vaultUserTimedOut) {
     renderAthProfileStats();
     refreshComposerCostStatus();
     setVaultStatus('RPC busy, retrying');
     markNavVaultBalancePending('RPC busy', { retry: true });
     refreshComposerPublishPolicy();
-    // Apply the slow reads when they finally settle (best-effort, only if still on the Vault tab).
-    vaultReadsPromise.then(() => { if (isVaultViewActive()) scheduleVaultAutoRefresh(1_000); }).catch(() => {});
-    markRuntimeOp('vault');
+    if (isVaultViewActive()) scheduleVaultAutoRefresh(1_000);
     return null;
   }
-  const [walletBalancesResult, userResult, globalResult] = settledVaultReads;
-  const walletBalances = walletBalancesResult.status === 'fulfilled'
-    ? walletBalancesResult.value
-    : { ton_balance: null, ath_balance: null };
-  if (userResult.status === 'fulfilled') {
-    user = userResult.value;
+  if (settledUser.status === 'fulfilled') {
+    user = settledUser.value;
   } else {
-    userError = userResult.reason;
+    userError = settledUser.reason;
   }
-  if (globalResult.status === 'fulfilled') {
-    global = globalResult.value;
-  } else {
-    noteTonRpcRateLimit(globalResult.reason);
-  }
-  vaultProtocolState = {
-    airdrop_remaining_ath: global?.airdrop_remaining_ath ?? null,
-    airdrop_total_allocation_ath: global?.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-    profile_registry_bound: global?.profile_registry_bound === true,
-    profile_registry_address: global?.profile_registry_address ?? null,
-    username_registry_bound: global?.username_registry_bound === true,
-    username_registry_address: global?.username_registry_address ?? null,
-  };
-  // WITH-WALLET crumbs: the freeze is in THIS branch (no-wallet works). Each crumb is written to
-  // localStorage synchronously before its call, so a force-reload after a hard freeze shows prev=<exact step>.
-  markRuntimeOp('vaultw:athstats'); renderAthProfileStats();
-  markRuntimeOp('vaultw:pocketcards'); renderVaultPocketCards(walletBalances, user);
-  markRuntimeOp('vaultw:coststatus'); refreshComposerCostStatus();
-  markRuntimeOp('vaultw:postrender');
+  // Render the Vault from get_user ONLY. get_global (airdrop/registry display) is NOT awaited here — its
+  // last-known value persists in vaultProtocolState and is refreshed by the deferred sequential reader.
+  renderAthProfileStats();
+  // Carry-forward external wallet balances (never wipe last-known to "-" — that would flicker every refresh).
+  renderVaultPocketCards({
+    ton_balance: vaultPocketState.wallet?.ton_balance ?? null,
+    ath_balance: vaultPocketState.wallet?.ath_balance ?? null,
+  }, user);
+  refreshComposerCostStatus();
+  // Everything beyond get_user loads deferred + STRICTLY SEQUENTIALLY (one read at a time), off the render
+  // path: get_global (stats/registry), then external GRAM, then external ATH. Single-flight guarded.
+  scheduleVaultDeferredReads(user);
   if (user) {
     setVaultStatus(user.exists === true ? 'synced' : 'Vault setup required');
     globalThis.plathoVaultBinding = {
@@ -15605,6 +15433,71 @@ async function refreshVaultDashboard() {
   setVaultStatus('sync blocked');
   if (userError) console.error(userError);
   return null;
+}
+
+// Hard ceiling per deferred Vault read, so a hung read (e.g. the iOS v2-GET GRAM read) can never latch the
+// single-flight guard and starve later refreshes. Resolves to null on timeout.
+const VAULT_DEFERRED_READ_TIMEOUT_MS = 10_000;
+// Single-flight for the deferred Vault reads (get_global + external GRAM/ATH). refreshVaultNow resolves
+// before this fire-and-forget chain finishes, so every Vault open / 60s auto-refresh would otherwise stack
+// overlapping reads (re-introducing the concurrency we are removing). Cleared in finally so a thrown/timed-
+// out read never latches it (the deferred values would then never reload until a page reload).
+let vaultDeferredReadInFlight = false;
+function scheduleVaultDeferredReads(vaultUser) {
+  // Defer to a macrotask so the Vault paints from get_user BEFORE any further read runs.
+  setTimeout(() => { void refreshVaultDeferredReadsInBackground(vaultUser); }, 0);
+}
+async function refreshVaultDeferredReadsInBackground(vaultUser) {
+  if (vaultDeferredReadInFlight) return;
+  if (!plathoWallet?.address || !isVaultViewActive()) return;
+  vaultDeferredReadInFlight = true;
+  try {
+    // 1) get_global (airdrop / registry display) — unverified display read, on its own connection. Never
+    //    concurrent with get_user (that 2-read burst was the iOS freeze). assertVaultGlobalMatchesConfig
+    //    (inside loadConnectedVaultGlobal) still validates the config binding regardless of verify.
+    let global = null;
+    try {
+      global = await Promise.race([
+        loadConnectedVaultGlobal({ verify: false, priority: 'critical', cacheTtlMs: VAULT_DISPLAY_READ_CACHE_TTL_MS, queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS }),
+        delay(VAULT_DEFERRED_READ_TIMEOUT_MS).then(() => null),
+      ]);
+    } catch (error) { noteTonRpcRateLimit(error); }
+    if (!isVaultViewActive()) return;
+    if (global) {
+      vaultProtocolState = {
+        airdrop_remaining_ath: global.airdrop_remaining_ath ?? null,
+        airdrop_total_allocation_ath: global.airdrop_total_allocation_ath ?? VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
+        profile_registry_bound: global.profile_registry_bound === true,
+        profile_registry_address: global.profile_registry_address ?? null,
+        username_registry_bound: global.username_registry_bound === true,
+        username_registry_address: global.username_registry_address ?? null,
+      };
+      renderAthProfileStats();
+      refreshComposerPublishPolicy();
+    }
+    // 2) external GRAM (TON) balance — its own connection.
+    let ton = null;
+    try {
+      ton = await Promise.race([
+        loadConnectedTonWalletBalance(),
+        delay(VAULT_DEFERRED_READ_TIMEOUT_MS).then(() => null),
+      ]);
+    } catch (error) { noteTonRpcRateLimit(error); }
+    if (!isVaultViewActive()) return;
+    renderVaultPocketCards({ ton_balance: ton, ath_balance: vaultPocketState.wallet?.ath_balance ?? null }, vaultUser);
+    // 3) external ATH jetton balance — its own connection (this was the original freeze site).
+    let ath = null;
+    try {
+      ath = await Promise.race([
+        loadConnectedAthWalletBalance(),
+        delay(VAULT_DEFERRED_READ_TIMEOUT_MS).then(() => null),
+      ]);
+    } catch (error) { noteTonRpcRateLimit(error); }
+    if (!isVaultViewActive()) return;
+    renderVaultPocketCards({ ton_balance: ton, ath_balance: ath }, vaultUser);
+  } finally {
+    vaultDeferredReadInFlight = false;
+  }
 }
 
 async function resolveAthMasterProvider() {
@@ -15690,7 +15583,6 @@ async function refreshAthAirdropState() {
 }
 
 async function refreshAthProtocolStats() {
-  markRuntimeOp('vault:stats');
   renderAthProfileStats();
   refreshAthAirdropState().catch(() => {});
   try {
@@ -15766,11 +15658,6 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
 
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
   if (vaultRefreshPromise) return vaultRefreshPromise;
-  // Attribute the whole Vault load+render (the no-wallet path renders synchronously
-  // here, and the wallet path's critical chain-reads + render also live here) so a
-  // Public->Vault freeze surfaces as worstStallOp='vault' / crumb 'vault'.
-  const prevVaultOp = runtimeDiagnostics.currentOp;
-  markRuntimeOp('vault');
   const vaultWork = (async () => {
     const results = [];
     const dashboardResult = await Promise.allSettled([refreshVaultDashboard()]);
@@ -15806,7 +15693,6 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
     return outcome;
   } finally {
     vaultRefreshPromise = null;
-    markRuntimeOp(prevVaultOp);
     scheduleVaultAutoRefresh();
   }
 }
@@ -20196,7 +20082,6 @@ async function refreshVaultActivationStatus(options = {}) {
     return null;
   }
   try {
-    markRuntimeOp('vact:enter');
     const provider = await resolveVaultChainProvider(options.provider);
     if (!provider?.getUser || !provider?.getKeyRecord) throw new VaultChainProviderUnavailableError('Vault provider unavailable');
     const user = options.user ?? await provider.getUser(plathoWallet.address, {
@@ -20222,40 +20107,31 @@ async function refreshVaultActivationStatus(options = {}) {
       renderAthProfileStats();
     }
     if (!user?.current_key_id || BigInt(user.current_key_id) === 0n) {
-      // Fine crumbs: a NON-activated account (current_key_id===0) runs these RENDER calls while crumb='vault'
-      // (no sub-crumb), so a hard freeze here leaves prev=<the exact render> after a force-reload. (Diagnosing
-      // the iOS Vault freeze that hangs even on a 16 Pro Max with an empty localStorage -> NOT the feed cache.)
-      markRuntimeOp('vact:notactivated');
       globalThis.plathoVaultBinding = {
         walletAddress: plathoWallet.address,
         user,
         keyRecord: null,
       };
       setText(vaultRecordStatus, 'account activation required');
-      markRuntimeOp('vact:msgactions'); refreshMessageActionStatuses();
-      markRuntimeOp('vact:msgcontrols'); refreshMessagingControls();
-      markRuntimeOp('vact:pubpolicy'); refreshComposerPublishPolicy();
-      markRuntimeOp('vact:notactivated-done');
+      refreshMessageActionStatuses();
+      refreshMessagingControls();
+      refreshComposerPublishPolicy();
       return null;
     }
-    markRuntimeOp('vact:getkeyrecord');
     const record = await provider.getKeyRecord(user.current_key_id, {
       vaultAddress: requireVaultAddress(),
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
     });
-    markRuntimeOp('vact:assertowner');
     await assertVaultKeyRecordMatchesOwner(plathoWallet.address, record, user.current_key_id);
     // The synchronous ed25519.verify of the signed-bundle binding runs inside here (wallet-only, every
-    // vault open). If the freeze is the crypto, a hard-freeze reload shows prev=vact:verifybinding.
-    markRuntimeOp('vact:verifybinding');
+    // vault open).
     const binding = await verifyVaultKeyRecordBinding(localSignedPublicBundle, record, {
       ownerWallet: plathoWallet.address,
       currentKeyId: user.current_key_id,
       recordKeyId: user.current_key_id,
     });
-    markRuntimeOp('vact:bound');
     const localAuthPubkey = localVaultAuthKeyPair?.publicKey
       ? bytesToBigIntValue(localVaultAuthKeyPair.publicKey)
       : 0n;
@@ -20487,12 +20363,14 @@ window.addEventListener('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passive: true });
 
-markRuntimeOp('boot');
 customPublicChannels = readCustomPublicChannels();
 rebuildPublicChannelRegistry();
 publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
 writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
+// Warm per-wallet avatars from the persisted media cache BEFORE the first render so reloaded public feeds
+// show faces immediately (no letter-tile placeholder + chain-refetch flash). Synchronous + local-only.
+warmPublicChannelAvatarsFromCache();
 // One-time cleanup: an EXISTING device cache (written before the strip below) may still hold megabytes of
 // base64 media in localStorage — the root of the iOS Vault freeze. Re-persist it through the now-stripping
 // writer so the on-disk store shrinks to light metadata. Deferred (setTimeout 0) so the single heavy
@@ -20789,10 +20667,10 @@ if (activeThreadId) {
 } else {
   appShell.dataset.chatOpen = 'false';
 }
+installNavBackHandling();
 renderThreads();
 renderConversation();
 refreshMessagingControls();
-markRuntimeOp('idle');
 document.documentElement.dataset.plathoAppJs = 'ready';
 bootCrypto()
   .then(() => restoreWalletRecordFromTelegramCloud().catch(() => false))

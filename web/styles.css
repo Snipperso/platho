@@ -413,26 +413,6 @@ button:disabled,
   max-width: 100%;
 }
 
-.private-debug-log {
-  grid-column: 1 / -1;
-  width: 100%;
-  margin: 6px 0 0;
-  max-width: 100%;
-  max-height: 118px;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--accent);
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(49, 211, 182, 0.24);
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 10px;
-  line-height: 1.35;
-  user-select: text;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -483,16 +463,11 @@ button:disabled,
   display: none;
 }
 
-.docs-header-button,
-.debug-copy-button {
+.docs-header-button {
   width: 34px;
   height: 34px;
   background: #0d1012;
 }
-
-/* Debug copy button + log are VISIBLE again (re-enabled for on-device diagnostics): the freeze on
-   slow devices needs real runtime data (main-thread stall detector + sync timing), surfaced in the
-   #privateDebugLog panel and copyable via #copyPrivateDebugButton. */
 
 .install-header-button {
   width: 34px;
@@ -1500,13 +1475,6 @@ html[data-platho-telegram="true"] .install-header-button {
 .public-pane .pane-header,
 .vault-pane .pane-header {
   flex-wrap: wrap;
-}
-
-.public-diagnostics,
-.vault-diagnostics {
-  flex: 1 0 100%;
-  display: grid;
-  gap: 8px;
 }
 
 .public-pane[data-public-mode="channels"] {

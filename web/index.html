@@ -9,7 +9,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=164">
+    <link rel="stylesheet" href="./styles.css?v=165">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
@@ -26,7 +26,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel">network</span>
-              <span class="app-version-label" id="appVersionLabel">v505</span>
+              <span class="app-version-label" id="appVersionLabel">v511</span>
             </div>
           </div>
         </div>
@@ -101,14 +101,10 @@
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho">
                 <span class="icon icon-open-app"></span>
               </button>
-              <button class="icon-button debug-copy-button" id="copyPrivateDebugButton" type="button" aria-label="Copy debug text" title="Copy debug text" disabled>
-                <span class="icon icon-copy"></span>
-              </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
               </button>
             </div>
-            <pre class="private-debug-log" id="privateDebugLog" hidden></pre>
           </header>
 
           <div class="message-strip" id="messageStrip" aria-live="polite"></div>
@@ -169,12 +165,6 @@
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
               </button>
-            </div>
-            <div class="public-diagnostics" id="publicDiagnostics">
-              <div class="settings-list">
-                <button id="copyProfileDiagnosticsButton" type="button"><span>Copy diagnostics</span><strong id="copyProfileDiagnosticsStatus">runtime</strong></button>
-              </div>
-              <pre class="private-debug-log" id="profileDiagnosticsLog" aria-live="polite"></pre>
             </div>
           </header>
           <div class="search-row action-search-row public-channel-search-row" id="publicChannelSearchRow">
@@ -238,12 +228,6 @@
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents">
                 <span class="icon icon-info"></span>
               </button>
-            </div>
-            <div class="vault-diagnostics" id="vaultDiagnostics">
-              <div class="settings-list">
-                <button id="copyVaultDiagnosticsButton" type="button"><span>Copy diagnostics</span><strong id="copyVaultDiagnosticsStatus">runtime</strong></button>
-              </div>
-              <pre class="private-debug-log" id="vaultDiagnosticsLog" aria-live="polite"></pre>
             </div>
           </header>
 
@@ -608,6 +592,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=505" type="module"></script>
+    <script src="./app.js?v=511" type="module"></script>
   </body>
 </html>
