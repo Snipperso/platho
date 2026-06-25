@@ -59,7 +59,7 @@ import {
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-} from './public-channel-subscriptions.mjs?v=11';
+} from './public-channel-subscriptions.mjs?v=12';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -157,7 +157,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v503';
+const PLATHO_APP_RUNTIME_VERSION = 'v504';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -20486,6 +20486,12 @@ rebuildPublicChannelRegistry();
 publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
 writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
+// One-time cleanup: an EXISTING device cache (written before the strip below) may still hold megabytes of
+// base64 media in localStorage — the root of the iOS Vault freeze. Re-persist it through the now-stripping
+// writer so the on-disk store shrinks to light metadata. Deferred (setTimeout 0) so the single heavy
+// re-serialize of the old store does not block boot; it runs before the user can navigate to the Vault tab.
+// The in-memory cache keeps its media for rendering; only the persisted copy is lightened.
+setTimeout(() => { try { writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache); } catch {} }, 0);
 publicReadCursors = readPublicReadCursors();
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
