@@ -76,7 +76,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
           sendBocEndpoint: 'https://toncenter.com/api/v3/message',
           messagesEndpoint: 'https://toncenter.com/api/v3/messages',
-          walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
+          walletBalanceEndpoint: 'https://toncenter.com/api/v3/addressInformation',
           // 125ms = 8 rps, a 20% margin under the 10 rps free-key cap. toncenter rate-limits per-second with
           // NO burst grace, so a flat 100ms (=10 rps, zero margin) sporadically tips to 11/sec on jitter -> 429.
           requestSpacingMs: 125,
@@ -110,7 +110,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     deploymentManifestHash: '9cba5ac253a4c18697c962df6c032c60eb27241e930f9ba26d5ab16481555df2',
     provider: {
       globalName: 'plathoVaultChainProvider',
-      moduleUrl: './vault-ton-rpc-provider.mjs?v=56',
+      moduleUrl: './vault-ton-rpc-provider.mjs?v=58',
       exportName: 'default',
       unavailableStatus: 'provider required',
       requiredInProduction: true,

@@ -151,7 +151,7 @@ describe('PWA runtime config guard', () => {
       runGetMethodEndpoint: 'https://toncenter.com/api/v3/runGetMethod',
       sendBocEndpoint: 'https://toncenter.com/api/v3/message',
       messagesEndpoint: 'https://toncenter.com/api/v3/messages',
-      walletBalanceEndpoint: 'https://toncenter.com/api/v2/getAddressInformation',
+      walletBalanceEndpoint: 'https://toncenter.com/api/v3/addressInformation',
     });
     expect(PLATHO_APP_CONFIG.network.tonRpc.providers.find((provider) => provider.id === 'keyless-toncenter')).toMatchObject({
       verifierOnly: true,
@@ -256,18 +256,9 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v504<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v504'/);
+    expect(html).toMatch(/id="appVersionLabel">v511<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v511'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
-    expect(html).toMatch(/id="copyPrivateDebugButton"/);
-    expect(html).toMatch(/aria-label="Copy debug text"/);
-    expect(app).toMatch(/copyPrivateDebugButton/);
-    expect(app).toMatch(/async function copyPrivateDebugText\(\)/);
-    expect(app).toMatch(/await copyTextToClipboard\(text\)/);
-    expect(css).toMatch(/\.debug-copy-button/);
-    // The debug copy button + log panel are VISIBLE again (re-enabled for on-device freeze diagnostics):
-    // the old `display: none !important` hide rule must be gone.
-    expect(css).not.toMatch(/\.private-debug-log,\s*\.debug-copy-button\s*\{\s*display:\s*none/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
     expect(css).toMatch(/\.message\.in \.bubble\s*\{[\s\S]*?justify-self: start;/);
@@ -1619,7 +1610,7 @@ describe('PWA runtime config guard', () => {
     );
     const debugSource = app.slice(
       app.indexOf('function privateDebugPublishMessages'),
-      app.indexOf('function refreshPrivateDebugLog'),
+      app.indexOf('function refreshConversationSubtitle'),
     );
 
     expect(syncSource.match(/resumePendingPrivateSendRetries\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
@@ -1786,87 +1777,19 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/queueTimeoutMs: CRITICAL_CHAIN_READ_QUEUE_TIMEOUT_MS/);
     // E: the progressing-catch-up re-fire is floored at 8s so it cannot re-burst the sync every 2s.
     expect(app).toMatch(/Math\.max\(8_000, Math\.min\(2_000 \* 2 \*\* Math\.min\(messageAutoSyncStallStreak, 5\), MESSAGE_AUTO_SYNC_MS\)\)/);
-    // v447 diagnostics: always-on main-thread stall detector + per-entry decapsulate timing, exposed in the
-    // debug panel and on globalThis.plathoRuntimeDiagnostics, so the freeze can be measured on-device.
-    expect(app).toMatch(/globalThis\.plathoRuntimeDiagnostics = runtimeDiagnostics/);
-    expect(app).toMatch(/function startRuntimeDiagnostics\(\)/);
-    expect(app).toMatch(/const stall = gap - RUNTIME_DIAG_HEARTBEAT_MS/);
-    expect(app).toMatch(/markRuntimeOp\('sync-decap'\)/);
-    expect(app).toMatch(/if \(entryMs > runtimeDiagnostics\.worstEntryMs\) runtimeDiagnostics\.worstEntryMs = entryMs/);
-    expect(app).toMatch(/diag op=\$\{diag\.currentOp\}/);
-    // v451: the diagnostics panel + copy button are pinned at the TOP of the Public page (the default
-    // landing tab), inside the pane header, so a freeze is visible immediately without any navigation.
-    const html = readFileSync('web/index.html', 'utf8');
-    expect(html).toMatch(/id="profileDiagnosticsLog"/);
-    expect(html).toMatch(/id="copyProfileDiagnosticsButton"/);
-    // the diagnostics wrapper lives in the public pane (between the public header actions and </header>).
-    expect(html).toMatch(/id="publicDiagnostics"/);
-    expect(html).toMatch(/<div class="public-diagnostics" id="publicDiagnostics">[\s\S]*id="profileDiagnosticsLog"[\s\S]*<\/header>/);
-    expect(app).toMatch(/function runtimeDiagnosticsText\(\)/);
-    expect(app).toMatch(/function refreshProfileDiagnostics\(\)/);
-    // refreshed on entering the Public/Vault tab AND live every heartbeat (~1/s) so the freeze can be watched.
-    expect(app).toMatch(/if \(view === 'public' \|\| view === 'vault'\) refreshProfileDiagnostics\(\)/);
-    expect(app).toMatch(/refreshProfileDiagnostics\(\);\n {2}\}, RUNTIME_DIAG_HEARTBEAT_MS\)/);
-    expect(app).toMatch(/copyProfileDiagnosticsButton\?\.addEventListener\('click'/);
-    // v459: heartbeat-liveness indicator (beat counter + live age) so even a STATIC freeze screenshot
-    // disambiguates a CPU block (beat frozen) from a UI-event lock (beat keeps climbing). The freeze
-    // reproduces in iOS Safari + PWA + Telegram Mini App (all WebKit), never on Android/Windows, so it is
-    // NOT Telegram-specific. markRuntimeOp now also brackets the synchronous boot block + the public render
-    // so a transient main-thread block on the no-wallet Public path is attributed (worstStallOp).
-    expect(app).toMatch(/runtimeDiagnostics\.beats \+= 1/);
-    expect(app).toMatch(/beat=\$\{d\.beats\} age=\$\{Math\.round\(\(Date\.now\(\) - d\.startedAtMs\) \/ 1000\)\}s/);
-    expect(app).toMatch(/markRuntimeOp\('boot'\)/);
-    expect(app).toMatch(/markRuntimeOp\('public-render'\)/);
-    // v460: the freeze was narrowed to the Public->Vault switch (only that switch lags; staying on one
-    // tab is fine). The diagnostics panel lives on Public so a Vault freeze is not visible live; so (a)
-    // markRuntimeOp now brackets the Vault load (refreshVaultNow -> 'vault') and the panel switch
-    // (setView -> 'view:<tab>'), and (b) markRuntimeOp writes a localStorage crumb on every op CHANGE so a
-    // HARD freeze (heartbeat dead, can't switch back) still names the op that was active when it died,
-    // surfaced as 'prev=' in the panel after a force-reload.
-    expect(app).toMatch(/markRuntimeOp\(`view:\$\{view\}`\)/);
-    expect(app).toMatch(/markRuntimeOp\('vault'\)/);
-    expect(app).toMatch(/const RUNTIME_DIAG_CRUMB_KEY = 'platho\.diag\.crumb\.v1'/);
-    expect(app).toMatch(/if \(runtimeDiagnostics\.currentOp === op\) return/);
-    expect(app).toMatch(/localStorage\.setItem\(RUNTIME_DIAG_CRUMB_KEY/);
-    expect(app).toMatch(/prev=\$\{d\.prevCrumb \?\? '-'\}/);
-    // v461: the diagnostics panel is also MIRRORED onto the Vault page (owner request) so the
-    // Public->Vault freeze is readable right there without switching back. Distinct ids (#vaultDiagnostics*
-    // — ids are unique per document); refreshProfileDiagnostics() now fills BOTH panels and setView refreshes
-    // on entering Vault too.
-    expect(html).toMatch(/id="vaultDiagnostics"/);
-    expect(html).toMatch(/<div class="vault-diagnostics" id="vaultDiagnostics">[\s\S]*id="vaultDiagnosticsLog"[\s\S]*<\/header>/);
-    expect(app).toMatch(/const vaultDiagnosticsLog = document\.querySelector\('#vaultDiagnosticsLog'\)/);
-    expect(app).toMatch(/if \(vaultDiagnosticsLog\) vaultDiagnosticsLog\.textContent = text/);
-    expect(app).toMatch(/if \(view === 'public' \|\| view === 'vault'\) refreshProfileDiagnostics\(\)/);
-    expect(app).toMatch(/copyVaultDiagnosticsButton\?\.addEventListener\('click'/);
-    // v462: the Public->Vault freeze is a SYNCHRONOUS block (beat frozen on-device, op stuck at vault, no
-    // wallet, network-independent, iOS-WebKit/slow-device only). Fine-grained crumbs on each step of the
-    // no-wallet refreshVaultDashboard render chain (+ resetVaultPocketState's leaves) so the next force-reload
-    // 'prev=' names the EXACT function that froze.
-    expect(app).toMatch(/markRuntimeOp\('vault:athstats'\); renderAthProfileStats\(\)/);
-    expect(app).toMatch(/markRuntimeOp\('vault:cards'\); renderVaultCards/);
-    expect(app).toMatch(/markRuntimeOp\('vault:pocketreset'\); resetVaultPocketState\(\)/);
-    expect(app).toMatch(/markRuntimeOp\('vault:coststatus'\); refreshComposerCostStatus\(\)/);
-    expect(app).toMatch(/markRuntimeOp\('reset:movewidget'\); refreshVaultMoveWidget\(\)/);
-    // v463: the freeze is in the WITH-WALLET branch (no-wallet works) — v462's crumbs were in the wrong
-    // (no-wallet) branch. An exhaustive parallel module audit found NO infinite loop / catastrophic regex /
-    // heavy-crypto loop in the balance path (all bounded/async; one ed25519.verify is too small to freeze).
-    // So crumb the WITH-WALLET vault renders + the activation key-record-binding verify chain to name the
-    // exact synchronous step on the next force-reload's prev=.
-    expect(app).toMatch(/markRuntimeOp\('vaultw:pocketcards'\); renderVaultPocketCards/);
-    expect(app).toMatch(/markRuntimeOp\('vaultw:coststatus'\); refreshComposerCostStatus\(\)/);
-    expect(app).toMatch(/markRuntimeOp\('vact:verifybinding'\)/);
-    expect(app).toMatch(/markRuntimeOp\('vault:stats'\)/);
-    // v476 FIX: the with-wallet capture (op=vault stuck ~148s, heartbeat ALIVE, renders not reached =>
-    // crumb 'vault') proved the freeze is the ASYNC Vault-open read burst hanging (degraded RPC: keyless
-    // toncenter fallback + verify cross-check + backoff -> minutes), NOT a CPU loop. refreshVaultDashboard
+    // v476 FIX: the with-wallet capture proved the freeze is the ASYNC Vault-open read burst hanging (degraded
+    // RPC: keyless toncenter fallback + verify cross-check + backoff -> minutes), NOT a CPU loop. refreshVaultDashboard
     // now bounds the read burst with a hard VAULT_OPEN_READ_DEADLINE_MS; on timeout it renders with cached
     // state + 'RPC busy, retrying' instead of awaiting forever, so the Vault tab can never hang open.
     expect(app).toMatch(/const VAULT_OPEN_READ_DEADLINE_MS = 12_000/);
-    expect(app).toMatch(/Promise\.race\(\[\s*vaultReadsPromise,\s*delay\(VAULT_OPEN_READ_DEADLINE_MS\)\.then\(\(\) => vaultReadsTimedOut\)/);
-    expect(app).toMatch(/if \(settledVaultReads === vaultReadsTimedOut\) \{/);
+    // v511: the Vault-open critical path reads get_user ALONE (the concurrent get_user+get_global burst was
+    // the iOS freeze; the working nav path reads get_user alone), raced against the deadline; get_global +
+    // external balances load deferred + strictly sequentially off the render path.
+    expect(app).toMatch(/delay\(VAULT_OPEN_READ_DEADLINE_MS\)\.then\(\(\) => vaultUserTimedOut\)/);
+    expect(app).toMatch(/if \(settledUser === vaultUserTimedOut\) \{/);
+    expect(app).toMatch(/function refreshVaultDeferredReadsInBackground\(/);
     // And an overall backstop on refreshVaultNow so the activation/stats jobs (same verify:true reads) can't
-    // keep op='vault' + the single-flight lock held for minutes either.
+    // keep the single-flight lock held for minutes either.
     expect(app).toMatch(/const VAULT_REFRESH_DEADLINE_MS = 16_000/);
     expect(app).toMatch(/Promise\.race\(\[\s*vaultWork,\s*delay\(VAULT_REFRESH_DEADLINE_MS\)\.then\(\(\) => vaultRefreshTimedOut\)/);
     expect(app).toMatch(/vaultWork\.catch\(\(\) => \{\}\)/);
@@ -2240,7 +2163,7 @@ describe('PWA runtime config guard', () => {
     );
     const profileSource = app.slice(
       app.indexOf('async function submitVaultProfileAvatarRegistration'),
-      app.indexOf('async function loadConnectedWalletBalances'),
+      app.indexOf('async function refreshWalletTonBalanceForProfile'),
     );
     const submitSource = app.slice(
       app.indexOf('async function submitVaultMessage'),
@@ -3226,7 +3149,7 @@ describe('PWA runtime config guard', () => {
     );
     const profileSource = app.slice(
       app.indexOf('async function submitVaultProfileAvatarRegistration'),
-      app.indexOf('async function loadConnectedWalletBalances'),
+      app.indexOf('async function refreshWalletTonBalanceForProfile'),
     );
     const avatarFlow = app.slice(
       app.indexOf('async function submitProfileAvatarUpdate'),
@@ -4604,16 +4527,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v575/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=164/);
+    expect(sw).toMatch(/platho-pwa-prototype-v582/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=165/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=504/);
+    expect(sw).toMatch(/\.\/app\.js\?v=511/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
     expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=4/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=96/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=97/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
@@ -4621,7 +4544,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);
-    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=56/);
+    expect(sw).toMatch(/\.\/vault-ton-rpc-provider\.mjs\?v=58/);
     expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=40/);
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=38/);
