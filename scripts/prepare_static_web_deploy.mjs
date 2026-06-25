@@ -42,6 +42,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'sw.js',
   'manifest.webmanifest',
   'replay-store.mjs',
+  'profile-avatar-media-store.mjs',
   'vault-chain-provider.mjs',
   'webp-encoder.mjs',
   'qr-code.mjs',
