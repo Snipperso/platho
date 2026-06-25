@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v513<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v513'/);
+    expect(html).toMatch(/id="appVersionLabel">v514<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v514'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1058,6 +1058,9 @@ describe('PWA runtime config guard', () => {
     expect(cacheSource).toMatch(/await store\?\.delete\(hash\)/);
     expect(avatarReadSource).toMatch(/const cached = await readProfileAvatarMediaCache/);
     expect(hydrateSource).toMatch(/const cached = pointer \? await readProfileAvatarMediaCache/);
+    // The boot warm-up must read cached posts via feed.posts — the cache shape is { feed: { posts: [...] } }.
+    // Iterating `feed` as an array silently warmed NOTHING (the avatar-flash-on-reload bug). Guard it.
+    expect(app).toMatch(/Array\.isArray\(feed\?\.posts\) \? feed\.posts/);
   });
 
   it('PWA-CONFIG-01D2: publish path confirms fresh chain price increases before sendBoc', () => {
@@ -1786,7 +1789,7 @@ describe('PWA runtime config guard', () => {
     // now bounds the read burst with a hard VAULT_OPEN_READ_DEADLINE_MS; on timeout it renders with cached
     // state + 'RPC busy, retrying' instead of awaiting forever, so the Vault tab can never hang open.
     expect(app).toMatch(/const VAULT_OPEN_READ_DEADLINE_MS = 12_000/);
-    // v513: the Vault-open critical path reads get_user ALONE (the concurrent get_user+get_global burst was
+    // v514: the Vault-open critical path reads get_user ALONE (the concurrent get_user+get_global burst was
     // the iOS freeze; the working nav path reads get_user alone), raced against the deadline; get_global +
     // external balances load deferred + strictly sequentially off the render path.
     expect(app).toMatch(/delay\(VAULT_OPEN_READ_DEADLINE_MS\)\.then\(\(\) => vaultUserTimedOut\)/);
@@ -4531,11 +4534,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v584/);
+    expect(sw).toMatch(/platho-pwa-prototype-v585/);
     expect(sw).toMatch(/\.\/styles\.css\?v=165/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=513/);
+    expect(sw).toMatch(/\.\/app\.js\?v=514/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

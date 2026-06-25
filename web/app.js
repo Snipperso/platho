@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v513';
+const PLATHO_APP_RUNTIME_VERSION = 'v514';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1892,19 +1892,44 @@ function collectCachedAvatarPointers(post, byWallet) {
   if (raw && hash && !publicChannelAvatarUrlByWallet.has(raw) && !byWallet.has(raw)) byWallet.set(raw, hash);
   for (const comment of Array.isArray(post.comments) ? post.comments : []) collectCachedAvatarPointers(comment, byWallet);
 }
+// Synchronous read of a legacy localStorage avatar entry (pre-v512 format {hash,url,cachedAt}). Used as a
+// first-boot fallback while the one-time IndexedDB migration has not yet run. Reads do NOT trigger the iOS
+// whole-store re-serialization (only writes do), so this is safe.
+function legacyAvatarMediaUrlFromLocalStorage(avatarHash) {
+  const hash = profileAvatarMediaHashKey(avatarHash);
+  if (!hash) return null;
+  try {
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(`${PROFILE_AVATAR_MEDIA_CACHE_PREFIX}:${hash}`) ?? 'null');
+    return parsed?.hash === hash && typeof parsed.url === 'string' ? parsed.url : null;
+  } catch {
+    return null;
+  }
+}
 async function warmPublicChannelAvatarsFromCache() {
   try {
     const byWallet = new Map(); // raw wallet -> avatarHash, for authors not already in the in-memory map
     for (const record of Object.values(publicChannelFeedCache ?? {})) {
+      // A cached channel record is { feed: { posts: [...] } } (sometimes the feed object directly, or just an
+      // array). Extract the posts array robustly — iterating the wrong shape silently warmed NOTHING.
       const feed = record?.feed ?? record;
-      if (!Array.isArray(feed)) continue;
-      for (const post of feed) collectCachedAvatarPointers(post, byWallet);
+      const posts = Array.isArray(feed?.posts) ? feed.posts : (Array.isArray(feed) ? feed : []);
+      for (const post of posts) collectCachedAvatarPointers(post, byWallet);
     }
     if (byWallet.size === 0) return;
+    // 1) Legacy localStorage (pre-v512) — synchronous + instant, so the FIRST boot after the upgrade is clean
+    //    before the deferred IndexedDB migration runs.
+    const pending = new Map();
+    for (const [raw, hash] of byWallet) {
+      const url = legacyAvatarMediaUrlFromLocalStorage(hash);
+      if (url) publicChannelAvatarUrlByWallet.set(raw, url);
+      else pending.set(raw, hash);
+    }
+    // 2) IndexedDB — migrated + freshly-cached avatars.
+    if (pending.size === 0) return;
     const store = await profileAvatarMediaStore();
     if (!store) return;
-    const urls = await store.getMany([...byWallet.values()]);
-    for (const [raw, hash] of byWallet) {
+    const urls = await store.getMany([...pending.values()]);
+    for (const [raw, hash] of pending) {
       const url = urls.get(hash);
       if (url && !publicChannelAvatarUrlByWallet.has(raw)) publicChannelAvatarUrlByWallet.set(raw, url);
     }
