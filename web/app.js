@@ -157,7 +157,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v502';
+const PLATHO_APP_RUNTIME_VERSION = 'v503';
 
 // Always-on, lightweight runtime diagnostics to pin down slow-device main-thread FREEZES without a device
 // console. A 1s heartbeat measures how late it actually fires: if the main thread was blocked for N ms, the
@@ -4492,6 +4492,34 @@ function appendPublicItemComments(article, item) {
   article.append(commentList);
 }
 
+// The "Display as" chevron for a public FEED post — relabel another author (.ath / local name), shared
+// per-counterparty and in sync with their Private dialog. Returns null for your own post, the official
+// platho.app channel, or an item with no author wallet. Lives in the post's author row (top-right) in FEED
+// mode only; in CHANNELS mode the channel-detail HEADER already carries it, so post cards omit it.
+function publicItemIdentityButton(item) {
+  const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
+  const isOwnPost = Boolean(authorWallet && plathoWallet?.address && sameWalletAddress(authorWallet, plathoWallet.address));
+  if (!authorWallet || isOwnPost || item.channelId === DEFAULT_PUBLIC_CHANNEL_ID) return null;
+  const identityButton = document.createElement('button');
+  identityButton.type = 'button';
+  identityButton.className = 'icon-button feed-author-identity';
+  identityButton.setAttribute('aria-haspopup', 'menu');
+  identityButton.setAttribute('aria-expanded', 'false');
+  identityButton.title = 'Choose display name';
+  const identityIcon = document.createElement('span');
+  identityIcon.className = 'icon icon-chevron-down';
+  identityButton.append(identityIcon);
+  identityButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (identityPopover && !identityPopover.hidden) {
+      hideIdentityPopover();
+    } else {
+      showPublicChannelDisplayPopover({ authorWallet }, identityButton);
+    }
+  });
+  return identityButton;
+}
+
 function appendPublicItemActions(article, item) {
   const actions = document.createElement('div');
   actions.className = 'feed-actions';
@@ -4525,30 +4553,6 @@ function appendPublicItemActions(article, item) {
 
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
   const isOwnPost = Boolean(authorWallet && plathoWallet?.address && sameWalletAddress(authorWallet, plathoWallet.address));
-
-  // "Display as" parity with Private: let the user relabel another author (their .ath / a local name). The
-  // choice is shared per-counterparty and stays in sync with that person's Private dialog. Reuses the same
-  // popover the channel-detail header uses. Not shown on your OWN post or the official platho.app channel.
-  if (authorWallet && !isOwnPost && item.channelId !== DEFAULT_PUBLIC_CHANNEL_ID) {
-    const identityButton = document.createElement('button');
-    identityButton.type = 'button';
-    identityButton.className = 'icon-button';
-    identityButton.setAttribute('aria-haspopup', 'menu');
-    identityButton.setAttribute('aria-expanded', 'false');
-    identityButton.title = 'Choose display name';
-    const identityIcon = document.createElement('span');
-    identityIcon.className = 'icon icon-chevron-down';
-    identityButton.append(identityIcon);
-    identityButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (identityPopover && !identityPopover.hidden) {
-        hideIdentityPopover();
-      } else {
-        showPublicChannelDisplayPopover({ authorWallet }, identityButton);
-      }
-    });
-    actions.append(identityButton);
-  }
 
   // "Private chat" — open the author in Private. HIDDEN on your own post: a dialog with yourself is meaningless.
   if (!isOwnPost) {
@@ -4599,6 +4603,10 @@ function renderPublicFeed(items, options = {}) {
       meta.append(span);
     }
     authorRow.append(authorAvatar, meta);
+    // FEED mode only: the "Display as" chevron lives top-right in the author row (CHANNELS mode omits it on
+    // post cards — its channel-detail header already carries the affordance).
+    const feedIdentityButton = publicItemIdentityButton(item);
+    if (feedIdentityButton) authorRow.append(feedIdentityButton);
     article.append(authorRow);
     if (item.title) {
       const title = document.createElement('h2');
