@@ -422,3 +422,32 @@ export function publicChannelThreadsToFeedItems(threads) {
 export function clonePublicChannelSubscriptions(value) {
   return safeClone(value);
 }
+
+// Phase 3 public eviction floor (pure, BigInt). clean-10 public eviction is strictly bottom-FIFO and gapless, and
+// entryIds are 0-INDEXED while public_latest_id is the NEXT id (highest live id = latest - 1; total ever = latest).
+// So the live id range is [latest - live_count, latest - 1] and the oldest-live id (the floor) is EXACTLY
+// latest - live_count (= the contract's public_oldest_live_id). live_count 0 → nothing live (floor = latest).
+export function publicEvictionFloor(latestId, liveCount) {
+  const latest = BigInt(latestId ?? 0n);
+  const live = BigInt(liveCount ?? 0n);
+  return live > 0n ? (latest - live) : latest;
+}
+
+// Drop cache posts/comments evicted on-chain (entryId STRICTLY below the FIFO floor). A post below the floor is
+// evicted → dropped with its comments; a live post keeps only its still-live comments. A local-pending post
+// (non-numeric/absent entryId) is NOT on-chain → never pruned. floor <= 0 → nothing evicted → returned unchanged.
+export function prunePublicPostsBelowFloor(posts, floor) {
+  if (!(floor > 0n)) return posts;
+  const kept = [];
+  for (const post of posts ?? []) {
+    let id = null;
+    try { id = post?.entryId === undefined || post?.entryId === null ? null : BigInt(post.entryId); } catch { id = null; }
+    if (id !== null && id < floor) continue;
+    const comments = post.comments ?? [];
+    const liveComments = comments.filter((comment) => {
+      try { return comment?.entryId === undefined || comment?.entryId === null ? true : BigInt(comment.entryId) >= floor; } catch { return true; }
+    });
+    kept.push(liveComments.length === comments.length ? post : { ...post, comments: liveComments });
+  }
+  return kept;
+}
