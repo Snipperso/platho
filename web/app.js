@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v519';
+const PLATHO_APP_RUNTIME_VERSION = 'v520';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -9649,6 +9649,14 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
   if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
     return 'Unlock and activate Platho account before sending';
   }
+  // Activation gate, mirroring the public send button (refreshPublicSendButtonState): an unlocked-but-not-
+  // activated sender has the local keys but NO Vault user record, so publishing would be rejected downstream
+  // by assertVaultHasPrivatePublishHold. Disable the button + show this reason in the cost status up front
+  // instead of letting the user send into an optimistic bubble that flips to "not sent". (The draft INPUT,
+  // canEditPrivateComposerDraft, deliberately stays independent of this flickering state — PWA-ACTIVATION-02.)
+  if (!hasActivePlathoAccount()) {
+    return 'Activate Platho account before sending';
+  }
   if (options.includeVaultShortfall !== false && privateComposerKnownVaultTonShortfall()) {
     return 'Vault GRAM hold required';
   }
@@ -9658,6 +9666,7 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
 function canAttemptPrivateSend(thread = activeThread()) {
   return canEditPrivateComposerDraft(thread)
     && Boolean(localIdentity && localRecipientKeyPair && localSignedPublicBundle)
+    && hasActivePlathoAccount()
     && pendingServiceWorkerAppShellReload !== true
     && !privateComposerKnownVaultTonShortfall();
 }
@@ -12157,6 +12166,19 @@ composer?.addEventListener('submit', async (event) => {
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshMessagingControls();
+    return;
+  }
+  // Not-activated sender: keys are present (wallet unlocked) but there is no Vault user record. Reject BEFORE
+  // inserting the optimistic "sending" bubble so the user sees the activation message instead of a bubble that
+  // flips to "not sent". (The button is also disabled via privateSendBlockReason; this covers an Enter-key
+  // submit or the brief boot window before activation status loads.) assertVaultHasPrivatePublishHold remains
+  // the authoritative downstream check.
+  if (!hasActivePlathoAccount()) {
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = 'Activate Platho account before sending';
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+    refreshPrivateSendButtonState();
     return;
   }
   if (tonRpcLimited()) {
