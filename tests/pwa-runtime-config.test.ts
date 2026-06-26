@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v527<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v527'/);
+    expect(html).toMatch(/id="appVersionLabel">v528<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v528'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -576,6 +576,11 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.message\.out\s*{[\s\S]*align-self: flex-end;/);
     expect(css).toMatch(/\.conversation-title h2,\s*\.conversation-title p\s*{\s*overflow: hidden;\s*text-overflow: ellipsis;\s*white-space: nowrap;/);
     expect(css).toMatch(/\.header-actions\s*{\s*display: flex;\s*align-items: center;\s*justify-content: flex-end;\s*gap: 8px;\s*flex: 0 0 auto;\s*min-width: max-content;/);
+    // The "Display as" chevron is the compact 34px header-button size (matching the info/install buttons and the
+    // other tabs' headers) — shrink the chevron, do NOT grow info/install to 40px (that made the tab inconsistent).
+    expect(readFileSync('web/index.html', 'utf8')).toMatch(/class="[^"]*\bidentity-menu-button\b[^"]*"[^>]*id="identityMenuButton"/);
+    expect(css).toMatch(/\.identity-menu-button\s*{\s*width: 34px;\s*height: 34px;/);
+    expect(css).not.toMatch(/\.conversation-header \.docs-header-button,\s*\n?\s*\.conversation-header \.install-header-button\s*{\s*width: 40px/);
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
     expect(css).toMatch(/\.public-pane,\s*\.vault-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: 24px;/);
     expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
@@ -4746,11 +4751,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v598/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=171/);
+    expect(sw).toMatch(/platho-pwa-prototype-v599/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=172/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=527/);
+    expect(sw).toMatch(/\.\/app\.js\?v=528/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
