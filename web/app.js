@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v522';
+const PLATHO_APP_RUNTIME_VERSION = 'v523';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -570,6 +570,10 @@ let publicChannelRegistry = [];
 let publicChannelThreads = [];
 let publicChannelSubscriptions = null;
 let publicChannelFeedCache = {};
+// Incremental public-sync cursor (mirrors the private chain-index cursor): the global public head id + history
+// window of the last CLEAN (non-rate-limited) full walk. While the head is unchanged we skip the whole walk.
+let lastSyncedPublicLatestId = null;
+let lastSyncedPublicSyncWindow = null;
 // Wallet (raw) -> resolved profile-avatar data URL for Public wallet channels, so a channel shows the
 // author's avatar even before/without any cached public post. `null` is a cached "no avatar" miss.
 const publicChannelAvatarUrlByWallet = new Map();
@@ -2894,6 +2898,24 @@ function applyContactDisplaySelection(counterpartyWallet, { displayIdentity = nu
 // real Private thread exists, callers pass that instead and full parity (incl. a known .ath username)
 // is automatic.
 function contactDisplayContextForWallet(counterpartyWallet) {
+  const base = baseContactDisplayContextForWallet(counterpartyWallet);
+  // The user's OWN wallet channel must offer their OWN linked username (.ath) as a "Display as" option, the
+  // same way a counterparty's channel offers theirs. A counterparty's username arrives via their received
+  // posts (senderUsername); your own never does (you don't receive your own posts), so without this the own
+  // channel only ever shows the wallet address while everyone else sees your username. Add it explicitly.
+  if (plathoWallet?.address && sameWalletAddress(counterpartyWallet, plathoWallet.address)) {
+    const ownUsername = readLinkedPlathoUsername(plathoWallet.address);
+    const ownIdentity = ownUsername?.label ? plathoUsernameIdentity(ownUsername.label) : null;
+    if (ownIdentity) {
+      // Non-mutating: return a shallow context whose variants include the own username (base may be a live
+      // thread object; don't graft the variant onto it as a side effect of opening a popover).
+      return { ...base, identityVariants: normalizeIdentityVariants([ownIdentity, ...threadIdentityVariants(base)]) };
+    }
+  }
+  return base;
+}
+
+function baseContactDisplayContextForWallet(counterpartyWallet) {
   const existing = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
   if (existing) return existing;
   const created = createRecipientThread(counterpartyWallet);
@@ -5787,6 +5809,21 @@ async function syncPublicChannelFromChain() {
   const minEntryId = syncWindow === 'long' ? 0 : Math.max(0, latest - readLimit);
   const retryEntryIds = publicBodyHistoryRetryEntryIds(address, latestId, BigInt(minEntryId));
   const retryEntryIdSet = new Set(retryEntryIds.map((id) => id.toString()));
+  // Incremental fast-path (mirrors the private cursor's "head unchanged -> zero reads"): if no new public entry
+  // has appeared globally since the last CLEAN walk in the SAME history window, and no body-gap retries are
+  // pending, the cached feed is already current — skip the entire author/parent index walk + body re-resolution.
+  // This is what stops re-reading every post and every comment every ~30s. lastSyncedPublicLatestId only advances
+  // after a non-degraded walk (the commit-gate below), so a rate-limited cycle re-walks next time and never
+  // strands a post that a rate limit made it miss behind a skipped head.
+  if (lastSyncedPublicLatestId !== null
+    && latestId === lastSyncedPublicLatestId
+    && syncWindow === lastSyncedPublicSyncWindow
+    && retryEntryIds.length === 0) {
+    return true;
+  }
+  // Set when a transient read failure (rate limit) was swallowed mid-walk, so the walk produced a PARTIAL result.
+  // A degraded walk must not advance the cursor (commit-gate) and must not be trusted to prune the cache.
+  let walkDegraded = false;
   // Per-subscribed-author walk (replaces the old global scan): fetch only posts by channels the user is
   // subscribed to, plus the comments on those posts, via the on-chain author/parent indexes. Cost scales with
   // the user's subscriptions, NOT the global feed size — the scalability fix. The walk caches each fetched
@@ -5832,6 +5869,7 @@ async function syncPublicChannelFromChain() {
     try {
       authorIndex = await provider.getPublicAuthorIndex(await computePublicAuthorKeyId(channelAuthor), readOptions);
     } catch (error) {
+      if (noteTonRpcRateLimit(error)) walkDegraded = true;
       console.warn('Skipping public author index read', channel.id, error);
       continue;
     }
@@ -5843,7 +5881,8 @@ async function syncPublicChannelFromChain() {
       let parentIndex;
       try {
         parentIndex = await provider.getPublicParentIndex(postId, readOptions);
-      } catch {
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) walkDegraded = true;
         continue;
       }
       if (parentIndex.exists === true) {
@@ -5885,6 +5924,7 @@ async function syncPublicChannelFromChain() {
         continue;
       }
       if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
+      if (noteTonRpcRateLimit(error)) walkDegraded = true;
       console.warn('Skipping unreadable public CapsuleHub entry', entry.entry_id?.toString?.() ?? entryIdValue.toString(), error);
       continue;
     }
@@ -6049,10 +6089,18 @@ async function syncPublicChannelFromChain() {
     ...Object.keys(publicChannelFeedCache ?? {}),
     ...postsByChannel.keys(),
   ]);
-  const nextFeedCache = {};
+  const nextFeedCache = { ...publicChannelFeedCache };
   for (const channelId of channelIdsToRefresh) {
-    const channelPosts = postsByChannel.get(channelId) ?? [];
-    const postsWithLocalPending = mergeLocalPendingPublicFeed(channelId, channelPosts);
+    const newChainPosts = postsByChannel.get(channelId) ?? [];
+    // Append-merge (NOT a wholesale rebuild from this one walk): upsert this cycle's chain posts into the
+    // channel's EXISTING cached chain posts by entryId, unioning comments. A degraded/rate-limited cycle that
+    // returned fewer (or zero) posts for a channel therefore LEAVES the already-cached posts in place instead of
+    // wiping them to the "Waiting for public feed" placeholder — that wholesale swap was the flicker. (Genuinely
+    // evicted posts persist until the history window hides them or a future rotating self-heal prunes them.)
+    const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
+    const existingChainPosts = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
+    const mergedChainPosts = upsertPublicChainPosts(existingChainPosts, newChainPosts);
+    const postsWithLocalPending = mergeLocalPendingPublicFeed(channelId, mergedChainPosts);
     nextFeedCache[channelId] = {
       feed: {
         version: 1,
@@ -6064,6 +6112,14 @@ async function syncPublicChannelFromChain() {
     };
   }
   publicChannelFeedCache = nextFeedCache;
+  // Commit-gate (mirrors the private cursor advance at app.js ~8163): only remember this global head as
+  // "fully synced" after a CLEAN walk. A degraded (rate-limited) cycle leaves lastSyncedPublicLatestId unchanged
+  // so the next cycle re-walks and picks up whatever the rate limit made it miss, instead of the fast-path
+  // skipping past it forever.
+  if (!walkDegraded) {
+    lastSyncedPublicLatestId = latestId;
+    lastSyncedPublicSyncWindow = syncWindow;
+  }
   globalThis.plathoLastPublicSync = {
     capsuleHub: address,
     latest: String(latest),
@@ -6088,6 +6144,49 @@ function publicFeedPostHasChainAnchor(post) {
     && post?.entryUid
     && /^0x[0-9a-fA-F]{64}$/.test(String(post.bodyHash)),
   );
+}
+
+// Union two comment lists by entryId (fallback bodyHash), keeping the fresh copy on collision, sorted oldest
+// first. Lets a degraded walk that re-read only SOME of a post's comments keep the rest instead of dropping them.
+function mergePublicComments(existing = [], fresh = []) {
+  const byKey = new Map();
+  const order = [];
+  const add = (comment) => {
+    const key = String(comment?.entryId ?? '') || `hash:${String(comment?.bodyHash ?? '')}`;
+    if (key === '' || key === 'hash:') return;
+    if (!byKey.has(key)) order.push(key);
+    byKey.set(key, byKey.has(key) ? { ...byKey.get(key), ...comment } : comment);
+  };
+  for (const comment of existing) add(comment);
+  for (const comment of fresh) add(comment);
+  return order
+    .map((key) => byKey.get(key))
+    .sort((a, b) => new Date(a?.createdAt ?? 0).getTime() - new Date(b?.createdAt ?? 0).getTime());
+}
+
+// Upsert this walk's chain posts into the channel's existing cached chain posts by entryId (fallback bodyHash):
+// matching posts are refreshed (newer fields win) with their comments UNIONED; posts the walk did not return
+// this cycle are kept. Result is sorted oldest-first to match the feed order. This is the public analogue of the
+// private sync's idempotent append (appendOpenedCapsuleMessage) — merge into existing, never rebuild from empty.
+function upsertPublicChainPosts(existing = [], fresh = []) {
+  const byKey = new Map();
+  const order = [];
+  const add = (post) => {
+    const key = String(post?.entryId ?? '') || `hash:${String(post?.bodyHash ?? '')}`;
+    if (key === '' || key === 'hash:') return;
+    if (byKey.has(key)) {
+      const prev = byKey.get(key);
+      byKey.set(key, { ...prev, ...post, comments: mergePublicComments(prev.comments ?? [], post.comments ?? []) });
+    } else {
+      byKey.set(key, post);
+      order.push(key);
+    }
+  };
+  for (const post of existing) add(post);
+  for (const post of fresh) add(post);
+  return order
+    .map((key) => byKey.get(key))
+    .sort((a, b) => new Date(a?.createdAt ?? 0).getTime() - new Date(b?.createdAt ?? 0).getTime());
 }
 
 function chainBackedPublicFeedOnly(feed) {
