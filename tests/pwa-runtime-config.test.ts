@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v519<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v519'/);
+    expect(html).toMatch(/id="appVersionLabel">v520<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v520'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2456,7 +2456,20 @@ describe('PWA runtime config guard', () => {
 
     expect(helpers).toMatch(/function canEditPrivateComposerDraft/);
     expect(helpers).toMatch(/function canAttemptPrivateSend/);
-    expect(helpers).not.toMatch(/hasActivePlathoAccount\(\)/);
+    // The draft INPUT must NOT depend on the flickering chain activation state (typing stays stable from the
+    // moment a chat opens): canEditPrivateComposerDraft -> messageInput.disabled is activation-free.
+    const editDraftHelper = app.slice(
+      app.indexOf('function canEditPrivateComposerDraft'),
+      app.indexOf('function privateSendBlockReason'),
+    );
+    expect(editDraftHelper).not.toMatch(/hasActivePlathoAccount/);
+    // The SEND button + payment-check ARE gated on activation (mirroring the public button) — this disables the
+    // button and surfaces "Activate Platho account before sending" in the cost status, but never the textarea.
+    const sendHelpers = app.slice(
+      app.indexOf('function privateSendBlockReason'),
+      app.indexOf('function isTonRpcTransientError'),
+    );
+    expect(sendHelpers).toMatch(/hasActivePlathoAccount\(\)/);
     expect(helpers).toMatch(/localIdentity && localRecipientKeyPair && localSignedPublicBundle/);
     expect(controls).toMatch(/const canEditPrivateDraft = canEditPrivateComposerDraft\(thread\)/);
     expect(controls).toMatch(/const canSendPrivate = canAttemptPrivateSend\(thread\)/);
@@ -4642,11 +4655,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v590/);
+    expect(sw).toMatch(/platho-pwa-prototype-v591/);
     expect(sw).toMatch(/\.\/styles\.css\?v=168/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=519/);
+    expect(sw).toMatch(/\.\/app\.js\?v=520/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
