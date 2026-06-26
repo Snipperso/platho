@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v514';
+const PLATHO_APP_RUNTIME_VERSION = 'v515';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -8339,7 +8339,11 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
     // and a stalled image (the owner's "image sent during sync" case). Yielding the budget to the in-flight
     // confirm lets it settle fast; sync resumes once privatePublishConfirmJobs drains. (Wallet-lock logic is
     // untouched: confirmation stays keyless / not key-holding — this only gates the background read pump.)
-    if (privateOutboundWorkActive() || privatePublishConfirmJobs.size > 0) {
+    // Also pause while ACCOUNT ACTIVATION is in flight: activation fires its own vault read burst (the poll +
+    // status/key-record reads), and on iOS WebKit the background sync reads running concurrently with it is
+    // the run-loop-stall pattern (v509) that froze the activation page. plathoAccountActivationPending clears
+    // the moment the account is active, so this only yields for the activation window.
+    if (privateOutboundWorkActive() || privatePublishConfirmJobs.size > 0 || plathoAccountActivationPending) {
       scheduleMessageAutoSync(PRIVATE_OUTBOUND_SYNC_PAUSE_MS);
       return;
     }
@@ -11130,11 +11134,14 @@ function setView(view) {
     scheduleVaultAutoRefresh(2_000);
   }
   if (view === 'profile' && plathoWallet?.address) {
-    refreshWalletTonBalanceForProfile().catch((error) => {
-      if (!noteTonRpcRateLimit(error)) console.error(error);
-    });
-    refreshAthProtocolStats().catch(() => {});
-    refreshOwnProfileAvatar().catch((error) => console.error(error));
+    // Serialize the Profile chain reads (GRAM balance -> ATH stats -> own avatar). Firing them concurrently is
+    // the iOS-WebKit run-loop-stall pattern fixed for the Vault in v509: 2+ concurrent toncenter reads freeze
+    // the page (it scrolls via the compositor but taps die — the account-activation freeze). One at a time.
+    (async () => {
+      try { await refreshWalletTonBalanceForProfile(); } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
+      try { await refreshAthProtocolStats(); } catch { /* best effort */ }
+      try { await refreshOwnProfileAvatar(); } catch (error) { console.error(error); }
+    })();
   }
 }
 
@@ -15562,18 +15569,14 @@ async function resolveAthMasterProvider() {
 
 async function readAthBurnFlushState() {
   const readOptions = criticalChainReadOptions();
-  const [usernameResult, profileResult] = await Promise.allSettled([
-    resolveUsernameRegistryProvider()
-      .then((provider) => provider.getGlobal({
-        address: requireUsernameRegistryAddress(),
-        ...readOptions,
-      })),
-    resolveProfileRegistryProvider()
-      .then(({ provider, address }) => provider.getGlobal({
-        address,
-        ...readOptions,
-      })),
-  ]);
+  // Read the two registry globals SEQUENTIALLY (not concurrently) — concurrent toncenter reads stall the iOS
+  // run loop (the v509 pattern). Keep the {status,value/reason} settled shape the rest of the fn expects.
+  const usernameResult = await resolveUsernameRegistryProvider()
+    .then((provider) => provider.getGlobal({ address: requireUsernameRegistryAddress(), ...readOptions }))
+    .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
+  const profileResult = await resolveProfileRegistryProvider()
+    .then(({ provider, address }) => provider.getGlobal({ address, ...readOptions }))
+    .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
   const next = {
     username_burn_due_ath: null,
     profile_burn_due_ath: null,
@@ -15637,7 +15640,9 @@ async function refreshAthAirdropState() {
 
 async function refreshAthProtocolStats() {
   renderAthProfileStats();
-  refreshAthAirdropState().catch(() => {});
+  // Serialize the ATH-stats reads (airdrop -> jetton -> flush), one at a time. The airdrop read was
+  // fire-and-forget, overlapping the jetton read + the flush burst — the iOS run-loop-stall pattern (v509).
+  await refreshAthAirdropState().catch(() => {});
   try {
     const provider = await resolveAthMasterProvider();
     if (!provider?.getJettonData) {
@@ -15655,7 +15660,7 @@ async function refreshAthProtocolStats() {
     return athProtocolState;
   } catch (error) {
     noteTonRpcRateLimit(error);
-    refreshAthFlushState().catch(() => {});
+    await refreshAthFlushState().catch(() => {});
     return athProtocolState;
   }
 }
@@ -15718,14 +15723,19 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
     const dashboardUser = dashboardResult[0]?.status === 'fulfilled'
       ? dashboardResult[0].value
       : null;
-    const jobs = [];
+    // Run the post-dashboard jobs SEQUENTIALLY (one at a time), not concurrently: on iOS WebKit, activation +
+    // ATH-stats firing together (and each fanning out) is the run-loop-stall pattern fixed for the Vault in
+    // v509. Build thunks so each job is INVOKED only when the previous has settled.
+    const jobThunks = [];
     if (includeActivation) {
-      jobs.push(refreshVaultActivationStatus(
+      jobThunks.push(() => refreshVaultActivationStatus(
         dashboardUser ? { user: dashboardUser, skipGlobal: true } : {},
       ));
     }
-    if (includeStats) jobs.push(refreshAthProtocolStats());
-    if (jobs.length > 0) results.push(...await Promise.allSettled(jobs));
+    if (includeStats) jobThunks.push(() => refreshAthProtocolStats());
+    for (const job of jobThunks) {
+      results.push(...await Promise.allSettled([job()]));
+    }
     const rejected = results.find((result) => result.status === 'rejected');
     if (rejected) throw rejected.reason;
   })();
