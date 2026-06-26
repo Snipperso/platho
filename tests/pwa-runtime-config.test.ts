@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v515<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v515'/);
+    expect(html).toMatch(/id="appVersionLabel">v516<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v516'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1061,6 +1061,87 @@ describe('PWA runtime config guard', () => {
     // The boot warm-up must read cached posts via feed.posts — the cache shape is { feed: { posts: [...] } }.
     // Iterating `feed` as an array silently warmed NOTHING (the avatar-flash-on-reload bug). Guard it.
     expect(app).toMatch(/Array\.isArray\(feed\?\.posts\) \? feed\.posts/);
+  });
+
+  it('PWA-AVATAR-SERIAL-01: every avatar chain read runs through one serial lane and the post-unlock refresh is serialized in bootCrypto', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const loadAvatarSource = app.slice(
+      app.indexOf('async function loadProfileAvatarImage'),
+      app.indexOf('function attachAvatarUrlToPublicFeedCache'),
+    );
+    const loadWalletSource = app.slice(
+      app.indexOf('async function loadPlathoWallet'),
+      app.indexOf('async function setPlathoWallet'),
+    );
+    const setWalletSource = app.slice(
+      app.indexOf('async function setPlathoWallet'),
+      app.indexOf('async function loadMessagingIdentityFromWallet'),
+    );
+    const syncPublicSource = app.slice(
+      app.indexOf('async function syncPublicChannels'),
+      app.indexOf('function collectPublicAvatarRequests'),
+    );
+    const bootSource = app.slice(
+      app.indexOf('async function bootCrypto'),
+      app.indexOf("if ('serviceWorker' in navigator"),
+    );
+
+    // The iOS run-loop freeze (v509) recurs whenever 2+ toncenter reads run concurrently. Avatar hydration
+    // fanned out many getAvatar reads through loadProfileAvatarImage with DIFFERENT dedup keys, so they were
+    // NOT serialized against each other. A single serial lane caps avatar chain reads to one at a time.
+    expect(app).toMatch(/let avatarChainReadLane = Promise\.resolve\(\)/);
+    expect(app).toMatch(/function enqueueAvatarChainRead\(task\) \{/);
+    expect(loadAvatarSource).toMatch(/const promise = enqueueAvatarChainRead\(async \(\) => \{/);
+
+    // The two public-feed avatar hydrators run sequentially (feed-post authors, then channel authors) instead
+    // of two bare fire-and-forget launches that overlapped on iOS.
+    expect(syncPublicSource).toMatch(/await hydratePublicAvatars\(\);\s*await hydratePublicChannelAvatars\(\);/);
+    expect(syncPublicSource).not.toMatch(/hydratePublicAvatars\(\)\.catch/);
+
+    // The OWN-profile avatar refresh has ONE canonical spot — bootCrypto's tail, AFTER the activation +
+    // private-sync reads and BEFORE the background loop / vault auto-refresh timers are armed. loadPlathoWallet
+    // and the wallet-change paths must NOT fire it themselves (that overlapped bootCrypto's reads on iOS).
+    expect(loadWalletSource).not.toMatch(/refreshOwnProfileAvatar/);
+    expect(setWalletSource).not.toMatch(/refreshOwnProfileAvatar/);
+    const avatarRefreshIndex = bootSource.indexOf('await refreshOwnProfileAvatar()');
+    const syncIndex = bootSource.indexOf('syncPrivateCapsulesFromChainOnce');
+    const autoSyncIndex = bootSource.indexOf('scheduleMessageAutoSync()');
+    expect(avatarRefreshIndex).toBeGreaterThanOrEqual(0);
+    expect(avatarRefreshIndex).toBeGreaterThan(syncIndex);
+    expect(autoSyncIndex).toBeGreaterThan(avatarRefreshIndex);
+  });
+
+  it('PWA-FUNDS-SERIAL-01: funds-action pre-sign reads and the private-index sync read are serialized, never a concurrent Promise.all', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // The iOS run-loop freeze (v509) fires on 2+ concurrent toncenter reads. Every funds-critical ACTION users
+    // hit — setting an avatar, minting a username, moving Vault money — ran its pre-sign user/global/route reads
+    // as a Promise.all, and the private sync read both index heads as a Promise.all. Those are the exact paths a
+    // freeze would wreck. They are now sequential awaits returning IDENTICAL values (independent pure reads); the
+    // nonce floor / waitForVaultPublishNonce barrier / send lock / sendBoc were never inside these read bursts.
+    // BLANKET GUARD: no concurrent-read array literal anywhere in app.js. NOTE this deliberately forbids
+    // `Promise.all([...])`; the cleanup `Promise.all(arr.map(...))` forms (local IndexedDB/cache, no chain read)
+    // and the single-element `Promise.allSettled([job()])` serialization pattern do NOT match and stay allowed.
+    expect(app).not.toMatch(/Promise\.all\(\[/);
+
+    // The private-index sync read (runs on every sync tick, boot and unlock) reads the two heads sequentially.
+    const syncSource = app.slice(
+      app.indexOf('const readPrivateIndexes = async ()'),
+      app.indexOf('const privateIndexReadFailure'),
+    );
+    expect(syncSource).not.toMatch(/Promise\.all\(/);
+    expect(syncSource).toMatch(/const recipient = await provider\.getPrivateRecipientIndex\(keyIdIndex, readOptions\)/);
+    expect(syncSource).toMatch(/const sender = await provider\.getPrivateSenderIndex\(keyIdIndex, readOptions\)/);
+    expect(syncSource).toMatch(/return \[recipient, sender\]/);
+
+    // Spot-check the ProfileRegistry route verifier (runs twice per avatar op) reads its two checks sequentially.
+    const profileRouteSource = app.slice(
+      app.indexOf('function requireProfileRegistryVaultRoute('),
+      app.indexOf('function requireUsernameRegistryVaultRoute('),
+    );
+    expect(profileRouteSource).not.toMatch(/Promise\.all\(/);
+    expect(profileRouteSource).toMatch(/const registryGlobal = await resolved\.provider\.getGlobal/);
+    expect(profileRouteSource).toMatch(/const derivedOfficialWallet = await resolved\.provider\.getAthWalletAddress/);
   });
 
   it('PWA-CONFIG-01D2: publish path confirms fresh chain price increases before sendBoc', () => {
@@ -4101,7 +4182,7 @@ describe('PWA runtime config guard', () => {
 
     expect(routeSource).toMatch(/provider\.getAthWalletAddress\(registry/);
     expect(routeSource).toMatch(/resolveAthMasterProvider\(\)/);
-    expect(routeSource).toMatch(/athMasterProvider\?\.getWalletAddress\(registry/);
+    expect(routeSource).toMatch(/athMasterProvider\.getWalletAddress\(registry/);
     expect(routeSource).toMatch(/officialWallet !== appDerivedWallet/);
     expect(routeSource).toMatch(/createAthWalletTonRpcProvider\(\{ athWalletAddress: officialWallet \}\)\.getWalletData/);
     expect(routeSource).toMatch(/if \(!isAthWalletNotDeployedError\(error\)\) throw error/);
@@ -4538,11 +4619,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v586/);
+    expect(sw).toMatch(/platho-pwa-prototype-v587/);
     expect(sw).toMatch(/\.\/styles\.css\?v=165/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=515/);
+    expect(sw).toMatch(/\.\/app\.js\?v=516/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

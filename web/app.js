@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v515';
+const PLATHO_APP_RUNTIME_VERSION = 'v516';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -609,6 +609,21 @@ let publicImageAttachments = [];
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
+// iOS-WebKit stalls its run loop under 2+ CONCURRENT toncenter reads (the v509 freeze class). Avatar
+// hydration is the worst remaining offender: the public feed, the channel list, restored history, and
+// per-message append each fan out many getAvatar/getAvatarVersion/readAvatarParts reads through the one
+// loadProfileAvatarImage chokepoint with DIFFERENT dedup keys, so the per-key dedup above does NOT
+// serialize them against each other. Route every avatar CHAIN read through a single serial lane so at
+// most one runs at a time. The transport queue already spaces toncenter reads ~1.5s apart, so a serial
+// lane costs ~no wall-clock (the reads were already effectively serial at the network) while removing
+// the concurrent-pending run-loop stall on iOS.
+let avatarChainReadLane = Promise.resolve();
+function enqueueAvatarChainRead(task) {
+  const run = avatarChainReadLane.then(() => task());
+  // Keep the lane alive (never rejecting) regardless of this task's outcome so the next read still runs.
+  avatarChainReadLane = run.then(() => undefined, () => undefined);
+  return run;
+}
 const profileAvatarPublishRecoveryJobs = new Map();
 let profileAvatarPublishRecoverySeq = 0;
 let vaultMoveDirections = { TON: 'to-vault', ATH: 'to-vault' };
@@ -5602,7 +5617,7 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
   if (cached) return cached;
   const key = `${ownerWallet}:${requestedPointer?.profileVersion ?? 'current'}:${requestedPointer?.avatarHash ?? 'current'}`;
   if (profileAvatarLoadPromises.has(key)) return profileAvatarLoadPromises.get(key);
-  const promise = (async () => {
+  const promise = enqueueAvatarChainRead(async () => {
     const resolved = await resolveProfileRegistryProvider();
     if (!resolved) return null;
     const readOptions = { profileRegistryAddress: resolved.address, ...criticalChainReadOptions() };
@@ -5613,7 +5628,7 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
     if (!recordPointer) return null;
     if (requestedPointer && recordPointer.avatarHash.toLowerCase() !== requestedPointer.avatarHash.toLowerCase()) return null;
     return readAvatarPartsFromCapsuleHub(ownerWallet, recordPointer);
-  })().catch((error) => {
+  }).catch((error) => {
     if (!noteTonRpcRateLimit(error)) console.error(error);
     return null;
   }).finally(() => {
@@ -6085,8 +6100,13 @@ async function syncPublicChannels() {
       rebuildThreadsFromPublicSubscriptions();
       renderThreads();
       renderConversation();
-      hydratePublicAvatars().catch((error) => console.error(error));
-      hydratePublicChannelAvatars().catch((error) => console.error(error));
+      // Serialize the two avatar hydrators (feed-post authors, then channel authors): firing both
+      // fire-and-forget let their chain reads overlap on iOS (the v509 run-loop freeze class). One
+      // sequential worker keeps them off the sync critical path while never running two at once.
+      void (async () => {
+        await hydratePublicAvatars();
+        await hydratePublicChannelAvatars();
+      })().catch((error) => console.error(error));
       const unavailableCount = Number(globalThis.plathoLastPublicSync?.historyUnavailableCount ?? 0);
       const incompleteCount = Number(globalThis.plathoLastPublicSync?.incompleteChannelCount ?? 0);
       if (unavailableCount > 0) {
@@ -6143,8 +6163,10 @@ async function syncPublicChannels() {
   rebuildThreadsFromPublicSubscriptions();
   renderThreads();
   renderConversation();
-  hydratePublicAvatars().catch((error) => console.error(error));
-  hydratePublicChannelAvatars().catch((error) => console.error(error));
+  void (async () => {
+    await hydratePublicAvatars();
+    await hydratePublicChannelAvatars();
+  })().catch((error) => console.error(error));
 }
 
 function collectPublicAvatarRequests() {
@@ -7662,10 +7684,15 @@ async function syncPrivateCapsulesFromChain(options = {}) {
   let recipientIndex = null;
   let senderIndex = null;
   let indexReadFallback = null;
-  const readPrivateIndexes = async () => Promise.all([
-    provider.getPrivateRecipientIndex(keyIdIndex, readOptions),
-    provider.getPrivateSenderIndex(keyIdIndex, readOptions),
-  ]);
+  // Sequential, not Promise.all: the recipient + sender index reads are 2 concurrent toncenter reads that stall
+  // the iOS run loop (v509 class) — and this runs on every sync tick, boot and unlock. Two independent read-only
+  // index reads; sequential returns the same [recipient, sender] heads (the walk is eventually-consistent, so a
+  // one-block skew between the two heads just resolves on the next cycle — no entry is lost).
+  const readPrivateIndexes = async () => {
+    const recipient = await provider.getPrivateRecipientIndex(keyIdIndex, readOptions);
+    const sender = await provider.getPrivateSenderIndex(keyIdIndex, readOptions);
+    return [recipient, sender];
+  };
   const privateIndexReadFailure = (error) => {
     const rateLimited = noteTonRpcRateLimit(error);
     const rpcDelayed = !rateLimited && isTonRpcTransientError(error);
@@ -9299,7 +9326,9 @@ async function loadPlathoWallet() {
         retry: true,
         retryDelayMs: 0,
       });
-      refreshOwnProfileAvatar().catch((error) => console.error(error));
+      // The profile-avatar read is NOT fired here: every loadPlathoWallet caller (unlock button, auto-unlock,
+      // boot) runs bootCrypto right after, and bootCrypto refreshes the avatar at its tail — serialized AFTER
+      // the activation/sync reads. Firing it here overlapped those reads and stalled the iOS run loop (v509).
       resumeProfileAvatarPublishRecoveryForOwner(wallet.address);
     }
     return wallet;
@@ -9319,8 +9348,9 @@ async function setPlathoWallet(wallet, { password } = {}) {
   await writeStoredPlathoWallet(wallet, password);
   scheduleWalletAutoLock();
   await bootCrypto();
+  // bootCrypto already refreshed the profile avatar at its tail (serialized after sync). Fire the vault
+  // refresh only AFTER bootCrypto fully settles so its single vault read does not overlap that avatar read.
   queueVaultRefreshAfterWalletChange();
-  await refreshOwnProfileAvatar();
   return wallet;
 }
 
@@ -13053,8 +13083,9 @@ async function activateImportedEncryptedWalletRecord(wallet, record) {
   markWalletUnlocked();
   scheduleWalletAutoLock();
   await bootCrypto();
+  // bootCrypto refreshed the avatar at its tail (serialized after sync); fire the vault refresh after it
+  // fully settles so the single vault read does not overlap the avatar read on iOS.
   queueVaultRefreshAfterWalletChange();
-  await refreshOwnProfileAvatar().catch((error) => console.error(error));
   refreshMessagingControls();
   renderWalletIdentity('Wallet key imported');
   return true;
@@ -14446,10 +14477,11 @@ async function requireProfileRegistryVaultRoute(global, options = {}) {
       cacheTtlMs: 0,
     }
     : criticalChainReadOptions();
-  const [registryGlobal, derivedOfficialWallet] = await Promise.all([
-    resolved.provider.getGlobal({ profileRegistryAddress: registry, ...readOptions }),
-    resolved.provider.getAthWalletAddress(registry, { profileRegistryAddress: registry, ...readOptions }),
-  ]);
+  // Sequential, not Promise.all: 2 concurrent toncenter reads stall the iOS run loop (v509 class). These are
+  // pure ProfileRegistry route-verify reads — reading them one at a time yields identical values (this runs on
+  // the avatar funds-move pre-sign path; serializing touches no nonce/sign/broadcast logic).
+  const registryGlobal = await resolved.provider.getGlobal({ profileRegistryAddress: registry, ...readOptions });
+  const derivedOfficialWallet = await resolved.provider.getAthWalletAddress(registry, { profileRegistryAddress: registry, ...readOptions });
   if (registryGlobal.sealed !== true) throw new Error('ProfileRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('ProfileRegistry official ATH wallet is not bound');
   if (registryGlobal.vault_bound !== true) throw new Error('ProfileRegistry is not bound back to Vault');
@@ -14513,11 +14545,14 @@ async function requireUsernameRegistryVaultRoute(global, options = {}) {
       cacheTtlMs: 0,
     }
     : criticalChainReadOptions();
-  const [registryGlobal, derivedOfficialWallet, appMasterOfficialWallet] = await Promise.all([
-    provider.getGlobal({ address: registry, ...readOptions }),
-    provider.getAthWalletAddress(registry, { address: registry, ...readOptions }),
-    athMasterProvider?.getWalletAddress(registry, { address: expectedAthMaster, ...readOptions }) ?? null,
-  ]);
+  // Sequential, not Promise.all: 2-3 concurrent toncenter reads stall the iOS run loop (v509 class). These are
+  // pure UsernameRegistry route-verify reads — reading them one at a time yields identical values (this runs on
+  // the username-mint pre-sign path; serializing touches no nonce/sign/broadcast logic).
+  const registryGlobal = await provider.getGlobal({ address: registry, ...readOptions });
+  const derivedOfficialWallet = await provider.getAthWalletAddress(registry, { address: registry, ...readOptions });
+  const appMasterOfficialWallet = athMasterProvider
+    ? (await athMasterProvider.getWalletAddress(registry, { address: expectedAthMaster, ...readOptions })) ?? null
+    : null;
   if (registryGlobal.sealed !== true) throw new Error('UsernameRegistry is not sealed on this network');
   if (registryGlobal.official_ath_wallet_bound !== true) throw new Error('UsernameRegistry official ATH wallet is not bound');
   if (registryGlobal.vault_bound !== true) throw new Error('UsernameRegistry is not bound back to Vault');
@@ -14581,10 +14616,10 @@ async function estimateVaultPublicPublishHoldNanotons(provider, owner, partCount
 
 async function assertVaultProfileAvatarCanStart(owner, partCount) {
   const provider = await resolveVaultChainProvider();
-  const [user, global] = await Promise.all([
-    readFreshConnectedVaultUser(provider),
-    loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
-  ]);
+  // Sequential, not Promise.all: concurrent get_user + get_global stall the iOS run loop (v509 class). Pure
+  // pre-sign balance/route reads — sequential preserves the same user/global; nonce/sign/broadcast run later.
+  const user = await readFreshConnectedVaultUser(provider);
+  const global = await loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() });
   await requireProfileRegistryVaultRouteForOwnVaultAction(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before setting an avatar');
@@ -14606,10 +14641,10 @@ async function assertVaultProfileAvatarCanStart(owner, partCount) {
 
 async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
   const provider = await resolveVaultChainProvider();
-  const [user, global] = await Promise.all([
-    readFreshConnectedVaultUserForOwnVaultAction(provider),
-    readConnectedVaultGlobalForOwnVaultAction(provider),
-  ]);
+  // Sequential, not Promise.all: concurrent get_user + get_global stall the iOS run loop (v509 class). Pure
+  // pre-sign balance/route reads — sequential preserves the same user/global; nonce/sign/broadcast run later.
+  const user = await readFreshConnectedVaultUserForOwnVaultAction(provider);
+  const global = await readConnectedVaultGlobalForOwnVaultAction(provider);
   await requireUsernameRegistryVaultRouteForOwnVaultAction(global);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
     throw new Error('Activate Platho account before minting a username');
@@ -14630,10 +14665,11 @@ async function assertVaultUsernameMintCanStart(owner, username, priceAtomic) {
 async function submitVaultProfileAvatarRegistration({ owner, avatarHash, avatarEntryId, avatarStreamId, avatarPartCount, mediaFormat }) {
   requireNoPendingServiceWorkerAppShellReload();
   const provider = await resolveVaultChainProvider();
-  const [global, rawUser] = await Promise.all([
-    loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() }),
-    readFreshConnectedVaultUser(provider),
-  ]);
+  // Sequential, not Promise.all: concurrent get_global + get_user stall the iOS run loop (v509 class). Pure
+  // pre-sign reads — sequential returns the same global/user, and reading user LAST keeps it the freshest read
+  // before signing. The nonce floor / barrier / send-lock / sendBoc all run later in submitVaultAuthExternal*.
+  const global = await loadConnectedVaultGlobal({ provider, ...criticalChainReadOptions() });
+  const rawUser = await readFreshConnectedVaultUser(provider);
   const registry = await requireProfileRegistryVaultRouteForOwnVaultAction(global);
   const user = rememberConnectedVaultUser(rawUser);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
@@ -15144,10 +15180,11 @@ async function runProfileAvatarPublishRecovery(key) {
 async function submitVaultUsernameMint({ owner, username, priceAtomic }) {
   requireNoPendingServiceWorkerAppShellReload();
   const provider = await resolveVaultChainProvider();
-  const [global, rawUser] = await Promise.all([
-    readConnectedVaultGlobalForOwnVaultAction(provider),
-    readFreshConnectedVaultUserForOwnVaultAction(provider),
-  ]);
+  // Sequential, not Promise.all: concurrent get_global + get_user stall the iOS run loop (v509 class). Pure
+  // pre-sign reads — sequential returns the same global/user, and reading user LAST keeps it the freshest read
+  // before signing. The nonce floor / barrier / send-lock / sendBoc all run later in submitVaultAuthExternal*.
+  const global = await readConnectedVaultGlobalForOwnVaultAction(provider);
+  const rawUser = await readFreshConnectedVaultUserForOwnVaultAction(provider);
   const registry = await requireUsernameRegistryVaultRouteForOwnVaultAction(global);
   const user = rememberConnectedVaultUser(rawUser);
   if (user.exists !== true || BigInt(user.current_key_id ?? 0n) === 0n) {
@@ -15854,10 +15891,10 @@ async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry,
   }
   const readOptions = { address: registry, ...criticalChainReadOptions() };
   const nameHash = await computeUsernameNameHash(username);
-  const [record, pending] = await Promise.all([
-    provider.getNameRecordByUsername(username, readOptions),
-    provider.getPendingMint(nameHash, readOptions),
-  ]);
+  // Sequential, not Promise.all: concurrent toncenter reads stall the iOS run loop (v509 class). Pure
+  // availability reads on the username-mint pre-sign path — sequential preserves the same record/pending.
+  const record = await provider.getNameRecordByUsername(username, readOptions);
+  const pending = await provider.getPendingMint(nameHash, readOptions);
   if (record?.exists === true) {
     throw new Error('Username is already registered');
   }
@@ -20308,6 +20345,11 @@ async function bootCrypto() {
     } else if (messageSyncStatus?.textContent !== 'sync delayed') {
       setText(messageSyncStatus, 'sync failed');
     }
+    // Refresh the OWN profile avatar here — the single canonical post-unlock spot — serialized AFTER the
+    // activation + private-sync reads above and BEFORE the background loop / vault auto-refresh timers are
+    // armed below, so no avatar read overlaps another chain read on iOS (v509 class). Cached avatars resolve
+    // instantly (IndexedDB) so this rarely blocks; an uncached avatar pays one serial read, never a freeze.
+    await refreshOwnProfileAvatar().catch((error) => console.error(error));
     scheduleMessageAutoSync();
     if (isVaultViewActive()) {
       await refreshVaultNow({ includeActivation: true, includeStats: true }).catch((error) => {
