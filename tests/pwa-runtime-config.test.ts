@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v523<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v523'/);
+    expect(html).toMatch(/id="appVersionLabel">v524<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v524'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1142,6 +1142,43 @@ describe('PWA runtime config guard', () => {
     expect(avatarRefreshIndex).toBeGreaterThanOrEqual(0);
     expect(avatarRefreshIndex).toBeGreaterThan(syncIndex);
     expect(autoSyncIndex).toBeGreaterThan(avatarRefreshIndex);
+  });
+
+  it('PWA-AVATAR-OWN-PERSIST-01: the own avatar restores from the media cache into the public-feed map on reload (no letter-tile flash)', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const restoreSource = app.slice(
+      app.indexOf('async function restoreOwnAvatarFromCacheFast'),
+      app.indexOf('async function refreshOwnProfileAvatar'),
+    );
+    const refreshSource = app.slice(
+      app.indexOf('async function refreshOwnProfileAvatar'),
+      app.indexOf('async function readCurrentProfileAvatarPointerResultFromChain'),
+    );
+    const bootSource = app.slice(
+      app.indexOf('async function bootCrypto'),
+      app.indexOf("if ('serviceWorker' in navigator"),
+    );
+
+    // Counterparty avatars warm from the avatarHash embedded in their feed posts; the OWN wallet often has no feed
+    // post carrying its CURRENT avatarHash (a postless official channel; a past comment embeds an older pointer),
+    // so the feed-warm path cannot restore it and the own face flashed the letter tile + re-fetched from chain on
+    // every reload. The own avatar must restore from the persisted current pointer + media store, into the public
+    // feed per-wallet map, with no chain wait.
+    expect(restoreSource).toMatch(/readStoredProfileAvatarPointer\(owner\)/);
+    expect(restoreSource).toMatch(/readProfileAvatarMediaCache\(pointer\.avatarHash\)/);
+    expect(restoreSource).toMatch(/setOwnPublicFeedAvatar\(owner, cachedUrl\)/);
+    expect(app).toMatch(/function setOwnPublicFeedAvatar\(owner, imageUrl\)/);
+    expect(app).toMatch(/publicChannelAvatarUrlByWallet\.set\(raw, imageUrl\)/);
+
+    // refreshOwnProfileAvatar shows the cached avatar FIRST (no chain wait) and mirrors the result into the feed map.
+    expect(refreshSource).toMatch(/await restoreOwnAvatarFromCacheFast\(owner\)/);
+    expect(refreshSource).toMatch(/setOwnPublicFeedAvatar\(owner, imageUrl\)/);
+
+    // bootCrypto restores it EARLY — right after unlock, before the sync + first feed render — not only at its tail.
+    const earlyRestoreIndex = bootSource.indexOf('await restoreOwnAvatarFromCacheFast(plathoWallet.address)');
+    const tailRefreshIndex = bootSource.indexOf('await refreshOwnProfileAvatar()');
+    expect(earlyRestoreIndex).toBeGreaterThanOrEqual(0);
+    expect(earlyRestoreIndex).toBeLessThan(tailRefreshIndex);
   });
 
   it('PWA-FUNDS-SERIAL-01: funds-action pre-sign reads and the private-index sync read are serialized, never a concurrent Promise.all', () => {
@@ -4674,11 +4711,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v594/);
+    expect(sw).toMatch(/platho-pwa-prototype-v595/);
     expect(sw).toMatch(/\.\/styles\.css\?v=170/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=523/);
+    expect(sw).toMatch(/\.\/app\.js\?v=524/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

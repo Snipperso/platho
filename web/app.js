@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v523';
+const PLATHO_APP_RUNTIME_VERSION = 'v524';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -7215,20 +7215,57 @@ async function hydrateThreadAvatarFromPointer(thread, ownerWallet, pointer) {
   return true;
 }
 
+// Push the logged-in user's own avatar into the public-feed per-wallet map (publicChannelAvatarUrlByWallet) so
+// the own face shows in the feed/channel header, and re-render if it changed. Unlike counterparties — whose
+// avatars warm from the avatarHash embedded in their feed posts — the own wallet often has NO feed post carrying
+// its CURRENT avatarHash (the official channel may be postless; a past comment embeds the avatar-at-publish-time),
+// so the feed-warm path can't restore it. Driving the map from the own profile avatar fixes that.
+function setOwnPublicFeedAvatar(owner, imageUrl) {
+  const raw = rawWalletAddress(owner);
+  if (!raw) return;
+  if (imageUrl) {
+    if (publicChannelAvatarUrlByWallet.get(raw) === imageUrl) return;
+    publicChannelAvatarUrlByWallet.set(raw, imageUrl);
+  } else if (publicChannelAvatarUrlByWallet.has(raw)) {
+    publicChannelAvatarUrlByWallet.delete(raw);
+  } else {
+    return;
+  }
+  renderPublicSurface({ anchorUnread: false });
+}
+
+// Restore the own avatar from the local media store IMMEDIATELY (no chain wait) using the persisted current
+// pointer, into both the profile node and the public-feed map. This is what stops the own face vanishing to the
+// letter tile on reload while the chain refresh is still in flight. Returns the cached url, or null on a miss.
+async function restoreOwnAvatarFromCacheFast(owner = plathoWallet?.address) {
+  if (!owner) return null;
+  const pointer = readStoredProfileAvatarPointer(owner);
+  if (!pointer) return null;
+  const cachedUrl = await readProfileAvatarMediaCache(pointer.avatarHash);
+  if (!cachedUrl) return null;
+  setAvatarNode(profileAvatar, 'P', cachedUrl);
+  setOwnPublicFeedAvatar(owner, cachedUrl);
+  return cachedUrl;
+}
+
 async function refreshOwnProfileAvatar() {
   const owner = plathoWallet?.address;
   if (!owner) {
     setAvatarNode(profileAvatar, 'P', null);
     return null;
   }
+  // Cache-first: show the cached avatar at once so it never flashes the letter tile, then confirm from chain.
+  await restoreOwnAvatarFromCacheFast(owner).catch(() => {});
   const onChain = await readCurrentProfileAvatarPointerResultFromChain(owner, { required: false });
   const pointer = onChain.ok ? onChain.pointer : readStoredProfileAvatarPointer(owner);
   if (!pointer) {
     setAvatarNode(profileAvatar, 'P', null);
+    setOwnPublicFeedAvatar(owner, null);
     return null;
   }
   const imageUrl = await loadProfileAvatarImage(owner, pointer);
   setAvatarNode(profileAvatar, 'P', imageUrl);
+  setOwnPublicFeedAvatar(owner, imageUrl);
   return imageUrl;
 }
 
@@ -20427,6 +20464,9 @@ async function bootCrypto() {
     await bootWalletScopedLocalStores();
     renderWalletIdentity();
     localProfileAvatarPointer = readStoredProfileAvatarPointer(plathoWallet.address);
+    // Restore the own avatar from the media cache right after unlock — before the sync and the first feed render —
+    // so it does not flash the letter tile on reload; the tail refreshOwnProfileAvatar then confirms it on-chain.
+    await restoreOwnAvatarFromCacheFast(plathoWallet.address).catch(() => {});
     localVaultAuthKeyPair = await deriveVaultAuthKeyPairFromWallet(plathoWallet);
     localIdentity = await loadMessagingIdentityFromWallet(VAULT_RECEIVE_CRYPTO_SUITE);
     localRecipientKeyPair = localIdentity?.encryptionKeyPair ?? null;
