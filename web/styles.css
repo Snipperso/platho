@@ -3494,8 +3494,12 @@ button.feed-item:hover {
     display: none;
   }
 
-  /* Tapping a channel opens its detail (posts) full-width, replacing the list + search; a back button
-     in the detail header returns to the list. Desktop keeps both columns and ignores this state. */
+  /* Tapping a channel opens its detail (posts) FULL-SCREEN — same pattern as a Private conversation: hide the
+     whole list chrome (the Platho.app title + the Feed/Channels toggle, both in .pane-header; the search row;
+     the feed) so all the vertical space goes to the channel. The detail has its OWN header (back + name +
+     Unfollow), and Back returns to the channel list where the Feed/Channels toggle lives — the toggle is a
+     list-level control, meaningless inside a single channel. Desktop keeps both columns and ignores this. */
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .pane-header,
   .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-search-row,
   .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-feed {
     display: none;
@@ -3506,7 +3510,7 @@ button.feed-item:hover {
     grid-template-rows: auto minmax(0, 1fr);
     gap: 14px;
     grid-column: 1;
-    grid-row: 2 / 4;
+    grid-row: 1 / 4;
     min-height: 0;
     padding: 0 4px 0 0;
   }
