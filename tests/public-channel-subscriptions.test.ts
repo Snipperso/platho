@@ -13,6 +13,8 @@ import {
   publicChannelThreadId,
   subscribedPublicChannels,
   writePublicChannelFeedCache,
+  publicEvictionFloor,
+  prunePublicPostsBelowFloor,
 } from '../web/public-channel-subscriptions.mjs';
 
 describe('PWA public channel subscriptions', () => {
@@ -295,5 +297,45 @@ describe('PWA public channel subscriptions', () => {
       name: 'Builder',
       authorWallet,
     });
+  });
+});
+
+describe('Public eviction floor + prune (Phase 3)', () => {
+  // entryIds are 0-indexed; public_latest_id (latest) is the NEXT id, so the highest live id is latest-1 and the
+  // live id range is [latest - live_count, latest - 1]. The floor (oldest-live id) is EXACTLY latest - live_count.
+  // An off-by-one here would silently drop the OLDEST LIVE post every cycle — so this is checked NUMERICALLY.
+  it('PUBLIC-EVICT-FLOOR-01: floor = latest - live_count (the oldest-live id), keeping the oldest live entry', () => {
+    // Fresh chain, 3 posts (ids 0,1,2), nothing evicted: latest=3, live=3 -> floor 0 (keep all).
+    expect(publicEvictionFloor(3n, 3n)).toBe(0n);
+    // After evicting ids 0..4 (O=5): ids 5..9 live, latest=10, live=5 -> floor 5 (the oldest LIVE id, kept).
+    expect(publicEvictionFloor(10n, 5n)).toBe(5n);
+    // One post, none evicted: latest=1, live=1 -> floor 0.
+    expect(publicEvictionFloor(1n, 1n)).toBe(0n);
+    // Everything evicted: live=0 -> floor = latest (prune all ids 0..latest-1).
+    expect(publicEvictionFloor(10n, 0n)).toBe(10n);
+    // Empty chain.
+    expect(publicEvictionFloor(0n, 0n)).toBe(0n);
+    // Coerces non-BigInt inputs.
+    expect(publicEvictionFloor(10, 5)).toBe(5n);
+  });
+
+  it('PUBLIC-EVICT-PRUNE-01: prune drops entries strictly below the floor, KEEPS the oldest-live entry + comments', () => {
+    const post = (entryId: bigint | string, comments: any[] = []) => ({ entryId: String(entryId), comments });
+    // floor 5: ids < 5 are evicted, id 5 is the oldest LIVE and must survive.
+    const posts = [post(3n), post(5n, [post(4n), post(6n)]), post(9n)];
+    const kept = prunePublicPostsBelowFloor(posts, 5n);
+    expect(kept.map((p: any) => p.entryId)).toEqual(['5', '9']); // id 3 dropped; id 5 (oldest live) kept
+    // The kept post's comments: id 4 (< floor) dropped, id 6 kept.
+    expect(kept[0].comments.map((c: any) => c.entryId)).toEqual(['6']);
+  });
+
+  it('PUBLIC-EVICT-PRUNE-02: floor 0 (no eviction) returns posts unchanged; local-pending (no entryId) is never pruned', () => {
+    const posts = [{ entryId: '0', comments: [] }, { id: 'pending', comments: [] }];
+    expect(prunePublicPostsBelowFloor(posts, 0n)).toBe(posts); // floor <= 0 -> unchanged
+    // With a real floor, a numeric-id post below it drops but a pending (no entryId) post is kept.
+    const mixed = [{ entryId: '2', comments: [] }, { id: 'pending-no-entryid', comments: [] }];
+    const kept = prunePublicPostsBelowFloor(mixed, 5n);
+    expect(kept).toHaveLength(1);
+    expect(kept[0].id).toBe('pending-no-entryid');
   });
 });

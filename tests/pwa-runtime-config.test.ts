@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v525<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v525'/);
+    expect(html).toMatch(/id="appVersionLabel">v526<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v526'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3992,6 +3992,14 @@ describe('PWA runtime config guard', () => {
     // self-heal — in-window ids are excluded from the body-gap retry set). Both failure branches gate on it.
     expect(syncPublicSource).toMatch(/if \(entryIdValue >= BigInt\(minEntryId\)\) walkDegraded = true/);
     expect(syncPublicSource).toMatch(/noteTonRpcRateLimit\(error\) \|\| entryIdValue >= BigInt\(minEntryId\)/);
+    // Phase 3: free eviction prune. The FIFO floor + prune are pure helpers in public-channel-subscriptions.mjs
+    // (numerically unit-tested there — the floor arithmetic, where an off-by-one would silently drop the oldest
+    // LIVE post, must be exercised numerically, not just regex-pinned). app.js derives the floor from get_state
+    // (public_live_count + public_latest_id, already read) and prunes cached posts/comments below it.
+    expect(app).toMatch(/publicEvictionFloor,/);
+    expect(app).toMatch(/prunePublicPostsBelowFloor,/);
+    expect(syncPublicSource).toMatch(/publicOldestLiveId = publicEvictionFloor\(latestId, publicLiveCount\)/);
+    expect(syncPublicSource).toMatch(/prunePublicPostsBelowFloor\(/);
   });
 
   it('PWA-CONFIG-06B: profile avatar registry update waits for CapsuleHub proof and registry finality', () => {
@@ -4738,11 +4746,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v596/);
+    expect(sw).toMatch(/platho-pwa-prototype-v597/);
     expect(sw).toMatch(/\.\/styles\.css\?v=170/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=525/);
+    expect(sw).toMatch(/\.\/app\.js\?v=526/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
@@ -4751,7 +4759,7 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/capsulehub-ton-rpc-provider\.mjs\?v=53/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=43/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=13/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=12/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=13/);
     expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
     expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=17/);
     expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=30/);

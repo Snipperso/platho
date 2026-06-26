@@ -60,7 +60,9 @@ import {
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-} from './public-channel-subscriptions.mjs?v=12';
+  publicEvictionFloor,
+  prunePublicPostsBelowFloor,
+} from './public-channel-subscriptions.mjs?v=13';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -158,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v525';
+const PLATHO_APP_RUNTIME_VERSION = 'v526';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -5808,6 +5810,15 @@ async function syncPublicChannelFromChain() {
   const state = await provider.getState(readOptions);
   const latestId = BigInt(state.public_latest_id ?? 0n);
   const latest = Number(latestId);
+  // Eviction floor (Phase 3), derived FOR FREE from get_state (already read): clean-10 public eviction is strictly
+  // bottom-FIFO and gapless (PruneCapsuleEntry was removed → no mid-chain deletes), and entryIds are 0-INDEXED with
+  // public_latest_id the NEXT id (highest live id = latest - 1; total ever = latest). So the live id range is
+  // [latest - live_count, latest - 1] and the oldest-live id is EXACTLY latest - live_count (= the contract's
+  // public_oldest_live_id). Cached posts/comments with entryId STRICTLY BELOW this floor are evicted on-chain —
+  // pruned from the cache in the merge below (no rotating re-walk, zero extra reads, scales to any subscription
+  // count). live_count 0 → nothing live (floor = latest → every id 0..latest-1 pruned).
+  const publicLiveCount = BigInt(state.public_live_count ?? 0n);
+  const publicOldestLiveId = publicEvictionFloor(latestId, publicLiveCount);
   const configuredLimit = Number(appConfig.capsuleHub?.publicReadLimit ?? PUBLIC_CHAIN_READ_LIMIT);
   const readLimit = Number.isFinite(configuredLimit)
     ? Math.max(1, Math.floor(configuredLimit))
@@ -6149,9 +6160,12 @@ async function syncPublicChannelFromChain() {
     const existingChainPosts = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
     // Upsert this cycle's walked posts into the cached posts, THEN attach this cycle's new comments — including
     // comments whose parent is a cached post that was not re-walked (the Phase 2 comment-on-old-post path).
-    const mergedChainPosts = attachNewPublicComments(
-      upsertPublicChainPosts(existingChainPosts, newChainPosts),
-      newCommentsByParent,
+    const mergedChainPosts = prunePublicPostsBelowFloor(
+      attachNewPublicComments(
+        upsertPublicChainPosts(existingChainPosts, newChainPosts),
+        newCommentsByParent,
+      ),
+      publicOldestLiveId,
     );
     const postsWithLocalPending = mergeLocalPendingPublicFeed(channelId, mergedChainPosts);
     nextFeedCache[channelId] = {
