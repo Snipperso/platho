@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v528';
+const PLATHO_APP_RUNTIME_VERSION = 'v529';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -659,6 +659,9 @@ let messageAutoSyncTimer = null;
 let messageAutoSyncAt = 0;
 let messageAutoSyncCountdownTimer = null;
 let messageAutoSyncPhase = 'idle';
+// Public-feed sync phase (mirrors messageAutoSyncPhase) — drives the channel-detail header subtitle so it reads
+// the same "Syncing…/✓ Synced/Sync delayed" status as a Private conversation. Starts 'syncing' (initial load).
+let publicSyncPhase = 'syncing';
 let messageAutoSyncLastResult = null;
 let messageAutoSyncLastErrorLabel = null;
 let messageAutoSyncLoadingFrame = 0;
@@ -3312,6 +3315,23 @@ function conversationSubtitleText(thread) {
   return messageAutoSyncCountdownText() ?? thread?.subtitle ?? '';
 }
 
+// The public channel-detail header subtitle — same sync wording as a Private conversation (Syncing…/✓ Synced/
+// Sync delayed) instead of a static channel blurb.
+function publicChannelSyncSubtitle() {
+  if (publicSyncPhase === 'syncing') return 'Syncing…';
+  if (publicSyncPhase === 'delayed') return 'Sync delayed';
+  return '✓ Synced';
+}
+
+// Advance the public sync phase and, ONLY when it actually changes, repaint the public surface so the open
+// channel-detail subtitle updates. Gated to the active Public view + change-only so a quiet background sync does
+// not repaint every cycle.
+function setPublicSyncPhase(phase) {
+  if (publicSyncPhase === phase) return;
+  publicSyncPhase = phase;
+  if (isPublicViewActive()) renderPublicSurface({ anchorUnread: false });
+}
+
 function debugTiny(value, fallback = '-') {
   const text = String(value ?? '').trim();
   if (!text) return fallback;
@@ -4237,6 +4257,12 @@ function addCustomPublicChannel(channel) {
   renderPublicSurface();
 }
 
+function isPublicChannelSubscribed(channelId) {
+  const id = String(channelId ?? '').trim();
+  if (!id) return false;
+  return (publicChannelSubscriptions?.channels ?? []).some((item) => item.id === id && item.subscribed === true);
+}
+
 function setPublicChannelSubscribed(channelId, subscribed) {
   const id = String(channelId ?? '').trim();
   if (!id) return false;
@@ -4524,10 +4550,10 @@ function appendPublicItemComments(article, item) {
   article.append(commentList);
 }
 
-// The "Display as" chevron for a public FEED post — relabel another author (.ath / local name), shared
+// The "Display as" chevron for a public post — relabel another author (.ath / local name), shared
 // per-counterparty and in sync with their Private dialog. Returns null for your own post, the official
-// platho.app channel, or an item with no author wallet. Lives in the post's author row (top-right) in FEED
-// mode only; in CHANNELS mode the channel-detail HEADER already carries it, so post cards omit it.
+// platho.app channel, or an item with no author wallet. Lives top-right in the post's author row in BOTH Feed
+// and Channels modes (the channel-detail header no longer carries it).
 function publicItemIdentityButton(item) {
   const authorWallet = item.authorWallet ?? item.author_wallet ?? null;
   const isOwnPost = Boolean(authorWallet && plathoWallet?.address && sameWalletAddress(authorWallet, plathoWallet.address));
@@ -4601,6 +4627,21 @@ function appendPublicItemActions(article, item) {
     });
     actions.append(privateButton);
   }
+
+  // "Unfollow" — moved here from the channel-detail header so it sits with the post actions in BOTH Feed and
+  // Channels modes. Shown only when the post's channel is currently subscribed (so it is actionable) AND it is not
+  // the user's own post: publishing in Channels mode auto-subscribes the OWN channel (ensurePublicChannelForAuthorWallet
+  // activate:true), so without the !isOwnPost guard Unfollow would wrongly appear on the user's own posts.
+  if (!isOwnPost && isPublicChannelSubscribed(item.channelId)) {
+    const unfollowButton = document.createElement('button');
+    unfollowButton.type = 'button';
+    unfollowButton.textContent = 'Unfollow';
+    unfollowButton.title = 'Stop following this channel';
+    unfollowButton.addEventListener('click', () => {
+      setPublicChannelSubscribed(item.channelId, false);
+    });
+    actions.append(unfollowButton);
+  }
   article.append(actions);
 }
 
@@ -4635,8 +4676,7 @@ function renderPublicFeed(items, options = {}) {
       meta.append(span);
     }
     authorRow.append(authorAvatar, meta);
-    // FEED mode only: the "Display as" chevron lives top-right in the author row (CHANNELS mode omits it on
-    // post cards — its channel-detail header already carries the affordance).
+    // The "Display as" chevron lives top-right in the author row (same in Channels mode, via appendPublicChannelPost).
     const feedIdentityButton = publicItemIdentityButton(item);
     if (feedIdentityButton) authorRow.append(feedIdentityButton);
     article.append(authorRow);
@@ -4676,6 +4716,10 @@ function appendPublicChannelPost(container, item) {
     meta.append(span);
   }
   authorRow.append(avatar, meta);
+  // Same "Display as" chevron as the Feed-mode post card (top-right of the author row) — now in Channels mode too,
+  // since the channel-detail header no longer carries it.
+  const channelIdentityButton = publicItemIdentityButton(item);
+  if (channelIdentityButton) authorRow.append(channelIdentityButton);
   article.append(authorRow);
   if (item.title) {
     const title = document.createElement('h2');
@@ -4731,59 +4775,13 @@ function renderPublicChannelDetail(channel, items) {
   title.textContent = channel.name;
   if (display?.tone) title.className = `identity-title-label identity-label-${display.tone}`;
   const subtitle = document.createElement('p');
-  subtitle.textContent = channel.subtitle ?? 'public channel';
+  // Consistent with the Private conversation header: show the live sync status, not a static channel blurb.
+  subtitle.textContent = publicChannelSyncSubtitle();
   titleWrap.append(title, subtitle);
-  const actions = document.createElement('div');
-  actions.className = 'header-actions';
-  // Order mirrors the Private conversation header so the two read identically: Unfollow first, then the
-  // shared "Display as" chevron (wallet channels only), then the Documents button.
-  const unfollowButton = document.createElement('button');
-  unfollowButton.type = 'button';
-  unfollowButton.className = 'mini-action-button';
-  unfollowButton.textContent = 'Unfollow';
-  unfollowButton.title = `Hide ${channel.name} from Public feed and Channels`;
-  unfollowButton.addEventListener('click', () => {
-    setPublicChannelSubscribed(channel.id, false);
-  });
-  actions.append(unfollowButton);
-  // Wallet channels get the same "Display as" affordance as a Private conversation header — the choice
-  // is shared per-counterparty, so it stays in sync with that person's Private dialog.
-  const canChooseDisplay = Boolean(channel.authorWallet) && channel.id !== DEFAULT_PUBLIC_CHANNEL_ID;
-  if (canChooseDisplay) {
-    const identityButton = document.createElement('button');
-    identityButton.type = 'button';
-    identityButton.className = 'icon-button';
-    identityButton.setAttribute('aria-haspopup', 'menu');
-    identityButton.setAttribute('aria-expanded', 'false');
-    identityButton.setAttribute('aria-label', `Choose display name for ${channel.name}`);
-    identityButton.title = 'Choose display name';
-    const identityIcon = document.createElement('span');
-    identityIcon.className = 'icon icon-chevron-down';
-    identityButton.append(identityIcon);
-    identityButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (identityPopover && !identityPopover.hidden) {
-        hideIdentityPopover();
-      } else {
-        showPublicChannelDisplayPopover(channel, identityButton);
-      }
-    });
-    actions.append(identityButton);
-  }
-  // Documents button — same icon and action as the Private conversation header's info button.
-  const docsButton = document.createElement('button');
-  docsButton.type = 'button';
-  docsButton.className = 'icon-button';
-  docsButton.setAttribute('aria-label', 'Documents');
-  docsButton.title = 'Documents';
-  const docsIcon = document.createElement('span');
-  docsIcon.className = 'icon icon-info';
-  docsButton.append(docsIcon);
-  docsButton.addEventListener('click', () => {
-    openDocsDialog().catch((error) => console.error(error));
-  });
-  actions.append(docsButton);
-  header.append(backButton, avatar, titleWrap, actions);
+  // No action buttons in this header: the "Display as" chevron and Unfollow now live on the post cards (both Feed
+  // and Channels modes), and the only info/Documents button is the pane header's — carrying it here too made a
+  // duplicate menu on desktop. The detail header is just back (mobile) + avatar + name + sync status.
+  header.append(backButton, avatar, titleWrap);
 
   const list = document.createElement('div');
   list.className = 'public-channel-detail-feed';
@@ -6334,6 +6332,7 @@ async function syncPublicChannels() {
           ? `feed incomplete: ${incompleteCount} channel${incompleteCount === 1 ? '' : 's'}`
           : 'older posts available — set History sync to Long');
       }
+      setPublicSyncPhase('synced');
       return;
     }
   } catch (error) {
@@ -6346,6 +6345,7 @@ async function syncPublicChannels() {
   }
 
   if (appConfig.capsuleHub?.allowUnverifiedStaticPublicFeeds !== true) {
+    setPublicSyncPhase('delayed');
     setPublicStatus(chainSyncError ? 'chain sync unavailable' : 'chain provider unavailable');
     return;
   }
