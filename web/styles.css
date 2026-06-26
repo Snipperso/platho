@@ -3503,6 +3503,14 @@ button.feed-item:hover {
     display: none;
   }
 
+  /* The Private chats pane has no padding; the Public pane has 24px. With the channel detail open full-screen,
+     drop the pane's TOP padding so the channel header sits at the very top exactly like the Private conversation
+     header (the header's negative side margins already cancel the left/right pane padding; the composer cancels
+     the bottom with its own negative margin). */
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] {
+    padding-top: 0;
+  }
+
   .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
