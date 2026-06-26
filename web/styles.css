@@ -482,14 +482,13 @@ button:disabled,
   border-color: rgba(48, 213, 176, 0.28);
 }
 
-/* In the conversation header the info/install buttons sit next to the 40px "Display as" chevron
-   (#identityMenuButton, a plain .icon-button), so keep them the SAME 40px there — the 34px compact size made the
-   chevron look bigger than the info button. Matches the already-uniform public channel-detail header. (Mobile
-   ≤900px keeps them all at the .icon-button 38px below.) */
-.conversation-header .docs-header-button,
-.conversation-header .install-header-button {
-  width: 40px;
-  height: 40px;
+/* The "Display as" chevron (#identityMenuButton) matches the compact 34px info/install header buttons, so the
+   conversation header stays consistent with the other tabs' headers. The 34px compact button is the canonical
+   header-button size; the chevron was the lone 40px outlier — shrink IT, don't grow the others. (Mobile ≤900px
+   keeps all three at the .icon-button 38px below.) */
+.identity-menu-button {
+  width: 34px;
+  height: 34px;
 }
 
 @media (display-mode: standalone) {
@@ -3364,14 +3363,6 @@ button.feed-item:hover {
 
   .conversation-header .install-header-button {
     display: none;
-  }
-
-  /* Keep the conversation-header info/install buttons at the mobile .icon-button size, so the desktop 40px rule
-     above does not make them larger than the 38px "Display as" chevron on mobile. */
-  .conversation-header .docs-header-button,
-  .conversation-header .install-header-button {
-    width: 38px;
-    height: 38px;
   }
 
   .message-strip {
