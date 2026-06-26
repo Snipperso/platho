@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v520<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v520'/);
+    expect(html).toMatch(/id="appVersionLabel">v521<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v521'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -398,9 +398,11 @@ describe('PWA runtime config guard', () => {
     expect(chevronIdx).toBeGreaterThan(unfollowIdx);
     expect(docsIdx).toBeGreaterThan(chevronIdx);
     // (6) The Public pane has 24px padding (the chats pane has none); with the detail open full-screen the
-    // pane's TOP padding is dropped so the channel header sits flush at the top like the Private header — no
-    // extra gap above it. (Left/right are cancelled by the header's negative margins, bottom by the composer's.)
-    expect(css).toMatch(/\[data-channel-detail-open="true"\]\s*\{\s*padding-top: 0;/);
+    // pane's padding is dropped ENTIRELY so the header/feed/composer self-inset with their own padding exactly
+    // like the Private chats pane — no extra gap, and no fragile negative-margin compensation that could clip
+    // the header buttons at the screen edge.
+    expect(css).toMatch(/\[data-channel-detail-open="true"\]\s*\{\s*padding: 0;/);
+    expect(css).not.toMatch(/\[data-channel-detail-open="true"\] \.public-channel-detail-header\s*\{\s*margin: 0 -24px/);
   });
 
   it('PWA-CONFIG-01C: profile keeps postquantum messaging fixed without an encryption selector', () => {
@@ -4655,11 +4657,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v591/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=168/);
+    expect(sw).toMatch(/platho-pwa-prototype-v592/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=169/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=520/);
+    expect(sw).toMatch(/\.\/app\.js\?v=521/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

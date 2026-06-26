@@ -3504,11 +3504,12 @@ button.feed-item:hover {
   }
 
   /* The Private chats pane has no padding; the Public pane has 24px. With the channel detail open full-screen,
-     drop the pane's TOP padding so the channel header sits at the very top exactly like the Private conversation
-     header (the header's negative side margins already cancel the left/right pane padding; the composer cancels
-     the bottom with its own negative margin). */
+     drop the pane's padding entirely and let the header, feed and composer self-inset with their OWN padding —
+     exactly like the Private chats pane (.chat-pane has no padding either). This matches Private pixel-for-pixel
+     and avoids the fragile negative-margin compensation, which could over-pull and clip the header buttons at
+     the screen edge (e.g. with a wide wallet-channel action cluster or device side insets). */
   .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] {
-    padding-top: 0;
+    padding: 0;
   }
 
   .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail {
@@ -3521,16 +3522,14 @@ button.feed-item:hover {
     padding: 0;
   }
 
-  /* The header + feed span edge-to-edge (negative margin counteracts the pane's 24px padding, the same
-     trick the composer uses) so the channel header lands EXACTLY where the Private conversation header does
-     — its own 12px 14px padding then insets the content identically. */
-  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail-header {
-    margin: 0 -24px;
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail-feed {
+    padding: 0 14px 14px;
   }
 
-  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail-feed {
-    margin: 0 -24px;
-    padding: 0 14px 14px;
+  /* Pane padding is 0 in this state, so the composer no longer needs the negative side/bottom margins it uses
+     in the channel-LIST view to reach the edges — its own padding insets it, like the Private composer. */
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-composer {
+    margin: 0;
   }
 
   .public-channel-detail-back-button {
