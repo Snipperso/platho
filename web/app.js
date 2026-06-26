@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v524';
+const PLATHO_APP_RUNTIME_VERSION = 'v525';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -574,6 +574,13 @@ let publicChannelFeedCache = {};
 // window of the last CLEAN (non-rate-limited) full walk. While the head is unchanged we skip the whole walk.
 let lastSyncedPublicLatestId = null;
 let lastSyncedPublicSyncWindow = null;
+// Phase 2 per-index incremental cursors (in-memory; rebuilt by a full walk after reload). Per-author POST-index
+// head and per-post COMMENT (parent) index head. An index whose head is unchanged since the last clean walk is
+// skipped without re-reading its entries — so a busy global feed re-reads only the authors/posts that actually
+// changed. Committed together with lastSyncedPublicLatestId, only after a clean walk (the commit-gate), so a
+// degraded cycle never advances a head past entries a rate limit made it miss.
+const publicAuthorIndexHeads = new Map();
+const publicParentIndexHeads = new Map();
 // Wallet (raw) -> resolved profile-avatar data URL for Public wallet channels, so a channel shows the
 // author's avatar even before/without any cached public post. `null` is a cached "no avatar" miss.
 const publicChannelAvatarUrlByWallet = new Map();
@@ -5862,12 +5869,16 @@ async function syncPublicChannelFromChain() {
   const incompleteChannels = [];
   // Walk the FEED source (subscribed + own) so the user's own confirmed posts are fetched from chain, not just
   // the subscribed authors. Adds at most one author index (the user's own).
+  const pendingAuthorHeadWrites = [];
+  const pendingParentHeadWrites = [];
   for (const channel of feedSourcePublicChannels()) {
     const channelAuthor = channel.authorWallet;
     if (!channelAuthor) continue;
+    let authorKeyId;
     let authorIndex;
     try {
-      authorIndex = await provider.getPublicAuthorIndex(await computePublicAuthorKeyId(channelAuthor), readOptions);
+      authorKeyId = await computePublicAuthorKeyId(channelAuthor);
+      authorIndex = await provider.getPublicAuthorIndex(authorKeyId, readOptions);
     } catch (error) {
       if (noteTonRpcRateLimit(error)) walkDegraded = true;
       console.warn('Skipping public author index read', channel.id, error);
@@ -5875,7 +5886,25 @@ async function syncPublicChannelFromChain() {
     }
     if (authorIndex.exists !== true) continue;
     const liveCount = Number(authorIndex.entry_count ?? 0n) || 0;
-    const { ids: postIds, truncated: postsTruncated } = await walkPublicChainIds(authorIndex.latest_entry_link, authorWalkMax);
+    const authorHeadKey = authorKeyId.toString();
+    const authorHead = String(authorIndex.latest_entry_link ?? 0n);
+    const cachedPostIds = cachedChainPostEntryIds(channel.id);
+    // Per-author POST cursor: an unchanged author-index head means no new posts — reuse the cached post ids (so a
+    // new comment on an OLD post is still detected below) without re-reading every post body. A changed head
+    // re-walks the window and unions the result with the cached ids.
+    let postIds;
+    let postsTruncated = false;
+    if (publicAuthorIndexHeads.get(authorHeadKey) === authorHead) {
+      postIds = cachedPostIds;
+    } else {
+      const walked = await walkPublicChainIds(authorIndex.latest_entry_link, authorWalkMax);
+      postsTruncated = walked.truncated;
+      const postIdSet = new Map();
+      for (const id of walked.ids) postIdSet.set(id.toString(), id);
+      for (const id of cachedPostIds) if (!postIdSet.has(id.toString())) postIdSet.set(id.toString(), id);
+      postIds = [...postIdSet.values()];
+      pendingAuthorHeadWrites.push([authorHeadKey, authorHead]);
+    }
     let commentsTruncated = false;
     for (const postId of postIds) {
       let parentIndex;
@@ -5885,13 +5914,17 @@ async function syncPublicChannelFromChain() {
         if (noteTonRpcRateLimit(error)) walkDegraded = true;
         continue;
       }
-      if (parentIndex.exists === true) {
-        const { truncated: ct } = await walkPublicChainIds(parentIndex.latest_entry_link, authorWalkMax);
-        if (ct) commentsTruncated = true;
-      }
+      if (parentIndex.exists !== true) continue;
+      const parentHeadKey = postId.toString();
+      const parentHead = String(parentIndex.latest_entry_link ?? 0n);
+      // Per-post COMMENT cursor: an unchanged parent-index head means no new comments on this post — skip its walk.
+      if (publicParentIndexHeads.get(parentHeadKey) === parentHead) continue;
+      const { truncated: ct } = await walkPublicChainIds(parentIndex.latest_entry_link, authorWalkMax);
+      if (ct) commentsTruncated = true;
+      pendingParentHeadWrites.push([parentHeadKey, parentHead]);
     }
-    // Honest incomplete: more live posts on-chain than were surfaced (cap-truncated, or walked < the contract's
-    // exact live count), or some post's comment chain was truncated.
+    // Honest incomplete: more live posts on-chain than were surfaced (cap-truncated, or fewer ids than the
+    // contract's exact live count), or some post's comment chain was truncated.
     if (postsTruncated || commentsTruncated || (liveCount > 0 && postIds.length < liveCount)) {
       incompleteChannels.push(channel.id);
     }
@@ -5921,15 +5954,22 @@ async function syncPublicChannelFromChain() {
           entryId: String(entry.entry_id ?? entryIdValue),
           bodyHash: entryBodyHashHex(entry),
         });
+        // An in-window post/comment that failed to materialize must NOT let the commit-gate advance this author's
+        // cursor: Phase 2 would then skip re-walking it (postIds = cached, and the body-gap retry set excludes
+        // in-window ids), so the gap would never self-heal. Marking the walk degraded keeps the cursor put so the
+        // next cycle re-attempts — restoring the pre-Phase-2 unconditional-re-walk self-heal. (Out-of-window
+        // retryOnly ids are < minEntryId, so they keep self-healing via the retry set without degrading the walk.)
+        if (entryIdValue >= BigInt(minEntryId)) walkDegraded = true;
         continue;
       }
       if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
-      if (noteTonRpcRateLimit(error)) walkDegraded = true;
+      if (noteTonRpcRateLimit(error) || entryIdValue >= BigInt(minEntryId)) walkDegraded = true;
       console.warn('Skipping unreadable public CapsuleHub entry', entry.entry_id?.toString?.() ?? entryIdValue.toString(), error);
       continue;
     }
     if (!payload) {
       if (retryOnly) clearPublicBodyHistoryUnavailable(address, entryIdValue);
+      if (entryIdValue >= BigInt(minEntryId)) walkDegraded = true;
       continue;
     }
     clearPublicBodyHistoryUnavailable(address, entryIdValue);
@@ -6076,6 +6116,14 @@ async function syncPublicChannelFromChain() {
     if (parent.bodyHash && comment.parentHash && parent.bodyHash.toLowerCase() !== comment.parentHash.toLowerCase()) continue;
     parent.comments = [...(parent.comments ?? []), comment];
   }
+  // Group this cycle's new comments by parent entryId so the merge can attach them to a parent that is a CACHED
+  // post (Phase 2 skips re-resolving unchanged posts, so such a parent is absent from `posts`/postsByEntry above).
+  const newCommentsByParent = new Map();
+  for (const comment of comments) {
+    const key = String(comment.parentEntryId);
+    if (!newCommentsByParent.has(key)) newCommentsByParent.set(key, []);
+    newCommentsByParent.get(key).push(comment);
+  }
   const updatedAt = new Date().toISOString();
   const postsByChannel = new Map();
   for (const post of posts) {
@@ -6099,7 +6147,12 @@ async function syncPublicChannelFromChain() {
     // evicted posts persist until the history window hides them or a future rotating self-heal prunes them.)
     const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
     const existingChainPosts = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
-    const mergedChainPosts = upsertPublicChainPosts(existingChainPosts, newChainPosts);
+    // Upsert this cycle's walked posts into the cached posts, THEN attach this cycle's new comments — including
+    // comments whose parent is a cached post that was not re-walked (the Phase 2 comment-on-old-post path).
+    const mergedChainPosts = attachNewPublicComments(
+      upsertPublicChainPosts(existingChainPosts, newChainPosts),
+      newCommentsByParent,
+    );
     const postsWithLocalPending = mergeLocalPendingPublicFeed(channelId, mergedChainPosts);
     nextFeedCache[channelId] = {
       feed: {
@@ -6119,6 +6172,10 @@ async function syncPublicChannelFromChain() {
   if (!walkDegraded) {
     lastSyncedPublicLatestId = latestId;
     lastSyncedPublicSyncWindow = syncWindow;
+    // Advance the per-index cursors only now — after the merge committed — so a head is never recorded as "seen"
+    // before its (new) entries actually reached the cache. A degraded cycle skips this entirely and re-walks next.
+    for (const [key, head] of pendingAuthorHeadWrites) publicAuthorIndexHeads.set(key, head);
+    for (const [key, head] of pendingParentHeadWrites) publicParentIndexHeads.set(key, head);
   }
   globalThis.plathoLastPublicSync = {
     capsuleHub: address,
@@ -6187,6 +6244,34 @@ function upsertPublicChainPosts(existing = [], fresh = []) {
   return order
     .map((key) => byKey.get(key))
     .sort((a, b) => new Date(a?.createdAt ?? 0).getTime() - new Date(b?.createdAt ?? 0).getTime());
+}
+
+// Chain-anchored post entryIds (BigInt) already cached for a channel. Phase 2 reuses these to check a cached
+// post's parent (comment) index for NEW comments even when the post itself was not re-walked this cycle.
+function cachedChainPostEntryIds(channelId) {
+  const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
+  const ids = [];
+  for (const post of cachedFeed?.posts ?? []) {
+    if (!publicFeedPostHasChainAnchor(post)) continue;
+    try { ids.push(BigInt(post.entryId)); } catch { /* skip non-numeric entryId */ }
+  }
+  return ids;
+}
+
+// Attach this cycle's NEW comments to their parent post even when the parent is a CACHED post that Phase 2 did
+// not re-resolve (the parent is absent from the freshly-walked `posts`, so the in-place attach above would drop
+// it). Comments are validated (commentsAllowed + parentHash match, mirroring the in-place attach) and unioned
+// idempotently, so a comment already present is not duplicated.
+function attachNewPublicComments(posts, newCommentsByParent) {
+  if (!newCommentsByParent || newCommentsByParent.size === 0) return posts;
+  return posts.map((post) => {
+    const fresh = newCommentsByParent.get(String(post.entryId));
+    if (!fresh || fresh.length === 0) return post;
+    const valid = fresh.filter((comment) => post.commentsAllowed !== false
+      && (!post.bodyHash || !comment.parentHash || post.bodyHash.toLowerCase() === comment.parentHash.toLowerCase()));
+    if (valid.length === 0) return post;
+    return { ...post, comments: mergePublicComments(post.comments ?? [], valid) };
+  });
 }
 
 function chainBackedPublicFeedOnly(feed) {
