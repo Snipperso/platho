@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v522<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v522'/);
+    expect(html).toMatch(/id="appVersionLabel">v523<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v523'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -334,6 +334,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function showPublicChannelDisplayPopover\(channel, anchor\)/);
     expect(app).toMatch(/options: identityDisplayOptions\(context\)/);
     expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName \}\)/);
+
+    // The user's OWN wallet channel offers their OWN linked username (.ath) as a "Display as" option too: it
+    // never arrives via received posts (you don't receive your own), so contactDisplayContextForWallet injects
+    // it for the own wallet — otherwise the own channel shows only the wallet address while others see the name.
+    expect(app).toMatch(/function baseContactDisplayContextForWallet\(counterpartyWallet\)/);
+    expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)/);
+    expect(app).toMatch(/const ownUsername = readLinkedPlathoUsername\(plathoWallet\.address\)/);
+    expect(app).toMatch(/normalizeIdentityVariants\(\[ownIdentity, \.\.\.threadIdentityVariants\(base\)\]\)/);
 
     // Registry name overlay + per-wallet avatar resolution so feed, channels list and detail all show it.
     expect(app).toMatch(/\.map\(applyContactDisplayToRegistryChannel\)/);
@@ -3904,8 +3912,14 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).toMatch(/syncWindow === 'long' \? 0 : Math\.max\(0, latest - readLimit\)/);
     expect(syncPublicSource).toMatch(/const channelIdsToRefresh = new Set/);
     expect(syncPublicSource).toMatch(/\.\.\.Object\.keys\(publicChannelFeedCache \?\? \{\}\)/);
-    expect(syncPublicSource).toMatch(/const nextFeedCache = \{\}/);
-    expect(syncPublicSource).not.toMatch(/const nextFeedCache = \{ \.\.\.publicChannelFeedCache \}/);
+    // Incremental append-merge (not a wholesale rebuild from a single walk): the cache is preserved and this
+    // cycle's chain posts are upserted in, so a degraded/rate-limited cycle never wipes a channel to the
+    // "Waiting for public feed" placeholder (the flicker). Plus the global-head fast-path + commit-gate so a
+    // cycle with no new public entry skips the whole walk, and the head only advances after a clean walk.
+    expect(syncPublicSource).toMatch(/const nextFeedCache = \{ \.\.\.publicChannelFeedCache \}/);
+    expect(syncPublicSource).toMatch(/upsertPublicChainPosts\(existingChainPosts, newChainPosts\)/);
+    expect(syncPublicSource).toMatch(/latestId === lastSyncedPublicLatestId/);
+    expect(syncPublicSource).toMatch(/if \(!walkDegraded\) \{\s*lastSyncedPublicLatestId = latestId/);
     expect(app).toMatch(/function chainBackedPublicFeedOnly/);
     expect(app).toMatch(/post\?\.chainVerified === true/);
     expect(syncPublicSource).toMatch(/chainVerified: true/);
@@ -4660,11 +4674,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v593/);
+    expect(sw).toMatch(/platho-pwa-prototype-v594/);
     expect(sw).toMatch(/\.\/styles\.css\?v=170/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=522/);
+    expect(sw).toMatch(/\.\/app\.js\?v=523/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
