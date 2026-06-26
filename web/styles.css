@@ -1615,15 +1615,12 @@ html[data-platho-telegram="true"] .install-header-button {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
-  padding: 0 24px 24px;
+  padding: 0;
 }
 
-.public-channel-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-}
+/* .public-channel-detail-header reuses the .conversation-header layout (the class is added in
+   renderPublicChannelDetail) so the public channel header and the private conversation header are
+   pixel-identical — no "jump" when switching tabs. Header + feed self-pad; the container does not. */
 
 /* The detail's back button only exists on mobile, where the detail replaces the channel list. */
 .public-channel-detail-back-button {
@@ -1643,7 +1640,8 @@ html[data-platho-telegram="true"] .install-header-button {
   gap: 10px;
   min-height: 0;
   overflow: auto;
-  padding-right: 4px;
+  /* Match the conversation-header's own horizontal padding (24px) so posts line up under the channel name. */
+  padding: 0 24px 24px;
 }
 
 .public-channel-empty {
@@ -3512,7 +3510,19 @@ button.feed-item:hover {
     grid-column: 1;
     grid-row: 1 / 4;
     min-height: 0;
-    padding: 0 4px 0 0;
+    padding: 0;
+  }
+
+  /* The header + feed span edge-to-edge (negative margin counteracts the pane's 24px padding, the same
+     trick the composer uses) so the channel header lands EXACTLY where the Private conversation header does
+     — its own 12px 14px padding then insets the content identically. */
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail-header {
+    margin: 0 -24px;
+  }
+
+  .public-pane[data-public-mode="channels"][data-channel-detail-open="true"] .public-channel-detail-feed {
+    margin: 0 -24px;
+    padding: 0 14px 14px;
   }
 
   .public-channel-detail-back-button {
