@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v521<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v521'/);
+    expect(html).toMatch(/id="appVersionLabel">v522<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v522'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4616,8 +4616,11 @@ describe('PWA runtime config guard', () => {
     const pubMjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
     // 1. Returning to the private tab restores the open conversation (data-chat-open) on mobile.
     expect(app).toMatch(/appShell\.dataset\.chatOpen = activeThreadId \? 'true' : 'false'/);
-    // 2. Public header actions grow to flush-right when wrapped (mobile info button no longer jumps).
-    expect(css).toMatch(/\.public-header-actions \{[\s\S]*?flex-grow: 1;/);
+    // 2. The public header keeps its Feed/Channels toggle + info on ONE line with the title (no wrap to a
+    // second line). The vestigial diagnostics-panel flex-wrap + the actions' forced min-width are gone, and
+    // the install button is hidden on mobile so the toggle + info fit beside the title.
+    expect(css).not.toMatch(/min-width: var\(--header-actions-width\)/);
+    expect(css).toMatch(/\.public-pane \.pane-header \.install-header-button \{\s*display: none;/);
     // 3a. Feed grid column is capped so a long token cannot stretch the card off-screen.
     expect(css).toMatch(/\.public-feed \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/);
     // 3b. Plain feed post bodies wrap long tokens.
@@ -4657,11 +4660,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v592/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=169/);
+    expect(sw).toMatch(/platho-pwa-prototype-v593/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=170/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=521/);
+    expect(sw).toMatch(/\.\/app\.js\?v=522/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

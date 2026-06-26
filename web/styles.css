@@ -386,6 +386,12 @@ button:disabled,
 .pane-header h1 {
   font-size: 26px;
   line-height: 1.1;
+  /* On a narrow screen the public header (title + Feed/Channels toggle + info) can run out of room; let the
+     title truncate with an ellipsis so the action buttons stay fully visible instead of overflowing the edge.
+     The title-block is min-width: 0, so this only kicks in when space is genuinely tight. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pane-header p,
@@ -1470,13 +1476,6 @@ html[data-platho-telegram="true"] .install-header-button {
   --public-list-col: clamp(280px, 32vw, 392px);
 }
 
-/* Diagnostics panel pinned at the top of the Public page (inside the header
-   row, full-width on a wrapped flex line — no change to the pane grid). */
-.public-pane .pane-header,
-.vault-pane .pane-header {
-  flex-wrap: wrap;
-}
-
 .public-pane[data-public-mode="channels"] {
   position: relative;
   grid-template-columns: minmax(280px, var(--public-list-col)) minmax(0, 1fr);
@@ -1667,7 +1666,6 @@ html[data-platho-telegram="true"] .install-header-button {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-width: var(--header-actions-width);
 }
 
 .segmented-control {
@@ -3303,12 +3301,10 @@ button.feed-item:hover {
     height: 38px;
   }
 
-  .public-header-actions {
-    min-width: var(--header-actions-width);
-    /* The public pane-header is flex-wrap:wrap; when the actions wrap to their own line, grow to fill it so
-       the base justify-content:flex-end keeps the info button flush right (consistent with the other tabs)
-       instead of left-aligning at the wrapped line's start. */
-    flex-grow: 1;
+  /* The public header already carries the Feed/Channels toggle; drop its install button on mobile so the
+     toggle + info button sit on ONE line with the title (install stays available on the other tabs' headers). */
+  .public-pane .pane-header .install-header-button {
+    display: none;
   }
 
   .segmented-control {
