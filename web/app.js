@@ -158,7 +158,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v517';
+const PLATHO_APP_RUNTIME_VERSION = 'v518';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4674,7 +4674,9 @@ function renderPublicChannelDetail(channel, items) {
   const latestPost = items?.[items.length - 1] ?? null;
   const display = channel.authorWallet ? resolveWalletChannelDisplay(channel.authorWallet) : null;
   const header = document.createElement('header');
-  header.className = 'public-channel-detail-header';
+  // Reuse the Private conversation header's layout class so the two headers are pixel-identical (no "jump"
+  // when switching tabs); public-channel-detail-header stays as a marker for the mobile back-button rules.
+  header.className = 'conversation-header public-channel-detail-header';
   // Mobile-only back affordance: the detail replaces the channel list on narrow screens, so the user
   // needs a way back. Hidden on desktop via CSS (where list + detail are side by side).
   const backButton = document.createElement('button');
@@ -4701,7 +4703,18 @@ function renderPublicChannelDetail(channel, items) {
   subtitle.textContent = channel.subtitle ?? 'public channel';
   titleWrap.append(title, subtitle);
   const actions = document.createElement('div');
-  actions.className = 'public-channel-detail-actions';
+  actions.className = 'header-actions';
+  // Order mirrors the Private conversation header so the two read identically: Unfollow first, then the
+  // shared "Display as" chevron (wallet channels only), then the Documents button.
+  const unfollowButton = document.createElement('button');
+  unfollowButton.type = 'button';
+  unfollowButton.className = 'mini-action-button';
+  unfollowButton.textContent = 'Unfollow';
+  unfollowButton.title = `Hide ${channel.name} from Public feed and Channels`;
+  unfollowButton.addEventListener('click', () => {
+    setPublicChannelSubscribed(channel.id, false);
+  });
+  actions.append(unfollowButton);
   // Wallet channels get the same "Display as" affordance as a Private conversation header — the choice
   // is shared per-counterparty, so it stays in sync with that person's Private dialog.
   const canChooseDisplay = Boolean(channel.authorWallet) && channel.id !== DEFAULT_PUBLIC_CHANNEL_ID;
@@ -4726,15 +4739,19 @@ function renderPublicChannelDetail(channel, items) {
     });
     actions.append(identityButton);
   }
-  const unfollowButton = document.createElement('button');
-  unfollowButton.type = 'button';
-  unfollowButton.className = 'mini-action-button';
-  unfollowButton.textContent = 'Unfollow';
-  unfollowButton.title = `Hide ${channel.name} from Public feed and Channels`;
-  unfollowButton.addEventListener('click', () => {
-    setPublicChannelSubscribed(channel.id, false);
+  // Documents button — same icon and action as the Private conversation header's info button.
+  const docsButton = document.createElement('button');
+  docsButton.type = 'button';
+  docsButton.className = 'icon-button';
+  docsButton.setAttribute('aria-label', 'Documents');
+  docsButton.title = 'Documents';
+  const docsIcon = document.createElement('span');
+  docsIcon.className = 'icon icon-info';
+  docsButton.append(docsIcon);
+  docsButton.addEventListener('click', () => {
+    openDocsDialog().catch((error) => console.error(error));
   });
-  actions.append(unfollowButton);
+  actions.append(docsButton);
   header.append(backButton, avatar, titleWrap, actions);
 
   const list = document.createElement('div');
