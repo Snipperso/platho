@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v514<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v514'/);
+    expect(html).toMatch(/id="appVersionLabel">v515<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v515'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -1789,7 +1789,7 @@ describe('PWA runtime config guard', () => {
     // now bounds the read burst with a hard VAULT_OPEN_READ_DEADLINE_MS; on timeout it renders with cached
     // state + 'RPC busy, retrying' instead of awaiting forever, so the Vault tab can never hang open.
     expect(app).toMatch(/const VAULT_OPEN_READ_DEADLINE_MS = 12_000/);
-    // v514: the Vault-open critical path reads get_user ALONE (the concurrent get_user+get_global burst was
+    // v515: the Vault-open critical path reads get_user ALONE (the concurrent get_user+get_global burst was
     // the iOS freeze; the working nav path reads get_user alone), raced against the deadline; get_global +
     // external balances load deferred + strictly sequentially off the render path.
     expect(app).toMatch(/delay\(VAULT_OPEN_READ_DEADLINE_MS\)\.then\(\(\) => vaultUserTimedOut\)/);
@@ -2840,7 +2840,9 @@ describe('PWA runtime config guard', () => {
     // Sync pauses for BOTH an in-flight broadcast (privateOutboundWorkActive) AND the full publish-confirm
     // lifecycle (privatePublishConfirmJobs.size > 0) — the confirm phase's reads otherwise compete with the
     // index walk for the keyless ~1 rps budget and 429-storm an image sent during sync.
-    expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\) \|\| privatePublishConfirmJobs\.size > 0\) \{/);
+    // Also yields while account activation is in flight (plathoAccountActivationPending) — activation fires
+    // its own vault read burst and concurrent background reads stall the iOS run loop (v509 pattern).
+    expect(autoSyncSource).toMatch(/if \(privateOutboundWorkActive\(\) \|\| privatePublishConfirmJobs\.size > 0 \|\| plathoAccountActivationPending\) \{/);
     expect(autoSyncSource).toMatch(/scheduleMessageAutoSync\(PRIVATE_OUTBOUND_SYNC_PAUSE_MS\)/);
     for (const source of [paymentSource, publishSource, confirmSource]) {
       expect(source).toMatch(/const endPrivateOutboundWork = beginPrivateOutboundWork\(\)/);
@@ -4249,7 +4251,9 @@ describe('PWA runtime config guard', () => {
     expect(refreshSource).toMatch(/await refreshAthFlushState\(\)/);
     expect(refreshSource).toMatch(/total_supply:\s*data\?\.total_supply === null \|\| data\?\.total_supply === undefined\s*\?\s*null\s*:\s*nonNegativeBigInt\(data\.total_supply\)/);
     expect(refreshSource).not.toMatch(/ATH_TOTAL_SUPPLY_ATOMIC/);
-    expect(viewSource).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\) \{[\s\S]*refreshAthProtocolStats\(\)\.catch/);
+    // Profile reads are serialized (one at a time) to avoid the iOS concurrent-read freeze (v509 pattern):
+    // await GRAM balance -> ATH stats -> own avatar.
+    expect(viewSource).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\) \{[\s\S]*await refreshAthProtocolStats\(\)/);
     // Burn ATH user row removed (see the index.html assertions). The ATHBurn message primitive itself stays
     // for the protocol buyback/burn-due path; there is no longer a user-facing wallet-burn handler to assert.
     expect(app).not.toMatch(/async function submitAthWalletBurn/);
@@ -4534,11 +4538,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v585/);
+    expect(sw).toMatch(/platho-pwa-prototype-v586/);
     expect(sw).toMatch(/\.\/styles\.css\?v=165/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=514/);
+    expect(sw).toMatch(/\.\/app\.js\?v=515/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
