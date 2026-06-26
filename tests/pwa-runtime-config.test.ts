@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v524<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v524'/);
+    expect(html).toMatch(/id="appVersionLabel">v525<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v525'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -3967,6 +3967,33 @@ describe('PWA runtime config guard', () => {
     expect(syncPublicSource).not.toMatch(/readPublicPostPayload/);
   });
 
+  it('PWA-PUBLIC-INCREMENTAL-02: public sync uses per-author + per-post cursors, attaches new comments to cached posts, and withholds the cursor on an in-window gap', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const syncPublicSource = app.slice(
+      app.indexOf('async function syncPublicChannelFromChain'),
+      app.indexOf('async function syncPublicChannels'),
+    );
+    // Per-index cursors (in-memory), skipping unchanged authors/posts so a busy feed re-reads only what changed.
+    expect(app).toMatch(/const publicAuthorIndexHeads = new Map\(\)/);
+    expect(app).toMatch(/const publicParentIndexHeads = new Map\(\)/);
+    expect(syncPublicSource).toMatch(/publicAuthorIndexHeads\.get\(authorHeadKey\) === authorHead/);
+    expect(syncPublicSource).toMatch(/publicParentIndexHeads\.get\(parentHeadKey\) === parentHead/);
+    // A skipped author still checks its CACHED posts for new comments (the comment-on-old-post path).
+    expect(app).toMatch(/function cachedChainPostEntryIds\(channelId\)/);
+    expect(syncPublicSource).toMatch(/postIds = cachedPostIds/);
+    // New comments attach to a cached parent post that was not re-walked this cycle.
+    expect(app).toMatch(/function attachNewPublicComments\(posts, newCommentsByParent\)/);
+    expect(syncPublicSource).toMatch(/attachNewPublicComments\(/);
+    // Commit-gate: per-index heads advance ONLY after a clean walk, alongside the global head.
+    expect(syncPublicSource).toMatch(/for \(const \[key, head\] of pendingAuthorHeadWrites\) publicAuthorIndexHeads\.set\(key, head\)/);
+    expect(syncPublicSource).toMatch(/for \(const \[key, head\] of pendingParentHeadWrites\) publicParentIndexHeads\.set\(key, head\)/);
+    // Strand guard: an in-window entry that fails to resolve marks the walk degraded, so the commit-gate does NOT
+    // advance the cursor past it (Phase 2 would otherwise skip re-walking it next cycle and it could never
+    // self-heal — in-window ids are excluded from the body-gap retry set). Both failure branches gate on it.
+    expect(syncPublicSource).toMatch(/if \(entryIdValue >= BigInt\(minEntryId\)\) walkDegraded = true/);
+    expect(syncPublicSource).toMatch(/noteTonRpcRateLimit\(error\) \|\| entryIdValue >= BigInt\(minEntryId\)/);
+  });
+
   it('PWA-CONFIG-06B: profile avatar registry update waits for CapsuleHub proof and registry finality', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const submitAvatarSource = app.slice(
@@ -4711,11 +4738,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v595/);
+    expect(sw).toMatch(/platho-pwa-prototype-v596/);
     expect(sw).toMatch(/\.\/styles\.css\?v=170/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=524/);
+    expect(sw).toMatch(/\.\/app\.js\?v=525/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
