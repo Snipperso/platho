@@ -1490,10 +1490,10 @@ html[data-platho-telegram="true"] .install-header-button {
   grid-template-columns: minmax(280px, var(--public-list-col)) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 14px 0;
-  /* Top inset only (the feed pane uses padding:24px all round). The columns self-pad horizontally and the full-bleed
-     ::before/::after backgrounds are absolutely positioned, so this shifts the grid content — header row included —
-     down 24px to match the Feed view's vertical start, without affecting the backgrounds. */
-  padding: 24px 0 0;
+  /* No pane padding — each column self-pads (pane-header has its own padding, the detail's conversation-header has
+     min-height:90px + padding:24px). Adding a top pad here would push the 90px-tall detail header's centered
+     content far below the list-column title + menu. */
+  padding: 0;
   background: transparent;
 }
 
@@ -1535,9 +1535,10 @@ html[data-platho-telegram="true"] .install-header-button {
      as the Feed/Channels toggle — like the Private list-pane + conversation headers, which are top-aligned. */
   grid-column: 1;
   grid-row: 1;
-  /* Horizontal inset only — the pane now carries the 24px top inset. (A top padding here would double it and push
-     the title below the channel name + menu, which center on the row.) */
-  padding: 0 24px;
+  /* Own 24px top padding (like the Private list-pane), and align to the TOP of the row — the detail's 90px header
+     makes row 1 tall, and stretching+centering the title in it would drop "Platho.app" well below the channel name. */
+  align-self: start;
+  padding: 24px 24px 0;
 }
 
 /* The narrow list column must keep the title + Feed/Channels toggle + info on ONE line (so the toggle stays on the
@@ -1570,9 +1571,13 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 .public-pane[data-public-mode="channels"] .public-header-actions {
   grid-column: 2;
-  /* The pane now carries the 24px top inset (like the feed pane), but no horizontal padding (columns self-pad), so
-     add the 24px right inset here to match the channel-detail header's own 24px right padding. Vertical alignment is
-     handled by align-self:center (inherited): the title, channel name and this menu all center on row 1. */
+  /* Give the menu the SAME vertical box as the channel-detail header (.conversation-header: min-height 90 + padding
+     24/16) and align it to the top of the row, so align-items:center centers the buttons on exactly the same line as
+     the avatar + channel name — like the Private conversation header's buttons. margin-right re-creates the detail
+     header's 24px right padding (this column self-pads). */
+  align-self: start;
+  min-height: 90px;
+  padding: 24px 0 16px;
   margin-right: 24px;
 }
 .public-pane[data-public-mode="channels"] .public-header-actions .install-header-button {
