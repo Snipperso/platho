@@ -1551,6 +1551,7 @@ html[data-platho-telegram="true"] .install-header-button {
    of the full-width feed header. align-self centers it vertically on that row (no pixel guessing). install is
    dropped in Channels mode (the menu is Feed/Channels + info). */
 .public-pane .public-header-actions {
+  grid-column: 1;
   grid-row: 1;
   justify-self: end;
   align-self: center;
