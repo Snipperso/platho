@@ -1556,29 +1556,22 @@ html[data-platho-telegram="true"] .install-header-button {
    detail header's row, exactly where the Private conversation header's buttons sit. In Feed mode it sits top-right
    of the full-width feed header. align-self centers it vertically on that row (no pixel guessing). install is
    dropped in Channels mode (the menu is Feed/Channels + info). */
+/* The Feed/Channels/info menu is pinned to the SAME top-right spot in BOTH modes: absolutely positioned against the
+   pane (.public-pane is position:relative) and vertically centred on the header line (≈49px from the pane top — where
+   the pane-header title and, in Channels mode, the channel-detail name sit). Pinning it identically in Feed and
+   Channels guarantees the toggle text lands at the exact same y in both — no per-mode grid box that rounds 1px off. */
 .public-pane .public-header-actions {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: end;
-  align-self: center;
+  position: absolute;
+  top: 49px;
+  right: 24px;
+  transform: translateY(-50%);
   z-index: 3;
 }
-/* Pin the (title-only) pane header to row 1 too, so the menu (also row 1) shares the row instead of pushing the
-   title to row 2 — in Feed mode they share column 1 (title left, menu right); in Channels mode the menu is column 2. */
+/* Pin the (title-only) pane header to row 1, column 1 (the menu is absolutely positioned and out of flow, so it
+   neither shares nor disturbs this cell). */
 .public-pane .pane-header {
   grid-column: 1;
   grid-row: 1;
-}
-.public-pane[data-public-mode="channels"] .public-header-actions {
-  grid-column: 2;
-  /* Give the menu the SAME vertical box as the channel-detail header (.conversation-header: min-height 90 + padding
-     24/16) and align it to the top of the row, so align-items:center centers the buttons on exactly the same line as
-     the avatar + channel name — like the Private conversation header's buttons. margin-right re-creates the detail
-     header's 24px right padding (this column self-pads). */
-  align-self: start;
-  min-height: 90px;
-  padding: 24px 0 16px;
-  margin-right: 24px;
 }
 .public-pane[data-public-mode="channels"] .public-header-actions .install-header-button {
   display: none;
@@ -3534,11 +3527,6 @@ button.feed-item:hover {
 
   .public-pane[data-public-mode="channels"] .pane-header {
     padding: 0;
-  }
-
-  /* Single column on mobile — keep the menu in column 1 (the desktop column-2 placement has no column 2 here). */
-  .public-pane[data-public-mode="channels"] .public-header-actions {
-    grid-column: 1;
   }
 
   .public-pane[data-public-mode="channels"] .public-channel-search-row {
