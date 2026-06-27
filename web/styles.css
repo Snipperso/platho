@@ -1549,6 +1549,16 @@ html[data-platho-telegram="true"] .install-header-button {
   display: none;
 }
 
+/* The Feed/Channels/info MENU belongs in the top-right corner — where every other tab's header menu sits — not
+   crammed into the narrow channels-list column. Float it out of the (column-1) pane header to the pane's top-right,
+   on the detail header's row, so the left column is just the "Platho.app" title (full, like the Private list pane). */
+.public-pane[data-public-mode="channels"] .public-header-actions {
+  position: absolute;
+  top: 26px;
+  right: 24px;
+  z-index: 2;
+}
+
 .public-pane[data-public-mode="channels"] .public-channel-search-row {
   grid-column: 1;
   grid-row: 2;
@@ -3499,6 +3509,11 @@ button.feed-item:hover {
 
   .public-pane[data-public-mode="channels"] .pane-header {
     padding: 0;
+  }
+
+  /* The desktop top-right floating menu does not apply on mobile (single column, inline pane header). */
+  .public-pane[data-public-mode="channels"] .public-header-actions {
+    position: static;
   }
 
   .public-pane[data-public-mode="channels"] .public-channel-search-row {
