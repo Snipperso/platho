@@ -1528,9 +1528,25 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .public-pane[data-public-mode="channels"] .pane-header {
-  grid-column: 1 / -1;
+  /* Column 1 ONLY (the channels-list column), so the channel-detail header in column 2 sits on the SAME top row
+     as the Feed/Channels toggle — like the Private list-pane + conversation headers, which are top-aligned. */
+  grid-column: 1;
   grid-row: 1;
   padding: 24px 24px 0;
+}
+
+/* The narrow list column must keep the title + Feed/Channels toggle + info on ONE line (so the toggle stays on the
+   detail header's row). Let the title shrink first; drop the install button here (it stays on the Feed view). */
+.public-pane[data-public-mode="channels"] .pane-header .pane-title-block {
+  min-width: 0;
+}
+.public-pane[data-public-mode="channels"] .pane-header h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.public-pane[data-public-mode="channels"] .pane-header .install-header-button {
+  display: none;
 }
 
 .public-pane[data-public-mode="channels"] .public-channel-search-row {
@@ -1619,7 +1635,8 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .public-pane[data-public-mode="channels"] .public-channel-detail {
   grid-column: 2;
-  grid-row: 2 / 4;
+  /* From row 1 (the pane-header's row) so the detail header is top-aligned with the Feed/Channels toggle. */
+  grid-row: 1 / 4;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
