@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v536';
+const PLATHO_APP_RUNTIME_VERSION = 'v537';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3312,11 +3312,12 @@ function messageAutoSyncCountdownText() {
 }
 
 function conversationSubtitleText() {
-  // The conversation-header subtitle is the message-sync status ONLY (Syncing…/✓ Synced/Sync delayed), exactly like
-  // the Public channel-detail header. Do NOT fall back to the thread's identity-type label ("Platho NFT", "wallet",
-  // TON DNS, …): it's redundant with the name above it and surfaces as a stray tag whenever the sync status is
-  // momentarily unavailable (background wallet-lock, the pre-first-sync idle frame). Blank in those gaps is correct.
-  return messageAutoSyncCountdownText() ?? '';
+  // The conversation-header subtitle is the message-sync status ONLY (Syncing…/✓ Synced/Sync delayed), like the
+  // Public channel-detail header — never the thread's identity-type label ("Platho NFT", "wallet", TON DNS, …),
+  // which is redundant with the name above it. The status must be present at ALL times: in the brief gaps where it
+  // isn't known yet (the pre-first-sync 'idle'/'scheduled' frame; the post-reload wallet/key load) default to
+  // "Syncing…" instead of a blank that only pops in a beat later — the resting state resolves to ✓ Synced on its own.
+  return messageAutoSyncCountdownText() ?? 'Syncing…';
 }
 
 // The public channel-detail header subtitle — same sync wording as a Private conversation (Syncing…/✓ Synced/
