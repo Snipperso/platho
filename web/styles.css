@@ -3346,7 +3346,9 @@ button.feed-item:hover {
   }
 
   .header-actions {
-    gap: 6px;
+    /* Match the desktop 8px gap so the menu buttons sit the same distance apart in both views (mobile's 6px set
+       them a couple of pixels closer). */
+    gap: 8px;
     min-width: max-content;
   }
 
