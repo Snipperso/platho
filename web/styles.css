@@ -1545,18 +1545,28 @@ html[data-platho-telegram="true"] .install-header-button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.public-pane[data-public-mode="channels"] .pane-header .install-header-button {
-  display: none;
+/* The Feed/Channels/info menu is a direct child of the pane (moved out of the pane header), placed as ONE unit at
+   the top-right. In Channels mode it sits in column 2's top-right corner — the real top-right of the window, on the
+   detail header's row, exactly where the Private conversation header's buttons sit. In Feed mode it sits top-right
+   of the full-width feed header. align-self centers it vertically on that row (no pixel guessing). install is
+   dropped in Channels mode (the menu is Feed/Channels + info). */
+.public-pane .public-header-actions {
+  grid-row: 1;
+  justify-self: end;
+  align-self: center;
+  z-index: 3;
 }
-
-/* The Feed/Channels/info MENU belongs in the top-right corner — where every other tab's header menu sits — not
-   crammed into the narrow channels-list column. Float it out of the (column-1) pane header to the pane's top-right,
-   on the detail header's row, so the left column is just the "Platho.app" title (full, like the Private list pane). */
+/* Pin the (title-only) pane header to row 1 too, so the menu (also row 1) shares the row instead of pushing the
+   title to row 2 — in Feed mode they share column 1 (title left, menu right); in Channels mode the menu is column 2. */
+.public-pane .pane-header {
+  grid-column: 1;
+  grid-row: 1;
+}
 .public-pane[data-public-mode="channels"] .public-header-actions {
-  position: absolute;
-  top: 26px;
-  right: 24px;
-  z-index: 2;
+  grid-column: 2;
+}
+.public-pane[data-public-mode="channels"] .public-header-actions .install-header-button {
+  display: none;
 }
 
 .public-pane[data-public-mode="channels"] .public-channel-search-row {
@@ -3511,9 +3521,9 @@ button.feed-item:hover {
     padding: 0;
   }
 
-  /* The desktop top-right floating menu does not apply on mobile (single column, inline pane header). */
+  /* Single column on mobile — keep the menu in column 1 (the desktop column-2 placement has no column 2 here). */
   .public-pane[data-public-mode="channels"] .public-header-actions {
-    position: static;
+    grid-column: 1;
   }
 
   .public-pane[data-public-mode="channels"] .public-channel-search-row {
