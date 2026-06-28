@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v542';
+const PLATHO_APP_RUNTIME_VERSION = 'v543';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11498,6 +11498,12 @@ function renderThreads() {
     });
 }
 
+// Conversation scroll memory. Jump to the latest messages ONLY when opening a chat (instant) or when the user
+// sends a new outbound message (smooth). Every other re-render — background message sync, send-status changes,
+// a newly received message — keeps the reader exactly where they were instead of yanking the view to the bottom.
+let lastConversationThreadId = null;
+let lastConversationMsgCount = 0;
+
 function renderConversation() {
   const thread = activeThread();
   if (!thread) {
@@ -11522,6 +11528,8 @@ function renderConversation() {
     if (privateComposerAddButton) privateComposerAddButton.disabled = true;
     if (privateAnonymousButton) privateAnonymousButton.disabled = true;
     if (privateImageModeSelect) privateImageModeSelect.disabled = true;
+    lastConversationThreadId = null;
+    lastConversationMsgCount = 0;
     return;
   }
   setAvatarNode(activeAvatar, thread.avatar, thread.avatarImageUrl);
@@ -11530,6 +11538,9 @@ function renderConversation() {
   }
   renderConversationIdentity(thread);
   activeSubtitle.textContent = conversationSubtitleText(thread);
+  // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
+  const prevConversationScrollTop = messageStrip.scrollTop;
+  const conversationThreadChanged = thread.id !== lastConversationThreadId;
   messageStrip.innerHTML = '';
   const isReadOnly = thread.readOnly === true;
   const canEditPrivateDraft = canEditPrivateComposerDraft(thread);
@@ -11551,6 +11562,14 @@ function renderConversation() {
   refreshPrivateSendButtonState();
   updatePrivateSenderModeUi();
   sortThreadMessages(thread);
+  // A fresh outbound message at the tail (the user just sent) is the only re-render that smooth-scrolls to the end.
+  const conversationMsgCount = thread.messages.length;
+  const conversationLastMsg = thread.messages[conversationMsgCount - 1];
+  const conversationNewOutbound = !conversationThreadChanged
+    && conversationMsgCount > lastConversationMsgCount
+    && conversationLastMsg?.type === 'out';
+  lastConversationThreadId = thread.id;
+  lastConversationMsgCount = conversationMsgCount;
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
@@ -11723,7 +11742,16 @@ function renderConversation() {
   });
 
   requestAnimationFrame(() => {
-    messageStrip.scrollTop = messageStrip.scrollHeight;
+    if (conversationThreadChanged) {
+      // Opening a chat — land on the latest messages (instant, no long animation).
+      messageStrip.scrollTop = messageStrip.scrollHeight;
+    } else if (conversationNewOutbound) {
+      // The user just sent — scroll their message into view, as a scroll rather than a sudden jump.
+      messageStrip.scrollTo({ top: messageStrip.scrollHeight, behavior: 'smooth' });
+    } else {
+      // Background sync / status change / received message — keep the reader where they were.
+      messageStrip.scrollTop = prevConversationScrollTop;
+    }
   });
 }
 
