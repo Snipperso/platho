@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v553';
+const PLATHO_APP_RUNTIME_VERSION = 'v554';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -12471,7 +12471,12 @@ composer?.addEventListener('submit', async (event) => {
   const text = messageInput.value.trim();
   const attachments = normalizePrivateImageAttachments(privateImageAttachments);
   const paymentDraft = privatePaymentCheckDraft;
-  if (!text && attachments.length === 0 && !paymentDraft) return;
+  if (!text && attachments.length === 0 && !paymentDraft) {
+    // Empty submit (e.g. an accidental Send click with nothing typed) — return focus to the input so the user can
+    // just start typing, the same as after a real send.
+    messageInput?.focus();
+    return;
+  }
   const thread = threads.find((item) => item.id === activeThreadId) ?? threads[0];
   if (!thread) return;
   if (thread.readOnly) {
