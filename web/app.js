@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v566';
+const PLATHO_APP_RUNTIME_VERSION = 'v567';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -13824,18 +13824,39 @@ async function requestUsernameMintName() {
       }],
       summary: (values) => {
         const raw = values.username?.trim() || 'not set';
-        return [
+        const lines = [
           { label: 'Display', value: raw.endsWith('.ath') ? raw : `${raw}.ath` },
           { label: 'ATH price', value: usernameMintPricePreview(raw) },
-          { label: 'GRAM hold', value: `up to ${formatTonNanotons(estimatedUsernameMintTonFeeNanotons())} GRAM from Vault` },
-          { label: 'Route', value: 'Vault' },
         ];
+        // Show the live ATH balance + an affordability flag — but only when the Vault user (hence the balance)
+        // is actually loaded, so we never claim "not enough" against an unknown balance.
+        if (currentVaultUserSource()) {
+          let priceAtomic = null;
+          try { priceAtomic = localUsernameMintPriceAtomic(normalizeUsernameInput(raw)); } catch { priceAtomic = null; }
+          const athBalance = currentAthBalanceAtomic();
+          const short = priceAtomic !== null && athBalance < priceAtomic;
+          lines.push({ label: 'Your ATH', value: `${formatAthAtomic(athBalance)} ATH${short ? ' — not enough' : ''}` });
+        }
+        lines.push({ label: 'GRAM hold', value: `up to ${formatTonNanotons(estimatedUsernameMintTonFeeNanotons())} GRAM from Vault` });
+        lines.push({ label: 'Route', value: 'Vault' });
+        return lines;
       },
     });
     if (!result) return null;
     usernameValue = result.username;
     try {
-      return normalizeUsernameInput(result.username);
+      const username = normalizeUsernameInput(result.username);
+      // Up-front ATH affordability gate: don't let the user proceed to review/mint a name they can't pay for
+      // (price is by length: 6+ chars = 100 ATH, 5 = 1000, 4 = 10000; <4 already rejected above). Only enforced
+      // when the Vault user/balance is loaded; otherwise defer to the authoritative mint-time check.
+      const priceAtomic = localUsernameMintPriceAtomic(username);
+      if (priceAtomic !== null && currentVaultUserSource()) {
+        const athBalance = currentAthBalanceAtomic();
+        if (athBalance < priceAtomic) {
+          throw new Error(`Insufficient ATH: ${username}.ath costs ${formatAthAtomic(priceAtomic)} ATH, you have ${formatAthAtomic(athBalance)} — top up ATH in Vault`);
+        }
+      }
+      return username;
     } catch (error) {
       feedback = error.message;
       tone = 'error';

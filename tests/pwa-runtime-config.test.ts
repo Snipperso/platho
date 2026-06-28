@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v566<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v566'/);
+    expect(html).toMatch(/id="appVersionLabel">v567<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v567'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -2340,6 +2340,27 @@ describe('PWA runtime config guard', () => {
     expect(linkSource).toMatch(/id: 'pick',\s*\n\s*type: 'select'/);
     expect(linkSource).toMatch(/await verifyWalletDisplayIdentity\(normalizedMode, value, plathoWallet\)/);
     expect(linkSource).toMatch(/addKnownPlathoUsername\(verified\.label, plathoWallet\?\.address\)/);
+  });
+
+  it('PWA-MINT-ATH-PREFLIGHT-01: Mint Platho name validates length and ATH affordability up front', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // Length-based price is the owner's spec (4 chars = 10000 ATH, 5 = 1000, 6+ = 100; <4 rejected).
+    expect(app).toMatch(/const USERNAME_PRICE_4_CHARS_ATOMIC = 10_000_000_000_000n/);
+    expect(app).toMatch(/const USERNAME_PRICE_5_CHARS_ATOMIC = 1_000_000_000_000n/);
+    expect(app).toMatch(/const USERNAME_PRICE_6_PLUS_CHARS_ATOMIC = 100_000_000_000n/);
+    expect(app).toMatch(/\/\^\[a-z0-9_-\]\{4,16\}\$\//); // normalizeUsernameInput enforces >= 4 chars
+    const mintSource = app.slice(
+      app.indexOf('async function requestUsernameMintName'),
+      app.indexOf('function avatarCompressionOptions'),
+    );
+    // Up-front affordability gate: compare the length-based price to the live ATH balance and block before review,
+    // only when the Vault user/balance is loaded (no false "not enough" against an unknown balance).
+    expect(mintSource).toMatch(/const priceAtomic = localUsernameMintPriceAtomic\(username\)/);
+    expect(mintSource).toMatch(/priceAtomic !== null && currentVaultUserSource\(\)/);
+    expect(mintSource).toMatch(/athBalance < priceAtomic/);
+    expect(mintSource).toMatch(/Insufficient ATH/);
+    // The summary surfaces the live ATH balance with a "not enough" flag.
+    expect(mintSource).toMatch(/label: 'Your ATH'/);
   });
 
   it('PWA-VAULT-ATH-DEPOSIT-PREFLIGHT-01: Vault ATH deposit preflights Vault ATHMaster and official wallet route', () => {
@@ -4830,11 +4851,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v637/);
+    expect(sw).toMatch(/platho-pwa-prototype-v638/);
     expect(sw).toMatch(/\.\/styles\.css\?v=185/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=566/);
+    expect(sw).toMatch(/\.\/app\.js\?v=567/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
