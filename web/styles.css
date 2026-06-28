@@ -3364,13 +3364,15 @@ button.feed-item:hover {
     display: none;
   }
 
+  /* Keep the Feed/Channels toggle at its canonical 34px on mobile too (matching desktop + the info button beside
+     it), so the Public header menu stays the same size as the Private conversation header menu. */
   .segmented-control {
-    min-height: 38px;
+    min-height: 34px;
   }
 
   .segmented-control button {
-    height: 38px;
-    min-height: 38px;
+    height: 34px;
+    min-height: 34px;
   }
 
   .conversation-header {
@@ -3417,11 +3419,13 @@ button.feed-item:hover {
     display: none;
   }
 
-  /* Keep the conversation-header menu buttons at their canonical compact 34px on mobile too — the generic 38px
-     .icon-button touch size above is for the composer/send controls. This makes the menu buttons the SAME size as
-     on desktop (they were the lone 38px buttons that looked oversized when the layout went narrow). */
-  .conversation-header .identity-menu-button,
-  .conversation-header .docs-header-button {
+  /* All canonical header menu buttons stay at their compact 34px on mobile too (matching desktop) — the generic 38px
+     .icon-button touch size above is for the composer/send controls. Without this they were the lone 38px buttons,
+     oversized vs desktop when the layout went narrow: the conversation chevron + info, the Public Feed view's info,
+     the list-pane install/docs. */
+  .identity-menu-button,
+  .docs-header-button,
+  .install-header-button {
     width: 34px;
     height: 34px;
   }
