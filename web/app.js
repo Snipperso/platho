@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v557';
+const PLATHO_APP_RUNTIME_VERSION = 'v558';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -7762,10 +7762,11 @@ function relocateExistingCapsuleMessage(existing, targetThread) {
       if (sourceThread.localLabel && !targetThread.localLabel) {
         targetThread.localLabel = sourceThread.localLabel;
       } else if (!targetThread.localLabel) {
-        const sourceDisplay = sourceThread.displayIdentity ?? primaryThreadIdentity(sourceThread);
-        if (sourceDisplay && sourceDisplay.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
-          targetThread.displayIdentity = sourceDisplay;
-        }
+        // Adopt the username the merged dialog actually represented — a NAMED identity from its variants (which now
+        // include it), not its possibly-stale/hydrated displayIdentity — so the survivor shows e.g. "support" instead
+        // of reverting to "platho".
+        const namedVariant = sourceVariants.find((variant) => variant && variant.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS);
+        if (namedVariant) targetThread.displayIdentity = namedVariant;
       }
       applyThreadDisplayFields(targetThread);
       syncThreadDisplayToContactStore(targetThread);
