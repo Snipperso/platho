@@ -256,8 +256,8 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
 
     expect(html).not.toMatch(/aria-label="Call"|aria-label="More"|aria-label="Attach"/);
-    expect(html).toMatch(/id="appVersionLabel">v560<\/span>/);
-    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v560'/);
+    expect(html).toMatch(/id="appVersionLabel">v561<\/span>/);
+    expect(app).toMatch(/const PLATHO_APP_RUNTIME_VERSION = 'v561'/);
     expect(app).toMatch(/setText\(appVersionLabel, PLATHO_APP_RUNTIME_VERSION\)/);
     expect(css).toMatch(/\.app-version-label/);
     expect(css).toMatch(/\.message\.out \.bubble\s*\{[\s\S]*?justify-self: end;/);
@@ -4745,8 +4745,10 @@ describe('PWA runtime config guard', () => {
     // It is pinned right in the compact author row (margin-left:auto, clean square so the chevron centres).
     expect(css).toMatch(/\.feed-author-identity \{[\s\S]*?margin-left: auto;[\s\S]*?padding: 0;/);
     expect(css).not.toMatch(/\.feed-actions \.icon-button/);
-    // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read).
-    expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)\)[\s\S]*?readLinkedPlathoUsername\(plathoWallet\.address\)\?\.label/);
+    // 6B-own. The user's OWN .ath shows in their own public channel (local, no chain read). Resolved FIRST and via
+    // the stored address (so it works before the wallet loads and isn't shadowed by a stray self-entry in the store).
+    expect(app).toMatch(/const ownAddress = plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address \?\? null/);
+    expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, ownAddress\)\)[\s\S]*?readLinkedPlathoUsername\(ownAddress\)\?\.label/);
     // 6B phase-1: PUBLIC document decode is forward-compat tolerant (skips unknown blocks) so a later phase can
     // embed an author-.ath block without breaking already-updated clients; PRIVATE decode stays STRICT.
     expect(app).toMatch(/function decodeMessageDocumentBlocks\(bytesLike, options = \{\}\)/);
@@ -4760,11 +4762,11 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v631/);
+    expect(sw).toMatch(/platho-pwa-prototype-v632/);
     expect(sw).toMatch(/\.\/styles\.css\?v=185/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=560/);
+    expect(sw).toMatch(/\.\/app\.js\?v=561/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);

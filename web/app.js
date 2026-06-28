@@ -160,7 +160,7 @@ import {
 import { createQrSvgDataUrl } from './qr-code.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
-const PLATHO_APP_RUNTIME_VERSION = 'v560';
+const PLATHO_APP_RUNTIME_VERSION = 'v561';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2144,13 +2144,14 @@ function resolveContactDisplay(counterpartyWallet) {
 // the matching Private dialog's CURRENT display (so a chat started via an .ath name shows that name in
 // Public too, even with no explicit choice). Returns null to keep the default short-address name.
 function resolveWalletChannelDisplay(counterpartyWallet) {
-  const explicit = resolveContactDisplay(counterpartyWallet);
-  if (explicit) return explicit;
-  // Own wallet: show the user's OWN .ath in their own public channel (feed name + channels list), parity with
-  // the Profile header. The own username is known locally (readLinkedPlathoUsername, verified at mint) — no
-  // chain read, no verification needed. An explicit manual choice above still wins.
-  if (plathoWallet?.address && sameWalletAddress(counterpartyWallet, plathoWallet.address)) {
-    const ownLabel = readLinkedPlathoUsername(plathoWallet.address)?.label;
+  // Own wallet FIRST: the user's own public channel (feed author name + channels list + their own posts) shows
+  // their OWN .ath / profile NFT choice — parity with the Profile header. Known locally (readLinkedPlathoUsername,
+  // verified at mint) so no chain read. Resolved via the address persisted in storage so it works before the full
+  // wallet finishes loading, and BEFORE the per-counterparty store so a stray self-entry (only writable via the
+  // old pre-wallet-load flash, now fixed) can't pin your own channel to the bare wallet address.
+  const ownAddress = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  if (ownAddress && sameWalletAddress(counterpartyWallet, ownAddress)) {
+    const ownLabel = readLinkedPlathoUsername(ownAddress)?.label;
     const ownIdentity = ownLabel ? plathoUsernameIdentity(ownLabel) : null;
     if (ownIdentity) {
       return {
@@ -2161,6 +2162,8 @@ function resolveWalletChannelDisplay(counterpartyWallet) {
       };
     }
   }
+  const explicit = resolveContactDisplay(counterpartyWallet);
+  if (explicit) return explicit;
   const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
   if (thread) {
     const name = threadDisplayLabel(thread);
